@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::super::{get_finite_node_value, sum_nodes};
+use finstack_quant_statements::checks::{get_finite_node_value, sum_nodes};
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Materiality, Severity,
 };

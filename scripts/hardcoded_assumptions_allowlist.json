@@ -1394,12 +1394,6 @@
       "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
     },
     {
-      "path": "finstack-quant/statements-analytics/src/analysis/ecl/engine.rs",
-      "category": "credit_assumption",
-      "contains": "Error::Validation(\"At least one PD source is required for EclEngine\".to_string())",
-      "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."
-    },
-    {
       "path": "finstack-quant/statements-analytics/src/analysis/ecl/types.rs",
       "category": "credit_assumption",
       "contains": "\"Exposure '{}': LGD must be finite and in [0, 1] (got {})\",",

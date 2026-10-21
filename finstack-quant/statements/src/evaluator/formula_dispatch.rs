@@ -251,12 +251,14 @@ fn finite_arg_values(
     // hide an upstream problem — surface the count as a warning.
     if dropped > 0 {
         if let Some(id) = node_id {
-            context.push_warning(crate::evaluator::EvalWarning::NonFiniteSkipped {
-                node_id: id.to_string(),
-                period: context.period_id,
-                function: function.to_string(),
-                count: dropped,
-            });
+            context
+                .warnings
+                .push(crate::evaluator::EvalWarning::NonFiniteSkipped {
+                    node_id: id.to_string(),
+                    period: context.period_id,
+                    function: function.to_string(),
+                    count: dropped,
+                });
         }
     }
     Ok(values)

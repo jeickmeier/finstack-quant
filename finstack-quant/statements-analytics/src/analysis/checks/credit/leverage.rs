@@ -2,8 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::super::get_finite_node_value;
 use crate::analysis::reports::trailing_sum_at;
+use finstack_quant_statements::checks::get_finite_node_value;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Materiality, Severity,
 };

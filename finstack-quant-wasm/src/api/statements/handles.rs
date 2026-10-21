@@ -110,7 +110,7 @@ impl JsEvaluator {
             FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
         let market: finstack_quant_core::market_data::context::MarketContext =
             from_js_json(&market, "market")?;
-        let as_of = crate::utils::parse_iso_date(&js_string(&as_of, "asOf")?)?;
+        let as_of = crate::utils::wire::js_date(&as_of, "asOf")?;
         to_js_value(
             &self
                 .inner

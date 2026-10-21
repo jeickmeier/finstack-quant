@@ -1,7 +1,7 @@
 //! Dynamic registry integration tests.
 #![allow(clippy::expect_used, clippy::panic)]
 
-use finstack_quant_statements::registry::dynamic::Registry;
+use finstack_quant_statements::registry::Registry;
 
 #[test]
 fn test_load_from_json_str() {

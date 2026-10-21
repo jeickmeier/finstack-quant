@@ -528,11 +528,6 @@ impl<'a> CeclEngine<'a> {
             f64::INFINITY
         })
     }
-
-    /// Access the engine's configuration.
-    pub fn config(&self) -> &CeclConfig {
-        &self.config
-    }
 }
 
 #[cfg(test)]

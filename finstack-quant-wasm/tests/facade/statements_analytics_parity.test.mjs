@@ -71,7 +71,7 @@ test('statements_analytics matches the cross-host golden', () => {
   const dcf = sa.evaluateDcf(
     dcfBuilder.build(),
     0.1,
-    sa.terminalValueSpecGordonGrowth(0.02),
+    { type: 'gordon_growth', stable_growth_rate: 0.02 },
     undefined,
     0.0
   );
@@ -142,9 +142,9 @@ test('statements_analytics matches the cross-host golden', () => {
       equity: corporate.equity,
     },
     terminal_specs: [
-      sa.terminalValueSpecGordonGrowth(0.02),
-      sa.terminalValueSpecExitMultiple(8.5, 0.0),
-      sa.terminalValueSpecHModel(0.08, 0.02, 5.0),
+      { type: 'gordon_growth', stable_growth_rate: 0.02 },
+      { type: 'exit_multiple', multiple: 8.5, terminal_metric: 0.0 },
+      { type: 'h_model', high_growth_rate: 0.08, stable_growth_rate: 0.02, half_life_years: 5.0 },
     ],
     scenario_diff: sa.scenarioDiff(scenarioSet, scenarioResults, 'base', 'down', ['profit'], [Q2]),
     variance_bridge: sa.varianceBridge(result, down, 'profit', Q2, ['revenue'], 'base', 'down'),
@@ -164,12 +164,13 @@ test('statements_analytics matches the cross-host golden', () => {
       .peerSetFromUniverse(INPUTS.subject, INPUTS.universe, INPUTS.peer_filter, 'ltm')
       .peers.map((row) => row.id),
     sensitivity: {
-      config: sa.sensitivityConfigAddParameter(INPUTS.sensitivity_config, {
-        node_id: 'cogs',
-        period_id: Q2,
-        base_value: 50.0,
-        perturbations: [45.0, 55.0],
-      }),
+      config: {
+        ...INPUTS.sensitivity_config,
+        parameters: [
+          ...INPUTS.sensitivity_config.parameters,
+          { node_id: 'cogs', period_id: Q2, base_value: 50.0, perturbations: [45.0, 55.0] },
+        ],
+      },
       parameter_value: orNull(
         sa.sensitivityResultGetParameterValue(sensitivity, 0, `revenue@${Q2}`)
       ),
@@ -201,14 +202,14 @@ test('statements_analytics matches the cross-host golden', () => {
       gordon_growth: sa.dcfSensitivity(
         INPUTS.dcf_model,
         0.1,
-        sa.terminalValueSpecGordonGrowth(0.02),
+        { type: 'gordon_growth', stable_growth_rate: 0.02 },
         'ufcf',
         0.0
       ),
       exit_multiple: sa.dcfSensitivity(
         INPUTS.dcf_model,
         0.1,
-        sa.terminalValueSpecExitMultiple(8.0, 999.0),
+        { type: 'exit_multiple', multiple: 8.0, terminal_metric: 999.0 },
         'ufcf',
         0.0,
         { exit_multiple_metric_node: 'ebitda' }

@@ -8,20 +8,16 @@
 //! the canonical Rust builder, applies the template, and returns a typed model
 //! while preserving metadata and capital structure.
 
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe, serde_object_to_single_row_dataframe_with_schema,
 };
+use crate::bindings::statements::parse_period_id;
 use crate::bindings::statements::types::PyFinancialModelSpec;
-use crate::errors::display_to_py;
-use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements_analytics::templates::real_estate as rust_re;
 use pyo3::prelude::*;
 
 use super::templates_common::{extract_builder, finish_builder};
-
-fn parse_period(s: &str) -> PyResult<PeriodId> {
-    s.parse().map_err(crate::errors::core_to_py)
-}
 
 /// Rent step that resets the base rent starting at ``start`` (inclusive).
 #[pyclass(
@@ -40,7 +36,7 @@ impl PyRentStepSpec {
     fn new(start: &str, rent: f64) -> PyResult<Self> {
         Ok(Self {
             inner: rust_re::RentStepSpec {
-                start: parse_period(start)?,
+                start: parse_period_id(start)?,
                 rent,
             },
         })
@@ -61,26 +57,6 @@ impl PyRentStepSpec {
         self.inner.rent
     }
 
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: rust_re::RentStepSpec = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -90,6 +66,8 @@ impl PyRentStepSpec {
         crate::bindings::repr_support::repr_from_serde("RentStepSpec", &self.inner)
     }
 }
+
+wire_methods!(PyRentStepSpec, rust_re::RentStepSpec, "RentStepSpec");
 
 /// Free rent (concession) window that zeros out rent for ``periods`` starting at ``start``.
 #[pyclass(
@@ -108,7 +86,7 @@ impl PyFreeRentWindowSpec {
     fn new(start: &str, periods: u32) -> PyResult<Self> {
         Ok(Self {
             inner: rust_re::FreeRentWindowSpec {
-                start: parse_period(start)?,
+                start: parse_period_id(start)?,
                 periods,
             },
         })
@@ -126,27 +104,6 @@ impl PyFreeRentWindowSpec {
         self.inner.periods
     }
 
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: rust_re::FreeRentWindowSpec =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -156,6 +113,12 @@ impl PyFreeRentWindowSpec {
         crate::bindings::repr_support::repr_from_serde("FreeRentWindowSpec", &self.inner)
     }
 }
+
+wire_methods!(
+    PyFreeRentWindowSpec,
+    rust_re::FreeRentWindowSpec,
+    "FreeRentWindowSpec"
+);
 
 /// Renewal specification modeled in expected-value terms.
 #[pyclass(
@@ -244,37 +207,6 @@ impl PyRenewalSpec {
         serde_object_to_single_row_dataframe(py, &self.inner)
     }
 
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: rust_re::RenewalSpec = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -284,6 +216,9 @@ impl PyRenewalSpec {
         crate::bindings::repr_support::repr_from_serde("RenewalSpec", &self.inner)
     }
 }
+
+wire_methods!(PyRenewalSpec, rust_re::RenewalSpec, "RenewalSpec");
+impl_repr_html_via_dataframe!(PyRenewalSpec);
 
 /// Compounding convention for lease rent growth.
 #[pyclass(
@@ -380,8 +315,8 @@ impl PyLeaseSpec {
     ) -> PyResult<Self> {
         let inner = rust_re::LeaseSpec {
             node_id: node_id.to_string(),
-            start: parse_period(start)?,
-            end: end.map(parse_period).transpose()?,
+            start: parse_period_id(start)?,
+            end: end.map(parse_period_id).transpose()?,
             base_rent,
             growth_rate,
             growth_convention: growth_convention.to_rust()?,
@@ -513,37 +448,6 @@ impl PyLeaseSpec {
         )
     }
 
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: rust_re::LeaseSpec = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -553,6 +457,9 @@ impl PyLeaseSpec {
         crate::bindings::repr_support::repr_from_serde("LeaseSpec", &self.inner)
     }
 }
+
+wire_methods!(PyLeaseSpec, rust_re::LeaseSpec, "LeaseSpec");
+impl_repr_html_via_dataframe!(PyLeaseSpec);
 
 /// Standard aggregated output node ids for a rent roll.
 #[pyclass(
@@ -626,38 +533,6 @@ impl PyRentRollOutputNodes {
         serde_object_to_single_row_dataframe(py, &self.inner)
     }
 
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: rust_re::RentRollOutputNodes =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -667,6 +542,13 @@ impl PyRentRollOutputNodes {
         crate::bindings::repr_support::repr_from_serde("RentRollOutputNodes", &self.inner)
     }
 }
+
+wire_methods!(
+    PyRentRollOutputNodes,
+    rust_re::RentRollOutputNodes,
+    "RentRollOutputNodes"
+);
+impl_repr_html_via_dataframe!(PyRentRollOutputNodes);
 
 /// Basis for management fee calculation.
 #[pyclass(
@@ -757,27 +639,6 @@ impl PyManagementFeeSpec {
         PyManagementFeeBase::from_rust(self.inner.base)
     }
 
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: rust_re::ManagementFeeSpec =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -787,6 +648,12 @@ impl PyManagementFeeSpec {
         crate::bindings::repr_support::repr_from_serde("ManagementFeeSpec", &self.inner)
     }
 }
+
+wire_methods!(
+    PyManagementFeeSpec,
+    rust_re::ManagementFeeSpec,
+    "ManagementFeeSpec"
+);
 
 /// Standard node ids for the full property operating-statement template.
 #[pyclass(
@@ -931,38 +798,6 @@ impl PyPropertyTemplateNodes {
         )
     }
 
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: rust_re::PropertyTemplateNodes =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -972,6 +807,13 @@ impl PyPropertyTemplateNodes {
         crate::bindings::repr_support::repr_from_serde("PropertyTemplateNodes", &self.inner)
     }
 }
+
+wire_methods!(
+    PyPropertyTemplateNodes,
+    rust_re::PropertyTemplateNodes,
+    "PropertyTemplateNodes"
+);
+impl_repr_html_via_dataframe!(PyPropertyTemplateNodes);
 
 // add_noi_buildup
 

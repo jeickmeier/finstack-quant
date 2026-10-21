@@ -39,7 +39,6 @@ VARIANCE_COLUMNS = [
     "comparison",
     "abs_var",
     "pct_var",
-    "driver_contribution",
 ]
 
 

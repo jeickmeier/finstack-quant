@@ -80,46 +80,6 @@ pub enum Multiple {
     YieldPerCoverage,
 }
 
-impl Multiple {
-    /// Returns true if this is an enterprise-value-based multiple.
-    pub fn is_ev_multiple(&self) -> bool {
-        matches!(
-            self,
-            Self::EvEbitda | Self::EvRevenue | Self::EvEbit | Self::EvFcf
-        )
-    }
-
-    /// Returns true if this is an equity-based multiple.
-    pub fn is_equity_multiple(&self) -> bool {
-        matches!(
-            self,
-            Self::Pe | Self::Pb | Self::Ptbv | Self::PFcf | Self::DividendYield
-        )
-    }
-
-    /// Returns true if this is a credit-specific multiple.
-    pub fn is_credit_multiple(&self) -> bool {
-        matches!(self, Self::SpreadPerTurn | Self::YieldPerCoverage)
-    }
-
-    /// Human-readable short label.
-    pub fn label(&self) -> &'static str {
-        match self {
-            Self::EvEbitda => "EV/EBITDA",
-            Self::EvRevenue => "EV/Revenue",
-            Self::EvEbit => "EV/EBIT",
-            Self::EvFcf => "EV/FCF",
-            Self::Pe => "P/E",
-            Self::Pb => "P/B",
-            Self::Ptbv => "P/TBV",
-            Self::PFcf => "P/FCF",
-            Self::DividendYield => "Div Yield",
-            Self::SpreadPerTurn => "Spread/Turn",
-            Self::YieldPerCoverage => "Yield/Coverage",
-        }
-    }
-}
-
 impl FromStr for Multiple {
     type Err = String;
 

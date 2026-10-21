@@ -4,7 +4,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
-use finstack_quant_statements::builder::{ModelBuilder, NeedPeriods, Ready};
+use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::types::FinancialStatementInstrument;
 use finstack_quant_valuations::instruments::RevolvingCredit;
 use time::Month;
@@ -14,7 +14,7 @@ fn test_add_bond() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
     let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("valid date");
 
-    let builder = ModelBuilder::<NeedPeriods>::new("test")
+    let builder = ModelBuilder::new("test")
         .periods("2025Q1..2025Q2", None)
         .expect("valid period range")
         .add_bond(
@@ -41,8 +41,8 @@ fn test_add_bond() {
     ));
 }
 
-fn swap_in(currency: Currency) -> finstack_quant_statements::Result<ModelBuilder<Ready>> {
-    ModelBuilder::<NeedPeriods>::new("test")
+fn swap_in(currency: Currency) -> finstack_quant_statements::Result<ModelBuilder> {
+    ModelBuilder::new("test")
         .periods("2025Q1..2025Q2", None)
         .expect("valid period range")
         .add_swap(
@@ -93,7 +93,7 @@ fn test_add_swap() {
     let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
 
-    let builder = ModelBuilder::<NeedPeriods>::new("test")
+    let builder = ModelBuilder::new("test")
         .periods("2025Q1..2025Q2", None)
         .expect("valid period range")
         .add_swap(
@@ -126,7 +126,7 @@ fn test_add_multiple_instruments() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
     let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("valid date");
 
-    let builder = ModelBuilder::<NeedPeriods>::new("test")
+    let builder = ModelBuilder::new("test")
         .periods("2025Q1..2025Q2", None)
         .expect("valid period range")
         .add_bond(
@@ -161,7 +161,7 @@ fn test_add_debt() {
     let instrument = FinancialStatementInstrument::RevolvingCredit(
         RevolvingCredit::example().expect("valid revolving credit example"),
     );
-    let builder = ModelBuilder::<NeedPeriods>::new("test")
+    let builder = ModelBuilder::new("test")
         .periods("2025Q1..2025Q2", None)
         .expect("valid period range")
         .add_debt("RCF-A", instrument);
@@ -186,38 +186,36 @@ fn parity_add_bond_and_add_bond_with_convention_same_id() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
     let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("valid date");
 
-    let model_simple =
-        ModelBuilder::<finstack_quant_statements::builder::NeedPeriods>::new("simple")
-            .periods("2025Q1..2025Q2", None)
-            .expect("valid period range")
-            .add_bond(
-                "BOND-SIMPLE",
-                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-                0.05,
-                issue,
-                maturity,
-                "USD-OIS",
-            )
-            .expect("valid bond")
-            .build()
-            .expect("valid model");
+    let model_simple = ModelBuilder::new("simple")
+        .periods("2025Q1..2025Q2", None)
+        .expect("valid period range")
+        .add_bond(
+            "BOND-SIMPLE",
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            0.05,
+            issue,
+            maturity,
+            "USD-OIS",
+        )
+        .expect("valid bond")
+        .build()
+        .expect("valid model");
 
-    let model_conv =
-        ModelBuilder::<finstack_quant_statements::builder::NeedPeriods>::new("convention")
-            .periods("2025Q1..2025Q2", None)
-            .expect("valid period range")
-            .add_bond_with_convention(
-                "BOND-CONV",
-                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-                Rate::from_decimal(0.05).expect("valid rate fixture"),
-                issue,
-                maturity,
-                BondConvention::UsCorporate,
-                "USD-OIS",
-            )
-            .expect("valid bond with convention")
-            .build()
-            .expect("valid model");
+    let model_conv = ModelBuilder::new("convention")
+        .periods("2025Q1..2025Q2", None)
+        .expect("valid period range")
+        .add_bond_with_convention(
+            "BOND-CONV",
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            Rate::from_decimal(0.05).expect("valid rate fixture"),
+            issue,
+            maturity,
+            BondConvention::UsCorporate,
+            "USD-OIS",
+        )
+        .expect("valid bond with convention")
+        .build()
+        .expect("valid model");
 
     let cs_simple = model_simple
         .capital_structure
@@ -248,44 +246,42 @@ fn parity_add_swap_and_add_swap_with_conventions_produce_swap_variant() {
     let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
 
-    let model_simple =
-        ModelBuilder::<finstack_quant_statements::builder::NeedPeriods>::new("simple")
-            .periods("2025Q1..2025Q2", None)
-            .expect("valid period range")
-            .add_swap(
-                "SWAP-SIMPLE",
-                Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
-                0.04,
-                start,
-                maturity,
-                "USD-OIS",
-                "USD-SOFR-3M",
-            )
-            .expect("valid swap")
-            .build()
-            .expect("valid model");
+    let model_simple = ModelBuilder::new("simple")
+        .periods("2025Q1..2025Q2", None)
+        .expect("valid period range")
+        .add_swap(
+            "SWAP-SIMPLE",
+            Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
+            0.04,
+            start,
+            maturity,
+            "USD-OIS",
+            "USD-SOFR-3M",
+        )
+        .expect("valid swap")
+        .build()
+        .expect("valid model");
 
-    let model_conv =
-        ModelBuilder::<finstack_quant_statements::builder::NeedPeriods>::new("convention")
-            .periods("2025Q1..2025Q2", None)
-            .expect("valid period range")
-            .add_swap_with_conventions(
-                "SWAP-CONV",
-                Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
-                0.04,
-                start,
-                maturity,
-                "USD-OIS",
-                "USD-SOFR-3M",
-                Tenor::semi_annual(),
-                DayCount::Thirty360,
-                Tenor::quarterly(),
-                DayCount::Act360,
-                BusinessDayConvention::ModifiedFollowing,
-            )
-            .expect("valid swap with conventions")
-            .build()
-            .expect("valid model");
+    let model_conv = ModelBuilder::new("convention")
+        .periods("2025Q1..2025Q2", None)
+        .expect("valid period range")
+        .add_swap_with_conventions(
+            "SWAP-CONV",
+            Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
+            0.04,
+            start,
+            maturity,
+            "USD-OIS",
+            "USD-SOFR-3M",
+            Tenor::semi_annual(),
+            DayCount::Thirty360,
+            Tenor::quarterly(),
+            DayCount::Act360,
+            BusinessDayConvention::ModifiedFollowing,
+        )
+        .expect("valid swap with conventions")
+        .build()
+        .expect("valid model");
 
     let cs_simple = model_simple
         .capital_structure

@@ -7,7 +7,9 @@ use finstack_quant_statements::checks::{
     CheckCategory, CheckFinding, CheckReport, CheckResult, CheckSummary, Materiality, Severity,
 };
 use finstack_quant_statements::types::NodeId;
-use finstack_quant_statements_analytics::analysis::checks::CheckReportRenderer;
+use finstack_quant_statements_analytics::analysis::{
+    render_check_report_html, render_check_report_text,
+};
 
 fn sample_report() -> CheckReport {
     let error_result = CheckResult {
@@ -82,7 +84,7 @@ fn render_html_escapes_every_report_text_field() {
     finding.message = "<script>unsafe()</script>".into();
     finding.materiality.as_mut().unwrap().reference_label = "<em>reference</em>".into();
     finding.nodes = vec![NodeId::new("<img>node")];
-    let html = CheckReportRenderer::render_html(&report);
+    let html = render_check_report_html(&report);
     assert!(html.contains("&lt;b&gt;identifier &amp; text&lt;/b&gt;"));
     assert!(html.contains("&lt;script&gt;unsafe()&lt;/script&gt;"));
     assert!(html.contains("&lt;em&gt;reference&lt;/em&gt;"));
@@ -90,14 +92,14 @@ fn render_html_escapes_every_report_text_field() {
     for tag in ["<script>", "<img>", "<em>reference", "<b>identifier"] {
         assert!(!html.contains(tag));
     }
-    assert!(CheckReportRenderer::render_text(&report).contains("<script>unsafe()</script>"));
+    assert!(render_check_report_text(&report).contains("<script>unsafe()</script>"));
 }
 
 // Text renderer
 
 #[test]
 fn render_text_has_header_and_summary() {
-    let text = CheckReportRenderer::render_text(&sample_report());
+    let text = render_check_report_text(&sample_report());
     assert!(text.contains("Check Report"));
     assert!(text.contains("3 checks"));
     assert!(text.contains("2 passed"));
@@ -106,7 +108,7 @@ fn render_text_has_header_and_summary() {
 
 #[test]
 fn render_text_has_error_section() {
-    let text = CheckReportRenderer::render_text(&sample_report());
+    let text = render_check_report_text(&sample_report());
     assert!(text.contains("ERRORS"));
     assert!(text.contains("[ERROR]"));
     assert!(text.contains("balance_sheet_articulation"));
@@ -115,7 +117,7 @@ fn render_text_has_error_section() {
 
 #[test]
 fn render_text_has_warning_section() {
-    let text = CheckReportRenderer::render_text(&sample_report());
+    let text = render_check_report_text(&sample_report());
     assert!(text.contains("WARNINGS"));
     assert!(text.contains("[WARN]"));
     assert!(text.contains("leverage_range"));
@@ -123,13 +125,13 @@ fn render_text_has_warning_section() {
 
 #[test]
 fn render_text_omits_empty_info_section() {
-    let text = CheckReportRenderer::render_text(&sample_report());
+    let text = render_check_report_text(&sample_report());
     assert!(!text.contains("── INFO ──"));
 }
 
 #[test]
 fn render_text_shows_nodes() {
-    let text = CheckReportRenderer::render_text(&sample_report());
+    let text = render_check_report_text(&sample_report());
     assert!(text.contains("total_assets"));
     assert!(text.contains("total_liabilities"));
 }
@@ -138,14 +140,14 @@ fn render_text_shows_nodes() {
 
 #[test]
 fn render_html_produces_div() {
-    let html = CheckReportRenderer::render_html(&sample_report());
+    let html = render_check_report_html(&sample_report());
     assert!(html.starts_with("<div"));
     assert!(html.contains("</div>"));
 }
 
 #[test]
 fn render_html_has_summary() {
-    let html = CheckReportRenderer::render_html(&sample_report());
+    let html = render_check_report_html(&sample_report());
     assert!(html.contains("3"));
     assert!(html.contains("2 passed"));
     assert!(html.contains("1 failed"));
@@ -153,7 +155,7 @@ fn render_html_has_summary() {
 
 #[test]
 fn render_html_has_error_section() {
-    let html = CheckReportRenderer::render_html(&sample_report());
+    let html = render_check_report_html(&sample_report());
     assert!(html.contains("Errors"));
     assert!(html.contains("balance_sheet_articulation"));
 }

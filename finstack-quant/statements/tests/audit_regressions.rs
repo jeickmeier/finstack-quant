@@ -3,8 +3,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_statements::adjustments::engine::NormalizationEngine;
-use finstack_quant_statements::adjustments::types::{Adjustment, NormalizationConfig};
+use finstack_quant_statements::adjustments::{normalize, Adjustment, NormalizationConfig};
 use finstack_quant_statements::evaluator::{EvalWarning, StatementResult};
 use finstack_quant_statements::prelude::*;
 use finstack_quant_statements::types::NodeValueType;
@@ -146,15 +145,20 @@ fn normalization_preserves_units_and_rejects_foreign_sources_and_caps() {
         .unwrap();
     let mut result = Evaluator::new().evaluate(&model).unwrap();
     let invalid: NormalizationConfig = serde_json::from_value(json!({"target_node":"usd","adjustments":[{"id":"a","name":"a","value":{"type":"percentage_of_node","node_id":"eur","percentage":0.1}}]})).unwrap();
-    assert!(NormalizationEngine::normalize(&result, &invalid).is_err());
+    assert!(normalize(&result, &invalid).is_err());
     let invalid_cap: NormalizationConfig = serde_json::from_value(json!({"target_node":"usd","adjustments":[{"id":"a","name":"a","value":{"type":"fixed","amounts":{"2025Q1":10}},"cap":{"base_node":"eur","value":0.1}}]})).unwrap();
-    assert!(NormalizationEngine::normalize(&result, &invalid_cap).is_err());
+    assert!(normalize(&result, &invalid_cap).is_err());
     let config = NormalizationConfig::new("usd")
         .add_adjustment(Adjustment::fixed("a", "a", indexmap! {q(2025,1)=>10.0}))
         .unwrap();
-    let normalized = NormalizationEngine::normalize(&result, &config).unwrap();
+    let normalized = normalize(&result, &config).unwrap();
     for target in ["adjusted", "usd", "eur"] {
-        NormalizationEngine::merge_into_results(&mut result, &normalized, target).unwrap();
+        finstack_quant_statements::adjustments::merge_into_results(
+            &mut result,
+            &normalized,
+            target,
+        )
+        .unwrap();
         assert_eq!(result.get(target, &q(2025, 1)), Some(110.0));
         assert_eq!(
             result.get_money(target, &q(2025, 1)),

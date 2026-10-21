@@ -483,7 +483,7 @@ pub fn evaluate_formula(
                             context.period_id
                         );
                         if let Some(id) = node_id {
-                            context.push_warning(EvalWarning::DivisionByZero {
+                            context.warnings.push(EvalWarning::DivisionByZero {
                                 node_id: id.to_string(),
                                 period: context.period_id,
                             });
@@ -500,7 +500,7 @@ pub fn evaluate_formula(
                             context.period_id
                         );
                         if let Some(id) = node_id {
-                            context.push_warning(EvalWarning::DivisionByZero {
+                            context.warnings.push(EvalWarning::DivisionByZero {
                                 node_id: id.to_string(),
                                 period: context.period_id,
                             });

@@ -3803,11 +3803,6 @@
       "MixedNodeBuilder",
       "ModelBuilder",
       "Registry",
-      "adjustmentFixed",
-      "adjustmentPercentage",
-      "adjustmentWithCap",
-      "adjustmentWithCapMode",
-      "adjustmentWithCategory",
       "capitalStructureCashflowsGetAccruedInterest",
       "capitalStructureCashflowsGetDebtBalance",
       "capitalStructureCashflowsGetFees",
@@ -3829,21 +3824,9 @@
       "checkReportHasErrors",
       "checkReportHasWarnings",
       "checkSuiteSpecBuiltinCheckNames",
-      "financialModelBuilder",
       "financialModelContentHash",
       "financialModelGetNode",
       "financialModelHasNode",
-      "forecastSpecBootstrap",
-      "forecastSpecCurve",
-      "forecastSpecFadeToTarget",
-      "forecastSpecForwardFill",
-      "forecastSpecGrowth",
-      "forecastSpecLogNormal",
-      "forecastSpecMeanReverting",
-      "forecastSpecNormal",
-      "forecastSpecOverride",
-      "forecastSpecSeasonal",
-      "forecastSpecTimeSeries",
       "mergeIntoResults",
       "modelNodeIds",
       "monteCarloBreachProbability",
@@ -3851,7 +3834,6 @@
       "nodeToDatedSchedule",
       "normalizationConfigAddAdjustment",
       "normalize",
-      "normalizeJson",
       "parseAndCompile",
       "parseFormula",
       "schema",
@@ -3976,9 +3958,6 @@
   "statements.parseAndCompile": {
     "kind": "function"
   },
-  "statements.financialModelBuilder": {
-    "kind": "function"
-  },
   "statements.statementResultGet": {
     "kind": "function"
   },
@@ -4066,54 +4045,6 @@
   "statements.capitalStructureCashflowsGetInterestIncome": {
     "kind": "function"
   },
-  "statements.forecastSpecForwardFill": {
-    "kind": "function"
-  },
-  "statements.forecastSpecGrowth": {
-    "kind": "function"
-  },
-  "statements.forecastSpecCurve": {
-    "kind": "function"
-  },
-  "statements.forecastSpecNormal": {
-    "kind": "function"
-  },
-  "statements.forecastSpecLogNormal": {
-    "kind": "function"
-  },
-  "statements.forecastSpecOverride": {
-    "kind": "function"
-  },
-  "statements.forecastSpecSeasonal": {
-    "kind": "function"
-  },
-  "statements.forecastSpecTimeSeries": {
-    "kind": "function"
-  },
-  "statements.forecastSpecFadeToTarget": {
-    "kind": "function"
-  },
-  "statements.forecastSpecMeanReverting": {
-    "kind": "function"
-  },
-  "statements.forecastSpecBootstrap": {
-    "kind": "function"
-  },
-  "statements.adjustmentFixed": {
-    "kind": "function"
-  },
-  "statements.adjustmentPercentage": {
-    "kind": "function"
-  },
-  "statements.adjustmentWithCap": {
-    "kind": "function"
-  },
-  "statements.adjustmentWithCapMode": {
-    "kind": "function"
-  },
-  "statements.adjustmentWithCategory": {
-    "kind": "function"
-  },
   "statements.normalizationConfigAddAdjustment": {
     "kind": "function"
   },
@@ -4121,9 +4052,6 @@
     "kind": "function"
   },
   "statements.normalize": {
-    "kind": "function"
-  },
-  "statements.normalizeJson": {
     "kind": "function"
   },
   "statements.mergeIntoResults": {
@@ -4217,12 +4145,8 @@
       "scenarioResultsGet",
       "scenarioSetTrace",
       "scoreRelativeValue",
-      "sensitivityConfigAddParameter",
       "sensitivityResultGetParameterValue",
       "sensitivityResultGetValue",
-      "terminalValueSpecExitMultiple",
-      "terminalValueSpecGordonGrowth",
-      "terminalValueSpecHModel",
       "validateLeaseSpecJson",
       "validateRenewalSpecJson",
       "validateScorecardConfig",
@@ -4386,15 +4310,6 @@
   "statements_analytics.runCorporateAnalysis": {
     "kind": "function"
   },
-  "statements_analytics.terminalValueSpecGordonGrowth": {
-    "kind": "function"
-  },
-  "statements_analytics.terminalValueSpecExitMultiple": {
-    "kind": "function"
-  },
-  "statements_analytics.terminalValueSpecHModel": {
-    "kind": "function"
-  },
   "statements_analytics.scenarioDiff": {
     "kind": "function"
   },
@@ -4417,9 +4332,6 @@
     "kind": "function"
   },
   "statements_analytics.scenarioSetTrace": {
-    "kind": "function"
-  },
-  "statements_analytics.sensitivityConfigAddParameter": {
     "kind": "function"
   },
   "statements_analytics.sensitivityResultGetParameterValue": {

@@ -676,10 +676,8 @@ pub fn execute_waterfall(
     // priorities, each bounded by the principal remaining at that rung.
     // (b) Dated principal accounting keeps economic balance changes separate
     // from settlement cash, including unpaid and early-settled installments.
-    // (c) PIK capitalization bookkeeping: the coupon was already moved into
-    // the PIK bucket in Step 4 when the toggle is active. The moved
-    // amount is accumulated into `state.cumulative_toggled_pik` so the
-    // period-flow scale clamp can exclude toggle-driven compounding.
+    // (c) PIK capitalization: the coupon was already moved into the PIK
+    // bucket in Step 4 when the toggle is active.
     // Toggle PIK capitalizes at period close even when principal was fully
     // paid down during the period; contractual PIK is already dated principal.
     // (d) closing_balance = post_sweep_balance + toggle PIK.
@@ -720,22 +718,6 @@ pub fn execute_waterfall(
         } else {
             Money::new(post_pay_amount, currency)?
         };
-        // (c) PIK bookkeeping at close. The coupon was already moved into the
-        // PIK bucket in Step 4 whenever the toggle is active; here the moved
-        // amount is accumulated into state so the period-flow scale clamp can
-        // exclude toggle-driven compounding from its basis.
-        if toggled_pik_moved.amount() != 0.0 {
-            let current = state
-                .cumulative_toggled_pik
-                .get(instrument_id.as_str())
-                .copied()
-                .unwrap_or_else(|| Money::from((0_i64, currency)));
-            state.cumulative_toggled_pik.insert(
-                instrument_id.clone(),
-                current.checked_add(toggled_pik_moved)?,
-            );
-        }
-
         // (d) Contractual PIK is already in payable principal. Only the
         // coupon moved by the toggle still capitalizes at period close.
         let closing_balance = post_sweep_balance.checked_add(toggled_pik_moved)?;
@@ -2453,14 +2435,6 @@ mod tests {
                 .amount(),
             50.0,
             "cash untouched by the PIK'd coupon flows to equity"
-        );
-        assert_eq!(
-            state
-                .cumulative_toggled_pik
-                .get("TL-PIK")
-                .expect("toggled PIK tracked")
-                .amount(),
-            100.0
         );
     }
 

@@ -8,7 +8,7 @@ use finstack_quant_core::dates::PeriodId;
 ///
 /// Precedence: Value > Forecast > Formula
 ///
-/// - If explicit value exists for this period → use Value
+/// - If explicit value exists for this period (and is visible) → use Value
 /// - Else if forecast is applicable → use Forecast
 /// - Else if formula exists → use Formula
 /// - Else → error (node cannot be resolved)
@@ -17,20 +17,9 @@ use finstack_quant_core::dates::PeriodId;
 /// * `node_spec` - Node metadata that includes values, forecast config, and formula text
 /// * `period_id` - Period being evaluated
 /// * `is_actual_period` - Flag indicating whether the period is classified as actuals (forecasts are skipped)
-#[cfg(test)]
-fn resolve_node_value(
-    node_spec: &NodeSpec,
-    period_id: &PeriodId,
-    is_actual_period: bool,
-) -> Result<NodeValueSource> {
-    resolve_node_value_with_policy(node_spec, period_id, is_actual_period, true)
-}
-
-/// Resolve a node value with explicit control over period values visibility.
-///
-/// `allow_explicit_values = false` is used by as-of evaluation to hide future
-/// actual values while still allowing forecast/formula fallbacks.
-pub(crate) fn resolve_node_value_with_policy(
+/// * `allow_explicit_values` - `false` hides explicit values (as-of evaluation of
+///   not-yet-available actuals) while still allowing forecast/formula fallbacks
+pub(crate) fn resolve_node_value(
     node_spec: &NodeSpec,
     period_id: &PeriodId,
     is_actual_period: bool,
@@ -123,6 +112,7 @@ mod tests {
             &node,
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
             true,
+            true,
         )
         .unwrap();
 
@@ -137,6 +127,7 @@ mod tests {
         let source = resolve_node_value(
             &node,
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            true,
             true,
         )
         .unwrap();
@@ -153,6 +144,7 @@ mod tests {
             &node,
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
             true,
+            true,
         );
 
         // Should error because no value provided
@@ -163,7 +155,7 @@ mod tests {
     fn test_hidden_value_error_message_is_well_formed() {
         let node = NodeSpec::new("revenue", NodeType::Value);
 
-        let err = resolve_node_value_with_policy(
+        let err = resolve_node_value(
             &node,
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
             true,
@@ -194,6 +186,7 @@ mod tests {
             &node,
             &PeriodId::quarter(2025, 3).expect("valid period fixture"),
             false,
+            true,
         )
         .unwrap();
         assert_eq!(source, NodeValueSource::Forecast);
@@ -214,6 +207,7 @@ mod tests {
         let source = resolve_node_value(
             &node,
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            true,
             true,
         )
         .unwrap();

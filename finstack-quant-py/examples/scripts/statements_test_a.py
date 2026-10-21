@@ -31,7 +31,7 @@ from finstack_quant.statements import (
     ForecastSpec,
     ModelBuilder,
     NormalizationConfig,
-    normalize_json,
+    normalize,
 )
 
 WORKSPACE_ROOT: Final = Path(__file__).resolve().parents[3]
@@ -278,7 +278,7 @@ def run_checks() -> TestAEvidence:
     _validate_schema(config_document, NORMALIZATION_SCHEMA_PATH, "A2 normalization")
 
     results = Evaluator().evaluate(round_tripped_model)
-    normalized = json.loads(normalize_json(results, config))
+    normalized = [json.loads(row.to_json()) for row in normalize(results, config)]
     _require(isinstance(normalized, list), "A1 normalize did not return a JSON list")
     _assert_normalization(normalized)
 
@@ -322,7 +322,7 @@ The model and normalization contracts are mechanically ready. Empirical
 - Adjustments: `{evidence.adjustment_count}`
 - `FinancialModelSpec` and `NormalizationConfig` both round-trip structurally
 - Both documents validate against their checked-in Draft 2020-12 schemas
-- Rust evaluation and `NormalizationEngine::normalize` complete cleanly
+- Rust evaluation and `adjustments::normalize` complete cleanly
 
 | Period | Reported EBITDA | Fixed applied | Percentage applied | Final EBITDA |
 |---|---:|---:|---:|---:|

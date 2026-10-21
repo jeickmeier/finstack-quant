@@ -512,7 +512,7 @@ impl CreditScorecardExtension {
         };
         let mut eval_context = context.clone();
 
-        let value = finstack_quant_statements::evaluator::formula::evaluate_formula(
+        let value = finstack_quant_statements::evaluator::evaluate_formula(
             &expr,
             &mut eval_context,
             Some(metric.name.as_str()),

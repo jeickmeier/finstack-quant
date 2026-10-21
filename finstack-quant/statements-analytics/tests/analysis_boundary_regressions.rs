@@ -6,7 +6,7 @@ use finstack_quant_statements::{
     types::{AmountOrScalar, FinancialModelSpec},
 };
 use finstack_quant_statements_analytics::analysis::*;
-use finstack_quant_statements_analytics::extensions::{corkscrew::*, scorecards::*};
+use finstack_quant_statements_analytics::extensions::*;
 
 fn monetary_model(currency: Currency) -> FinancialModelSpec {
     ModelBuilder::new("money")
@@ -63,19 +63,23 @@ fn variance_and_bridge_reject_currency_mismatch() {
     let comparison = Evaluator::new()
         .evaluate(&monetary_model(Currency::EUR))
         .unwrap();
-    let analyzer = VarianceAnalyzer::new(&base, &comparison);
     let period = PeriodId::annual(2025);
-    assert!(analyzer
-        .compute(&VarianceConfig::new(
-            "usd",
-            "eur",
-            vec!["revenue"],
-            vec![period]
-        ))
-        .is_err());
-    assert!(analyzer
-        .bridge_decomposition("revenue", period, &["profit"], "usd", "eur")
-        .is_err());
+    assert!(run_variance(
+        &base,
+        &comparison,
+        &VarianceConfig::new("usd", "eur", vec!["revenue"], vec![period])
+    )
+    .is_err());
+    assert!(variance_bridge(
+        &base,
+        &comparison,
+        "revenue",
+        period,
+        &["profit"],
+        "usd",
+        "eur"
+    )
+    .is_err());
 }
 
 #[test]
@@ -233,7 +237,7 @@ fn dcf_opening_debt_is_available_on_the_inclusive_reporting_date() {
         time::macros::date!(2024 - 12 - 31),
         time::macros::date!(2025 - 01 - 01),
     ] {
-        let result = evaluate_dcf_with_market(
+        let result = evaluate_dcf(
             &model,
             0.10,
             TerminalValueSpec::GordonGrowth {
@@ -249,7 +253,7 @@ fn dcf_opening_debt_is_available_on_the_inclusive_reporting_date() {
         assert_eq!(result.net_debt.amount(), 100.0);
     }
     let mixed = dcf_model(Currency::EUR);
-    let result = evaluate_dcf_with_market(
+    let result = evaluate_dcf(
         &mixed,
         0.10,
         TerminalValueSpec::GordonGrowth {

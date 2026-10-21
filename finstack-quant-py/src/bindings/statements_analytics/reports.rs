@@ -8,8 +8,10 @@
 
 use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::extract::extract_results_ref;
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::bindings::statements::parse_period_id;
+use crate::errors::core_to_py;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements_analytics::analysis::{
@@ -24,10 +26,6 @@ const SERIES_COLUMNS: [ColumnSchema<'static>; 4] = [
     ("interest_coverage", "float64"),
     ("free_cash_flow", "float64"),
 ];
-
-fn parse_period(period: &str) -> PyResult<PeriodId> {
-    period.parse().map_err(core_to_py)
-}
 
 /// One period's structured credit metrics.
 #[pyclass(
@@ -153,40 +151,13 @@ impl PyCreditAssessment {
         serde_rows_to_dataframe_with_schema(py, &rows, &SERIES_COLUMNS)
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "CreditAssessment"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``CreditAssessment`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid CreditAssessment JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("CreditAssessment", &self.inner)
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(PyCreditAssessment, CreditAssessment, "CreditAssessment");
+impl_repr_html_via_dataframe!(PyCreditAssessment);
 
 /// Compute a structured credit assessment (leverage, interest coverage, FCF).
 ///
@@ -229,7 +200,7 @@ impl PyCreditAssessment {
 #[pyo3(text_signature = "(results, period)")]
 fn credit_assessment(results: &Bound<'_, PyAny>, period: &str) -> PyResult<PyCreditAssessment> {
     let results = extract_results_ref(results)?;
-    let period = parse_period(period)?;
+    let period = parse_period_id(period)?;
     Ok(PyCreditAssessment {
         inner: CreditAssessment::compute(&results, period),
     })
@@ -268,7 +239,7 @@ fn credit_assessment(results: &Bound<'_, PyAny>, period: &str) -> PyResult<PyCre
 #[pyo3(text_signature = "(results, period)")]
 fn credit_assessment_report_text(results: &Bound<'_, PyAny>, period: &str) -> PyResult<String> {
     let results = extract_results_ref(results)?;
-    let period = parse_period(period)?;
+    let period = parse_period_id(period)?;
     Ok(CreditAssessmentReport::new(&results, period).to_string())
 }
 
@@ -354,13 +325,9 @@ impl PyPLSummaryReport {
             self.periods()
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+impl_repr_html_via_dataframe!(PyPLSummaryReport);
 
 /// Build a P&L summary report for selected line items and periods.
 ///
@@ -400,52 +367,13 @@ fn pl_summary_report(
     let results = extract_results_ref(results)?.into_owned();
     let periods = periods
         .iter()
-        .map(|p| parse_period(p))
+        .map(|p| parse_period_id(p))
         .collect::<PyResult<Vec<_>>>()?;
     Ok(PyPLSummaryReport {
         results,
         line_items,
         periods,
     })
-}
-
-/// Generate a P&L summary report as formatted text.
-///
-/// Parameters
-/// ----------
-/// results : StatementResult | str
-///     A ``StatementResult`` object or a JSON string.
-/// line_items : list[str]
-///     Node ids to include as rows.
-/// periods : list[str]
-///     Period-id strings for columns.
-///
-/// Returns
-/// -------
-/// str
-///     Formatted P&L summary report text (same as
-///     ``pl_summary_report(...).to_text()``).
-///
-/// Raises
-/// ------
-/// ValueError
-///     If a period does not parse or ``results`` is malformed JSON.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.statements import ModelBuilder, Evaluator
-/// >>> from finstack_quant.statements_analytics import pl_summary_report_text
-/// >>> b = ModelBuilder("m"); b.periods("2025Q1..Q2", None); b.value("revenue", [("2025Q1", 1.0), ("2025Q2", 2.0)])
-/// >>> pl_summary_report_text(Evaluator().evaluate(b.build()), ["revenue"], ["2025Q1"]).startswith("P&L Summary")
-/// True
-#[pyfunction]
-#[pyo3(text_signature = "(results, line_items, periods)")]
-fn pl_summary_report_text(
-    results: &Bound<'_, PyAny>,
-    line_items: Vec<String>,
-    periods: Vec<String>,
-) -> PyResult<String> {
-    Ok(pl_summary_report(results, line_items, periods)?.to_text())
 }
 
 /// Register report types and functions.
@@ -456,6 +384,5 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(credit_assessment, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(credit_assessment_report_text, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(pl_summary_report, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(pl_summary_report_text, m)?)?;
     Ok(())
 }

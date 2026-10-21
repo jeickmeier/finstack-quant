@@ -5,26 +5,22 @@ use crate::utils::input::{
     from_js_json, js_f64, js_f64_seq, js_opt_string_seq, js_string, js_string_seq, json_text,
 };
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_statements::builder::{ModelBuilder, Ready};
+use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::FinancialModelSpec;
 use finstack_quant_statements_analytics::templates::{real_estate, roll_forward, vintage};
 use wasm_bindgen::prelude::*;
 
-fn builder(model: &JsValue) -> Result<ModelBuilder<Ready>, JsValue> {
+fn builder(model: &JsValue) -> Result<ModelBuilder, JsValue> {
     let model = FinancialModelSpec::from_json(&json_text(model, "model")?).map_err(to_js_err)?;
     ModelBuilder::from_spec(model).map_err(to_js_err)
 }
 
-fn finish(builder: ModelBuilder<Ready>) -> Result<JsValue, JsValue> {
+fn finish(builder: ModelBuilder) -> Result<JsValue, JsValue> {
     to_js_value(&builder.build().map_err(to_js_err)?)
 }
 
 fn refs(names: &[String]) -> Vec<&str> {
     names.iter().map(String::as_str).collect()
-}
-
-fn present(value: Option<JsValue>) -> Option<JsValue> {
-    value.filter(|v| !v.is_null() && !v.is_undefined())
 }
 
 /// Add a vintage (cohort) buildup: each period's new volume decays along a curve.
@@ -222,10 +218,8 @@ pub fn add_rent_roll(
     nodes: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let leases: Vec<real_estate::LeaseSpec> = from_js_json(&leases, "leases")?;
-    let nodes: real_estate::RentRollOutputNodes = match present(nodes) {
-        Some(nodes) => from_js_json(&nodes, "nodes")?,
-        None => real_estate::RentRollOutputNodes::default(),
-    };
+    let nodes: real_estate::RentRollOutputNodes =
+        crate::utils::wire::js_opt_wire(nodes.as_ref(), "nodes")?.unwrap_or_default();
     let builder =
         real_estate::add_rent_roll(builder(&model)?, &leases, &nodes).map_err(to_js_err)?;
     finish(builder)
@@ -266,13 +260,10 @@ pub fn add_property_operating_statement(
         js_opt_string_seq(other_income_nodes.as_ref(), "otherIncomeNodes")?.unwrap_or_default();
     let opex = js_opt_string_seq(opex_nodes.as_ref(), "opexNodes")?.unwrap_or_default();
     let capex = js_opt_string_seq(capex_nodes.as_ref(), "capexNodes")?.unwrap_or_default();
-    let management_fee: Option<real_estate::ManagementFeeSpec> = present(management_fee)
-        .map(|fee| from_js_json(&fee, "managementFee"))
-        .transpose()?;
-    let nodes: real_estate::PropertyTemplateNodes = match present(nodes) {
-        Some(nodes) => from_js_json(&nodes, "nodes")?,
-        None => real_estate::PropertyTemplateNodes::default(),
-    };
+    let management_fee: Option<real_estate::ManagementFeeSpec> =
+        crate::utils::wire::js_opt_wire(management_fee.as_ref(), "managementFee")?;
+    let nodes: real_estate::PropertyTemplateNodes =
+        crate::utils::wire::js_opt_wire(nodes.as_ref(), "nodes")?.unwrap_or_default();
     let builder = real_estate::add_property_operating_statement(
         builder(&model)?,
         &leases,
@@ -299,9 +290,7 @@ pub fn add_property_operating_statement(
 /// rent step, an occupancy outside `[0, 1]`, or an invalid renewal.
 #[wasm_bindgen(js_name = validateLeaseSpecJson)]
 pub fn validate_lease_spec_json(json: JsValue) -> Result<String, JsValue> {
-    let spec: real_estate::LeaseSpec = from_js_json(&json, "json")?;
-    spec.validate().map_err(to_js_err)?;
-    serde_json::to_string(&spec).map_err(to_js_err)
+    crate::api::statements::validated_json(&json, real_estate::LeaseSpec::validate)
 }
 
 /// Validate a `RenewalSpec` and return its canonical JSON.
@@ -318,7 +307,5 @@ pub fn validate_lease_spec_json(json: JsValue) -> Result<String, JsValue> {
 /// rent factor.
 #[wasm_bindgen(js_name = validateRenewalSpecJson)]
 pub fn validate_renewal_spec_json(json: JsValue) -> Result<String, JsValue> {
-    let spec: real_estate::RenewalSpec = from_js_json(&json, "json")?;
-    spec.validate().map_err(to_js_err)?;
-    serde_json::to_string(&spec).map_err(to_js_err)
+    crate::api::statements::validated_json(&json, real_estate::RenewalSpec::validate)
 }

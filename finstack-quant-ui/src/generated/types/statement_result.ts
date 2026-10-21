@@ -223,19 +223,6 @@ export type D_76Adf23Abc095Fd56514 =
       };
     }
   | {
-      nan_propagated: {
-        /**
-         * Identifier of the node that produced the NaN value.
-         */
-        node_id: string;
-        /**
-         * Period in which the warning occurred.
-         */
-        period: string;
-        [k: string]: unknown;
-      };
-    }
-  | {
       non_finite_value: {
         /**
          * Identifier of the node that produced the non-finite value.

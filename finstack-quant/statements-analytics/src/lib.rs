@@ -98,10 +98,8 @@
 //! - Discounting and DCF context: `docs/REFERENCES.md#hull-options-futures`
 //! - Coverage and leverage interpretation: `docs/REFERENCES.md#tuckman-serrat-fixed-income`
 
-/// Analysis tools for financial statement models.
 pub mod analysis;
 
-/// Concrete extension implementations (corkscrew, credit scorecard).
 pub mod extensions;
 
 #[cfg(feature = "json-schema")]

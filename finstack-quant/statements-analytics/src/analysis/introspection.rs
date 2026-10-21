@@ -457,17 +457,33 @@ fn render_tree_lines(
 
 // Formula explanation
 
-/// Explains how formulas are calculated.
+/// Explain how a node's value was calculated for one period.
 ///
-/// The explainer breaks down formula calculations to show how a node's value
-/// was derived from its dependencies.
+/// Breaks the node's formula down into the dependency values that produced
+/// its result.
+///
+/// # Arguments
+///
+/// * `model` - Financial model specification the results were evaluated from.
+/// * `results` - Evaluation results holding the node's value.
+/// * `node_id` - Node to explain.
+/// * `period` - Period to explain.
+///
+/// # Returns
+///
+/// Detailed explanation of the calculation.
+///
+/// # Errors
+///
+/// Returns an invalid-input error when the model has no such node or the
+/// supplied evaluation results contain no value for it in `period`.
 ///
 /// # Examples
 ///
 /// ```rust
 /// # use finstack_quant_statements::builder::ModelBuilder;
 /// # use finstack_quant_statements::evaluator::Evaluator;
-/// # use finstack_quant_statements_analytics::analysis::FormulaExplainer;
+/// # use finstack_quant_statements_analytics::analysis::explain_formula;
 /// # use finstack_quant_core::dates::PeriodId;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let model = ModelBuilder::new("demo")
@@ -480,11 +496,10 @@ fn render_tree_lines(
 /// let mut evaluator = Evaluator::new();
 /// let results = evaluator.evaluate(&model)?;
 ///
-/// let explainer = FormulaExplainer::new(&model, &results);
 /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-/// let explanation = explainer.explain("gross_profit", &period)?;
+/// let explanation = explain_formula(&model, &results, "gross_profit", &period)?;
 ///
-/// println!("{}", explanation.to_string_detailed());
+/// println!("{}", explanation.to_text());
 /// // Output:
 /// // gross_profit [2025Q1] = 60,000
 /// // Formula: revenue - cogs
@@ -492,38 +507,23 @@ fn render_tree_lines(
 /// # Ok(())
 /// # }
 /// ```
-pub struct FormulaExplainer<'a> {
+pub fn explain_formula(
+    model: &FinancialModelSpec,
+    results: &StatementResult,
+    node_id: &str,
+    period: &PeriodId,
+) -> Result<Explanation> {
+    FormulaExplainer { model, results }.explain(node_id, period)
+}
+
+/// The model and results a formula explanation reads from.
+struct FormulaExplainer<'a> {
     model: &'a FinancialModelSpec,
     results: &'a StatementResult,
 }
 
 impl<'a> FormulaExplainer<'a> {
-    /// Create a new formula explainer.
-    ///
-    /// # Arguments
-    ///
-    /// * `model` - Financial model specification
-    /// * `results` - Evaluation results
-    pub fn new(model: &'a FinancialModelSpec, results: &'a StatementResult) -> Self {
-        Self { model, results }
-    }
-
-    /// Explain how a node's value was calculated for a specific period.
-    ///
-    /// # Arguments
-    ///
-    /// * `node_id` - Node identifier
-    /// * `period` - Period to explain
-    ///
-    /// # Returns
-    ///
-    /// Detailed explanation of the calculation
-    ///
-    /// # Errors
-    ///
-    /// Returns an invalid-input error when the model has no such node or the
-    /// supplied evaluation results contain no value for it in `period`.
-    pub fn explain(&self, node_id: &str, period: &PeriodId) -> Result<Explanation> {
+    fn explain(&self, node_id: &str, period: &PeriodId) -> Result<Explanation> {
         let node_spec = self
             .model
             .nodes
@@ -602,7 +602,7 @@ impl<'a> FormulaExplainer<'a> {
         }
 
         // Otherwise list each referenced component once, without an operation.
-        let identifiers = finstack_quant_statements::formula::extract_all_identifiers(formula)?;
+        let identifiers = finstack_quant_statements::dsl::extract_all_identifiers(formula)?;
         Ok(identifiers
             .into_iter()
             .filter_map(|component| {
@@ -719,7 +719,7 @@ impl Explanation {
     /// # Returns
     ///
     /// Human-readable explanation of the calculation
-    pub fn to_string_detailed(&self) -> String {
+    pub fn to_text(&self) -> String {
         let mut output = String::new();
 
         output.push_str(&format!(
@@ -1104,10 +1104,8 @@ mod tests {
         let mut evaluator = Evaluator::new();
         let results = evaluator.evaluate(&model).expect("test should succeed");
 
-        let explainer = FormulaExplainer::new(&model, &results);
-        let explanation = explainer
-            .explain("revenue", &period)
-            .expect("test should succeed");
+        let explanation =
+            explain_formula(&model, &results, "revenue", &period).expect("test should succeed");
 
         assert_eq!(explanation.node_id, "revenue");
         assert_eq!(explanation.final_value, 100_000.0);
@@ -1117,7 +1115,7 @@ mod tests {
         // The explanation says where the number came from.
         assert_eq!(explanation.source, Some(CellSource::Value));
         assert!(explanation.forecast.is_none());
-        assert!(explanation.to_string_detailed().contains("Source: value"));
+        assert!(explanation.to_text().contains("Source: value"));
     }
 
     /// A forecast cell is explained by its source and forecast spec.
@@ -1136,19 +1134,18 @@ mod tests {
         let results = Evaluator::new()
             .evaluate(&model)
             .expect("test should succeed");
-        let explainer = FormulaExplainer::new(&model, &results);
 
-        let actual = explainer.explain("revenue", &period).expect("actual");
+        let actual = explain_formula(&model, &results, "revenue", &period).expect("actual");
         assert_eq!(actual.source, Some(CellSource::Value));
         assert!(actual.forecast.is_none());
 
-        let forecast = explainer.explain("revenue", &period2).expect("forecast");
+        let forecast = explain_formula(&model, &results, "revenue", &period2).expect("forecast");
         assert!((forecast.final_value - 105.0).abs() < 1e-9);
         assert_eq!(forecast.source, Some(CellSource::Forecast));
         let spec = forecast.forecast.as_ref().expect("forecast spec");
         assert_eq!(spec.method, ForecastMethod::GrowthPct);
         assert_eq!(spec.params["rate"], serde_json::json!(0.05));
-        let text = forecast.to_string_detailed();
+        let text = forecast.to_text();
         assert!(text.contains("Source: forecast"), "{text}");
         assert!(
             text.contains("GrowthPct") && text.contains("rate=0.05"),
@@ -1203,9 +1200,8 @@ mod tests {
             .insert("pretax".into(), [(period, 70.0)].into_iter().collect());
         results.cs_cashflows = Some(cashflows);
 
-        let explanation = FormulaExplainer::new(&model, &results)
-            .explain("pretax", &period)
-            .expect("explanation");
+        let explanation =
+            explain_formula(&model, &results, "pretax", &period).expect("explanation");
         // Hand-built results carry no cell source; the formula is explained.
         assert_eq!(explanation.source, None);
         let steps: Vec<(&str, f64, Option<&str>)> = explanation
@@ -1249,9 +1245,8 @@ mod tests {
         let results = Evaluator::new()
             .evaluate(&model)
             .expect("test should succeed");
-        let explainer = FormulaExplainer::new(&model, &results);
 
-        let ebit = explainer.explain("ebit", &period).expect("ebit");
+        let ebit = explain_formula(&model, &results, "ebit", &period).expect("ebit");
         assert_eq!(ebit.source, Some(CellSource::Formula));
         let signed: Vec<(&str, &str)> = ebit
             .breakdown
@@ -1283,7 +1278,7 @@ mod tests {
         assert_eq!(total, ebit.final_value);
         assert_eq!(ebit.final_value, 40.0);
 
-        let margin = explainer.explain("margin", &period).expect("margin");
+        let margin = explain_formula(&model, &results, "margin", &period).expect("margin");
         assert_eq!(margin.breakdown.len(), 2);
         assert!(margin.breakdown.iter().all(|step| step.operation.is_none()));
     }
@@ -1312,9 +1307,7 @@ mod tests {
         let mut evaluator = Evaluator::new();
         let results = evaluator.evaluate(&model).expect("test should succeed");
 
-        let explainer = FormulaExplainer::new(&model, &results);
-        let explanation = explainer
-            .explain("gross_profit", &period)
+        let explanation = explain_formula(&model, &results, "gross_profit", &period)
             .expect("test should succeed");
 
         assert_eq!(explanation.node_id, "gross_profit");
@@ -1347,9 +1340,8 @@ mod tests {
         let results = Evaluator::new()
             .evaluate(&model)
             .expect("test should succeed");
-        let explanation = FormulaExplainer::new(&model, &results)
-            .explain("lagged", &period)
-            .expect("test should succeed");
+        let explanation =
+            explain_formula(&model, &results, "lagged", &period).expect("test should succeed");
         assert!(explanation.final_value.is_nan());
 
         let json = serde_json::to_value(&explanation).expect("serialize");
@@ -1363,7 +1355,7 @@ mod tests {
     }
 
     #[test]
-    fn test_explain_to_string_detailed() {
+    fn test_explain_to_text() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let model = ModelBuilder::new("test")
@@ -1384,12 +1376,10 @@ mod tests {
         let mut evaluator = Evaluator::new();
         let results = evaluator.evaluate(&model).expect("test should succeed");
 
-        let explainer = FormulaExplainer::new(&model, &results);
-        let explanation = explainer
-            .explain("cogs", &period)
-            .expect("test should succeed");
+        let explanation =
+            explain_formula(&model, &results, "cogs", &period).expect("test should succeed");
 
-        let detailed = explanation.to_string_detailed();
+        let detailed = explanation.to_text();
         assert!(detailed.contains("cogs [2025Q1]"));
         assert!(detailed.contains("Formula: revenue * 0.4"));
         assert!(detailed.contains("revenue = 100000.00"));
@@ -1415,8 +1405,7 @@ mod tests {
         let mut evaluator = Evaluator::new();
         let results = evaluator.evaluate(&model).expect("test should succeed");
 
-        let explainer = FormulaExplainer::new(&model, &results);
-        let result = explainer.explain("nonexistent", &period);
+        let result = explain_formula(&model, &results, "nonexistent", &period);
 
         assert!(result.is_err());
     }

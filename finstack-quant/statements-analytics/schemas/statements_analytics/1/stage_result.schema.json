@@ -1,0 +1,263 @@
+{
+  "$defs": {
+    "Stage": {
+      "description": "IFRS 9 impairment stage for a credit exposure.\n\nUnder IFRS 9, financial instruments are classified into three stages that\ndetermine the ECL measurement horizon:\n\n- **Stage 1**: 12-month ECL (no significant increase in credit risk)\n- **Stage 2**: Lifetime ECL (significant increase in credit risk detected)\n- **Stage 3**: Lifetime ECL (credit-impaired, objective evidence of default)\n\n# References\n\nIFRS 9 Financial Instruments, Section 5.5 -- Impairment. `docs/REFERENCES.md#ifrs-9-impairment`",
+      "oneOf": [
+        {
+          "const": "stage1",
+          "description": "Performing -- 12-month ECL. No significant increase in credit risk\nsince initial recognition.",
+          "type": "string"
+        },
+        {
+          "const": "stage2",
+          "description": "Underperforming -- lifetime ECL. Significant increase in credit risk\n(SICR) detected but not yet credit-impaired.",
+          "type": "string"
+        },
+        {
+          "const": "stage3",
+          "description": "Non-performing -- lifetime ECL. Credit-impaired (objective evidence of\ndefault: DPD >= 90, restructuring, etc.).",
+          "type": "string"
+        }
+      ]
+    },
+    "StagingTrigger": {
+      "description": "Reason for stage assignment (audit trail).\n\nEach variant captures the specific values that triggered the classification,\nenabling regulatory reporting and model governance review.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "DPD exceeded Stage 3 threshold.",
+          "properties": {
+            "dpd_stage3": {
+              "additionalProperties": false,
+              "properties": {
+                "dpd": {
+                  "description": "Actual days past due.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "threshold": {
+                  "description": "Configured threshold.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "dpd",
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "dpd_stage3"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Objective evidence of default (IFRS 9 B5.5.37 \"unlikely to pay\").",
+          "properties": {
+            "stage3_qualitative": {
+              "additionalProperties": false,
+              "properties": {
+                "flag": {
+                  "description": "Name of the default-evidence flag (e.g. `bankruptcy`,\n`distressed_modification`, `cross_default`, or a user\nsupplied key from `other_default_evidence`).",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "flag"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "stage3_qualitative"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Absolute PD increase exceeded threshold.",
+          "properties": {
+            "pd_delta_absolute": {
+              "additionalProperties": false,
+              "properties": {
+                "delta": {
+                  "description": "Actual PD delta (current minus origination).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "threshold": {
+                  "description": "Configured threshold.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "delta",
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "pd_delta_absolute"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Relative PD increase exceeded threshold.",
+          "properties": {
+            "pd_delta_relative": {
+              "additionalProperties": false,
+              "properties": {
+                "ratio": {
+                  "description": "Actual ratio (current PD / origination PD).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "threshold": {
+                  "description": "Configured threshold.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "ratio",
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "pd_delta_relative"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Rating downgraded by N or more notches (IFRS 9 B5.5.17(f): external\ncredit rating downgrade as a SICR indicator).\n\nNotches are counted as `position(current) - position(origination)`\non the configured rating scale (see\n[`StagingConfig::rating_scale_labels`]); a value of `notches >=\nthreshold` fires this trigger.",
+          "properties": {
+            "rating_downgrade": {
+              "additionalProperties": false,
+              "properties": {
+                "notches": {
+                  "description": "Actual downgrade notches.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "threshold": {
+                  "description": "Configured threshold.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "notches",
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "rating_downgrade"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "DPD exceeded Stage 2 backstop.",
+          "properties": {
+            "dpd_stage2": {
+              "additionalProperties": false,
+              "properties": {
+                "dpd": {
+                  "description": "Actual days past due.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "threshold": {
+                  "description": "Configured threshold.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "dpd",
+                "threshold"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "dpd_stage2"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Qualitative flag active.",
+          "properties": {
+            "qualitative": {
+              "additionalProperties": false,
+              "properties": {
+                "flag": {
+                  "description": "Name of the active flag.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "flag"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "qualitative"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "no_trigger",
+          "description": "No triggers active: Stage 1 default.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/stage_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "IFRS 9 stage classification with its ordered trigger audit trail.",
+  "properties": {
+    "cured": {
+      "description": "Whether the exposure was cured from a higher stage.",
+      "type": "boolean"
+    },
+    "stage": {
+      "$ref": "#/$defs/Stage",
+      "description": "Assigned stage."
+    },
+    "triggers": {
+      "description": "Which trigger(s) caused the classification.",
+      "items": {
+        "$ref": "#/$defs/StagingTrigger"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "stage",
+    "triggers",
+    "cured"
+  ],
+  "title": "StageResult",
+  "type": "object"
+}

@@ -3,8 +3,7 @@
 
 use finstack_quant_core::dates::StubKind;
 use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
-use finstack_quant_statements::adjustments::engine::NormalizationEngine;
-use finstack_quant_statements::adjustments::types::{Adjustment, NormalizationConfig};
+use finstack_quant_statements::adjustments::{normalize, Adjustment, NormalizationConfig};
 use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};
 use finstack_quant_statements::checks::builtins::BalanceSheetArticulation;
 use finstack_quant_statements::checks::{
@@ -245,9 +244,10 @@ fn normalization_merge_clears_the_report_for_the_previous_financial_values() {
             [(q1(), 50.0)].into_iter().collect(),
         ))
         .unwrap();
-    let normalized = NormalizationEngine::normalize(&results, &config).unwrap();
+    let normalized = normalize(&results, &config).unwrap();
 
-    NormalizationEngine::merge_into_results(&mut results, &normalized, "assets").unwrap();
+    finstack_quant_statements::adjustments::merge_into_results(&mut results, &normalized, "assets")
+        .unwrap();
 
     assert_eq!(results.get("assets", &q1()), Some(150.0));
     assert!(results.check_report.is_none());
@@ -259,13 +259,18 @@ fn failed_and_empty_normalization_merges_preserve_the_original_report_and_values
     let (_, mut results, _) = checked_balance_sheet();
     let original_report = results.check_report.clone();
     let original_values = results.nodes.clone();
-    NormalizationEngine::merge_into_results(&mut results, &[], "assets").unwrap();
+    finstack_quant_statements::adjustments::merge_into_results(&mut results, &[], "assets")
+        .unwrap();
     assert_eq!(results.check_report, original_report);
 
-    let normalized =
-        NormalizationEngine::normalize(&results, &NormalizationConfig::new("assets")).unwrap();
+    let normalized = normalize(&results, &NormalizationConfig::new("assets")).unwrap();
     let duplicated = vec![normalized[0].clone(), normalized[0].clone()];
-    assert!(NormalizationEngine::merge_into_results(&mut results, &duplicated, "assets").is_err());
+    assert!(finstack_quant_statements::adjustments::merge_into_results(
+        &mut results,
+        &duplicated,
+        "assets"
+    )
+    .is_err());
     assert_eq!(results.nodes, original_values);
     assert_eq!(results.check_report, original_report);
 }

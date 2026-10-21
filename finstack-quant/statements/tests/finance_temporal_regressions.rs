@@ -5,7 +5,7 @@ use finstack_quant_core::dates::{
 };
 use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};
 use finstack_quant_statements::dsl::parse_and_compile;
-use finstack_quant_statements::evaluator::formula::evaluate_formula;
+use finstack_quant_statements::evaluator::evaluate_formula;
 use finstack_quant_statements::evaluator::EvaluationContext;
 use finstack_quant_statements::prelude::*;
 use indexmap::IndexMap;

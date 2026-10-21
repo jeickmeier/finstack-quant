@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{get_finite_node_value, sum_nodes};
+use crate::checks::helpers::{get_finite_node_value, sum_nodes};
 use crate::checks::types::effective_tolerance;
 use crate::checks::{
     Check, CheckCategory, CheckComparison, CheckContext, CheckFinding, CheckResult, Materiality,

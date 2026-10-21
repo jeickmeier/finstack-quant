@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 
 use serde_json::Value;
 
-use crate::adjustments::types::{NormalizationConfig, NormalizationResult};
+use crate::adjustments::{NormalizationConfig, NormalizationResult};
 use crate::checks::CheckSuiteSpec;
 use crate::evaluator::{MonteCarloConfig, MonteCarloResults, RollupSpec, StatementResult};
 use crate::registry::MetricRegistry;
@@ -57,7 +57,7 @@ pub fn statement_result_schema() -> Result<&'static Value> {
 }
 
 /// Return the checked-in schema for
-/// [`crate::adjustments::types::NormalizationConfig`].
+/// [`crate::adjustments::NormalizationConfig`].
 ///
 /// # Errors
 ///
@@ -121,7 +121,7 @@ fn financial_model_examples() -> finstack_quant_core::Result<Vec<Value>> {
 /// Built from the public types rather than hand-written JSON so the published
 /// example cannot drift from the contract it illustrates.
 fn normalization_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    use crate::adjustments::types::{Adjustment, AdjustmentValue};
+    use crate::adjustments::{Adjustment, AdjustmentValue};
 
     let mut amounts = indexmap::IndexMap::new();
     for (label, amount) in [("2024Q1", 1_500_000.0), ("2024Q2", 1_250_000.0)] {
@@ -260,7 +260,7 @@ fn rollup_spec_examples() -> finstack_quant_core::Result<Vec<Value>> {
 
 /// One quarter of EBITDA with a single restructuring add-back.
 fn normalization_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    finstack_quant_core::schema::example_from_json::<crate::adjustments::types::NormalizationResult>(
+    finstack_quant_core::schema::example_from_json::<crate::adjustments::NormalizationResult>(
         serde_json::json!({
             "value_type": {"type": "monetary", "currency": "USD"},
             "period": "2024Q1",

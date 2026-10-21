@@ -454,98 +454,79 @@ export default [
   {
     "path": "#/$defs/d_76adf23abc095fd56514/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/1",
-    "description": "NaN value bubbled up to a node result"
-  },
-  {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/1/properties/nan_propagated",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/1/properties/nan_propagated"
-  },
-  {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/1/properties/nan_propagated/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/1/properties/nan_propagated/properties/node_id",
-    "description": "Identifier of the node that produced the NaN value."
-  },
-  {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/1/properties/nan_propagated/properties/period",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/1/properties/nan_propagated/properties/period",
-    "description": "Period in which the warning occurred."
-  },
-  {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/2",
     "description": "Non-finite value (NaN, Inf, -Inf) detected when storing a node result.\n\nThis warning is emitted by the finiteness validation pipeline so that\nconsumers can identify which node/period introduced bad values."
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/2/properties/non_finite_value",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/2/properties/non_finite_value"
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/1/properties/non_finite_value",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/1/properties/non_finite_value"
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/2/properties/non_finite_value/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/2/properties/non_finite_value/properties/node_id",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/1/properties/non_finite_value/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/1/properties/non_finite_value/properties/node_id",
     "description": "Identifier of the node that produced the non-finite value."
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/2/properties/non_finite_value/properties/period",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/2/properties/non_finite_value/properties/period",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/1/properties/non_finite_value/properties/period",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/1/properties/non_finite_value/properties/period",
     "description": "Period in which the warning occurred."
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/2/properties/non_finite_value/properties/value",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/2/properties/non_finite_value/properties/value",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/1/properties/non_finite_value/properties/value",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/1/properties/non_finite_value/properties/value",
     "description": "The actual non-finite value, encoded as `\"nan\"`, `\"inf\"`, or `\"-inf\"`.",
     "ref": "#/$defs/ResultNumber",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultNumber"
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/2",
     "description": "Capital-structure extraction or waterfall processing required a guarded fallback."
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/capital_structure",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/capital_structure"
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/2/properties/capital_structure",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/2/properties/capital_structure"
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/capital_structure/properties/period",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/capital_structure/properties/period",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/2/properties/capital_structure/properties/period",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/2/properties/capital_structure/properties/period",
     "description": "Period in which the warning was raised."
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/capital_structure/properties/warning",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/capital_structure/properties/warning",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/2/properties/capital_structure/properties/warning",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/2/properties/capital_structure/properties/warning",
     "description": "Typed reason and associated diagnostic values.",
     "ref": "#/$defs/CapitalStructureWarning",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning"
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3",
     "description": "One or more non-finite inputs were skipped by a skip-NaN aggregate\n(`sum`, `mean`, ...).\n\nThe aggregate's skip-NaN policy is intentional, but silently dropping a\nbroken line item can mask upstream problems (e.g. a division by zero in\none argument), so the drop is surfaced here."
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/non_finite_skipped",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/non_finite_skipped"
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/non_finite_skipped",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped"
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/non_finite_skipped/properties/count",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/non_finite_skipped/properties/count",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/non_finite_skipped/properties/count",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/count",
     "description": "Number of non-finite inputs dropped.",
     "format": "uint",
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/non_finite_skipped/properties/function",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/non_finite_skipped/properties/function",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/non_finite_skipped/properties/function",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/function",
     "description": "Name of the aggregate function that dropped values."
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/non_finite_skipped/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/non_finite_skipped/properties/node_id",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/non_finite_skipped/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/node_id",
     "description": "Identifier of the node whose aggregate dropped inputs."
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/non_finite_skipped/properties/period",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/non_finite_skipped/properties/period",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/non_finite_skipped/properties/period",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/period",
     "description": "Period in which the drop occurred."
   },
   {

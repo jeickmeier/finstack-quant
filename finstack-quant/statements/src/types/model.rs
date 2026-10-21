@@ -184,25 +184,9 @@ impl FinancialModelSpec {
         Ok(currencies)
     }
 
-    /// Create a [`crate::builder::ModelBuilder`] for constructing a model specification.
-    ///
-    /// This is the preferred entry point for staged model creation. The
-    /// returned builder uses typestate to require `.periods()` before node
-    /// definitions can be added.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Stable string identifier used for lookup and serialization of this object
-    #[must_use]
-    pub fn builder(
-        id: impl Into<String>,
-    ) -> crate::builder::ModelBuilder<crate::builder::NeedPeriods> {
-        crate::builder::ModelBuilder::new(id)
-    }
-
     /// Create a new model specification directly from a period list.
     ///
-    /// Prefer [`FinancialModelSpec::builder`] for user-facing model construction:
+    /// Prefer [`ModelBuilder::new`](crate::builder::ModelBuilder::new) for user-facing model construction:
     /// the builder validates period ranges and catches stale references to
     /// undefined nodes. This direct constructor is retained for programmatic
     /// use (scenarios, template generators, tests) where callers already have

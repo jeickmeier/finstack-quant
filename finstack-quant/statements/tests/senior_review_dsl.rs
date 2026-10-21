@@ -2,7 +2,7 @@
 
 use finstack_quant_core::expr::{Expr, Function};
 use finstack_quant_statements::dsl::parse_and_compile;
-use finstack_quant_statements::evaluator::{formula::evaluate_formula, EvaluationContext};
+use finstack_quant_statements::evaluator::{evaluate_formula, EvaluationContext};
 use finstack_quant_statements::prelude::*;
 use finstack_quant_statements::types::NodeValueType;
 use indexmap::IndexMap;

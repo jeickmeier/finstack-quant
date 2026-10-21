@@ -1,11 +1,10 @@
-//! Type-state builder pattern for financial models.
+//! Fluent builder for financial models.
 
 use crate::error::{Error, Result};
 use crate::registry::dynamic::StoredMetric;
 use crate::types::{AmountOrScalar, FinancialModelSpec, NodeId, NodeSpec, NodeType};
 use finstack_quant_core::dates::{build_periods, Period, PeriodId};
 use indexmap::{IndexMap, IndexSet};
-use std::marker::PhantomData;
 
 /// DSL keywords that must not be used as node IDs.
 ///
@@ -70,31 +69,23 @@ pub fn validate_node_id(node_id: &str) -> Result<()> {
     Ok(())
 }
 
-/// Type-state marker: Periods not yet defined
-#[derive(Debug)]
-pub struct NeedPeriods;
-
-/// Type-state marker: Ready to add nodes
-#[derive(Debug)]
-pub struct Ready;
-
-/// Builder for financial models with compile-time type-state enforcement.
+/// Builder for financial models.
 ///
-/// The builder uses a type-state pattern to ensure correct usage:
-/// 1. Start with [`FinancialModelSpec::builder`](crate::types::FinancialModelSpec::builder)
-///    or `ModelBuilder::new()` → `ModelBuilder<NeedPeriods>`
-/// 2. Call `.periods()` → `ModelBuilder<Ready>`
-/// 3. Add nodes, forecasts, etc.
-/// 4. Call `.build()` → `FinancialModelSpec`
+/// 1. Start with `ModelBuilder::new()`.
+/// 2. Set the timeline once with `.periods()` or `.periods_explicit()`.
+/// 3. Add nodes, forecasts, capital structure, etc. (in any order).
+/// 4. Call `.build()` → `FinancialModelSpec`, which rejects a model without
+///    periods along with every other semantic error.
 ///
 /// # Example
 ///
 /// ```rust
-/// use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec, NodeType};
+/// use finstack_quant_statements::builder::ModelBuilder;
+/// use finstack_quant_statements::types::{AmountOrScalar, NodeType};
 /// use finstack_quant_core::dates::PeriodId;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let model = FinancialModelSpec::builder("test_model")
+/// let model = ModelBuilder::new("test_model")
 ///     .periods("2025Q1..Q4", None)?
 ///     .value("revenue", &[
 ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0)),
@@ -104,7 +95,7 @@ pub struct Ready;
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct ModelBuilder<State> {
+pub struct ModelBuilder {
     id: String,
     pub(crate) periods: Vec<Period>,
     pub(crate) nodes: IndexMap<NodeId, NodeSpec>,
@@ -112,17 +103,21 @@ pub struct ModelBuilder<State> {
     pub(crate) capital_structure: Option<crate::types::CapitalStructureSpec>,
     /// Node most recently defined or modified; the target of `where_clause`.
     last_node: Option<NodeId>,
-    _state: PhantomData<State>,
 }
 
-impl<State> ModelBuilder<State> {
+impl ModelBuilder {
     /// Insert a pre-built node into the model.
     ///
     /// This is an advanced API for template builders that need to construct
     /// nodes programmatically. Prefer `.compute()` and `.value()` for
     /// standard model construction.
-    pub fn insert_node(&mut self, id: NodeId, spec: NodeSpec) -> &mut Self {
-        self.put_node(id, spec);
+    ///
+    /// # Arguments
+    ///
+    /// * `spec` - Node to insert under its own `node_id`, replacing any node
+    ///   already stored with that id.
+    pub fn insert_node(&mut self, spec: NodeSpec) -> &mut Self {
+        self.put_node(spec.node_id.clone(), spec);
         self
     }
 
@@ -221,13 +216,13 @@ impl<State> ModelBuilder<State> {
     }
 }
 
-impl ModelBuilder<NeedPeriods> {
+impl ModelBuilder {
     /// Create a new model builder.
     ///
     /// # Arguments
     /// * `id` - Unique identifier for the model
     ///
-    /// You must call `.periods()` before adding nodes.
+    /// Set the timeline with `.periods()` before calling `.build()`.
     #[must_use]
     pub fn new(id: impl Into<String>) -> Self {
         Self {
@@ -237,7 +232,6 @@ impl ModelBuilder<NeedPeriods> {
             meta: IndexMap::new(),
             capital_structure: None,
             last_node: None,
-            _state: PhantomData,
         }
     }
 
@@ -257,20 +251,17 @@ impl ModelBuilder<NeedPeriods> {
     ///
     /// Returns a period error if the range or actuals cutoff cannot be parsed,
     /// uses incompatible period kinds, is reversed, or resolves to no periods.
-    /// The type-state transition succeeds only with a non-empty period plan.
-    pub fn periods(self, range: &str, actuals_until: Option<&str>) -> Result<ModelBuilder<Ready>> {
-        self.try_periods(range, actuals_until)
-            .map_err(|(_, error)| error)
+    /// Periods can be set once; a second call is rejected.
+    pub fn periods(mut self, range: &str, actuals_until: Option<&str>) -> Result<Self> {
+        self.try_periods(range, actuals_until)?;
+        Ok(self)
     }
 
-    /// Define periods from a range expression, handing the builder back on
-    /// failure.
+    /// Define periods from a range expression in place.
     ///
-    /// Identical to [`periods`](Self::periods) except that a rejected range
-    /// returns the untouched `NeedPeriods` builder alongside the error, so a
-    /// host wrapper that cannot express Rust's move semantics (Python, JS) can
-    /// keep the instruments, metadata, and capital structure accumulated so
-    /// far instead of forcing the caller to start over after a typo.
+    /// Identical to [`periods`](Self::periods) but borrows the builder, so a
+    /// host wrapper that cannot express Rust's move semantics (Python, JS)
+    /// keeps everything accumulated so far when the range is rejected.
     ///
     /// # Arguments
     ///
@@ -282,35 +273,28 @@ impl ModelBuilder<NeedPeriods> {
     ///
     /// # Errors
     ///
-    /// Returns `(self, error)` (the builder boxed, to keep the error variant
-    /// small) when the range or cutoff cannot be parsed, the families are
+    /// Leaves the builder unchanged and returns an error when periods are
+    /// already set, the range or cutoff cannot be parsed, the families are
     /// incompatible, the range is reversed, or it resolves to no periods.
-    pub fn try_periods(
-        self,
-        range: &str,
-        actuals_until: Option<&str>,
-    ) -> std::result::Result<ModelBuilder<Ready>, (Box<Self>, Error)> {
-        let period_plan = match build_periods(range, actuals_until) {
-            Ok(plan) => plan,
-            Err(error) => return Err((Box::new(self), error.into())),
-        };
-
+    pub fn try_periods(&mut self, range: &str, actuals_until: Option<&str>) -> Result<&mut Self> {
+        self.ensure_periods_unset()?;
+        let period_plan = build_periods(range, actuals_until)?;
         if period_plan.periods.is_empty() {
-            return Err((
-                Box::new(self),
-                Error::period("Period range must contain at least one period"),
+            return Err(Error::period(
+                "Period range must contain at least one period",
             ));
         }
+        self.periods = period_plan.periods;
+        Ok(self)
+    }
 
-        Ok(ModelBuilder {
-            id: self.id,
-            periods: period_plan.periods,
-            nodes: self.nodes,
-            meta: self.meta,
-            capital_structure: self.capital_structure,
-            last_node: self.last_node,
-            _state: PhantomData,
-        })
+    /// Reject a second timeline: node values are keyed to the first one.
+    fn ensure_periods_unset(&self) -> Result<()> {
+        if self.periods.is_empty() {
+            Ok(())
+        } else {
+            Err(Error::build("Periods already set"))
+        }
     }
 
     /// Define periods explicitly (for advanced use cases).
@@ -328,26 +312,19 @@ impl ModelBuilder<NeedPeriods> {
     ///
     /// Returns a period error when `periods` is empty. No additional period
     /// ordering or continuity validation is performed at this boundary.
-    pub fn periods_explicit(self, periods: Vec<Period>) -> Result<ModelBuilder<Ready>> {
+    pub fn periods_explicit(mut self, periods: Vec<Period>) -> Result<Self> {
+        self.ensure_periods_unset()?;
         if periods.is_empty() {
             return Err(Error::period(
                 "Period list must contain at least one period",
             ));
         }
-
-        Ok(ModelBuilder {
-            id: self.id,
-            periods,
-            nodes: self.nodes,
-            meta: self.meta,
-            capital_structure: self.capital_structure,
-            last_node: self.last_node,
-            _state: PhantomData,
-        })
+        self.periods = periods;
+        Ok(self)
     }
 }
 
-impl ModelBuilder<Ready> {
+impl ModelBuilder {
     /// Reconstruct a ready builder from a complete model specification.
     ///
     /// This is the canonical path for applying builder-based transformations to
@@ -382,7 +359,6 @@ impl ModelBuilder<Ready> {
             meta: spec.meta,
             capital_structure: spec.capital_structure,
             last_node,
-            _state: PhantomData,
         })
     }
 
@@ -934,6 +910,10 @@ impl ModelBuilder<Ready> {
     ) -> Result<()> {
         let mut namespace_cache: IndexMap<String, IndexSet<String>> = IndexMap::new();
         for (qualified_id, stored_metric) in registry.all_metrics() {
+            // A user node with a built-in metric's id wins, as documented.
+            if self.nodes.contains_key(qualified_id) {
+                continue;
+            }
             let namespace = qualified_id.split('.').next().unwrap_or("");
             let formula = if namespace.is_empty() {
                 stored_metric.definition.formula.clone()
@@ -1118,7 +1098,7 @@ impl ModelBuilder<Ready> {
 /// in a fluent manner before adding it to the model.
 #[derive(Debug)]
 pub struct MixedNodeBuilder {
-    parent: ModelBuilder<Ready>,
+    parent: ModelBuilder,
     node_id: NodeId,
     values: Option<IndexMap<PeriodId, AmountOrScalar>>,
     forecast: Option<crate::types::ForecastSpec>,
@@ -1312,7 +1292,7 @@ impl MixedNodeBuilder {
     /// compatibility, period coverage, and cross-node references are validated
     /// later when the parent builder is finalized.
     #[must_use = "builder methods must be chained"]
-    pub fn build(mut self) -> Result<ModelBuilder<Ready>> {
+    pub fn build(mut self) -> Result<ModelBuilder> {
         validate_node_id(self.node_id.as_str())?;
 
         let mut node = NodeSpec::new(self.node_id.clone(), NodeType::Mixed);
@@ -1339,6 +1319,22 @@ impl MixedNodeBuilder {
 mod tests {
     use super::*;
     use crate::evaluator::Evaluator;
+
+    #[test]
+    fn builtin_metrics_do_not_overwrite_an_existing_node() {
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let builder = ModelBuilder::new("user-roe")
+            .periods("2025Q1..Q1", None)
+            .expect("valid periods")
+            .value("fin.roe", &[(period, AmountOrScalar::scalar(0.12))])
+            .with_builtin_metrics()
+            .expect("built-in catalog loads");
+
+        let roe = builder.nodes().get("fin.roe").expect("node kept");
+        assert_eq!(roe.node_type, NodeType::Value);
+        assert!(roe.formula_text.is_none());
+        assert!(builder.nodes().contains_key("fin.roa"));
+    }
 
     #[test]
     fn where_clause_targets_a_redefined_node_not_the_last_map_slot() {

@@ -5,7 +5,7 @@ use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, ForecastSpec};
-use finstack_quant_statements_analytics::analysis::goal_seek::goal_seek;
+use finstack_quant_statements_analytics::analysis::goal_seek;
 
 #[test]
 fn test_goal_seek_simple_linear() {

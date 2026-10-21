@@ -1,6 +1,6 @@
 //! Python bindings for the corkscrew (roll-forward / articulation) extension.
 //!
-//! Wraps [`finstack_quant_statements_analytics::extensions::corkscrew`] types:
+//! Wraps [`finstack_quant_statements_analytics::extensions`] types:
 //!
 //! - [`PyAccountType`] — asset / liability / equity classifier (serialized as the snake_case rust enum).
 //! - [`PyCorkscrewAccount`] — single account definition (balance node + change nodes).
@@ -9,12 +9,13 @@
 //! - [`PyCorkscrewReport`] — validation report (status, message, structured data, warnings, errors).
 
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
     ColumnSchema,
 };
 use crate::errors::display_to_py;
-use finstack_quant_statements_analytics::extensions::corkscrew as rust_corkscrew;
+use finstack_quant_statements_analytics::extensions as rust_corkscrew;
 use pyo3::prelude::*;
 
 /// Column schema for [`PyCorkscrewReport::to_validations_dataframe`].
@@ -160,29 +161,6 @@ impl PyCorkscrewAccount {
         self.inner.beginning_balance_node.as_deref()
     }
 
-    /// Round-trip via JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Build a corkscrew account from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: rust_corkscrew::CorkscrewAccount =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CorkscrewAccount(node_id='{}', account_type={:?}, changes={})",
@@ -192,6 +170,12 @@ impl PyCorkscrewAccount {
         )
     }
 }
+
+wire_methods!(
+    PyCorkscrewAccount,
+    rust_corkscrew::CorkscrewAccount,
+    "CorkscrewAccount"
+);
 
 /// Configuration for corkscrew (roll-forward) validation.
 ///
@@ -254,29 +238,6 @@ impl PyCorkscrewConfig {
         self.inner.fail_on_error
     }
 
-    /// Serialize this config to JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Build a config from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: rust_corkscrew::CorkscrewConfig =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CorkscrewConfig(accounts={}, tolerance={}, fail_on_error={})",
@@ -286,6 +247,12 @@ impl PyCorkscrewConfig {
         )
     }
 }
+
+wire_methods!(
+    PyCorkscrewConfig,
+    rust_corkscrew::CorkscrewConfig,
+    "CorkscrewConfig"
+);
 
 /// Report produced by [`PyCorkscrewExtension.execute`].
 #[pyclass(
@@ -384,29 +351,6 @@ impl PyCorkscrewReport {
         serde_rows_to_dataframe_with_schema(py, &self.validations(), &VALIDATION_COLUMNS)
     }
 
-    /// Serialize the full report to JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Build a report from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: rust_corkscrew::CorkscrewReport =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "CorkscrewReport(status='{}', warnings={}, errors={})",
@@ -415,18 +359,14 @@ impl PyCorkscrewReport {
             self.inner.errors.len()
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(
+    PyCorkscrewReport,
+    rust_corkscrew::CorkscrewReport,
+    "CorkscrewReport"
+);
+impl_repr_html_via_dataframe!(PyCorkscrewReport);
 
 impl PyCorkscrewReport {
     /// Per-account validation records from the structured `data` payload.

@@ -12,7 +12,7 @@ The model and normalization contracts are mechanically ready. Empirical
 - Adjustments: `2`
 - `FinancialModelSpec` and `NormalizationConfig` both round-trip structurally
 - Both documents validate against their checked-in Draft 2020-12 schemas
-- Rust evaluation and `NormalizationEngine::normalize` complete cleanly
+- Rust evaluation and `adjustments::normalize` complete cleanly
 
 | Period | Reported EBITDA | Fixed applied | Percentage applied | Final EBITDA |
 |---|---:|---:|---:|---:|

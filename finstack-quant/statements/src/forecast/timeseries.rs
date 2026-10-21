@@ -377,8 +377,8 @@ fn double_exponential_smoothing(data: &[f64], alpha: f64, beta: f64, phi: f64) -
 
 /// Apply a seasonal forecast with decomposition.
 ///
-/// Uses seasonal decomposition of historical data to extract trend, seasonal,
-/// and residual components, then projects forward.
+/// Uses seasonal decomposition of historical data to extract trend and
+/// seasonal components, then projects forward.
 ///
 /// # Parameters
 ///
@@ -488,7 +488,7 @@ fn seasonal_forecast_with_decomposition(
         Error::forecast("Invalid 'mode' parameter. Must be 'additive' or 'multiplicative'.")
     })?;
 
-    let (trend, seasonal, _residual) = decompose_series_with_mode(&hist_data, season_length, mode)?;
+    let (trend, seasonal) = decompose_series_with_mode(&hist_data, season_length, mode)?;
 
     let growth = params.get("growth").and_then(|v| v.as_f64()).unwrap_or(0.0);
 
@@ -529,19 +529,13 @@ fn seasonal_forecast_with_decomposition(
     Ok(results)
 }
 
-/// Decompose a time series into trend, seasonal, and residual components.
-/// Uses a simple moving average approach.
-#[cfg(test)]
-fn decompose_series(data: &[f64], season_length: usize) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
-    decompose_series_with_mode(data, season_length, SeasonalMode::Additive)
-        .expect("additive decomposition is infallible")
-}
-
+/// Decompose a time series into trend and seasonal components using a simple
+/// moving-average trend.
 fn decompose_series_with_mode(
     data: &[f64],
     season_length: usize,
     mode: SeasonalMode,
-) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+) -> Result<(Vec<f64>, Vec<f64>)> {
     let trend = calculate_trend_component(data, season_length);
 
     match mode {
@@ -633,14 +627,10 @@ fn calculate_trend_component(data: &[f64], season_length: usize) -> Vec<f64> {
     trend
 }
 
-fn decompose_additive(
-    data: &[f64],
-    season_length: usize,
-    trend: Vec<f64>,
-) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+fn decompose_additive(data: &[f64], season_length: usize, trend: Vec<f64>) -> (Vec<f64>, Vec<f64>) {
     debug_assert!(season_length > 0, "season_length must be > 0");
     if season_length == 0 {
-        return (trend, Vec::new(), vec![0.0; data.len()]);
+        return (trend, Vec::new());
     }
     let n = data.len();
 
@@ -669,23 +659,17 @@ fn decompose_additive(
         *s -= seasonal_mean;
     }
 
-    let mut residual = vec![0.0; n];
-    for i in 0..n {
-        let season_idx = i % season_length;
-        residual[i] = data[i] - trend[i] - seasonal[season_idx];
-    }
-
-    (trend, seasonal, residual)
+    (trend, seasonal)
 }
 
 fn decompose_multiplicative(
     data: &[f64],
     season_length: usize,
     trend: Vec<f64>,
-) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+) -> Result<(Vec<f64>, Vec<f64>)> {
     debug_assert!(season_length > 0, "season_length must be > 0");
     if season_length == 0 {
-        return Ok((trend, Vec::new(), vec![1.0; data.len()]));
+        return Ok((trend, Vec::new()));
     }
     let n = data.len();
 
@@ -735,28 +719,7 @@ fn decompose_multiplicative(
         }
     }
 
-    let mut residual = vec![1.0; n];
-    for i in 0..n {
-        let season_idx = i % season_length;
-        let denom = trend[i] * seasonal[season_idx];
-        residual[i] = if denom.abs() < ZERO_TOLERANCE {
-            // Trend is non-zero (validated above), so this only triggers when
-            // a seasonal factor collapses to ~0. Surface the identity
-            // substitution rather than silently masking the model fit.
-            tracing::warn!(
-                index = i,
-                seasonal_factor = seasonal[season_idx],
-                "Multiplicative residual denominator is near zero (seasonal factor ~0); \
-                 substituting the identity residual 1.0, which masks fit quality at \
-                 this observation"
-            );
-            1.0
-        } else {
-            data[i] / denom
-        };
-    }
-
-    Ok((trend, seasonal, residual))
+    Ok((trend, seasonal))
 }
 
 #[cfg(test)]
@@ -944,7 +907,8 @@ mod tests {
             110.0, 100.0, 120.0, 95.0, // Year 3
         ];
 
-        let (trend, seasonal, _residual) = decompose_series(&data, 4);
+        let (trend, seasonal) =
+            decompose_series_with_mode(&data, 4, SeasonalMode::Additive).expect("additive");
 
         assert_eq!(
             trend.len(),

@@ -5,7 +5,7 @@ use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::capital_structure::CapitalStructureCashflows;
-use finstack_quant_statements::dsl::{ast::StmtExpr, parse_formula};
+use finstack_quant_statements::dsl::{parse_formula, StmtExpr};
 use finstack_quant_statements::evaluator::EvaluationContext;
 use finstack_quant_statements::types::AmountOrScalar;
 use indexmap::IndexMap;

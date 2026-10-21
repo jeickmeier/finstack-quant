@@ -48,7 +48,7 @@ proptest! {
         value in 0.0..1_000_000.0
     ) {
         let formula = format!("{} + {}", identifier, value);
-        let result = dsl::parser::parse_formula(&formula);
+        let result = dsl::parse_formula(&formula);
         prop_assert!(result.is_ok(), "Failed to parse: {}", formula);
     }
 
@@ -57,8 +57,8 @@ proptest! {
     fn parse_deterministic(
         formula in simple_binary_expr()
     ) {
-        let result1 = dsl::parser::parse_formula(&formula);
-        let result2 = dsl::parser::parse_formula(&formula);
+        let result1 = dsl::parse_formula(&formula);
+        let result2 = dsl::parse_formula(&formula);
 
         match (result1, result2) {
             (Ok(ast1), Ok(ast2)) => {
@@ -82,12 +82,12 @@ proptest! {
     ) {
         // a + b * c should always parse as a + (b * c)
         let formula = format!("{} + {} * {}", a, b, c);
-        let result = dsl::parser::parse_formula(&formula);
+        let result = dsl::parse_formula(&formula);
 
         if let Ok(ast) = result {
             // Verify the structure matches expected precedence
             // Top level should be Add, right side should be Mul
-            use finstack_quant_statements::dsl::ast::{StmtExpr, BinOp};
+            use finstack_quant_statements::dsl::{StmtExpr, BinOp};
 
             match ast {
                 StmtExpr::BinOp { op: BinOp::Add, left: _, right } => {
@@ -112,8 +112,8 @@ proptest! {
     ) {
         // Just verify that parsing with and without extra parens both succeed or both fail
         let with_parens = format!("({})", formula);
-        let result1 = dsl::parser::parse_formula(&formula);
-        let result2 = dsl::parser::parse_formula(&with_parens);
+        let result1 = dsl::parse_formula(&formula);
+        let result2 = dsl::parse_formula(&with_parens);
 
         // Both should succeed or both should fail
         prop_assert_eq!(result1.is_ok(), result2.is_ok(), "Parentheses changed parse success");

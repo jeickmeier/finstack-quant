@@ -9,8 +9,8 @@ pub(crate) mod lbo;
 pub(crate) mod orchestrator;
 
 pub use corporate::{
-    dcf_sensitivity, evaluate_dcf_with_market, wacc, CorporateValuationResult, DcfOptions,
-    DcfPeriodRow, DcfSensitivityResult, ExitMultipleBump, DEFAULT_UFCF_NODE,
+    dcf_sensitivity, evaluate_dcf, wacc, CorporateValuationResult, DcfOptions, DcfPeriodRow,
+    DcfSensitivityResult, ExitMultipleBump, DEFAULT_UFCF_NODE,
 };
 pub use lbo::{evaluate_lbo, LboCheckMappings, LboConfig, LboResult, LboTranche};
 pub use orchestrator::{

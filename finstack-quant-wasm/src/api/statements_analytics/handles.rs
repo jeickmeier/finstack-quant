@@ -1,7 +1,8 @@
 //! Stateful statements-analytics handles: the dependency tracer and the
 //! corkscrew and credit-scorecard extensions.
 
-use crate::utils::input::{from_js_json, js_string, json_text};
+use super::parse_model;
+use crate::utils::input::{from_js_json, js_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_statements::evaluator::{DependencyGraph, StatementResult};
 use finstack_quant_statements::FinancialModelSpec;
@@ -10,10 +11,6 @@ use finstack_quant_statements_analytics::extensions::{
     CorkscrewConfig, CorkscrewExtension, CreditScorecardExtension, ScorecardConfig,
 };
 use wasm_bindgen::prelude::*;
-
-fn parse_model(model: &JsValue) -> Result<FinancialModelSpec, JsValue> {
-    FinancialModelSpec::from_json(&json_text(model, "model")?).map_err(to_js_err)
-}
 
 /// Reusable dependency tracer for a financial model.
 ///

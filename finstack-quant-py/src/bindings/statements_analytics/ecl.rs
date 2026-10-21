@@ -14,6 +14,7 @@
 //! PD term structures are passed as ``[(time_years, cumulative_pd), ...]``
 //! knots; a ``(0.0, 0.0)`` anchor is inserted when absent.
 
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
 };
@@ -274,35 +275,16 @@ impl PyQualitativeFlags {
         self.inner.active_default_evidence()
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "QualitativeFlags"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``QualitativeFlags`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid QualitativeFlags JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("QualitativeFlags", &self.inner)
     }
 }
+
+wire_methods!(
+    PyQualitativeFlags,
+    rust_ecl::QualitativeFlags,
+    "QualitativeFlags"
+);
 
 /// IFRS 9 staging policy: SICR thresholds, days-past-due backstops, qualitative
 /// switches and curing windows.
@@ -543,31 +525,6 @@ impl PyStageResult {
         self.inner.cured
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "StageResult"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``StageResult`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid StageResult JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "StageResult(stage=Stage.{:?}, triggers={:?}, cured={})",
@@ -577,6 +534,8 @@ impl PyStageResult {
         )
     }
 }
+
+wire_methods!(PyStageResult, rust_ecl::StageResult, "StageResult");
 
 /// A single credit exposure at a reporting date.
 ///
@@ -957,16 +916,9 @@ impl PyExposure {
             py_opt_str(self.inner.origination_rating.as_deref()),
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`; returns `None` if the frame
-    /// cannot be built so IPython falls back to `__repr__`.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+impl_repr_html_via_dataframe!(PyExposure);
 
 /// One integration bucket of an ECL calculation.
 #[pyclass(
@@ -1092,31 +1044,6 @@ impl PyEclResult {
         serde_rows_to_dataframe_with_schema(py, &self.inner.buckets, &BUCKET_COLUMNS)
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "EclResult"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``EclResult`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid EclResult JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "EclResult(exposure_id='{}', stage=Stage.{:?}, ecl={}, horizon={}, buckets={})",
@@ -1127,13 +1054,10 @@ impl PyEclResult {
             self.inner.buckets.len()
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(PyEclResult, rust_ecl::EclResult, "EclResult");
+impl_repr_html_via_dataframe!(PyEclResult);
 
 /// Probability-weighted ECL across macro scenarios with the per-scenario
 /// audit trail.
@@ -1231,31 +1155,6 @@ impl PyWeightedEclResult {
         serde_rows_to_dataframe_with_schema(py, &rows, &WEIGHTED_BUCKET_COLUMNS)
     }
 
-    /// Serialize to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "WeightedEclResult"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``WeightedEclResult`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid WeightedEclResult JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "WeightedEclResult(exposure_id='{}', stage=Stage.{:?}, ecl={}, scenarios={})",
@@ -1265,13 +1164,14 @@ impl PyWeightedEclResult {
             self.inner.scenario_breakdown.len()
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(
+    PyWeightedEclResult,
+    rust_ecl::WeightedEclResult,
+    "WeightedEclResult"
+);
+impl_repr_html_via_dataframe!(PyWeightedEclResult);
 
 fn staging_config(config: Option<&PyStagingConfig>) -> rust_ecl::StagingConfig {
     config.map_or_else(rust_ecl::StagingConfig::default, |c| c.inner.clone())

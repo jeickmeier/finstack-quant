@@ -107,7 +107,6 @@ def statements_cases() -> dict[str, Any]:
             built_result.get("capex", Q2),
         ],
         "normalize": [doc(row) for row in normalized],
-        "normalize_json": json.loads(st.normalize_json(result, config)),
         "forecast_specs": [
             doc(spec)
             for spec in (

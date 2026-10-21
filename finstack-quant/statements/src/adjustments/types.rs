@@ -188,7 +188,7 @@ impl NormalizationConfig {
     /// `Deserialize` performs no such check. Since the normalization engine
     /// applies every entry unconditionally, a duplicated add-back would be
     /// silently counted twice and report a wrong adjusted value. This is
-    /// called by [`NormalizationEngine::normalize`], so every path is covered;
+    /// called by [`normalize`], so every path is covered;
     /// call it directly to reject a bad config earlier.
     ///
     /// # Errors
@@ -196,7 +196,7 @@ impl NormalizationConfig {
     /// Returns an error naming the first adjustment ID that appears more than
     /// once.
     ///
-    /// [`NormalizationEngine::normalize`]: crate::adjustments::engine::NormalizationEngine::normalize
+    /// [`normalize`]: crate::adjustments::normalize
     pub fn validate(&self) -> crate::error::Result<()> {
         let mut seen: IndexSet<&str> = IndexSet::with_capacity(self.adjustments.len());
         for adjustment in &self.adjustments {
@@ -284,7 +284,7 @@ impl Adjustment {
     /// # Example
     ///
     /// ```rust
-    /// use finstack_quant_statements::adjustments::types::Adjustment;
+    /// use finstack_quant_statements::adjustments::Adjustment;
     ///
     /// let adjustment =
     ///     Adjustment::percentage("synergies", "Synergies", "revenue", 0.05).with_category("run_rate");

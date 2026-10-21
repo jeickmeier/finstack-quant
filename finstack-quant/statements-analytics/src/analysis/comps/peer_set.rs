@@ -4,7 +4,7 @@
 //! from a larger universe. `PeerSet` holds the subject company alongside
 //! its peers and provides metric extraction helpers.
 
-use super::types::{CompanyId, CompanyMetrics, PeriodBasis};
+use super::types::{CompanyMetrics, PeriodBasis};
 use serde::{Deserialize, Serialize};
 
 /// Criteria for filtering companies into a peer set.
@@ -161,28 +161,5 @@ impl PeerSet {
     /// Number of peers (excluding subject).
     pub fn peer_count(&self) -> usize {
         self.peers.len()
-    }
-
-    /// Extract a specific metric as a vec across all peers.
-    ///
-    /// Returns only peers where the metric is `Some`. The returned
-    /// `Vec` contains `(CompanyId, value)` pairs preserving the
-    /// association.
-    pub fn extract_metric(
-        &self,
-        extractor: impl Fn(&CompanyMetrics) -> Option<f64>,
-    ) -> Vec<(CompanyId, f64)> {
-        self.peers
-            .iter()
-            .filter_map(|c| extractor(c).map(|v| (c.id.clone(), v)))
-            .collect()
-    }
-
-    /// Extract the subject's value for a given metric.
-    pub fn subject_metric(
-        &self,
-        extractor: impl Fn(&CompanyMetrics) -> Option<f64>,
-    ) -> Option<f64> {
-        extractor(&self.subject)
     }
 }

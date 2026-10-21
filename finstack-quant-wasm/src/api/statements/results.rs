@@ -304,9 +304,7 @@ pub fn check_report_findings_by_severity(
     severity: JsValue,
 ) -> Result<JsValue, JsValue> {
     let report: CheckReport = from_js_json(&report_json, "reportJson")?;
-    let severity: Severity =
-        finstack_quant_core::wire::serde_parse(&js_string(&severity, "severity")?)
-            .map_err(to_js_err)?;
+    let severity: Severity = crate::utils::wire::js_wire(&severity, "severity")?;
     to_js_value(&report.findings_by_severity(severity))
 }
 

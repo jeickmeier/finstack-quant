@@ -40,7 +40,7 @@
 //!
 //! # fn main() -> Result<()> {
 //! // Build a simple P&L model
-//! let model = FinancialModelSpec::builder("Acme Corp")
+//! let model = ModelBuilder::new("Acme Corp")
 //!     .periods("2025Q1..Q4", Some("2025Q2"))?
 //!     .value("revenue", &[
 //!         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(10_000_000.0)),
@@ -67,7 +67,6 @@
 //! - **forecast**: Deterministic and statistical forecast methods (growth, seasonal, Monte Carlo)
 //! - **registry**: Dynamic metric registry with namespace management and built-in `fin.*` metrics
 //! - **checks**: Financial-statement consistency checks framework
-//! - **formula**: Public formula helpers for identifier extraction and qualification
 //! - **schema**: Checked-in JSON Schema artifacts for persisted statement contracts
 //!
 //! ## Analytics
@@ -77,7 +76,6 @@
 //! `CreditScorecardExtension`) live in the `finstack-quant-statements-analytics`
 //! crate.
 
-/// Normalization engine and add-back tracking for adjusted metrics.
 pub mod adjustments;
 /// Type-safe model builder API.
 pub mod builder;
@@ -92,9 +90,7 @@ pub mod error;
 /// Evaluation engine for metric graphs.
 pub mod evaluator;
 /// Forecast methods and time-series drivers.
-pub mod forecast;
-/// Public formula helper functions for identifier extraction and qualification.
-pub mod formula;
+pub(crate) mod forecast;
 /// Convenient re-exports for common statement types.
 pub mod prelude;
 /// Metric registry and namespace management.

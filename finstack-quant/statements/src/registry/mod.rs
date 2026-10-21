@@ -13,10 +13,9 @@
 //!
 //! ```no_run
 //! use finstack_quant_statements::prelude::*;
-//! use finstack_quant_statements::builder::Ready;
 //!
 //! # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
-//! # let mut model: ModelBuilder<Ready> = unimplemented!("build a ModelBuilder<Ready>");
+//! # let mut model: ModelBuilder = unimplemented!("build a ModelBuilder");
 //! let registry = Registry::with_builtins()?;
 //! model.add_metric_from_registry("fin.gross_profit", &registry)?;
 //! model.compute("margin", "fin.gross_profit / revenue")?;
@@ -51,10 +50,9 @@
 //!
 //! ```no_run
 //! use finstack_quant_statements::prelude::*;
-//! use finstack_quant_statements::builder::Ready;
 //!
 //! # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
-//! # let mut model: ModelBuilder<Ready> = unimplemented!("build a ModelBuilder<Ready>");
+//! # let mut model: ModelBuilder = unimplemented!("build a ModelBuilder");
 //! // Load standard metrics under "fin" namespace
 //! model.with_builtin_metrics()?;
 //!
@@ -75,9 +73,9 @@
 //! - Metric files in `finstack-quant/statements/data/metrics/`
 
 pub(crate) mod builtins;
-pub mod dynamic;
+pub(crate) mod dynamic;
 pub(crate) mod schema;
 pub(crate) mod validation;
 
-pub use dynamic::Registry;
+pub use dynamic::{Registry, StoredMetric};
 pub use schema::{MetricDefinition, MetricRegistry, UnitType};

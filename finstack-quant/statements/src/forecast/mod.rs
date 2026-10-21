@@ -114,48 +114,28 @@ pub(crate) fn apply_forecast_for_node(
                      (only Monte Carlo honors it); this node's draws are independent here"
                 );
             }
-            let params = mix_node_seed(&spec.params, node_id);
-            let spec = ForecastSpec {
-                method: spec.method,
-                params,
-            };
-            apply_forecast_internal(&spec, base_value, forecast_periods, None)?
+            apply_forecast(spec, base_value, forecast_periods, node_id, None)?
         }
-        _ => apply_forecast_internal(spec, base_value, forecast_periods, None)?,
+        _ => apply_forecast(spec, base_value, forecast_periods, node_id, None)?,
     };
     apply_bounds(&spec.params, &mut results)?;
     Ok(results)
 }
 
-/// Apply a forecast method with an additional seed offset for statistical
-/// methods.
+/// Run a forecast method without bounds.
 ///
-/// Used by Monte Carlo evaluation to derive independent, but still
-/// deterministic, per-path seeds from the base seed configured in the
-/// [`ForecastSpec`]. The `node_id` argument is mixed into the effective RNG
-/// seed so different stochastic nodes on the same path do not reuse identical
-/// draws. Deterministic methods ignore the seed and behave identically to
-/// [`apply_forecast_for_node`].
-pub(crate) fn apply_forecast_seeded(
+/// Stochastic methods (normal, log-normal, mean-reverting, bootstrap) mix
+/// `node_id` into their configured seed so different nodes on the same run do
+/// not reuse identical draws. `stream` selects an independent Philox stream
+/// for Monte Carlo path `stream`; `None` is the single-run stream.
+/// Deterministic methods ignore both. Monte Carlo callers apply
+/// [`apply_bounds`] themselves, after recording correlation shocks.
+pub(crate) fn apply_forecast(
     spec: &ForecastSpec,
     base_value: f64,
     forecast_periods: &[PeriodId],
-    seed_offset: u64,
     node_id: &str,
-) -> Result<indexmap::IndexMap<PeriodId, f64>> {
-    apply_forecast_internal(
-        spec,
-        base_value,
-        forecast_periods,
-        Some((seed_offset, node_id)),
-    )
-}
-
-fn apply_forecast_internal(
-    spec: &ForecastSpec,
-    base_value: f64,
-    forecast_periods: &[PeriodId],
-    seed_ctx: Option<(u64, &str)>,
+    stream: Option<u64>,
 ) -> Result<indexmap::IndexMap<PeriodId, f64>> {
     use crate::types::ForecastMethod;
     use statistical::{
@@ -167,53 +147,29 @@ fn apply_forecast_internal(
     // through on any path.
     validate_params(spec.method, &spec.params)?;
 
-    match (spec.method, seed_ctx) {
-        (ForecastMethod::Normal, Some((seed_offset, node_id))) => {
-            let params = mix_node_seed(&spec.params, node_id);
-            normal_forecast_with_stream(base_value, forecast_periods, &params, Some(seed_offset))
+    let seeded = || mix_node_seed(&spec.params, node_id);
+    match spec.method {
+        ForecastMethod::Normal => {
+            normal_forecast_with_stream(base_value, forecast_periods, &seeded(), stream)
         }
-        (ForecastMethod::LogNormal, Some((seed_offset, node_id))) => {
-            let params = mix_node_seed(&spec.params, node_id);
-            lognormal_forecast_with_stream(base_value, forecast_periods, &params, Some(seed_offset))
+        ForecastMethod::LogNormal => {
+            lognormal_forecast_with_stream(base_value, forecast_periods, &seeded(), stream)
         }
-        (ForecastMethod::MeanReverting, Some((seed_offset, node_id))) => {
-            let params = mix_node_seed(&spec.params, node_id);
-            mean_reverting_forecast_with_stream(
-                base_value,
-                forecast_periods,
-                &params,
-                Some(seed_offset),
-            )
+        ForecastMethod::MeanReverting => {
+            mean_reverting_forecast_with_stream(base_value, forecast_periods, &seeded(), stream)
         }
-        (ForecastMethod::Bootstrap, Some((seed_offset, node_id))) => {
-            let params = mix_node_seed(&spec.params, node_id);
-            bootstrap_forecast_with_stream(base_value, forecast_periods, &params, Some(seed_offset))
+        ForecastMethod::Bootstrap => {
+            bootstrap_forecast_with_stream(base_value, forecast_periods, &seeded(), stream)
         }
-        (ForecastMethod::ForwardFill, _) => forward_fill(base_value, forecast_periods),
-        (ForecastMethod::GrowthPct, _) => growth_pct(base_value, forecast_periods, &spec.params),
-        (ForecastMethod::CurvePct, _) => curve_pct(base_value, forecast_periods, &spec.params),
-        (ForecastMethod::Override, _) => apply_override(base_value, forecast_periods, &spec.params),
-        (ForecastMethod::Normal, None) => {
-            normal_forecast_with_stream(base_value, forecast_periods, &spec.params, None)
-        }
-        (ForecastMethod::LogNormal, None) => {
-            lognormal_forecast_with_stream(base_value, forecast_periods, &spec.params, None)
-        }
-        (ForecastMethod::TimeSeries, _) => {
+        ForecastMethod::ForwardFill => forward_fill(base_value, forecast_periods),
+        ForecastMethod::GrowthPct => growth_pct(base_value, forecast_periods, &spec.params),
+        ForecastMethod::CurvePct => curve_pct(base_value, forecast_periods, &spec.params),
+        ForecastMethod::Override => apply_override(base_value, forecast_periods, &spec.params),
+        ForecastMethod::TimeSeries => {
             timeseries_forecast(base_value, forecast_periods, &spec.params)
         }
-        (ForecastMethod::Seasonal, _) => {
-            seasonal_forecast(base_value, forecast_periods, &spec.params)
-        }
-        (ForecastMethod::FadeToTarget, _) => {
-            fade_to_target(base_value, forecast_periods, &spec.params)
-        }
-        (ForecastMethod::MeanReverting, None) => {
-            mean_reverting_forecast_with_stream(base_value, forecast_periods, &spec.params, None)
-        }
-        (ForecastMethod::Bootstrap, None) => {
-            bootstrap_forecast_with_stream(base_value, forecast_periods, &spec.params, None)
-        }
+        ForecastMethod::Seasonal => seasonal_forecast(base_value, forecast_periods, &spec.params),
+        ForecastMethod::FadeToTarget => fade_to_target(base_value, forecast_periods, &spec.params),
     }
 }
 
@@ -564,7 +520,7 @@ mod tests {
         }
     }
 
-    /// Monte Carlo path: `apply_forecast_seeded` must return **unclamped**
+    /// Monte Carlo path: `apply_forecast` must return **unclamped**
     /// values. Z-score recording inverts the generating recurrence from the
     /// series, so clamping before recording would corrupt every correlated
     /// peer's shocks. The evaluator applies bounds after recording.
@@ -576,7 +532,7 @@ mod tests {
         spec.params.insert("max".into(), serde_json::json!(101.0));
 
         let seeded =
-            apply_forecast_seeded(&spec, 100.0, &periods, 3, "node").expect("seeded forecast");
+            apply_forecast(&spec, 100.0, &periods, "node", Some(3)).expect("seeded forecast");
         // With sigma = 50 and tight bounds, an unclamped walk must escape
         // [99, 101] somewhere in 8 periods.
         assert!(

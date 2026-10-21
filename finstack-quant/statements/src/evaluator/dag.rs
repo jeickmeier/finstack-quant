@@ -49,8 +49,8 @@ impl DependencyGraph {
     ///
     /// Returns an error if a formula or `where` clause cannot be parsed for
     /// dependency extraction, or if it references an unknown node identifier.
-    /// It does not reject cycles; call [`detect_cycles`](Self::detect_cycles) or
-    /// [`evaluate_order`] after construction when an executable order is needed.
+    /// It does not reject cycles; the evaluator orders the graph and rejects
+    /// cycles when it prepares the model.
     pub fn from_model(model: &FinancialModelSpec) -> Result<Self> {
         let mut parsed = IndexMap::new();
         for node in model.nodes.values() {
@@ -155,7 +155,7 @@ impl DependencyGraph {
     /// Returns a circular-dependency error containing one representative cycle
     /// when same-period dependencies form a loop. Temporal `lag` and `shift`
     /// links are not graph edges and therefore do not cause this error.
-    pub fn detect_cycles(&self) -> Result<()> {
+    pub(crate) fn detect_cycles(&self) -> Result<()> {
         let mut visited: IndexSet<NodeId> = IndexSet::new();
         for node_id in self.dependencies.keys() {
             if let Some(cycle) = self.dfs_cycle(node_id.as_str(), &mut visited) {
@@ -264,23 +264,6 @@ fn add_dependency_edges(
 /// # Arguments
 /// * `graph` - Dependency graph built from a [`FinancialModelSpec`](crate::types::FinancialModelSpec)
 ///
-/// # Example
-///
-/// ```rust
-/// # use finstack_quant_statements::builder::ModelBuilder;
-/// # use finstack_quant_statements::evaluator::{DependencyGraph, evaluate_order};
-/// let model = ModelBuilder::new("demo")
-///     .periods("2025Q1..Q2", None)?
-///     .compute("a", "10")?
-///     .compute("b", "a * 2")?
-///     .build()?;
-///
-/// let graph = DependencyGraph::from_model(&model)?;
-/// let order = evaluate_order(&graph)?;
-/// assert!(order.iter().position(|n| n == "a") < order.iter().position(|n| n == "b"));
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-///
 /// The order is deterministic for a fixed graph and is suitable for one
 /// period's evaluation. It does not imply an ordering between historical
 /// references, because those are intentionally excluded from direct edges.
@@ -290,7 +273,7 @@ fn add_dependency_edges(
 /// Returns an evaluation error if the graph contains a same-period cycle. The
 /// diagnostic lists the nodes that remain unprocessed so callers can locate
 /// the circular dependency.
-pub fn evaluate_order(graph: &DependencyGraph) -> Result<Vec<NodeId>> {
+pub(crate) fn evaluate_order(graph: &DependencyGraph) -> Result<Vec<NodeId>> {
     crate::utils::graph::toposort_ids(&graph.dependencies).map_err(|unprocessed| {
         Error::eval(format!(
             "Circular dependency detected in model. Affected nodes: {}",

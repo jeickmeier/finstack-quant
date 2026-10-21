@@ -44,7 +44,6 @@ StatementResult = _statements.StatementResult
 WaterfallSpec = _statements.WaterfallSpec
 merge_into_results = _statements.merge_into_results
 normalize = _statements.normalize
-normalize_json = _statements.normalize_json
 parse_and_compile = _statements.parse_and_compile
 parse_formula = _statements.parse_formula
 
@@ -85,7 +84,6 @@ __all__: list[str] = [
     "WaterfallSpec",
     "merge_into_results",
     "normalize",
-    "normalize_json",
     "parse_and_compile",
     "parse_formula",
     "schema",
