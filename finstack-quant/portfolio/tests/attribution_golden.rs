@@ -382,11 +382,15 @@ fn test_parallel_portfolio_attribution_closes_with_serial_inner_policy() {
         })
         .collect::<Vec<_>>();
 
-    let portfolio = Portfolio::builder("TEST_PARALLEL_ATTR")
-        .base_currency(Currency::USD)
-        .as_of(as_of_t0)
-        .entity(Entity::new("ENTITY_A"))
-        .positions(positions)
+    let portfolio = positions
+        .into_iter()
+        .fold(
+            Portfolio::builder("TEST_PARALLEL_ATTR")
+                .base_currency(Currency::USD)
+                .as_of(as_of_t0)
+                .entity(Entity::new("ENTITY_A")),
+            |builder, position| builder.position(position),
+        )
         .build()
         .unwrap();
 

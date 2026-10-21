@@ -8,6 +8,8 @@
 mod allocation;
 mod attribution;
 mod brinson;
+pub(crate) mod cashflows;
+pub(crate) mod container;
 mod excess_return;
 mod factor_brinson;
 pub(crate) mod factor_model;
@@ -15,16 +17,16 @@ mod fi_attribution;
 mod grid_attribution;
 mod margin;
 mod materialization;
-mod optimization_spec;
+mod metrics;
+mod optimization;
 mod performance;
-mod pipeline;
 mod primitive;
 mod replay;
-mod scenario_pnl;
+mod results;
+mod scenarios;
 mod schema;
-mod sensitivity;
-mod spec;
-pub(crate) mod types;
+pub(crate) mod sensitivity;
+pub(crate) mod valuation;
 
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -35,13 +37,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.setattr(
         "__doc__",
         "Portfolio construction, valuation, cashflows, scenarios, and metrics.",
-    )?;
-    // Common base for every named finstack exception; its canonical home is
-    // `finstack_quant.core`, and it is re-exported here alongside the portfolio
-    // family so `except FinstackError` is reachable without a second import.
-    m.add(
-        "FinstackError",
-        py.get_type::<crate::errors::FinstackError>(),
     )?;
     m.add(
         "PortfolioError",
@@ -68,12 +63,15 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         py.get_type::<crate::errors::ContractLimitExceededError>(),
     )?;
 
-    types::register(py, &m)?;
+    container::register(py, &m)?;
+    valuation::register(py, &m)?;
+    results::register(py, &m)?;
+    metrics::register(py, &m)?;
+    cashflows::register(py, &m)?;
+    scenarios::register(py, &m)?;
     materialization::register(py, &m)?;
-    spec::register(py, &m)?;
-    pipeline::register(py, &m)?;
     attribution::register(py, &m)?;
-    optimization_spec::register(py, &m)?;
+    optimization::register(py, &m)?;
     allocation::register(py, &m)?;
     replay::register(py, &m)?;
     factor_model::register(py, &m)?;
@@ -88,7 +86,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     margin::register(py, &m)?;
 
     let exports = vec![
-        "FinstackError",
         "PortfolioError",
         "ContractValidationError",
         "UnsupportedContractVersionError",
@@ -112,7 +109,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "CarinoLinkedAttribution",
         "FiAttributionResult",
         "FiCarinoLinkedResult",
-        "FiReconciliationReport",
         "DurationCellTable",
         "ExcessReturnResult",
         "GridAttributionResult",
@@ -129,21 +125,15 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "apply_scenario_and_revalue",
         "scenario_pnl",
         "scenario_pnl_batch",
-        "scenario_pnl_batch_json",
         "attribute_portfolio_pnl",
         "allocate_weights",
-        "allocate_weights_json",
         "optimize_portfolio",
         "rebalance_from_spec",
         "replay_portfolio",
-        "replay_portfolio_json",
         "brinson_fachler",
         "carino_link",
-        "carino_link_from_sector_periods",
         "campisi_attribution",
         "campisi_carino_link",
-        "campisi_carino_link_from_snapshots",
-        "campisi_reconciliation_check",
         "cell_returns_from_curves",
         "cell_returns_from_reference",
         "excess_returns",
@@ -157,7 +147,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "FactorPnlProfile",
         "compute_factor_sensitivities",
         "compute_pnl_profiles",
-        "decompose_factor_risk",
         // portfolio-owned factor workflow result classes
         "FactorContributionDelta",
         "WhatIfResult",
@@ -173,7 +162,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "build_credit_vol_report",
         "PortfolioPrimitiveExposureReport",
         "primitive_exposures",
-        "validate_allocation_json",
         // optimization spec/result classes (Slice 9)
         "WeightingScheme",
         "MissingMetricPolicy",
@@ -193,8 +181,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "PortfolioOptimizationResult",
         // portfolio margin aggregation
         "NettingSetMargin",
-        "PortfolioMarginAggregator",
         "PortfolioMarginResult",
+        "portfolio_margin",
         "schema",
     ];
 

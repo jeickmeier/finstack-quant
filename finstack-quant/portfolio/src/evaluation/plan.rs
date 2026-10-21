@@ -867,7 +867,7 @@ mod tests {
 
         let outcome = plan.execute();
         let best_effort_result = outcome.get(best_effort_job).expect("best-effort result");
-        assert!(best_effort_result.has_degraded_risk());
+        assert!(!best_effort_result.degraded_positions.is_empty());
         assert!(outcome
             .get(strict_job)
             .expect_err("strict job must surface metric failure")

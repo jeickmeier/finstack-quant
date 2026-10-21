@@ -58,7 +58,7 @@ total = Decimal(wire["total_base_currency"]["amount"])
 rows=[{"position":iid,"currency":pv["value_native"]["currency"],"native_amount":pv["value_native"]["amount"],"base_usd":pv["value_base"]["amount"]} for iid,pv in wire["position_values"].items()]
 frame=pd.DataFrame(rows)
 frame.to_csv("pm-report-positions.csv",index=False)
-risk=aggregate_metrics(valuation,"USD",market,AS_OF)
+risk=aggregate_metrics(valuation, market)
 credit={key:value for key,value in risk.aggregated.items() if key.startswith("cs01::")}
 report=TearSheet(INSTITUTIONAL,"Analyst common book",[
     Section("Decision and conditions","<p>Hold pending confirmation of the private loan's executable liquidity. Size any hedge from qualified curve and credit sensitivities; positive bump P&amp;L sets the sign.</p>"),
@@ -133,7 +133,7 @@ report_rows=[]
 for pid,item in report_wire["position_values"].items():
  required=expected_metrics("common")[pid]
  report_rows.append({"position":pid,"currency":item["value_native"]["currency"],"native_amount":item["value_native"]["amount"],"USD":item["value_base"]["amount"]})
-report_risk=aggregate_metrics(report_valuation,"USD",report_market,report_date)
+report_risk=aggregate_metrics(report_valuation, report_market)
 report_shock=ScenarioSpec(id="report-usd-zero-plus100",operations=[OperationSpec.curve_parallel_bp(CurveKind.discount(),"USD-OIS",100.)])
 shocked_market=apply_scenario(report_shock, report_market, report_date).market
 shocked=value_portfolio(Portfolio.from_spec(json.dumps(report_spec)),shocked_market,metrics=[])

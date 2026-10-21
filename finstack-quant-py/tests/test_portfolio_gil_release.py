@@ -13,6 +13,7 @@ import time
 import pytest
 
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
+from finstack_quant.models.factor.risk import decompose_factors
 from finstack_quant.models.liquidity import (
     amihud_illiquidity,
     kyle_lambda,
@@ -23,10 +24,10 @@ from finstack_quant.portfolio import (
     Portfolio,
     aggregate_metrics,
     attribute_portfolio_pnl,
-    carino_link_from_sector_periods,
+    brinson_fachler,
+    carino_link,
     compute_factor_sensitivities,
-    decompose_factor_risk,
-    replay_portfolio_json,
+    replay_portfolio,
     twrr_linked,
     value_portfolio,
 )
@@ -117,21 +118,6 @@ def _factor_model_config_json() -> str:
         },
         "risk_measure": "variance",
     })
-
-
-def _sensitivity_positions_json(position_count: int) -> str:
-    spec = json.loads(_portfolio_spec_json(position_count))
-    return json.dumps([
-        {
-            "id": position["position_id"],
-            "instrument": {
-                "schema": "finstack_quant.instrument/1",
-                "instrument": position["instrument_spec"],
-            },
-            "weight": position["quantity"],
-        }
-        for position in spec["positions"]
-    ])
 
 
 _GIL_PROBE_ATTEMPTS = 8
@@ -228,14 +214,7 @@ def test_raw_valuation_metric_aggregation_releases_gil() -> None:
     market = _market()
     valuation = value_portfolio(portfolio, market, metrics=[])
 
-    metrics_json = _assert_releases_gil(
-        lambda: aggregate_metrics(
-            valuation,
-            "USD",
-            market,
-            AS_OF.isoformat(),
-        ).to_json()
-    )
+    metrics_json = _assert_releases_gil(lambda: aggregate_metrics(valuation, market).to_json())
 
     by_position = json.loads(metrics_json)["by_position"]
     assert len(by_position) == 3_000
@@ -259,14 +238,13 @@ def test_attribution_nested_serialization_releases_gil() -> None:
     assert len(json.loads(by_position_json)) == 256
 
 
-def test_replay_parse_compute_and_serialize_release_gil() -> None:
+def test_replay_parse_and_compute_release_gil() -> None:
     portfolio = Portfolio.from_spec(_portfolio_spec_json(500))
     snapshots_json = _replay_snapshots_json(20)
 
-    result_json = _assert_releases_gil(lambda: replay_portfolio_json(portfolio, snapshots_json, '{"mode":"pv_only"}'))
-    result = json.loads(result_json)
+    typed = _assert_releases_gil(lambda: replay_portfolio(portfolio, snapshots_json, '{"mode":"pv_only"}'))
+    result = json.loads(typed.to_json())
 
-    assert isinstance(result_json, str)
     assert len(result["steps"]) == 20
     assert result["summary"]["num_steps"] == 20
 
@@ -275,7 +253,7 @@ def test_replay_detached_parse_preserves_value_error_mapping() -> None:
     portfolio = Portfolio.from_spec(_portfolio_spec_json(1))
 
     with pytest.raises(ValueError, match="invalid snapshots JSON"):
-        replay_portfolio_json(portfolio, "{}", '{"mode":"pv_only"}')
+        replay_portfolio(portfolio, "{}", '{"mode":"pv_only"}')
 
 
 def test_factor_stress_releases_gil_and_returns_position_results() -> None:
@@ -353,9 +331,10 @@ def test_large_carino_parse_compute_and_serialize_release_gil() -> None:
             "benchmark_return": 0.0,
         },
     ]
-    periods_json = json.dumps([period] * 10_000)
+    period_result = json.loads(brinson_fachler(json.dumps(period)).to_json())
+    periods_json = json.dumps([period_result] * 10_000)
 
-    result_json = _assert_releases_gil(lambda: carino_link_from_sector_periods(periods_json).to_json())
+    result_json = _assert_releases_gil(lambda: carino_link(periods_json).to_json())
     result = json.loads(result_json)
 
     assert len(result["periods"]) == 10_000
@@ -364,20 +343,19 @@ def test_large_carino_parse_compute_and_serialize_release_gil() -> None:
 
 def test_sensitivity_result_conversion_and_decomposition_release_gil() -> None:
     factor_config = json.loads(_factor_model_config_json())
-    positions_json = _sensitivity_positions_json(2_000)
+    portfolio = Portfolio.from_spec(_portfolio_spec_json(2_000))
     factors_json = json.dumps(factor_config["factors"])
     covariance_json = json.dumps(factor_config["covariance"])
     market = _market()
     matrix = _assert_releases_gil(
         lambda: compute_factor_sensitivities(
-            positions_json,
+            portfolio,
             factors_json,
             market,
             AS_OF.isoformat(),
-            "USD",
         )
     )
-    decomposition = _assert_releases_gil(lambda: decompose_factor_risk(matrix, covariance_json))
+    decomposition = _assert_releases_gil(lambda: decompose_factors(matrix, covariance_json))
 
     assert matrix.n_positions == 2_000
     assert matrix.n_factors == 1

@@ -53,15 +53,11 @@ const book = portfolio.Portfolio.fromSpec(inputs.portfolio_spec);
 const marketT0 = core.MarketContext.fromJson(inputs.market_t0);
 const marketT1 = core.MarketContext.fromJson(inputs.market_t1);
 
-test('allocateWeights and its JSON twins match Python', () => {
+test('allocateWeights matches Python', () => {
   assertClose(wire(portfolio.allocateWeights(inputs.allocation_spec)), expected.allocate_weights);
   assertClose(
-    JSON.parse(portfolio.allocateWeightsJson(JSON.stringify(inputs.allocation_spec))),
+    wire(portfolio.allocateWeights(JSON.stringify(inputs.allocation_spec))),
     expected.allocate_weights
-  );
-  assertClose(
-    JSON.parse(portfolio.validateAllocationJson(inputs.allocation_spec)),
-    expected.validate_allocation_json
   );
   assert.throws(
     () => portfolio.allocateWeights({ ...inputs.allocation_spec, scheme: 'nope' }),
@@ -217,12 +213,22 @@ test('buildCreditVolReport matches Python', () => {
   const report = portfolio.buildCreditVolReport(inputs.credit_decomposition, model, true);
   assertClose(wire(report), expected.build_credit_vol_report);
   assert.equal(
-    portfolio.buildCreditVolReport(inputs.credit_decomposition, model, false).by_position_optional,
+    portfolio.buildCreditVolReport(inputs.credit_decomposition, model, false).by_position,
     null
   );
   assert.throws(
     () => portfolio.buildCreditVolReport(inputs.credit_decomposition, model, 1),
     TypeError
+  );
+  const unattributable = {
+    ...inputs.credit_decomposition,
+    factor_contributions: [
+      { factor_id: 'usd_rates', absolute_risk: 1, relative_risk: 1, marginal_risk: 0 },
+    ],
+  };
+  assert.throws(
+    () => portfolio.buildCreditVolReport(unattributable, model, false),
+    (error) => error.kind === 'validation' && /usd_rates/.test(error.message)
   );
   model.free();
 });
@@ -243,7 +249,7 @@ test('valuation and metrics lookups match Python', () => {
   );
   assert.equal(portfolio.portfolioValuationGetEntityValue(valuation, 'NOPE'), undefined);
 
-  const metrics = portfolio.aggregateMetrics(valuation, 'USD', inputs.market_t0, inputs.as_of_t0);
+  const metrics = portfolio.aggregateMetrics(valuation, marketT0);
   assertClose(portfolio.portfolioMetricsGetTotal(metrics, 'dv01'), expected.metrics_total_dv01);
   assert.equal(portfolio.portfolioMetricsGetTotal(metrics, 'nope'), undefined);
   assertClose(
@@ -327,4 +333,37 @@ test('optimization result methods read the wire result', () => {
     (error) => error.kind === 'validation'
   );
   assert.throws(() => portfolio.portfolioOptimizationResultNewPositionTrades(3), TypeError);
+  // Feasibility is derived from `status`; the wire carries no stored flag.
+  assert.equal(optimized.status, 'optimal');
+  assert.equal('is_feasible' in optimized, false);
+  assert.equal(portfolio.portfolioOptimizationResultIsFeasible(optimized), true);
+  assert.equal(
+    portfolio.portfolioOptimizationResultIsFeasible({ ...optimized, status: 'infeasible' }),
+    false
+  );
+});
+
+test('optimizePortfolio validates constraint objects and requires a UnitScaling budget', () => {
+  const spec = (constraints, weighting = 'notional_weight') => ({
+    portfolio: inputs.portfolio_spec,
+    objective: { maximize: { weighted_sum: { metric: { constant: 1.0 } } } },
+    constraints,
+    weighting,
+    missing_metric_policy: 'zero',
+    label: null,
+  });
+  for (const [constraint, pattern] of [
+    [{ budget: { rhs: -1.0 } }, /budget rhs/],
+    [{ max_turnover: { label: null, max_turnover: -0.1 } }, /max_turnover/],
+    [{ weight_bounds: { label: null, filter: 'all', min: 0.2, max: 0.1 } }, /weight bounds/],
+  ]) {
+    assert.throws(
+      () => portfolio.optimizePortfolio(spec([constraint]), inputs.market_t0),
+      (error) => error.kind === 'validation' && pattern.test(error.message)
+    );
+  }
+  assert.throws(
+    () => portfolio.optimizePortfolio(spec([], 'unit_scaling'), inputs.market_t0),
+    (error) => error.kind === 'validation' && /MO-9/.test(error.message)
+  );
 });

@@ -90,8 +90,10 @@ fn test_factor_model_report_types_roundtrip() {
     });
 
     assert_roundtrip_value(&StressResult {
-        total_pnl: -1_250.0,
-        position_pnl: vec![(PositionId::new("POS_1"), -750.0)],
+        pnl: StressPnl {
+            total_pnl: -1_250.0,
+            position_pnl: vec![(PositionId::new("POS_1"), -750.0)],
+        },
         stressed_decomposition: sample_decomposition(),
     });
 }

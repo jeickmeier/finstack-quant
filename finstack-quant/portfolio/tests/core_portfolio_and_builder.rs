@@ -28,7 +28,7 @@ fn getters_and_tag_filters() {
 
     let p = Position::new("P", "E", "D", Arc::new(dep), 1.0, PositionUnit::Units)
         .unwrap()
-        .with_text_attribute("sector", "Tech");
+        .with_attribute("sector", "Tech");
 
     let portfolio = Portfolio::builder("P")
         .base_currency(Currency::USD)

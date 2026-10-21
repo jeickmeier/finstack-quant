@@ -4,10 +4,10 @@ import json
 
 import pytest
 
-from finstack_quant.portfolio import allocate_weights_json, validate_allocation_json
+from finstack_quant.portfolio import allocate_weights
 
 
-def test_allocate_weights_json_entrypoint_inverse_volatility() -> None:
+def test_allocate_weights_inverse_volatility_from_json_spec() -> None:
     spec = {
         "scheme": "inverse_volatility",
         "total_capital": 1000.0,
@@ -18,8 +18,7 @@ def test_allocate_weights_json_entrypoint_inverse_volatility() -> None:
         "money_decimal_places": 2,
     }
 
-    validate_allocation_json(json.dumps(spec))
-    result = json.loads(allocate_weights_json(json.dumps(spec)))
+    result = json.loads(allocate_weights(json.dumps(spec)).to_json())
 
     assert result["scheme"] == "inverse_volatility"
     low, high = result["allocations"]

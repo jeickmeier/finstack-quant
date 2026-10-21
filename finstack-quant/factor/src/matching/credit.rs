@@ -357,6 +357,41 @@ fn format_bucket_factor_id(level_idx: usize, dim_path: &str, val_path: &str) -> 
     FactorId::new(format!("credit::level{level_idx}::{dim_path}::{val_path}"))
 }
 
+/// Parses a canonical credit bucket factor ID
+/// `credit::level{idx}::{dim_path}::{val_path}` back into its level index and
+/// bucket value path, the inverse of the IDs [`bucket_factor_id`] builds.
+///
+/// # Arguments
+///
+/// * `id` - Factor identifier to inspect. The generic credit factor
+///   ([`CREDIT_GENERIC_FACTOR_ID`]) and non-credit IDs are not bucket IDs.
+///
+/// # Returns
+///
+/// `Some((level_idx, val_path))` with the zero-based hierarchy level and the
+/// `.`-joined bucket value path (for example `"IG.EU"`), or `None` when `id`
+/// is not a credit bucket factor ID or its level index is not an integer.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_factor::matching::parse_bucket_factor_id;
+/// use finstack_quant_factor::FactorId;
+///
+/// let id = FactorId::new("credit::level1::Rating.Region::IG.EU");
+/// assert_eq!(parse_bucket_factor_id(&id), Some((1, "IG.EU")));
+/// assert_eq!(parse_bucket_factor_id(&FactorId::new("credit::generic")), None);
+/// ```
+#[must_use]
+pub fn parse_bucket_factor_id(id: &FactorId) -> Option<(usize, &str)> {
+    let rest = id.as_str().strip_prefix("credit::level")?;
+    let mut parts = rest.splitn(3, "::");
+    let level_idx = parts.next()?.parse::<usize>().ok()?;
+    let _dim_path = parts.next()?;
+    let val_path = parts.next()?;
+    Some((level_idx, val_path))
+}
+
 /// Builds the canonical factor ID `credit::level{idx}::{dim_path}::{val_path}`
 /// for the given hierarchy level. Returns `None` if any required tag is missing.
 ///
@@ -433,6 +468,20 @@ mod tests {
     use crate::primitives::dependency::{DependencyType, MarketDependency};
     use finstack_quant_core::types::{Attributes, CurveId, IssuerId};
     use std::collections::BTreeMap;
+
+    #[test]
+    fn parse_bucket_factor_id_inverts_format() {
+        let id = format_bucket_factor_id(2, "Rating.Region.Sector", "IG.EU.FIN");
+        assert_eq!(parse_bucket_factor_id(&id), Some((2, "IG.EU.FIN")));
+        for bad in [
+            CREDIT_GENERIC_FACTOR_ID,
+            "credit::levelX::Rating::IG",
+            "credit::level0::Rating",
+            "rates::level0::Rating::IG",
+        ] {
+            assert_eq!(parse_bucket_factor_id(&FactorId::new(bad)), None, "{bad}");
+        }
+    }
 
     fn three_level_spec() -> CreditHierarchySpec {
         CreditHierarchySpec {

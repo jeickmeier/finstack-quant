@@ -23,7 +23,7 @@ pub(super) fn optimize_portfolio(
     // borrow held across the GIL-release boundary. Both clones are negligible
     // next to the optimization itself.
     let result = py
-        .detach(move || opt::optimize_from_spec(&spec, &market, &config))
+        .detach(move || opt::optimize_portfolio(&spec, &market, &config))
         .map_err(crate::errors::portfolio_to_py)?;
     Ok(PyPortfolioOptimizationResult::from_inner(result))
 }
@@ -32,18 +32,17 @@ pub(super) fn optimize_portfolio(
 ///
 /// Mirrors Rust ``optimization::rebalance_from_spec``: held positions take the
 /// result's implied quantities and trade-universe candidates with a
-/// non-negligible target weight and quantity become new positions. Unlike
-/// ``PortfolioOptimizationResult.to_rebalanced_portfolio`` it also works on a
-/// result rebuilt from JSON or unpickled.
+/// non-negligible target weight and quantity become new positions. It works on
+/// any result, including one rebuilt from JSON or unpickled.
 #[pyfunction]
 #[pyo3(signature = (spec, result))]
 pub(super) fn rebalance_from_spec(
     spec: &PyPortfolioOptimizationSpec,
     result: &PyPortfolioOptimizationResult,
-) -> PyResult<crate::bindings::portfolio::types::PyPortfolio> {
+) -> PyResult<crate::bindings::portfolio::container::PyPortfolio> {
     let portfolio = opt::rebalance_from_spec(&spec.inner, &result.inner)
         .map_err(crate::errors::portfolio_to_py)?;
-    Ok(crate::bindings::portfolio::types::PyPortfolio {
+    Ok(crate::bindings::portfolio::container::PyPortfolio {
         inner: std::sync::Arc::new(portfolio),
     })
 }

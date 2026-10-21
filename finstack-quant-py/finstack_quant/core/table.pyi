@@ -21,7 +21,7 @@ Examples
 >>> portfolio, _ = Portfolio.from_materialization(json.dumps(bundle))
 >>> table = value_portfolio(portfolio, MarketContext()).to_arrow_positions()
 >>> (table.num_rows, table.num_columns, table.column_names())
-(0, 6, ['position_id', 'entity_id', 'value_native', 'value_base', 'currency_native', 'currency_base'])
+(0, 8, ['position_id', 'entity_id', 'value_native', 'value_base', 'currency_native', 'currency_base', 'fx_rate', 'risk_error'])
 
 """
 
@@ -63,7 +63,7 @@ class ArrowTable:
     >>> portfolio, _ = Portfolio.from_materialization(json.dumps(bundle))
     >>> table = value_portfolio(portfolio, MarketContext()).to_arrow_positions()
     >>> (table.num_rows, table.num_columns, table.column_names())
-    (0, 6, ['position_id', 'entity_id', 'value_native', 'value_base', 'currency_native', 'currency_base'])
+    (0, 8, ['position_id', 'entity_id', 'value_native', 'value_base', 'currency_native', 'currency_base', 'fx_rate', 'risk_error'])
     >>> import pickle
     >>> pickle.loads(pickle.dumps(table)) == table
     True

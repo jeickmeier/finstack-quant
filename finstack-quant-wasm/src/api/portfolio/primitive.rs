@@ -37,8 +37,11 @@ pub fn primitive_exposures(
     metrics: JsValue,
 ) -> Result<JsValue, JsValue> {
     let metrics: Vec<MetricId> = from_js_json(&metrics, "metrics")?;
-    let report =
-        finstack_quant_portfolio::primitive_exposures(&portfolio.inner, market.inner(), &metrics)
-            .map_err(to_js_err)?;
+    let report = finstack_quant_portfolio::primitive::primitive_exposures(
+        &portfolio.inner,
+        market.inner(),
+        &metrics,
+    )
+    .map_err(to_js_err)?;
     to_js_value(&report)
 }

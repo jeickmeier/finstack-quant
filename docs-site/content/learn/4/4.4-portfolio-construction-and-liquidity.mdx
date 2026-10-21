@@ -91,7 +91,7 @@ for p in opt_spec["positions"]:
 objective=Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.attribute("expected_profit_usd")))
 def optimize_units(cap,turnover=None):
  spec=PortfolioOptimizationSpec.new(json.dumps(opt_spec),objective).with_weighting(WeightingScheme.unit_scaling()).with_missing_metric_policy(MissingMetricPolicy.strict()).with_constraint(Constraint.weight_bounds(PositionFilter.all(),0.,cap/initial_quantity,label="position_cap"))
- # Override the default budget: eight starting multipliers represent one full contract.
+ # UnitScaling requires an explicit budget: eight starting multipliers represent one full contract.
  spec=spec.with_constraint(Constraint.budget(float(len(position_ids))))
  if turnover is not None:spec=spec.with_constraint(Constraint.max_turnover(turnover/initial_quantity,label="turnover"))
  result=optimize_portfolio(spec,build_market("common"))

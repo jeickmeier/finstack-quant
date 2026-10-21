@@ -147,3 +147,27 @@ def test_attribute_portfolio_pnl_accepts_json_extractors_and_tracks_fx_translati
     assert typed.fx_translation_pnl.currency == Currency("USD")
     assert typed.fx_translation_pnl.amount > 0.0
     assert json.loads(typed.to_json()) == json.loads(from_json.to_json())
+
+
+def test_position_dataframe_is_position_id_plus_the_rust_wide_row() -> None:
+    result = attribute_portfolio_pnl(
+        _ordered_two_position_portfolio_json(),
+        _market("USD", AS_OF_T0),
+        _market("USD", AS_OF_T1, shift=0.002),
+        AS_OF_T0,
+        AS_OF_T1,
+        "parallel",
+    )
+
+    frame = result.to_position_dataframe()
+    wide = result.by_position["USD-POS-Z"].to_dataframe()
+
+    assert list(frame.columns) == ["position_id", *wide.columns]
+    assert list(frame["position_id"]) == ["USD-POS-Z", "USD-POS-A"]
+    assert list(frame["instrument_id"]) == ["USD-DEP", "USD-DEP-2"]
+    assert frame["num_repricings"].dtype == "int64"
+    assert frame["result_invalid"].dtype == "bool"
+    first = frame.iloc[0]
+    assert first["total_pnl"] == pytest.approx(wide.iloc[0]["total_pnl"])
+    assert first["rates_curves_pnl"] == pytest.approx(wide.iloc[0]["rates_curves_pnl"])
+    assert first["currency"] == "USD"

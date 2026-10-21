@@ -69,15 +69,12 @@ ENTRY_SHAPES: list[tuple[str, str, str]] = [
     ("finstack_quant.portfolio", "value_portfolio", "wrapper"),
     ("finstack_quant.portfolio", "aggregate_full_cashflows", "wrapper"),
     # portfolio attribution/performance surface (typed result-return
-    # conversion, audit M1): the typed entry point returns a wrapper; the
-    # paired `_json` twin is the only string-returning surface.
+    # conversion, audit M1): every entry point returns a wrapper whose
+    # `to_json()` is the wire form.
     ("finstack_quant.portfolio", "brinson_fachler", "wrapper"),
     ("finstack_quant.portfolio", "carino_link", "wrapper"),
-    ("finstack_quant.portfolio", "carino_link_from_sector_periods", "wrapper"),
     ("finstack_quant.portfolio", "campisi_attribution", "wrapper"),
     ("finstack_quant.portfolio", "campisi_carino_link", "wrapper"),
-    ("finstack_quant.portfolio", "campisi_carino_link_from_snapshots", "wrapper"),
-    ("finstack_quant.portfolio", "campisi_reconciliation_check", "wrapper"),
     ("finstack_quant.portfolio", "cell_returns_from_reference", "wrapper"),
     ("finstack_quant.portfolio", "cell_returns_from_curves", "wrapper"),
     ("finstack_quant.portfolio", "excess_returns", "wrapper"),
@@ -89,9 +86,6 @@ ENTRY_SHAPES: list[tuple[str, str, str]] = [
     ("finstack_quant.portfolio", "replay_portfolio", "wrapper"),
     ("finstack_quant.portfolio", "allocate_weights", "wrapper"),
     ("finstack_quant.portfolio", "scenario_pnl_batch", "wrapper"),
-    ("finstack_quant.portfolio", "replay_portfolio_json", "json"),
-    ("finstack_quant.portfolio", "allocate_weights_json", "json"),
-    ("finstack_quant.portfolio", "scenario_pnl_batch_json", "json"),
 ]
 
 # Result classes that must carry the full accessor contract:
@@ -131,7 +125,6 @@ RESULT_CLASSES: list[tuple[str, str]] = [
     ("finstack_quant.portfolio", "FactorBrinsonResult"),
     ("finstack_quant.portfolio", "FiAttributionResult"),
     ("finstack_quant.portfolio", "FiCarinoLinkedResult"),
-    ("finstack_quant.portfolio", "FiReconciliationReport"),
     ("finstack_quant.portfolio", "GridAttributionResult"),
     ("finstack_quant.portfolio", "GridCarinoLinkedResult"),
     ("finstack_quant.portfolio", "LinkedReturn"),

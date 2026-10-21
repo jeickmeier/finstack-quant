@@ -718,9 +718,10 @@ class ApplicationReport:
 
     Exposed as the :attr:`ApplicationResult.report` attribute of the result
     returned by :func:`apply_scenario`,
-    and as the second element of the tuples returned by
-    :func:`finstack_quant.portfolio.scenario_pnl` and
-    :func:`finstack_quant.portfolio.apply_scenario_and_revalue`.
+    as the second element of the tuple returned by
+    :func:`finstack_quant.portfolio.apply_scenario_and_revalue`, and as the
+    ``report`` of the ``ScenarioPnlBatchItem`` returned by
+    :func:`finstack_quant.portfolio.scenario_pnl`.
 
     Examples
     --------

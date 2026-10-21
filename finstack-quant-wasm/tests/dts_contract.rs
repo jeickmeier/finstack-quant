@@ -839,11 +839,7 @@ fn campisi_dts_declarations_pin_their_argument_lists() {
     ));
     assert!(contains_signature(
         &dts,
-        "campisiCarinoLinkFromSnapshots(periodsJson: JsonInput, configJson: JsonInput): FiCarinoLinkedResult;",
-    ));
-    assert!(contains_signature(
-        &dts,
-        "campisiReconciliationCheck(resultJson: JsonInput, tolerance: number): FiReconciliationReport;",
+        "fiAttributionResultReconciliationCheck(result: FiAttributionResult | string, tolerance: number): ReconciliationReport;",
     ));
 
     // The results-based linker must not grow a config argument: it links

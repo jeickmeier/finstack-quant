@@ -11,20 +11,18 @@
 //! sensitivities, risk decomposition, position what-if and factor stress. The
 
 mod assignment;
-mod budget_whatif;
-mod credit_vol;
+mod credit_vol_report;
 mod model;
-mod stress;
+mod whatif;
 
 use pyo3::prelude::*;
 
 use assignment::{PyFactorAssignmentReport, PyPositionAssignment, PyUnmatchedEntry};
-use budget_whatif::{PyFactorContributionDelta, PyWhatIfResult};
-use credit_vol::{
+use credit_vol_report::{
     build_credit_vol_report, PyCreditVolReport, PyLevelVolContribution, PyPositionVolContribution,
 };
 use model::PyFactorModel;
-use stress::{PyStressPnl, PyStressResult};
+use whatif::{PyFactorContributionDelta, PyStressPnl, PyStressResult, PyWhatIfResult};
 
 /// Register factor_model typed result classes and typed-sibling functions on
 /// the portfolio submodule.

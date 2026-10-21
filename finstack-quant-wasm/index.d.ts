@@ -246,7 +246,6 @@ import type {
   FactorPnlProfile,
   FiAttributionResult,
   FiCarinoLinkedResult,
-  FiReconciliationReport,
   GridAttributionResult,
   GridCarinoLinkedResult,
   LinkedReturn,
@@ -262,7 +261,6 @@ import type {
   PositionSpec,
   ReconciliationReport,
   ScenarioPnlBatchItem,
-  ScenarioPnlView,
   SensitivityMatrixJson,
   StressPnl,
   StressResult,
@@ -481,7 +479,6 @@ export type {
   FactorPnlProfile,
   FiAttributionResult,
   FiCarinoLinkedResult,
-  FiReconciliationReport,
   GridAttributionResult,
   GridCarinoLinkedResult,
   LinkedReturn,
@@ -497,7 +494,6 @@ export type {
   PositionSpec,
   ReconciliationReport,
   ScenarioPnlBatchItem,
-  ScenarioPnlView,
   SensitivityMatrixJson,
   StressPnl,
   StressResult,
@@ -660,10 +656,9 @@ export type ReplayStep = WithFields<
 export type ReplayResult = WithFields<generated.portfolio.ReplayResult, { steps: ReplayStep[] }>;
 
 /**
- * Solution of a portfolio optimization problem (Rust `PortfolioOptimizationResult`, serialized
- * through its `PortfolioOptimizationResultWire` form).
+ * Solution of a portfolio optimization problem (Rust `PortfolioOptimizationResult`).
  */
-export type PortfolioOptimizationResult = generated.portfolio.PortfolioOptimizationResultWire;
+export type PortfolioOptimizationResult = generated.portfolio.PortfolioOptimizationResult;
 
 /**
  * A dated amount (Rust `DatedFlowJson`); in `CashFlowSchedule.outstandingByDate`
@@ -799,7 +794,6 @@ export type {
   PeriodDecomposition,
   Portfolio,
   PortfolioBuilder,
-  PortfolioMarginAggregator,
 };
 
 // --- core -----------------------------------------------------------------
@@ -880,12 +874,6 @@ interface Portfolio extends WasmOwned {}
  * calls.
  */
 interface FactorModel extends WasmOwned {}
-/**
- * Portfolio margin aggregator built once from a `Portfolio` and reused across
- * market snapshots; `calculate` returns netting-set initial and variation
- * margin as a plain `PortfolioMarginResult`.
- */
-interface PortfolioMarginAggregator extends WasmOwned {}
 
 /**
  * ISO-4217 currency code wrapper for JavaScript.
@@ -10154,6 +10142,34 @@ export interface FactorRiskNamespace {
    * @throws Error - Throws a `validation` error if `decomp` is malformed, and a `not_found` error if the position is not in the decomposition.
    */
   positionComponentVar(decomp: PositionRiskDecomposition | string, positionId: string): number;
+  /**
+   * Decompose portfolio risk into factor and position contributions.
+   *
+   * Uses the parametric (covariance-based) Euler decomposition.  Accepts
+   * the canonical sensitivity-matrix wire object (the output of
+   * `portfolio.computeFactorSensitivities`, or the Python `SensitivityMatrix.to_json`),
+   * a `FactorCovarianceMatrix` JSON, and an optional `RiskMeasure` JSON.
+   *
+   * Returns a structured object with `total_risk`, `measure`, `residual_risk`,
+   * `factor_contributions` (array), `position_factor_contributions` (array),
+   * and `position_residual_contributions` (array; empty for the parametric
+   * decomposer — populated only by credit-aware position decomposers).
+   *
+   * `measure` is the risk measure in its canonical serde form, the same shape
+   * as the `riskMeasureJson` input: `"variance"` or `"volatility"`, or an
+   * object carrying `confidence` for `var` / `expected_shortfall`. The Python
+   * `RiskDecomposition.measure` getter returns the same value.
+   * @returns Returns a structured `RiskDecomposition` object.
+   * @param sensitivitiesJson - Canonical factor-sensitivity JSON with required `base_currency`, ordered `position_ids`/`factor_ids`, and nested `data[position][factor]` rows; `JSON.stringify` the result of `computeFactorSensitivities`. Python `SensitivityMatrix.to_json()` uses the same contract. Unknown fields, inconsistent dimensions, and non-finite entries are rejected.
+   * @param covarianceJson - Factor covariance-matrix JSON aligned with the supplied sensitivities.
+   * @param riskMeasureJson - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
+   * @throws Error - Throws a JavaScript exception (`kind` `validation`) if any JSON input is malformed or has unknown keys; `base_currency` is not an ISO-4217 code; the sensitivity rows do not match `position_ids` / `factor_ids`; sensitivity and covariance factor axes disagree; the covariance matrix or risk measure is invalid; or decomposition produces invalid variance or another non-finite value.
+   */
+  decomposeFactors(
+    sensitivitiesJson: JsonInput,
+    covarianceJson: JsonInput,
+    riskMeasureJson?: JsonInput
+  ): RiskDecomposition;
 }
 
 /**
@@ -34494,7 +34510,7 @@ declare class FactorModel {
    *
    * Returns the sensitivity-matrix wire object (`base_currency`,
    * `position_ids`, `factor_ids`, `data` rows), the same shape
-   * `computeFactorSensitivities` returns and `decomposeFactorRisk` accepts.
+   * `computeFactorSensitivities` returns and `models.factor.risk.decomposeFactors` accepts.
    * @param portfolio - Built portfolio; its base currency is the reporting currency of every sensitivity.
    * @param market - `core.MarketContext` handle bumped by the sensitivity engine, including FX for cross-currency positions.
    * @param asOf - ISO-8601 valuation date for sensitivities and spot FX.
@@ -34578,61 +34594,6 @@ declare class FactorModel {
 }
 
 /**
- * Aggregates margin requirements across a portfolio by netting set (Rust
- * `PortfolioMarginAggregator`). Build one with `fromPortfolio`, then call
- * `calculate` for each market snapshot.
- * @example
- * ```typescript
- * import init, { core, portfolio } from "finstack-quant-wasm";
- * await init();
- * const book = portfolio.Portfolio.builder("book", "USD", "2025-01-01").build();
- * const market = new core.MarketContext();
- * const aggregator = portfolio.PortfolioMarginAggregator.fromPortfolio(book);
- * const margin = aggregator.calculate(book, market, "2025-01-01");
- * console.log(margin.total_initial_margin.amount, margin.netting_sets.length);
- * aggregator.free();
- * market.free();
- * book.free();
- * ```
- */
-declare class PortfolioMarginAggregator {
-  private constructor();
-  /**
-   * Create an aggregator from a portfolio.
-   * @param portfolio - Built portfolio whose positions carrying margin metadata seed the netting sets; its base currency is the reporting currency.
-   * @returns A reusable `PortfolioMarginAggregator` handle.
-   * @throws Error - Throws a `FinstackError` (kind `validation`) if positions in one netting set carry conflicting margin specifications.
-   */
-  static fromPortfolio(portfolio: Portfolio): PortfolioMarginAggregator;
-  /**
-   * Calculate margin requirements for the portfolio.
-   *
-   * Returns the `PortfolioMarginResult`: base-currency totals
-   * (`total_initial_margin`, signed `total_variation_margin`,
-   * `total_margin`), the one-way IM accounts `by_csa`, and `netting_sets`
-   * in ascending identifier order. Each netting set carries the netted SIMM
-   * `sensitivities` its initial margin was computed from and the
-   * per-risk-class `im_breakdown`.
-   * @param portfolio - Built portfolio used for mark-to-market and sensitivity lookups; normally the one passed to `fromPortfolio`.
-   * @param market - `core.MarketContext` handle supplying curves and quotes for VM and SIMM sensitivities, and the FX matrix for base-currency reporting.
-   * @param asOf - ISO-8601 valuation date of the margin run.
-   * @param currentImCollateral - Optional one-way IM balances already held, as an object (or JSON) keyed by CSA id with `Money` values (`{ amount, currency }`) in that CSA's currency. Omitted, `undefined`, `null` or a missing key means zero.
-   * @returns The `PortfolioMarginResult` as a plain object.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string or `currentImCollateral` is not a JSON string or plain object, and a `FinstackError` if `asOf` is not an ISO date, `currentImCollateral` does not match the schema or names an unknown CSA id, or a required FX rate is unavailable.
-   */
-  calculate(
-    portfolio: Portfolio,
-    market: MarketContext,
-    asOf: string,
-    currentImCollateral?: Record<string, MoneyValue> | string | null
-  ): PortfolioMarginResult;
-  /**
-   * Release the underlying wasm heap allocation. Do not use this handle after calling `free()`.
-   */
-  free(): void;
-}
-
-/**
  * Namespaced TypeScript entry points for portfolio calculations and types.
  * @example
  * ```typescript
@@ -34661,9 +34622,32 @@ export interface PortfolioNamespace {
    */
   FactorModel: typeof FactorModel;
   /**
-   * Stateful portfolio margin aggregator: netting-set initial and variation margin.
+   * Calculate portfolio margin requirements by netting set (Rust
+   * `margin::portfolio_margin`).
+   * @example
+   * ```typescript
+   * import init, { core, portfolio } from "finstack-quant-wasm";
+   * await init();
+   * const book = portfolio.Portfolio.builder("book", "USD", "2025-01-01").build();
+   * const market = new core.MarketContext();
+   * const margin = portfolio.portfolioMargin(book, market, "2025-01-01");
+   * console.log(margin.total_initial_margin.amount, margin.netting_sets.length);
+   * market.free();
+   * book.free();
+   * ```
+   * @param portfolio - Built portfolio whose positions carrying margin metadata form the netting sets; its base currency is the reporting currency.
+   * @param market - `core.MarketContext` handle supplying curves and quotes for VM and SIMM sensitivities, and the FX matrix for base-currency reporting.
+   * @param asOf - ISO-8601 valuation date of the margin run.
+   * @param currentImCollateral - Optional one-way IM balances already held, as an object (or JSON) keyed by CSA id with `Money` values (`{ amount, currency }`) in that CSA's currency. Omitted, `undefined`, `null` or a missing key means zero.
+   * @returns The `PortfolioMarginResult` as a plain object.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string or `currentImCollateral` is not a JSON string or plain object, and a `FinstackError` if positions in one netting set carry conflicting margin specifications (kind `validation`), `asOf` is not an ISO date, `currentImCollateral` does not match the schema or names an unknown CSA id, or a required FX rate is unavailable.
    */
-  PortfolioMarginAggregator: typeof PortfolioMarginAggregator;
+  portfolioMargin(
+    portfolio: Portfolio,
+    market: MarketContext,
+    asOf: string,
+    currentImCollateral?: Record<string, MoneyValue> | string | null
+  ): PortfolioMarginResult;
   /**
    * Parse and validate a portfolio specification from JSON.
    *
@@ -34690,33 +34674,21 @@ export interface PortfolioNamespace {
    * Binds Rust `carino_link`: accepts a chronological JSON array of
    * `BrinsonPeriodResult` objects (for example `brinsonFachler` outputs) and
    * returns a structured `CarinoLinkedAttribution` object whose linked effects
-   * reconstruct the geometrically compounded active return. Use
-   * `carinoLinkFromSectorPeriods` to link raw sector inputs instead.
+   * reconstruct the geometrically compounded active return. To link raw sector
+   * inputs, attribute each period with `brinsonFachler` first.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param periodsJson - Chronological JSON array of `BrinsonPeriodResult` objects with identical sector ordering in every period.
    * @throws Error - Throws a JavaScript exception if `periodsJson` is malformed, the sequence is empty or changes sector ordering, or a period return is non-finite or at most `-1`.
    */
   carinoLink(periodsJson: JsonInput): CarinoLinkedAttribution;
   /**
-   * Compute Carino-linked multi-period Brinson attribution from raw sector
-   * periods.
-   *
-   * Binds Rust `carino_link_from_sector_periods`: runs `brinsonFachler` on
-   * each period, then Carino-links the results. Returns a structured
-   * `CarinoLinkedAttribution` object.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param periodsJson - Chronological JSON array of periods, each an array of `SectorPeriod` objects (`sector`, `portfolio_weight`, `benchmark_weight`, `portfolio_return`, `benchmark_return`).
-   * @throws Error - Throws a JavaScript exception if `periodsJson` is malformed, any period fails Brinson validation, the sequence is empty or changes sector ordering, or a period return is non-finite or at most `-1`.
-   */
-  carinoLinkFromSectorPeriods(periodsJson: JsonInput): CarinoLinkedAttribution;
-  /**
    * Compute a single-period Campisi fixed-income attribution from JSON.
    *
    * Decomposes both sides into carry / treasury / spread / selection and
    * splits the active return into allocation plus four active component
-   * effects (Campisi 2000). Returns a structured `FiAttributionResult` object;
-   * `JSON.stringify` it to chain into `campisiCarinoLink` or
-   * `campisiReconciliationCheck`.
+   * effects (Campisi 2000). Returns a structured `FiAttributionResult` object
+   * to chain into `campisiCarinoLink` or
+   * `fiAttributionResultReconciliationCheck`.
    *
    * Every snapshot must use the quote-reproducing `z_spread` basis:
    * `spread_duration` is the canonical Z-spread duration, and `spread` plus
@@ -34743,11 +34715,10 @@ export interface PortfolioNamespace {
   /**
    * Carino-link already-computed single-period Campisi results.
    *
-   * Binds Rust `campisi_carino_link`. Each period carries its own
-   * already-applied `period_years`, so periods of *different* lengths (e.g.
-   * act/365 calendar months) link correctly here; prefer this entry point
-   * whenever the periods are not all the same length. Returns a structured
-   * `FiCarinoLinkedResult` object.
+   * Binds Rust `campisi_carino_link`. Attribute each period with
+   * `campisiAttribution` first; each period carries its own already-applied
+   * `period_years`, so periods of *different* lengths (e.g. act/365 calendar
+   * months) link correctly. Returns a structured `FiCarinoLinkedResult` object.
    *
    * Throws if no periods are supplied, sector ordering differs, a consumed
    * top-level return/effect, per-sector linked effect, or sector `total_active`
@@ -34763,36 +34734,24 @@ export interface PortfolioNamespace {
    */
   campisiCarinoLink(periodsJson: JsonInput): FiCarinoLinkedResult;
   /**
-   * Compute per-period Campisi attributions from snapshots and Carino-link them.
-   *
-   * Binds Rust `campisi_carino_link_from_snapshots`. One shared config — hence
-   * one shared `period_years` — is applied to every period, so this entry point
-   * is only correct for equal-length periods; use `campisiCarinoLink` for
-   * unequal periods. Returns a structured `FiCarinoLinkedResult` object.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param periodsJson - Canonical JSON array of `FiPeriodInput` objects, each holding `portfolio` and `benchmark` arrays of `FiPositionSnapshot`.
-   * @param configJson - Canonical JSON `FiAttributionConfig` applied to every period; `period_years` is its only field and is required (no default).
-   * @throws Error - Throws a JavaScript exception if either JSON input is malformed, any period fails Campisi attribution validation, the computed periods fail Carino linking validation, or the result cannot be converted to a JavaScript value.
-   */
-  campisiCarinoLinkFromSnapshots(
-    periodsJson: JsonInput,
-    configJson: JsonInput
-  ): FiCarinoLinkedResult;
-  /**
    * Reconcile the five Campisi effect totals against the active return.
    *
-   * Binds the Rust method `FiAttributionResult::reconciliation_check`. The
+   * Binds the Rust method `FiAttributionResult::reconciliation_check` (Python
+   * `FiAttributionResult.reconciliation_check`); WASM results are plain
+   * objects, so the method is a free function taking the object. The
    * decomposition reconciles by construction (selection is the residual), so
-   * this is a floating-point sanity gate rather than a model check; without it
-   * callers must re-sum the five totals by hand. Returns a structured
-   * `FiReconciliationReport` object with `total_residual`, `is_reconciled`
-   * and `tolerance`.
+   * this is a floating-point sanity gate rather than a model check. Returns a
+   * structured `ReconciliationReport` object with `total_residual`,
+   * `is_reconciled` and `tolerance`.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param resultJson - Canonical JSON `FiAttributionResult` as returned by `campisiAttribution` (`JSON.stringify` its structured result); unknown fields are rejected.
+   * @param result - `FiAttributionResult` object or JSON as returned by `campisiAttribution`; unknown fields are rejected.
    * @param tolerance - Absolute reconciliation tolerance in return units; `1e-10` suits return-space values.
-   * @throws Error - Throws a JavaScript exception if `resultJson` is malformed or does not match `FiAttributionResult`, or if the reconciliation report cannot be converted to a JavaScript value.
+   * @throws Error - Throws a JavaScript exception if `result` is malformed or does not match `FiAttributionResult`, or if the reconciliation report cannot be converted to a JavaScript value.
    */
-  campisiReconciliationCheck(resultJson: JsonInput, tolerance: number): FiReconciliationReport;
+  fiAttributionResultReconciliationCheck(
+    result: FiAttributionResult | string,
+    tolerance: number
+  ): ReconciliationReport;
   /**
    * Build a duration-cell base-return table from a reference universe.
    *
@@ -34943,20 +34902,16 @@ export interface PortfolioNamespace {
    */
   mwrXirr(cashflowsJson: JsonInput): number;
   /**
-   * Aggregate portfolio metrics from a valuation JSON.
+   * Aggregate portfolio metrics from a valuation.
+   *
+   * Metrics are aggregated in the valuation's base currency, with FX spots
+   * read at the valuation's `as_of`.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param valuationJson - `PortfolioValuation` JSON, for example `JSON.stringify(valuePortfolio(...))`.
-   * @param baseCurrency - ISO-4217 base currency in which aggregate portfolio values are reported.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @throws Error - Throws a JavaScript exception if either JSON input is malformed, `baseCurrency` or `asOf` is invalid, valuation currency or date metadata is inconsistent, a required FX conversion is unavailable or invalid, or the metrics cannot be converted to a JavaScript value.
+   * @param valuationJson - `PortfolioValuation` object or JSON, for example the result of `valuePortfolio`.
+   * @param market - `core.MarketContext` handle supplying the FX spots that convert out-of-base metrics.
+   * @throws Error - Throws a JavaScript exception if the valuation input is malformed, a required FX conversion is unavailable or invalid, or the metrics cannot be converted to a JavaScript value.
    */
-  aggregateMetrics(
-    valuationJson: JsonInput,
-    baseCurrency: string,
-    marketJson: JsonInput,
-    asOf: string
-  ): PortfolioMetrics;
+  aggregateMetrics(valuationJson: PortfolioValuation | string, market: MarketContext): PortfolioMetrics;
   /**
    * Decoded series of one base metric from aggregated portfolio metrics (twin of Python `PortfolioMetrics.metric_series`).
    * @param metricsJson - `PortfolioMetrics` from `aggregateMetrics` (object or JSON).
@@ -35018,7 +34973,7 @@ export interface PortfolioNamespace {
   /**
    * Collapse a multi-currency cashflow ladder into the base currency per date and kind (twin of Python `PortfolioCashflows.collapse_to_base_by_date_kind_json`), converting at the CIP forward from the `asOf` spot.
    * @param cashflowsJson - `PortfolioCashflows` from `aggregateFullCashflows` (object or JSON).
-   * @param marketJson - Canonical market-context JSON supplying the FX matrix and discount curves.
+   * @param market - `core.MarketContext` handle supplying the FX matrix and discount curves.
    * @param baseCurrency - ISO-4217 reporting currency.
    * @param asOf - ISO-8601 valuation date for spot FX and the start of each discount interval.
    * @param discountCurves - Optional `{ currency: curveId }` map; a missing entry uses the ISO code as the curve id.
@@ -35027,7 +34982,7 @@ export interface PortfolioNamespace {
    */
   collapseToBaseByDateKind(
     cashflowsJson: PortfolioCashflows | string,
-    marketJson: JsonInput,
+    market: MarketContext,
     baseCurrency: string,
     asOf: string,
     discountCurves?: Record<string, string> | null
@@ -35051,21 +35006,22 @@ export interface PortfolioNamespace {
    * already-built `Portfolio` handle.
    *
    * Values the portfolio against the unshocked market and against the
-   * scenario-shocked market, and returns a JS object with structured `pnl`
-   * (base-currency `total` plus `by_position`) and `report` values. Positions
-   * added or removed by the scenario are zero-filled against the missing side,
-   * so the drill-down always sums to the total.
-   * @returns Scenario-attributable P&L ladder and application report.
+   * scenario-shocked market, and returns the `ScenarioPnlBatchItem`
+   * (`scenario_id`, a structured `pnl` with base-currency `total` plus
+   * `by_position`, and `report`), the same item `scenarioPnlBatch` returns per
+   * scenario. Positions added or removed by the scenario are zero-filled
+   * against the missing side, so the drill-down always sums to the total.
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
    * @param scenarioJson - Canonical JSON payload representing the scenario whose profit-and-loss impact is measured.
    * @param market - Constructed `core.MarketContext` handle supplying the unshocked curves, quotes, and FX data used for the base leg.
+   * @returns The scenario's `ScenarioPnlBatchItem`.
    * @throws Error - Throws a JavaScript exception if the scenario JSON is malformed or invalid, scenario application or either valuation fails, valuation currencies are inconsistent, or the structured result cannot be converted to JavaScript.
    */
   scenarioPnl(
     portfolio: Portfolio,
     scenarioJson: JsonInput,
     market: MarketContext
-  ): ScenarioPnlView;
+  ): ScenarioPnlBatchItem;
   /**
    * Optimize portfolio weights using the LP-based optimizer.
    *
@@ -35092,89 +35048,65 @@ export interface PortfolioNamespace {
   /**
    * Replay a portfolio through dated market snapshots.
    *
-   * Accepts a portfolio spec, an array of dated market snapshots, and a
+   * Accepts a built portfolio, an array of dated market snapshots, and a
    * replay configuration. Returns a structured `ReplayResult` object.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
+   * @param portfolio - Built `Portfolio` handle (from `Portfolio.fromSpec` or `Portfolio.builder`) to revalue at every snapshot.
    * @param snapshotsJson - Market-snapshot JSON array.
-   * @param configJson - `ReplayConfig` JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
-   * @throws Error - Throws a JavaScript exception if any JSON input is malformed; the portfolio, replay configuration, or snapshot dates and ordering are invalid; valuation, attribution, or currency conversion fails; best-effort replay retains no step; or the result cannot be converted to a JavaScript value.
+   * @param configJson - `ReplayConfig` JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from the portfolio's positions when it matters.
+   * @throws Error - Throws a JavaScript exception if any JSON input is malformed; the replay configuration or snapshot dates and ordering are invalid; valuation, attribution, or currency conversion fails; best-effort replay retains no step; or the result cannot be converted to a JavaScript value.
    */
   replayPortfolio(
-    specJson: JsonInput,
+    portfolio: Portfolio,
     snapshotsJson: JsonInput,
     configJson: JsonInput
   ): ReplayResult;
   /**
-   * Compute first-order factor sensitivities using a pre-parsed `core.MarketContext` handle.
+   * Compute the position-by-factor sensitivity matrix of a portfolio.
    *
-   * Avoids reparsing market JSON for repeated factor analytics calls.
-   * @returns Returns a structured `SensitivityMatrixJson` object.
-   * @param positionsJson - Canonical portfolio-positions JSON to bump and revalue.
-   * @param factorsJson - Canonical factor-definition JSON identifying the market factors to shock.
-   * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param baseCurrency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
-   * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
-   * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; a position, factor, or bump-config JSON input is malformed; a factor definition is invalid or unsupported; bumping or repricing fails; or the sensitivity matrix cannot be converted to a JavaScript value.
+   * Each cell is the central difference of the position's base-currency PV
+   * under an up and a down bump of the factor, weighted by the position's scale
+   * factor. Rows follow portfolio position order, columns follow the factors,
+   * and every value is in the portfolio's base currency. Returns the
+   * sensitivity-matrix wire object (`base_currency`, `position_ids`,
+   * `factor_ids`, `data` rows).
+   * @param portfolio - Built portfolio whose positions are the matrix rows; its base currency is the reporting currency.
+   * @param factorsJson - `FactorDefinition` array (object or JSON text); every factor must map to market data, so credit hierarchy factors need `FactorModel.computeSensitivities`.
+   * @param market - `core.MarketContext` handle bumped per factor, including FX for cross-currency positions.
+   * @param asOf - ISO-8601 valuation date for pricing and spot FX.
+   * @param bumpConfigJson - Optional `BumpSizeConfig` (object or JSON text); omit for 1 bp / 1 % per factor type.
+   * @returns The `SensitivityMatrixJson` object.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string or a JSON argument is neither text nor a plain object/array, and a `FinstackError` if `asOf` is not an ISO date, the factors or bump config do not match their schema, a factor is a credit hierarchy factor (kind `validation`), or bumping, repricing or FX conversion fails.
    */
   computeFactorSensitivities(
-    positionsJson: JsonInput,
-    factorsJson: JsonInput,
+    portfolio: Portfolio,
+    factorsJson: FactorDefinition[] | string,
     market: MarketContext,
     asOf: string,
-    baseCurrency: string,
-    bumpConfigJson?: JsonInput
+    bumpConfigJson?: BumpSizeConfig | string
   ): SensitivityMatrixJson;
   /**
-   * Compute scenario P&L profiles using a pre-parsed `core.MarketContext` handle.
-   * @returns Returns a structured `FactorPnlProfile` array.
-   * @param positionsJson - Canonical portfolio-positions JSON to bump and revalue.
-   * @param factorsJson - Canonical factor-definition JSON identifying the market factors to shock.
-   * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param baseCurrency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
-   * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
-   * @param nScenarioPoints - Odd number of evenly spaced bump levels in each P-and-L profile, in `3..=1001`; omit for 5.
-   * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; a position, factor, or bump-config JSON input is malformed; a factor or scenario-point count is invalid or unsupported; bumping or repricing fails; or the profiles cannot be converted to a JavaScript value.
+   * Compute full-repricing scenario P&L profiles of a portfolio, one per factor.
+   *
+   * Each profile holds the scale-factor-weighted P&L of every position at each
+   * grid shift, in the portfolio's base currency.
+   * @param portfolio - Built portfolio whose positions are the profile columns; its base currency is the reporting currency.
+   * @param factorsJson - `FactorDefinition` array (object or JSON text) to shock, in returned profile order.
+   * @param market - `core.MarketContext` handle reused by every scenario.
+   * @param asOf - ISO-8601 valuation date for pricing and spot FX.
+   * @param bumpConfigJson - Optional `BumpSizeConfig` (object or JSON text); omit for 1 bp / 1 % per factor type.
+   * @param nPoints - Odd number of grid points in `3..=1001`; omit for 5 (shifts `[-2, -1, 0, 1, 2]`).
+   * @returns The `FactorPnlProfile` array.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string, `nPoints` is not a whole number, or a JSON argument is neither text nor a plain object/array, and a `FinstackError` if `asOf` is not an ISO date, the factors or bump config do not match their schema, the grid size is invalid or a factor is a credit hierarchy factor (kind `validation`), or bumping, repricing or FX conversion fails.
    */
   computePnlProfiles(
-    positionsJson: JsonInput,
-    factorsJson: JsonInput,
+    portfolio: Portfolio,
+    factorsJson: FactorDefinition[] | string,
     market: MarketContext,
     asOf: string,
-    baseCurrency: string,
-    bumpConfigJson?: JsonInput,
-    nScenarioPoints?: number
+    bumpConfigJson?: BumpSizeConfig | string,
+    nPoints?: number
   ): FactorPnlProfile[];
-  /**
-   * Decompose portfolio risk into factor and position contributions.
-   *
-   * Uses the parametric (covariance-based) Euler decomposition.  Accepts
-   * the canonical sensitivity-matrix wire object (the output of
-   * `computeFactorSensitivities`, or the Python `SensitivityMatrix.to_json`),
-   * a `FactorCovarianceMatrix` JSON, and an optional `RiskMeasure` JSON.
-   *
-   * Returns a structured object with `total_risk`, `measure`, `residual_risk`,
-   * `factor_contributions` (array), `position_factor_contributions` (array),
-   * and `position_residual_contributions` (array; empty for the parametric
-   * decomposer — populated only by credit-aware position decomposers).
-   *
-   * `measure` is the risk measure in its canonical serde form, the same shape
-   * as the `riskMeasureJson` input: `"variance"` or `"volatility"`, or an
-   * object carrying `confidence` for `var` / `expected_shortfall`. The Python
-   * `RiskDecomposition.measure` getter returns the same value.
-   * @returns Returns a structured `RiskDecomposition` object.
-   * @param sensitivitiesJson - Canonical factor-sensitivity JSON with required `base_currency`, ordered `position_ids`/`factor_ids`, and nested `data[position][factor]` rows; `JSON.stringify` the result of `computeFactorSensitivities`. Python `SensitivityMatrix.to_json()` uses the same contract. Unknown fields, inconsistent dimensions, and non-finite entries are rejected.
-   * @param covarianceJson - Factor covariance-matrix JSON aligned with the supplied sensitivities.
-   * @param riskMeasureJson - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
-   * @throws Error - Throws a JavaScript exception (`kind` `validation`) if any JSON input is malformed or has unknown keys; `base_currency` is not an ISO-4217 code; the sensitivity rows do not match `position_ids` / `factor_ids`; sensitivity and covariance factor axes disagree; the covariance matrix or risk measure is invalid; or decomposition produces invalid variance or another non-finite value.
-   */
-  decomposeFactorRisk(
-    sensitivitiesJson: JsonInput,
-    covarianceJson: JsonInput,
-    riskMeasureJson?: JsonInput
-  ): RiskDecomposition;
   /**
    * Fluent portfolio builder class; instances come from `Portfolio.builder`.
    */
@@ -35183,32 +35115,13 @@ export interface PortfolioNamespace {
    * Allocate strategy weights from a `WeightAllocationSpec`.
    *
    * Returns the `WeightAllocationResult` object (`scheme`, per-strategy
-   * `allocations` and portfolio `diagnostics`); `allocateWeightsJson` returns
-   * the same result as a JSON string.
+   * `allocations` and portfolio `diagnostics`). A spec that allocates without
+   * error is valid.
    * @param spec - `WeightAllocationSpec` object or JSON selecting the allocation scheme, the strategy inputs and any covariance data the scheme needs.
    * @returns The `WeightAllocationResult`.
    * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `spec` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `WeightAllocationSpec` schema or violates a scheme invariant.
    */
   allocateWeights(spec: WeightAllocationSpec | string): WeightAllocationResult;
-  /**
-   * Allocate strategy weights and return the result as wire JSON.
-   *
-   * Wire twin of `allocateWeights` (Rust `allocate_weights_json`).
-   * @param specJson - `WeightAllocationSpec` object or JSON.
-   * @returns Compact JSON of the `WeightAllocationResult`.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `specJson` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `WeightAllocationSpec` schema or violates a scheme invariant.
-   */
-  allocateWeightsJson(specJson: WeightAllocationSpec | string): string;
-  /**
-   * Validate a strategy allocation specification and return its canonical JSON.
-   *
-   * The spec is parsed and executed solely for validation; the allocation
-   * itself is discarded (Rust `validate_allocation_json`).
-   * @param specJson - `WeightAllocationSpec` object or JSON.
-   * @returns The canonical compact JSON of the accepted spec.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `specJson` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `WeightAllocationSpec` schema or violates a scheme invariant.
-   */
-  validateAllocationJson(specJson: WeightAllocationSpec | string): string;
   /**
    * Decompose every portfolio position into primitive economic exposures.
    *
@@ -35235,12 +35148,12 @@ export interface PortfolioNamespace {
    * Rolls the decomposition's factor contributions up by credit-hierarchy
    * level. Returns the `CreditVolReport`: `total`, `measure`, the `generic`
    * credit-factor contribution, `by_level` rollups, `idiosyncratic_total` and,
-   * when requested, `by_position_optional` rows.
-   * @param decomposition - `RiskDecomposition` object or JSON, e.g. the output of `decomposeFactorRisk`.
+   * when requested, `by_position` rows.
+   * @param decomposition - `RiskDecomposition` object or JSON, e.g. the output of `models.factor.risk.decomposeFactors`.
    * @param model - `models.factor.credit.CreditFactorModel` handle whose hierarchy names the levels.
-   * @param byPosition - `true` to include the per-position breakdown; `false` leaves `by_position_optional` `null`.
+   * @param byPosition - `true` to include the per-position breakdown; `false` leaves `by_position` `null`.
    * @returns The `CreditVolReport`.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `decomposition` is not a JSON string or plain object or `byPosition` is not a boolean, and a `FinstackError` (kind `validation`) if `decomposition` does not match the `RiskDecomposition` schema.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `decomposition` is not a JSON string or plain object or `byPosition` is not a boolean, and a `FinstackError` (kind `validation`) if `decomposition` does not match the `RiskDecomposition` schema or holds a factor contribution that is neither the generic credit factor nor a bucket of one of `model`'s hierarchy levels.
    */
   buildCreditVolReport(
     decomposition: RiskDecomposition | string,
@@ -35391,7 +35304,7 @@ export interface PortfolioNamespace {
    * Trades of an optimization result that open a new position.
    *
    * Twin of Python `PortfolioOptimizationResult.new_position_trades` (Rust
-   * `PortfolioOptimizationResultWire::new_position_trades`): the entries of
+   * `PortfolioOptimizationResult::new_position_trades`): the entries of
    * `trades` whose `trade_type` is `new_position`, in trade-list order.
    * @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
    * @returns The matching `TradeSpec` rows; empty for an infeasible solve.
@@ -35404,7 +35317,7 @@ export interface PortfolioNamespace {
    * Approximately binding constraints of an optimization result.
    *
    * Twin of Python `PortfolioOptimizationResult.binding_constraints` (Rust
-   * `PortfolioOptimizationResultWire::binding_constraints`): the constraints
+   * `PortfolioOptimizationResult::binding_constraints`): the constraints
    * whose slack is zero within the solver tolerance.
    * @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
    * @returns `[label, slack]` pairs in slack order; empty for an infeasible solve.
@@ -35417,19 +35330,30 @@ export interface PortfolioNamespace {
    * Executable trade list of an optimization result.
    *
    * Twin of Python `PortfolioOptimizationResult.to_trade_list` (Rust
-   * `PortfolioOptimizationResultWire::to_trade_list`): the trades from current
+   * `PortfolioOptimizationResult::to_trade_list`): the trades from current
    * to target quantities, largest absolute quantity change first.
    * @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
-   * @returns The `TradeSpec` rows; empty for an infeasible solve (check `is_feasible`).
+   * @returns The `TradeSpec` rows; empty for an infeasible solve (check `portfolioOptimizationResultIsFeasible`).
    * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `result` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the optimization-result schema.
    */
   portfolioOptimizationResultToTradeList(result: PortfolioOptimizationResult | string): TradeSpec[];
   /**
+   * Whether an optimization result carries a usable solution.
+   *
+   * Twin of Python `PortfolioOptimizationResult.is_feasible` (Rust
+   * `PortfolioOptimizationResult::is_feasible`): derived from `status`, which
+   * is the only stored outcome; `true` only for `"optimal"`.
+   * @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
+   * @returns `true` when the status is `"optimal"`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `result` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the optimization-result schema.
+   */
+  portfolioOptimizationResultIsFeasible(result: PortfolioOptimizationResult | string): boolean;
+  /**
    * Look up one metric's portfolio-wide total, failing when it was not aggregated.
    *
-   * Twin of Python `PortfolioResult.require_metric` (Rust
-   * `PortfolioMetrics::require_total`, which `PortfolioResult::require_metric`
-   * calls on its metrics).
+   * Twin of Python `PortfolioMetrics.require_total` (Rust
+   * `PortfolioMetrics::require_total`); WASM results are plain objects, so the
+   * method is a free function taking the object.
    * @param metrics - `PortfolioMetrics` object or JSON from `aggregateMetrics`.
    * @param metricId - Fully qualified metric key (for example `dv01` or `bucketed_dv01::USD-OIS::10y`).
    * @returns The aggregated total in base-currency metric units.
@@ -35479,42 +35403,6 @@ export interface PortfolioNamespace {
     matrix: SensitivityMatrixJson | string,
     factorIdx: number
   ): Float64Array;
-  /**
-   * Build a budget (weight-sum) constraint.
-   *
-   * Twin of Python `Constraint.budget` (Rust `Constraint::budget`).
-   * @param rhs - Target sum of weights as a decimal (`1.0` is fully invested); finite and non-negative.
-   * @returns The `Constraint` object `{ budget: { rhs } }`.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `rhs` is not a number, and a `FinstackError` (kind `validation`) if it is negative or not finite.
-   */
-  constraintBudget(rhs: number): generated.portfolio.Constraint;
-  /**
-   * Build per-position weight bounds for the positions a filter selects.
-   *
-   * Twin of Python `Constraint.weight_bounds` (Rust `Constraint::weight_bounds`).
-   * @param filter - `PositionFilter` value selecting the bounded positions: `"all"` or a filter object such as `{ by_entity_id: "FUND" }`.
-   * @param min - Inclusive minimum weight as a decimal fraction of portfolio value.
-   * @param max - Inclusive maximum weight as a decimal fraction of portfolio value.
-   * @param label - Optional label reported in constraint slacks.
-   * @returns The `weight_bounds` `Constraint` object.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a `FinstackError` (kind `validation`) if `filter` does not match the schema or `min > max`.
-   */
-  constraintWeightBounds(
-    filter: generated.portfolio.PositionFilter,
-    min: number,
-    max: number,
-    label?: string | null
-  ): generated.portfolio.Constraint;
-  /**
-   * Build a maximum-turnover constraint: `sum |w_new - w_current| <= maxTurnover`.
-   *
-   * Twin of Python `Constraint.max_turnover` (Rust `Constraint::max_turnover`).
-   * @param maxTurnover - Largest allowed gross turnover as a decimal fraction of portfolio value; non-negative.
-   * @param label - Optional label reported in constraint slacks.
-   * @returns The `max_turnover` `Constraint` object.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a `FinstackError` (kind `validation`) if `maxTurnover` is negative.
-   */
-  constraintMaxTurnover(maxTurnover: number, label?: string | null): generated.portfolio.Constraint;
   /**
    * Build an attribute exposure cap: `sum w_i * I[attr == value] <= maxShare`.
    *

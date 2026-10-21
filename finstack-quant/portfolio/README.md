@@ -16,7 +16,7 @@ depends on it; only the `finstack-quant` umbrella crate and the Python/WASM
 binding crates do.
 
 Cargo features: `json-schema` (default; `schemars` derives, the schema
-registry and the `gen_materialization_schemas` binary). Rayon parallelism is
+registry and the `gen_portfolio_schemas` binary). Rayon parallelism is
 unconditional — there is no feature flag for it.
 
 ## Public surface
@@ -50,24 +50,24 @@ through its module path. See the rustdoc for detail
 | `metrics::aggregate_metrics` | FX-converted metric rollup; returns `PortfolioMetrics` |
 | `grouping::aggregate_by_book` | Book-tree rollup including descendants |
 | `cashflows::aggregate_full_cashflows` | Currency-preserving cashflow ladder (`PortfolioCashflows`) |
-| `positions_to_table`, `entities_to_table`, `metrics_to_table`, `aggregated_metrics_to_table` | `core::table::TableEnvelope` exports |
+| `positions_to_table`, `metrics_to_table`, `aggregated_metrics_to_table` | `core::table::TableEnvelope` exports |
 
 ### Analytics
 
 | Module | Entry points |
 |--------|--------------|
 | `attribution` | `attribute_portfolio_pnl` → `PortfolioAttribution`; re-exports `AttributionMethod`, `PnlAttribution` and friends from `finstack-quant-attribution` |
-| `brinson` | `brinson_fachler`, `carino_link`, `carino_link_from_sector_periods` |
-| `fi_attribution` | `campisi_attribution`, `campisi_carino_link`, `campisi_carino_link_from_snapshots` |
+| `brinson` | `brinson_fachler`, `carino_link` |
+| `fi_attribution` | `campisi_attribution`, `campisi_carino_link` |
 | `grid_attribution` | `grid_attribution`, `grid_carino_link` |
 | `factor_brinson` | `factor_brinson_attribution` |
 | `excess_return` | `excess_returns`, `cell_returns_from_curves`, `cell_returns_from_reference` |
 | `performance` | `twrr_modified_dietz`, `twrr_linked`, `mwr_xirr` |
 | `factor_model` | `FactorModel` (`assign_factors` / `compute_sensitivities` / `analyze`), `decompose_factors`, `allocate_weights` |
 | `sensitivity` | `DeltaBasedEngine`, `FullRepricingEngine` + `ScenarioGrid`, `FactorSensitivityEngine` |
-| `optimization` | `PortfolioOptimizationProblem`, `optimize`, `optimize_from_spec`, `PortfolioOptimizationResult` |
-| `margin` (re-exported at root) | `PortfolioMarginAggregator`, `PortfolioMarginResult` — see [`src/margin/README.md`](src/margin/README.md) |
-| `scenarios` | `apply_and_revalue`, `scenario_pnl`, `scenario_pnl_batch` |
+| `optimization` | `PortfolioOptimizationProblem`, `optimize`, `optimize_portfolio`, `PortfolioOptimizationResult` |
+| `margin` | `portfolio_margin`, `PortfolioMarginResult`, `NettingSetMargin` — see [`src/margin/README.md`](src/margin/README.md) |
+| `scenarios` | `apply_scenario_and_revalue`, `scenario_pnl`, `scenario_pnl_batch` |
 | `replay` | `replay_portfolio` over a `ReplayTimeline` of dated market snapshots |
 
 ## Quick start
@@ -124,7 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         1.0,
         PositionUnit::Units,
     )?
-    .with_text_attribute("asset_class", "cash");
+    .with_attribute("asset_class", "cash");
 
     let portfolio = Portfolio::builder("MY_FUND")
         .base_currency(Currency::USD)
@@ -152,8 +152,8 @@ A larger end-to-end program lives in
 - **Base currency.** `Portfolio::base_currency` is the reporting currency for
   totals and every portfolio-level analytic. Position values are kept in both
   native and base currency; summable risk metrics are FX-converted before
-  aggregation. `aggregate_metrics` rejects a `base_currency` or `as_of` that
-  disagrees with the valuation it was handed.
+  aggregation. `aggregate_metrics` takes the base currency and `as_of` from
+  the valuation it is handed.
 - **Spot FX for NAV, P&L, and risk.** Position PV, metric rollup, attribution,
   scenario P&L, margin, and factor endpoints convert native amounts to base
   with the market FX-matrix spot at `as_of`. `aggregate_metrics` prefers that
@@ -227,7 +227,7 @@ This crate owns two checked-in JSON Schemas in
 [`schemas/index.json`](schemas/index.json). Regenerate and verify with:
 
 ```bash
-cargo run -p finstack-quant-portfolio --bin gen_materialization_schemas -- --write
+cargo run -p finstack-quant-portfolio --bin gen_portfolio_schemas -- --write
 mise run rust-check-schemas
 ```
 

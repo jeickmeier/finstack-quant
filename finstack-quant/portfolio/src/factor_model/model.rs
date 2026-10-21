@@ -21,13 +21,13 @@
 //!
 
 use super::assignment::{assign_position_factors, FactorAssignmentReport};
-use super::dependencies::flatten as flatten_dependencies;
-use super::whatif::{StressPnl, StressResult};
+use super::dependencies::factor_dependencies;
 use crate::error::{Error, Result};
 use crate::sensitivity::{
-    exact_factor_market_keys, DeltaBasedEngine, FactorSensitivityEngine, SensitivityMatrix,
+    exact_factor_market_keys, portfolio_rows, uses_assignment_driven_credit_shock,
+    DeltaBasedEngine, FactorSensitivityEngine,
 };
-use crate::{MarketFactorKey, Portfolio};
+use crate::{dependencies::MarketFactorKey, Portfolio};
 use finstack_quant_calibration::api::schema::HazardCurveParams;
 use finstack_quant_calibration::recalibration::bump_hazard_spreads;
 use finstack_quant_core::currency::Currency;
@@ -39,9 +39,10 @@ use finstack_quant_factor::risk::{
     apply_residual_contributions, decompose_factors, PositionResidualContribution,
     ResidualContributionSource, RiskDecomposition,
 };
+use finstack_quant_factor::SensitivityMatrix;
 use finstack_quant_factor::{
-    BumpSizeConfig, FactorCovarianceMatrix, FactorDefinition, FactorModelConfig, FactorType,
-    MarketDependency, MatchingConfig, RiskMeasure, UnmatchedPolicy,
+    BumpSizeConfig, FactorCovarianceMatrix, FactorDefinition, FactorModelConfig, MarketDependency,
+    MatchingConfig, RiskMeasure, UnmatchedPolicy,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::recalibration::QuoteBump;
@@ -54,10 +55,10 @@ use std::collections::{BTreeMap, HashMap};
 pub struct FactorModel {
     credit_idiosyncratic_variance: BTreeMap<finstack_quant_core::types::IssuerId, f64>,
     factors: Vec<FactorDefinition>,
-    covariance: FactorCovarianceMatrix,
+    pub(super) covariance: FactorCovarianceMatrix,
     matcher: Box<dyn finstack_quant_factor::FactorMatcher>,
     sensitivity_engine: Box<dyn FactorSensitivityEngine>,
-    risk_measure: RiskMeasure,
+    pub(super) risk_measure: RiskMeasure,
     unmatched_policy: UnmatchedPolicy,
     bump_config: BumpSizeConfig,
 }
@@ -152,7 +153,7 @@ impl FactorModel {
 
         for position in &portfolio.positions {
             let dependencies =
-                flatten_dependencies(&position.instrument.market_dependencies()?, market)?;
+                factor_dependencies(&position.instrument.market_dependencies()?, market)?;
             let (assignment, position_unmatched) = assign_position_factors(
                 &position.position_id,
                 &dependencies,
@@ -235,20 +236,11 @@ impl FactorModel {
         credit_exposures: &mut CreditExposureMatrix<'_>,
     ) -> Result<SensitivityMatrix> {
         let assignment_report = self.assign_factors(portfolio, market)?;
-        let positions: Vec<(String, &dyn Instrument, f64)> = portfolio
-            .positions
-            .iter()
-            .map(|position| {
-                (
-                    position.position_id.to_string(),
-                    position.instrument.as_ref() as &dyn Instrument,
-                    position.scale_factor(),
-                )
-            })
-            .collect();
-
+        // Same rows as `sensitivity::compute_factor_sensitivities`; this path
+        // additionally overlays the assignment-driven credit-hierarchy exposure
+        // that the free function rejects.
         let mut sensitivities = self.sensitivity_engine.compute_sensitivities(
-            &positions,
+            &portfolio_rows(portfolio),
             &self.factors,
             market,
             as_of,
@@ -411,7 +403,7 @@ impl FactorModel {
     ///
     /// - `docs/REFERENCES.md#meucci-risk-and-asset-allocation`
     /// - `docs/REFERENCES.md#tasche-2008-capital-allocation`
-    pub fn analyze_with_sensitivities(
+    pub(crate) fn analyze_with_sensitivities(
         &self,
         portfolio: &Portfolio,
         market: &MarketContext,
@@ -490,7 +482,7 @@ impl FactorModel {
             if idio_variance <= 0.0 {
                 continue;
             }
-            let dependencies = flatten_dependencies(
+            let dependencies = factor_dependencies(
                 &position.instrument.market_dependencies()?,
                 credit_exposures.bump_contexts.base,
             )?;
@@ -547,121 +539,6 @@ impl FactorModel {
             decomposition,
             residual_contributions,
         )?)
-    }
-
-    /// Shock configured factors and reprice the portfolio without decomposing
-    /// stressed risk.
-    ///
-    /// Use this when only shocked-minus-base P&L is required. Call
-    /// [`Self::factor_stress`] when the stressed risk decomposition is also
-    /// needed; that path reuses this P&L evaluation and then analyzes the
-    /// shocked market once.
-    ///
-    /// # Arguments
-    ///
-    /// * `portfolio` - Portfolio whose position P&L is evaluated.
-    /// * `market` - Baseline market snapshot to shock.
-    /// * `as_of` - Valuation date used for both endpoints.
-    /// * `stresses` - Factor IDs and shock magnitudes in each factor's
-    ///   configured market-mapping convention.
-    ///
-    /// # Returns
-    ///
-    /// Total and per-position stressed-minus-base P&L in the portfolio base
-    /// currency.
-    ///
-    /// # Errors
-    ///
-    /// Propagates unknown-factor, market-bump, valuation, and
-    /// currency-validation failures.
-    pub fn factor_stress_pnl(
-        &self,
-        portfolio: &Portfolio,
-        market: &MarketContext,
-        as_of: Date,
-        stresses: &[(finstack_quant_factor::FactorId, f64)],
-    ) -> Result<StressPnl> {
-        super::whatif::factor_stress_pnl(self, portfolio, market, as_of, stresses)
-            .map(|(pnl, _)| pnl)
-    }
-
-    /// Shock configured factors, reprice the portfolio, and decompose risk
-    /// under the stressed market.
-    ///
-    /// This direct workflow does not compute an unused baseline sensitivity
-    /// matrix; use [`Self::position_what_if`] for position remove/resize
-    /// scenarios against a baseline decomposition.
-    ///
-    /// # Arguments
-    ///
-    /// * `portfolio` - Portfolio whose position P&L and stressed risk are
-    ///   evaluated.
-    /// * `market` - Baseline market snapshot to shock.
-    /// * `as_of` - Valuation date used for both endpoints and stressed
-    ///   sensitivities.
-    /// * `stresses` - Factor IDs and shock magnitudes in each factor's
-    ///   configured market-mapping convention.
-    ///
-    /// # Returns
-    ///
-    /// Total and per-position stressed-minus-base P&L plus the risk
-    /// decomposition under the stressed market.
-    ///
-    /// # Errors
-    ///
-    /// Propagates unknown-factor, market-bump, valuation, currency-validation,
-    /// sensitivity, and decomposition failures.
-    pub fn factor_stress(
-        &self,
-        portfolio: &Portfolio,
-        market: &MarketContext,
-        as_of: Date,
-        stresses: &[(finstack_quant_factor::FactorId, f64)],
-    ) -> Result<StressResult> {
-        super::whatif::factor_stress(self, portfolio, market, as_of, stresses)
-    }
-
-    /// Run a position remove/resize what-if against this model's baseline.
-    ///
-    /// Decomposes the portfolio's baseline risk with
-    /// [`Self::analyze_with_sensitivities`], then applies `changes` to that
-    /// baseline: a removal zeroes the position's sensitivity row and a resize
-    /// scales it in proportion to the original nonzero quantity.
-    ///
-    /// # Arguments
-    ///
-    /// * `portfolio` - Portfolio the baseline is computed for and the changes
-    ///   are applied to.
-    /// * `market` - Market data used to value positions and compute
-    ///   sensitivities.
-    /// * `as_of` - Valuation date of the analysis.
-    /// * `changes` - Position removals and resizes to apply, in order; every
-    ///   `position_id` must exist in `portfolio`.
-    ///
-    /// # Returns
-    ///
-    /// The baseline and post-change risk decompositions with per-factor deltas.
-    ///
-    /// # Errors
-    ///
-    /// Propagates factor assignment, sensitivity, decomposition and
-    /// unknown-position failures.
-    pub fn position_what_if(
-        &self,
-        portfolio: &Portfolio,
-        market: &MarketContext,
-        as_of: Date,
-        changes: &[super::PositionChange],
-    ) -> Result<super::WhatIfResult> {
-        super::whatif::position_what_if(self, portfolio, market, as_of, changes)
-    }
-
-    pub(crate) fn covariance(&self) -> &FactorCovarianceMatrix {
-        &self.covariance
-    }
-
-    pub(crate) fn risk_measure(&self) -> &RiskMeasure {
-        &self.risk_measure
     }
 
     /// Build one stressed market and its exact selective-repricing manifest.
@@ -747,7 +624,7 @@ impl FactorModel {
         let mut curve_betas: BTreeMap<finstack_quant_core::types::CurveId, f64> = BTreeMap::new();
         for position in &portfolio.positions {
             let dependencies =
-                flatten_dependencies(&position.instrument.market_dependencies()?, market)?;
+                factor_dependencies(&position.instrument.market_dependencies()?, market)?;
             for dependency in &dependencies {
                 let Some(curve_id) = credit_curve_id(dependency) else {
                     continue;
@@ -796,15 +673,6 @@ fn collect_credit_idiosyncratic_variance(
         }
         _ => {}
     }
-}
-
-fn uses_assignment_driven_credit_shock(factor: &FactorDefinition) -> bool {
-    matches!(factor.factor_type, FactorType::Credit)
-        && matches!(
-            factor.market_mapping,
-            finstack_quant_factor::MarketMapping::CurveParallel { ref curve_ids, .. }
-                if curve_ids.is_empty()
-        )
 }
 
 fn credit_curve_id(dependency: &MarketDependency) -> Option<finstack_quant_core::types::CurveId> {
@@ -880,9 +748,8 @@ impl<'a> CreditExposureMatrix<'a> {
         }
 
         let (up, down) = self.bump_contexts.get(curve_id, bump_size)?;
-        let pv_up = crate::sensitivity::raw_pv_in_base(instrument, up, as_of, self.base_currency)?;
-        let pv_down =
-            crate::sensitivity::raw_pv_in_base(instrument, down, as_of, self.base_currency)?;
+        let pv_up = crate::fx::raw_pv_in_base(instrument, up, as_of, self.base_currency)?;
+        let pv_down = crate::fx::raw_pv_in_base(instrument, down, as_of, self.base_currency)?;
         if !pv_up.is_finite() || !pv_down.is_finite() {
             return Err(Error::invalid_input(format!(
                 "non-finite bumped credit PV for position {position_index} on curve '{curve_id}' (up = {pv_up}, down = {pv_down})"
@@ -997,7 +864,7 @@ fn shift_credit_curves(
 pub(super) mod tests {
     use super::*;
     use crate::position::{Position, PositionUnit};
-    use crate::sensitivity::{FactorSensitivityEngine, SensitivityMatrix};
+    use crate::sensitivity::FactorSensitivityEngine;
     use crate::types::{PositionId, DUMMY_ENTITY_ID};
     use crate::Portfolio;
     use finstack_quant_core::currency::Currency;
@@ -1006,6 +873,7 @@ pub(super) mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{Attributes, CurveId};
     use finstack_quant_factor::matching::{DependencyFilter, MappingRule};
+    use finstack_quant_factor::SensitivityMatrix;
     use finstack_quant_factor::{
         BumpSizeConfig, CurveType, DependencyType, FactorCovarianceMatrix, FactorDefinition,
         FactorId, FactorModelConfig, FactorType, MarketMapping, RiskMeasure, UnmatchedPolicy,

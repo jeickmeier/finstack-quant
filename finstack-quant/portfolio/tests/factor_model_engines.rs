@@ -342,7 +342,7 @@ fn portfolio_wrap_uses_scale_factor_weight_for_eur_fx_factor() -> Result<()> {
         &[(FactorId::new("eur-usd"), 1.0)],
     )?;
     assert!(
-        stressed.total_pnl.abs() > 1e-8,
+        stressed.pnl.total_pnl.abs() > 1e-8,
         "FX factor stress must convert through the bumped spot matrix"
     );
     Ok(())

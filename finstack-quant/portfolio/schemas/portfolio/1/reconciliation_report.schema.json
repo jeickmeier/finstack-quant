@@ -1,7 +1,7 @@
 {
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/reconciliation_report.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Report from reconciling position-level P&L attribution against portfolio totals.",
+  "description": "Report from reconciling an attribution's effect buckets against its total.",
   "examples": [
     {
       "is_reconciled": true,
@@ -20,7 +20,7 @@
       "type": "number"
     },
     "total_residual": {
-      "description": "Total residual: `total_pnl - (sum of factor buckets + fx_translation_pnl)`.",
+      "description": "Total minus the sum of its effect buckets: `total_pnl - (factor buckets\n+ fx_translation_pnl)` for P&L attribution, `active_return - (allocation\n+ carry + treasury + spread + selection)` for Campisi attribution.",
       "format": "double",
       "type": "number"
     }

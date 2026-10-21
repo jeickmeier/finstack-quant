@@ -3,7 +3,9 @@
 use crate::utils::input::js_opt_uint;
 
 use finstack_quant_core::contract::LoadLimits;
-use finstack_quant_portfolio::{InstrumentArtifactCache, Portfolio as RustPortfolio};
+use finstack_quant_portfolio::{
+    materialization::InstrumentArtifactCache, Portfolio as RustPortfolio,
+};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 

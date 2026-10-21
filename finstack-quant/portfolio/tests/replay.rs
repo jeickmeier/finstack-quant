@@ -15,7 +15,9 @@ mod replay_tests {
     };
     use finstack_quant_portfolio::types::Entity;
     use finstack_quant_portfolio::Portfolio;
-    use finstack_quant_portfolio::{PortfolioValuationOptions, RequestedMetrics};
+    use finstack_quant_portfolio::{
+        valuation::PortfolioValuationOptions, valuation::RequestedMetrics,
+    };
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
     use finstack_quant_valuations::instruments::{Attributes, Instrument, PricingOptions};
     use finstack_quant_valuations::metrics::MetricId;

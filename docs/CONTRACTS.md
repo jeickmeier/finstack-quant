@@ -54,7 +54,7 @@ contract. The pre-release policy is documented in
 | Valuation result | numeric `schema_version: 1` | `ValuationResult` serde | [valuation result](../finstack-quant/valuations/schemas/results/1/valuation_result.schema.json) |
 | Statement result | numeric `schema_version: 1` | `StatementResult` serde | [statement result](../finstack-quant/statements/schemas/statements/1/statement_result.schema.json) |
 | Portfolio result | numeric `schema_version: 1` | `PortfolioResult` serde | derived where embedded |
-| Portfolio optimization result | numeric `schema_version: 1` | `PortfolioOptimizationResultWire` | [portfolio optimization result](../finstack-quant/portfolio/schemas/portfolio/1/portfolio_optimization_result.schema.json) |
+| Portfolio optimization result | numeric `schema_version: 1` | `PortfolioOptimizationResult` serde | [portfolio optimization result](../finstack-quant/portfolio/schemas/portfolio/1/portfolio_optimization_result.schema.json) |
 
 `MarginEnvelope` preserves three closed root shapes:
 `otc_margin_spec`, `csa_spec`, and `margin_call`. Portfolio materialization

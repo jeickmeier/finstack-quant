@@ -52,8 +52,9 @@ def test_build_stress_attribution_rejects_bad_shape() -> None:
         build_stress_attribution(["A", "B"], [[1.0, 2.0], [1.0]], confidence=0.95)
 
 
-def test_build_credit_vol_report_from_typed_inputs() -> None:
-    model = CreditFactorModel.from_json(
+def _two_level_model() -> CreditFactorModel:
+    """A credit factor model with a rating/region hierarchy and no calibrated factors."""
+    return CreditFactorModel.from_json(
         json.dumps({
             "schema": "finstack_quant.credit_factor_model/1",
             "as_of": "2024-03-29",
@@ -83,6 +84,10 @@ def test_build_credit_vol_report_from_typed_inputs() -> None:
             },
         })
     )
+
+
+def test_build_credit_vol_report_from_typed_inputs() -> None:
+    model = _two_level_model()
     decomposition = RiskDecomposition.from_json(
         json.dumps({
             "total_risk": 1.0,
@@ -136,3 +141,22 @@ def test_build_credit_vol_report_from_typed_inputs() -> None:
     assert report.by_level[1].total == pytest.approx(0.30)
     assert report.by_position is not None
     assert report.by_position[0].position_id == "POS1"
+
+
+@pytest.mark.parametrize("factor_id", ["usd_rates", "credit::level2::a.b.c::x.y.z"])
+def test_build_credit_vol_report_rejects_unattributable_factors(factor_id: str) -> None:
+    decomposition = RiskDecomposition.from_json(
+        json.dumps({
+            "total_risk": 1.0,
+            "measure": "variance",
+            "factor_contributions": [
+                {"factor_id": factor_id, "absolute_risk": 1.0, "relative_risk": 1.0, "marginal_risk": 0.0}
+            ],
+            "residual_risk": 0.0,
+            "position_factor_contributions": [],
+            "position_residual_contributions": [],
+        })
+    )
+
+    with pytest.raises(ValueError, match=factor_id.replace(".", r"\.")):
+        build_credit_vol_report(decomposition, _two_level_model())

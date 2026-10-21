@@ -22,7 +22,7 @@ use finstack_quant_portfolio::fi_attribution::{
 };
 use finstack_quant_portfolio::grid_attribution::{grid_attribution, GridPosition};
 use finstack_quant_portfolio::grouping::aggregate_by_book;
-use finstack_quant_portfolio::primitive_exposures;
+use finstack_quant_portfolio::primitive::primitive_exposures;
 use finstack_quant_portfolio::valuation::{
     value_portfolio, PortfolioValuationOptions, RequestedMetrics,
 };
@@ -39,8 +39,10 @@ fn booked_institutional_portfolio(num_positions: usize) -> finstack_quant_portfo
     let mut builder = Portfolio::builder(format!("{}_BOOKS", source.id))
         .base_currency(source.base_currency)
         .as_of(source.as_of)
-        .entities(source.entities.values().cloned())
         .book(Book::new("ROOT", Some("Root".into())));
+    for entity in source.entities.values().cloned() {
+        builder = builder.entity(entity);
+    }
 
     for region in 0..n_regions {
         builder = builder.book(
@@ -56,14 +58,8 @@ fn booked_institutional_portfolio(num_positions: usize) -> finstack_quant_portfo
         }
     }
 
-    for position in source.positions().iter().cloned() {
-        builder = builder.position(position);
-    }
-    for (index, position) in source.positions().iter().enumerate() {
-        let desk = format!("DESK_{}", index % n_desks);
-        builder = builder
-            .add_position_to_book(position.position_id.clone(), desk)
-            .expect("bench: book assignment");
+    for (index, position) in source.positions().iter().cloned().enumerate() {
+        builder = builder.position(position.with_book(format!("DESK_{}", index % n_desks)));
     }
     builder.build().expect("bench: booked portfolio")
 }
@@ -174,7 +170,7 @@ fn campisi_side(n_positions: usize, n_sectors: usize, tilt: f64) -> Vec<FiPositi
 
 fn bench_campisi(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_campisi");
-    let config = FiAttributionConfig::new(0.25);
+    let config = FiAttributionConfig { period_years: 0.25 };
     let portfolio = campisi_side(2_000, 20, 1.0);
     let benchmark = campisi_side(2_000, 20, 0.0);
     group.bench_function("campisi_2000pos_20sectors", |b| {

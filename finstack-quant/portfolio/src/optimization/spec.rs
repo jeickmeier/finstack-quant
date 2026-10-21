@@ -1,14 +1,12 @@
 //! JSON-serializable optimization spec and the spec-driven entry points the
 //! bindings call.
 
-use super::result::rebalance_portfolio;
 use super::{
-    optimize, CandidatePosition, Constraint, MissingMetricPolicy, Objective,
-    PortfolioOptimizationProblem, PortfolioOptimizationResult, PortfolioOptimizationResultWire,
-    TradeUniverse, WeightingScheme,
+    optimize, rebalance, CandidatePosition, Constraint, MissingMetricPolicy, Objective,
+    PortfolioOptimizationProblem, PortfolioOptimizationResult, TradeUniverse, WeightingScheme,
 };
-use crate::error::Result;
 use crate::portfolio::{Portfolio, PortfolioSpec};
+use crate::Result;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::market_data::context::MarketContext;
 use serde::{Deserialize, Serialize};
@@ -21,13 +19,16 @@ use serde::{Deserialize, Serialize};
 /// [`PortfolioSpec`], and then run the optimizer.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PortfolioOptimizationSpec {
     /// Portfolio specification (same format as `value_portfolio`).
     pub portfolio: PortfolioSpec,
     /// Optimization objective.
     pub objective: Objective,
-    /// Constraints on the optimized portfolio. An explicit budget replaces the
-    /// default sum-of-weights budget of one; duplicate explicit budgets are rejected.
+    /// Constraints on the optimized portfolio. Without an explicit budget the
+    /// optimizer applies a sum-of-weights budget of one, except under
+    /// `unit_scaling` weighting, which requires an explicit budget; duplicate
+    /// explicit budgets are rejected.
     #[serde(default)]
     pub constraints: Vec<Constraint>,
     /// How weights are defined.
@@ -86,9 +87,8 @@ impl PortfolioOptimizationSpec {
 /// Run portfolio optimization from a JSON-friendly spec.
 ///
 /// Builds the `Portfolio` from the embedded `PortfolioSpec`, constructs the
-/// optimization problem, and returns the native
-/// [`PortfolioOptimizationResult`] — which serializes to the canonical JSON
-/// wire format via its `Serialize` impl.
+/// optimization problem with exactly the spec's constraints, and solves it
+/// with [`optimize`].
 ///
 /// # Arguments
 ///
@@ -101,10 +101,11 @@ impl PortfolioOptimizationSpec {
 ///
 /// # Errors
 ///
-/// Propagates invalid portfolio-spec, objective, constraint, weighting, and
-/// missing-metric-policy inputs, along with optimization and market-dependent
-/// valuation failures.
-pub fn optimize_from_spec(
+/// Propagates invalid portfolio-spec, objective, constraint (see
+/// [`Constraint::validate`]), weighting, and missing-metric-policy inputs —
+/// including `unit_scaling` weighting without an explicit budget — along with
+/// optimization and market-dependent valuation failures.
+pub fn optimize_portfolio(
     spec: &PortfolioOptimizationSpec,
     market: &MarketContext,
     config: &FinstackConfig,
@@ -114,14 +115,7 @@ pub fn optimize_from_spec(
     problem.weighting = spec.weighting;
     problem.missing_metric_policy = spec.missing_metric_policy;
     problem.label = spec.label.clone();
-    if spec
-        .constraints
-        .iter()
-        .any(|constraint| matches!(constraint, Constraint::Budget { .. }))
-    {
-        problem.constraints.clear();
-    }
-    problem.constraints.extend(spec.constraints.iter().cloned());
+    problem.constraints = spec.constraints.clone();
     if let Some(universe) = &spec.trade_universe {
         problem = problem.with_trade_universe(universe.clone());
     }
@@ -131,19 +125,17 @@ pub fn optimize_from_spec(
 
 /// Rebalance a spec's portfolio to a serialized optimization solution.
 ///
-/// Wire twin of [`PortfolioOptimizationResult::to_rebalanced_portfolio`] for
-/// results that crossed a host boundary (the wire result does not carry the
-/// live problem): the portfolio is rebuilt from `spec.portfolio`, candidates
-/// come from `spec.trade_universe`, and the same rebalancing rules apply.
+/// Spec form of [`rebalance`] for results that crossed a host boundary: the
+/// portfolio is rebuilt from `spec.portfolio`, candidates come from
+/// `spec.trade_universe`, and the same rebalancing rules apply.
 ///
 /// # Arguments
 ///
 /// * `spec` - The optimization specification that produced `result`; its
 ///   portfolio is the starting point and its trade-universe candidates may be
 ///   added as new positions.
-/// * `result` - The solver outcome for `spec` (the wire form returned by the
-///   bindings), whose `status`, `implied_quantities` and `optimal_weights`
-///   are applied.
+/// * `result` - The solver outcome for `spec`, whose `status`,
+///   `implied_quantities` and `optimal_weights` are applied.
 ///
 /// # Returns
 ///
@@ -159,7 +151,7 @@ pub fn optimize_from_spec(
 /// validation failures.
 pub fn rebalance_from_spec(
     spec: &PortfolioOptimizationSpec,
-    result: &PortfolioOptimizationResultWire,
+    result: &PortfolioOptimizationResult,
 ) -> Result<Portfolio> {
     let candidates: &[CandidatePosition] = spec
         .trade_universe
@@ -183,11 +175,9 @@ pub fn rebalance_from_spec(
              portfolio nor a trade-universe candidate"
         )));
     }
-    rebalance_portfolio(
+    rebalance(
         Portfolio::from_spec(spec.portfolio.clone())?,
         candidates,
-        &result.status,
-        &result.implied_quantities,
-        &result.optimal_weights,
+        result,
     )
 }

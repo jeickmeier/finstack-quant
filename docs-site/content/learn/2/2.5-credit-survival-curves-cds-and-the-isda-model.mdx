@@ -304,7 +304,7 @@ stages={
 for stage, (book, market) in stages.items():
  result=value_portfolio(book,market,metrics=['cs01'],strict_risk=True)
  wire=json.loads(result.to_json())
- metrics=aggregate_metrics(result,'USD',market,AS_OF)
+ metrics=aggregate_metrics(result, market)
  reports[stage]=json.loads(metrics.to_json())
 before=reports['options']['aggregated'];after=reports['base']['aggregated']
 net_before=before['cs01']['total'];net_after=after['cs01']['total']

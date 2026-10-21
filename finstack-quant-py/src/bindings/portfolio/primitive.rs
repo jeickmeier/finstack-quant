@@ -1,5 +1,5 @@
 //! Portfolio-wide primitive exposure look-through
-//! (`finstack_quant_portfolio::primitive_exposures`).
+//! (`finstack_quant_portfolio::primitive::primitive_exposures`).
 
 use pyo3::prelude::*;
 
@@ -214,9 +214,11 @@ fn primitive_exposures(
         .collect::<Result<Vec<_>, _>>()
         .map_err(core_to_py)?;
     let (portfolio, market) = (&*portfolio, &*market);
-    py.detach(move || finstack_quant_portfolio::primitive_exposures(portfolio, market, &metrics))
-        .map(|inner| PyPortfolioPrimitiveExposureReport { inner })
-        .map_err(portfolio_to_py)
+    py.detach(move || {
+        finstack_quant_portfolio::primitive::primitive_exposures(portfolio, market, &metrics)
+    })
+    .map(|inner| PyPortfolioPrimitiveExposureReport { inner })
+    .map_err(portfolio_to_py)
 }
 
 /// Register the primitive exposure report class and function.

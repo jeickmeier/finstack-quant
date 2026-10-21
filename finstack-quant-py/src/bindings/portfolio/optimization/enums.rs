@@ -1,4 +1,6 @@
 use pyo3::prelude::*;
+
+use crate::errors::core_to_py;
 use pyo3::types::PyType;
 
 use finstack_quant_portfolio::optimization::{
@@ -54,16 +56,12 @@ impl PyWeightingScheme {
     }
 
     #[getter]
-    fn label(&self) -> &'static str {
-        match self.inner {
-            WeightingScheme::ValueWeight => "value_weight",
-            WeightingScheme::NotionalWeight => "notional_weight",
-            WeightingScheme::UnitScaling => "unit_scaling",
-        }
+    fn label(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
-    fn __repr__(&self) -> String {
-        format!("WeightingScheme.{}()", self.label())
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("WeightingScheme.{}()", self.label()?))
     }
 }
 
@@ -119,16 +117,12 @@ impl PyMissingMetricPolicy {
     }
 
     #[getter]
-    fn label(&self) -> &'static str {
-        match self.inner {
-            MissingMetricPolicy::Zero => "zero",
-            MissingMetricPolicy::Exclude => "exclude",
-            MissingMetricPolicy::Strict => "strict",
-        }
+    fn label(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
-    fn __repr__(&self) -> String {
-        format!("MissingMetricPolicy.{}()", self.label())
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("MissingMetricPolicy.{}()", self.label()?))
     }
 }
 
@@ -192,16 +186,12 @@ impl PyInequality {
 
     /// Canonical inequality operator label such as ``le``, ``ge``, or ``eq``.
     #[getter]
-    fn label(&self) -> &'static str {
-        match self.inner {
-            Inequality::Le => "le",
-            Inequality::Ge => "ge",
-            Inequality::Eq => "eq",
-        }
+    fn label(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
-    fn __repr__(&self) -> String {
-        format!("Inequality.{}()", self.label())
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("Inequality.{}()", self.label()?))
     }
 }
 
@@ -257,16 +247,12 @@ impl PyTradeDirection {
     }
 
     #[getter]
-    fn label(&self) -> &'static str {
-        match self.inner {
-            TradeDirection::Buy => "buy",
-            TradeDirection::Sell => "sell",
-            TradeDirection::Hold => "hold",
-        }
+    fn label(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
-    fn __repr__(&self) -> String {
-        format!("TradeDirection.{}()", self.label())
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("TradeDirection.{}()", self.label()?))
     }
 }
 
@@ -319,15 +305,11 @@ impl PyTradeType {
     }
 
     #[getter]
-    fn label(&self) -> &'static str {
-        match self.inner {
-            TradeType::Existing => "existing",
-            TradeType::NewPosition => "new_position",
-            TradeType::CloseOut => "close_out",
-        }
+    fn label(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
-    fn __repr__(&self) -> String {
-        format!("TradeType.{}()", self.label())
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("TradeType.{}()", self.label()?))
     }
 }

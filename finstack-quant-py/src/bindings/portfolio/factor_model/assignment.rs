@@ -8,7 +8,7 @@ use finstack_quant_portfolio::factor_model::{
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::display_to_py;
 
-use crate::bindings::json_bridge::{deserialize_json, serialize_json};
+use crate::bindings::json_bridge::serialize_json;
 
 /// Matched factor assignments for a single portfolio position.
 ///
@@ -35,30 +35,6 @@ impl PyPositionAssignment {
 
 #[pymethods]
 impl PyPositionAssignment {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: PositionAssignment = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Portfolio position identifier.
     #[getter]
     fn position_id(&self) -> String {
@@ -95,6 +71,11 @@ impl PyPositionAssignment {
         )
     }
 }
+crate::bindings::macros::wire_methods!(
+    PyPositionAssignment,
+    PositionAssignment,
+    "PositionAssignment"
+);
 
 /// Single unmatched dependency surfaced during assignment.
 #[pyclass(
@@ -116,30 +97,6 @@ impl PyUnmatchedEntry {
 
 #[pymethods]
 impl PyUnmatchedEntry {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: UnmatchedEntry = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Portfolio position identifier that owns the unmatched dependency.
     #[getter]
     fn position_id(&self) -> String {
@@ -159,6 +116,7 @@ impl PyUnmatchedEntry {
         )
     }
 }
+crate::bindings::macros::wire_methods!(PyUnmatchedEntry, UnmatchedEntry, "UnmatchedEntry");
 
 /// Assignment results for a portfolio-level factor mapping pass.
 #[pyclass(
@@ -180,30 +138,6 @@ impl PyFactorAssignmentReport {
 
 #[pymethods]
 impl PyFactorAssignmentReport {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: FactorAssignmentReport = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Per-position matched dependencies and factor identifiers.
     #[getter]
     fn assignments(&self) -> Vec<PyPositionAssignment> {
@@ -297,15 +231,10 @@ impl PyFactorAssignmentReport {
             self.inner.unmatched.len(),
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+crate::bindings::macros::wire_methods!(
+    PyFactorAssignmentReport,
+    FactorAssignmentReport,
+    "FactorAssignmentReport"
+);
+crate::bindings::macros::impl_repr_html_via_dataframe!(PyFactorAssignmentReport);

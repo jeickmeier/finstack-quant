@@ -33,7 +33,7 @@ for this crate.
 | `features/` | `pub` | Single file; all transforms are free functions on `mod.rs` |
 | `margin/` | `pub` | `calculators.rs`, `im.rs`, `regulatory.rs`, `xva.rs`, `metrics.rs`, `types.rs`, `sensitivity_frame.rs`, `schema.rs` |
 | `models/` | `pub` | Analytical, Fourier, SABR, credit, correlation, and factor bindings plus `monte_carlo/` (`engine.rs`, `pricers.rs`, `greeks.rs`, `analytical.rs`, `results.rs`, `time_grid.rs`) |
-| `portfolio/` | `pub` | 34 files: `factor_model/` and `optimization_spec/` subtrees plus per-method attribution (`brinson.rs`, `factor_brinson.rs`, `fi_attribution.rs`, `grid_attribution.rs`, `excess_return.rs`), `materialization.rs`, `pipeline.rs`, `sensitivity.rs`, `liquidity.rs`, `replay.rs`, `types.rs` |
+| `portfolio/` | `pub` | One file per Rust module (`container.rs` holds `portfolio` + `builder`): `factor_model/` and `optimization/` subtrees, `allocation.rs`, `attribution.rs`, `brinson.rs`, `cashflows.rs`, `excess_return.rs`, `factor_brinson.rs`, `fi_attribution.rs`, `grid_attribution.rs`, `margin.rs`, `materialization.rs`, `metrics.rs`, `performance.rs`, `primitive.rs`, `replay.rs`, `results.rs`, `scenarios.rs`, `schema.rs`, `sensitivity.rs`, `valuation.rs` |
 | `scenarios/` | `pub` | `engine.rs`, `horizon.rs`, `operation_spec/` (typed authoring path), `schema.rs` |
 | `statements/` | `pub` | `builder.rs`, `evaluator.rs`, `types.rs`, `capital_structure.rs`, `checks.rs`, `adjustments.rs`, `monte_carlo.rs`, `dsl.rs`, `schema.rs` |
 | `statements_analytics/` | `pub` | `analysis.rs`, `typed.rs`, `corkscrew.rs`, `ecl.rs`, `scorecards.rs`, `comps.rs`, and the `templates_*.rs` family |

@@ -136,7 +136,7 @@
       ]
     },
     "CashflowExtractionIssue": {
-      "description": "Structured issue captured while extracting full cashflow schedules.",
+      "description": "A position whose instrument could not build its contractual cashflow\nschedule, so it contributed no classified cashflows to the ladder.",
       "properties": {
         "instrument_id": {
           "description": "Underlying instrument identifier.",
@@ -146,16 +146,12 @@
           "$ref": "#/$defs/InstrumentType",
           "description": "Underlying instrument type key."
         },
-        "kind": {
-          "$ref": "#/$defs/CashflowExtractionIssueKind",
-          "description": "Failure category."
-        },
         "message": {
           "description": "Human-readable failure detail.",
           "type": "string"
         },
         "position_id": {
-          "$ref": "#/$defs/PositionId",
+          "$ref": "#/$defs/Id",
           "description": "Position whose cashflow extraction was attempted."
         }
       },
@@ -163,15 +159,9 @@
         "position_id",
         "instrument_id",
         "instrument_type",
-        "kind",
         "message"
       ],
       "type": "object"
-    },
-    "CashflowExtractionIssueKind": {
-      "const": "build_failed",
-      "description": "Why a position did not contribute classified cashflows to a portfolio ladder.",
-      "type": "string"
     },
     "CashflowFxPolicy": {
       "const": "cip_forward",
@@ -1013,6 +1003,10 @@
       "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
       "type": "string"
     },
+    "Id": {
+      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
+      "type": "string"
+    },
     "InstrumentType": {
       "description": "Strongly-typed instrument classification for pricer dispatch.\n\nEach variant represents a distinct instrument type with its own pricing\nlogic and risk characteristics. Used by the pricing registry to route\ninstruments to appropriate pricer implementations.",
       "oneOf": [
@@ -1456,7 +1450,7 @@
           "description": "Cashflow classification preserved from the instrument schedule."
         },
         "position_id": {
-          "$ref": "#/$defs/PositionId",
+          "$ref": "#/$defs/Id",
           "description": "Position contributing the event."
         },
         "rate": {
@@ -1508,7 +1502,7 @@
           "description": "Underlying instrument type key."
         },
         "position_id": {
-          "$ref": "#/$defs/PositionId",
+          "$ref": "#/$defs/Id",
           "description": "Position identifier."
         },
         "representation": {
@@ -1524,10 +1518,6 @@
         "event_count"
       ],
       "type": "object"
-    },
-    "PositionId": {
-      "description": "Position identifier.",
-      "type": "string"
     }
   },
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_cashflows.schema.json",
@@ -1625,7 +1615,6 @@
     },
     "fx_collapse_policy": {
       "$ref": "#/$defs/CashflowFxPolicy",
-      "default": "cip_forward",
       "description": "FX policy applied by [`Self::collapse_to_base_by_date_kind`].\n\nStamped so callers do not infer a spot-on-payment-date conversion from\n[`finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate`]."
     },
     "issues": {
@@ -1648,7 +1637,8 @@
     "by_position",
     "by_date",
     "position_summaries",
-    "issues"
+    "issues",
+    "fx_collapse_policy"
   ],
   "title": "PortfolioCashflows",
   "type": "object"

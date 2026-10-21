@@ -1,8 +1,6 @@
-//! Finite-difference and repricing utilities for portfolio sensitivities.
+//! Central-difference factor sensitivity engine.
 //!
-use super::traits::{
-    mapping_bumps_fx, raw_pv_in_base, FactorRepricingPlan, FactorSensitivityEngine,
-};
+use super::traits::{factor_bump, mapping_bumps_fx, FactorRepricingPlan, FactorSensitivityEngine};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{
@@ -41,13 +39,7 @@ impl DeltaBasedEngine {
         as_of: Date,
         base_currency: Currency,
     ) -> Result<Vec<f64>> {
-        let bump_size = bump_config.bump_size_for_factor(&factor.id, &factor.factor_type);
-        let bump_units = factor.factor_type.bump_units();
-        if !bump_size.is_finite() || bump_size.abs() < f64::EPSILON {
-            return Err(finstack_quant_core::Error::Validation(
-                "factor bump size must be finite and non-zero".to_string(),
-            ));
-        }
+        let (bump_size, bump_units) = factor_bump(bump_config, factor)?;
 
         let up_market = market.bump(mapping_to_market_bumps(
             &factor.market_mapping,
@@ -70,8 +62,8 @@ impl DeltaBasedEngine {
                 if !affected && !reconvert_all {
                     return Ok(0.0);
                 }
-                let pv_up = raw_pv_in_base(*instrument, &up_market, as_of, base_currency)?;
-                let pv_down = raw_pv_in_base(*instrument, &down_market, as_of, base_currency)?;
+                let pv_up = crate::fx::raw_pv_in_base(*instrument, &up_market, as_of, base_currency)?;
+                let pv_down = crate::fx::raw_pv_in_base(*instrument, &down_market, as_of, base_currency)?;
                 if !pv_up.is_finite() || !pv_down.is_finite() {
                     return Err(Error::Validation(format!(
                         "minor 15: non-finite bumped PV for position '{position_id}' on factor '{}' (up = {pv_up}, down = {pv_down})",
@@ -274,6 +266,22 @@ pub(crate) fn mapping_to_market_bumps(
 }
 
 impl FactorSensitivityEngine for DeltaBasedEngine {
+    /// Compute a factor matrix with two central endpoint prices per affected position.
+    ///
+    /// # Arguments
+    ///
+    /// * `bump_config` - Central bump magnitudes in each factor's canonical units.
+    /// * `positions` - Ordered `(id, instrument, weight)` rows; weights are finite,
+    ///   signed instrument-unit multipliers applied to the unscaled central delta.
+    /// * `factors` - Ordered factor definitions selecting the market inputs to bump.
+    /// * `market` - Base market snapshot used to construct both endpoint markets.
+    /// * `as_of` - Valuation date for instrument pricing and spot FX lookup.
+    /// * `base_currency` - Reporting currency for all converted endpoint PVs.
+    ///
+    /// # Errors
+    ///
+    /// Rejects non-finite weights, endpoint PVs, and final weighted sensitivities,
+    /// and invalid bump sizes. Propagates pricing, market-bump, and FX failures.
     fn compute_sensitivities(
         &self,
         positions: &[(String, &dyn Instrument, f64)],
@@ -282,79 +290,36 @@ impl FactorSensitivityEngine for DeltaBasedEngine {
         as_of: Date,
         base_currency: Currency,
     ) -> Result<SensitivityMatrix> {
-        compute_delta_sensitivities(
-            &self.bump_config,
-            positions,
-            factors,
-            market,
-            as_of,
-            base_currency,
-        )
-    }
-}
+        validate_position_weights(positions)?;
+        let position_ids = positions.iter().map(|(id, _, _)| id.clone()).collect();
+        let factor_ids = factors.iter().map(|factor| factor.id.clone()).collect();
+        let mut matrix = SensitivityMatrix::zeros(position_ids, factor_ids);
+        let repricing_plan = FactorRepricingPlan::build(positions, factors, market);
 
-/// Compute a factor matrix with two central endpoint prices per affected position.
-///
-/// # Arguments
-///
-/// * `bump_config` - Central bump magnitudes in each factor's canonical units.
-/// * `positions` - Ordered `(id, instrument, weight)` rows; weights are finite,
-///   signed instrument-unit multipliers applied to the unscaled central delta.
-/// * `factors` - Ordered factor definitions selecting the market inputs to bump.
-/// * `market` - Base market snapshot used to construct both endpoint markets.
-/// * `as_of` - Valuation date for instrument pricing and spot FX lookup.
-/// * `base_currency` - Reporting currency for all converted endpoint PVs.
-///
-/// # Errors
-///
-/// Rejects non-finite weights, endpoint PVs, and final weighted sensitivities,
-/// and invalid bump sizes. Propagates pricing, market-bump, and FX failures.
-pub(super) fn compute_delta_sensitivities(
-    bump_config: &BumpSizeConfig,
-    positions: &[(String, &dyn Instrument, f64)],
-    factors: &[FactorDefinition],
-    market: &MarketContext,
-    as_of: Date,
-    base_currency: Currency,
-) -> Result<SensitivityMatrix> {
-    validate_position_weights(positions)?;
-    let position_ids = positions.iter().map(|(id, _, _)| id.clone()).collect();
-    let factor_ids = factors.iter().map(|factor| factor.id.clone()).collect();
-    let mut matrix = SensitivityMatrix::zeros(position_ids, factor_ids);
-    let repricing_plan = FactorRepricingPlan::build(positions, factors, market);
+        let compute_column = |(factor_index, factor): (usize, &FactorDefinition)| {
+            DeltaBasedEngine::compute_factor_column(
+                &self.bump_config,
+                positions,
+                repricing_plan.affected(factor_index),
+                factor,
+                market,
+                as_of,
+                base_currency,
+            )
+        };
 
-    let compute_column = |(factor_index, factor): (usize, &FactorDefinition)| {
-        DeltaBasedEngine::compute_factor_column(
-            bump_config,
-            positions,
-            repricing_plan.affected(factor_index),
-            factor,
-            market,
-            as_of,
-            base_currency,
-        )
-    };
+        let columns = finstack_quant_core::parallel::try_map_ordered(0..factors.len(), |index| {
+            compute_column((index, &factors[index]))
+        })?;
 
-    #[cfg(not(target_arch = "wasm32"))]
-    let column_results: Vec<Result<Vec<f64>>> = {
-        use rayon::prelude::*;
-        factors.par_iter().enumerate().map(compute_column).collect()
-    };
-
-    #[cfg(target_arch = "wasm32")]
-    let column_results: Vec<Result<Vec<f64>>> =
-        factors.iter().enumerate().map(compute_column).collect();
-    let columns = column_results
-        .into_iter()
-        .collect::<Result<Vec<Vec<f64>>>>()?;
-
-    for (factor_idx, column) in columns.iter().enumerate() {
-        for (position_idx, value) in column.iter().enumerate() {
-            matrix.set_delta(position_idx, factor_idx, *value);
+        for (factor_idx, column) in columns.iter().enumerate() {
+            for (position_idx, value) in column.iter().enumerate() {
+                matrix.set_delta(position_idx, factor_idx, *value);
+            }
         }
-    }
 
-    Ok(matrix)
+        Ok(matrix)
+    }
 }
 
 /// Reject position weights that cannot produce a finite risk representation.

@@ -18,7 +18,7 @@ pub enum Inequality {
 }
 
 impl std::str::FromStr for Inequality {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
 
     /// Parse an inequality from its serde name or symbol alias.
     ///
@@ -36,7 +36,7 @@ impl std::str::FromStr for Inequality {
             "le" | "<=" => Ok(Self::Le),
             "ge" | ">=" => Ok(Self::Ge),
             "eq" | "==" => Ok(Self::Eq),
-            other => Err(crate::error::Error::invalid_input(format!(
+            other => Err(crate::Error::invalid_input(format!(
                 "Unknown inequality {other:?}; expected one of le/ge/eq or <=/>=/=="
             ))),
         }
@@ -122,122 +122,129 @@ impl Constraint {
 
     /// Shorthand for attribute exposure limit: `sum w_i * I[attr == value] <= max_share`.
     ///
+    /// # Arguments
+    ///
+    /// * `key` - Position attribute key to test, such as `rating` or `sector`.
+    /// * `value` - Text attribute value that marks a position as in the bucket
+    ///   (exact match).
+    /// * `max_share` - Weight share of the bucket, as a decimal fraction of the
+    ///   portfolio in `[0, 1]`; the bucket weight must be at most this.
+    ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::InvalidInput`] if `max_share` is not in `[0, 1]`.
+    /// Returns [`crate::Error::InvalidInput`] if `max_share` is not in `[0, 1]`.
     pub fn exposure_limit(
         key: impl Into<String>,
         value: impl Into<String>,
         max_share: f64,
-    ) -> crate::error::Result<Self> {
-        if !(0.0..=1.0).contains(&max_share) {
-            return Err(crate::error::Error::invalid_input(format!(
-                "max_share must be in [0, 1], got {max_share}"
-            )));
-        }
-        Ok(Self::MetricBound {
-            label: None,
-            metric: super::types::MetricExpr::WeightedSum {
-                metric: super::types::PerPositionMetric::AttributeIndicator(
-                    crate::types::AttributeTest::text_eq(key, value),
-                ),
-                filter: None,
-            },
-            op: Inequality::Le,
-            rhs: max_share,
-        })
+    ) -> crate::Result<Self> {
+        Self::exposure_bound(key, value, "max_share", Inequality::Le, max_share)
     }
 
     /// Shorthand for attribute exposure minimum: `sum w_i * I[attr == value] >= min_share`.
     ///
+    /// # Arguments
+    ///
+    /// * `key` - Position attribute key to test, such as `rating` or `sector`.
+    /// * `value` - Text attribute value that marks a position as in the bucket
+    ///   (exact match).
+    /// * `min_share` - Weight share of the bucket, as a decimal fraction of the
+    ///   portfolio in `[0, 1]`; the bucket weight must be at least this.
+    ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::InvalidInput`] if `min_share` is not in `[0, 1]`.
+    /// Returns [`crate::Error::InvalidInput`] if `min_share` is not in `[0, 1]`.
     pub fn exposure_minimum(
         key: impl Into<String>,
         value: impl Into<String>,
         min_share: f64,
-    ) -> crate::error::Result<Self> {
-        if !(0.0..=1.0).contains(&min_share) {
-            return Err(crate::error::Error::invalid_input(format!(
-                "min_share must be in [0, 1], got {min_share}"
+    ) -> crate::Result<Self> {
+        Self::exposure_bound(key, value, "min_share", Inequality::Ge, min_share)
+    }
+
+    /// `sum w_i * I[attr == value] OP share`, with `share` checked to lie in `[0, 1]`.
+    fn exposure_bound(
+        key: impl Into<String>,
+        value: impl Into<String>,
+        share_name: &str,
+        op: Inequality,
+        share: f64,
+    ) -> crate::Result<Self> {
+        if !(0.0..=1.0).contains(&share) {
+            return Err(crate::Error::invalid_input(format!(
+                "{share_name} must be in [0, 1], got {share}"
             )));
         }
         Ok(Self::MetricBound {
             label: None,
             metric: super::types::MetricExpr::WeightedSum {
                 metric: super::types::PerPositionMetric::AttributeIndicator(
-                    crate::types::AttributeTest::text_eq(key, value),
+                    crate::types::AttributeTest::new(
+                        key,
+                        crate::types::ComparisonOp::Eq,
+                        crate::types::AttributeValue::Text(value.into()),
+                    ),
                 ),
                 filter: None,
             },
-            op: Inequality::Ge,
-            rhs: min_share,
+            op,
+            rhs: share,
         })
     }
 
-    /// Create a weight bounds constraint with validation.
+    /// Check the constraint's own inputs, independent of any portfolio.
     ///
-    /// # Arguments
+    /// [`super::optimize`] calls this for every constraint before solving, so
+    /// constraints built directly as variants or deserialized from JSON get the
+    /// same checks. Rules per variant:
     ///
-    /// * `filter` - Filter to select positions
-    /// * `min` - Inclusive minimum weight
-    /// * `max` - Inclusive maximum weight
+    /// - `Budget`: `rhs` finite and non-negative.
+    /// - `WeightBounds`: `min` and `max` finite and `min <= max`.
+    /// - `MaxTurnover`: `max_turnover` finite and non-negative.
+    /// - `MetricBound`: `rhs` finite. The bound is generic (a duration, a yield,
+    ///   an exposure share), so no range is imposed; the `[0, 1]` share range is
+    ///   checked by [`Constraint::exposure_limit`] and
+    ///   [`Constraint::exposure_minimum`], which build the exposure shape.
     ///
-    /// # Errors
+    /// # Returns
     ///
-    /// Returns [`crate::error::Error::InvalidInput`] if `min > max`.
-    pub fn weight_bounds(filter: PositionFilter, min: f64, max: f64) -> crate::error::Result<Self> {
-        if min > max {
-            return Err(crate::error::Error::invalid_input(format!(
-                "weight bounds min ({min}) must be <= max ({max})"
-            )));
-        }
-        Ok(Self::WeightBounds {
-            label: None,
-            filter,
-            min,
-            max,
-        })
-    }
-
-    /// Create a max turnover constraint with validation.
-    ///
-    /// # Arguments
-    ///
-    /// * `max_turnover` - Maximum allowed turnover (must be non-negative)
+    /// `Ok(())` when every input satisfies the rules above.
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::Error::InvalidInput`] if `max_turnover` is negative.
-    pub fn max_turnover(max_turnover: f64) -> crate::error::Result<Self> {
-        if max_turnover < 0.0 {
-            return Err(crate::error::Error::invalid_input(format!(
-                "max_turnover must be non-negative, got {max_turnover}"
-            )));
+    /// Returns [`crate::Error::InvalidInput`] naming the offending input.
+    pub fn validate(&self) -> crate::Result<()> {
+        match self {
+            Self::MetricBound { rhs, .. } => {
+                if !rhs.is_finite() {
+                    return Err(crate::Error::invalid_input(format!(
+                        "metric bound rhs must be finite, got {rhs}"
+                    )));
+                }
+            }
+            Self::WeightBounds { min, max, .. } => {
+                if !min.is_finite() || !max.is_finite() || min > max {
+                    return Err(crate::Error::invalid_input(format!(
+                        "weight bounds min ({min}) and max ({max}) must be finite with min <= max"
+                    )));
+                }
+            }
+            Self::MaxTurnover { max_turnover, .. } => {
+                if !max_turnover.is_finite() || *max_turnover < 0.0 {
+                    return Err(crate::Error::invalid_input(format!(
+                        "max_turnover must be finite and non-negative, got {max_turnover}"
+                    )));
+                }
+            }
+            Self::Budget { rhs } => {
+                if !rhs.is_finite() || *rhs < 0.0 {
+                    return Err(crate::Error::invalid_input(format!(
+                        "budget rhs must be finite and non-negative, got {rhs}"
+                    )));
+                }
+            }
         }
-        Ok(Self::MaxTurnover {
-            label: None,
-            max_turnover,
-        })
-    }
-
-    /// Create a budget (normalization) constraint with validation.
-    ///
-    /// # Arguments
-    ///
-    /// * `rhs` - Weight sum target (typically 1.0 for fully-invested portfolios).
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::error::Error::InvalidInput`] if `rhs` is NaN, infinite, or negative.
-    pub fn budget(rhs: f64) -> crate::error::Result<Self> {
-        if !rhs.is_finite() || rhs < 0.0 {
-            return Err(crate::error::Error::invalid_input(format!(
-                "budget rhs must be finite and non-negative, got {rhs}"
-            )));
-        }
-        Ok(Self::Budget { rhs })
+        Ok(())
     }
 }
 
@@ -271,21 +278,47 @@ mod tests {
     }
 
     #[test]
-    fn test_weight_bounds_validation() {
-        assert!(Constraint::weight_bounds(PositionFilter::All, 0.0, 0.1).is_ok());
-        assert!(Constraint::weight_bounds(PositionFilter::All, 0.05, 0.05).is_ok());
+    fn validate_checks_each_variant() {
+        let bounds = |min, max| Constraint::WeightBounds {
+            label: None,
+            filter: PositionFilter::All,
+            min,
+            max,
+        };
+        assert!(bounds(0.0, 0.1).validate().is_ok());
+        assert!(bounds(0.05, 0.05).validate().is_ok());
+        assert!(bounds(0.2, 0.1).validate().is_err());
+        assert!(bounds(f64::NAN, 0.1).validate().is_err());
+        assert!(bounds(0.0, f64::INFINITY).validate().is_err());
 
-        let result = Constraint::weight_bounds(PositionFilter::All, 0.2, 0.1);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("min"));
-    }
+        let turnover = |max_turnover| Constraint::MaxTurnover {
+            label: None,
+            max_turnover,
+        };
+        assert!(turnover(0.0).validate().is_ok());
+        assert!(turnover(0.5).validate().is_ok());
+        assert!(turnover(-0.1).validate().is_err());
+        assert!(turnover(f64::NAN).validate().is_err());
 
-    #[test]
-    fn test_max_turnover_validation() {
-        assert!(Constraint::max_turnover(0.5).is_ok());
-        assert!(Constraint::max_turnover(0.0).is_ok());
+        assert!(Constraint::Budget { rhs: 1.0 }.validate().is_ok());
+        assert!(Constraint::Budget { rhs: 0.0 }.validate().is_ok());
+        assert!(Constraint::Budget { rhs: -1.0 }.validate().is_err());
+        assert!(Constraint::Budget { rhs: f64::NAN }.validate().is_err());
 
-        let result = Constraint::max_turnover(-0.1);
-        assert!(result.is_err());
+        let exposure = Constraint::exposure_limit("rating", "CCC", 0.2).expect("valid share");
+        assert!(exposure.validate().is_ok());
+        let Constraint::MetricBound {
+            label, metric, op, ..
+        } = exposure
+        else {
+            panic!("exposure_limit builds a metric bound");
+        };
+        let unbounded = Constraint::MetricBound {
+            label,
+            metric,
+            op,
+            rhs: f64::INFINITY,
+        };
+        assert!(unbounded.validate().is_err());
     }
 }

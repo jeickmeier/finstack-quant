@@ -20,7 +20,6 @@ from finstack_quant.portfolio import (
     PortfolioValuation,
     scenario_pnl,
     scenario_pnl_batch,
-    scenario_pnl_batch_json,
     value_portfolio,
 )
 from finstack_quant.scenarios import ScenarioSpec
@@ -123,28 +122,19 @@ def test_scenario_pnl_batch_matches_standalone_and_accepts_json_or_typed_inputs(
     scenarios_json = _scenario_batch_json()
     scenarios = json.loads(scenarios_json)
 
-    # `scenario_pnl_batch_json` is the JSON-wire twin, so the typed
-    # standalone results are compared through their canonical JSON.
-    batch = json.loads(scenario_pnl_batch_json(portfolio, scenarios_json, market))
-    expected = []
-    for scenario in scenarios:
-        pnl, report = scenario_pnl(portfolio, json.dumps(scenario), market)
-        expected.append({
-            "scenario_id": scenario["id"],
-            "pnl": json.loads(pnl.to_json()),
-            "report": json.loads(report.to_json()),
-        })
+    # Batch items and the standalone results are compared through their
+    # canonical JSON.
+    batch = [json.loads(item.to_json()) for item in scenario_pnl_batch(portfolio, scenarios_json, market)]
+    expected = [json.loads(scenario_pnl(portfolio, json.dumps(scenario), market).to_json()) for scenario in scenarios]
 
     assert batch == expected
     assert [item["scenario_id"] for item in batch] == ["up_10bp", "down_15bp"]
-    assert json.loads(scenario_pnl_batch_json(_portfolio_json(), scenarios_json, market.to_json())) == batch
-    assert json.loads(scenario_pnl_batch_json(portfolio, "[]", market)) == []
-    # The typed entry point returns the same payloads as wrapper objects.
-    typed = scenario_pnl_batch(portfolio, scenarios_json, market)
-    assert [json.loads(item.to_json()) for item in typed] == batch
+    # JSON portfolio/market inputs reach the same answer as the typed handles.
+    from_json = scenario_pnl_batch(_portfolio_json(), scenarios_json, market.to_json())
+    assert [json.loads(item.to_json()) for item in from_json] == batch
     assert scenario_pnl_batch(portfolio, "[]", market) == []
     with pytest.raises(ValueError, match="invalid type"):
-        scenario_pnl_batch_json(portfolio, "{}", market)
+        scenario_pnl_batch(portfolio, "{}", market)
 
 
 @pytest.mark.parametrize(

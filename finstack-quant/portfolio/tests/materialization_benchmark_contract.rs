@@ -8,7 +8,7 @@ mod materialization_gate;
 use std::collections::HashSet;
 
 use finstack_quant_core::contract::LoadLimits;
-use finstack_quant_portfolio::{InstrumentArtifactCache, Portfolio};
+use finstack_quant_portfolio::{materialization::InstrumentArtifactCache, Portfolio};
 use serde_json::Value;
 
 use materialization_fixtures::{build_fixture, fixture_a, fixture_b, FixtureKind};

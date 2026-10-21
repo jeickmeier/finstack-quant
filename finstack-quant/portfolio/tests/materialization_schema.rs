@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use finstack_quant_portfolio::materialization::PortfolioMaterializationEnvelope;
-use finstack_quant_portfolio::PositionUnit;
+use finstack_quant_portfolio::position::PositionUnit;
 use serde_json::{json, Value};
 
 const INSTRUMENT_SCHEMA_URI: &str =

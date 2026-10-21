@@ -826,14 +826,6 @@ export type AttributionMethod =
       taylor: TaylorAttributionConfig;
     };
 /**
- * Book identifier.
- */
-export type BookId = string;
-/**
- * Position identifier.
- */
-export type PositionId = string;
-/**
  * Enumeration of cash-flow kinds for classification and ordering.
  *
  * Used to distinguish between different types of cashflows for
@@ -904,10 +896,6 @@ export type CFKind =
   | "collateral_substitution_in"
   | "collateral_substitution_out";
 /**
- * Entity identifier (company, fund, etc.)
- */
-export type EntityId = string;
-/**
  * Unit of position measurement.
  *
  * The unit describes how the `quantity` on a [`Position`] should be interpreted.
@@ -947,10 +935,6 @@ export type PositionUnit =
     }
   | "face_value"
   | "percentage";
-/**
- * Why a position did not contribute classified cashflows to a portfolio ladder.
- */
-export type CashflowExtractionIssueKind = "build_failed";
 /**
  * How [`PortfolioCashflows::collapse_to_base_by_date_kind`] converts
  * foreign-currency flows into the reporting currency.
@@ -1066,13 +1050,13 @@ export type MetricExpr =
 export type PositionFilter =
   | "all"
   | {
-      by_entity_id: EntityId;
+      by_entity_id: Id;
     }
   | {
       by_attribute: AttributeTest;
     }
   | {
-      by_position_ids: PositionId[];
+      by_position_ids: Id[];
     }
   | {
       not: PositionFilter;
@@ -1367,16 +1351,7 @@ export type Objective =
  */
 export type OptimizationStatus =
   | "optimal"
-  | "feasible_but_suboptimal"
-  | {
-      infeasible: {
-        /**
-         * Constraints that appear to conflict (if determinable).
-         */
-        conflicting_constraints: string[];
-        [k: string]: unknown;
-      };
-    }
+  | "infeasible"
   | "unbounded"
   | {
       error: {
@@ -1470,7 +1445,7 @@ export type PositionChange =
       /**
        * Position identifier to remove from the scenario.
        */
-      position_id: PositionId;
+      position_id: Id;
     }
   | {
       kind: "resize";
@@ -1481,7 +1456,7 @@ export type PositionChange =
       /**
        * Position identifier to resize.
        */
-      position_id: PositionId;
+      position_id: Id;
     };
 /**
  * Source of a per-position residual variance contribution.
@@ -2046,18 +2021,18 @@ export interface TaylorAttributionConfig {
  *   indefinitely. A portfolio supports at most 100,000 books and 512 levels
  *   of ancestry, including the root.
  * - [`Book::child_book_ids`] drives rollup in [`crate::grouping::aggregate_by_book`];
- *   [`crate::portfolio::Portfolio::validate`] checks parent/child consistency
+ *   [`crate::Portfolio::validate`] checks parent/child consistency
  *   between child lists and [`Book::parent_id`]
  */
 export interface Book {
   /**
    * Child book IDs (for hierarchical organization)
    */
-  child_book_ids: BookId[];
+  child_book_ids: Id[];
   /**
    * Unique identifier for this book
    */
-  id: BookId;
+  id: Id;
   /**
    * Additional metadata
    */
@@ -2071,11 +2046,11 @@ export interface Book {
   /**
    * Parent book identifier (None for root books)
    */
-  parent_id?: BookId | null;
+  parent_id?: Id | null;
   /**
    * Position IDs directly assigned to this book (non-recursive)
    */
-  position_ids: PositionId[];
+  position_ids: Id[];
   /**
    * Book-level tags for grouping and filtering
    */
@@ -2116,7 +2091,6 @@ export interface BrinsonPeriodResult {
    * Sum of selection effects across sectors.
    */
   total_selection: number;
-  [k: string]: unknown;
 }
 /**
  * Per-sector attribution effects (Brinson-Fachler three-way split).
@@ -2143,7 +2117,6 @@ export interface SectorEffect {
    * active return.
    */
   total: number;
-  [k: string]: unknown;
 }
 /**
  * A candidate instrument that could be added to the portfolio.
@@ -2155,8 +2128,8 @@ export interface CandidatePosition {
   attributes?: {
     [k: string]: AttributeValue;
   };
-  entity_id: EntityId;
-  id: PositionId;
+  entity_id: Id;
+  id: Id;
   instrument_spec: valuations.InstrumentJson;
   max_weight: number;
   min_weight: number;
@@ -2301,10 +2274,10 @@ export interface CashflowAggregationOptions {
    * contribute to the ladder and issues are returned on the result.
    */
   allow_partial: boolean;
-  [k: string]: unknown;
 }
 /**
- * Structured issue captured while extracting full cashflow schedules.
+ * A position whose instrument could not build its contractual cashflow
+ * schedule, so it contributed no classified cashflows to the ladder.
  */
 export interface CashflowExtractionIssue {
   /**
@@ -2316,17 +2289,13 @@ export interface CashflowExtractionIssue {
    */
   instrument_type: InstrumentType;
   /**
-   * Failure category.
-   */
-  kind: CashflowExtractionIssueKind;
-  /**
    * Human-readable failure detail.
    */
   message: string;
   /**
    * Position whose cashflow extraction was attempted.
    */
-  position_id: PositionId;
+  position_id: Id;
   [k: string]: unknown;
 }
 /**
@@ -2627,9 +2596,9 @@ export interface CreditVolReport {
    */
   by_level: LevelVolContribution[];
   /**
-   * Optional position-level breakdown.
+   * Position-level breakdown; `None` unless requested.
    */
-  by_position_optional?: PositionVolContribution[] | null;
+  by_position?: PositionVolContribution[] | null;
   /**
    * Contribution from the generic credit factor.
    */
@@ -2685,7 +2654,7 @@ export interface PositionVolContribution {
   /**
    * Portfolio position identifier.
    */
-  position_id: PositionId;
+  position_id: Id;
   /**
    * Sum of systematic and idiosyncratic contributions.
    */
@@ -2722,7 +2691,6 @@ export interface DatedCashflow {
    * Cashflow date.
    */
   date: DateWire;
-  [k: string]: unknown;
 }
 export interface DegradedPosition {
   message: string;
@@ -2830,7 +2798,7 @@ export interface Entity {
   /**
    * Unique identifier for the entity
    */
-  id: EntityId;
+  id: Id;
   /**
    * Additional metadata
    */
@@ -2971,7 +2939,7 @@ export interface PositionAssignment {
   /**
    * Portfolio position identifier.
    */
-  position_id: PositionId;
+  position_id: Id;
   [k: string]: unknown;
 }
 /**
@@ -2985,7 +2953,7 @@ export interface UnmatchedEntry {
   /**
    * Portfolio position identifier.
    */
-  position_id: PositionId;
+  position_id: Id;
   [k: string]: unknown;
 }
 /**
@@ -3370,96 +3338,6 @@ export interface FiLinkedSectorEffect {
    */
   total_active: number;
   [k: string]: unknown;
-}
-/**
- * One attribution period's raw inputs for multi-period linking.
- */
-export interface FiPeriodInput {
-  /**
-   * Benchmark snapshots for the period.
-   */
-  benchmark: FiPositionSnapshot[];
-  /**
-   * Portfolio snapshots for the period.
-   */
-  portfolio: FiPositionSnapshot[];
-}
-/**
- * Plain-data snapshot of one position (or pre-aggregated bucket) for one
- * attribution period.
- *
- * Weights are fractions of the whole portfolio (or benchmark) and must sum
- * to 1.0 within each side. Returns, yields and spreads are decimals
- * (`0.02` = 2 %); durations are in years.
- */
-export interface FiPositionSnapshot {
-  /**
-   * Absolute change in the quote-reproducing Z-spread over the period
-   * (decimal).
-   *
-   * Must use the same Z-spread basis as [`Self::spread_duration`] and
-   * [`Self::spread`].
-   */
-  delta_spread: number;
-  /**
-   * Change in the treasury/benchmark yield relevant to this position's
-   * duration bucket over the period (decimal).
-   */
-  delta_treasury_yield: number;
-  /**
-   * Modified duration in years at period start.
-   */
-  modified_duration: number;
-  /**
-   * Sector bucket label (industry / quality / any grouping).
-   */
-  sector: string;
-  /**
-   * Quote-reproducing Z-spread at period start (decimal).
-   *
-   * Carried for provenance and downstream reporting only — the
-   * decomposition never divides by it, so any finite value (including zero
-   * and negative levels) is accepted. See "Why there is no DTS spread mode"
-   * in the module docs.
-   */
-  spread: number;
-  /**
-   * Quote-reproducing Z-spread duration in years at period start.
-   *
-   * Must use the same Z-spread basis as [`Self::spread`] and
-   * [`Self::delta_spread`]; OAS, G-spread, and discount-margin durations
-   * are not compatible inputs.
-   */
-  spread_duration: number;
-  /**
-   * Realized total return for the period (decimal).
-   */
-  total_return: number;
-  /**
-   * Weight as a fraction of the whole side at period start.
-   */
-  weight: number;
-  /**
-   * Annualized yield at period start (decimal; e.g. YTM).
-   */
-  yield_annual: number;
-}
-/**
- * Report from reconciling the five effect totals against the active return, mirroring `crate::attribution` reconciliation conventions.
- */
-export interface FiReconciliationReport {
-  /**
-   * Whether the residual is within tolerance.
-   */
-  is_reconciled: boolean;
-  /**
-   * Tolerance used for the check.
-   */
-  tolerance: number;
-  /**
-   * `active_return − (allocation + carry + treasury + spread + selection)`.
-   */
-  total_residual: number;
 }
 /**
  * Detailed attribution for FX rate changes.
@@ -4787,7 +4665,7 @@ export interface PortfolioCashflowEvent {
   /**
    * Position contributing the event.
    */
-  position_id: PositionId;
+  position_id: Id;
   /**
    * Effective rate used to compute the event when available.
    */
@@ -4817,7 +4695,7 @@ export interface PortfolioCashflowPositionSummary {
   /**
    * Position identifier.
    */
-  position_id: PositionId;
+  position_id: Id;
   /**
    * Schedule representation carried by the instrument.
    */
@@ -4854,7 +4732,7 @@ export interface PortfolioCashflows {
    * Stamped so callers do not infer a spot-on-payment-date conversion from
    * [`finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate`].
    */
-  fx_collapse_policy?: CashflowFxPolicy;
+  fx_collapse_policy: CashflowFxPolicy;
   /**
    * Extraction issues for unsupported instruments and provider failures.
    */
@@ -5009,7 +4887,7 @@ export interface PortfolioMetrics {
    * [`SkippedMetric`] entry — that field only records non-finite values —
    * so this list is the only signal that the aggregate is partial.
    */
-  degraded_positions?: PositionId[];
+  degraded_positions?: Id[];
   /**
    * Positions whose non-finite metric values were excluded from aggregation.
    *
@@ -5058,7 +4936,7 @@ export interface SkippedMetric {
   /**
    * Position that produced the non-finite value.
    */
-  position_id: PositionId;
+  position_id: Id;
   /**
    * The non-finite value that was encountered.
    */
@@ -5068,33 +4946,44 @@ export interface SkippedMetric {
 /**
  * Canonical typed v1 output from portfolio optimization.
  */
-export interface PortfolioOptimizationResultWire {
+export interface PortfolioOptimizationResult {
   /**
-   * Approximately binding constraint names.
+   * Names of the approximately binding constraints (slack ≈ 0), in slack
+   * order; empty for an infeasible solve.
    */
   binding_constraints: string[];
   /**
-   * Constraint slack values; undefined averages use the `"nan"` sentinel.
+   * Constraint slack values (positive = slack, zero ≈ binding); undefined
+   * averages use the `"nan"` sentinel.
    */
   constraint_slacks: {
     [k: string]: NonFiniteF64Wire;
   };
   /**
-   * Current weights keyed by position.
+   * Pre‑trade weights (current portfolio state).
    */
   current_weights: {
     [k: string]: number;
   };
   /**
-   * Implied target quantities keyed by position.
+   * Implied target quantities for each position (units / face / notional).
+   *
+   * Reconstruction depends on the weighting scheme and is always written
+   * in `Position::quantity` units (lots, shares, face multiplier, or
+   * percentage points):
+   * - `ValueWeight`: convert the target PV share through `pv_per_unit`
+   *   (base PV per 1.0 of `scale_factor()`) and map scale back to quantity
+   * - `NotionalWeight`: convert the target notional share through
+   *   `|instrument.notional().amount()|` and map scale back to quantity
+   * - `UnitScaling`: treat the optimized weight as a quantity multiplier for
+   *   existing positions, or as the direct target quantity for new candidates
+   *
+   * Held existing positions retain their exact current quantity under every
+   * scheme, including positions with zero or negligible present value.
    */
   implied_quantities: {
     [k: string]: number;
   };
-  /**
-   * Whether the solution can be consumed.
-   */
-  is_feasible: boolean;
   /**
    * Optional user-supplied problem label.
    */
@@ -5104,12 +4993,6 @@ export interface PortfolioOptimizationResultWire {
    */
   meta: ResultsMeta;
   /**
-   * Evaluated metrics.
-   */
-  metric_values: {
-    [k: string]: number;
-  };
-  /**
    * Objective value at the solution.
    *
    * `NaN` when the solve is not feasible; non-finite values travel as the
@@ -5117,7 +5000,8 @@ export interface PortfolioOptimizationResultWire {
    */
   objective_value: NonFiniteF64Wire;
   /**
-   * Optimal weights keyed by position.
+   * Optimal weights per position (for positions in the universe).
+   * Non‑universe positions implicitly keep weight = current_weight.
    */
   optimal_weights: {
     [k: string]: number;
@@ -5127,25 +5011,27 @@ export interface PortfolioOptimizationResultWire {
    */
   schema_version: SchemaVersion;
   /**
-   * Solver outcome.
+   * Solver outcome; see [`OptimizationStatus::is_feasible`].
    */
   status: OptimizationStatus;
   /**
-   * Stable snake-case status label.
-   */
-  status_label: string;
-  /**
-   * Executable trade list.
+   * Executable trade list, largest absolute quantity change first.
+   *
+   * Covers existing positions and candidate additions whose weight change
+   * is materially non-zero. Empty for an infeasible solve, which is not the
+   * same as "nothing to trade"; check [`Self::is_feasible`] first.
    */
   trades: TradeSpec[];
   /**
-   * Gross turnover.
+   * Gross turnover (sum of absolute weight changes).
    *
-   * `NaN` when the solve is not feasible; encoded like `objective_value`.
+   * `NaN` when the solve is not feasible — there is no solution, so "no
+   * turnover" would be indistinguishable from "already optimal"; encoded
+   * like `objective_value`.
    */
   turnover: NonFiniteF64Wire;
   /**
-   * Weight changes keyed by position.
+   * Weight changes (`optimal - current`).
    */
   weight_deltas: {
     [k: string]: number;
@@ -5178,7 +5064,7 @@ export interface TradeSpec {
   /**
    * Position identifier in the optimized portfolio.
    */
-  position_id: PositionId;
+  position_id: Id;
   /**
    * Post‑trade quantity.
    */
@@ -5197,8 +5083,10 @@ export interface TradeSpec {
  */
 export interface PortfolioOptimizationSpec {
   /**
-   * Constraints on the optimized portfolio. An explicit budget replaces the
-   * default sum-of-weights budget of one; duplicate explicit budgets are rejected.
+   * Constraints on the optimized portfolio. Without an explicit budget the
+   * optimizer applies a sum-of-weights budget of one, except under
+   * `unit_scaling` weighting, which requires an explicit budget; duplicate
+   * explicit budgets are rejected.
    */
   constraints?: Constraint[];
   /**
@@ -5227,7 +5115,6 @@ export interface PortfolioOptimizationSpec {
    * How weights are defined.
    */
   weighting?: WeightingScheme;
-  [k: string]: unknown;
 }
 /**
  * Serializable portfolio specification.
@@ -5281,7 +5168,6 @@ export interface PortfolioSpec {
   tags?: {
     [k: string]: string;
   };
-  [k: string]: unknown;
 }
 /**
  * Serializable position specification (without `Arc<dyn Instrument>`).
@@ -5299,11 +5185,11 @@ export interface PositionSpec {
   /**
    * Optional book identifier
    */
-  book_id?: BookId | null;
+  book_id?: Id | null;
   /**
    * Entity identifier
    */
-  entity_id: EntityId;
+  entity_id: Id;
   /**
    * Instrument identifier (for reference/lookup)
    */
@@ -5324,7 +5210,7 @@ export interface PositionSpec {
   /**
    * Position identifier
    */
-  position_id: PositionId;
+  position_id: Id;
   /**
    * Signed quantity. For [`PositionUnit::Notional`], a lot multiplier.
    */
@@ -5333,7 +5219,6 @@ export interface PositionSpec {
    * Unit of measurement
    */
   unit: PositionUnit;
-  [k: string]: unknown;
 }
 /**
  * Defines which instruments the optimizer can trade.
@@ -5456,7 +5341,7 @@ export interface PortfolioPrimitivePath {
   /**
    * Portfolio position containing the direct instrument or root composite.
    */
-  position_id: PositionId;
+  position_id: Id;
   /**
    * Signed primitive quantity after position and nested-leg scaling.
    */
@@ -5508,7 +5393,7 @@ export interface PortfolioValuation {
    * Positions whose valuation fell back to PV-only because requested risk
    * metrics could not be computed.
    */
-  degraded_positions?: PositionId[];
+  degraded_positions?: Id[];
   /**
    * FX policy applied when collapsing position values to the base currency.
    *
@@ -5517,7 +5402,7 @@ export interface PortfolioValuation {
    * applied [`FxConversionPolicy`] so the result envelope satisfies the
    * policy-visibility invariant (the FX strategy is stamped, not implied).
    */
-  fx_collapse_policy?: FxConversionPolicy;
+  fx_collapse_policy: FxConversionPolicy;
   /**
    * Values for each position
    */
@@ -5540,7 +5425,7 @@ export interface PositionValue {
   /**
    * Entity that owns this position
    */
-  entity_id: EntityId;
+  entity_id: Id;
   /**
    * Spot FX rate applied to collapse [`value_native`](Self::value_native)
    * into [`value_base`](Self::value_base): units of the portfolio base
@@ -5549,8 +5434,7 @@ export interface PositionValue {
    * base currency's `Money` rounding).
    *
    * Absent when the native currency is the base currency (no FX lookup is
-   * made), and on values deserialized from JSON written before this field
-   * existed.
+   * made).
    */
   fx_rate?: number | null;
   /**
@@ -5588,7 +5472,7 @@ export interface PositionValue {
   /**
    * Position identifier
    */
-  position_id: PositionId;
+  position_id: Id;
   /**
    * Original metrics failure message when the valuation fell back to PV-only.
    */
@@ -5646,7 +5530,6 @@ export interface PortfolioValuationOptions {
    * reported on [`PositionValue::inapplicable_metrics`].
    */
   strict_risk?: boolean;
-  [k: string]: unknown;
 }
 /**
  * Contribution of a single position to a specific factor bucket.
@@ -5692,7 +5575,7 @@ export interface PositionResidualContribution {
   [k: string]: unknown;
 }
 /**
- * Report from reconciling position-level P&L attribution against portfolio totals.
+ * Report from reconciling an attribution's effect buckets against its total.
  */
 export interface ReconciliationReport {
   /**
@@ -5704,7 +5587,9 @@ export interface ReconciliationReport {
    */
   tolerance: number;
   /**
-   * Total residual: `total_pnl - (sum of factor buckets + fx_translation_pnl)`.
+   * Total minus the sum of its effect buckets: `total_pnl - (factor buckets
+   * + fx_translation_pnl)` for P&L attribution, `active_return - (allocation
+   * + carry + treasury + spread + selection)` for Campisi attribution.
    */
   total_residual: number;
   [k: string]: unknown;
@@ -5939,7 +5824,7 @@ export interface ScenarioPnl {
   [k: string]: unknown;
 }
 /**
- * One ordered result from `scenario_pnl_batch`.
+ * One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`.
  */
 export interface ScenarioPnlBatchItem {
   /**
@@ -5954,20 +5839,6 @@ export interface ScenarioPnlBatchItem {
    * Identifier copied from the input scenario.
    */
   scenario_id: string;
-  [k: string]: unknown;
-}
-/**
- * Scenario-P&L view returned by binding surfaces.
- */
-export interface ScenarioPnlView {
-  /**
-   * Scenario-attributable profit and loss.
-   */
-  pnl: ScenarioPnl;
-  /**
-   * Scenario application report.
-   */
-  report: ApplicationReport;
   [k: string]: unknown;
 }
 /**
@@ -6012,7 +5883,6 @@ export interface SectorPeriod {
    * Sector identifier (industry / country / any grouping).
    */
   sector: string;
-  [k: string]: unknown;
 }
 /**
  * Canonical wire form of a factor-sensitivity matrix, shared by both hosts.

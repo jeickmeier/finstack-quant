@@ -1,7 +1,7 @@
 """Regression tests for factor-model risk binding edge-cases.
 
 Covers:
-- decompose_factor_risk returns a clean zero-risk decomposition for zero factors.
+- decompose_factors returns a clean zero-risk decomposition for zero factors.
 """
 
 from __future__ import annotations
@@ -13,17 +13,19 @@ import pickle
 import pytest
 
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
+from finstack_quant.models.factor.risk import decompose_factors
 from finstack_quant.portfolio import (
+    FactorModel,
+    Portfolio,
     SensitivityMatrix,
     compute_factor_sensitivities,
     compute_pnl_profiles,
-    decompose_factor_risk,
 )
 
 # Shared helpers
 
 
-def _market_and_positions() -> tuple[MarketContext, str]:
+def _market_and_portfolio() -> tuple[MarketContext, Portfolio]:
     """Minimal single-position portfolio against a flat USD-OIS curve."""
     mc = MarketContext()
     mc.insert(
@@ -58,46 +60,60 @@ def _market_and_positions() -> tuple[MarketContext, str]:
             "attributes": {},
         },
     }
-    positions_json = json.dumps([
-        {
-            "id": "bond_5y",
-            "instrument": {
-                "schema": "finstack_quant.instrument/1",
-                "instrument": bond,
-            },
-            "weight": 1.0,
-        }
-    ])
-    return mc, positions_json
+    portfolio = Portfolio.from_spec(
+        json.dumps({
+            "id": "BOOK",
+            "as_of": "2025-01-15",
+            "base_currency": "USD",
+            "entities": {"FUND": {"id": "FUND"}},
+            "positions": [
+                {
+                    "position_id": "bond_5y",
+                    "entity_id": "FUND",
+                    "instrument_id": "BOND-5Y",
+                    "instrument_spec": bond,
+                    "quantity": 1.0,
+                    "unit": "units",
+                }
+            ],
+        })
+    )
+    return mc, portfolio
+
+
+_CREDIT_HIERARCHY_FACTOR = {
+    "id": "credit::generic",
+    "factor_type": "credit",
+    "market_mapping": {"curve_parallel": {"curve_ids": [], "units": "rate_bp"}},
+}
 
 
 # C20 — zero-factor matrix must not abort
 
 
-def test_decompose_factor_risk_zero_factors_returns_zero_risk() -> None:
-    """Regression: decompose_factor_risk must handle zero factors cleanly.
+def test_decompose_factors_zero_factors_returns_zero_risk() -> None:
+    """Regression: decompose_factors must handle zero factors cleanly.
 
     when the sensitivity matrix has n_factors == 0.
 
     Before the fix, chunks_exact(0) panicked across the PyO3 boundary. The
     canonical Rust/WASM behavior is now an empty zero-risk decomposition.
     """
-    market, positions_json = _market_and_positions()
+    market, portfolio = _market_and_portfolio()
 
     # Build a zero-factor sensitivity matrix via the public API.
     zero_factor_matrix = compute_factor_sensitivities(
-        positions_json,
+        portfolio,
         "[]",  # empty factor list → n_factors == 0
         market,
         "2025-01-15",
-        "USD",
     )
     assert zero_factor_matrix.n_factors == 0, "Precondition: matrix must have n_factors == 0 for this regression test"
 
     # Dummy covariance for a zero-factor model.
     cov_json = json.dumps({"factor_ids": [], "n": 0, "data": []})
 
-    decomposition = decompose_factor_risk(zero_factor_matrix, cov_json)
+    decomposition = decompose_factors(zero_factor_matrix, cov_json)
 
     assert decomposition.total_risk == 0.0
     assert decomposition.residual_risk == 0.0
@@ -105,18 +121,43 @@ def test_decompose_factor_risk_zero_factors_returns_zero_risk() -> None:
     assert decomposition.position_factor_contributions == []
 
 
-def test_sensitivity_reporting_currency_is_required_and_survives_round_trip() -> None:
+def test_sensitivity_reporting_currency_is_the_portfolio_base_currency() -> None:
     market = MarketContext()
-    with pytest.raises(TypeError):
-        compute_factor_sensitivities("[]", "[]", market, "2025-01-15")
-    matrix = compute_factor_sensitivities("[]", "[]", market, "2025-01-15", "EUR")
+    book = Portfolio.builder("book", "EUR", "2025-01-15").build()
+    matrix = compute_factor_sensitivities(book, "[]", market, "2025-01-15")
     assert matrix.base_currency == "EUR"
     assert json.loads(matrix.to_json())["base_currency"] == "EUR"
     assert SensitivityMatrix.from_json(matrix.to_json()).base_currency == "EUR"
     assert pickle.loads(pickle.dumps(matrix)).base_currency == "EUR"  # noqa: S301 - trusted local roundtrip
-    assert compute_pnl_profiles("[]", "[]", market, "2025-01-15", "EUR") == []
-    with pytest.raises(ValueError, match=r'Invalid currency code "INVALID"'):
-        compute_factor_sensitivities("[]", "[]", market, "2025-01-15", "INVALID")
+    assert compute_pnl_profiles(book, "[]", market, "2025-01-15") == []
+
+
+def test_free_sensitivities_match_factor_model_and_reject_credit_hierarchy_factors() -> None:
+    market, portfolio = _market_and_portfolio()
+    rates = {
+        "id": "usd_rates",
+        "factor_type": "rates",
+        "market_mapping": {"curve_parallel": {"curve_ids": ["USD-OIS"], "units": "rate_bp"}},
+    }
+    model = FactorModel.from_config(
+        json.dumps({
+            "factors": [rates],
+            "covariance": {"factor_ids": ["usd_rates"], "n": 1, "data": [0.0001]},
+            "matching": {
+                "mapping_table": [{"dependency_filter": {}, "attribute_filter": {}, "factor_id": "usd_rates"}]
+            },
+            "risk_measure": "variance",
+        })
+    )
+    free = compute_factor_sensitivities(portfolio, [rates], market, "2025-01-15")
+    from_model = model.compute_sensitivities(portfolio, market, "2025-01-15")
+    assert free.to_json() == from_model.to_json()
+    assert free.delta(0, 0) != 0.0
+    profiles = compute_pnl_profiles(portfolio, [rates], market, "2025-01-15", n_points=3)
+    assert profiles[0].shifts == [-1.0, 0.0, 1.0]
+    for call in (compute_factor_sensitivities, compute_pnl_profiles):
+        with pytest.raises(ValueError, match="credit::generic"):
+            call(portfolio, [_CREDIT_HIERARCHY_FACTOR], market, "2025-01-15")
 
 
 def test_canonical_nested_sensitivity_json_roundtrips_and_reconciles_risk() -> None:
@@ -133,7 +174,7 @@ def test_canonical_nested_sensitivity_json_roundtrips_and_reconciles_risk() -> N
     assert matrix.position_deltas(0) == [2.0]
     assert matrix.factor_deltas(0) == [2.0, 3.0]
     assert json.loads(pickle.loads(pickle.dumps(matrix)).to_json()) == payload  # noqa: S301
-    decomposition = decompose_factor_risk(matrix, '{"factor_ids":["F"],"n":1,"data":[0.04]}')
+    decomposition = decompose_factors(matrix, '{"factor_ids":["F"],"n":1,"data":[0.04]}')
     assert decomposition.total_risk == pytest.approx(1.0)
     contributions = decomposition.position_factor_contributions
     assert sum(row.risk_contribution for row in contributions) == pytest.approx(1.0)

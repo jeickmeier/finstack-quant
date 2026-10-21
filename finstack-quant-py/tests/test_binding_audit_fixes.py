@@ -2,7 +2,7 @@
 
 Covers strict metric-name parsing, core validation taxonomy for liquidity
 entry points, the ``measure`` getter wire form, ``OptimizationStatus``
-equality, residual-contribution parity on ``decompose_factor_risk``, new
+equality, residual-contribution parity on ``decompose_factors``, new
 result fields (``specific_return``, ``degraded_positions``,
 ``unaggregated_metrics``), non-finite risk-budget utilization, and the
 ``Portfolio.validate_materialization`` twin.
@@ -18,7 +18,7 @@ import pytest
 
 from finstack_quant.attribution import ReturnContributionResult
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
-from finstack_quant.models.factor.risk import evaluate_risk_budget
+from finstack_quant.models.factor.risk import decompose_factors, evaluate_risk_budget
 from finstack_quant.models.liquidity import lvar_bangia
 from finstack_quant.portfolio import (
     OptimizationStatus,
@@ -26,7 +26,6 @@ from finstack_quant.portfolio import (
     Portfolio,
     PortfolioMetrics,
     compute_factor_sensitivities,
-    decompose_factor_risk,
     value_portfolio,
 )
 
@@ -156,15 +155,16 @@ def test_per_position_metric_accepts_standard_and_custom_paths() -> None:
 
 
 # M5: measure getter returns the canonical serde form (a string for unit
-# variants), the same value as to_json() and the WASM decomposeFactorRisk
+# variants), the same value as to_json() and the WASM decomposeFactors
 
 
 def _variance_decomposition():  # noqa: ANN202
-    matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), AS_OF, "USD")
-    return decompose_factor_risk(matrix, '{"factor_ids":[],"n":0,"data":[]}')
+    book = Portfolio.builder("book", "USD", AS_OF).build()
+    matrix = compute_factor_sensitivities(book, "[]", MarketContext(), AS_OF)
+    return decompose_factors(matrix, '{"factor_ids":[],"n":0,"data":[]}')
 
 
-def test_decompose_factor_risk_measure_is_canonical_serde_form() -> None:
+def test_decompose_factors_measure_is_canonical_serde_form() -> None:
     decomp = _variance_decomposition()
     assert decomp.measure == "variance"
     assert json.loads(decomp.to_json())["measure"] == decomp.measure
@@ -173,7 +173,7 @@ def test_decompose_factor_risk_measure_is_canonical_serde_form() -> None:
 # MD5: position_residual_contributions exposed on RiskDecomposition
 
 
-def test_decompose_factor_risk_exposes_position_residual_contributions() -> None:
+def test_decompose_factors_exposes_position_residual_contributions() -> None:
     decomp = _variance_decomposition()
     assert decomp.position_residual_contributions == []
 
@@ -194,9 +194,10 @@ def test_optimization_status_equality_and_hash() -> None:
     assert optimal == same_optimal
     assert hash(optimal) == hash(same_optimal)
     assert optimal != OptimizationStatus.unbounded()
-    infeasible, same_infeasible = OptimizationStatus.infeasible(["a"]), OptimizationStatus.infeasible(["a"])
+    infeasible, same_infeasible = OptimizationStatus.infeasible(), OptimizationStatus.infeasible()
     assert infeasible == same_infeasible
-    assert infeasible != OptimizationStatus.infeasible(["b"])
+    assert hash(infeasible) == hash(same_infeasible)
+    assert infeasible != OptimizationStatus.error("b")
 
 
 # MD11: Portfolio.validate_materialization Python twin

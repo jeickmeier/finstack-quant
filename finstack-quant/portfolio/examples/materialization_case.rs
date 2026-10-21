@@ -4,7 +4,7 @@ use std::env;
 use std::fs;
 
 use finstack_quant_core::contract::LoadLimits;
-use finstack_quant_portfolio::{InstrumentArtifactCache, Portfolio};
+use finstack_quant_portfolio::{materialization::InstrumentArtifactCache, Portfolio};
 
 fn main() {
     let mut args = env::args().skip(1);

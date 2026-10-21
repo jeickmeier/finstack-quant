@@ -98,16 +98,6 @@ pub struct InstrumentArtifactCache {
 }
 
 impl InstrumentArtifactCache {
-    /// Create a cache with bounded default entry and encoded-byte budgets.
-    ///
-    /// # Returns
-    ///
-    /// An empty thread-safe cache.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::with_limits(DEFAULT_MAX_ENTRIES, DEFAULT_MAX_BYTES)
-    }
-
     /// Create a cache with a caller-selected entry budget.
     ///
     /// The encoded-byte budget remains the bounded 64 MiB default. A capacity
@@ -225,7 +215,7 @@ impl InstrumentArtifactCache {
 
 impl Default for InstrumentArtifactCache {
     fn default() -> Self {
-        Self::new()
+        Self::with_limits(DEFAULT_MAX_ENTRIES, DEFAULT_MAX_BYTES)
     }
 }
 
@@ -264,7 +254,7 @@ mod tests {
 
     #[test]
     fn poisoned_std_lock_recovers_for_reads_and_writes() {
-        let cache = Arc::new(InstrumentArtifactCache::new());
+        let cache = Arc::new(InstrumentArtifactCache::default());
         let poisoner = Arc::clone(&cache);
         let result = thread::spawn(move || {
             let _guard = poisoner

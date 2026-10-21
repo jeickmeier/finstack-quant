@@ -1,6 +1,7 @@
 {
   "$defs": {
     "BrinsonPeriodResult": {
+      "additionalProperties": false,
       "description": "Single-period Brinson-Fachler result.",
       "properties": {
         "benchmark_return": {
@@ -53,6 +54,7 @@
       "type": "object"
     },
     "SectorEffect": {
+      "additionalProperties": false,
       "description": "Per-sector attribution effects (Brinson-Fachler three-way split).",
       "properties": {
         "allocation": {

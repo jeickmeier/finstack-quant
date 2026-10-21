@@ -19,7 +19,7 @@ use finstack_quant_margin::{
 };
 use finstack_quant_portfolio::types::DUMMY_ENTITY_ID;
 use finstack_quant_portfolio::{
-    Entity, Portfolio, PortfolioMarginAggregator, Position, PositionUnit,
+    margin::portfolio_margin, position::Position, position::PositionUnit, types::Entity, Portfolio,
 };
 use finstack_quant_valuations::instruments::{Instrument, MarketDependencies};
 use finstack_quant_valuations::pricer::InstrumentType;
@@ -157,16 +157,13 @@ fn bench_margin_aggregation(c: &mut Criterion) {
             &n_positions,
             |b, _| {
                 b.iter(|| {
-                    let mut aggregator = PortfolioMarginAggregator::from_portfolio(&portfolio)
-                        .expect("consistent margin terms");
-                    aggregator
-                        .calculate(
-                            std::hint::black_box(&portfolio),
-                            std::hint::black_box(&market),
-                            as_of,
-                            std::hint::black_box(&collateral_balances),
-                        )
-                        .expect("bench: margin calculate")
+                    portfolio_margin(
+                        std::hint::black_box(&portfolio),
+                        std::hint::black_box(&market),
+                        as_of,
+                        std::hint::black_box(&collateral_balances),
+                    )
+                    .expect("bench: portfolio margin")
                 });
             },
         );

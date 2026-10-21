@@ -3,7 +3,7 @@
 //! This module provides a fluent interface for constructing validated portfolios.
 //! The builder keeps track of entities, positions, metadata and validates the resulting
 //! [`Portfolio`] to ensure it is internally consistent.
-//! Typical usage starts by creating a builder with [`Portfolio::builder`](crate::portfolio::Portfolio::builder), chaining
+//! Typical usage starts by creating a builder with [`Portfolio::builder`](crate::Portfolio::builder), chaining
 //! configuration methods, and finalizing with [`PortfolioBuilder::build`].
 //!
 //! # Error Handling Best Practices
@@ -38,9 +38,9 @@
 
 use crate::book::{Book, BookId};
 use crate::error::{Error, Result};
-use crate::portfolio::Portfolio;
 use crate::position::Position;
-use crate::types::{Entity, EntityId, PositionId, DUMMY_ENTITY_ID};
+use crate::types::{Entity, EntityId, DUMMY_ENTITY_ID};
+use crate::Portfolio;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use indexmap::IndexMap;
@@ -143,22 +143,6 @@ impl PortfolioBuilder {
         self
     }
 
-    /// Register multiple entities in a single call.
-    ///
-    /// # Arguments
-    ///
-    /// * `entities` - Iterator yielding entities to insert into the portfolio.
-    ///
-    /// # Returns
-    ///
-    /// The updated builder for fluent chaining.
-    pub fn entities(mut self, entities: impl IntoIterator<Item = Entity>) -> Self {
-        for entity in entities {
-            self.entities.insert(entity.id.clone(), entity);
-        }
-        self
-    }
-
     /// Add a single position to the portfolio.
     ///
     /// # Arguments
@@ -170,20 +154,6 @@ impl PortfolioBuilder {
     /// The updated builder for fluent chaining.
     pub fn position(mut self, position: Position) -> Self {
         self.positions.push(position);
-        self
-    }
-
-    /// Add multiple positions from any iterator.
-    ///
-    /// # Arguments
-    ///
-    /// * `positions` - Iterator yielding positions to append to the builder.
-    ///
-    /// # Returns
-    ///
-    /// The updated builder for fluent chaining.
-    pub fn positions(mut self, positions: impl IntoIterator<Item = Position>) -> Self {
-        self.positions.extend(positions);
         self
     }
 
@@ -255,83 +225,13 @@ impl PortfolioBuilder {
         self
     }
 
-    /// Add multiple books in a single call.
-    ///
-    /// # Arguments
-    ///
-    /// * `books` - Iterator yielding books to insert.
-    ///
-    /// # Returns
-    ///
-    /// The updated builder for fluent chaining.
-    pub fn books(mut self, books: impl IntoIterator<Item = Book>) -> Self {
-        for book in books {
-            self = self.book(book);
-        }
-        self
-    }
-
-    /// Assign a position to a book.
-    ///
-    /// This method updates both the position's book_id and adds the position
-    /// to the book's position_ids list.
-    ///
-    /// # Arguments
-    ///
-    /// * `position_id` - Position identifier.
-    /// * `book_id` - Book identifier.
-    ///
-    /// # Returns
-    ///
-    /// Updated builder with the position assigned to the requested book.
-    ///
-    /// # Errors
-    ///
-    /// Returns error if the position or book doesn't exist.
-    pub fn add_position_to_book(
-        mut self,
-        position_id: impl Into<PositionId>,
-        book_id: impl Into<BookId>,
-    ) -> Result<Self> {
-        let pos_id = position_id.into();
-        let bk_id = book_id.into();
-
-        let position = self
-            .positions
-            .iter_mut()
-            .find(|p| p.position_id == pos_id)
-            .ok_or_else(|| {
-                crate::error::Error::InvalidInput(format!("Position not found: {}", pos_id))
-            })?;
-
-        let previous_book_id = position.book_id.clone();
-
-        if let Some(previous_book_id) = previous_book_id {
-            if previous_book_id != bk_id {
-                if let Some(previous_book) = self.books.get_mut(&previous_book_id) {
-                    previous_book.remove_position(&pos_id);
-                }
-            }
-        }
-
-        position.book_id = Some(bk_id.clone());
-
-        let book = self.books.get_mut(&bk_id).ok_or_else(|| {
-            crate::error::Error::InvalidInput(format!("Book not found: {}", bk_id))
-        })?;
-
-        book.add_position(pos_id);
-
-        Ok(self)
-    }
-
     /// Build the portfolio with validation and entity reconciliation.
     ///
     /// This method performs several checks before returning a portfolio:
     /// 1. Ensures the base currency and valuation date are configured.
     /// 2. Injects a dummy entity when positions reference [`DUMMY_ENTITY_ID`].
     /// 3. Adds each position's book membership when supplied via `Position::with_book`.
-    /// 4. Delegates to [`Portfolio::validate`](crate::portfolio::Portfolio::validate) to confirm
+    /// 4. Delegates to [`Portfolio::validate`](crate::Portfolio::validate) to confirm
     ///    entity references and portfolio structure.
     ///
     /// # Returns
@@ -343,12 +243,12 @@ impl PortfolioBuilder {
     /// Returns [`Error`] when the configuration is incomplete
     /// or validation fails.
     pub fn build(mut self) -> Result<Portfolio> {
-        let base_currency = self.base_currency.ok_or_else(|| {
-            crate::error::Error::ValidationFailed("Base currency must be set".to_string())
-        })?;
+        let base_currency = self
+            .base_currency
+            .ok_or_else(|| crate::Error::InvalidInput("Base currency must be set".to_string()))?;
 
         let as_of = self.as_of.ok_or_else(|| {
-            crate::error::Error::ValidationFailed("Valuation date (as_of) must be set".to_string())
+            crate::Error::InvalidInput("Valuation date (as_of) must be set".to_string())
         })?;
 
         let needs_dummy = self
@@ -370,7 +270,7 @@ impl PortfolioBuilder {
         for position in &self.positions {
             if let Some(book_id) = &position.book_id {
                 let book = self.books.get_mut(book_id).ok_or_else(|| {
-                    Error::validation(format!(
+                    Error::invalid_input(format!(
                         "Position '{}' references non-existent book '{}'",
                         position.position_id, book_id
                     ))

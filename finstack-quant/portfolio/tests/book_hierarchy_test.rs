@@ -145,16 +145,9 @@ fn test_book_hierarchy_three_levels() {
         .book(americas)
         .book(credit)
         .book(ig)
-        .position(pos1)
-        .position(pos2)
-        .position(pos3)
-        // Assign positions to books
-        .add_position_to_book("POS_001", "ig")
-        .expect("should assign POS_001 to ig")
-        .add_position_to_book("POS_002", "ig")
-        .expect("should assign POS_002 to ig")
-        .add_position_to_book("POS_003", "credit")
-        .expect("should assign POS_003 to credit")
+        .position(pos1.with_book("ig"))
+        .position(pos2.with_book("ig"))
+        .position(pos3.with_book("credit"))
         .build()
         .expect("portfolio should build");
 
@@ -169,18 +162,18 @@ fn test_book_hierarchy_three_levels() {
         .books
         .get("americas")
         .expect("americas should exist");
-    assert!(americas_book.is_root());
+    assert!(americas_book.parent_id.is_none());
     assert_eq!(americas_book.child_book_ids.len(), 1);
     assert_eq!(americas_book.child_book_ids[0], BookId::new("credit"));
 
     let credit_book = portfolio.books.get("credit").expect("credit should exist");
-    assert!(!credit_book.is_root());
+    assert!(credit_book.parent_id.is_some());
     assert_eq!(credit_book.parent_id, Some(BookId::new("americas")));
     assert_eq!(credit_book.child_book_ids.len(), 1);
     assert_eq!(credit_book.child_book_ids[0], BookId::new("ig"));
 
     let ig_book = portfolio.books.get("ig").expect("ig should exist");
-    assert!(!ig_book.is_root());
+    assert!(ig_book.parent_id.is_some());
     assert_eq!(ig_book.parent_id, Some(BookId::new("credit")));
     assert_eq!(ig_book.child_book_ids.len(), 0);
 
@@ -278,12 +271,8 @@ fn test_book_hierarchy_multiple_root_books() {
         .entity(Entity::new("ENTITY_A"))
         .book(americas)
         .book(asia)
-        .position(pos1)
-        .position(pos2)
-        .add_position_to_book("POS_001", "americas")
-        .expect("should assign to americas")
-        .add_position_to_book("POS_002", "asia")
-        .expect("should assign to asia")
+        .position(pos1.with_book("americas"))
+        .position(pos2.with_book("asia"))
         .build()
         .expect("portfolio should build");
 
@@ -294,10 +283,10 @@ fn test_book_hierarchy_multiple_root_books() {
         .books
         .get("americas")
         .expect("americas should exist");
-    assert!(americas_book.is_root());
+    assert!(americas_book.parent_id.is_none());
 
     let asia_book = portfolio.books.get("asia").expect("asia should exist");
-    assert!(asia_book.is_root());
+    assert!(asia_book.parent_id.is_none());
 
     // Value and aggregate
     let market = build_test_market();
@@ -393,9 +382,7 @@ fn test_book_hierarchy_is_order_independent() {
         .book(ig)
         .book(credit)
         .book(americas)
-        .position(position)
-        .add_position_to_book("POS_001", "ig")
-        .expect("should assign position to ig")
+        .position(position.with_book("ig"))
         .build()
         .expect("portfolio should build");
 
@@ -410,57 +397,4 @@ fn test_book_hierarchy_is_order_independent() {
         &[BookId::new("credit")]
     );
     assert_eq!(credit_book.child_book_ids.as_slice(), &[BookId::new("ig")]);
-}
-
-#[test]
-fn test_reassigning_position_between_books_removes_stale_membership() {
-    let as_of = date!(2024 - 01 - 01);
-
-    let deposit = Deposit::builder()
-        .id("DEP".into())
-        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
-        .start_date(as_of)
-        .maturity(date!(2024 - 02 - 01))
-        .day_count(finstack_quant_core::dates::DayCount::Act360)
-        .discount_curve_id("USD".into())
-        .fixed_rate_opt(Some(
-            rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
-        ))
-        .build()
-        .expect("deposit should build");
-
-    let position = Position::new(
-        "POS_001",
-        "ENTITY_A",
-        "DEP",
-        Arc::new(deposit),
-        1.0,
-        PositionUnit::Units,
-    )
-    .expect("position should build");
-
-    let portfolio = Portfolio::builder("TEST_PORTFOLIO")
-        .base_currency(Currency::USD)
-        .as_of(as_of)
-        .entity(Entity::new("ENTITY_A"))
-        .book(Book::new("book_a", Some("Book A".to_string())))
-        .book(Book::new("book_b", Some("Book B".to_string())))
-        .position(position)
-        .add_position_to_book("POS_001", "book_a")
-        .expect("should assign to book_a")
-        .add_position_to_book("POS_001", "book_b")
-        .expect("should reassign to book_b")
-        .build()
-        .expect("portfolio should build");
-
-    let book_a = portfolio.books.get("book_a").expect("book_a should exist");
-    let book_b = portfolio.books.get("book_b").expect("book_b should exist");
-    let position = portfolio
-        .get_position("POS_001")
-        .expect("position should exist");
-
-    assert!(book_a.position_ids.is_empty());
-    assert_eq!(book_b.position_ids.len(), 1);
-    assert_eq!(book_b.position_ids[0], "POS_001");
-    assert_eq!(position.book_id, Some(BookId::new("book_b")));
 }

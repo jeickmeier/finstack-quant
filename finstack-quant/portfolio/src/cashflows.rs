@@ -12,10 +12,9 @@
 //! curves or discount factors fail closed.
 
 use crate::error::{Error, Result};
-#[cfg(not(target_arch = "wasm32"))]
-use crate::evaluation::POSITION_PARALLEL_MIN_POSITIONS;
-use crate::portfolio::Portfolio;
+use crate::evaluation::try_map_positions;
 use crate::types::PositionId;
+use crate::Portfolio;
 #[cfg(test)]
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_cashflows::builder::CashflowRepresentation;
@@ -37,6 +36,7 @@ use std::str::FromStr;
 /// ladder with those issues recorded on [`PortfolioCashflows::issues`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct CashflowAggregationOptions {
     /// When `false` (default), a non-empty [`PortfolioCashflows::issues`]
     /// list fails the call. When `true`, remaining positions still
@@ -61,16 +61,8 @@ pub enum CashflowFxPolicy {
     CipForward,
 }
 
-/// Why a position did not contribute classified cashflows to a portfolio ladder.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum CashflowExtractionIssueKind {
-    /// The instrument exposes `CashflowProvider`, but schedule construction failed.
-    BuildFailed,
-}
-
-/// Structured issue captured while extracting full cashflow schedules.
+/// A position whose instrument could not build its contractual cashflow
+/// schedule, so it contributed no classified cashflows to the ladder.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CashflowExtractionIssue {
@@ -80,8 +72,6 @@ pub struct CashflowExtractionIssue {
     pub instrument_id: String,
     /// Underlying instrument type key.
     pub instrument_type: InstrumentType,
-    /// Failure category.
-    pub kind: CashflowExtractionIssueKind,
     /// Human-readable failure detail.
     pub message: String,
 }
@@ -163,7 +153,6 @@ pub struct PortfolioCashflows {
     ///
     /// Stamped so callers do not infer a spot-on-payment-date conversion from
     /// [`finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate`].
-    #[serde(default)]
     pub fx_collapse_policy: CashflowFxPolicy,
 }
 
@@ -234,64 +223,60 @@ impl PortfolioCashflows {
 
     /// Net same-currency cashflow amounts across kinds for each payment date.
     ///
-    /// Dates with no flows in `currency` are omitted. Non-finite amounts are
-    /// skipped. Totals use Neumaier compensated summation.
+    /// Dates with no flows in `currency` are omitted. Totals use Neumaier
+    /// compensated summation over the kind buckets in ladder order.
     ///
     /// # Arguments
     ///
     /// * `currency` - ISO currency whose kind buckets are summed at each date.
     #[must_use]
     pub fn net_in_currency_by_date(&self, currency: Currency) -> Vec<(Date, f64)> {
-        net_amounts_by_date(&self.by_date, currency)
+        net_by_date(&self.by_date, currency)
     }
 }
 
-/// Net same-currency cashflow amounts across kinds for each payment date.
-///
-/// # Arguments
-///
-/// * `by_date` - Classified totals keyed by payment date, currency, and kind.
-/// * `currency` - ISO currency whose kind buckets are summed at each date.
-#[must_use]
-fn net_amounts_by_date(
-    by_date: &IndexMap<Date, IndexMap<Currency, IndexMap<CFKind, Money>>>,
+/// The netting kernel shared by [`PortfolioCashflows::net_in_currency_by_date`]
+/// and [`net_in_currency_by_date_json`]: the Neumaier sum of every kind bucket
+/// in `currency` at each date, skipping dates without such a bucket.
+fn net_by_date<K>(
+    by_date: &IndexMap<Date, IndexMap<Currency, IndexMap<K, Money>>>,
     currency: Currency,
 ) -> Vec<(Date, f64)> {
-    let mut out = Vec::new();
-    for (date, per_currency) in by_date {
-        let Some(per_kind) = per_currency.get(&currency) else {
-            continue;
-        };
-        let mut acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
-        let mut saw_finite = false;
-        for money in per_kind.values() {
-            let amount = money.amount();
-            if amount.is_finite() {
-                acc.add(amount);
-                saw_finite = true;
+    by_date
+        .iter()
+        .filter_map(|(date, per_currency)| {
+            let per_kind = per_currency
+                .get(&currency)
+                .filter(|kinds| !kinds.is_empty())?;
+            let mut acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+            for money in per_kind.values() {
+                acc.add(money.amount());
             }
-        }
-        if saw_finite {
-            out.push((*date, acc.total()));
-        }
-    }
-    out
+            Some((*date, acc.total()))
+        })
+        .collect()
 }
+
+/// Classified totals keyed by payment date, currency and an opaque kind label.
+type ByDateWire = IndexMap<Date, IndexMap<Currency, IndexMap<String, Money>>>;
 
 /// Net same-currency cashflow amounts from a classified `by_date` JSON object.
 ///
 /// Accepts either a full [`PortfolioCashflows`] payload or a bare `by_date`
 /// map. Kind keys are opaque strings (reporting fixtures may use mixed-case
 /// labels such as `"Notional"`). Money values use the canonical decimal-string
-/// amount and ISO currency representation.
+/// amount and ISO currency representation. The map is deserialized into the
+/// typed `{date: {currency: {kind: Money}}}` structure and netted by the same
+/// kernel as [`PortfolioCashflows::net_in_currency_by_date`]; rows are sorted
+/// by date.
 ///
 /// # Errors
 ///
-/// Returns [`Error::InvalidInput`] when `cashflows_json` is not JSON, when
-/// `currency` or a bucket key is not a known ISO code, a date or money value
-/// is invalid, a money currency disagrees with its bucket, a total is not
-/// finite, or a date/currency/kind container is not an object. Every bucket is
-/// validated, including currencies other than the requested output currency.
+/// Returns [`Error::InvalidInput`] when `cashflows_json` is not JSON or does
+/// not match that structure (an invalid date, currency key or money value), when
+/// `currency` is not a known ISO code, or when a money currency disagrees with
+/// its bucket. Every bucket is validated, including currencies other than the
+/// requested output currency.
 ///
 /// # Arguments
 ///
@@ -303,62 +288,30 @@ pub fn net_in_currency_by_date_json(
     currency: &str,
 ) -> Result<Vec<(String, f64)>> {
     let currency = Currency::from_str(currency).map_err(|e| Error::InvalidInput(e.to_string()))?;
-    let value: serde_json::Value = serde_json::from_str(cashflows_json)
+    let mut value: serde_json::Value = serde_json::from_str(cashflows_json)
         .map_err(|e| Error::InvalidInput(format!("invalid cashflow JSON: {e}")))?;
-    let by_date = value.get("by_date").unwrap_or(&value);
-    let Some(by_date_obj) = by_date.as_object() else {
-        return Err(Error::InvalidInput(
-            "cashflow JSON must contain a by_date object".to_string(),
-        ));
+    let by_date = match value.get_mut("by_date") {
+        Some(by_date) => by_date.take(),
+        None => value,
     };
-
-    let mut out = Vec::new();
-    for (date, per_currency) in by_date_obj {
-        let parsed_date: finstack_quant_core::wire::DateWire =
-            serde_json::from_value(serde_json::Value::String(date.clone()))
-                .map_err(|e| Error::InvalidInput(format!("invalid cashflow date '{date}': {e}")))?;
-        let currencies = per_currency.as_object().ok_or_else(|| {
-            Error::InvalidInput(format!(
-                "cashflow date '{date}' must contain a currency object"
-            ))
-        })?;
-        for (code, per_kind) in currencies {
-            let bucket_currency = Currency::from_str(code).map_err(|e| {
-                Error::InvalidInput(format!("invalid cashflow currency '{code}': {e}"))
-            })?;
-            let kinds = per_kind.as_object().ok_or_else(|| {
-                Error::InvalidInput(format!(
-                    "cashflow bucket '{date}/{code}' must contain a kind object"
-                ))
-            })?;
-            let mut acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
-            for (kind, value) in kinds {
-                let money: Money = serde_json::from_value(value.clone()).map_err(|e| {
-                    Error::InvalidInput(format!(
-                        "invalid cashflow money at '{date}/{code}/{kind}': {e}"
-                    ))
-                })?;
-                if money.currency() != bucket_currency {
-                    return Err(Error::InvalidInput(format!(
-                        "cashflow money at '{date}/{code}/{kind}' has currency {}, expected {bucket_currency}",
-                        money.currency()
-                    )));
-                }
-                acc.add(money.amount());
-            }
-            let total = acc.total();
-            if !total.is_finite() {
+    let by_date: ByDateWire = serde_json::from_value(by_date)
+        .map_err(|e| Error::InvalidInput(format!("invalid cashflow by_date ladder: {e}")))?;
+    for (date, per_currency) in &by_date {
+        for (bucket_currency, per_kind) in per_currency {
+            if let Some((kind, money)) = per_kind
+                .iter()
+                .find(|(_, money)| money.currency() != *bucket_currency)
+            {
                 return Err(Error::InvalidInput(format!(
-                    "cashflow total at '{date}/{code}' is not finite"
+                    "cashflow money at '{date}/{bucket_currency}/{kind}' has currency {}, expected {bucket_currency}",
+                    money.currency()
                 )));
-            }
-            if bucket_currency == currency && !kinds.is_empty() {
-                out.push((parsed_date.0, total));
             }
         }
     }
-    out.sort_by_key(|row| row.0);
-    Ok(out
+    let mut rows = net_by_date(&by_date, currency);
+    rows.sort_by_key(|row| row.0);
+    Ok(rows
         .into_iter()
         .map(|(date, amount)| (date.to_string(), amount))
         .collect())
@@ -368,7 +321,7 @@ pub fn net_in_currency_by_date_json(
 ///
 /// Successful positions contribute scaled events, deterministic date/currency/
 /// kind aggregates, and per-position summaries. A position whose instrument
-/// cannot build a contractual schedule is recorded as a `BuildFailed` issue.
+/// cannot build a contractual schedule is recorded as a [`CashflowExtractionIssue`].
 /// By default those issues fail the call; pass
 /// [`CashflowAggregationOptions::allow_partial`] to keep the partial ladder.
 ///
@@ -434,22 +387,9 @@ pub fn aggregate_full_cashflows(
         }
     };
 
-    #[cfg(not(target_arch = "wasm32"))]
-    let per_position: Vec<PositionCashflowResult> =
-        if portfolio.positions.len() >= POSITION_PARALLEL_MIN_POSITIONS {
-            use rayon::prelude::*;
-            portfolio
-                .positions
-                .par_iter()
-                .map(schedule_position)
-                .collect()
-        } else {
-            portfolio.positions.iter().map(schedule_position).collect()
-        };
-
-    #[cfg(target_arch = "wasm32")]
-    let per_position: Vec<PositionCashflowResult> =
-        portfolio.positions.iter().map(schedule_position).collect();
+    let per_position = try_map_positions(&portfolio.positions, |position| {
+        Ok(schedule_position(position))
+    })?;
 
     let mut events = Vec::new();
     let mut by_position: IndexMap<PositionId, Vec<PortfolioCashflowEvent>> = IndexMap::new();
@@ -486,7 +426,6 @@ pub fn aggregate_full_cashflows(
                     position_id: result.position_id,
                     instrument_id: result.instrument_id,
                     instrument_type: result.instrument_type,
-                    kind: CashflowExtractionIssueKind::BuildFailed,
                     message: err.to_string(),
                 });
             }
@@ -809,10 +748,6 @@ mod tests {
         );
         assert_eq!(full.issues.len(), 1, "expected one extraction issue");
         assert_eq!(full.issues[0].position_id.as_str(), "POS_SWAP");
-        assert_eq!(
-            full.issues[0].kind,
-            CashflowExtractionIssueKind::BuildFailed
-        );
         assert!(
             full.issues[0].message.contains("NG-SPOT-AVG"),
             "unexpected issue message: {}",
@@ -1035,10 +970,6 @@ mod tests {
             "unsupported instrument should not emit events"
         );
         assert_eq!(full.issues.len(), 1, "expected one unsupported issue");
-        assert_eq!(
-            full.issues[0].kind,
-            CashflowExtractionIssueKind::BuildFailed
-        );
     }
 
     #[test]

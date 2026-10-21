@@ -78,7 +78,7 @@ def test_strict_mixed_book_risk_and_currency_reconciliation(fixtures: SimpleName
     assert Decimal(eur["value_base"]["amount"]) == pytest.approx(
         Decimal(eur["value_native"]["amount"]) * Decimal("1.08"), abs=Decimal("0.01")
     )
-    metrics = aggregate_metrics(result, "USD", market, fixtures.book.AS_OF)
+    metrics = aggregate_metrics(result, market)
     assert not metrics.skipped_metrics
     assert not metrics.degraded_positions
     assert "cs01::ACME-HZD" in metrics.aggregated

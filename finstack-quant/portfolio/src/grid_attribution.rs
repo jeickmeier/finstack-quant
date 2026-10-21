@@ -148,8 +148,8 @@
 //!   above. `docs/REFERENCES.md#dynkin-hyman-vankudre-1998`
 
 use crate::brinson::{
-    carino_link_effects, check_active_return_identity, check_net_weight, check_weights_sum,
-    CarinoPeriod, ScaledL1Norm,
+    carino_link_effects, check_net_weight, check_weights_sum, validate_link_period, CarinoPeriod,
+    LinkPeriod,
 };
 use crate::error::{Error, Result};
 use finstack_quant_core::math::summation::NeumaierAccumulator;
@@ -542,71 +542,6 @@ pub struct GridCarinoLinkedResult {
     pub linked_selection: f64,
 }
 
-/// Validate one externally reachable single-period result before linking.
-fn validate_grid_link_period(period: &GridAttributionResult, index: usize) -> Result<()> {
-    for (name, value) in [
-        ("portfolio_return", period.portfolio_return),
-        ("benchmark_return", period.benchmark_return),
-        ("active_return", period.active_return),
-        ("total_curve", period.total_curve),
-        ("total_sector", period.total_sector),
-        ("total_selection", period.total_selection),
-    ] {
-        if !value.is_finite() {
-            if matches!(
-                name,
-                "portfolio_return" | "benchmark_return" | "active_return"
-            ) {
-                return Err(Error::invalid_input(format!(
-                    "Grid Carino linking requires finite period returns: \
-                     period[{index}].{name} must be finite (got {value})"
-                )));
-            }
-            return Err(Error::invalid_input(format!(
-                "Grid Carino period[{index}].{name} must be finite (got {value})"
-            )));
-        }
-    }
-
-    check_active_return_identity(
-        "Grid",
-        index,
-        period.portfolio_return,
-        period.benchmark_return,
-        period.active_return,
-    )?;
-
-    let effect_values = [
-        period.total_curve,
-        period.total_sector,
-        period.total_selection,
-    ];
-    let mut effect_l1 = ScaledL1Norm::default();
-    let mut effects = NeumaierAccumulator::new();
-    for value in effect_values {
-        effect_l1.add(value);
-        effects.add(value);
-    }
-    let tolerance = effect_l1.tolerance();
-    let effect_total = effects.total();
-    let reconciliation_residual = effect_total - period.active_return;
-    if !reconciliation_residual.is_finite() {
-        return Err(Error::invalid_input(format!(
-            "Grid Carino period[{index}] effect reconciliation residual must be finite"
-        )));
-    }
-    if reconciliation_residual.abs() > tolerance {
-        return Err(Error::invalid_input(format!(
-            "Grid Carino period[{index}] effect totals sum to {effect_total}, which does not \
-             reconcile to active_return {} within scale-aware tolerance {tolerance} \
-             (scaled L1 effect scale {}, normalized L1 sum {})",
-            period.active_return, effect_l1.scale, effect_l1.normalized_sum
-        )));
-    }
-
-    Ok(())
-}
-
 /// Apply Carino (1999) smoothing to a sequence of per-period hierarchical
 /// grid attribution results ([`grid_attribution()`]) so the three top-level
 /// arithmetic effects reconstruct the *geometrically compounded* active
@@ -671,7 +606,21 @@ pub fn grid_carino_link(periods: &[GridAttributionResult]) -> Result<GridCarinoL
     }
 
     for (index, p) in periods.iter().enumerate() {
-        validate_grid_link_period(p, index)?;
+        validate_link_period(&LinkPeriod {
+            method: "Grid",
+            index,
+            portfolio_return: p.portfolio_return,
+            benchmark_return: p.benchmark_return,
+            active_return: p.active_return,
+            totals: [
+                ("total_curve", p.total_curve),
+                ("total_sector", p.total_sector),
+                ("total_selection", p.total_selection),
+            ],
+            rows: Vec::new(),
+            effect_names: ["curve", "sector", "selection"],
+            row_total_name: "total",
+        })?;
     }
 
     let effect_periods: Vec<CarinoPeriod<3>> = periods

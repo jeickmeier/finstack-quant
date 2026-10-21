@@ -369,8 +369,8 @@ class TestPortfolioNamespace:
         })
         cashflows = aggregate_full_cashflows(spec_json, MarketContext())
         assert len(cashflows) == 0
-        assert cashflows.num_positions == 0
-        assert cashflows.num_issues == 0
+        assert len(cashflows.by_position) == 0
+        assert len(cashflows.issues) == 0
 
         result = json.loads(cashflows.to_json())
         assert result["events"] == []

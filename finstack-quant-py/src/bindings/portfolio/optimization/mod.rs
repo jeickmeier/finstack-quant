@@ -14,15 +14,10 @@
 //!   [`finstack_quant_portfolio::optimization::PositionFilter`], and the unit-style enums
 //!   (`Inequality`, `WeightingScheme`, `MissingMetricPolicy`,
 //!   `OptimizationStatus`, `TradeDirection`, `TradeType`) are exposed.
-//! - [`finstack_quant_portfolio::optimization::CandidatePosition`] and
-//!   [`finstack_quant_portfolio::optimization::TradeUniverse`] hold an
-//!   `Arc<DynInstrument>` and so cannot be constructed from Python without
-//!   the wider instrument-binding surface. They are bound here as opaque
-//!   wrappers (`from_inner` is internal); a future slice can add Python
-//!   constructors once the instrument bridge is wired.
-//! - [`finstack_quant_portfolio::optimization::PortfolioOptimizationResult`]
-//!   derives `Serialize` but not `Deserialize`, so its binding exposes
-//!   ``to_json`` only (no ``from_json``).
+//! - [`finstack_quant_portfolio::optimization::CandidatePosition`] is built from a
+//!   typed instrument (or its JSON) and [`finstack_quant_portfolio::optimization::TradeUniverse`]
+//!   from its classmethods.
+//! - Optimization results round-trip through ``to_json`` / ``from_json``.
 
 mod enums;
 mod expressions;

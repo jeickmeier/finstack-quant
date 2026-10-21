@@ -6,19 +6,8 @@ use crate::bindings::pandas_utils::{
 };
 use crate::errors::{display_to_py, portfolio_to_py};
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyString};
+use pyo3::types::PyAny;
 use serde::Serialize;
-use std::cell::RefCell;
-
-thread_local! {
-    /// Per-thread replay JSON scratch space.
-    ///
-    /// Large `serde_json::to_string` buffers are not reliably returned to the
-    /// process RSS allocator between calls on macOS. Retaining only the byte
-    /// capacity bounds repeated-call RSS without caching any portfolio,
-    /// market, valuation, or replay-result state.
-    static REPLAY_JSON_SCRATCH: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
-}
 
 /// Column schema for [`PyReplayResult::to_dataframe`].
 const REPLAY_STEP_COLUMNS: &[ColumnSchema<'static>] = &[
@@ -126,58 +115,49 @@ fn extract_replay_config(
 /// Resolve the snapshot timeline from a JSON array string, a list of
 /// ``{"date", "market"}`` dicts, or a list of ``(date, MarketContext | str)``
 /// tuples.
+///
+/// Tuples are converted to typed `(Date, MarketContext)` pairs and passed to
+/// `ReplayTimeline::new`; JSON text and dicts go through the Rust
+/// `ReplayTimeline::from_json_snapshots` wire parser.
 fn extract_replay_timeline(
     py: Python<'_>,
     snapshots: &Bound<'_, PyAny>,
 ) -> PyResult<finstack_quant_portfolio::replay::ReplayTimeline> {
-    let json = if let Ok(json) = snapshots.extract::<String>() {
-        json
-    } else {
-        let mut entries: Vec<serde_json::Value> = Vec::new();
-        for item in snapshots.try_iter()? {
-            let item = item?;
-            if let Ok((date, market)) = item.extract::<(Bound<'_, PyAny>, Bound<'_, PyAny>)>() {
-                let date = crate::bindings::date_utils::py_to_date(&date)?;
-                let market = crate::bindings::extract::extract_market(py, &market)?;
-                entries.push(serde_json::json!({
-                    "date": date.to_string(),
-                    "market": serde_json::to_value(&market).map_err(display_to_py)?,
-                }));
-            } else {
-                entries.push(crate::bindings::module_utils::py_to_json_value(
-                    py,
-                    &item,
-                    "replay snapshot",
-                )?);
-            }
-        }
-        serde_json::Value::Array(entries).to_string()
-    };
-    py.detach(move || finstack_quant_portfolio::replay::ReplayTimeline::from_json_snapshots(&json))
-        .map_err(crate::errors::portfolio_to_py)
-}
+    use finstack_quant_portfolio::replay::ReplayTimeline;
 
-/// Run the canonical Rust replay engine for both entry points.
-fn run_replay_portfolio(
-    py: Python<'_>,
-    portfolio: &Bound<'_, PyAny>,
-    snapshots: &Bound<'_, PyAny>,
-    config: &Bound<'_, PyAny>,
-) -> PyResult<finstack_quant_portfolio::replay::ReplayResult> {
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let config = extract_replay_config(py, config)?;
-    let timeline = extract_replay_timeline(py, snapshots)?;
-    let finstack_config = finstack_quant_core::config::FinstackConfig::default();
-    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
-    py.detach(|| {
-        finstack_quant_portfolio::replay::replay_portfolio(
-            portfolio_ref,
-            &timeline,
-            &config,
-            &finstack_config,
-        )
-    })
-    .map_err(portfolio_to_py)
+    if let Ok(json) = snapshots.extract::<String>() {
+        return py
+            .detach(move || ReplayTimeline::from_json_snapshots(&json))
+            .map_err(portfolio_to_py);
+    }
+    let items: Vec<Bound<'_, PyAny>> = snapshots.try_iter()?.collect::<PyResult<_>>()?;
+    let is_tuple = |item: &Bound<'_, PyAny>| {
+        item.extract::<(Bound<'_, PyAny>, Bound<'_, PyAny>)>()
+            .is_ok()
+    };
+    if items.first().is_some_and(is_tuple) {
+        let mut pairs = Vec::with_capacity(items.len());
+        for item in &items {
+            let (date, market) = item
+                .extract::<(Bound<'_, PyAny>, Bound<'_, PyAny>)>()
+                .map_err(|_| {
+                    crate::errors::value_error(
+                        "replay snapshots must be all (date, market) tuples or all dicts",
+                    )
+                })?;
+            let date = crate::bindings::date_utils::py_to_date(&date)?;
+            let market = crate::bindings::extract::extract_market(py, &market)?;
+            pairs.push((date, market));
+        }
+        return ReplayTimeline::new(pairs).map_err(portfolio_to_py);
+    }
+    let entries = items
+        .iter()
+        .map(|item| crate::bindings::module_utils::py_to_json_value(py, item, "replay snapshot"))
+        .collect::<PyResult<Vec<_>>>()?;
+    let json = serde_json::Value::Array(entries).to_string();
+    py.detach(move || ReplayTimeline::from_json_snapshots(&json))
+        .map_err(portfolio_to_py)
 }
 
 /// Replay a portfolio through dated market snapshots.
@@ -203,8 +183,7 @@ fn run_replay_portfolio(
 /// -------
 /// ReplayResult
 ///     Typed result with ``steps``, ``summary`` and ``skipped_dates``
-///     getters plus ``to_dataframe()``. Use :func:`replay_portfolio_json`
-///     for the raw wire string.
+///     getters plus ``to_dataframe()``; ``to_json()`` gives the wire form.
 ///
 /// Raises
 /// ------
@@ -221,49 +200,27 @@ fn replay_portfolio(
     snapshots: &Bound<'_, PyAny>,
     config: &Bound<'_, PyAny>,
 ) -> PyResult<PyReplayResult> {
-    Ok(PyReplayResult {
-        inner: run_replay_portfolio(py, portfolio, snapshots, config)?,
-    })
-}
-
-/// Replay a portfolio through dated market snapshots and return wire JSON.
-///
-/// Wire twin of :func:`replay_portfolio`; same inputs, JSON-string output.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-serialized ``ReplayResult``.
-#[pyfunction]
-#[pyo3(text_signature = "(portfolio, snapshots, config)")]
-fn replay_portfolio_json<'py>(
-    py: Python<'py>,
-    portfolio: &Bound<'_, PyAny>,
-    snapshots: &Bound<'_, PyAny>,
-    config: &Bound<'_, PyAny>,
-) -> PyResult<Bound<'py, PyString>> {
-    let result = run_replay_portfolio(py, portfolio, snapshots, config)?;
-    py.detach(move || {
-        REPLAY_JSON_SCRATCH.with(|scratch| {
-            let mut scratch = scratch.borrow_mut();
-            scratch.clear();
-            serde_json::to_writer(&mut *scratch, &result)
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let config = extract_replay_config(py, config)?;
+    let timeline = extract_replay_timeline(py, snapshots)?;
+    let finstack_config = finstack_quant_core::config::FinstackConfig::default();
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let inner = py
+        .detach(|| {
+            finstack_quant_portfolio::replay::replay_portfolio(
+                portfolio_ref,
+                &timeline,
+                &config,
+                &finstack_config,
+            )
         })
-    })
-    .map_err(display_to_py)?;
-
-    REPLAY_JSON_SCRATCH.with(|scratch| {
-        let mut scratch = scratch.borrow_mut();
-        let output = PyString::from_bytes(py, scratch.as_slice());
-        scratch.clear();
-        output
-    })
+        .map_err(portfolio_to_py)?;
+    Ok(PyReplayResult { inner })
 }
 
 /// Register replay functions on the portfolio submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyReplayResult>()?;
     m.add_function(pyo3::wrap_pyfunction!(replay_portfolio, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(replay_portfolio_json, m)?)?;
     Ok(())
 }

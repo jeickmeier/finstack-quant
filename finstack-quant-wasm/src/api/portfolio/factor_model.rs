@@ -6,12 +6,11 @@ use super::JsPortfolio;
 use crate::api::core::market_context::JsMarketContext;
 use crate::api::models::factor::credit::JsCreditFactorModel;
 use crate::utils::date::parse_iso_date;
-use crate::utils::input::{from_js_json, js_bool, js_string, json_text};
+use crate::utils::input::{from_js_json, js_bool, js_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_factor::{FactorId, FactorModelConfig};
-use finstack_quant_portfolio::factor_model::{
-    self as fm, FactorModel, PositionChange, WeightAllocationSpec,
-};
+use finstack_quant_portfolio::allocation::{self, WeightAllocationSpec};
+use finstack_quant_portfolio::factor_model::{self as fm, FactorModel, PositionChange};
 use finstack_quant_portfolio::sensitivity::SensitivityMatrixJson;
 use wasm_bindgen::prelude::*;
 
@@ -85,7 +84,7 @@ impl JsFactorModel {
     ///
     /// Returns the sensitivity-matrix wire object (`base_currency`,
     /// `position_ids`, `factor_ids`, `data` rows), the same shape
-    /// `computeFactorSensitivities` returns and `decomposeFactorRisk` accepts.
+    /// `computeFactorSensitivities` returns and `models.factor.risk.decomposeFactors` accepts.
     /// @param portfolio - Built portfolio; its base currency is the reporting currency of every sensitivity.
     /// @param market - `core.MarketContext` handle bumped by the sensitivity engine, including FX for cross-currency positions.
     /// @param as_of - ISO-8601 valuation date for sensitivities and spot FX.
@@ -243,8 +242,8 @@ impl JsFactorModel {
 /// Allocate strategy weights from a `WeightAllocationSpec`.
 ///
 /// Returns the `WeightAllocationResult` object (`scheme`, per-strategy
-/// `allocations` and portfolio `diagnostics`); `allocateWeightsJson` returns
-/// the same result as a JSON string.
+/// `allocations` and portfolio `diagnostics`). A spec that allocates without
+/// error is valid.
 /// @param spec - `WeightAllocationSpec` object or JSON selecting the allocation scheme, the strategy inputs and any covariance data the scheme needs.
 /// @returns The `WeightAllocationResult`.
 ///
@@ -256,45 +255,8 @@ impl JsFactorModel {
 #[wasm_bindgen(js_name = allocateWeights)]
 pub fn allocate_weights(spec: JsValue) -> Result<JsValue, JsValue> {
     let spec: WeightAllocationSpec = from_js_json(&spec, "spec")?;
-    let result = fm::allocate_weights(&spec).map_err(to_js_err)?;
+    let result = allocation::allocate_weights(&spec).map_err(to_js_err)?;
     to_js_value(&result)
-}
-
-/// Allocate strategy weights and return the result as wire JSON.
-///
-/// Wire twin of `allocateWeights` (Rust `allocate_weights_json`).
-/// @param spec_json - `WeightAllocationSpec` object or JSON.
-/// @returns Compact JSON of the `WeightAllocationResult`.
-///
-/// # Errors
-///
-/// Throws a `TypeError` (kind `invalid_type`) if `specJson` is not a JSON
-/// string or plain object, and a `FinstackError` (kind `validation`) if it
-/// does not match the `WeightAllocationSpec` schema or violates a scheme
-/// invariant.
-#[wasm_bindgen(js_name = allocateWeightsJson)]
-pub fn allocate_weights_json(spec_json: JsValue) -> Result<String, JsValue> {
-    let spec_json = json_text(&spec_json, "specJson")?;
-    fm::allocate_weights_json(&spec_json).map_err(to_js_err)
-}
-
-/// Validate a strategy allocation specification and return its canonical JSON.
-///
-/// The spec is parsed and executed solely for validation; the allocation
-/// itself is discarded (Rust `validate_allocation_json`).
-/// @param spec_json - `WeightAllocationSpec` object or JSON.
-/// @returns The canonical compact JSON of the accepted spec.
-///
-/// # Errors
-///
-/// Throws a `TypeError` (kind `invalid_type`) if `specJson` is not a JSON
-/// string or plain object, and a `FinstackError` (kind `validation`) if it
-/// does not match the `WeightAllocationSpec` schema or violates a scheme
-/// invariant.
-#[wasm_bindgen(js_name = validateAllocationJson)]
-pub fn validate_allocation_json(spec_json: JsValue) -> Result<String, JsValue> {
-    let spec_json = json_text(&spec_json, "specJson")?;
-    fm::validate_allocation_json(&spec_json).map_err(to_js_err)
 }
 
 /// Build a credit volatility report from a risk decomposition and a credit factor model.
@@ -302,10 +264,10 @@ pub fn validate_allocation_json(spec_json: JsValue) -> Result<String, JsValue> {
 /// Rolls the decomposition's factor contributions up by credit-hierarchy
 /// level. Returns the `CreditVolReport`: `total`, `measure`, the `generic`
 /// credit-factor contribution, `by_level` rollups, `idiosyncratic_total` and,
-/// when requested, `by_position_optional` rows.
-/// @param decomposition - `RiskDecomposition` object or JSON, e.g. the output of `decomposeFactorRisk`.
+/// when requested, `by_position` rows.
+/// @param decomposition - `RiskDecomposition` object or JSON, e.g. the output of `models.factor.risk.decomposeFactors`.
 /// @param model - `models.factor.credit.CreditFactorModel` handle whose hierarchy names the levels.
-/// @param by_position - `true` to include the per-position breakdown; `false` leaves `by_position_optional` `null`.
+/// @param by_position - `true` to include the per-position breakdown; `false` leaves `by_position` `null`.
 /// @returns The `CreditVolReport`.
 ///
 /// # Errors
@@ -313,7 +275,8 @@ pub fn validate_allocation_json(spec_json: JsValue) -> Result<String, JsValue> {
 /// Throws a `TypeError` (kind `invalid_type`) if `decomposition` is not a JSON
 /// string or plain object or `byPosition` is not a boolean, and a
 /// `FinstackError` (kind `validation`) if `decomposition` does not match the
-/// `RiskDecomposition` schema.
+/// `RiskDecomposition` schema or holds a factor contribution that is neither
+/// the generic credit factor nor a bucket of one of `model`'s hierarchy levels.
 #[wasm_bindgen(js_name = buildCreditVolReport)]
 pub fn build_credit_vol_report(
     decomposition: JsValue,
@@ -323,6 +286,7 @@ pub fn build_credit_vol_report(
     let decomposition: finstack_quant_factor::risk::RiskDecomposition =
         from_js_json(&decomposition, "decomposition")?;
     let by_position = js_bool(&by_position, "byPosition")?;
-    let report = fm::build_credit_vol_report(&decomposition, &model.inner, by_position);
+    let report = fm::build_credit_vol_report(&decomposition, &model.inner, by_position)
+        .map_err(to_js_err)?;
     to_js_value(&report)
 }

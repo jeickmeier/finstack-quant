@@ -5,13 +5,14 @@ use std::sync::Arc;
 
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_portfolio::{
-    InstrumentArtifactCache, MaterializationReport, Portfolio as RustPortfolio,
+    materialization::InstrumentArtifactCache, materialization::MaterializationReport,
+    Portfolio as RustPortfolio,
 };
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyByteArray, PyBytes, PyDict, PyModule, PyString};
 
-use super::types::PyPortfolio;
+use super::container::PyPortfolio;
 use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema;
 use crate::errors::{diagnostics_to_py, display_to_py, materialization_to_py};
 
@@ -293,7 +294,7 @@ impl PyPortfolio {
         let bytes = extract_bundle_bytes(bundle)?;
         let cache = cache
             .map(|value| Arc::clone(&value.inner))
-            .unwrap_or_else(|| Arc::new(InstrumentArtifactCache::new()));
+            .unwrap_or_else(|| Arc::new(InstrumentArtifactCache::default()));
         let limits = LoadLimits::default();
         let (portfolio, report) = py
             .detach(move || RustPortfolio::from_materialization(&bytes, &cache, &limits))
@@ -340,7 +341,7 @@ impl PyPortfolio {
         let bytes = extract_bundle_bytes(bundle)?;
         let cache = cache
             .map(|value| Arc::clone(&value.inner))
-            .unwrap_or_else(|| Arc::new(InstrumentArtifactCache::new()));
+            .unwrap_or_else(|| Arc::new(InstrumentArtifactCache::default()));
         let limits = LoadLimits::default();
         match py.detach(move || RustPortfolio::validate_materialization(&bytes, &cache, &limits)) {
             Ok(report) => Ok(PyMaterializationReport::from_inner(report)

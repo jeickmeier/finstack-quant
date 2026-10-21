@@ -16,8 +16,8 @@ contract about how disruptive future changes are likely to be.
 * ``parse_portfolio_spec_json`` and ``Portfolio.from_spec``
 * ``value_portfolio``, ``aggregate_full_cashflows``,
   ``apply_scenario_and_revalue``
-* ``aggregate_metrics`` (scalar reads go through ``PortfolioResult``
-  methods such as ``total_value`` and ``get_metric``)
+* ``aggregate_metrics`` (scalar reads go through ``PortfolioMetrics``
+  methods such as ``get_total`` and ``require_total``)
 * ``replay_portfolio``
 
 **Stable, typed contracts may evolve** — function signatures are stable, but
@@ -37,11 +37,9 @@ exporting to downstream services.
 Exceptions
 ----------
 
-``FinstackError`` is the common base for the library's named exceptions, so
-``except FinstackError`` catches ``PortfolioError``, ``ContractValidationError``
-and their subclasses in one clause. It derives from ``ValueError``, so every
-existing ``except ValueError`` keeps working unchanged. Its canonical home is
-``finstack_quant.core``; it is re-exported here for convenience.
+``PortfolioError``, ``ContractValidationError`` and their subclasses derive
+from ``finstack_quant.core.FinstackError`` (itself a ``ValueError``), so one
+``except FinstackError`` clause catches them all.
 
 Examples:
 --------
@@ -53,7 +51,6 @@ Examples:
 
 from finstack_quant.finstack_quant import portfolio as _portfolio
 
-FinstackError = _portfolio.FinstackError
 PortfolioError = _portfolio.PortfolioError
 ContractValidationError = _portfolio.ContractValidationError
 UnsupportedContractVersionError = _portfolio.UnsupportedContractVersionError
@@ -83,7 +80,6 @@ ExcessReturnResult = _portfolio.ExcessReturnResult
 FactorBrinsonResult = _portfolio.FactorBrinsonResult
 FiAttributionResult = _portfolio.FiAttributionResult
 FiCarinoLinkedResult = _portfolio.FiCarinoLinkedResult
-FiReconciliationReport = _portfolio.FiReconciliationReport
 GridAttributionResult = _portfolio.GridAttributionResult
 GridCarinoLinkedResult = _portfolio.GridCarinoLinkedResult
 LinkedReturn = _portfolio.LinkedReturn
@@ -98,22 +94,15 @@ net_in_currency_by_date = _portfolio.net_in_currency_by_date
 apply_scenario_and_revalue = _portfolio.apply_scenario_and_revalue
 scenario_pnl = _portfolio.scenario_pnl
 scenario_pnl_batch = _portfolio.scenario_pnl_batch
-scenario_pnl_batch_json = _portfolio.scenario_pnl_batch_json
 attribute_portfolio_pnl = _portfolio.attribute_portfolio_pnl
 allocate_weights = _portfolio.allocate_weights
-allocate_weights_json = _portfolio.allocate_weights_json
-validate_allocation_json = _portfolio.validate_allocation_json
 optimize_portfolio = _portfolio.optimize_portfolio
 rebalance_from_spec = _portfolio.rebalance_from_spec
 replay_portfolio = _portfolio.replay_portfolio
-replay_portfolio_json = _portfolio.replay_portfolio_json
 brinson_fachler = _portfolio.brinson_fachler
 carino_link = _portfolio.carino_link
-carino_link_from_sector_periods = _portfolio.carino_link_from_sector_periods
 campisi_attribution = _portfolio.campisi_attribution
 campisi_carino_link = _portfolio.campisi_carino_link
-campisi_carino_link_from_snapshots = _portfolio.campisi_carino_link_from_snapshots
-campisi_reconciliation_check = _portfolio.campisi_reconciliation_check
 cell_returns_from_curves = _portfolio.cell_returns_from_curves
 cell_returns_from_reference = _portfolio.cell_returns_from_reference
 excess_returns = _portfolio.excess_returns
@@ -129,7 +118,6 @@ SensitivityMatrix = _portfolio.SensitivityMatrix
 FactorPnlProfile = _portfolio.FactorPnlProfile
 compute_factor_sensitivities = _portfolio.compute_factor_sensitivities
 compute_pnl_profiles = _portfolio.compute_pnl_profiles
-decompose_factor_risk = _portfolio.decompose_factor_risk
 FactorContributionDelta = _portfolio.FactorContributionDelta
 WhatIfResult = _portfolio.WhatIfResult
 StressResult = _portfolio.StressResult
@@ -163,8 +151,8 @@ PortfolioOptimizationResult = _portfolio.PortfolioOptimizationResult
 CandidatePosition = _portfolio.CandidatePosition
 TradeUniverse = _portfolio.TradeUniverse
 NettingSetMargin = _portfolio.NettingSetMargin
-PortfolioMarginAggregator = _portfolio.PortfolioMarginAggregator
 PortfolioMarginResult = _portfolio.PortfolioMarginResult
+portfolio_margin = _portfolio.portfolio_margin
 schema = _portfolio.schema
 
 __all__ = [
@@ -184,8 +172,6 @@ __all__ = [
     "FactorPnlProfile",
     "FiAttributionResult",
     "FiCarinoLinkedResult",
-    "FiReconciliationReport",
-    "FinstackError",
     "GridAttributionResult",
     "GridCarinoLinkedResult",
     "Inequality",
@@ -206,7 +192,6 @@ __all__ = [
     "PortfolioBuilder",
     "PortfolioCashflows",
     "PortfolioError",
-    "PortfolioMarginAggregator",
     "PortfolioMarginResult",
     "PortfolioMetrics",
     "PortfolioOptimizationResult",
@@ -237,22 +222,17 @@ __all__ = [
     "aggregate_full_cashflows",
     "aggregate_metrics",
     "allocate_weights",
-    "allocate_weights_json",
     "apply_scenario_and_revalue",
     "attribute_portfolio_pnl",
     "brinson_fachler",
     "build_credit_vol_report",
     "campisi_attribution",
     "campisi_carino_link",
-    "campisi_carino_link_from_snapshots",
-    "campisi_reconciliation_check",
     "carino_link",
-    "carino_link_from_sector_periods",
     "cell_returns_from_curves",
     "cell_returns_from_reference",
     "compute_factor_sensitivities",
     "compute_pnl_profiles",
-    "decompose_factor_risk",
     "excess_returns",
     "factor_brinson_attribution",
     "grid_attribution",
@@ -261,16 +241,14 @@ __all__ = [
     "net_in_currency_by_date",
     "optimize_portfolio",
     "parse_portfolio_spec_json",
+    "portfolio_margin",
     "primitive_exposures",
     "rebalance_from_spec",
     "replay_portfolio",
-    "replay_portfolio_json",
     "scenario_pnl",
     "scenario_pnl_batch",
-    "scenario_pnl_batch_json",
     "schema",
     "twrr_linked",
     "twrr_modified_dietz",
-    "validate_allocation_json",
     "value_portfolio",
 ]

@@ -99,6 +99,7 @@
       "type": "string"
     },
     "PortfolioValuationOptions": {
+      "additionalProperties": false,
       "description": "Options controlling portfolio valuation behaviour.\n\nThe default is a risk run: [`strict_risk`](Self::strict_risk) is `true`\nand [`metrics`](Self::metrics) is [`RequestedMetrics::Standard`]. A\nfailed requested risk metric aborts the valuation. Set `strict_risk` to\n`false` only when a PV-preserving best-effort fallback is intentional.",
       "properties": {
         "metrics": {

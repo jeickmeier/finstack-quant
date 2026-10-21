@@ -16,7 +16,8 @@
 use pyo3::prelude::*;
 
 use crate::bindings::core::market_data::context::PyMarketContext;
-use crate::bindings::portfolio::types::{PyPortfolio, PyPortfolioValuation};
+use crate::bindings::portfolio::container::PyPortfolio;
+use crate::bindings::portfolio::valuation::PyPortfolioValuation;
 use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::valuations::composite::PyCompositeInstrument;
@@ -369,7 +370,7 @@ pub fn extract_portfolio_ref<'py>(
         return Ok(PortfolioAccess::Borrowed(p.borrow()));
     }
     let json: String = obj.extract()?;
-    let spec: finstack_quant_portfolio::portfolio::PortfolioSpec = py
+    let spec: finstack_quant_portfolio::PortfolioSpec = py
         .detach(move || serde_json::from_str(&json))
         .map_err(to_py)?;
     let portfolio = py
@@ -562,7 +563,7 @@ pub fn extract_scenario_specs(
 /// Access to a [`finstack_quant_portfolio::cashflows::PortfolioCashflows`]
 /// ladder without re-parsing JSON when a typed Python object is passed.
 pub enum CashflowsAccess<'py> {
-    Borrowed(PyRef<'py, crate::bindings::portfolio::types::PyPortfolioCashflows>),
+    Borrowed(PyRef<'py, crate::bindings::portfolio::cashflows::PyPortfolioCashflows>),
     Owned(Box<finstack_quant_portfolio::cashflows::PortfolioCashflows>),
 }
 
@@ -582,7 +583,7 @@ pub fn extract_cashflows_ref<'py>(
     py: Python<'py>,
     obj: &Bound<'py, PyAny>,
 ) -> PyResult<CashflowsAccess<'py>> {
-    if let Ok(c) = obj.cast::<crate::bindings::portfolio::types::PyPortfolioCashflows>() {
+    if let Ok(c) = obj.cast::<crate::bindings::portfolio::cashflows::PyPortfolioCashflows>() {
         return Ok(CashflowsAccess::Borrowed(c.borrow()));
     }
     let json: String = obj.extract().map_err(|_| {

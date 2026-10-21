@@ -52,7 +52,8 @@ pub enum WeightingScheme {
     /// For existing positions, `w_i = 1.0` means "keep the current quantity",
     /// `w_i = 0.5` means "halve it", and `w_i = 0.0` means "close it".
     /// Existing multipliers are nonnegative by default; an explicit budget
-    /// or weight bound controls increases above one. Turnover is measured as
+    /// (required: the optimizer does not synthesize `Σ multipliers = 1`) or
+    /// weight bound controls increases above one. Turnover is measured as
     /// the sum of absolute changes in these multipliers.
     /// For new candidates, `w_i` is interpreted directly as the target quantity
     /// because there is no live quantity to scale.

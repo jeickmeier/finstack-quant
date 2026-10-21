@@ -27,12 +27,12 @@ const ALLOCATION_COLUMNS: &[ColumnSchema<'static>] = &[
 )]
 #[derive(Clone)]
 pub struct PyWeightAllocationResult {
-    pub(crate) inner: finstack_quant_portfolio::WeightAllocationResult,
+    pub(crate) inner: finstack_quant_portfolio::allocation::WeightAllocationResult,
 }
 
 crate::bindings::macros::wire_methods!(
     PyWeightAllocationResult,
-    finstack_quant_portfolio::WeightAllocationResult,
+    finstack_quant_portfolio::allocation::WeightAllocationResult,
     "WeightAllocationResult"
 );
 
@@ -92,8 +92,8 @@ impl PyWeightAllocationResult {
 /// -------
 /// WeightAllocationResult
 ///     Typed result with ``scheme``, ``allocations`` and ``diagnostics``
-///     getters plus ``to_dataframe()``. Use :func:`allocate_weights_json`
-///     for the raw wire string.
+///     getters plus ``to_dataframe()``; ``to_json()`` gives the wire form.
+///     A spec that allocates without error is valid.
 ///
 /// Raises
 /// ------
@@ -109,75 +109,17 @@ fn allocate_weights(
     let spec_json = crate::bindings::extract::extract_records_json(py, spec_json, "spec")?;
     let inner = py
         .detach(move || {
-            let spec = finstack_quant_portfolio::WeightAllocationSpec::from_json(&spec_json)?;
-            finstack_quant_portfolio::allocate_weights(&spec)
+            let spec =
+                finstack_quant_portfolio::allocation::WeightAllocationSpec::from_json(&spec_json)?;
+            finstack_quant_portfolio::allocation::allocate_weights(&spec)
         })
         .map_err(portfolio_to_py)?;
     Ok(PyWeightAllocationResult { inner })
-}
-
-/// Allocate strategy weights from a JSON specification and return wire JSON.
-///
-/// Wire twin of :func:`allocate_weights`; same signed-capital, largest-remainder
-/// rounding and validation, with JSON-string output.
-///
-/// Parameters
-/// ----------
-/// spec_json : str | dict | list | pandas.DataFrame
-///     JSON-serialized ``WeightAllocationSpec`` selecting the scheme, finite
-///     signed total capital, strategy inputs, and any required covariance data.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-serialized ``WeightAllocationResult``.
-///
-/// Raises
-/// ------
-/// PortfolioError
-///     If the specification is malformed, violates scheme invariants, or its
-///     capital is not representable at the requested rounding precision.
-#[pyfunction]
-#[pyo3(text_signature = "(spec_json)")]
-fn allocate_weights_json(py: Python<'_>, spec_json: &Bound<'_, PyAny>) -> PyResult<String> {
-    let spec_json = crate::bindings::extract::extract_records_json(py, spec_json, "spec")?;
-    py.detach(move || finstack_quant_portfolio::allocate_weights_json(&spec_json))
-        .map_err(portfolio_to_py)
-}
-
-/// Validate a strategy allocation JSON specification.
-///
-/// Executes the same allocation and capital rounding as :func:`allocate_weights`
-/// to validate the request, then discards the result.
-///
-/// Parameters
-/// ----------
-/// spec_json : str | dict | list | pandas.DataFrame
-///     JSON-serialized ``WeightAllocationSpec``.
-///
-/// Returns
-/// -------
-/// str
-///     Canonical compact JSON.
-///
-/// Raises
-/// ------
-/// PortfolioError
-///     If the specification is malformed, violates scheme invariants, or its
-///     capital is not representable at the requested rounding precision.
-#[pyfunction]
-#[pyo3(text_signature = "(spec_json)")]
-fn validate_allocation_json(py: Python<'_>, spec_json: &Bound<'_, PyAny>) -> PyResult<String> {
-    let spec_json = crate::bindings::extract::extract_records_json(py, spec_json, "spec")?;
-    py.detach(move || finstack_quant_portfolio::validate_allocation_json(&spec_json))
-        .map_err(portfolio_to_py)
 }
 
 /// Register strategy allocation functions on the portfolio submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyWeightAllocationResult>()?;
     m.add_function(pyo3::wrap_pyfunction!(allocate_weights, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(allocate_weights_json, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(validate_allocation_json, m)?)?;
     Ok(())
 }

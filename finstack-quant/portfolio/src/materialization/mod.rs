@@ -1,6 +1,6 @@
 //! Versioned, content-addressed portfolio materialization fast path.
 //!
-//! [`crate::portfolio::PortfolioSpec`] remains the portable embedded
+//! [`crate::PortfolioSpec`] remains the portable embedded
 //! interchange format. This module is the native bulk-loading path for
 //! normalized stores: an allocation-free preflight enforces collection limits,
 //! then the outer document is parsed once into its canonical serde type. Unique
@@ -15,10 +15,10 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::dependencies::DependencyIndex;
-use crate::error::Error;
-use crate::portfolio::Portfolio;
 use crate::position::Position;
 use crate::types::PositionId;
+use crate::Error;
+use crate::Portfolio;
 use cache::{CacheKey, CachedArtifact};
 use finstack_quant_core::canonical::CANONICAL_VERSION;
 use finstack_quant_core::contract::{
@@ -204,7 +204,11 @@ impl Portfolio {
                 diagnostics.push_bounded(limits, missing_artifact_diagnostic(index, materialized));
                 continue;
             };
-            validate_position_semantics(index, materialized, artifact, limits, &mut diagnostics);
+            // A quantity the semantic check rejected is reported once, there.
+            if !validate_position_semantics(index, materialized, artifact, limits, &mut diagnostics)
+            {
+                continue;
+            }
 
             match Position::new(
                 materialized.id.clone(),
@@ -340,7 +344,8 @@ impl Portfolio {
                 diagnostics.push_bounded(limits, missing_artifact_diagnostic(index, position));
                 continue;
             };
-            validate_position_semantics(index, position, artifact, limits, &mut diagnostics);
+            let _ =
+                validate_position_semantics(index, position, artifact, limits, &mut diagnostics);
         }
         let semantic_nanos = report::elapsed_nanos(semantic_started);
         if diagnostics.has_errors() {
@@ -585,13 +590,15 @@ fn enforce_materialization_collection_limits(
     enforce_count_limit("books", counts.portfolio.books.0, crate::book::MAX_BOOKS)
 }
 
+/// Record semantic diagnostics for one position; returns `false` when its
+/// quantity is invalid, so the build phase does not report it a second time.
 fn validate_position_semantics(
     index: usize,
     position: &MaterializedPosition,
     artifact: &CachedArtifact,
     limits: &LoadLimits,
     diagnostics: &mut ValidationReport,
-) {
+) -> bool {
     if artifact.instrument.id() != position.instrument_id {
         diagnostics.push_bounded(
             limits,
@@ -632,6 +639,7 @@ fn validate_position_semantics(
             .with_position_id(position.id.to_string()),
         );
     }
+    !invalid_quantity
 }
 
 fn enforce_count_limit(what: &'static str, found: usize, limit: usize) -> crate::Result<()> {

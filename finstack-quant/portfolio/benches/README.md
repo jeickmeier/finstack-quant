@@ -19,7 +19,7 @@ expand benchmark runtime unless a matching `[[bench]]` entry is added.
 | `portfolio_attribution.rs` | yes | Parallel, metrics-based, and method-owned attribution controls |
 | `portfolio_workflows.rs` | yes | `scenario_pnl` / `scenario_pnl_batch` reuse and `replay_portfolio` |
 | `portfolio_analytics.rs` | yes | Book rollup, primitive exposure, Brinson / Campisi / grid / factor-Brinson / excess-return |
-| `portfolio_margin.rs` | yes | `PortfolioMarginAggregator::calculate` over 256 / 1,024 mocked-marginable positions |
+| `portfolio_margin.rs` | yes | `margin::portfolio_margin` over 256 / 1,024 mocked-marginable positions |
 | `portfolio_optimization.rs` | yes | `optimization::optimize` on 32 / 64-bond books |
 | `sensitivity_simulation.rs` | yes | Full-repricing grids, delta-based sensitivities, `FactorModel::analyze` / `factor_stress`, parametric and Monte Carlo decomposition |
 | `parallel_thresholds.rs` | yes | Historical tail-risk decomposer serial fold at 400 / 500 / 600 positions |
