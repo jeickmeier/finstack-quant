@@ -2,6 +2,10 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
+ * Opaque string identifier.
+ */
+export type Id = string;
+/**
  * Base currency (foreign currency, numerator of the pair).
  */
 export type Currency =
@@ -165,17 +169,17 @@ export type Currency =
   | "ZMW"
   | "ZWL";
 /**
- * Domestic (quote currency) discount curve ID.
- */
-export type Id = string;
-/**
- * Foreign (base currency) discount curve ID.
+ * Opaque string identifier.
  */
 export type Id1 = string;
 /**
- * Unique instrument identifier.
+ * Opaque string identifier.
  */
 export type Id2 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id3 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -673,15 +677,15 @@ export interface D_5F15F4Bd684Bc813Ff88 {
   /**
    * Optional base currency calendar for business day adjustment.
    */
-  base_calendar_id?: string | null;
+  base_calendar_id?: Id | null;
   base_currency: Currency;
   /**
    * Contract forward rate (quote per base). If None, valued at-market.
    */
   contract_rate?: number | null;
-  domestic_discount_curve_id: Id;
-  foreign_discount_curve_id: Id1;
-  id: Id2;
+  domestic_discount_curve_id: Id1;
+  foreign_discount_curve_id: Id2;
+  id: Id3;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   maturity: Date;
   metric_pricing_overrides?: MetricPricingOverrides;
@@ -689,7 +693,7 @@ export interface D_5F15F4Bd684Bc813Ff88 {
   /**
    * Optional quote currency calendar for business day adjustment.
    */
-  quote_calendar_id?: string | null;
+  quote_calendar_id?: Id | null;
   quote_currency: Currency1;
   /**
    * Optional spot rate override (quote per base). If None, source from FxMatrix.
@@ -698,7 +702,7 @@ export interface D_5F15F4Bd684Bc813Ff88 {
   scenario_pricing_overrides?: ScenarioPricingOverrides;
 }
 /**
- * Attributes for scenario selection and tagging.
+ * Attributes for scenario selection and tagging
  */
 export interface Attributes {
   /**

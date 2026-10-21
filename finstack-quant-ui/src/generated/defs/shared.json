@@ -2970,7 +2970,7 @@
           "type": "number"
         },
         "coupon_barriers": {
-          "description": "Coupon barriers corresponding to observation dates.",
+          "description": "Coupon barriers as ratios of initial spot.\n\nCoupon eligibility is independent of the autocall barrier. Each entry\ncorresponds to the observation date at the same index.",
           "items": {
             "format": "double",
             "type": "number"
@@ -3002,7 +3002,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional dividend-yield scalar ID.\n\n`Some(id)`: lookup MUST succeed (a missing or non-unitless scalar\nreturns an error). `None`: no implicit default; treated as zero\ncontinuous dividend yield. Set explicitly for index underlyings."
         },
         "expiry": {
@@ -3033,19 +3032,15 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "memory_coupons": {
           "default": false,
-          "description": "Memory (\"Phoenix\") coupon feature.\n\nMissed coupons accrue until a later coupon barrier is met.",
+          "description": "Memory (\"Phoenix\") coupon feature.\n\nWhen enabled, a coupon whose coupon barrier is missed accrues until a\nlater observation meets its coupon barrier. The current and all accrued\ncoupons are then paid on that observation's payment date. Coupon\neligibility remains independent of autocall eligibility.",
           "type": "boolean"
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
@@ -3080,10 +3075,10 @@
         },
         "path_model": {
           "$ref": "#/$defs/EquityPathModel",
-          "description": "Explicit path model selection; required to acknowledge model risk."
+          "description": "Explicit path model selection.\n\n`AtmTermGbm` is an ATM-term-structure approximation and does not model\nequity strike skew; callers must opt into that limitation."
         },
         "payment_dates": {
-          "description": "Contractual payment dates corresponding to observation dates.",
+          "description": "Contractual payment dates for coupons and early redemption.\n\nEach entry corresponds to `observation_dates` at the same index.",
           "items": {
             "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
           },
@@ -3091,7 +3086,6 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
@@ -5816,7 +5810,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional dividend-yield scalar ID.\n\n`Some(id)`: lookup MUST succeed (a missing or non-unitless scalar\nreturns an error). `None`: no implicit default; treated as zero\ncontinuous dividend yield. Set explicitly for index underlyings."
         },
         "expiry": {
@@ -5848,7 +5841,6 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "local_cap": {
@@ -5863,9 +5855,6 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
@@ -5893,7 +5882,7 @@
         },
         "path_model": {
           "$ref": "#/$defs/EquityPathModel",
-          "description": "Explicit path model selection; required to acknowledge model risk."
+          "description": "Explicit path model selection.\n\n`AtmTermGbm` is an ATM-term-structure approximation and does not model\nequity strike skew; callers must opt into that limitation."
         },
         "payoff_type": {
           "$ref": "#/$defs/CliquetPayoffType",
@@ -5909,7 +5898,6 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
@@ -14786,7 +14774,6 @@
           "description": "Currency for all cashflows."
         },
         "dilution_securities": {
-          "default": [],
           "description": "Dilutive securities (options, warrants, RSUs, convertibles) for treasury stock method.",
           "items": {
             "$ref": "#/$defs/DilutionSecurity"
@@ -14821,28 +14808,22 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "mid_year_convention": {
           "default": false,
-          "description": "Discount curve identifier, used for risk attribution only.\n\nDiscounting always uses [`wacc`](Self::wacc) via `(1 + wacc)^{-t}`\nregardless of whether this curve is loaded (the\nprevious behavior silently switched risky flows to risk-free curve\ndiscounting). WACC sensitivity is exposed separately as `dcf::wacc01`.\nMid-year discounting convention (default: `false` = end-of-period).\n\nWhen `true`, each flow is discounted at `t` minus half the average\nflow spacing instead of `t` (the classic `t - 0.5` for annual\ngrids; half a period for sub-annual grids), reflecting the\nassumption that cash flows arrive mid-period. This is the standard\nconvention in IB/PE practice (Koller et al.). Exit-multiple\nterminal values are not shifted (point-in-time sale at the horizon).",
+          "description": "Mid-year discounting convention (default: `false` = end-of-period).\n\nWhen `true`, each flow is discounted at `t` minus half the average\nflow spacing instead of `t` (the classic `t - 0.5` for annual\ngrids; half a period for sub-annual grids), reflecting the\nassumption that cash flows arrive mid-period. This is the standard\nconvention in IB/PE practice (Koller et al.). Exit-multiple\nterminal values are not shifted (point-in-time sale at the horizon).",
           "type": "boolean"
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "shares_outstanding": {
-          "default": null,
           "description": "Basic shares outstanding for per-share value calculation.",
           "format": "double",
           "type": [
@@ -14851,7 +14832,6 @@
           ]
         },
         "terminal_flow_override": {
-          "default": null,
           "description": "Annualized terminal flow used by growth-perpetuity terminal values.\n\nGordon Growth and H-Model capitalize an *annual* flow with annual\nWACC and growth rates. When the explicit `flows` grid is sub-annual\n(e.g. quarterly), the last flow is a period flow, not an annual one;\nset this to the trailing-twelve-month aggregate of the final\nexplicit year so the terminal value is computed on a consistent\nannual basis (Koller et al., Damodaran). When `None`, the last\nexplicit flow is used directly (correct for annual grids).\n\nIgnored by `ExitMultiple` terminal values.",
           "format": "double",
           "type": [
@@ -14876,7 +14856,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Private company valuation discounts (DLOM, DLOC)."
         },
         "wacc": {
@@ -15835,7 +15814,6 @@
           "description": "Attributes for scenario selection and tagging"
         },
         "discrete_dividends": {
-          "default": [],
           "description": "Optional discrete cash dividends `(ex_date, amount)` for the underlying.\n\nWhen non-empty, pricing uses explicit period dividend pass-through and does\nnot add continuous-yield dividend return to avoid double counting.",
           "items": {
             "maxItems": 2,
@@ -15855,7 +15833,7 @@
         },
         "dividend_settlement": {
           "$ref": "#/$defs/TrsDividendSettlement",
-          "description": "Settlement timing for explicit manufactured dividends."
+          "description": "Settlement timing for explicit manufactured dividends.\n\nThis field is mandatory because dividend-date and period-end settlement\ndiffer by the funding carry between the two dates."
         },
         "dividend_tax_rate": {
           "default": 0,
@@ -15881,7 +15859,6 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
@@ -15893,14 +15870,10 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional OTC margin specification for VM/IM.\n\nEquity TRS use SIMM equity bucket for margin calculation."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
@@ -15908,8 +15881,7 @@
           "description": "Notional amount for the swap."
         },
         "past_fixings": {
-          "default": [],
-          "description": "Observed underlying levels at past reset (period-start) dates.\n\nFor a seasoned TRS valued inside a return period, the total-return leg\nmust anchor the current period to the level *observed* at the period\nstart so the realized spot move enters the PV (equity delta). Provide\n`(reset_date, level)` pairs for every period-start date on or before\nthe valuation date; the first period may use `initial_level` instead.\nPricing errors when the current period's start level is unavailable.",
+          "description": "Observed underlying levels at contractual reset boundaries.\n\nProvide `(reset_date, level)` for each boundary on or before the\nvaluation date that is needed by an unpaid return period. This includes\nthe final period end when payment lag leaves its cashflow outstanding.\nThe first boundary may use `initial_level`; a boundary equal to `as_of`\nmay use live spot. Pricing errors when any other required fixing is\nunavailable.",
           "items": {
             "maxItems": 2,
             "minItems": 2,
@@ -15928,7 +15900,6 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "schedule": {
@@ -15937,7 +15908,7 @@
         },
         "side": {
           "$ref": "#/$defs/PayReceive",
-          "description": "Trade side (receive/pay total return)."
+          "description": "Trade side: `receive` receives the total-return leg and pays financing;\n`pay` pays the total return and receives financing."
         },
         "underlying": {
           "$ref": "#/$defs/EquityUnderlyingParams",
@@ -18090,22 +18061,24 @@
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "default": null,
-          "description": "Optional base currency calendar for business day adjustment.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional base currency calendar for business day adjustment."
         },
         "base_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
           "description": "Base currency (foreign currency, numerator of the pair)."
         },
         "contract_rate": {
-          "default": null,
           "description": "Contract forward rate (quote per base). If None, valued at-market.",
           "format": "double",
           "type": [
@@ -18127,7 +18100,6 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
@@ -18136,9 +18108,6 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
@@ -18146,19 +18115,21 @@
           "description": "Notional amount in base currency."
         },
         "quote_calendar_id": {
-          "default": null,
-          "description": "Optional quote currency calendar for business day adjustment.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional quote currency calendar for business day adjustment."
         },
         "quote_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
           "description": "Quote currency (domestic currency, denominator of the pair, PV currency)."
         },
         "quoted_spot": {
-          "default": null,
           "description": "Optional spot rate override (quote per base). If None, source from FxMatrix.",
           "format": "double",
           "type": [
@@ -18168,7 +18139,6 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         }
       },
@@ -18375,11 +18345,15 @@
           "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "description": "Optional base currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional base currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars."
         },
         "base_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
@@ -18399,7 +18373,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional quote-currency discount curve for PV-ing the settlement\ncashflow. When absent the settlement amount is reported undiscounted\n(a 1–2 day effect for standard spot lags)."
         },
         "id": {
@@ -18408,14 +18381,10 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
@@ -18423,11 +18392,15 @@
           "description": "Notional amount in base currency."
         },
         "quote_calendar_id": {
-          "description": "Optional quote currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional quote currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars."
         },
         "quote_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
@@ -18443,7 +18416,6 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "settlement_date": {
@@ -18456,10 +18428,10 @@
             }
           ],
           "default": null,
-          "description": "Optional explicit settlement (value) date"
+          "description": "Optional explicit settlement (value) date. When set it is only\nbusiness-day adjusted and `settlement_days` is ignored."
         },
         "settlement_days": {
-          "description": "Optional T+N settlement lag in business days when `settlement_date` is not provided.\n\n`None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.",
+          "description": "Optional contractual T+N settlement lag in business days when\n`settlement_date` is not provided.\n\n`None` uses the pair-aware default from\n[`finstack_quant_core::dates::fx::fx_standard_settlement_days`]: T+1 for\nUSD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB, T+2 otherwise. An explicit value\noverrides that default.",
           "format": "uint32",
           "minimum": 0,
           "type": [
@@ -18483,30 +18455,32 @@
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "default": null,
-          "description": "Optional base currency calendar for spot/settlement adjustment metadata.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional base currency calendar for spot/settlement adjustment metadata."
         },
         "base_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
-          "description": "Base currency (foreign)."
+          "description": "Base currency (foreign)"
         },
         "domestic_discount_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Domestic discount curve id (quote currency)."
+          "description": "Domestic discount curve id (quote currency)"
         },
         "far_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Far leg settlement date (forward leg)."
+          "description": "Far leg settlement date (forward leg)"
         },
         "far_rate": {
-          "default": null,
           "description": "Optional far leg FX rate (quote per base). If absent, use the market\noutright forward from the valuation date to far settlement.",
           "format": "double",
           "type": [
@@ -18516,30 +18490,25 @@
         },
         "foreign_discount_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Foreign discount curve id (base currency)."
+          "description": "Foreign discount curve id (base currency)"
         },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Unique instrument identifier."
+          "description": "Unique instrument identifier"
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "near_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Near leg settlement date (spot leg)."
+          "description": "Near leg settlement date (spot leg)"
         },
         "near_rate": {
-          "default": null,
           "description": "Optional near leg FX rate (quote per base). If absent, use the market\noutright forward from the valuation date to near settlement.",
           "format": "double",
           "type": [
@@ -18549,23 +18518,25 @@
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Notional amount in base currency (exchanged on near, reversed on far)."
+          "description": "Notional amount in base currency (exchanged on near, reversed on far)"
         },
         "quote_calendar_id": {
-          "default": null,
-          "description": "Optional quote currency calendar for spot/settlement adjustment metadata.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional quote currency calendar for spot/settlement adjustment metadata."
         },
         "quote_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
-          "description": "Quote currency (domestic)."
+          "description": "Quote currency (domestic)"
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         }
       },
@@ -22180,23 +22151,25 @@
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "default": null,
-          "description": "Optional base currency calendar.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional base currency calendar."
         },
         "base_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
           "description": "Base currency (restricted/non-deliverable currency, numerator)."
         },
         "contract_rate": {
-          "default": null,
-          "description": "Contract forward rate. Interpretation depends on `quote_convention`.\n`None` values the NDF at-market.",
+          "description": "Contract forward rate. Interpretation depends on `quote_convention`:\n- BasePerSettlement: base per settlement (e.g., 7.25 CNY per USD)\n- SettlementPerBase: settlement per base (e.g., 0.138 USD per CNY)\n\n`None` values the NDF at-market: the contract rate equals the market\nforward, so the settlement amount and PV are zero.",
           "format": "double",
           "type": [
             "number",
@@ -22220,8 +22193,7 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Official fixing source/benchmark enum for type-safe specification."
+          "description": "Official fixing source/benchmark enum for type-safe specification.\n\nUse this field for validated fixing sources.\nSee [`NdfFixingSource`] for supported benchmarks and their typical currencies."
         },
         "foreign_discount_curve_id": {
           "anyOf": [
@@ -22232,8 +22204,7 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Optional foreign (base) currency discount curve ID."
+          "description": "Optional foreign (base) currency discount curve ID.\nRequired for pre-fixing forward estimation unless `quoted_forward`\nis supplied."
         },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -22241,7 +22212,6 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
@@ -22250,9 +22220,6 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
@@ -22260,8 +22227,7 @@
           "description": "Notional amount in base currency."
         },
         "observed_fixing": {
-          "default": null,
-          "description": "Observed fixing rate. Interpretation depends on `quote_convention`.",
+          "description": "Observed fixing rate. Interpretation depends on `quote_convention`.\nIf Some, NDF is post-fixing.",
           "format": "double",
           "type": [
             "number",
@@ -22273,8 +22239,7 @@
           "description": "Quote convention for contract_rate and observed_fixing."
         },
         "quoted_forward": {
-          "default": null,
-          "description": "Explicit pre-fixing forward rate in `quote_convention` units.",
+          "description": "Explicit pre-fixing forward rate in `quote_convention` units.\n\nUse this for NDF market quotes or basis-adjusted forwards when a base\ncurrency discount curve is unavailable.",
           "format": "double",
           "type": [
             "number",
@@ -22282,8 +22247,7 @@
           ]
         },
         "quoted_spot": {
-          "default": null,
-          "description": "Optional spot rate override for forward rate calculation.",
+          "description": "Optional spot rate override for forward rate calculation.\nInterpretation depends on `quote_convention`.",
           "format": "double",
           "type": [
             "number",
@@ -22292,16 +22256,18 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "settlement_calendar_id": {
-          "default": null,
-          "description": "Optional settlement currency calendar.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional settlement currency calendar."
         },
         "settlement_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
@@ -24107,14 +24073,14 @@
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
-          "description": "Attributes for scenario selection and grouping."
+          "description": "Attributes for scenario selection and grouping"
         },
         "base_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
-          "description": "Base currency (equity denomination)."
+          "description": "Base currency (equity denomination)"
         },
         "correlation": {
-          "description": "Correlation between equity price and FX rate.",
+          "description": "Correlation between equity price and FX rate",
           "format": "double",
           "type": "number"
         },
@@ -24132,20 +24098,19 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Optional dividend-yield scalar ID."
+          "description": "Optional dividend-yield scalar ID"
         },
         "domestic_discount_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Discount curve ID (domestic currency)."
+          "description": "Discount curve ID (domestic currency)"
         },
         "expiry": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Option expiry date."
+          "description": "Option expiry date"
         },
         "foreign_discount_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Discount curve ID (foreign currency)."
+          "description": "Discount curve ID (foreign currency)"
         },
         "fx_spot_id": {
           "anyOf": [
@@ -24156,8 +24121,7 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Optional FX rate identifier."
+          "description": "Optional FX rate identifier.\n\nThe referenced scalar must be quoted as **quote currency per unit of\nbase currency** (e.g. for base JPY / quote USD, USD-per-JPY ≈ 0.0071,\nconventionally named `JPYUSD`). The pricer compounds it with\n`exp((r_quote − r_base)·t)` to obtain the ATM forward for the FX vol\nlookup, so an inverted quote (JPY-per-USD) silently mislocates the\nsmile. `validate()` rejects ids whose embedded pair name contradicts\nthis direction."
         },
         "fx_vol_surface_id": {
           "anyOf": [
@@ -24168,36 +24132,30 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Optional FX volatility surface ID."
+          "description": "Optional FX volatility surface ID.\n\nMust be calibrated in the same **quote-per-base** direction as\n`fx_spot_id` so absolute-strike lookups at the CIRP forward land on\nthe correct smile. `validate()` rejects ids whose embedded pair name\ncontradicts this direction."
         },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Unique instrument identifier."
+          "description": "Unique instrument identifier"
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Strike-equivalent domestic reference notional."
+          "description": "Strike-equivalent domestic reference notional.\n\nWhen `quantity` and `payoff_fx_rate` are supplied, this must\nequal `quantity * payoff_fx_rate * strike`."
         },
         "option_type": {
           "$ref": "#/$defs/OptionType",
-          "description": "Option type (call or put)."
+          "description": "Option type (call or put)"
         },
         "payoff_fx_rate": {
-          "default": null,
-          "description": "Fixed payoff FX conversion rate from base-currency payoff into quote currency.",
+          "description": "Fixed payoff FX conversion rate from base-currency payoff into quote currency.\n\nExample: for a JPY-underlying option settled in USD at a fixed 140 JPY/USD\nconversion, `payoff_fx_rate` is `1.0 / 140.0` USD per JPY.",
           "format": "double",
           "type": [
             "number",
@@ -24205,8 +24163,7 @@
           ]
         },
         "quantity": {
-          "default": null,
-          "description": "Number of underlying units covered by the option payoff.",
+          "description": "Number of underlying units covered by the option payoff.\n\nQuanto pricing is performed per unit of the underlying in the base currency.\nThis quantity converts the per-unit price into contract-level exposure.",
           "format": "double",
           "type": [
             "number",
@@ -24215,16 +24172,15 @@
         },
         "quote_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
-          "description": "Quote currency (payment/settlement currency)."
+          "description": "Quote currency (payment/settlement currency)"
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Equity spot price identifier."
+          "description": "Equity spot price identifier"
         },
         "strike": {
           "description": "Per-unit strike of the equity underlying, in `base_currency` price units.",
@@ -24232,12 +24188,12 @@
           "type": "number"
         },
         "underlying_ticker": {
-          "description": "Underlying equity ticker symbol.",
+          "description": "Underlying equity ticker symbol",
           "type": "string"
         },
         "vol_surface_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Equity volatility surface ID."
+          "description": "Equity volatility surface ID"
         }
       },
       "required": [
@@ -24706,7 +24662,6 @@
       "description": "Real estate asset valuation instrument.\n\nSupports DCF (explicit NOI schedule) and direct capitalization valuation.",
       "properties": {
         "acquisition_costs": {
-          "default": [],
           "description": "Acquisition (closing) cost line items in instrument currency, as\npositive outflow magnitudes deducted at `as_of` in DCF valuation.",
           "items": {
             "$ref": "#/$defs/d_4ba43030fede59fe5993"
@@ -24722,7 +24677,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional appraisal override value."
         },
         "attributes": {
@@ -24731,7 +24685,6 @@
           "description": "Attributes for scenario selection and tagging"
         },
         "cap_rate": {
-          "default": null,
           "description": "Capitalization rate for direct cap (annualized).",
           "format": "double",
           "type": [
@@ -24740,7 +24693,6 @@
           ]
         },
         "capex_schedule": {
-          "default": null,
           "description": "Capital expenditure schedule (date, amount). Values are treated as **positive outflows**.\n\nWhen present, cashflows are valued as `NOI - CapEx` (unlevered net cash flow).",
           "items": {
             "maxItems": 2,
@@ -24770,7 +24722,6 @@
           "description": "Day count convention for year fractions."
         },
         "discount_rate": {
-          "default": null,
           "description": "Discount rate for DCF (annualized).",
           "format": "double",
           "type": [
@@ -24779,7 +24730,6 @@
           ]
         },
         "disposition_cost_decimal": {
-          "default": null,
           "description": "Optional disposition cost percentage applied to terminal value.\n\nA value of `0.02` represents 2% selling costs. Must be in \\([0, 1)\\).",
           "format": "double",
           "type": [
@@ -24788,7 +24738,6 @@
           ]
         },
         "disposition_costs": {
-          "default": [],
           "description": "Optional detailed disposition cost line items (positive outflows) deducted from terminal proceeds.",
           "items": {
             "$ref": "#/$defs/d_4ba43030fede59fe5993"
@@ -24801,18 +24750,14 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "noi_schedule": {
-          "description": "Net operating income schedule (date, amount).",
+          "description": "Net operating income schedule (date, amount).\n\nEntries must be **annual** NOI amounts: cap-rate formulas (direct cap,\nexit-cap terminal value, going-in cap rate) apply a quoted annual cap\nrate to a single schedule entry, so a monthly or quarterly schedule\nwould understate those values by 12x/4x. Flows dated exactly on the\nvaluation `as_of` are included in PV undiscounted (t = 0).",
           "items": {
             "maxItems": 2,
             "minItems": 2,
@@ -24838,7 +24783,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional property type classification (for reporting)."
         },
         "purchase_price": {
@@ -24850,7 +24794,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional purchase price (useful for IRR / cap rate metrics)."
         },
         "sale_date": {
@@ -24862,7 +24805,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional sale/exit date that truncates the DCF horizon.\n\nWhen set, DCF only values unlevered flows up to and including `sale_date`.\nTerminal proceeds (if configured) are realized on `sale_date`."
         },
         "sale_price": {
@@ -24874,16 +24816,13 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional explicit gross sale price (terminal proceeds), before disposition costs.\n\nWhen set, this takes precedence over `terminal_cap_rate` for terminal proceeds."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "stabilized_noi": {
-          "default": null,
           "description": "Optional stabilized NOI override for direct cap.",
           "format": "double",
           "type": [
@@ -24892,7 +24831,6 @@
           ]
         },
         "terminal_cap_rate": {
-          "default": null,
           "description": "Optional terminal cap rate for DCF (uses last NOI).",
           "format": "double",
           "type": [
@@ -24901,8 +24839,7 @@
           ]
         },
         "terminal_growth_rate": {
-          "default": null,
-          "description": "Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.\n\nMarket convention for exit-cap terminal value is \\(TV = NOI_{N+1} / cap\\_rate\\_exit\\).\nWhen not provided, defaults to 0 (uses last NOI as-is).\nValidation range is \\([-100\\%, 20\\%]\\) to guard against configuration errors.",
+          "description": "Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.\n\nMarket convention for exit-cap terminal value is \\(TV = NOI_{N+1} / cap\\_rate\\_exit\\).\nWhen not provided, defaults to 0 (uses last NOI as-is, i.e. a trailing-NOI\nterminal value). Exactly **one** period of growth is applied to the last\nNOI on/before the exit date — it is not compounded over any gap between\nthe last scheduled NOI and a later `sale_date`.\nValidation range is \\([-100\\%, 20\\%]\\) to guard against configuration errors.",
           "format": "double",
           "type": [
             "number",

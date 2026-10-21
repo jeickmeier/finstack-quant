@@ -187,7 +187,6 @@ export default [
   {
     "path": "#/$defs/d_05fc0451dee1e185f517/properties/dilution_securities",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/DiscountedCashFlow/properties/dilution_securities",
-    "default": [],
     "description": "Dilutive securities (options, warrants, RSUs, convertibles) for treasury stock method."
   },
   {
@@ -233,7 +232,6 @@ export default [
   {
     "path": "#/$defs/d_05fc0451dee1e185f517/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/DiscountedCashFlow/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -241,9 +239,6 @@ export default [
   {
     "path": "#/$defs/d_05fc0451dee1e185f517/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/DiscountedCashFlow/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -252,12 +247,11 @@ export default [
     "path": "#/$defs/d_05fc0451dee1e185f517/properties/mid_year_convention",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/DiscountedCashFlow/properties/mid_year_convention",
     "default": false,
-    "description": "Discount curve identifier, used for risk attribution only.\n\nDiscounting always uses [`wacc`](Self::wacc) via `(1 + wacc)^{-t}`\nregardless of whether this curve is loaded (the\nprevious behavior silently switched risky flows to risk-free curve\ndiscounting). WACC sensitivity is exposed separately as `dcf::wacc01`.\nMid-year discounting convention (default: `false` = end-of-period).\n\nWhen `true`, each flow is discounted at `t` minus half the average\nflow spacing instead of `t` (the classic `t - 0.5` for annual\ngrids; half a period for sub-annual grids), reflecting the\nassumption that cash flows arrive mid-period. This is the standard\nconvention in IB/PE practice (Koller et al.). Exit-multiple\nterminal values are not shifted (point-in-time sale at the horizon)."
+    "description": "Mid-year discounting convention (default: `false` = end-of-period).\n\nWhen `true`, each flow is discounted at `t` minus half the average\nflow spacing instead of `t` (the classic `t - 0.5` for annual\ngrids; half a period for sub-annual grids), reflecting the\nassumption that cash flows arrive mid-period. This is the standard\nconvention in IB/PE practice (Koller et al.). Exit-multiple\nterminal values are not shifted (point-in-time sale at the horizon)."
   },
   {
     "path": "#/$defs/d_05fc0451dee1e185f517/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/DiscountedCashFlow/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
@@ -265,14 +259,12 @@ export default [
   {
     "path": "#/$defs/d_05fc0451dee1e185f517/properties/shares_outstanding",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/DiscountedCashFlow/properties/shares_outstanding",
-    "default": null,
     "description": "Basic shares outstanding for per-share value calculation.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_05fc0451dee1e185f517/properties/terminal_flow_override",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/DiscountedCashFlow/properties/terminal_flow_override",
-    "default": null,
     "description": "Annualized terminal flow used by growth-perpetuity terminal values.\n\nGordon Growth and H-Model capitalize an *annual* flow with annual\nWACC and growth rates. When the explicit `flows` grid is sub-annual\n(e.g. quarterly), the last flow is a period flow, not an annual one;\nset this to the trailing-twelve-month aggregate of the final\nexplicit year so the terminal value is computed on a consistent\nannual basis (Koller et al., Damodaran). When `None`, the last\nexplicit flow is used directly (correct for annual grids).\n\nIgnored by `ExitMultiple` terminal values.",
     "format": "double"
   },
@@ -293,7 +285,6 @@ export default [
   {
     "path": "#/$defs/d_05fc0451dee1e185f517/properties/valuation_discounts",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json#/$defs/DiscountedCashFlow/properties/valuation_discounts",
-    "default": null,
     "description": "Private company valuation discounts (DLOM, DLOC)."
   },
   {

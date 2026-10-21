@@ -225,7 +225,7 @@ impl std::str::FromStr for NdfFixingSource {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields, try_from = "NdfUnchecked")]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct Ndf {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -323,106 +323,7 @@ pub struct Ndf {
     pub attributes: Attributes,
 }
 
-#[derive(Debug, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-struct NdfUnchecked {
-    /// Unique instrument identifier.
-    id: InstrumentId,
-    /// Base currency (restricted/non-deliverable currency, numerator).
-    base_currency: Currency,
-    /// Settlement currency (freely convertible, typically USD, denominator and PV currency).
-    settlement_currency: Currency,
-    /// Fixing date (rate observation date, typically T-2 before maturity).
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    fixing_date: Date,
-    /// Maturity/settlement date.
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    maturity: Date,
-    /// Notional amount in base currency.
-    notional: Money,
-    /// Contract forward rate. Interpretation depends on `quote_convention`.
-    /// `None` values the NDF at-market.
-    #[serde(default)]
-    contract_rate: Option<f64>,
-    /// Settlement currency discount curve ID.
-    domestic_discount_curve_id: CurveId,
-    /// Quote convention for contract_rate and observed_fixing.
-    quote_convention: NdfQuoteConvention,
-    /// Optional foreign (base) currency discount curve ID.
-    #[serde(default)]
-    foreign_discount_curve_id: Option<CurveId>,
-    /// Observed fixing rate. Interpretation depends on `quote_convention`.
-    #[serde(default)]
-    observed_fixing: Option<f64>,
-    /// Official fixing source/benchmark enum for type-safe specification.
-    #[serde(default)]
-    fixing_source: Option<NdfFixingSource>,
-    /// Optional spot rate override for forward rate calculation.
-    #[serde(default)]
-    quoted_spot: Option<f64>,
-    /// Explicit pre-fixing forward rate in `quote_convention` units.
-    #[serde(default)]
-    quoted_forward: Option<f64>,
-    /// Optional base currency calendar.
-    #[serde(default)]
-    base_calendar_id: Option<String>,
-    /// Optional settlement currency calendar.
-    #[serde(default)]
-    settlement_calendar_id: Option<String>,
-    /// Instrument-owned pricing inputs.
-    #[serde(default)]
-    instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[serde(default)]
-    metric_pricing_overrides: finstack_quant_valuations_core::instruments::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[serde(default)]
-    scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
-    /// Attributes for scenario selection and tagging.
-    attributes: Attributes,
-}
-
-impl TryFrom<NdfUnchecked> for Ndf {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(value: NdfUnchecked) -> std::result::Result<Self, Self::Error> {
-        let ndf = Self {
-            id: value.id,
-            base_currency: value.base_currency,
-            settlement_currency: value.settlement_currency,
-            fixing_date: value.fixing_date,
-            maturity: value.maturity,
-            notional: value.notional,
-            contract_rate: value.contract_rate,
-            domestic_discount_curve_id: value.domestic_discount_curve_id,
-            quote_convention: value.quote_convention,
-            foreign_discount_curve_id: value.foreign_discount_curve_id,
-            observed_fixing: value.observed_fixing,
-            fixing_source: value.fixing_source,
-            quoted_spot: value.quoted_spot,
-            quoted_forward: value.quoted_forward,
-            base_calendar_id: value.base_calendar_id.map(Into::into),
-            settlement_calendar_id: value.settlement_calendar_id.map(Into::into),
-            instrument_pricing_overrides: value.instrument_pricing_overrides,
-            metric_pricing_overrides: value.metric_pricing_overrides,
-            scenario_pricing_overrides: value.scenario_pricing_overrides,
-            attributes: value.attributes,
-        };
-        ndf.validate()?;
-        Ok(ndf)
-    }
-}
+finstack_quant_valuations_core::validate_on_deserialize!(Ndf);
 
 impl Ndf {
     const MIN_POSITIVE_RATE: f64 = 1.0e-12;

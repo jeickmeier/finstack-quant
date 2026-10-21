@@ -11,23 +11,25 @@
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "default": null,
-          "description": "Optional base currency calendar.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional base currency calendar."
         },
         "base_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Base currency (restricted/non-deliverable currency, numerator)."
         },
         "contract_rate": {
-          "default": null,
-          "description": "Contract forward rate. Interpretation depends on `quote_convention`.\n`None` values the NDF at-market.",
+          "description": "Contract forward rate. Interpretation depends on `quote_convention`:\n- BasePerSettlement: base per settlement (e.g., 7.25 CNY per USD)\n- SettlementPerBase: settlement per base (e.g., 0.138 USD per CNY)\n\n`None` values the NDF at-market: the contract rate equals the market\nforward, so the settlement amount and PV are zero.",
           "format": "double",
           "type": [
             "number",
@@ -51,8 +53,7 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Official fixing source/benchmark enum for type-safe specification."
+          "description": "Official fixing source/benchmark enum for type-safe specification.\n\nUse this field for validated fixing sources.\nSee [`NdfFixingSource`] for supported benchmarks and their typical currencies."
         },
         "foreign_discount_curve_id": {
           "anyOf": [
@@ -63,8 +64,7 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Optional foreign (base) currency discount curve ID."
+          "description": "Optional foreign (base) currency discount curve ID.\nRequired for pre-fixing forward estimation unless `quoted_forward`\nis supplied."
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -72,7 +72,6 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
@@ -81,9 +80,6 @@
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
@@ -91,8 +87,7 @@
           "description": "Notional amount in base currency."
         },
         "observed_fixing": {
-          "default": null,
-          "description": "Observed fixing rate. Interpretation depends on `quote_convention`.",
+          "description": "Observed fixing rate. Interpretation depends on `quote_convention`.\nIf Some, NDF is post-fixing.",
           "format": "double",
           "type": [
             "number",
@@ -104,8 +99,7 @@
           "description": "Quote convention for contract_rate and observed_fixing."
         },
         "quoted_forward": {
-          "default": null,
-          "description": "Explicit pre-fixing forward rate in `quote_convention` units.",
+          "description": "Explicit pre-fixing forward rate in `quote_convention` units.\n\nUse this for NDF market quotes or basis-adjusted forwards when a base\ncurrency discount curve is unavailable.",
           "format": "double",
           "type": [
             "number",
@@ -113,8 +107,7 @@
           ]
         },
         "quoted_spot": {
-          "default": null,
-          "description": "Optional spot rate override for forward rate calculation.",
+          "description": "Optional spot rate override for forward rate calculation.\nInterpretation depends on `quote_convention`.",
           "format": "double",
           "type": [
             "number",
@@ -123,16 +116,18 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "settlement_calendar_id": {
-          "default": null,
-          "description": "Optional settlement currency calendar.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional settlement currency calendar."
         },
         "settlement_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",

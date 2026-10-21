@@ -1680,7 +1680,6 @@ export default [
   {
     "path": "#/$defs/d_785f04c4ffd82f89f1ab/properties/discrete_dividends",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/EquityTotalReturnSwap/properties/discrete_dividends",
-    "default": [],
     "description": "Optional discrete cash dividends `(ex_date, amount)` for the underlying.\n\nWhen non-empty, pricing uses explicit period dividend pass-through and does\nnot add continuous-yield dividend return to avoid double counting."
   },
   {
@@ -1701,7 +1700,7 @@ export default [
   {
     "path": "#/$defs/d_785f04c4ffd82f89f1ab/properties/dividend_settlement",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/EquityTotalReturnSwap/properties/dividend_settlement",
-    "description": "Settlement timing for explicit manufactured dividends.",
+    "description": "Settlement timing for explicit manufactured dividends.\n\nThis field is mandatory because dividend-date and period-end settlement\ndiffer by the funding carry between the two dates.",
     "ref": "#/$defs/TrsDividendSettlement",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/TrsDividendSettlement"
   },
@@ -1735,7 +1734,6 @@ export default [
   {
     "path": "#/$defs/d_785f04c4ffd82f89f1ab/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/EquityTotalReturnSwap/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -1743,7 +1741,6 @@ export default [
   {
     "path": "#/$defs/d_785f04c4ffd82f89f1ab/properties/margin_spec",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/EquityTotalReturnSwap/properties/margin_spec",
-    "default": null,
     "description": "Optional OTC margin specification for VM/IM.\n\nEquity TRS use SIMM equity bucket for margin calculation."
   },
   {
@@ -1759,9 +1756,6 @@ export default [
   {
     "path": "#/$defs/d_785f04c4ffd82f89f1ab/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/EquityTotalReturnSwap/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -1776,8 +1770,7 @@ export default [
   {
     "path": "#/$defs/d_785f04c4ffd82f89f1ab/properties/past_fixings",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/EquityTotalReturnSwap/properties/past_fixings",
-    "default": [],
-    "description": "Observed underlying levels at past reset (period-start) dates.\n\nFor a seasoned TRS valued inside a return period, the total-return leg\nmust anchor the current period to the level *observed* at the period\nstart so the realized spot move enters the PV (equity delta). Provide\n`(reset_date, level)` pairs for every period-start date on or before\nthe valuation date; the first period may use `initial_level` instead.\nPricing errors when the current period's start level is unavailable."
+    "description": "Observed underlying levels at contractual reset boundaries.\n\nProvide `(reset_date, level)` for each boundary on or before the\nvaluation date that is needed by an unpaid return period. This includes\nthe final period end when payment lag leaves its cashflow outstanding.\nThe first boundary may use `initial_level`; a boundary equal to `as_of`\nmay use live spot. Pricing errors when any other required fixing is\nunavailable."
   },
   {
     "path": "#/$defs/d_785f04c4ffd82f89f1ab/properties/past_fixings/items",
@@ -1797,7 +1790,6 @@ export default [
   {
     "path": "#/$defs/d_785f04c4ffd82f89f1ab/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/EquityTotalReturnSwap/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
@@ -1812,7 +1804,7 @@ export default [
   {
     "path": "#/$defs/d_785f04c4ffd82f89f1ab/properties/side",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/EquityTotalReturnSwap/properties/side",
-    "description": "Trade side (receive/pay total return).",
+    "description": "Trade side: `receive` receives the total-return leg and pays financing;\n`pay` pays the total return and receives financing.",
     "ref": "#/$defs/PayReceive",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/PayReceive"
   },

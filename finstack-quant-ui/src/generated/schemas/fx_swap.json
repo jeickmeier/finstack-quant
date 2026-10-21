@@ -309,30 +309,32 @@
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "default": null,
-          "description": "Optional base currency calendar for spot/settlement adjustment metadata.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional base currency calendar for spot/settlement adjustment metadata."
         },
         "base_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
-          "description": "Base currency (foreign)."
+          "description": "Base currency (foreign)"
         },
         "domestic_discount_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Domestic discount curve id (quote currency)."
+          "description": "Domestic discount curve id (quote currency)"
         },
         "far_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Far leg settlement date (forward leg)."
+          "description": "Far leg settlement date (forward leg)"
         },
         "far_rate": {
-          "default": null,
           "description": "Optional far leg FX rate (quote per base). If absent, use the market\noutright forward from the valuation date to far settlement.",
           "format": "double",
           "type": [
@@ -342,30 +344,25 @@
         },
         "foreign_discount_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Foreign discount curve id (base currency)."
+          "description": "Foreign discount curve id (base currency)"
         },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Unique instrument identifier."
+          "description": "Unique instrument identifier"
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "near_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Near leg settlement date (spot leg)."
+          "description": "Near leg settlement date (spot leg)"
         },
         "near_rate": {
-          "default": null,
           "description": "Optional near leg FX rate (quote per base). If absent, use the market\noutright forward from the valuation date to near settlement.",
           "format": "double",
           "type": [
@@ -375,23 +372,25 @@
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Notional amount in base currency (exchanged on near, reversed on far)."
+          "description": "Notional amount in base currency (exchanged on near, reversed on far)"
         },
         "quote_calendar_id": {
-          "default": null,
-          "description": "Optional quote currency calendar for spot/settlement adjustment metadata.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional quote currency calendar for spot/settlement adjustment metadata."
         },
         "quote_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
-          "description": "Quote currency (domestic)."
+          "description": "Quote currency (domestic)"
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         }
       },

@@ -5992,7 +5992,7 @@ export type Currency12 =
   | "ZMW"
   | "ZWL";
 /**
- * Base currency (foreign).
+ * Base currency (foreign)
  */
 export type Currency13 =
   | "AED"
@@ -6175,7 +6175,7 @@ export type Id129 = string;
  */
 export type Date97 = string;
 /**
- * Quote currency (domestic).
+ * Quote currency (domestic)
  */
 export type Currency14 =
   | "AED"
@@ -9069,7 +9069,7 @@ export type Date106 = string;
  */
 export type Id156 = string;
 /**
- * Base currency (equity denomination).
+ * Base currency (equity denomination)
  */
 export type Currency30 =
   | "AED"
@@ -9265,7 +9265,7 @@ export type Id158 = string;
  */
 export type Id159 = string;
 /**
- * Quote currency (payment/settlement currency).
+ * Quote currency (payment/settlement currency)
  */
 export type Currency31 =
   | "AED"
@@ -28714,7 +28714,10 @@ export interface Autocallable {
    */
   cap_level: number;
   /**
-   * Coupon barriers corresponding to observation dates.
+   * Coupon barriers as ratios of initial spot.
+   *
+   * Coupon eligibility is independent of the autocall barrier. Each entry
+   * corresponds to the observation date at the same index.
    */
   coupon_barriers: number[];
   /**
@@ -28785,7 +28788,10 @@ export interface Autocallable {
   /**
    * Memory ("Phoenix") coupon feature.
    *
-   * Missed coupons accrue until a later coupon barrier is met.
+   * When enabled, a coupon whose coupon barrier is missed accrues until a
+   * later observation meets its coupon barrier. The current and all accrued
+   * coupons are then paid on that observation's payment date. Coupon
+   * eligibility remains independent of autocall eligibility.
    */
   memory_coupons?: boolean;
   metric_pricing_overrides?: MetricPricingOverrides8;
@@ -28808,11 +28814,16 @@ export interface Autocallable {
    */
   past_fixings?: [Date, number][];
   /**
-   * Explicit path model selection; required to acknowledge model risk.
+   * Explicit path model selection.
+   *
+   * `AtmTermGbm` is an ATM-term-structure approximation and does not model
+   * equity strike skew; callers must opt into that limitation.
    */
   path_model: "atm_term_gbm";
   /**
-   * Contractual payment dates corresponding to observation dates.
+   * Contractual payment dates for coupons and early redemption.
+   *
+   * Each entry corresponds to `observation_dates` at the same index.
    */
   payment_dates: Date[];
   scenario_pricing_overrides?: ScenarioPricingOverrides8;
@@ -41541,7 +41552,7 @@ export interface FxSpot {
    * Per market convention, FX settlement uses the joint calendar of both currencies.
    * A date is a good business day only if it's valid in both calendars.
    */
-  base_calendar_id?: string | null;
+  base_calendar_id?: Id9 | null;
   base_currency: Currency11;
   business_day_convention?: BusinessDayConvention18;
   /**
@@ -41560,7 +41571,7 @@ export interface FxSpot {
    * Per market convention, FX settlement uses the joint calendar of both currencies.
    * A date is a good business day only if it's valid in both calendars.
    */
-  quote_calendar_id?: string | null;
+  quote_calendar_id?: Id9 | null;
   quote_currency: Currency12;
   /**
    * Optional quoted FX spot rate (quote per base); `None` reads the FxMatrix.
@@ -41568,13 +41579,18 @@ export interface FxSpot {
   quoted_spot?: number | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides39;
   /**
-   * Optional explicit settlement (value) date
+   * Optional explicit settlement (value) date. When set it is only
+   * business-day adjusted and `settlement_days` is ignored.
    */
   settlement_date?: Date | null;
   /**
-   * Optional T+N settlement lag in business days when `settlement_date` is not provided.
+   * Optional contractual T+N settlement lag in business days when
+   * `settlement_date` is not provided.
    *
-   * `None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.
+   * `None` uses the pair-aware default from
+   * [`finstack_quant_core::dates::fx::fx_standard_settlement_days`]: T+1 for
+   * USD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB, T+2 otherwise. An explicit value
+   * overrides that default.
    */
   settlement_days?: number | null;
 }
@@ -41844,7 +41860,7 @@ export interface FxSwap {
   /**
    * Optional base currency calendar for spot/settlement adjustment metadata.
    */
-  base_calendar_id?: string | null;
+  base_calendar_id?: Id9 | null;
   base_currency: Currency13;
   domestic_discount_curve_id: Id127;
   far_date: Date96;
@@ -41867,12 +41883,12 @@ export interface FxSwap {
   /**
    * Optional quote currency calendar for spot/settlement adjustment metadata.
    */
-  quote_calendar_id?: string | null;
+  quote_calendar_id?: Id9 | null;
   quote_currency: Currency14;
   scenario_pricing_overrides?: ScenarioPricingOverrides40;
 }
 /**
- * Attributes for scenario selection and tagging.
+ * Attributes for scenario selection and tagging
  */
 export interface Attributes41 {
   /**
@@ -42176,7 +42192,7 @@ export interface FxForward {
   /**
    * Optional base currency calendar for business day adjustment.
    */
-  base_calendar_id?: string | null;
+  base_calendar_id?: Id9 | null;
   base_currency: Currency15;
   /**
    * Contract forward rate (quote per base). If None, valued at-market.
@@ -42192,7 +42208,7 @@ export interface FxForward {
   /**
    * Optional quote currency calendar for business day adjustment.
    */
-  quote_calendar_id?: string | null;
+  quote_calendar_id?: Id9 | null;
   quote_currency: Currency16;
   /**
    * Optional spot rate override (quote per base). If None, source from FxMatrix.
@@ -42201,7 +42217,7 @@ export interface FxForward {
   scenario_pricing_overrides?: ScenarioPricingOverrides41;
 }
 /**
- * Attributes for scenario selection and tagging.
+ * Attributes for scenario selection and tagging
  */
 export interface Attributes42 {
   /**
@@ -42526,21 +42542,30 @@ export interface Ndf {
   /**
    * Optional base currency calendar.
    */
-  base_calendar_id?: string | null;
+  base_calendar_id?: Id9 | null;
   base_currency: Currency17;
   /**
-   * Contract forward rate. Interpretation depends on `quote_convention`.
-   * `None` values the NDF at-market.
+   * Contract forward rate. Interpretation depends on `quote_convention`:
+   * - BasePerSettlement: base per settlement (e.g., 7.25 CNY per USD)
+   * - SettlementPerBase: settlement per base (e.g., 0.138 USD per CNY)
+   *
+   * `None` values the NDF at-market: the contract rate equals the market
+   * forward, so the settlement amount and PV are zero.
    */
   contract_rate?: number | null;
   domestic_discount_curve_id: Id133;
   fixing_date: Date99;
   /**
    * Official fixing source/benchmark enum for type-safe specification.
+   *
+   * Use this field for validated fixing sources.
+   * See [`NdfFixingSource`] for supported benchmarks and their typical currencies.
    */
   fixing_source?: NdfFixingSource | null;
   /**
    * Optional foreign (base) currency discount curve ID.
+   * Required for pre-fixing forward estimation unless `quoted_forward`
+   * is supplied.
    */
   foreign_discount_curve_id?: Id9 | null;
   id: Id134;
@@ -42550,6 +42575,7 @@ export interface Ndf {
   notional: Money68;
   /**
    * Observed fixing rate. Interpretation depends on `quote_convention`.
+   * If Some, NDF is post-fixing.
    */
   observed_fixing?: number | null;
   /**
@@ -42558,21 +42584,25 @@ export interface Ndf {
   quote_convention: "base_per_settlement" | "settlement_per_base";
   /**
    * Explicit pre-fixing forward rate in `quote_convention` units.
+   *
+   * Use this for NDF market quotes or basis-adjusted forwards when a base
+   * currency discount curve is unavailable.
    */
   quoted_forward?: number | null;
   /**
    * Optional spot rate override for forward rate calculation.
+   * Interpretation depends on `quote_convention`.
    */
   quoted_spot?: number | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides42;
   /**
    * Optional settlement currency calendar.
    */
-  settlement_calendar_id?: string | null;
+  settlement_calendar_id?: Id9 | null;
   settlement_currency: Currency18;
 }
 /**
- * Attributes for scenario selection and tagging.
+ * Attributes for scenario selection and tagging
  */
 export interface Attributes43 {
   /**
@@ -44680,12 +44710,12 @@ export interface QuantoOption {
   attributes: Attributes49;
   base_currency: Currency30;
   /**
-   * Correlation between equity price and FX rate.
+   * Correlation between equity price and FX rate
    */
   correlation: number;
   day_count?: DayCount41;
   /**
-   * Optional dividend-yield scalar ID.
+   * Optional dividend-yield scalar ID
    */
   div_yield_id?: Id9 | null;
   domestic_discount_curve_id: Id157;
@@ -44693,10 +44723,23 @@ export interface QuantoOption {
   foreign_discount_curve_id: Id158;
   /**
    * Optional FX rate identifier.
+   *
+   * The referenced scalar must be quoted as **quote currency per unit of
+   * base currency** (e.g. for base JPY / quote USD, USD-per-JPY ≈ 0.0071,
+   * conventionally named `JPYUSD`). The pricer compounds it with
+   * `exp((r_quote − r_base)·t)` to obtain the ATM forward for the FX vol
+   * lookup, so an inverted quote (JPY-per-USD) silently mislocates the
+   * smile. `validate()` rejects ids whose embedded pair name contradicts
+   * this direction.
    */
   fx_spot_id?: Id9 | null;
   /**
    * Optional FX volatility surface ID.
+   *
+   * Must be calibrated in the same **quote-per-base** direction as
+   * `fx_spot_id` so absolute-strike lookups at the CIRP forward land on
+   * the correct smile. `validate()` rejects ids whose embedded pair name
+   * contradicts this direction.
    */
   fx_vol_surface_id?: Id9 | null;
   id: Id159;
@@ -44704,15 +44747,21 @@ export interface QuantoOption {
   metric_pricing_overrides?: MetricPricingOverrides48;
   notional: Money75;
   /**
-   * Option type (call or put).
+   * Option type (call or put)
    */
   option_type: "call" | "put";
   /**
    * Fixed payoff FX conversion rate from base-currency payoff into quote currency.
+   *
+   * Example: for a JPY-underlying option settled in USD at a fixed 140 JPY/USD
+   * conversion, `payoff_fx_rate` is `1.0 / 140.0` USD per JPY.
    */
   payoff_fx_rate?: number | null;
   /**
    * Number of underlying units covered by the option payoff.
+   *
+   * Quanto pricing is performed per unit of the underlying in the base currency.
+   * This quantity converts the per-unit price into contract-level exposure.
    */
   quantity?: number | null;
   quote_currency: Currency31;
@@ -44723,13 +44772,13 @@ export interface QuantoOption {
    */
   strike: number;
   /**
-   * Underlying equity ticker symbol.
+   * Underlying equity ticker symbol
    */
   underlying_ticker: string;
   vol_surface_id: Id161;
 }
 /**
- * Attributes for scenario selection and grouping.
+ * Attributes for scenario selection and grouping
  */
 export interface Attributes49 {
   /**
@@ -47496,7 +47545,10 @@ export interface CliquetOption {
    */
   past_fixings?: [Date, number][];
   /**
-   * Explicit path model selection; required to acknowledge model risk.
+   * Explicit path model selection.
+   *
+   * `AtmTermGbm` is an ATM-term-structure approximation and does not model
+   * equity strike skew; callers must opt into that limitation.
    */
   path_model: "atm_term_gbm";
   /**
@@ -49276,6 +49328,9 @@ export interface EquityTotalReturnSwap {
   discrete_dividends?: [Date, number][];
   /**
    * Settlement timing for explicit manufactured dividends.
+   *
+   * This field is mandatory because dividend-date and period-end settlement
+   * differ by the funding carry between the two dates.
    */
   dividend_settlement: "on_dividend_date" | "at_period_end";
   /**
@@ -49315,20 +49370,21 @@ export interface EquityTotalReturnSwap {
   metric_pricing_overrides?: MetricPricingOverrides67;
   notional: Money81;
   /**
-   * Observed underlying levels at past reset (period-start) dates.
+   * Observed underlying levels at contractual reset boundaries.
    *
-   * For a seasoned TRS valued inside a return period, the total-return leg
-   * must anchor the current period to the level *observed* at the period
-   * start so the realized spot move enters the PV (equity delta). Provide
-   * `(reset_date, level)` pairs for every period-start date on or before
-   * the valuation date; the first period may use `initial_level` instead.
-   * Pricing errors when the current period's start level is unavailable.
+   * Provide `(reset_date, level)` for each boundary on or before the
+   * valuation date that is needed by an unpaid return period. This includes
+   * the final period end when payment lag leaves its cashflow outstanding.
+   * The first boundary may use `initial_level`; a boundary equal to `as_of`
+   * may use live spot. Pricing errors when any other required fixing is
+   * unavailable.
    */
   past_fixings?: [Date, number][];
   scenario_pricing_overrides?: ScenarioPricingOverrides67;
   schedule: TrsScheduleSpec;
   /**
-   * Trade side (receive/pay total return).
+   * Trade side: `receive` receives the total-return leg and pays financing;
+   * `pay` pays the total return and receives financing.
    */
   side: "pay" | "receive";
   underlying: EquityUnderlyingParams;
@@ -50618,6 +50674,12 @@ export interface RealEstateAsset {
   metric_pricing_overrides?: MetricPricingOverrides70;
   /**
    * Net operating income schedule (date, amount).
+   *
+   * Entries must be **annual** NOI amounts: cap-rate formulas (direct cap,
+   * exit-cap terminal value, going-in cap rate) apply a quoted annual cap
+   * rate to a single schedule entry, so a monthly or quarterly schedule
+   * would understate those values by 12x/4x. Flows dated exactly on the
+   * valuation `as_of` are included in PV undiscounted (t = 0).
    */
   noi_schedule: [Date, number][];
   /**
@@ -50654,7 +50716,10 @@ export interface RealEstateAsset {
    * Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.
    *
    * Market convention for exit-cap terminal value is \(TV = NOI_{N+1} / cap\_rate\_exit\).
-   * When not provided, defaults to 0 (uses last NOI as-is).
+   * When not provided, defaults to 0 (uses last NOI as-is, i.e. a trailing-NOI
+   * terminal value). Exactly **one** period of growth is applied to the last
+   * NOI on/before the exit date — it is not compounded over any gap between
+   * the last scheduled NOI and a later `sale_date`.
    * Validation range is \([-100\%, 20\%]\) to guard against configuration errors.
    */
   terminal_growth_rate?: number | null;
@@ -50790,12 +50855,6 @@ export interface DiscountedCashFlow {
   instrument_pricing_overrides?: InstrumentPricingOverrides71;
   metric_pricing_overrides?: MetricPricingOverrides71;
   /**
-   * Discount curve identifier, used for risk attribution only.
-   *
-   * Discounting always uses [`wacc`](Self::wacc) via `(1 + wacc)^{-t}`
-   * regardless of whether this curve is loaded (the
-   * previous behavior silently switched risky flows to risk-free curve
-   * discounting). WACC sensitivity is exposed separately as `dcf::wacc01`.
    * Mid-year discounting convention (default: `false` = end-of-period).
    *
    * When `true`, each flow is discounted at `t` minus half the average
@@ -54806,6 +54865,12 @@ export interface RealEstateAsset1 {
   metric_pricing_overrides?: MetricPricingOverrides70;
   /**
    * Net operating income schedule (date, amount).
+   *
+   * Entries must be **annual** NOI amounts: cap-rate formulas (direct cap,
+   * exit-cap terminal value, going-in cap rate) apply a quoted annual cap
+   * rate to a single schedule entry, so a monthly or quarterly schedule
+   * would understate those values by 12x/4x. Flows dated exactly on the
+   * valuation `as_of` are included in PV undiscounted (t = 0).
    */
   noi_schedule: [Date, number][];
   /**
@@ -54842,7 +54907,10 @@ export interface RealEstateAsset1 {
    * Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.
    *
    * Market convention for exit-cap terminal value is \(TV = NOI_{N+1} / cap\_rate\_exit\).
-   * When not provided, defaults to 0 (uses last NOI as-is).
+   * When not provided, defaults to 0 (uses last NOI as-is, i.e. a trailing-NOI
+   * terminal value). Exactly **one** period of growth is applied to the last
+   * NOI on/before the exit date — it is not compounded over any gap between
+   * the last scheduled NOI and a later `sale_date`.
    * Validation range is \([-100\%, 20\%]\) to guard against configuration errors.
    */
   terminal_growth_rate?: number | null;

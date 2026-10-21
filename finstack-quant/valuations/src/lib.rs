@@ -97,7 +97,7 @@
 // The framework crate's exported macros keep their `finstack_quant_valuations::` paths.
 pub use finstack_quant_valuations_core::{
     impl_empty_cashflow_provider, impl_focused_pricing_overrides, impl_future_option_instrument,
-    impl_instrument_base, register_generic, register_metrics,
+    impl_instrument_base, register_generic, register_metrics, validate_on_deserialize,
 };
 
 #[doc(hidden)]

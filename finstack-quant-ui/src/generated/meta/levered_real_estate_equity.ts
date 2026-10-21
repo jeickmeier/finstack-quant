@@ -1361,7 +1361,6 @@ export default [
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/acquisition_costs",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/acquisition_costs",
-    "default": [],
     "description": "Acquisition (closing) cost line items in instrument currency, as\npositive outflow magnitudes deducted at `as_of` in DCF valuation."
   },
   {
@@ -1373,7 +1372,6 @@ export default [
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/appraisal_value",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/appraisal_value",
-    "default": null,
     "description": "Optional appraisal override value."
   },
   {
@@ -1397,14 +1395,12 @@ export default [
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/cap_rate",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/cap_rate",
-    "default": null,
     "description": "Capitalization rate for direct cap (annualized).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/capex_schedule",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/capex_schedule",
-    "default": null,
     "description": "Capital expenditure schedule (date, amount). Values are treated as **positive outflows**.\n\nWhen present, cashflows are valued as `NOI - CapEx` (unlevered net cash flow)."
   },
   {
@@ -1439,21 +1435,18 @@ export default [
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/discount_rate",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/discount_rate",
-    "default": null,
     "description": "Discount rate for DCF (annualized).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/disposition_cost_decimal",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/disposition_cost_decimal",
-    "default": null,
     "description": "Optional disposition cost percentage applied to terminal value.\n\nA value of `0.02` represents 2% selling costs. Must be in \\([0, 1)\\).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/disposition_costs",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/disposition_costs",
-    "default": [],
     "description": "Optional detailed disposition cost line items (positive outflows) deducted from terminal proceeds."
   },
   {
@@ -1472,7 +1465,6 @@ export default [
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -1480,9 +1472,6 @@ export default [
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -1490,7 +1479,7 @@ export default [
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/noi_schedule",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/noi_schedule",
-    "description": "Net operating income schedule (date, amount)."
+    "description": "Net operating income schedule (date, amount).\n\nEntries must be **annual** NOI amounts: cap-rate formulas (direct cap,\nexit-cap terminal value, going-in cap rate) apply a quoted annual cap\nrate to a single schedule entry, so a monthly or quarterly schedule\nwould understate those values by 12x/4x. Flows dated exactly on the\nvaluation `as_of` are included in PV undiscounted (t = 0)."
   },
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/noi_schedule/items",
@@ -1510,7 +1499,6 @@ export default [
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/property_type",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/property_type",
-    "default": null,
     "description": "Optional property type classification (for reporting)."
   },
   {
@@ -1526,7 +1514,6 @@ export default [
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/purchase_price",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/purchase_price",
-    "default": null,
     "description": "Optional purchase price (useful for IRR / cap rate metrics)."
   },
   {
@@ -1542,7 +1529,6 @@ export default [
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/sale_date",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/sale_date",
-    "default": null,
     "description": "Optional sale/exit date that truncates the DCF horizon.\n\nWhen set, DCF only values unlevered flows up to and including `sale_date`.\nTerminal proceeds (if configured) are realized on `sale_date`."
   },
   {
@@ -1558,7 +1544,6 @@ export default [
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/sale_price",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/sale_price",
-    "default": null,
     "description": "Optional explicit gross sale price (terminal proceeds), before disposition costs.\n\nWhen set, this takes precedence over `terminal_cap_rate` for terminal proceeds."
   },
   {
@@ -1574,7 +1559,6 @@ export default [
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
@@ -1582,22 +1566,19 @@ export default [
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/stabilized_noi",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/stabilized_noi",
-    "default": null,
     "description": "Optional stabilized NOI override for direct cap.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/terminal_cap_rate",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/terminal_cap_rate",
-    "default": null,
     "description": "Optional terminal cap rate for DCF (uses last NOI).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_42ef997031425d58ca65/properties/terminal_growth_rate",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RealEstateAsset/properties/terminal_growth_rate",
-    "default": null,
-    "description": "Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.\n\nMarket convention for exit-cap terminal value is \\(TV = NOI_{N+1} / cap\\_rate\\_exit\\).\nWhen not provided, defaults to 0 (uses last NOI as-is).\nValidation range is \\([-100\\%, 20\\%]\\) to guard against configuration errors.",
+    "description": "Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.\n\nMarket convention for exit-cap terminal value is \\(TV = NOI_{N+1} / cap\\_rate\\_exit\\).\nWhen not provided, defaults to 0 (uses last NOI as-is, i.e. a trailing-NOI\nterminal value). Exactly **one** period of growth is applied to the last\nNOI on/before the exit date — it is not compounded over any gap between\nthe last scheduled NOI and a later `sale_date`.\nValidation range is \\([-100\\%, 20\\%]\\) to guard against configuration errors.",
     "format": "double"
   },
   {

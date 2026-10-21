@@ -19,7 +19,7 @@ use time::macros::date;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields, try_from = "CliquetOptionUnchecked")]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct CliquetOption {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -125,130 +125,7 @@ pub struct CliquetOption {
     pub payoff_type: CliquetPayoffType,
 }
 
-/// Mirror of `CliquetOption` used by serde to apply `validate()` after
-/// deserialization. Not part of the public API.
-#[derive(Debug, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-struct CliquetOptionUnchecked {
-    /// Unique instrument identifier
-    id: InstrumentId,
-    /// Underlying asset ticker symbol
-    underlying_ticker: String,
-    /// Reset dates for periodic return locking
-    #[serde(with = "finstack_quant_core::wire::dates")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
-    )]
-    reset_dates: Vec<Date>,
-    /// Explicit terminal expiry date for the structure.
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    expiry: Date,
-    /// Local cap on individual period returns
-    local_cap: f64,
-    /// Local floor on individual period returns (default 0.0)
-    local_floor: f64,
-    /// Global cap on sum of all period returns
-    global_cap: f64,
-    /// Global floor on sum of all period returns (default 0.0)
-    global_floor: f64,
-    /// Notional amount
-    notional: Money,
-    /// Day count convention
-    day_count: finstack_quant_core::dates::DayCount,
-    /// Discount curve ID for present value calculations
-    discount_curve_id: CurveId,
-    /// Spot price identifier
-    spot_id: PriceId,
-    /// Volatility surface ID
-    vol_surface_id: CurveId,
-    /// Explicit path model selection; required to acknowledge model risk.
-    path_model: EquityPathModel,
-    /// Optional dividend-yield scalar ID.
-    ///
-    /// `Some(id)`: lookup MUST succeed (a missing or non-unitless scalar
-    /// returns an error). `None`: no implicit default; treated as zero
-    /// continuous dividend yield. Set explicitly for index underlyings.
-    #[serde(default)]
-    div_yield_id: Option<PriceId>,
-    /// Strike-set underlying level anchoring the first period's return.
-    ///
-    /// `None` (the default) uses the spot at the valuation date, which is only
-    /// correct for a new trade priced on its strike-set date. **Required for
-    /// seasoned trades** (any reset date strictly before `as_of`): pricing
-    /// errors otherwise. Do not duplicate the strike-set date inside
-    /// `reset_dates` when providing this — reset dates are period-end
-    /// observations.
-    #[serde(default)]
-    initial_level: Option<f64>,
-    /// Observed underlying fixings for seasoned trades (date, level pairs).
-    ///
-    /// Every reset date strictly before the valuation date must have a
-    /// matching fixing here; pricing errors otherwise. Locked-in period
-    /// returns are computed deterministically from these fixings (with local
-    /// cap/floor applied) and only the remaining future periods are simulated.
-    #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
-    )]
-    past_fixings: Vec<(Date, f64)>,
-    /// Instrument-owned pricing inputs.
-    #[serde(default)]
-    instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[serde(default)]
-    metric_pricing_overrides: finstack_quant_valuations_core::instruments::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[serde(default)]
-    scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
-    /// Attributes for scenario selection and grouping
-    attributes: Attributes,
-    /// Payoff aggregation type (default: Additive)
-    #[serde(default)]
-    payoff_type: CliquetPayoffType,
-}
-
-impl TryFrom<CliquetOptionUnchecked> for CliquetOption {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(value: CliquetOptionUnchecked) -> std::result::Result<Self, Self::Error> {
-        let opt = Self {
-            id: value.id,
-            underlying_ticker: value.underlying_ticker,
-            reset_dates: value.reset_dates,
-            expiry: value.expiry,
-            local_cap: value.local_cap,
-            local_floor: value.local_floor,
-            global_cap: value.global_cap,
-            global_floor: value.global_floor,
-            notional: value.notional,
-            day_count: value.day_count,
-            discount_curve_id: value.discount_curve_id,
-            spot_id: value.spot_id,
-            vol_surface_id: value.vol_surface_id,
-            path_model: value.path_model,
-            div_yield_id: value.div_yield_id,
-            initial_level: value.initial_level,
-            past_fixings: value.past_fixings,
-            instrument_pricing_overrides: value.instrument_pricing_overrides,
-            metric_pricing_overrides: value.metric_pricing_overrides,
-            scenario_pricing_overrides: value.scenario_pricing_overrides,
-            attributes: value.attributes,
-            payoff_type: value.payoff_type,
-        };
-        opt.validate()?;
-        Ok(opt)
-    }
-}
+finstack_quant_valuations_core::validate_on_deserialize!(CliquetOption);
 
 impl CliquetOption {
     /// Validate structural invariants required by the pricing engine.

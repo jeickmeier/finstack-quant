@@ -1139,6 +1139,16 @@ export default [
     "description": "Optional base currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars."
   },
   {
+    "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/base_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/base_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/base_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/base_calendar_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/base_currency",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/base_currency",
     "description": "Base currency (the currency being priced)",
@@ -1156,7 +1166,6 @@ export default [
   {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/domestic_discount_curve_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/domestic_discount_curve_id",
-    "default": null,
     "description": "Optional quote-currency discount curve for PV-ing the settlement\ncashflow. When absent the settlement amount is reported undiscounted\n(a 1–2 day effect for standard spot lags)."
   },
   {
@@ -1179,7 +1188,6 @@ export default [
   {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -1187,9 +1195,6 @@ export default [
   {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -1207,6 +1212,16 @@ export default [
     "description": "Optional quote currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars."
   },
   {
+    "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/quote_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/quote_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/quote_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/quote_calendar_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/quote_currency",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/quote_currency",
     "description": "Quote currency (the currency used for pricing)",
@@ -1222,7 +1237,6 @@ export default [
   {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
@@ -1231,7 +1245,7 @@ export default [
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/settlement_date",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/settlement_date",
     "default": null,
-    "description": "Optional explicit settlement (value) date"
+    "description": "Optional explicit settlement (value) date. When set it is only\nbusiness-day adjusted and `settlement_days` is ignored."
   },
   {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/settlement_date/anyOf/0",
@@ -1246,7 +1260,7 @@ export default [
   {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/settlement_days",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/settlement_days",
-    "description": "Optional T+N settlement lag in business days when `settlement_date` is not provided.\n\n`None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.",
+    "description": "Optional contractual T+N settlement lag in business days when\n`settlement_date` is not provided.\n\n`None` uses the pair-aware default from\n[`finstack_quant_core::dates::fx::fx_standard_settlement_days`]: T+1 for\nUSD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB, T+2 otherwise. An explicit value\noverrides that default.",
     "format": "uint32",
     "minimum": 0
   },

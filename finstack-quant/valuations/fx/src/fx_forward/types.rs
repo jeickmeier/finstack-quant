@@ -66,7 +66,7 @@ use time::macros::date;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields, try_from = "FxForwardUnchecked")]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct FxForward {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -129,81 +129,7 @@ pub struct FxForward {
     pub attributes: Attributes,
 }
 
-#[derive(Debug, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-struct FxForwardUnchecked {
-    /// Unique instrument identifier.
-    id: InstrumentId,
-    /// Base currency (foreign currency, numerator of the pair).
-    base_currency: Currency,
-    /// Quote currency (domestic currency, denominator of the pair, PV currency).
-    quote_currency: Currency,
-    /// Maturity/settlement date.
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    maturity: Date,
-    /// Notional amount in base currency.
-    notional: Money,
-    /// Contract forward rate (quote per base). If None, valued at-market.
-    #[serde(default)]
-    contract_rate: Option<f64>,
-    /// Domestic (quote currency) discount curve ID.
-    domestic_discount_curve_id: CurveId,
-    /// Foreign (base currency) discount curve ID.
-    foreign_discount_curve_id: CurveId,
-    /// Optional spot rate override (quote per base). If None, source from FxMatrix.
-    #[serde(default)]
-    quoted_spot: Option<f64>,
-    /// Optional base currency calendar for business day adjustment.
-    #[serde(default)]
-    base_calendar_id: Option<String>,
-    /// Optional quote currency calendar for business day adjustment.
-    #[serde(default)]
-    quote_calendar_id: Option<String>,
-    /// Instrument-owned pricing inputs.
-    #[serde(default)]
-    instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[serde(default)]
-    metric_pricing_overrides: finstack_quant_valuations_core::instruments::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[serde(default)]
-    scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
-    /// Attributes for scenario selection and tagging.
-    attributes: Attributes,
-}
-
-impl TryFrom<FxForwardUnchecked> for FxForward {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(value: FxForwardUnchecked) -> std::result::Result<Self, Self::Error> {
-        let forward = Self {
-            id: value.id,
-            base_currency: value.base_currency,
-            quote_currency: value.quote_currency,
-            maturity: value.maturity,
-            notional: value.notional,
-            contract_rate: value.contract_rate,
-            domestic_discount_curve_id: value.domestic_discount_curve_id,
-            foreign_discount_curve_id: value.foreign_discount_curve_id,
-            quoted_spot: value.quoted_spot,
-            base_calendar_id: value.base_calendar_id.map(Into::into),
-            quote_calendar_id: value.quote_calendar_id.map(Into::into),
-            instrument_pricing_overrides: value.instrument_pricing_overrides,
-            metric_pricing_overrides: value.metric_pricing_overrides,
-            scenario_pricing_overrides: value.scenario_pricing_overrides,
-            attributes: value.attributes,
-        };
-        forward.validate()?;
-        Ok(forward)
-    }
-}
+finstack_quant_valuations_core::validate_on_deserialize!(FxForward);
 
 impl FxForward {
     /// Validate the FX forward parameters.

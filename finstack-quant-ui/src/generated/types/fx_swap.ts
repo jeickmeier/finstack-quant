@@ -2,7 +2,11 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
- * Base currency (foreign).
+ * Opaque string identifier.
+ */
+export type Id = string;
+/**
+ * Base currency (foreign)
  */
 export type Currency =
   | "AED"
@@ -165,21 +169,21 @@ export type Currency =
   | "ZMW"
   | "ZWL";
 /**
- * Domestic discount curve id (quote currency).
- */
-export type Id = string;
-/**
- * Far leg settlement date (forward leg).
- */
-export type Date = string;
-/**
- * Foreign discount curve id (base currency).
+ * Opaque string identifier.
  */
 export type Id1 = string;
 /**
- * Unique instrument identifier.
+ * Far leg settlement date (forward leg)
+ */
+export type Date = string;
+/**
+ * Opaque string identifier.
  */
 export type Id2 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id3 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -448,11 +452,11 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
- * Near leg settlement date (spot leg).
+ * Near leg settlement date (spot leg)
  */
 export type Date1 = string;
 /**
- * Quote currency (domestic).
+ * Quote currency (domestic)
  */
 export type Currency1 =
   | "AED"
@@ -638,17 +642,17 @@ export interface D_17Ebaf6Bae7Cbde5673D {
   /**
    * Optional base currency calendar for spot/settlement adjustment metadata.
    */
-  base_calendar_id?: string | null;
+  base_calendar_id?: Id | null;
   base_currency: Currency;
-  domestic_discount_curve_id: Id;
+  domestic_discount_curve_id: Id1;
   far_date: Date;
   /**
    * Optional far leg FX rate (quote per base). If absent, use the market
    * outright forward from the valuation date to far settlement.
    */
   far_rate?: number | null;
-  foreign_discount_curve_id: Id1;
-  id: Id2;
+  foreign_discount_curve_id: Id2;
+  id: Id3;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
   near_date: Date1;
@@ -661,12 +665,12 @@ export interface D_17Ebaf6Bae7Cbde5673D {
   /**
    * Optional quote currency calendar for spot/settlement adjustment metadata.
    */
-  quote_calendar_id?: string | null;
+  quote_calendar_id?: Id | null;
   quote_currency: Currency1;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
 }
 /**
- * Attributes for scenario selection and tagging.
+ * Attributes for scenario selection and tagging
  */
 export interface Attributes {
   /**
@@ -1609,7 +1613,7 @@ export interface DE49387F97C0F9D510642 {
   reporting_currency?: DB556Bbeb1Ecf96C44C5A | null;
 }
 /**
- * Notional amount in base currency (exchanged on near, reversed on far).
+ * Notional amount in base currency (exchanged on near, reversed on far)
  */
 export interface Money {
   /**

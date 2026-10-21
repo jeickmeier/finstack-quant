@@ -2,6 +2,10 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
+ * Opaque string identifier.
+ */
+export type Id = string;
+/**
  * Base currency (restricted/non-deliverable currency, numerator).
  */
 export type Currency =
@@ -165,9 +169,9 @@ export type Currency =
   | "ZMW"
   | "ZWL";
 /**
- * Settlement currency discount curve ID.
+ * Opaque string identifier.
  */
-export type Id = string;
+export type Id1 = string;
 /**
  * Fixing date (rate observation date, typically T-2 before maturity).
  */
@@ -221,10 +225,6 @@ export type Date = string;
  */
 export type D_1F0Bf95E27D8096E424E =
   "pboc" | "cnhfix" | "rbi" | "kftc" | "ptax" | "taifx" | "php_bval" | "jisdor" | "bnm" | "other";
-/**
- * Opaque string identifier.
- */
-export type Id1 = string;
 /**
  * Opaque string identifier.
  */
@@ -747,23 +747,32 @@ export interface D_6737E7813812De86Cf9B {
   /**
    * Optional base currency calendar.
    */
-  base_calendar_id?: string | null;
+  base_calendar_id?: Id | null;
   base_currency: Currency;
   /**
-   * Contract forward rate. Interpretation depends on `quote_convention`.
-   * `None` values the NDF at-market.
+   * Contract forward rate. Interpretation depends on `quote_convention`:
+   * - BasePerSettlement: base per settlement (e.g., 7.25 CNY per USD)
+   * - SettlementPerBase: settlement per base (e.g., 0.138 USD per CNY)
+   *
+   * `None` values the NDF at-market: the contract rate equals the market
+   * forward, so the settlement amount and PV are zero.
    */
   contract_rate?: number | null;
-  domestic_discount_curve_id: Id;
+  domestic_discount_curve_id: Id1;
   fixing_date: Date;
   /**
    * Official fixing source/benchmark enum for type-safe specification.
+   *
+   * Use this field for validated fixing sources.
+   * See [`NdfFixingSource`] for supported benchmarks and their typical currencies.
    */
   fixing_source?: D_1F0Bf95E27D8096E424E | null;
   /**
    * Optional foreign (base) currency discount curve ID.
+   * Required for pre-fixing forward estimation unless `quoted_forward`
+   * is supplied.
    */
-  foreign_discount_curve_id?: Id1 | null;
+  foreign_discount_curve_id?: Id | null;
   id: Id2;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   maturity: Date1;
@@ -771,6 +780,7 @@ export interface D_6737E7813812De86Cf9B {
   notional: Money;
   /**
    * Observed fixing rate. Interpretation depends on `quote_convention`.
+   * If Some, NDF is post-fixing.
    */
   observed_fixing?: number | null;
   /**
@@ -779,21 +789,25 @@ export interface D_6737E7813812De86Cf9B {
   quote_convention: "base_per_settlement" | "settlement_per_base";
   /**
    * Explicit pre-fixing forward rate in `quote_convention` units.
+   *
+   * Use this for NDF market quotes or basis-adjusted forwards when a base
+   * currency discount curve is unavailable.
    */
   quoted_forward?: number | null;
   /**
    * Optional spot rate override for forward rate calculation.
+   * Interpretation depends on `quote_convention`.
    */
   quoted_spot?: number | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
    * Optional settlement currency calendar.
    */
-  settlement_calendar_id?: string | null;
+  settlement_calendar_id?: Id | null;
   settlement_currency: Currency1;
 }
 /**
- * Attributes for scenario selection and tagging.
+ * Attributes for scenario selection and tagging
  */
 export interface Attributes {
   /**
