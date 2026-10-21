@@ -1,10 +1,10 @@
-//! Return computation utilities: simple returns, excess returns, price conversion,
-//! compounded returns. Delegates to `math::stats::log_returns` for log variants
-//! and `math::summation` for numerically stable accumulation.
+//! Return computation utilities: simple returns from prices, excess returns,
+//! and compounded returns, accumulated with `math::summation` for numerical
+//! stability.
 //!
 //! Crate-internal: callers use these through [`crate::Performance`].
 
-use crate::math::summation::NeumaierAccumulator;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 
 /// Pairwise simple (percentage-change) returns from a price series.
 ///

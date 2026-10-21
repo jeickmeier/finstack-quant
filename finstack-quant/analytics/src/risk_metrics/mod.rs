@@ -11,14 +11,14 @@ mod tail_risk;
 
 pub(crate) use return_based::{
     cagr, downside_deviation, gain_to_pain, geometric_mean, invalid_annualization_factor,
-    mean_return, mean_vol_annualized, modified_sharpe, omega_ratio, volatility_with_annualize,
+    mean_return, mean_vol_annualized, modified_sharpe, omega_ratio,
 };
 pub use return_based::{max_drawdown, sharpe, sortino, volatility, CagrDayCount};
 pub(crate) use rolling::{rolling_returns, rolling_sharpe, rolling_sortino, rolling_volatility};
 pub use rolling::{DatedSeries, RollingMetric};
 pub(crate) use tail_risk::{
-    cornish_fisher_var, expected_shortfall, kurtosis, parametric_var, skew_kurt, skewness,
-    tail_ratio, value_at_risk, value_at_risk_and_es,
+    cornish_fisher_var, expected_shortfall, kurtosis, parametric_var, skewness, tail_ratio,
+    value_at_risk, value_at_risk_and_es,
 };
 
 /// `numerator / denominator` with signed infinity when `denominator == 0.0`
@@ -57,5 +57,20 @@ pub(crate) fn annualized_ratio_or_sign_infinity(
         ratio_or_sign_infinity(period_excess, 0.0)
     } else {
         (period_excess * ann_factor) / (period_risk * ann_factor.sqrt())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ratio_or_sign_infinity_divides_and_signs_zero_denominators() {
+        assert!((ratio_or_sign_infinity(0.15, 0.30) - 0.5).abs() < 1e-12);
+        assert!((ratio_or_sign_infinity(-0.10, 0.30) - (-1.0 / 3.0)).abs() < 1e-12);
+        assert_eq!(ratio_or_sign_infinity(0.15, 0.0), f64::INFINITY);
+        assert_eq!(ratio_or_sign_infinity(-0.05, 0.0), f64::NEG_INFINITY);
+        assert_eq!(ratio_or_sign_infinity(0.0, 0.0), 0.0);
+        assert!(ratio_or_sign_infinity(f64::NAN, 1.0).is_nan());
     }
 }
