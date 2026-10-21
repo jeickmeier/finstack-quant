@@ -15,7 +15,7 @@
 //!   defined on an LTM basis (as most leverage/coverage covenants are), the
 //!   supplied metric node must already encode it — e.g. a statements node
 //!   defined via `ttm(ebitda)` — before being exposed through
-//!   [`crate::metric::CovenantMetricSource`].
+//!   [`crate::CovenantMetricSource`].
 
 mod covenant_engine;
 mod helpers;
