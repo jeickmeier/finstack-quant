@@ -420,7 +420,7 @@ pub fn instrument_cashflows(
     let market = parse_market_json(market_json)?;
     to_js_value(
         &finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
-            &instrument,
+            instrument.as_instrument(),
             &market,
             as_of,
             model,
@@ -637,7 +637,7 @@ pub fn instrument_cashflows_with_market(
     let instrument = parse_pricing_instrument_json(instrument_json, None)?;
     to_js_value(
         &finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
-            &instrument,
+            instrument.as_instrument(),
             market.inner(),
             as_of,
             model,
@@ -1229,7 +1229,7 @@ pub(super) mod tests {
                 .expect("credit instrument");
         assert!(
             finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
-                &credit_instrument,
+                credit_instrument.as_instrument(),
                 &revolving_credit_market(true),
                 "2024-01-01",
                 "discounting",
@@ -1271,7 +1271,7 @@ pub(super) mod tests {
 
         let cashflows =
             finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
-                &instrument,
+                instrument.as_instrument(),
                 &market,
                 "2024-01-01",
                 "discounting",

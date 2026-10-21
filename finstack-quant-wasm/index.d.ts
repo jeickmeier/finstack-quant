@@ -23365,7 +23365,6 @@ export interface ValuationsSchemaNamespace {
   /**
    * Canonical instrument type discriminators, in registry order.
    * @returns Every `type` tag accepted by the instrument envelope, e.g. `"bond"`, `"interest_rate_swap"`.
-   * @throws Error - Throws if the instrument registry cannot be read (does not occur for a released build).
    */
   instrumentTypes(): string[];
   /**

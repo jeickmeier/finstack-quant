@@ -526,7 +526,7 @@ fn test_structured_credit_full_feature_json_roundtrip() {
 fn test_structured_credit_instrument_envelope_roundtrip() {
     let instrument = build_full_feature_structured_credit();
     let envelope = InstrumentEnvelope {
-        schema: finstack_quant_valuations::instruments::json_loader::InstrumentSchema::CURRENT,
+        schema: finstack_quant_valuations::instruments::envelope::InstrumentSchema::CURRENT,
         instrument: InstrumentJson::StructuredCredit(Box::new(instrument.clone())),
     };
 
@@ -657,7 +657,7 @@ fn waterfall_rules_round_trip_and_price_through_json() {
 /// Serialize the canonical Rust provider as mutable JSON.
 fn full_example_value() -> serde_json::Value {
     serde_json::to_value(InstrumentEnvelope {
-        schema: finstack_quant_valuations::instruments::json_loader::InstrumentSchema::CURRENT,
+        schema: finstack_quant_valuations::instruments::envelope::InstrumentSchema::CURRENT,
         instrument: InstrumentJson::StructuredCredit(Box::new(
             build_full_feature_structured_credit(),
         )),
@@ -756,7 +756,7 @@ fn retired_behavior_and_credit_factor_channels_are_rejected() {
 fn retired_trustee_fee_annual_key_is_rejected() {
     let deal = build_full_feature_structured_credit().with_standard_fees();
     let mut v = serde_json::to_value(InstrumentEnvelope {
-        schema: finstack_quant_valuations::instruments::json_loader::InstrumentSchema::CURRENT,
+        schema: finstack_quant_valuations::instruments::envelope::InstrumentSchema::CURRENT,
         instrument: InstrumentJson::StructuredCredit(Box::new(deal)),
     })
     .expect("provider must serialize");

@@ -23,9 +23,22 @@ use finstack_quant_valuations::pricer::ModelKey;
 use std::sync::Arc;
 use time::Month;
 
+/// Parse a canonical instrument envelope and export its cashflows as JSON.
+fn instrument_cashflows_json(
+    instrument_json: &str,
+    market: &MarketContext,
+    as_of: &str,
+    model: &str,
+) -> finstack_quant_core::Result<String> {
+    let instrument =
+        finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(instrument_json, None)?;
+    let envelope = instrument_cashflows(instrument.as_instrument(), market, as_of, model)?;
+    Ok(serde_json::to_string(&envelope).expect("serialize cashflow envelope"))
+}
+
 fn serialize_bond(bond: &Bond) -> String {
     let envelope = InstrumentEnvelope {
-        schema: finstack_quant_valuations::instruments::json_loader::InstrumentSchema::CURRENT,
+        schema: finstack_quant_valuations::instruments::envelope::InstrumentSchema::CURRENT,
         instrument: InstrumentJson::Bond(bond.clone()),
     };
     serde_json::to_string(&envelope).expect("serialize bond envelope")
@@ -143,7 +156,7 @@ fn mixed_currency_fx_swap_rows_use_native_curves_and_reporting_currency_pv() {
         )
         .insert_fx(FxMatrix::new(provider));
     let instrument = InstrumentEnvelope {
-        schema: finstack_quant_valuations::instruments::json_loader::InstrumentSchema::CURRENT,
+        schema: finstack_quant_valuations::instruments::envelope::InstrumentSchema::CURRENT,
         instrument: InstrumentJson::FxSwap(swap),
     };
     let json = serde_json::to_string(&instrument).expect("serialize fx swap");

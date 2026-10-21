@@ -15,7 +15,7 @@ use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_rates::irs::InterestRateSwap;
-use finstack_quant_valuations_test_support::test_helpers::tolerances;
+use finstack_quant_valuations_test_support::tolerances;
 use time::Month;
 
 fn create_test_swap() -> InterestRateSwap {

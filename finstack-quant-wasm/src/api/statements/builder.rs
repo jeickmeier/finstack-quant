@@ -661,7 +661,7 @@ impl JsModelBuilder {
     #[wasm_bindgen(js_name = addDebt)]
     pub fn add_debt(&mut self, id: JsValue, instrument: JsValue) -> Result<(), JsValue> {
         let id = js_string(&id, "id")?;
-        let spec = finstack_quant_valuations::pricer::json::parse_instrument_from_json(&json_text(
+        let spec = finstack_quant_valuations::pricer::parse_instrument_from_json(&json_text(
             &instrument,
             "instrument",
         )?)

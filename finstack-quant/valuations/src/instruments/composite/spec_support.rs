@@ -604,21 +604,15 @@ pub(super) fn unit_pnl_series(
     for index in 1..history.len() {
         let start = history[index - 1].date;
         let end = history[index].date;
-        let cashflows = instrument.dated_cashflows(&markets[index], start)?;
-        let cashflow_total = cashflows
-            .into_iter()
-            .filter(|(date, _)| *date > start && *date <= end)
-            .map(|(date, amount)| {
-                convert_amount(
-                    &markets[index],
-                    amount.amount(),
-                    amount.currency(),
-                    reporting_currency,
-                    date,
-                )
-            })
-            .collect::<Result<Vec<_>>>()?;
-        pnl.push(values[index] - values[index - 1] + neumaier_sum(cashflow_total));
+        let cashflow_total = cashflows_between(
+            instrument.as_ref(),
+            1.0,
+            reporting_currency,
+            &markets[index],
+            start,
+            end,
+        )?;
+        pnl.push(values[index] - values[index - 1] + cashflow_total);
     }
     Ok(pnl)
 }

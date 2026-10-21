@@ -124,7 +124,6 @@ pub fn run_schema_generator(
     let mut ids = BTreeSet::new();
     for artifact in artifacts {
         let relative_path = Path::new(artifact.relative_path);
-        validate_artifact_path(relative_path, owned_root)?;
         if !ids.insert(artifact.id) {
             return Err(Error::Validation(format!(
                 "duplicate schema id in registry: {}",
@@ -143,7 +142,54 @@ pub fn run_schema_generator(
         }
     }
 
-    if command.mode == SchemaGenerationMode::List {
+    sync_generated_files(
+        base,
+        owned_root,
+        &expected,
+        ".schema.json",
+        "schema",
+        command.mode,
+    )
+}
+
+/// Synchronize one owned directory of generated files with their expected bytes.
+///
+/// The shared check/write/list loop behind every schema generator and the
+/// valuations instrument-fixture generator. List mode prints the expected
+/// paths. Check mode is non-mutating and reports missing, changed, and extra
+/// files. Write mode rewrites only changed files, removes extras below
+/// `owned_root`, and prunes the directories that become empty.
+///
+/// # Arguments
+///
+/// * `base` - Directory every path is relative to: the crate manifest
+///   directory or the command's output root.
+/// * `owned_root` - `base`-relative directory exclusively owned by this
+///   generator; files in it that are not expected are extras.
+/// * `expected` - Complete `base`-relative file set with its rendered bytes;
+///   every path must lie below `owned_root` and end with `suffix`.
+/// * `suffix` - File-name suffix of the generated files (`".schema.json"`,
+///   `".json"`); only files with it count as owned.
+/// * `label` - Noun used in messages, such as `"schema"` or `"fixture"`.
+/// * `mode` - Operation to perform.
+///
+/// # Errors
+///
+/// Returns an error for an invalid path, a filesystem failure, or check-mode
+/// drift.
+pub fn sync_generated_files(
+    base: &Path,
+    owned_root: &Path,
+    expected: &BTreeMap<PathBuf, Vec<u8>>,
+    suffix: &str,
+    label: &str,
+    mode: SchemaGenerationMode,
+) -> Result<()> {
+    validate_relative_path(owned_root, &format!("owned {label} root"))?;
+    for relative_path in expected.keys() {
+        validate_generated_path(relative_path, owned_root, suffix, label)?;
+    }
+    if mode == SchemaGenerationMode::List {
         for path in expected.keys() {
             println!("{}", path.display());
         }
@@ -151,17 +197,17 @@ pub fn run_schema_generator(
     }
 
     let owned_directory = base.join(owned_root);
-    let actual = schema_files(&owned_directory, base)?;
+    let actual = generated_files(&owned_directory, base, suffix)?;
     let expected_paths = expected.keys().cloned().collect::<BTreeSet<_>>();
     let extra = actual
         .difference(&expected_paths)
         .cloned()
         .collect::<Vec<_>>();
 
-    match command.mode {
+    match mode {
         SchemaGenerationMode::Check => {
             let mut drift = Vec::new();
-            for (relative_path, rendered) in &expected {
+            for (relative_path, rendered) in expected {
                 let path = base.join(relative_path);
                 match std::fs::read(&path) {
                     Ok(actual) if actual == *rendered => {}
@@ -171,7 +217,7 @@ pub fn run_schema_generator(
                     }
                     Err(error) => {
                         return Err(Error::Internal(format!(
-                            "read schema {}: {error}",
+                            "read {label} {}: {error}",
                             path.display()
                         )))
                     }
@@ -182,7 +228,7 @@ pub fn run_schema_generator(
                 Ok(())
             } else {
                 Err(Error::Validation(format!(
-                    "schema artifacts are not current:\n{}",
+                    "{label} artifacts are not current:\n{}",
                     drift.join("\n")
                 )))
             }
@@ -196,20 +242,20 @@ pub fn run_schema_generator(
                 if let Some(parent) = path.parent() {
                     std::fs::create_dir_all(parent).map_err(|error| {
                         Error::Internal(format!(
-                            "create schema directory {}: {error}",
+                            "create {label} directory {}: {error}",
                             parent.display()
                         ))
                     })?;
                 }
                 std::fs::write(&path, rendered).map_err(|error| {
-                    Error::Internal(format!("write schema {}: {error}", path.display()))
+                    Error::Internal(format!("write {label} {}: {error}", path.display()))
                 })?;
                 println!("updated {}", path.display());
             }
             for relative_path in extra {
                 let path = base.join(&relative_path);
                 std::fs::remove_file(&path).map_err(|error| {
-                    Error::Internal(format!("remove stale schema {}: {error}", path.display()))
+                    Error::Internal(format!("remove stale {label} {}: {error}", path.display()))
                 })?;
                 println!("removed stale {}", path.display());
             }
@@ -434,17 +480,21 @@ pub(super) fn validate_owned_root(owned_root: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn validate_artifact_path(path: &Path, owned_root: &Path) -> Result<()> {
-    validate_relative_path(path, "schema artifact path")?;
+fn validate_generated_path(
+    path: &Path,
+    owned_root: &Path,
+    suffix: &str,
+    label: &str,
+) -> Result<()> {
+    validate_relative_path(path, &format!("{label} artifact path"))?;
     if !path.starts_with(owned_root)
-        || path.extension().and_then(|extension| extension.to_str()) != Some("json")
         || !path
             .file_name()
             .and_then(|name| name.to_str())
-            .is_some_and(|name| name.ends_with(".schema.json"))
+            .is_some_and(|name| name.ends_with(suffix))
     {
         return Err(Error::Validation(format!(
-            "schema artifact must be a .schema.json file below {}: {}",
+            "{label} artifact must be a {suffix} file below {}: {}",
             owned_root.display(),
             path.display()
         )));
@@ -452,18 +502,19 @@ pub(super) fn validate_artifact_path(path: &Path, owned_root: &Path) -> Result<(
     Ok(())
 }
 
-pub(super) fn schema_files(directory: &Path, base: &Path) -> Result<BTreeSet<PathBuf>> {
+fn generated_files(directory: &Path, base: &Path, suffix: &str) -> Result<BTreeSet<PathBuf>> {
     let mut files = BTreeSet::new();
     if !directory.exists() {
         return Ok(files);
     }
-    collect_schema_files(directory, base, &mut files)?;
+    collect_generated_files(directory, base, suffix, &mut files)?;
     Ok(files)
 }
 
-pub(super) fn collect_schema_files(
+fn collect_generated_files(
     directory: &Path,
     base: &Path,
+    suffix: &str,
     files: &mut BTreeSet<PathBuf>,
 ) -> Result<()> {
     let entries = std::fs::read_dir(directory).map_err(|error| {
@@ -481,11 +532,11 @@ pub(super) fn collect_schema_files(
         })?;
         let path = entry.path();
         if path.is_dir() {
-            collect_schema_files(&path, base, files)?;
+            collect_generated_files(&path, base, suffix, files)?;
         } else if path
             .file_name()
             .and_then(|name| name.to_str())
-            .is_some_and(|name| name.ends_with(".schema.json"))
+            .is_some_and(|name| name.ends_with(suffix))
         {
             let relative = path.strip_prefix(base).map_err(|error| {
                 Error::Internal(format!("resolve schema path {}: {error}", path.display()))
@@ -496,7 +547,7 @@ pub(super) fn collect_schema_files(
     Ok(())
 }
 
-pub(super) fn remove_empty_directories(directory: &Path, owned_root: &Path) -> Result<bool> {
+fn remove_empty_directories(directory: &Path, owned_root: &Path) -> Result<bool> {
     if !directory.exists() {
         return Ok(true);
     }

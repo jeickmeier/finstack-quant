@@ -1,8 +1,9 @@
 //! Schema tests: verify every instrument example() serializes to valid JSON
 //! and roundtrips through InstrumentEnvelope serde.
 
+use finstack_quant_valuations::instruments::envelope::InstrumentSchema;
 use finstack_quant_valuations::instruments::json_loader::{
-    instrument_registry, InstrumentEnvelope, InstrumentJson, InstrumentSchema,
+    instrument_registry, InstrumentEnvelope, InstrumentJson,
 };
 use finstack_quant_valuations::instruments::{AgencyCmo, CdsOption};
 
@@ -55,7 +56,7 @@ mod schema_roundtrip {
     #[allow(clippy::expect_used)]
     fn cds_option_schema_example_matches_canonical_json() {
         let envelope = InstrumentEnvelope {
-            schema: finstack_quant_valuations::instruments::json_loader::InstrumentSchema::CURRENT,
+            schema: finstack_quant_valuations::instruments::envelope::InstrumentSchema::CURRENT,
             instrument: InstrumentJson::CdsOption(CdsOption::example().expect("cdso")),
         };
         let canonical = serde_json::to_value(envelope).expect("serialize cds option example");
@@ -741,7 +742,7 @@ mod generated_schema_contract {
             .iter()
             .filter_map(|variant| variant_const(variant, "type"))
             .collect::<BTreeSet<_>>();
-        let expected = finstack_quant_valuations::instruments::json_loader::registry_tags()
+        let expected = finstack_quant_valuations::schema::instrument_types()
             .iter()
             .copied()
             .collect::<BTreeSet<_>>();

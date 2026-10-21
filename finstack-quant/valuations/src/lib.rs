@@ -102,11 +102,9 @@ pub use finstack_quant_valuations_core::{
 
 #[doc(hidden)]
 pub use finstack_quant_valuations_core::{__private, contract_specs, serde_defaults};
-pub use finstack_quant_valuations_core::{constants, error, market, recalibration};
+pub use finstack_quant_valuations_core::{constants, error, market, recalibration, results};
 /// Pricing dispatch and registry infrastructure.
 pub mod pricer;
-/// Valuation result envelopes and metadata.
-pub mod results;
 /// JSON Schema generation for API contracts.
 pub mod schema;
 

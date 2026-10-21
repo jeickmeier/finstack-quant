@@ -91,12 +91,23 @@
 //!   `docs/REFERENCES.md#tuckman-serrat-fixed-income`
 
 mod history;
-mod types;
+mod instrument;
+mod reporting;
+mod spec;
+mod spec_support;
+#[cfg(test)]
+mod tests;
 
+pub use crate::results::composite::{
+    CompositeExposureReport, CompositeLegValuation, CompositeValuationDetails, PrimitiveAggregate,
+    PrimitiveExposure, ResolvedCompositeLeg,
+};
 pub use history::{history, history_from_spec, CompositeHistoryRow};
-pub use types::{
-    CompositeExposureReport, CompositeInstrument, CompositeLegSpec, CompositeLegValuation,
-    CompositeMarketObservation, CompositeRebalanceResult, CompositeSpec, CompositeState,
-    CompositeTrade, CompositeValuationDetails, PrimitiveAggregate, PrimitiveExposure,
-    RebalanceRule, ResolvedCompositeLeg, WeightingMethod, MAX_COMPOSITE_DEPTH, MAX_COMPOSITE_LEGS,
+pub use instrument::CompositeInstrument;
+pub use reporting::{CompositeRebalanceResult, CompositeTrade};
+pub use spec::CompositeSpec;
+pub(crate) use spec_support::{cashflows_between, validate_history};
+pub use spec_support::{
+    CompositeLegSpec, CompositeMarketObservation, CompositeState, RebalanceRule, WeightingMethod,
+    MAX_COMPOSITE_DEPTH, MAX_COMPOSITE_LEGS,
 };

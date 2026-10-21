@@ -526,58 +526,6 @@ impl RealEstateAsset {
             .attributes(Attributes::default())
             .build()
     }
-
-    pub(crate) fn acquisition_cost_total(&self) -> finstack_quant_core::Result<f64> {
-        pricer::acquisition_cost_total(self)
-    }
-
-    /// Compute net sale proceeds (undiscounted) realized at `horizon`, if configured.
-    ///
-    /// Precedence:
-    /// - If `sale_price` is set: use it as the gross proceeds.
-    /// - Else if `terminal_cap_rate` is set: use exit-cap convention `TV = NOI_{N+1} / cap_rate_exit`
-    ///   with NOI taken as the last schedule entry on/before `horizon`.
-    ///
-    /// Then apply:
-    /// - `disposition_cost_decimal` (pct of gross proceeds), and
-    /// - `disposition_costs` (dollar line items).
-    pub(crate) fn sale_proceeds_at(
-        &self,
-        as_of: Date,
-        horizon: Date,
-    ) -> finstack_quant_core::Result<Option<(Date, f64)>> {
-        pricer::sale_proceeds_at(self, as_of, horizon)
-    }
-
-    /// First future NOI amount on/after `as_of`.
-    pub(crate) fn first_noi(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
-        pricer::first_noi(self, as_of)
-    }
-
-    /// Unlevered net cash flows (NOI - CapEx) on/after `as_of`, truncated at
-    /// the valuation horizon (`sale_date` when set, else the last NOI date).
-    pub(crate) fn unlevered_flows(
-        &self,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<Vec<(Date, f64)>> {
-        pricer::unlevered_flows(self, as_of)
-    }
-
-    /// NOI cash flows on/after `as_of`.
-    pub(crate) fn noi_flows(&self, as_of: Date) -> finstack_quant_core::Result<Vec<(Date, f64)>> {
-        pricer::future_noi_flows(self, as_of)
-    }
-
-    /// Compute net sale proceeds at the terminal date (undiscounted), if configured.
-    ///
-    /// Uses the exit-cap convention `TV = NOI_{N+1} / cap_rate_exit`, optionally applying
-    /// `disposition_cost_decimal`.
-    pub(crate) fn terminal_sale_proceeds(
-        &self,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<Option<(Date, f64)>> {
-        pricer::terminal_sale_proceeds(self, as_of)
-    }
 }
 
 impl Instrument for RealEstateAsset {
@@ -611,13 +559,12 @@ impl finstack_quant_cashflows::CashflowScheduleSource for RealEstateAsset {
         _curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        let mut flows: Vec<(Date, Money)> = self
-            .unlevered_flows(as_of)?
+        let mut flows: Vec<(Date, Money)> = pricer::unlevered_flows(self, as_of)?
             .into_iter()
             .map(|(date, amount)| Money::new(amount, self.currency).map(|money| (date, money)))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
-        if let Some((date, amount)) = self.terminal_sale_proceeds(as_of)? {
+        if let Some((date, amount)) = pricer::terminal_sale_proceeds(self, as_of)? {
             flows.push((date, Money::new(amount, self.currency)?));
         }
         Ok(finstack_quant_cashflows::schedule_from_dated_flows(

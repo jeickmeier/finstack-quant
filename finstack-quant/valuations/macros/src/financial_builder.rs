@@ -161,10 +161,8 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
                 defaults.insert(ident.clone(), expr);
             }
 
-            let is_option_ty = matches!(ty, syn::Type::Path(ref tp) if tp.path.segments.last().map(|s| s.ident == "Option").unwrap_or(false));
-
             // Optional if Option<T> or the field is `attributes`
-            if is_option_ty || ident == format_ident!("attributes") {
+            if option_inner(&ty).is_some() || ident == "attributes" {
                 optional_fields.push((ident, ty));
             } else {
                 required_fields.push((ident, ty));
@@ -183,97 +181,43 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
         .iter()
         .map(|(id, ty)| quote! { #id: ::core::option::Option<#ty> });
     let builder_opt_fields = optional_fields.iter().map(|(id, ty)| {
-        if let syn::Type::Path(ref tp) = ty {
-            if tp
-                .path
-                .segments
-                .last()
-                .map(|s| s.ident == "Option")
-                .unwrap_or(false)
-            {
-                // Keep Option<T> as is
-                quote! { #id: #ty }
-            } else {
-                quote! { #id: ::core::option::Option<#ty> }
-            }
+        if option_inner(ty).is_some() {
+            // Keep Option<T> as is
+            quote! { #id: #ty }
         } else {
             quote! { #id: ::core::option::Option<#ty> }
         }
     });
 
     // Setter methods
-    let setter_req = required_fields.iter().map(|(id, ty)| {
-        let summary = format!("Sets the `{id}` field.");
-        let argument = field_docs
-            .get(id)
-            .cloned()
-            .unwrap_or_else(|| format!("Replacement value for `{id}`."));
-        let doc_text = format!("{summary}\n\n# Arguments\n\n* `value` - {argument}");
-        quote! {
-            #[doc = #doc_text]
-            #[must_use]
-            pub fn #id(mut self, value: #ty) -> Self { self.#id = ::core::option::Option::Some(value); self }
-        }
-    });
-
-    let setter_opt = optional_fields.iter().map(|(id, ty)| {
+    let setter = |id: &syn::Ident, ty: &syn::Type| {
         let argument = field_docs
             .get(id)
             .cloned()
             .unwrap_or_else(|| format!("Replacement value for `{id}`."));
         let doc_text = format!("Sets the `{id}` field.\n\n# Arguments\n\n* `value` - {argument}");
-        let doc_text_opt = format!(
-            "Sets the `{id}` field from an optional value.\n\n# Arguments\n\n* `value` - Optional field value. Pass `None` to leave `{id}` unset."
-        );
-        if let syn::Type::Path(ref tp) = ty {
-            if let Some(seg) = tp.path.segments.last() {
-                if seg.ident == "Option" {
-                    // Extract inner type Option<Inner>
-                    let inner_ty: Option<syn::Type> = match &seg.arguments {
-                        syn::PathArguments::AngleBracketed(ab) => ab.args.iter().find_map(|ga| {
-                            if let syn::GenericArgument::Type(t) = ga { Some(t.clone()) } else { None }
-                        }),
-                        _ => None,
-                    };
-                    if let Some(inner) = inner_ty {
-                        let set_opt = format_ident!("{}_opt", id);
-                        quote! {
-                            #[doc = #doc_text]
-                            #[must_use]
-                            pub fn #id(mut self, value: #inner) -> Self { self.#id = ::core::option::Option::Some(value); self }
-                            #[doc = #doc_text_opt]
-                            #[must_use]
-                            pub fn #set_opt(mut self, value: #ty) -> Self { self.#id = value; self }
-                        }
-                    } else {
-                        quote! {
-                            #[doc = #doc_text]
-                            #[must_use]
-                            pub fn #id(mut self, value: #ty) -> Self { self.#id = value; self }
-                        }
-                    }
-                } else {
-                    quote! {
-                        #[doc = #doc_text]
-                        #[must_use]
-                        pub fn #id(mut self, value: #ty) -> Self { self.#id = ::core::option::Option::Some(value); self }
-                    }
-                }
-            } else {
-                quote! {
-                    #[doc = #doc_text]
-                    #[must_use]
-                    pub fn #id(mut self, value: #ty) -> Self { self.#id = ::core::option::Option::Some(value); self }
-                }
-            }
-        } else {
-            quote! {
+        let Some(inner) = option_inner(ty) else {
+            return quote! {
                 #[doc = #doc_text]
                 #[must_use]
                 pub fn #id(mut self, value: #ty) -> Self { self.#id = ::core::option::Option::Some(value); self }
-            }
+            };
+        };
+        let doc_text_opt = format!(
+            "Sets the `{id}` field from an optional value.\n\n# Arguments\n\n* `value` - Optional field value. Pass `None` to leave `{id}` unset."
+        );
+        let set_opt = format_ident!("{}_opt", id);
+        quote! {
+            #[doc = #doc_text]
+            #[must_use]
+            pub fn #id(mut self, value: #inner) -> Self { self.#id = ::core::option::Option::Some(value); self }
+            #[doc = #doc_text_opt]
+            #[must_use]
+            pub fn #set_opt(mut self, value: #ty) -> Self { self.#id = value; self }
         }
-    });
+    };
+    let setter_req = required_fields.iter().map(|(id, ty)| setter(id, ty));
+    let setter_opt = optional_fields.iter().map(|(id, ty)| setter(id, ty));
 
     // Build expression: required fields unwrap, optional fields carry through
     // (unwrap_or(None)) and initialize attributes if present. A missing required
@@ -294,22 +238,8 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
     });
 
     let assign_opt = optional_fields.iter().map(|(id, ty)| {
-        if let syn::Type::Path(ref tp) = ty {
-            if tp
-                .path
-                .segments
-                .last()
-                .map(|s| s.ident == "Option")
-                .unwrap_or(false)
-            {
-                quote! { #id: self.#id }
-            } else if id == "attributes" {
-                quote! { attributes: self.attributes.unwrap_or_default() }
-            } else {
-                quote! { #id: self.#id.unwrap_or_default() }
-            }
-        } else if id == "attributes" {
-            quote! { attributes: self.attributes.unwrap_or_default() }
+        if option_inner(ty).is_some() {
+            quote! { #id: self.#id }
         } else {
             quote! { #id: self.#id.unwrap_or_default() }
         }
@@ -328,7 +258,6 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         #[doc = #builder_doc]
         #[must_use]
-        #[allow(non_camel_case_types)]
         #[derive(Default)]
         pub struct #builder_name {
             #(#builder_req_fields,)*
@@ -357,4 +286,22 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(expanded)
+}
+
+/// The `T` of an `Option<T>` field type; `None` for any other type.
+fn option_inner(ty: &syn::Type) -> Option<&syn::Type> {
+    let syn::Type::Path(path) = ty else {
+        return None;
+    };
+    let segment = path.path.segments.last()?;
+    if segment.ident != "Option" {
+        return None;
+    }
+    let syn::PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+        return None;
+    };
+    arguments.args.iter().find_map(|argument| match argument {
+        syn::GenericArgument::Type(inner) => Some(inner),
+        _ => None,
+    })
 }

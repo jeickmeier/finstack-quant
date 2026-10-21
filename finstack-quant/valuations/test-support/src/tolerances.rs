@@ -1,99 +1,80 @@
-//! Tolerance constants for numerical comparisons in risk tests.
+//! Tolerance constants for numerical comparisons in tests.
 //!
-//! **This is the canonical location for tolerance constants in the test suite.**
-//!
-//! Using named constants instead of magic numbers improves readability
-//! and ensures consistency across tests.
+//! This is the one tolerance namespace of the test-support crate. Use the
+//! named tiers instead of ad-hoc literals so tests stay consistent.
 //!
 //! # Tolerance Hierarchy (strictest to loosest)
 //!
-//! | Constant      | Value  | Use Case                                        |
-//! |---------------|--------|-------------------------------------------------|
-//! | `TIGHT`       | 1e-10  | Analytical solutions, roundtrip identity checks |
-//! | `STANDARD`    | 1e-6   | Finite-difference vs analytical comparisons     |
-//! | `LOOSE`       | 1e-3   | Monte Carlo, cross-methodology comparisons      |
+//! | Constant | Value | Use Case |
+//! |----------|-------|----------|
+//! | `TIGHT` | 1e-10 | Bit-near identities, roundtrips, exact analytical checks |
+//! | `ANALYTICAL` | 1e-6 (0.0001%) | Closed-form solutions (put-call parity, zero-coupon YTM) |
+//! | `NUMERICAL` | 1e-4 (0.01%) | Iterative methods (Newton-Raphson, tree pricing) |
+//! | `CURVE_PRICING` | 5e-3 (0.5%) | Curve-based valuations with convention differences |
+//! | `RELATIVE` | 1e-2 (1%) | Proportional comparisons, textbook benchmarks |
+//! | `BUMP_VS_ANALYTICAL` | 1.5e-2 (1.5%) | Bump-and-reprice vs analytical approximations |
+//! | `STATISTICAL` | 2e-2 (2%) | Monte Carlo, statistical tests and FD greeks |
 //!
-//! # Relative Tolerances
+//! # Example
 //!
-//! | Constant      | Value  | Percentage | Use Case                         |
-//! |---------------|--------|------------|----------------------------------|
-//! | `PERCENT_001` | 0.0001 | 0.01%      | High-precision relative checks   |
-//! | `PERCENT_01`  | 0.001  | 0.1%       | Standard relative comparisons    |
-//! | `PERCENT_1`   | 0.01   | 1%         | Loose FD approximations          |
-//! | `PERCENT_5`   | 0.05   | 5%         | Second-order greeks via FD       |
-//!
-//! # Example Usage
-//!
-//! ```rust,ignore
+//! ```rust
 //! use finstack_quant_valuations_test_support::tolerances;
-//! use finstack_quant_test_utils::assert::approx_eq;
 //!
-//! // For analytical put-call parity check
-//! approx_eq(call - put, forward - strike_pv, tolerances::TIGHT, "put-call parity");
-//!
-//! // For finite-difference delta approximation
-//! approx_eq(fd_delta, analytical_delta, tolerances::STANDARD, "delta");
-//!
-//! // For Monte Carlo pricing
-//! approx_eq(mc_price, analytical_price, tolerances::LOOSE, "mc price");
+//! let (actual, expected): (f64, f64) = (1.0 + 1e-8, 1.0);
+//! assert!((actual - expected).abs() < tolerances::ANALYTICAL);
 //! ```
-//!
-//! # Migration Note
-//!
-//! If you encounter `F64_ABS_TOL_STRICT` or `F64_ABS_TOL_LOOSE` in older code,
-//! migrate to this module's constants:
-//! - `F64_ABS_TOL_STRICT` (1e-12) → use `TIGHT` (1e-10)
-//! - `F64_ABS_TOL_LOOSE` (1e-10) → use `TIGHT` (1e-10)
 
-/// Tight tolerance for bit-exact or analytical comparisons.
+/// Tight tolerance for bit-near or exact analytical comparisons.
 ///
-/// Use when comparing:
-/// - Identical calculations that should produce exact results
-/// - Analytical formulas (e.g., put-call parity, zero-coupon YTM)
-/// - Roundtrip serialization/deserialization
+/// Use when comparing identical calculations, roundtrip
+/// serialization/deserialization, or exact closed-form identities.
 pub const TIGHT: f64 = 1e-10;
 
-/// Standard tolerance for finite-difference vs analytical comparisons.
-///
-/// Use when comparing:
-/// - FD approximations to analytical values
-/// - Newton-Raphson solver results
-/// - Tree pricing vs closed-form
-pub const STANDARD: f64 = 1e-6;
+/// Analytical calculations (e.g., put-call parity, zero-coupon YTM).
+/// These have closed-form solutions and should be very precise.
+pub const ANALYTICAL: f64 = 1e-6; // 0.0001%
 
-/// Loose tolerance for Monte Carlo or cross-methodology comparisons.
-///
-/// Use when comparing:
-/// - MC results to analytical solutions
-/// - Different pricing methodologies
-/// - Cross-library validation (with expected methodology differences)
-pub const LOOSE: f64 = 1e-3;
+/// Numerical methods (e.g., tree pricing, Newton-Raphson solvers).
+/// These involve iterative convergence and may have small residual errors.
+pub const NUMERICAL: f64 = 1e-4; // 0.01%
 
-/// 0.01% relative tolerance.
-///
-/// Use for high-precision relative comparisons where the absolute
-/// magnitude varies but relative accuracy should be very tight.
-pub const PERCENT_001: f64 = 0.0001;
+/// Curve-based pricing with potential convention mismatches.
+/// Accounts for compounding convention differences (e.g., semi-annual vs continuous).
+pub const CURVE_PRICING: f64 = 5e-3; // 0.5%
 
-/// 0.1% relative tolerance.
-///
-/// Use for standard relative comparisons.
-pub const PERCENT_01: f64 = 0.001;
+/// Relative tolerance for scaling comparisons.
+/// Used when comparing proportional changes across different scales.
+pub const RELATIVE: f64 = 1e-2; // 1%
 
-/// 1% relative tolerance.
+/// Bump-and-reprice vs analytical approximation comparisons.
 ///
-/// Use for loose relative comparisons (e.g., FD approximations,
-/// textbook benchmark comparisons).
-pub const PERCENT_1: f64 = 0.01;
+/// Used when comparing numerical bump-based sensitivities (e.g., DV01 computed
+/// via curve parallel shift) against analytical approximations (e.g., DV01 ≈
+/// -Price × ModDur × 0.0001). The difference arises from:
+/// - Compounding convention mismatch (continuous vs periodic): ~0.6%
+/// - Curve-based vs yield-based rate definitions
+/// - Convexity effects (negligible for 1bp bumps)
+///
+/// For par bonds on flat curves, actual differences are typically 0.5-1.5%.
+pub const BUMP_VS_ANALYTICAL: f64 = 1.5e-2; // 1.5%
 
-/// 5% relative tolerance.
-///
-/// Use for very loose comparisons where significant differences are expected,
-/// such as second-order greeks computed via finite differences.
-pub const PERCENT_5: f64 = 0.05;
+/// Statistical/Monte Carlo methods and finite-difference greeks.
+/// These have inherent sampling or discretisation error.
+pub const STATISTICAL: f64 = 2e-2; // 2%
 
-/// Small absolute threshold for near-zero checks.
-///
-/// Use when determining if a value is effectively zero,
-/// particularly for relative tolerance fallback logic.
-pub const NEAR_ZERO: f64 = 1e-8;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tolerance_tiers_are_ordered() {
+        const _: () = {
+            assert!(TIGHT < ANALYTICAL);
+            assert!(ANALYTICAL < NUMERICAL);
+            assert!(NUMERICAL < CURVE_PRICING);
+            assert!(CURVE_PRICING < RELATIVE);
+            assert!(RELATIVE < BUMP_VS_ANALYTICAL);
+            assert!(BUMP_VS_ANALYTICAL < STATISTICAL);
+        };
+    }
+}

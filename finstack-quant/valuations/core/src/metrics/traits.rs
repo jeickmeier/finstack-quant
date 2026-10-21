@@ -148,6 +148,25 @@ pub struct MetricPricingInputs {
     finstack_config: Arc<FinstackConfig>,
 }
 
+/// State a pricer computed while producing a base value and hands to metric
+/// evaluation, so metric calculators reuse it instead of recomputing it.
+///
+/// A pricer attaches one through
+/// [`ValuationResult::with_metric_seed`](crate::results::ValuationResult::with_metric_seed);
+/// the registry installs it into the [`MetricContext`] before the instrument's
+/// own [`seed_metric_context`](crate::instruments::Instrument::seed_metric_context)
+/// runs. The seed belongs to that one valuation request (instrument, market and
+/// as-of date) and is never serialized.
+pub trait MetricSeed: std::fmt::Debug + Send + Sync {
+    /// Write the pricer's state into `context`.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Metric context of the valuation request that produced
+    ///   this seed, before the instrument seeds it.
+    fn seed(&self, context: &mut MetricContext);
+}
+
 /// Context containing all data needed for metric calculations.
 ///
 /// Provides access to the instrument, market data, base valuation,

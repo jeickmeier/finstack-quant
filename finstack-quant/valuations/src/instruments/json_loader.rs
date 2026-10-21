@@ -10,16 +10,7 @@ use finstack_quant_core::contract::{
 use finstack_quant_core::Result;
 use serde::{Deserialize, Serialize};
 
-pub(crate) use finstack_quant_valuations_core::instruments::envelope::instrument_load_error;
-pub use finstack_quant_valuations_core::instruments::envelope::{InstrumentSchema, MAX_JSON_BYTES};
-
-// Strict callers retain their supplied limits.
-fn decode_json<T: serde::de::DeserializeOwned>(
-    bytes: &[u8],
-    limits: &LoadLimits,
-) -> std::result::Result<T, ContractError> {
-    deserialize_json_value(parse_json_value(bytes, limits)?, limits)
-}
+use finstack_quant_valuations_core::instruments::envelope::InstrumentSchema;
 
 /// Versioned envelope for JSON instrument definitions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,198 +23,195 @@ pub struct InstrumentEnvelope {
     pub instrument: InstrumentJson,
 }
 
-/// One-line summary per instrument tag for the schema index.
+/// The closed-world instrument registry: one row per persisted `type` tag.
 ///
-/// Every generated single-instrument artifact otherwise shares one templated
-/// description, which makes the index unable to tell `cms_option` from
-/// `cms_spread_option`. The registry test asserts this covers every tag.
-#[cfg(feature = "json-schema")]
-pub(crate) fn instrument_summary(tag: &str) -> &'static str {
-    match tag {
-        "agency_cmo" => "Agency CMO tranche carved from a collateral pool.",
-        "agency_mbs_passthrough" => "Agency mortgage pass-through priced off a prepayment model.",
-        "agency_tba" => "To-be-announced agency MBS forward trade.",
-        "asian_option" => "Option on an average of observed fixings.",
-        "autocallable" => "Structured note that redeems early when a barrier is met.",
-        "barrier_option" => "Knock-in or knock-out option on a monitored barrier.",
-        "basis_swap" => "Floating-versus-floating swap between two indices or tenors.",
-        "basket" => "Weighted basket of constituents priced as one position.",
-        "bermudan_swaption" => "Bermudan-exercise swaption valued on a short-rate lattice.",
-        "bond" => "Fixed- or floating-rate cash bond with a coupon schedule.",
-        "bond_future" => "Exchange-traded bond future with a deliverable basket and CTD.",
-        "callable_range_accrual" => "Range accrual with issuer call rights.",
-        "cap_floor" => "Strip of caplets or floorlets on a floating index.",
-        "cds_index" => "Standardised CDS index such as CDX or iTraxx.",
-        "cds_option" => "Payer or receiver option on a CDS or CDS index.",
-        "cds_tranche" => "Synthetic index tranche priced with a correlation model.",
-        "cliquet_option" => "Series of forward-starting options with local and global caps.",
-        "cms_option" => "Option on a constant-maturity swap rate.",
-        "cms_spread_option" => "Option on the spread between two CMS rates.",
-        "cms_swap" => "Swap paying a constant-maturity swap rate.",
-        "commodity_asian_option" => "Commodity option on an average settlement price.",
-        "commodity_forward" => "Forward on a commodity reference price.",
-        "commodity_spot_option" => "Option on spot commodity with observed-spot exercise and explicit cash or physical settlement.",
-        "commodity_spread_option" => "Option on the spread between two commodity legs.",
-        "commodity_swap" => "Fixed-versus-floating commodity swap on an average price.",
-        "commodity_swaption" => "Option to enter a commodity swap.",
-        "composite" => "Resolved cross-asset synthetic instrument with immutable leg quantities.",
-        "convertible_bond" => "Corporate bond convertible into a fixed number of shares.",
-        "credit_default_swap" => "Single-name CDS priced on the ISDA standard model.",
-        "deposit" => "Money-market deposit quoted as a simple rate.",
-        "discounted_cash_flow" => {
-            "Enterprise DCF valuation with an explicit forecast and terminal value."
-        }
-        "dollar_roll" => "Simultaneous TBA sale and forward repurchase.",
-        "equity" => "Cash equity position.",
-        "equity_future" => "Listed equity future with optional fixed-currency quanto.",
-        "equity_total_return_future" => "Listed equity total-return future and financing spread.",
-        "equity_option" => "European or American option on a single equity.",
-        "forward_rate_agreement" => "Single-period forward rate agreement.",
-        "fx_barrier_option" => "FX option with a knock-in or knock-out barrier.",
-        "fx_digital_option" => "FX option paying a fixed amount if in the money.",
-        "fx_forward" => "Outright FX forward.",
-        "fx_future" => "Exchange-listed future on a deliverable currency pair.",
-        "fx_option" => "Vanilla European FX option.",
-        "fx_spot" => "Spot foreign-exchange trade.",
-        "fx_swap" => "Near- and far-leg FX swap.",
-        "fx_touch_option" => "FX option paying on barrier touch or no-touch.",
-        "fx_variance_swap" => "Swap on realised FX variance.",
-        "inflation_cap_floor" => "Cap or floor on realised inflation.",
-        "inflation_linked_bond" => "Bond whose principal and coupons index to a price level.",
-        "inflation_swap" => "Zero-coupon inflation swap on a price index.",
-        "interest_rate_future" => "Exchange-traded short-rate future.",
-        "interest_rate_future_option" => {
-            "Listed or bilateral option on an interest-rate futures price."
-        }
-        "interest_rate_swap" => "Vanilla fixed-versus-floating interest-rate swap.",
-        "levered_real_estate_equity" => "Property equity net of its financing stack.",
-        "lookback_option" => "Option struck on the path maximum or minimum.",
-        "ndf" => "Non-deliverable forward cash-settled against a fixing.",
-        "private_markets_fund" => {
-            "Closed-end fund with a commitment schedule and distribution waterfall."
-        }
-        "quanto_option" => {
-            "Option on a foreign asset settled in the domestic currency at a fixed rate."
-        }
-        "commodity_future" => "Linear listed future on a single or average observed price.",
-        "commodity_future_option" => "Exchange-listed option on a commodity future.",
-        "equity_future_option" => "Exchange-listed option on an equity future.",
-        "fx_future_option" => "Exchange-listed option on an FX future.",
-        "range_accrual" => "Coupon accruing only on days the index sits inside a range.",
-        "real_estate_asset" => "Direct property asset with rent roll and exit assumptions.",
-        "repo" => "Repurchase agreement against posted collateral.",
-        "revolving_credit" => "Committed revolver with drawn/undrawn balances and commitment fees.",
-        "asset_backed_facility" => {
-            "Warehouse line against a collateral pool: advance rates, concentration limits, borrowing base."
-        }
-        "snowball" => "Path-dependent note whose coupon builds on the previous one.",
-        "structured_credit" => "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.",
-        "swaption" => "European option to enter an interest-rate swap.",
-        "tarn" => "Target-redemption note that terminates once cumulative coupons hit a cap.",
-        "term_loan" => "Amortising leveraged loan with call protection and covenants.",
-        "trs_equity" => "Equity total-return swap versus a funding leg.",
-        "trs_fixed_income_index" => {
-            "Total-return swap on a fixed-income index versus a funding leg."
-        }
-        "variance_swap" => "Swap on realised variance against a strike.",
-        "volatility_index_future" => "Future on a volatility index such as VIX.",
-        "volatility_index_future_option" => "Exchange-listed option on a volatility-index future.",
-        "xccy_swap" => "Cross-currency swap with notional exchange and a basis spread.",
-        "yoy_inflation_swap" => "Year-on-year inflation swap.",
-        _ => "Canonical single-instrument v1 envelope.",
-    }
-}
-
+/// Row form: `kind: Variant(Type) => "tag" @ "category" = example; "summary";`
+/// where `kind` is `plain` (payload stored inline in [`InstrumentJson`]) or
+/// `boxed` (stored as `Box<Type>`), and `summary` is the one-sentence
+/// description the schema index shows for the tag.
 macro_rules! with_instrument_json_registry {
     ($callback:ident $(, $extra:expr )* $(,)?) => {
         $callback! {
             [$($extra),*]
             plain: Bond(Bond) => "bond" @ "fixed_income" = Bond::example();
+                "Fixed- or floating-rate cash bond with a coupon schedule.";
             plain: ConvertibleBond(ConvertibleBond) => "convertible_bond" @ "fixed_income" = ConvertibleBond::example();
+                "Corporate bond convertible into a fixed number of shares.";
             plain: InflationLinkedBond(InflationLinkedBond) => "inflation_linked_bond" @ "fixed_income" = InflationLinkedBond::example();
+                "Bond whose principal and coupons index to a price level.";
             plain: TermLoan(TermLoan) => "term_loan" @ "fixed_income" = TermLoan::example();
+                "Amortising leveraged loan with call protection and covenants.";
             plain: RevolvingCredit(RevolvingCredit) => "revolving_credit" @ "fixed_income" = RevolvingCredit::example();
+                "Committed revolver with drawn/undrawn balances and commitment fees.";
             plain: AgencyMbsPassthrough(AgencyMbsPassthrough) => "agency_mbs_passthrough" @ "fixed_income" = AgencyMbsPassthrough::example();
+                "Agency mortgage pass-through priced off a prepayment model.";
             plain: AgencyTba(AgencyTba) => "agency_tba" @ "fixed_income" = AgencyTba::example();
+                "To-be-announced agency MBS forward trade.";
             plain: AgencyCmo(AgencyCmo) => "agency_cmo" @ "fixed_income" = AgencyCmo::example();
+                "Agency CMO tranche carved from a collateral pool.";
             plain: DollarRoll(DollarRoll) => "dollar_roll" @ "fixed_income" = DollarRoll::example();
+                "Simultaneous TBA sale and forward repurchase.";
             plain: InterestRateSwap(InterestRateSwap) => "interest_rate_swap" @ "rates" = InterestRateSwap::example();
+                "Vanilla fixed-versus-floating interest-rate swap.";
             plain: BasisSwap(BasisSwap) => "basis_swap" @ "rates" = BasisSwap::example();
+                "Floating-versus-floating swap between two indices or tenors.";
             plain: XccySwap(XccySwap) => "xccy_swap" @ "rates" = XccySwap::example();
+                "Cross-currency swap with notional exchange and a basis spread.";
             plain: InflationSwap(InflationSwap) => "inflation_swap" @ "rates" = InflationSwap::example();
+                "Zero-coupon inflation swap on a price index.";
             plain: YoYInflationSwap(YoYInflationSwap) => "yoy_inflation_swap" @ "rates" = YoYInflationSwap::example();
+                "Year-on-year inflation swap.";
             plain: InflationCapFloor(InflationCapFloor) => "inflation_cap_floor" @ "rates" = InflationCapFloor::example();
+                "Cap or floor on realised inflation.";
             plain: ForwardRateAgreement(ForwardRateAgreement) => "forward_rate_agreement" @ "rates" = ForwardRateAgreement::example();
+                "Single-period forward rate agreement.";
             plain: Swaption(Swaption) => "swaption" @ "rates" = Swaption::example();
+                "European option to enter an interest-rate swap.";
             plain: BermudanSwaption(BermudanSwaption) => "bermudan_swaption" @ "rates" = BermudanSwaption::example();
+                "Bermudan-exercise swaption valued on a short-rate lattice.";
             plain: InterestRateFuture(InterestRateFuture) => "interest_rate_future" @ "rates" = InterestRateFuture::example();
+                "Exchange-traded short-rate future.";
             plain: InterestRateFutureOption(InterestRateFutureOption) => "interest_rate_future_option" @ "rates" = InterestRateFutureOption::example();
+                "Listed or bilateral option on an interest-rate futures price.";
             plain: CapFloor(CapFloor) => "cap_floor" @ "rates" = CapFloor::example();
+                "Strip of caplets or floorlets on a floating index.";
             plain: CmsSwap(CmsSwap) => "cms_swap" @ "rates" = CmsSwap::example();
+                "Swap paying a constant-maturity swap rate.";
             plain: CmsOption(CmsOption) => "cms_option" @ "rates" = CmsOption::example();
+                "Option on a constant-maturity swap rate.";
             plain: Deposit(Deposit) => "deposit" @ "rates" = Deposit::example();
+                "Money-market deposit quoted as a simple rate.";
             plain: Repo(Repo) => "repo" @ "rates" = Repo::example();
+                "Repurchase agreement against posted collateral.";
             plain: CreditDefaultSwap(CreditDefaultSwap) => "credit_default_swap" @ "credit_derivatives" = CreditDefaultSwap::example();
+                "Single-name CDS priced on the ISDA standard model.";
             plain: CdsIndex(CdsIndex) => "cds_index" @ "credit_derivatives" = CdsIndex::example();
+                "Standardised CDS index such as CDX or iTraxx.";
             plain: CdsTranche(CdsTranche) => "cds_tranche" @ "credit_derivatives" = CdsTranche::example();
+                "Synthetic index tranche priced with a correlation model.";
             plain: CdsOption(CdsOption) => "cds_option" @ "credit_derivatives" = CdsOption::example();
+                "Payer or receiver option on a CDS or CDS index.";
             plain: Equity(Equity) => "equity" @ "equity" = Equity::example();
+                "Cash equity position.";
             plain: EquityOption(EquityOption) => "equity_option" @ "equity" = EquityOption::example();
+                "European or American option on a single equity.";
             plain: AsianOption(AsianOption) => "asian_option" @ "exotics" = AsianOption::example();
+                "Option on an average of observed fixings.";
             plain: BarrierOption(BarrierOption) => "barrier_option" @ "exotics" = BarrierOption::example();
+                "Knock-in or knock-out option on a monitored barrier.";
             plain: LookbackOption(LookbackOption) => "lookback_option" @ "exotics" = LookbackOption::example();
+                "Option struck on the path maximum or minimum.";
             plain: VarianceSwap(VarianceSwap) => "variance_swap" @ "equity" = VarianceSwap::example();
+                "Swap on realised variance against a strike.";
             plain: VolatilityIndexFuture(VolatilityIndexFuture) => "volatility_index_future" @ "equity" = VolatilityIndexFuture::example();
+                "Future on a volatility index such as VIX.";
             plain: VolatilityIndexFutureOption(VolatilityIndexFutureOption) => "volatility_index_future_option" @ "equity" = VolatilityIndexFutureOption::example();
+                "Exchange-listed option on a volatility-index future.";
             plain: FxSpot(FxSpot) => "fx_spot" @ "fx" = FxSpot::example();
+                "Spot foreign-exchange trade.";
             plain: FxSwap(FxSwap) => "fx_swap" @ "fx" = FxSwap::example();
+                "Near- and far-leg FX swap.";
             plain: FxForward(FxForward) => "fx_forward" @ "fx" = FxForward::example();
+                "Outright FX forward.";
             plain: Ndf(Ndf) => "ndf" @ "fx" = Ndf::example();
+                "Non-deliverable forward cash-settled against a fixing.";
             plain: FxOption(FxOption) => "fx_option" @ "fx" = FxOption::example();
+                "Vanilla European FX option.";
             plain: FxDigitalOption(FxDigitalOption) => "fx_digital_option" @ "fx" = FxDigitalOption::example();
+                "FX option paying a fixed amount if in the money.";
             plain: FxTouchOption(FxTouchOption) => "fx_touch_option" @ "fx" = FxTouchOption::example();
+                "FX option paying on barrier touch or no-touch.";
             plain: FxBarrierOption(FxBarrierOption) => "fx_barrier_option" @ "fx" = FxBarrierOption::example();
+                "FX option with a knock-in or knock-out barrier.";
             plain: FxVarianceSwap(FxVarianceSwap) => "fx_variance_swap" @ "fx" = FxVarianceSwap::example();
+                "Swap on realised FX variance.";
             plain: QuantoOption(QuantoOption) => "quanto_option" @ "fx" = QuantoOption::example();
+                "Option on a foreign asset settled in the domestic currency at a fixed rate.";
             plain: CommoditySpotOption(CommoditySpotOption) => "commodity_spot_option" @ "commodity" = CommoditySpotOption::example();
+                "Option on spot commodity with observed-spot exercise and explicit cash or physical settlement.";
             plain: CommodityAsianOption(CommodityAsianOption) => "commodity_asian_option" @ "commodity" = CommodityAsianOption::example();
+                "Commodity option on an average settlement price.";
             plain: CommodityForward(CommodityForward) => "commodity_forward" @ "commodity" = CommodityForward::example();
+                "Forward on a commodity reference price.";
             plain: CommoditySwap(CommoditySwap) => "commodity_swap" @ "commodity" = CommoditySwap::example();
+                "Fixed-versus-floating commodity swap on an average price.";
             plain: CommoditySwaption(CommoditySwaption) => "commodity_swaption" @ "commodity" = CommoditySwaption::example();
+                "Option to enter a commodity swap.";
             plain: CommoditySpreadOption(CommoditySpreadOption) => "commodity_spread_option" @ "commodity" = CommoditySpreadOption::example();
+                "Option on the spread between two commodity legs.";
             plain: CommodityFuture(CommodityFuture) => "commodity_future" @ "commodity" = CommodityFuture::example();
+                "Linear listed future on a single or average observed price.";
             plain: CommodityFutureOption(CommodityFutureOption) => "commodity_future_option" @ "commodity" = CommodityFutureOption::example();
+                "Exchange-listed option on a commodity future.";
             plain: FxFuture(FxFuture) => "fx_future" @ "fx" = FxFuture::example();
+                "Exchange-listed future on a deliverable currency pair.";
             plain: FxFutureOption(FxFutureOption) => "fx_future_option" @ "fx" = FxFutureOption::example();
+                "Exchange-listed option on an FX future.";
             plain: EquityFuture(EquityFuture) => "equity_future" @ "equity" = EquityFuture::example();
+                "Listed equity future with optional fixed-currency quanto.";
             plain: EquityFutureOption(EquityFutureOption) => "equity_future_option" @ "equity" = EquityFutureOption::example();
+                "Exchange-listed option on an equity future.";
             plain: EquityTotalReturnFuture(EquityTotalReturnFuture) => "equity_total_return_future" @ "equity" = EquityTotalReturnFuture::example();
+                "Listed equity total-return future and financing spread.";
             plain: Autocallable(Autocallable) => "autocallable" @ "equity" = Autocallable::example();
+                "Structured note that redeems early when a barrier is met.";
             plain: CliquetOption(CliquetOption) => "cliquet_option" @ "equity" = CliquetOption::example();
+                "Series of forward-starting options with local and global caps.";
             plain: RangeAccrual(RangeAccrual) => "range_accrual" @ "exotics" = RangeAccrual::example();
+                "Coupon accruing only on days the index sits inside a range.";
             plain: Tarn(Tarn) => "tarn" @ "exotics" = Tarn::example();
+                "Target-redemption note that terminates once cumulative coupons hit a cap.";
             plain: Snowball(Snowball) => "snowball" @ "exotics" = Snowball::example();
+                "Path-dependent note whose coupon builds on the previous one.";
             plain: CmsSpreadOption(CmsSpreadOption) => "cms_spread_option" @ "rates" = CmsSpreadOption::example();
+                "Option on the spread between two CMS rates.";
             plain: TrsEquity(EquityTotalReturnSwap) => "trs_equity" @ "equity" = EquityTotalReturnSwap::example();
+                "Equity total-return swap versus a funding leg.";
             plain: TrsFixedIncomeIndex(FiIndexTotalReturnSwap) => "trs_fixed_income_index" @ "fixed_income" = FiIndexTotalReturnSwap::example();
+                "Total-return swap on a fixed-income index versus a funding leg.";
             plain: Basket(Basket) => "basket" @ "exotics" = Basket::example();
+                "Weighted basket of constituents priced as one position.";
             plain: PrivateMarketsFund(PrivateMarketsFund) => "private_markets_fund" @ "equity" = PrivateMarketsFund::example();
+                "Closed-end fund with a commitment schedule and distribution waterfall.";
             plain: RealEstateAsset(RealEstateAsset) => "real_estate_asset" @ "equity" = RealEstateAsset::example();
+                "Direct property asset with rent roll and exit assumptions.";
             plain: DiscountedCashFlow(DiscountedCashFlow) => "discounted_cash_flow" @ "equity" = DiscountedCashFlow::example();
+                "Enterprise DCF valuation with an explicit forecast and terminal value.";
             boxed: CallableRangeAccrual(CallableRangeAccrual) => "callable_range_accrual" @ "exotics" = CallableRangeAccrual::example();
+                "Range accrual with issuer call rights.";
             boxed: BondFuture(BondFuture) => "bond_future" @ "fixed_income" = BondFuture::example();
+                "Exchange-traded bond future with a deliverable basket and CTD.";
             boxed: StructuredCredit(StructuredCredit) => "structured_credit" @ "fixed_income" = StructuredCredit::example();
+                "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.";
             boxed: AssetBackedFacility(AssetBackedFacility) => "asset_backed_facility" @ "fixed_income" = AssetBackedFacility::example();
+                "Warehouse line against a collateral pool: advance rates, concentration limits, borrowing base.";
             boxed: LeveredRealEstateEquity(crate::instruments::equity::real_estate::LeveredRealEstateEquity) => "levered_real_estate_equity" @ "equity" = crate::instruments::equity::real_estate::LeveredRealEstateEquity::example();
+                "Property equity net of its financing stack.";
             boxed: Composite(CompositeInstrument) => "composite" @ "composite" = CompositeInstrument::example();
+                "Resolved cross-asset synthetic instrument with immutable leg quantities.";
         }
     };
 }
+/// Spell one registry row's payload storage.
+///
+/// `plain` rows store the instrument inline in [`InstrumentJson`]; `boxed`
+/// rows store it as `Box<T>` to keep the enum small. Every other part of a
+/// row is shared, so the callbacks below dispatch on the row kind only here.
+macro_rules! instrument_payload {
+    (ty plain $ty:ty) => { $ty };
+    (ty boxed $ty:ty) => { Box<$ty> };
+    (wrap plain $value:expr) => { $value };
+    (wrap boxed $value:expr) => { Box::new($value) };
+    (unwrap plain $value:expr) => { $value };
+    (unwrap boxed $value:expr) => { *$value };
+    (as_dyn plain $value:expr) => { $value as &dyn Instrument };
+    (as_dyn boxed $value:expr) => { $value.as_ref() as &dyn Instrument };
+}
+
 macro_rules! define_instrument_json {
     (
         []
-        $(plain: $variant:ident($ty:ty) => $tag:literal @ $category:literal = $example:expr;)*
-        $(boxed: $boxed_variant:ident($boxed_ty:ty) => $boxed_tag:literal @ $boxed_category:literal = $boxed_example:expr;)*
+        $($kind:ident: $variant:ident($ty:ty) => $tag:literal @ $category:literal = $example:expr; $summary:literal;)*
     ) => {
         mod instrument_variant {
             $(
@@ -246,26 +234,6 @@ macro_rules! define_instrument_json {
                     }
                 }
             )*
-            $(
-                #[allow(non_snake_case)]
-                pub(crate) mod $boxed_variant {
-                    use super::super::*;
-
-                    #[derive(Debug, Clone, Serialize, Deserialize)]
-                    #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-                    #[serde(
-                        rename_all = "snake_case",
-                        tag = "type",
-                        content = "spec",
-                        deny_unknown_fields
-                    )]
-                    #[cfg_attr(feature = "json-schema", schemars(rename = $boxed_tag))]
-                    pub(crate) enum Wire<'a> {
-                        #[serde(rename = $boxed_tag)]
-                        Instrument(std::borrow::Cow<'a, $boxed_ty>),
-                    }
-                }
-            )*
         }
 
         /// Canonical tagged union of all supported instrument serde types.
@@ -277,38 +245,147 @@ macro_rules! define_instrument_json {
             $(
                 #[doc = concat!("Canonical `", $tag, "` instrument payload.")]
                 #[serde(rename = $tag)]
-                $variant($ty),
-            )*
-            $(
-                #[doc = concat!("Canonical `", $boxed_tag, "` instrument payload.")]
-                #[serde(rename = $boxed_tag)]
-                $boxed_variant(Box<$boxed_ty>),
+                $variant(instrument_payload!(ty $kind $ty)),
             )*
         }
 
+        impl InstrumentJson {
+            /// Return this payload's canonical persisted `type` discriminator.
+            #[must_use]
+            pub const fn type_tag(&self) -> &'static str {
+                match self {
+                    $(Self::$variant(_) => $tag,)*
+                }
+            }
+
+            /// Borrow the payload as a runtime instrument.
+            fn as_dyn_instrument(&self) -> &dyn Instrument {
+                match self {
+                    $(Self::$variant(instrument) => instrument_payload!(as_dyn $kind instrument),)*
+                }
+            }
+
+            /// Box a payload without domain validation; callers must validate before pricing.
+            pub(crate) fn into_boxed_unchecked(self) -> Result<Box<dyn Instrument>> {
+                Ok(match self {
+                    $(Self::$variant(instrument) => {
+                        Box::new(instrument_payload!(unwrap $kind instrument)) as Box<dyn Instrument>
+                    })*
+                })
+            }
+        }
+
+        /// Every canonical instrument discriminator, in registry order; read it
+        /// through [`crate::schema::instrument_types`].
+        pub(crate) const INSTRUMENT_TYPES: &[&str] = &[$($tag,)*];
+
+        /// Build the canonical instrument registry used by serde, schemas, fixtures,
+        /// runtime schema lookup, and binding tag exposure.
+        #[must_use]
+        pub fn instrument_registry() -> Vec<InstrumentRegistryEntry> {
+            vec![$({
+                fn examples() -> Result<Vec<serde_json::Value>> {
+                    let spec: $ty = $example?;
+                    let value = serde_json::to_value(InstrumentEnvelope::new(
+                        InstrumentJson::$variant(instrument_payload!(wrap $kind spec)),
+                    ))
+                    .map_err(|error| {
+                        schema_example_error(concat!("serialize ", $tag, " example"), error)
+                    })?;
+                    serde_json::from_value::<SingleInstrumentEnvelope<
+                        instrument_variant::$variant::Wire<'static>,
+                    >>(value.clone())
+                    .map_err(|error| {
+                        schema_example_error(concat!("validate ", $tag, " example"), error)
+                    })?;
+                    Ok(vec![value])
+                }
+
+                fn embedded_schema() -> std::result::Result<serde_json::Value, String> {
+                    serde_json::from_str(include_str!(concat!(
+                        "../../schemas/instruments/1/",
+                        $category,
+                        "/",
+                        $tag,
+                        ".schema.json"
+                    )))
+                    .map_err(|error| format!("invalid embedded schema for {}: {error}", $tag))
+                }
+
+                InstrumentRegistryEntry {
+                    tag: $tag,
+                    category: $category,
+                    #[cfg(feature = "json-schema")]
+                    artifact: finstack_quant_core::schema::SchemaArtifact::new::<
+                        SingleInstrumentEnvelope<instrument_variant::$variant::Wire<'static>>,
+                    >(
+                        concat!("schemas/instruments/1/", $category, "/", $tag, ".schema.json"),
+                        concat!("https://finstack_quant.dev/schemas/instrument/1/", $category, "/", $tag, ".schema.json"),
+                        $tag,
+                        "Canonical single-instrument v1 envelope generated from its serde type.",
+                    )
+                    .with_packager(finstack_quant_valuations_core::schema::package_valuations_schema)
+                    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
+                    .with_summary($summary)
+                    .with_examples(examples),
+                    fixture_path: concat!("tests/instruments/json_examples/", $tag, ".json"),
+                    examples,
+                    embedded_schema,
+                }
+            },)*]
+        }
+
+        /// The registry-backed tagged union of a runtime instrument.
+        ///
+        /// Recognizes every concrete runtime type in the instrument registry and
+        /// clones it into its canonical [`InstrumentJson`] variant. Custom or
+        /// otherwise unregistered [`Instrument`] implementations give `None`.
+        /// Conversion itself is infallible; serialization of the returned tagged
+        /// union may still fail through the serializer used by the caller.
+        ///
+        /// # Arguments
+        ///
+        /// * `instrument` - Runtime instrument to convert; only its concrete type and
+        ///   contents matter.
+        ///
+        /// # Returns
+        ///
+        /// `Some(InstrumentJson)` for a registered runtime type, or `None` for an
+        /// unregistered implementation.
+        pub fn instrument_json_of(instrument: &dyn Instrument) -> Option<InstrumentJson> {
+            let value = instrument.as_any();
+            $(
+                if let Some(instrument) = value.downcast_ref::<$ty>() {
+                    return Some(InstrumentJson::$variant(instrument_payload!(wrap $kind instrument.clone())));
+                }
+            )*
+            None
+        }
+
+        $(
+            impl From<$ty> for InstrumentJson {
+                fn from(instrument: $ty) -> Self {
+                    Self::$variant(instrument_payload!(wrap $kind instrument))
+                }
+            }
+
+            impl TryFrom<InstrumentJson> for $ty {
+                type Error = finstack_quant_core::Error;
+
+                /// Extract the concrete payload, rejecting any other `type`
+                /// with `Error::Validation`.
+                fn try_from(instrument: InstrumentJson) -> Result<Self> {
+                    match instrument {
+                        InstrumentJson::$variant(inner) => Ok(instrument_payload!(unwrap $kind inner)),
+                        other => Err(instrument_type_mismatch($tag, other.type_tag())),
+                    }
+                }
+            }
+        )*
     };
 }
 
 with_instrument_json_registry!(define_instrument_json);
-
-macro_rules! instrument_json_registry_tags {
-    (
-        []
-        $(plain: $variant:ident($ty:ty) => $tag:literal @ $category:literal = $example:expr;)*
-        $(boxed: $boxed_variant:ident($boxed_ty:ty) => $boxed_tag:literal @ $boxed_category:literal = $boxed_example:expr;)*
-    ) => {
-        &[$($tag,)* $($boxed_tag,)*]
-    };
-}
-
-/// Return every canonical instrument discriminator.
-///
-/// The returned slice is generated from the same registry that emits the
-/// serde enum, boxed-instrument construction, and embedded schema lookup.
-#[must_use]
-pub fn registry_tags() -> &'static [&'static str] {
-    with_instrument_json_registry!(instrument_json_registry_tags)
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -356,207 +433,6 @@ fn schema_example_error(
     finstack_quant_core::Error::Internal(format!("{context}: {error}"))
 }
 
-macro_rules! instrument_registry_entries {
-    (
-        []
-        $(plain: $variant:ident($ty:ty) => $tag:literal @ $category:literal = $example:expr;)*
-        $(boxed: $boxed_variant:ident($boxed_ty:ty) => $boxed_tag:literal @ $boxed_category:literal = $boxed_example:expr;)*
-    ) => {{
-        let mut entries = Vec::new();
-        $(
-            entries.push({
-                fn examples() -> Result<Vec<serde_json::Value>> {
-                    let spec: $ty = $example?;
-                    let value = serde_json::to_value(InstrumentEnvelope::new(
-                        InstrumentJson::$variant(spec),
-                    ))
-                    .map_err(|error| {
-                        schema_example_error(concat!("serialize ", $tag, " example"), error)
-                    })?;
-                    serde_json::from_value::<SingleInstrumentEnvelope<
-                        instrument_variant::$variant::Wire<'static>,
-                    >>(value.clone())
-                    .map_err(|error| {
-                        schema_example_error(concat!("validate ", $tag, " example"), error)
-                    })?;
-                    Ok(vec![value])
-                }
-
-                fn embedded_schema() -> std::result::Result<serde_json::Value, String> {
-                    serde_json::from_str(include_str!(concat!(
-                        "../../schemas/instruments/1/",
-                        $category,
-                        "/",
-                        $tag,
-                        ".schema.json"
-                    )))
-                    .map_err(|error| format!("invalid embedded schema for {}: {error}", $tag))
-                }
-
-                InstrumentRegistryEntry {
-                    tag: $tag,
-                    category: $category,
-                    #[cfg(feature = "json-schema")]
-                    artifact: finstack_quant_core::schema::SchemaArtifact::new::<
-                        SingleInstrumentEnvelope<instrument_variant::$variant::Wire<'static>>,
-                    >(
-                        concat!("schemas/instruments/1/", $category, "/", $tag, ".schema.json"),
-                        concat!("https://finstack_quant.dev/schemas/instrument/1/", $category, "/", $tag, ".schema.json"),
-                        $tag,
-                        "Canonical single-instrument v1 envelope generated from its serde type.",
-                    )
-                    .with_packager(crate::schema::package_valuations_schema)
-                    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
-                    .with_summary(instrument_summary($tag))
-                    .with_examples(examples),
-                    fixture_path: concat!("tests/instruments/json_examples/", $tag, ".json"),
-                    examples,
-                    embedded_schema,
-                }
-            });
-        )*
-        $(
-            entries.push({
-                fn examples() -> Result<Vec<serde_json::Value>> {
-                    let spec: $boxed_ty = $boxed_example?;
-                    let value = serde_json::to_value(InstrumentEnvelope::new(
-                        InstrumentJson::$boxed_variant(Box::new(spec)),
-                    ))
-                    .map_err(|error| {
-                        schema_example_error(
-                            concat!("serialize ", $boxed_tag, " example"),
-                            error,
-                        )
-                    })?;
-                    serde_json::from_value::<SingleInstrumentEnvelope<
-                        instrument_variant::$boxed_variant::Wire<'static>,
-                    >>(value.clone())
-                    .map_err(|error| {
-                        schema_example_error(
-                            concat!("validate ", $boxed_tag, " example"),
-                            error,
-                        )
-                    })?;
-                    Ok(vec![value])
-                }
-
-                fn embedded_schema() -> std::result::Result<serde_json::Value, String> {
-                    serde_json::from_str(include_str!(concat!(
-                        "../../schemas/instruments/1/",
-                        $boxed_category,
-                        "/",
-                        $boxed_tag,
-                        ".schema.json"
-                    )))
-                    .map_err(|error| {
-                        format!("invalid embedded schema for {}: {error}", $boxed_tag)
-                    })
-                }
-
-                InstrumentRegistryEntry {
-                    tag: $boxed_tag,
-                    category: $boxed_category,
-                    #[cfg(feature = "json-schema")]
-                    artifact: finstack_quant_core::schema::SchemaArtifact::new::<
-                        SingleInstrumentEnvelope<instrument_variant::$boxed_variant::Wire<'static>>,
-                    >(
-                        concat!("schemas/instruments/1/", $boxed_category, "/", $boxed_tag, ".schema.json"),
-                        concat!("https://finstack_quant.dev/schemas/instrument/1/", $boxed_category, "/", $boxed_tag, ".schema.json"),
-                        $boxed_tag,
-                        "Canonical single-instrument v1 envelope generated from its serde type.",
-                    )
-                    .with_packager(crate::schema::package_valuations_schema)
-                    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
-                    .with_summary(instrument_summary($boxed_tag))
-                    .with_examples(examples),
-                    fixture_path: concat!("tests/instruments/json_examples/", $boxed_tag, ".json"),
-                    examples,
-                    embedded_schema,
-                }
-            });
-        )*
-        entries
-    }};
-}
-
-/// Build the canonical instrument registry used by serde, schemas, fixtures,
-/// runtime schema lookup, and binding tag exposure.
-#[must_use]
-pub fn instrument_registry() -> Vec<InstrumentRegistryEntry> {
-    with_instrument_json_registry!(instrument_registry_entries)
-}
-
-macro_rules! instrument_json_into_boxed_match {
-    (
-        [$instrument_json:expr]
-        $(plain: $variant:ident($ty:ty) => $tag:literal @ $category:literal = $example:expr;)*
-        $(boxed: $boxed_variant:ident($boxed_ty:ty) => $boxed_tag:literal @ $boxed_category:literal = $boxed_example:expr;)*
-    ) => {
-        match $instrument_json {
-            $(InstrumentJson::$variant(instrument) => Ok::<Box<dyn Instrument>, finstack_quant_core::Error>(Box::new(instrument) as Box<dyn Instrument>),)*
-            $(InstrumentJson::$boxed_variant(instrument) => Ok::<Box<dyn Instrument>, finstack_quant_core::Error>(Box::new(*instrument) as Box<dyn Instrument>),)*
-        }
-    };
-}
-
-macro_rules! instrument_json_as_instrument_match {
-    (
-        [$instrument_json:expr]
-        $(plain: $variant:ident($ty:ty) => $tag:literal @ $category:literal = $example:expr;)*
-        $(boxed: $boxed_variant:ident($boxed_ty:ty) => $boxed_tag:literal @ $boxed_category:literal = $boxed_example:expr;)*
-    ) => {
-        match $instrument_json {
-            $(InstrumentJson::$variant(instrument) => instrument as &dyn Instrument,)*
-            $(InstrumentJson::$boxed_variant(instrument) => instrument.as_ref() as &dyn Instrument,)*
-        }
-    };
-}
-
-macro_rules! instrument_json_from_any_match {
-    (
-        [$value:expr]
-        $(plain: $variant:ident($ty:ty) => $tag:literal @ $category:literal = $example:expr;)*
-        $(boxed: $boxed_variant:ident($boxed_ty:ty) => $boxed_tag:literal @ $boxed_category:literal = $boxed_example:expr;)*
-    ) => {{
-        $(
-            if let Some(instrument) = $value.downcast_ref::<$ty>() {
-                return Some(InstrumentJson::$variant(instrument.clone()));
-            }
-        )*
-        $(
-            if let Some(instrument) = $value.downcast_ref::<$boxed_ty>() {
-                return Some(InstrumentJson::$boxed_variant(Box::new(instrument.clone())));
-            }
-        )*
-        None
-    }};
-}
-
-pub(crate) fn instrument_json_from_any(value: &dyn std::any::Any) -> Option<InstrumentJson> {
-    with_instrument_json_registry!(instrument_json_from_any_match, value)
-}
-
-/// The registry-backed tagged union of a runtime instrument.
-///
-/// Recognizes every concrete runtime type in the instrument registry and
-/// clones it into its canonical [`InstrumentJson`] variant. Custom or
-/// otherwise unregistered [`Instrument`] implementations give `None`.
-/// Conversion itself is infallible; serialization of the returned tagged
-/// union may still fail through the serializer used by the caller.
-///
-/// # Arguments
-///
-/// * `instrument` - Runtime instrument to convert; only its concrete type and
-///   contents matter.
-///
-/// # Returns
-///
-/// `Some(InstrumentJson)` for a registered runtime type, or `None` for an
-/// unregistered implementation.
-pub fn instrument_json_of(instrument: &dyn Instrument) -> Option<InstrumentJson> {
-    instrument_json_from_any(instrument.as_any())
-}
-
 /// Market dependencies of a JSON-tagged instrument.
 ///
 /// Routes through [`InstrumentJson::into_boxed`] so JSON-loaded instruments
@@ -587,77 +463,7 @@ pub(crate) fn instrument_type_mismatch(expected: &str, actual: &str) -> finstack
     ))
 }
 
-macro_rules! instrument_json_conversions {
-    (
-        []
-        $(plain: $variant:ident($ty:ty) => $tag:literal @ $category:literal = $example:expr;)*
-        $(boxed: $boxed_variant:ident($boxed_ty:ty) => $boxed_tag:literal @ $boxed_category:literal = $boxed_example:expr;)*
-    ) => {
-        $(
-            impl From<$ty> for InstrumentJson {
-                fn from(instrument: $ty) -> Self {
-                    Self::$variant(instrument)
-                }
-            }
-
-            impl TryFrom<InstrumentJson> for $ty {
-                type Error = finstack_quant_core::Error;
-
-                /// Extract the concrete payload, rejecting any other `type`
-                /// with `Error::Validation`.
-                fn try_from(instrument: InstrumentJson) -> Result<Self> {
-                    match instrument {
-                        InstrumentJson::$variant(inner) => Ok(inner),
-                        other => Err(instrument_type_mismatch($tag, other.type_tag())),
-                    }
-                }
-            }
-        )*
-        $(
-            impl From<$boxed_ty> for InstrumentJson {
-                fn from(instrument: $boxed_ty) -> Self {
-                    Self::$boxed_variant(Box::new(instrument))
-                }
-            }
-
-            impl TryFrom<InstrumentJson> for $boxed_ty {
-                type Error = finstack_quant_core::Error;
-
-                /// Extract the concrete payload, rejecting any other `type`
-                /// with `Error::Validation`.
-                fn try_from(instrument: InstrumentJson) -> Result<Self> {
-                    match instrument {
-                        InstrumentJson::$boxed_variant(inner) => Ok(*inner),
-                        other => Err(instrument_type_mismatch($boxed_tag, other.type_tag())),
-                    }
-                }
-            }
-        )*
-    };
-}
-
-with_instrument_json_registry!(instrument_json_conversions);
-
-macro_rules! instrument_json_type_tag_match {
-    (
-        [$value:expr]
-        $(plain: $variant:ident($ty:ty) => $tag:literal @ $category:literal = $example:expr;)*
-        $(boxed: $boxed_variant:ident($boxed_ty:ty) => $boxed_tag:literal @ $boxed_category:literal = $boxed_example:expr;)*
-    ) => {
-        match $value {
-            $(InstrumentJson::$variant(_) => $tag,)*
-            $(InstrumentJson::$boxed_variant(_) => $boxed_tag,)*
-        }
-    };
-}
-
 impl InstrumentJson {
-    /// Return this payload's canonical persisted `type` discriminator.
-    #[must_use]
-    pub const fn type_tag(&self) -> &'static str {
-        with_instrument_json_registry!(instrument_json_type_tag_match, self)
-    }
-
     /// Validate this payload without cloning or consuming its concrete instrument.
     ///
     /// Runs the same domain validation that [`Self::into_boxed`] and the
@@ -668,8 +474,7 @@ impl InstrumentJson {
     /// Returns the concrete instrument's validation error when its state is
     /// not priceable.
     pub fn validate_for_pricing(&self) -> Result<()> {
-        let instrument = with_instrument_json_registry!(instrument_json_as_instrument_match, self);
-        instrument.validate_for_pricing()
+        self.as_dyn_instrument().validate_for_pricing()
     }
 
     /// Convert this JSON representation into a boxed instrument trait object.
@@ -685,17 +490,9 @@ impl InstrumentJson {
         self.validate_for_pricing()?;
         self.into_boxed_unchecked()
     }
-
-    /// Box a payload without domain validation; callers must validate before pricing.
-    pub(crate) fn into_boxed_unchecked(self) -> Result<Box<dyn Instrument>> {
-        with_instrument_json_registry!(instrument_json_into_boxed_match, self)
-    }
 }
 
 impl InstrumentEnvelope {
-    /// Current schema version emitted by Finstack instrument envelopes.
-    pub const CURRENT_SCHEMA: &'static str = "finstack_quant.instrument/1";
-
     /// Create the canonical v1 envelope for an instrument payload.
     ///
     /// # Arguments
@@ -735,7 +532,7 @@ impl InstrumentEnvelope {
         bytes: &[u8],
         limits: &LoadLimits,
     ) -> std::result::Result<Self, ContractError> {
-        decode_json(bytes, limits)
+        deserialize_json_value(parse_json_value(bytes, limits)?, limits)
     }
 
     /// Decode a parsed envelope using the same strict structure policy.
@@ -763,7 +560,7 @@ impl InstrumentEnvelope {
         bytes: &[u8],
         limits: &LoadLimits,
     ) -> std::result::Result<(Box<dyn Instrument>, ValidationReport), ContractError> {
-        let envelope: Self = decode_json(bytes, limits)?;
+        let envelope = Self::decode_bytes(bytes, limits)?;
         let instrument = envelope.into_boxed()?;
         Ok((instrument, ValidationReport::default()))
     }
@@ -774,6 +571,9 @@ mod tests {
     use rust_decimal::Decimal;
 
     use super::*;
+    use finstack_quant_valuations_core::instruments::envelope::{
+        instrument_load_error, MAX_JSON_BYTES,
+    };
 
     fn load(json: &str) -> Result<Box<dyn Instrument>> {
         let limits = LoadLimits::default().with_max_bytes(MAX_JSON_BYTES);
@@ -1575,7 +1375,7 @@ mod tests {
     #[test]
     fn test_instrument_schema_union_parity() {
         let entries = instrument_registry();
-        assert_eq!(entries.len(), registry_tags().len());
+        assert_eq!(entries.len(), INSTRUMENT_TYPES.len());
         for entry in entries {
             for envelope in entry.examples().expect("registry example builds") {
                 crate::schema::validate_instrument_envelope_json(&envelope).unwrap_or_else(|err| {
@@ -1700,16 +1500,14 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "json-schema")]
     #[test]
     fn every_registered_instrument_has_a_distinct_index_summary() {
-        // The fallback arm keeps `instrument_summary` total, which would let a
-        // newly registered instrument slip into the index with generic prose.
-        let fallback = instrument_summary("__unregistered__");
         let mut seen: std::collections::BTreeMap<&str, &str> = std::collections::BTreeMap::new();
         for entry in instrument_registry() {
-            let summary = instrument_summary(entry.tag);
-            assert_ne!(
-                summary, fallback,
+            let summary = entry.artifact.summary;
+            assert!(
+                !summary.is_empty(),
                 "instrument {} has no index summary",
                 entry.tag
             );

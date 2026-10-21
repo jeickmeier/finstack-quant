@@ -27,19 +27,18 @@ impl MetricCalculator for WeightRiskCalculator {
         let as_of = context.as_of;
         let base_pv = context.base_value.amount();
 
+        if basket.constituents.iter().any(|c| c.units.is_some()) {
+            return Err(finstack_quant_core::Error::Validation(
+                "WeightRisk requires weight-based constituents; explicit units do not define a financed weight direction".into(),
+            ));
+        }
+
         let mut series: Vec<(String, f64)> = Vec::new();
         let mut total_risk = 0.0;
 
         // For each constituent, bump its weight and adjust others proportionally
         for (idx, constituent) in basket.constituents.iter().enumerate() {
             let label = constituent.id.clone();
-
-            if constituent.units.is_some() || basket.constituents.iter().any(|c| c.units.is_some())
-            {
-                return Err(finstack_quant_core::Error::Validation(
-                    "WeightRisk requires weight-based constituents; explicit units do not define a financed weight direction".into(),
-                ));
-            }
             let weight_change = WEIGHT_BUMP;
             let total_other_weight: f64 = basket
                 .constituents

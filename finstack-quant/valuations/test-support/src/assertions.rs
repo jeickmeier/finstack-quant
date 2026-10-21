@@ -16,20 +16,6 @@ pub fn assert_positive(value: f64, name: &str) {
     );
 }
 
-/// Assert that a value is negative.
-///
-/// # Arguments
-///
-/// * `value` - Quantity under test; the assertion fails unless it is strictly less than zero.
-/// * `name` - Label for the value in the assertion message.
-#[track_caller]
-pub fn assert_negative(value: f64, name: &str) {
-    assert!(
-        value < 0.0,
-        "assertion failed: {name} should be negative, got {value}"
-    );
-}
-
 /// Assert that a value is non-negative.
 ///
 /// # Arguments

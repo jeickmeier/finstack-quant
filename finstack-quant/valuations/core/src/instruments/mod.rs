@@ -83,8 +83,8 @@ pub mod envelope;
 
 /// Per-flow cashflow export with DF / survival / PV columns.
 ///
-/// See [`cashflow_export::export_cashflows`] for the engine behind the
-/// umbrella crate's JSON entry points and the Python and WASM bindings.
+/// See [`cashflow_export::instrument_cashflows`] for the entry point used by
+/// the Python and WASM bindings.
 pub mod cashflow_export;
 
 /// Model parameter snapshots used by attribution.

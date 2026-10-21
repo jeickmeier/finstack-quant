@@ -220,7 +220,7 @@ Reachable from Python and WASM through the JSON envelope
 (`InstrumentJson::Irs` inside `finstack_quant.instrument/1`):
 
 - **Python**: typed leg specs in `finstack_quant.valuations.instruments`, plus
-  `price_instrument(...)` and `instrument_cashflows_json(...)` in the same
+  `price_instrument(...)` and `instrument_cashflows(...)` in the same
   namespace.
 - **WASM**: `valuations.instruments.priceInstrument` and
   `valuations.instruments.instrumentCashflows`.
