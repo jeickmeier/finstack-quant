@@ -934,7 +934,7 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::exotics::asian_option::{AsianOption, AveragingMethod};
+    use crate::exotics::asian_option::AsianOption;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
     use finstack_quant_core::market_data::scalars::MarketScalar;
@@ -943,6 +943,7 @@ mod tests {
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
     use finstack_quant_models::closed_form::asian::{geometric_asian_call, geometric_asian_put};
+    use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
     use finstack_quant_valuations_core::instruments::OptionType;
     use time::Month;
 

@@ -332,7 +332,7 @@ fn test_post_expiry_returns_zero() {
         .exercise_style(ExerciseStyle::European)
         .expiry(expiry)
         .exercise(
-            finstack_quant_valuations_exotics::CommoditySpotOptionExercise {
+            finstack_quant_valuations_exotics::commodity::commodity_spot_option::CommoditySpotOptionExercise {
                 date: expiry,
                 spot: 100.0,
                 settlement_date: expiry,
@@ -377,7 +377,7 @@ fn test_post_expiry_returns_zero() {
         .exercise_style(ExerciseStyle::European)
         .expiry(expiry)
         .exercise(
-            finstack_quant_valuations_exotics::CommoditySpotOptionExercise {
+            finstack_quant_valuations_exotics::commodity::commodity_spot_option::CommoditySpotOptionExercise {
                 date: expiry,
                 spot: 100.0,
                 settlement_date: expiry,

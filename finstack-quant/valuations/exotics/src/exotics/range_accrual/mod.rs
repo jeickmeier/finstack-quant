@@ -29,7 +29,7 @@
 //!
 //! # See Also
 //!
-//! - [`RangeAccrual`] for instrument struct
+//! - [`RangeAccrual`](crate::exotics::range_accrual::RangeAccrual) for instrument struct
 //! - range accrual pricer module for Static Replication and MC implementations
 //!
 

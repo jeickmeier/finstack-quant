@@ -233,9 +233,8 @@ mod mc_invariants {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_valuations::instruments::exotics::asian_option::{
-        AsianOption, AveragingMethod,
-    };
+    use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
+    use finstack_quant_valuations::instruments::exotics::asian_option::AsianOption;
     use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::OptionType;
     use time::macros::date;

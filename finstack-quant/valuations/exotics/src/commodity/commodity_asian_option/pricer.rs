@@ -19,11 +19,11 @@
 //!   European Average Options." `docs/REFERENCES.md#turnbull-wakeman-1991`
 
 use crate::commodity::commodity_asian_option::types::CommodityAsianOption;
-use crate::exotics::asian_option::AveragingMethod;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
+use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
 use finstack_quant_valuations_core::instruments::OptionType;
 use finstack_quant_valuations_core::pricer::{
@@ -429,12 +429,12 @@ impl Pricer for CommodityAsianOptionAnalyticalPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::exotics::asian_option::AveragingMethod;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
     use finstack_quant_core::types::{CurveId, InstrumentId};
+    use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
     use finstack_quant_valuations_core::instruments::common_impl::parameters::CommodityUnderlyingParams;
     use time::Month;
 

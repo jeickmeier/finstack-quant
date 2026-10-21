@@ -17,6 +17,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::PayoutTiming;
 use finstack_quant_core::types::{BarrierType, CurveId, InstrumentId, PriceId};
+use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_valuations::instruments::equity::autocallable::{Autocallable, FinalPayoffType};
 use finstack_quant_valuations::instruments::equity::{CliquetOption, EquityPathModel};
 use finstack_quant_valuations::instruments::exotics::lookback_option::{
@@ -24,8 +25,7 @@ use finstack_quant_valuations::instruments::exotics::lookback_option::{
 };
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::{
-    AsianOption, AveragingMethod, BarrierOption, Instrument, InstrumentPricingOverrides,
-    Monitoring, OptionType,
+    AsianOption, BarrierOption, Instrument, InstrumentPricingOverrides, Monitoring, OptionType,
 };
 use finstack_quant_valuations::pricer::{
     standard_pricer_registry, InstrumentType, ModelKey, PricerKey,

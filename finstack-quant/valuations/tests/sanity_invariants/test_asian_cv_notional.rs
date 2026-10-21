@@ -19,9 +19,8 @@ mod cv_notional_tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::InstrumentId;
-    use finstack_quant_valuations::instruments::exotics::asian_option::{
-        AsianOption, AveragingMethod,
-    };
+    use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
+    use finstack_quant_valuations::instruments::exotics::asian_option::AsianOption;
     use finstack_quant_valuations::instruments::{InstrumentPricingOverrides, OptionType};
     use finstack_quant_valuations::pricer::{
         standard_pricer_registry, InstrumentType, ModelKey, PricerKey,

@@ -51,7 +51,7 @@ use finstack_quant_valuations_core::instruments::OptionType;
 /// # Example
 ///
 /// ```
-/// use finstack_quant_valuations_exotics::commodity::CommoditySpreadOption;
+/// use finstack_quant_valuations_exotics::commodity::commodity_spread_option::CommoditySpreadOption;
 /// use finstack_quant_valuations_core::instruments::OptionType;
 /// use finstack_quant_core::types::{CurveId, InstrumentId};
 /// use time::macros::date;

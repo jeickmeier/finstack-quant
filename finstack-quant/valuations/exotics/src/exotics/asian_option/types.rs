@@ -7,7 +7,7 @@ use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instr
 use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 use finstack_quant_valuations_core::instruments::OptionType;
 
-pub use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
+pub(crate) use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 
 /// Asian option instrument.
 ///
