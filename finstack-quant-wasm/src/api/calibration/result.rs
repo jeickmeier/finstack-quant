@@ -1,4 +1,4 @@
-//! Free-function twins of the Python `CalibrationResult` methods.
+//! Free-function twins of the Python `CalibrationResultEnvelope` methods.
 //!
 //! WASM calibration results are plain `CalibrationResultEnvelope` objects, so
 //! the Rust `CalibrationResult::step_report` and `CalibrationReport::quote_rows`
@@ -13,7 +13,7 @@ use wasm_bindgen::prelude::*;
 
 /// Report of one calibration step, read from a calibration result.
 ///
-/// Free-function twin of Python `CalibrationResult.step_report` (Rust
+/// Free-function twin of Python `CalibrationResultEnvelope.step_report` (Rust
 /// `CalibrationResult::step_report`).
 /// @param result_json - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
 /// @param step_id - Identifier of the calibration step, as given in the plan.
@@ -36,35 +36,9 @@ pub fn calibration_result_step_report(
     to_js_value(report)
 }
 
-/// Report of one calibration step as a compact JSON string.
-///
-/// JSON wire twin of [`calibration_result_step_report`] and free-function twin
-/// of Python `CalibrationResult.step_report_json`.
-/// @param result_json - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
-/// @param step_id - Identifier of the calibration step, as given in the plan.
-/// @returns Compact `CalibrationReport` JSON.
-///
-/// # Errors
-///
-/// Throws a `CalibrationEnvelopeError` if the result is malformed or exceeds
-/// the default load limits, and a `FinstackError` with `kind: "not_found"` if
-/// no step has the given `stepId` or with `kind: "validation"` if the report
-/// cannot be serialized.
-#[wasm_bindgen(js_name = calibrationResultStepReportJson)]
-pub fn calibration_result_step_report_json(
-    result_json: JsValue,
-    step_id: JsValue,
-) -> Result<String, JsValue> {
-    let result_json: &str = &json_text(&result_json, "resultJson")?;
-    let step_id: &str = &js_string(&step_id, "stepId")?;
-    let result = load_result(result_json).map_err(execute_error_to_js)?;
-    let report = result.result.step_report(step_id).map_err(to_js_err)?;
-    serde_json::to_string(report).map_err(to_js_err)
-}
-
 /// Per-quote residual rows of one calibration step.
 ///
-/// Free-function twin of Python `CalibrationResult.residuals`, which returns
+/// Free-function twin of Python `CalibrationResultEnvelope.residuals`, which returns
 /// the same rows (Rust `CalibrationReport::quote_rows`) as a pandas
 /// `DataFrame`. `quote_value` is absent and `sensitivity` is `NaN` unless
 /// `CalibrationConfig.compute_diagnostics` was enabled.

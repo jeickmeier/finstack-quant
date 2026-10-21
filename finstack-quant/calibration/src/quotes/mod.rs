@@ -49,8 +49,6 @@ pub mod inflation;
 mod market_quote;
 /// Interest rate quotes (Deposit, FRA, Futures, Swap).
 pub mod rates;
-/// Shared numeric quote validation.
-pub(crate) mod validate;
 /// Volatility quotes.
 pub mod vol;
 /// Cross-currency swap quotes.

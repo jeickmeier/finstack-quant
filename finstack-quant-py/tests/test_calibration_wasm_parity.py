@@ -36,7 +36,6 @@ from finstack_quant.calibration import (
 from finstack_quant.calibration.hull_white import (
     CapFloorCalibrationConfig,
     CapFloorQuote,
-    HullWhiteParams,
     PiecewiseSigmaCalibrationConfig,
     SwaptionQuote,
     bootstrap_hull_white_sigma_schedule_to_cap_floors,
@@ -44,6 +43,7 @@ from finstack_quant.calibration.hull_white import (
     calibrate_hull_white_to_swaptions,
 )
 from finstack_quant.core.market_data import DiscountCurve
+from finstack_quant.models.rates.hull_white import HullWhiteParams
 
 GOLDEN: dict[str, Any] = json.loads((Path(__file__).parent / "data" / "calibration_wasm_parity.json").read_text())
 HW: dict[str, Any] = GOLDEN["hull_white"]
@@ -146,7 +146,7 @@ def test_validate_calibration_and_dry_run_accept_the_shared_envelope() -> None:
     validated = validate_calibration(envelope)
     assert validated.plan.id == envelope["plan"]["id"]
     assert validated.plan.step_ids == ["USD-OIS"]
-    assert CalibrationEnvelope.from_json(json.dumps(envelope)).dry_run().is_valid
+    assert dry_run(CalibrationEnvelope.from_json(json.dumps(envelope))).is_valid
     assert dry_run(envelope).is_valid
     broken = json.loads(json.dumps(envelope))
     broken["plan"]["steps"][0]["quote_set"] = "missing"
@@ -162,7 +162,6 @@ def test_result_step_report_and_residuals_match_the_shared_golden() -> None:
     assert report.success is expected["success"]
     assert report.iterations == expected["iterations"]
     assert sorted(report.residuals) == expected["residual_ids"]
-    assert json.loads(result.step_report_json("USD-OIS"))["iterations"] == expected["iterations"]
     frame = result.residuals("USD-OIS")
     assert list(frame["quote_id"]) == expected["residual_ids"]
     assert all(abs(value) < 1e-8 for value in frame["residual"])
@@ -186,10 +185,10 @@ def test_hull_white_piecewise_bootstrap_matches_the_shared_golden() -> None:
     assert params.kappa == expected["params"]["kappa"]
     assert params.times == expected["params"]["volatility"]["times"]
     assert params.values == pytest.approx(expected["params"]["volatility"]["values"], rel=1e-8)
-    assert params.sigma_at(1.5) == pytest.approx(expected["sigma_at_1_5"], rel=1e-8)
-    assert params.sigma_at(0.5) == pytest.approx(expected["sigma_at_0_5"], rel=1e-8)
+    assert params.sigma(1.5) == pytest.approx(expected["sigma_at_1_5"], rel=1e-8)
+    assert params.sigma(0.5) == pytest.approx(expected["sigma_at_0_5"], rel=1e-8)
     exact = HullWhiteParams.from_json(json.dumps(expected["params"]))
-    assert exact.sigma_at(1.5) == expected["sigma_at_1_5"]
+    assert exact.sigma(1.5) == expected["sigma_at_1_5"]
 
 
 def test_hull_white_cap_floor_fit_matches_the_shared_golden() -> None:

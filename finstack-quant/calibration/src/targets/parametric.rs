@@ -35,7 +35,7 @@ pub(crate) struct ParametricCurveTargetParams {
     /// NS or NSS variant.
     pub(crate) variant: NsVariant,
     /// Optional initial parameter guesses.
-    pub(crate) initial_params: Option<NelsonSiegelModel>,
+    pub(crate) initial_params: NelsonSiegelModel,
     /// Base market context.
     pub(crate) base_context: MarketContext,
     /// Residual normalization notional (used to scale PV residuals to per-unit notional).
@@ -175,24 +175,26 @@ impl ParametricCurveTarget {
         )?;
         let prepared_quotes = prepared.quotes;
 
-        let initial_params = schema_params.initial_params.clone().or_else(|| {
-            Some(match schema_params.model {
-                NsVariant::Ns => NelsonSiegelModel::Ns {
-                    beta0: 0.03,
-                    beta1: -0.02,
-                    beta2: 0.01,
-                    tau: 1.5,
-                },
-                NsVariant::Nss => NelsonSiegelModel::Nss {
-                    beta0: 0.03,
-                    beta1: -0.02,
-                    beta2: 0.01,
-                    beta3: 0.01,
-                    tau1: 1.5,
-                    tau2: 5.0,
-                },
-            })
-        });
+        let initial_params =
+            schema_params
+                .initial_params
+                .clone()
+                .unwrap_or(match schema_params.model {
+                    NsVariant::Ns => NelsonSiegelModel::Ns {
+                        beta0: 0.03,
+                        beta1: -0.02,
+                        beta2: 0.01,
+                        tau: 1.5,
+                    },
+                    NsVariant::Nss => NelsonSiegelModel::Nss {
+                        beta0: 0.03,
+                        beta1: -0.02,
+                        beta2: 0.01,
+                        beta3: 0.01,
+                        tau1: 1.5,
+                        tau2: 5.0,
+                    },
+                });
 
         let config = global_config.clone();
         let target = Self::new(
@@ -219,13 +221,7 @@ impl ParametricCurveTarget {
     }
 
     fn default_guesses(&self) -> Vec<f64> {
-        if let Some(ref model) = self.params.initial_params {
-            return model.to_params_vec();
-        }
-        match self.params.variant {
-            NsVariant::Ns => vec![0.03, -0.02, 0.01, 1.5],
-            NsVariant::Nss => vec![0.03, -0.02, 0.01, 0.01, 1.5, 5.0],
-        }
+        self.params.initial_params.to_params_vec()
     }
 }
 

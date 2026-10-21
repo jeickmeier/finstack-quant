@@ -27,7 +27,7 @@
 //!   and step constructors, returning the plain serde objects (`fields` holds
 //!   their shared argument marshalling).
 //! - `hull_white`: direct Hull-White one-factor calibrators on curve handles.
-//! - `result`: free-function twins of the Python `CalibrationResult` methods.
+//! - `result`: free-function twins of the Python `CalibrationResultEnvelope` methods.
 
 // `EnvelopeError` / `ExecuteError` are intentionally large structured errors
 // (rich diagnostic payloads); boxing them would change their public API.
@@ -84,7 +84,7 @@ pub fn validate_calibration(envelope: JsValue) -> Result<JsValue, JsValue> {
     let envelope: &str = &json_text(&envelope, "envelope")?;
     let parsed =
         validate::parse_envelope(envelope).map_err(|err| execute_error_to_js(err.into()))?;
-    validate::validate_fail_fast(&parsed).map_err(|err| execute_error_to_js(err.into()))?;
+    validate::validate_calibration(&parsed).map_err(|err| execute_error_to_js(err.into()))?;
     to_js_value(&parsed)
 }
 
@@ -151,7 +151,7 @@ pub fn calibration_envelope_content_hash(envelope_json: JsValue) -> Result<Strin
 
 /// Canonical content hash of a calibration result envelope.
 ///
-/// Free-function twin of Python `CalibrationResult.content_hash` (Rust
+/// Free-function twin of Python `CalibrationResultEnvelope.content_hash` (Rust
 /// `CalibrationResultEnvelope::content_hash`): the result is strict-loaded
 /// (default load limits), then hashed over its canonical JSON.
 /// @param result_json - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
@@ -360,7 +360,7 @@ mod tests {
     #[test]
     fn validate_calibration_returns_the_typed_envelope() {
         let envelope = validate::parse_envelope(&empty_envelope_json()).expect("parse");
-        validate::validate_fail_fast(&envelope).expect("validate");
+        validate::validate_calibration(&envelope).expect("validate");
         assert_eq!(envelope.plan.id, "empty");
         assert!(validate::parse_envelope("{ not json").is_err());
     }
@@ -392,7 +392,10 @@ mod tests {
         assert_eq!(details.stage.as_str(), "ingestion");
         assert_eq!(details.category, "strict_load");
         assert!(!details.cause.is_empty());
-        assert!(error.to_json().contains("\"stage\":\"ingestion\""));
+        assert!(error
+            .details()
+            .to_json()
+            .contains("\"stage\":\"ingestion\""));
     }
 
     #[test]
@@ -435,7 +438,7 @@ mod tests {
         let error = engine::calibrate_from_json("{ this is not valid json")
             .expect_err("malformed envelope must error");
         let details = error.details();
-        let json = error.to_json();
+        let json = error.details().to_json();
         assert_eq!(details.stage.as_str(), "ingestion");
         assert_eq!(details.category, "strict_load");
         assert!(

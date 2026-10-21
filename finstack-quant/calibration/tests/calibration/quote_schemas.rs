@@ -388,7 +388,7 @@ fn xccy_quote_helpers_preserve_ids() {
         spot_fx: Some(1.08),
     };
     assert_eq!(xccy.id().as_str(), "EURUSD-XCCY-5Y");
-    assert!((xccy.value() - 12.5).abs() < tolerances::TIGHT);
+    assert!((xccy.basis_spread_bp - 12.5).abs() < tolerances::TIGHT);
 }
 
 #[test]

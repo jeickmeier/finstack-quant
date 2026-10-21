@@ -137,30 +137,14 @@ pub fn validate_calendar_spread_with_forwards(
         }
     }
 
-    if !violations.is_empty() && !config.lenient_arbitrage {
-        let details: Vec<String> = violations
-            .iter()
-            .take(5)
-            .map(|(k, t1, t2, w1, w2)| {
-                format!("k={k:.4}: w({t1:.4}y)={w1:.6} > w({t2:.4}y)={w2:.6}")
-            })
-            .collect();
-        let suffix = if violations.len() > 5 {
-            format!(" (and {} more)", violations.len() - 5)
-        } else {
-            String::new()
-        };
-        return Err(Error::Validation(format!(
-            "Calendar spread arbitrage (fixed forward-moneyness) at {} point(s) in {}: [{}]{}. \
-             Total variance must be non-decreasing in expiry at fixed k = ln(K/F_T).",
-            violations.len(),
-            surface.id().as_str(),
-            details.join("; "),
-            suffix
-        )));
-    }
-
-    Ok(())
+    strict_arbitrage_result(
+        surface,
+        config,
+        &violations,
+        "Calendar spread arbitrage (fixed forward-moneyness)",
+        "Total variance must be non-decreasing in expiry at fixed k = ln(K/F_T).",
+        |(k, t1, t2, w1, w2)| format!("k={k:.4}: w({t1:.4}y)={w1:.6} > w({t2:.4}y)={w2:.6}"),
+    )
 }
 
 /// Validate that undiscounted call prices are convex in strike and that every
@@ -254,25 +238,14 @@ pub fn validate_butterfly_call_convexity(
         }
     }
 
-    if !violations.is_empty() && !config.lenient_arbitrage {
-        let details: Vec<&str> = violations.iter().take(5).map(String::as_str).collect();
-        let suffix = if violations.len() > 5 {
-            format!(" (and {} more)", violations.len() - 5)
-        } else {
-            String::new()
-        };
-        return Err(Error::Validation(format!(
-            "Call-spread arbitrage at {} point(s) in {}: [{}]{}. \
-             Undiscounted call prices must be convex in strike, and adjacent vertical \
-             spreads must cost between zero and their strike width.",
-            violations.len(),
-            surface.id().as_str(),
-            details.join("; "),
-            suffix
-        )));
-    }
-
-    Ok(())
+    strict_arbitrage_result(
+        surface,
+        config,
+        &violations,
+        "Call-spread arbitrage",
+        "Undiscounted call prices must be convex in strike, and adjacent vertical spreads must cost between zero and their strike width.",
+        String::clone,
+    )
 }
 
 /// Validate calendar monotonicity at fixed absolute strike.
@@ -329,35 +302,14 @@ pub fn validate_calendar_spread(surface: &VolSurface, config: &ValidationConfig)
         }
     }
 
-    // In strict mode (default), fail on any calendar arbitrage violations
-    if !violations.is_empty() && !config.lenient_arbitrage {
-        let details: Vec<String> = violations
-            .iter()
-            .take(5)
-            .map(|(k, t, actual, expected)| {
-                format!(
-                    "K={:.2}, T={:.4}y (var={:.6} < {:.6})",
-                    k, t, actual, expected
-                )
-            })
-            .collect();
-        let suffix = if violations.len() > 5 {
-            format!(" (and {} more)", violations.len() - 5)
-        } else {
-            String::new()
-        };
-        return Err(Error::Validation(format!(
-            "Calendar spread arbitrage detected at {} point(s) in {}: [{}]{}. \
-                Total variance must be monotonically increasing in expiry. \
-                Consider using SVI or monotone convex fitting for arbitrage-free surfaces.",
-            violations.len(),
-            surface.id().as_str(),
-            details.join("; "),
-            suffix
-        )));
-    }
-
-    Ok(())
+    strict_arbitrage_result(
+        surface,
+        config,
+        &violations,
+        "Calendar spread arbitrage detected",
+        "Total variance must be monotonically increasing in expiry. Consider using SVI or monotone convex fitting for arbitrage-free surfaces.",
+        |(k, t, actual, expected)| format!("K={k:.2}, T={t:.4}y (var={actual:.6} < {expected:.6})"),
+    )
 }
 
 /// Apply a forward-free convexity-band heuristic to total variance.
@@ -435,35 +387,14 @@ pub fn validate_butterfly_spread(surface: &VolSurface, config: &ValidationConfig
         }
     }
 
-    // In strict mode (default), fail on any butterfly arbitrage violations
-    if !violations.is_empty() && !config.lenient_arbitrage {
-        let details: Vec<String> = violations
-            .iter()
-            .take(5)
-            .map(|(t, k, actual, interp, ratio)| {
-                format!(
-                    "T={:.2}y, K={:.2} (var={:.6} vs interp={:.6}, ratio={:.2})",
-                    t, k, actual, interp, ratio
-                )
-            })
-            .collect();
-        let suffix = if violations.len() > 5 {
-            format!(" (and {} more)", violations.len() - 5)
-        } else {
-            String::new()
-        };
-        return Err(Error::Validation(format!(
-            "Butterfly spread arbitrage detected at {} point(s) in {}: [{}]{}. \
-                Total variance must be convex in strike. \
-                Consider using SVI or monotone convex fitting for arbitrage-free surfaces.",
-            violations.len(),
-            surface.id().as_str(),
-            details.join("; "),
-            suffix
-        )));
-    }
-
-    Ok(())
+    strict_arbitrage_result(
+        surface,
+        config,
+        &violations,
+        "Butterfly spread arbitrage detected",
+        "Total variance must be convex in strike. Consider using SVI or monotone convex fitting for arbitrage-free surfaces.",
+        |(t, k, actual, interp, ratio)| format!("T={t:.2}y, K={k:.2} (var={actual:.6} vs interp={interp:.6}, ratio={ratio:.2})"),
+    )
 }
 
 /// Validate volatility bounds.
@@ -509,4 +440,32 @@ pub fn validate_vol_bounds(surface: &VolSurface, config: &ValidationConfig) -> R
     }
 
     Ok(())
+}
+
+/// Fail with up to five sampled violations unless lenient arbitrage checks are on.
+///
+/// The message is `"{kind} at {n} point(s) in {surface id}: [...]{more}. {rule}"`.
+fn strict_arbitrage_result<T>(
+    surface: &VolSurface,
+    config: &ValidationConfig,
+    violations: &[T],
+    kind: &str,
+    rule: &str,
+    describe: impl Fn(&T) -> String,
+) -> Result<()> {
+    if violations.is_empty() || config.lenient_arbitrage {
+        return Ok(());
+    }
+    let details: Vec<String> = violations.iter().take(5).map(describe).collect();
+    let suffix = if violations.len() > 5 {
+        format!(" (and {} more)", violations.len() - 5)
+    } else {
+        String::new()
+    };
+    Err(Error::Validation(format!(
+        "{kind} at {} point(s) in {}: [{}]{suffix}. {rule}",
+        violations.len(),
+        surface.id().as_str(),
+        details.join("; "),
+    )))
 }

@@ -368,7 +368,6 @@
               "df_hard_min": 1e-12,
               "jacobian_step_size": 1e-06,
               "min_scan_grid_points": 20,
-              "min_t_spot": 1e-06,
               "scan_grid_points": 48,
               "scan_grid_step": 0.0001,
               "validation_tolerance": 1e-08,
@@ -427,7 +426,6 @@
               "tolerance": 1e-10
             },
             "validation_mode": "error",
-            "verbose": false,
             "vol_surface": {
               "validation_tolerance": 0.001
             }
@@ -779,7 +777,6 @@
               "df_hard_min": 1e-12,
               "jacobian_step_size": 1e-06,
               "min_scan_grid_points": 20,
-              "min_t_spot": 1e-06,
               "scan_grid_points": 48,
               "scan_grid_step": 0.0001,
               "validation_tolerance": 1e-08,
@@ -838,7 +835,6 @@
               "tolerance": 1e-10
             },
             "validation_mode": "error",
-            "verbose": false,
             "vol_surface": {
               "validation_tolerance": 0.001
             }

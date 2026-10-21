@@ -55,9 +55,9 @@ repos:
 
       - id: wasm-format
         name: WASM format (prettier)
-        entry: bash -c 'cd finstack-quant-wasm && npm run format:fix'
+        entry: npm --prefix finstack-quant-wasm run format:fix
         language: system
-        files: ^finstack-quant-wasm/.*\.(ts|tsx|js|jsx)$
+        files: ^finstack-quant-wasm/.*\.(ts|tsx|js|jsx|mjs|json|css|md)$
         pass_filenames: false
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
@@ -104,9 +104,16 @@ repos:
 
       - id: wasm-lint
         name: WASM lint (eslint)
-        entry: bash -c 'cd finstack-quant-wasm && npm run lint'
+        entry: npm --prefix finstack-quant-wasm run lint
         language: system
-        files: ^finstack-quant-wasm/.*\.(ts|tsx|js|jsx)$
+        files: ^finstack-quant-wasm/.*\.(ts|tsx|js|jsx|mjs|cjs)$
+        pass_filenames: false
+
+      - id: wasm-boundary
+        name: WASM boundary check (serializer and errors)
+        entry: python3 scripts/check_wasm_boundary.py
+        language: system
+        files: ^(finstack-quant-wasm/src/.*\.rs|scripts/check_wasm_boundary\.py)$
         pass_filenames: false
 
   # ============================================
@@ -140,16 +147,16 @@ repos:
 
   - repo: local
     hooks:
-      - id: wasm-audit
-        name: WASM security (npm audit)
-        entry: bash -c 'cd finstack-quant-wasm && npm audit --audit-level=high --omit=dev'
-        language: system
-        files: ^finstack-quant-wasm/(package\.json|package-lock\.json)$
-        pass_filenames: false
-
       - id: cargo-deny
         name: Rust supply-chain security (cargo deny)
         entry: cargo deny check
         language: system
         files: (Cargo\.toml|Cargo\.lock|deny\.toml)$
+        pass_filenames: false
+
+      - id: osv-scanner
+        name: Supply-chain security (OSV-Scanner)
+        entry: osv-scanner scan --lockfile=Cargo.lock --lockfile=uv.lock --lockfile=finstack-quant-wasm/package-lock.json
+        language: system
+        files: ^(Cargo\.lock|uv\.lock|finstack-quant-wasm/package-lock\.json|osv-scanner\.toml)$
         pass_filenames: false

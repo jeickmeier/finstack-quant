@@ -10,7 +10,7 @@ use crate::quotes::MarketQuote;
 use crate::solver::bootstrap::SequentialBootstrapper;
 use crate::solver::global::GlobalFitOptimizer;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
-use crate::targets::rate_recipe::recipe_ois_compounding;
+use crate::targets::rate_recipe::rate_calibration_recipe;
 use crate::targets::util::{
     discount_and_forward_curve_ids, prepare_rate_calibration_quotes, pv01_residual_weight,
     sorted_knot_grid, validate_global_knot_grid, ContextScratch,
@@ -21,7 +21,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
-    DiscountCurve, DiscountCurveBuilder, RateCalibrationCurveRole, RateCalibrationRecipe,
+    DiscountCurve, DiscountCurveBuilder, RateCalibrationCurveRole,
     ValidationMode as CurveValidationMode,
 };
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
@@ -346,10 +346,14 @@ impl DiscountCurveTarget {
             .pricing_forward_id
             .as_ref()
             .unwrap_or(&params.curve_id);
-        let rate_calibration = Self::rate_calibration(
-            params,
+        let rate_calibration = rate_calibration_recipe(
+            params.currency,
+            &params.method,
             curve_day_count,
-            forward_id.clone(),
+            params.conventions.ois_compounding.as_ref(),
+            RateCalibrationCurveRole::Discount {
+                projection_curve_id: forward_id.clone(),
+            },
             &raw_rates_quotes,
         )?;
 
@@ -515,29 +519,6 @@ impl DiscountCurveTarget {
             .insert("currency".to_string(), params.currency.to_string());
 
         Ok((curve, report))
-    }
-
-    fn rate_calibration(
-        params: &DiscountCurveParams,
-        curve_day_count: DayCount,
-        projection_curve_id: CurveId,
-        quotes: &[RateQuote],
-    ) -> Result<RateCalibrationRecipe> {
-        Ok(RateCalibrationRecipe {
-            currency: params.currency,
-            method: (&params.method).into(),
-            curve_day_count,
-            ois_compounding: params
-                .conventions
-                .ois_compounding
-                .as_ref()
-                .map(recipe_ois_compounding)
-                .transpose()?,
-            role: RateCalibrationCurveRole::Discount {
-                projection_curve_id,
-            },
-            quotes: quotes.iter().map(Into::into).collect(),
-        })
     }
 
     /// Extract the OIS rate cut-off (business days) from the step-level

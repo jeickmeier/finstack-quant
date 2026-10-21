@@ -47,15 +47,6 @@ use crate::validation::surfaces::{
 pub(crate) struct SviSurfaceTarget;
 
 impl SviSurfaceTarget {
-    fn validate_positive_input(label: &str, value: f64) -> Result<()> {
-        if !value.is_finite() || value <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "{label} must be finite and positive; got {value}"
-            )));
-        }
-        Ok(())
-    }
-
     /// Calibrate an SVI volatility surface from option vol quotes.
     ///
     /// Groups quotes by expiry, calibrates SVI parameters per expiry slice,
@@ -73,7 +64,7 @@ impl SviSurfaceTarget {
         }
         let option_quotes = extract_equity_option_quotes(quotes, &params.underlying_ticker)?;
         let spot = resolve_equity_spot(params.spot_override, &params.underlying_ticker, context)?;
-        Self::validate_positive_input("SVI spot", spot)?;
+        finstack_quant_core::validation::validate_f64_positive(spot, "SVI spot")?;
 
         let discount = params
             .discount_curve_id
@@ -123,7 +114,7 @@ impl SviSurfaceTarget {
                     )
                 })?;
                 let forward = spot * (-dividend_yield * t).exp();
-                Self::validate_positive_input("SVI forward", forward)?;
+                finstack_quant_core::validation::validate_f64_positive(forward, "SVI forward")?;
                 Ok(forward)
             }
         };
@@ -142,8 +133,11 @@ impl SviSurfaceTarget {
                     *expiry,
                     DayCountContext::default(),
                 )?;
-                Self::validate_positive_input("SVI quote strike", *strike)?;
-                Self::validate_positive_input("SVI quote vol", *vol)?;
+                finstack_quant_core::validation::validate_f64_positive(
+                    *strike,
+                    "SVI quote strike",
+                )?;
+                finstack_quant_core::validation::validate_f64_positive(*vol, "SVI quote vol")?;
                 if t > 0.0 {
                     quotes_by_expiry
                         .entry(t.into())
@@ -177,7 +171,7 @@ impl SviSurfaceTarget {
 
             let expiry = expiry_key.into_inner();
             let forward = forward_fn(expiry)?;
-            Self::validate_positive_input("SVI forward", forward)?;
+            finstack_quant_core::validation::validate_f64_positive(forward, "SVI forward")?;
             let strikes: Vec<f64> = expiry_quotes.iter().map(|(strike, _)| *strike).collect();
             let vols: Vec<f64> = expiry_quotes.iter().map(|(_, vol)| *vol).collect();
 
@@ -200,7 +194,7 @@ impl SviSurfaceTarget {
             Vec::with_capacity(params.target_expiries.len() * params.target_strikes.len());
         for &target_expiry in &params.target_expiries {
             let forward = forward_fn(target_expiry)?;
-            Self::validate_positive_input("SVI forward", forward)?;
+            finstack_quant_core::validation::validate_f64_positive(forward, "SVI forward")?;
             for &target_strike in &params.target_strikes {
                 let vol = interpolate_svi_vol(
                     target_expiry,

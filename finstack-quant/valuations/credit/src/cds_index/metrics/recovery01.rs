@@ -19,7 +19,7 @@
 //! the true value by 2-5x for spread-bootstrapped curves.
 
 use crate::cds::metrics::market_doc_clause;
-use crate::cds_index::CdsIndex;
+use crate::cds_index::{CdsIndex, IndexPricing};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
@@ -88,34 +88,43 @@ impl MetricCalculator for Recovery01Calculator {
         let index: &CdsIndex = context.instrument_as()?;
         let as_of = context.as_of;
 
+        // Recovery the bumped index prices with: the index leg in
+        // `SingleCurve` mode, the surviving constituents otherwise. Defaulted
+        // names are settled and outside both PV and market dependencies.
+        let by_constituent = index.pricing == IndexPricing::Constituents;
         let bump = |idx: &CdsIndex, delta: f64| -> CdsIndex {
             let mut bumped = idx.clone();
-            if bumped.constituents.is_empty() {
-                let base = bumped.protection_leg.recovery_rate;
-                bumped.protection_leg.recovery_rate = (base + delta).clamp(0.0, 1.0);
-            } else {
-                for con in &mut bumped.constituents {
+            if by_constituent {
+                for con in bumped.constituents.iter_mut().filter(|c| !c.defaulted) {
                     let base = con.credit.recovery_rate;
                     con.credit.recovery_rate = (base + delta).clamp(0.0, 1.0);
                 }
+            } else {
+                let base = bumped.protection_leg.recovery_rate;
+                bumped.protection_leg.recovery_rate = (base + delta).clamp(0.0, 1.0);
             }
             bumped
         };
 
         let effective_delta = |idx: &CdsIndex, delta: f64| -> f64 {
-            if idx.constituents.is_empty() {
-                let base = idx.protection_leg.recovery_rate;
-                (base + delta).clamp(0.0, 1.0) - base
-            } else {
-                let sum: f64 = idx
+            if by_constituent {
+                let deltas: Vec<f64> = idx
                     .constituents
                     .iter()
+                    .filter(|con| !con.defaulted)
                     .map(|con| {
                         let base = con.credit.recovery_rate;
                         (base + delta).clamp(0.0, 1.0) - base
                     })
-                    .sum();
-                sum / idx.constituents.len() as f64
+                    .collect();
+                if deltas.is_empty() {
+                    0.0
+                } else {
+                    deltas.iter().sum::<f64>() / deltas.len() as f64
+                }
+            } else {
+                let base = idx.protection_leg.recovery_rate;
+                (base + delta).clamp(0.0, 1.0) - base
             }
         };
 
@@ -123,16 +132,8 @@ impl MetricCalculator for Recovery01Calculator {
         // at its bumped recovery (re-bootstrap when par quotes are stored).
         let market_for = |bumped: &CdsIndex| -> Result<MarketContext> {
             let mut market = context.curves.as_ref().clone();
-            if bumped.constituents.is_empty() {
-                market = market_with_recovery(
-                    context,
-                    bumped,
-                    &market,
-                    bumped.protection_leg.credit_curve_id.as_str(),
-                    bumped.protection_leg.recovery_rate,
-                )?;
-            } else {
-                for con in &bumped.constituents {
+            if by_constituent {
+                for con in bumped.constituents.iter().filter(|c| !c.defaulted) {
                     market = market_with_recovery(
                         context,
                         bumped,
@@ -141,6 +142,14 @@ impl MetricCalculator for Recovery01Calculator {
                         con.credit.recovery_rate,
                     )?;
                 }
+            } else {
+                market = market_with_recovery(
+                    context,
+                    bumped,
+                    &market,
+                    bumped.protection_leg.credit_curve_id.as_str(),
+                    bumped.protection_leg.recovery_rate,
+                )?;
             }
             Ok(market)
         };

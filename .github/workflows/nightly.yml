@@ -34,7 +34,7 @@ jobs:
   # ============================================
   prime-cache:
     name: Prime mise cache
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     steps:
@@ -58,7 +58,7 @@ jobs:
   # ============================================
   supply-chain:
     name: Supply-chain Security
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: prime-cache
 
@@ -80,14 +80,14 @@ jobs:
   # ============================================
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Clippy + gen-check are cargo-heavy; keep headroom above the ~50m wall
     # that cancelled a green run during post-step cleanup.
     timeout-minutes: 90
     needs: supply-chain
 
     env:
-      # ubuntu-latest is 4 vCPUs; keep parallelism matched (was 2 for OOM caution).
+      # ubuntu-24.04 is 4 vCPUs; keep parallelism matched (was 2 for OOM caution).
       # Rust 1.90+ links x86_64-unknown-linux-gnu with rust-lld. Do not force ld.bfd.
       # Incremental is off because Swatinem/rust-cache does not restore target/incremental.
       CARGO_BUILD_JOBS: 4
@@ -112,7 +112,7 @@ jobs:
       # rust-cache hashes `rustc -vV` of every toolchain `rustup toolchain list`
       # shows into its restore key. mise installs into the image's rustup
       # (RUSTUP_HOME=~/.rustup), so the image's preinstalled `stable` is listed
-      # too, and it differs between ubuntu-latest images (1.99.0 vs 1.99.1): the
+      # too, and it differs between ubuntu-24.04 images (1.99.0 vs 1.99.1): the
       # key flips and the restore misses. Nothing builds with it: mise exports
       # RUSTUP_TOOLCHAIN and rust-toolchain.toml pins the same version. Every
       # rust-cache step needs this step before it.
@@ -155,10 +155,10 @@ jobs:
 
       # mise pre-commit-run uses `uv run --no-sync`. Plain `uv run` here used to
       # build the PyO3 extension (~20–25m) even though lint never needs it.
-      # Skip cargo-deny here: the supply-chain job already owns it.
+      # Skip cargo-deny and osv-scanner here: the supply-chain job already owns them.
       - name: Run pre-commit checks
         env:
-          SKIP: cargo-deny
+          SKIP: cargo-deny,osv-scanner
         run: mise run pre-commit-run
 
       - name: Check generated schemas and bindings
@@ -169,7 +169,7 @@ jobs:
   # ============================================
   test-rust:
     name: Test Rust
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Coverage instrumentation slows the suite.
     timeout-minutes: 90
     needs: supply-chain
@@ -208,6 +208,10 @@ jobs:
       - name: Run Rust lib and integration tests with coverage
         run: mise run rust-test --coverage
 
+      - name: Report Rust test and coverage results
+        if: always()
+        run: python3 scripts/ci_report.py rust
+
       - name: Upload Rust coverage
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -221,7 +225,7 @@ jobs:
   # ============================================
   test-python:
     name: Test Python
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 50
     needs: supply-chain
 
@@ -268,6 +272,10 @@ jobs:
       - name: Build extension and run fast Python tests with coverage
         run: mise run python-test --coverage
 
+      - name: Report Python test and coverage results
+        if: always()
+        run: python3 scripts/ci_report.py python
+
       - name: Upload Python coverage
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -281,13 +289,13 @@ jobs:
   # ============================================
   test-wasm:
     name: Test WASM
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 50
     needs: supply-chain
 
     env:
       # Four parallel rust-lld links of the wasm-bindgen test graph SIGBUS on
-      # ubuntu-latest (~7 GiB). Keep this below the native-job default of 4.
+      # ubuntu-24.04 (~7 GiB). Keep this below the native-job default of 4.
       CARGO_BUILD_JOBS: 2
       CARGO_INCREMENTAL: 0
       CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
@@ -325,14 +333,15 @@ jobs:
         run: npm ci --ignore-scripts
         working-directory: finstack-quant-wasm
 
-      # No binding may call `serde_wasm_bindgen::to_value` (its ES `Map`s are
-      # silently dropped by `JSON.stringify`) or throw a string-built error.
-      # The same check runs in `mise run wasm-lint`, which CI does not invoke.
-      - name: Check WASM serializer and error paths
-        run: python3 scripts/check_wasm_boundary.py
-
       - name: Run WASM tests
-        run: mise run wasm-test
+        run: |
+          set -o pipefail
+          mkdir -p coverage/wasm
+          mise run wasm-test 2>&1 | tee coverage/wasm/wasm-test.log
+
+      - name: Report WASM test results
+        if: always()
+        run: python3 scripts/ci_report.py wasm
 
   # ============================================
   # SonarQube — scan only, on master; runs after all three test jobs and
@@ -341,7 +350,7 @@ jobs:
   sonarqube:
     name: SonarQube
     if: github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: [test-rust, test-python, test-wasm]
 
@@ -375,3 +384,9 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Report SonarQube analysis results
+        if: always()
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: python3 scripts/ci_report.py sonarqube

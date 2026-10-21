@@ -14,7 +14,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import init, { calibration, core } from '../../index.js';
+import init, { calibration, core, models } from '../../index.js';
 
 await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
@@ -281,10 +281,6 @@ test('calibrationResultStepReport, its JSON twin and residuals read one step', (
   assert.equal(report.iterations, expected.iterations);
   assert.deepEqual(Object.keys(report.residuals).sort(), expected.residual_ids);
   assert.equal(
-    JSON.parse(calibration.calibrationResultStepReportJson(result, 'USD-OIS')).iterations,
-    expected.iterations
-  );
-  assert.equal(
     calibration.calibrationResultStepReport(JSON.stringify(result), 'USD-OIS').iterations,
     expected.iterations
   );
@@ -299,7 +295,6 @@ test('calibrationResultStepReport, its JSON twin and residuals read one step', (
   }
   for (const read of [
     calibration.calibrationResultStepReport,
-    calibration.calibrationResultStepReportJson,
     calibration.calibrationResultResiduals,
   ]) {
     assert.throws(
@@ -346,14 +341,15 @@ test('bootstrapHullWhiteSigmaScheduleToCapFloors matches the Python bootstrap', 
   );
 });
 
-test('hullWhiteParamsSigmaAt reads the piecewise sigma like Python sigma_at', () => {
+test('the bootstrapped HullWhiteParams reads its piecewise sigma through models.rates.hullWhite', () => {
   const expected = HW.piecewise;
-  assert.equal(calibration.hullWhiteParamsSigmaAt(expected.params, 1.5), expected.sigma_at_1_5);
-  assert.equal(
-    calibration.hullWhiteParamsSigmaAt(JSON.stringify(expected.params), 0.5),
-    expected.sigma_at_0_5
+  const params = models.rates.hullWhite.HullWhiteParams.piecewise(
+    expected.params.kappa,
+    expected.params.volatility.times,
+    expected.params.volatility.values
   );
-  assert.throws(() => calibration.hullWhiteParamsSigmaAt({ kappa: 0.03 }, 1.0), validation);
+  assert.equal(params.sigma(1.5), expected.sigma_at_1_5);
+  assert.equal(params.sigma(0.5), expected.sigma_at_0_5);
 });
 
 test('calibrateHullWhiteToCapFloors matches the Python fixed-kappa fit', () => {

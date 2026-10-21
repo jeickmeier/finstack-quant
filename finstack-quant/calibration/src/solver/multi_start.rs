@@ -45,21 +45,12 @@ pub(crate) struct MultiStartConfig {
     pub(crate) perturbation_scale: f64,
 }
 
-impl Default for MultiStartConfig {
-    fn default() -> Self {
-        Self {
-            num_restarts: 5,
-            perturbation_scale: 0.5,
-        }
-    }
-}
-
 /// Prime bases used when assigning a Halton stream per parameter dimension.
 ///
 /// For dimension `i` we use `BASES[i % BASES.len()]`. Ten bases is enough
 /// for any realistic calibration problem in this workspace (largest seen:
 /// ~8-parameter multi-factor LMM).
-pub(crate) const HALTON_BASES: [usize; 10] = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29];
+const HALTON_BASES: [usize; 10] = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29];
 
 /// Halton sequence value for index `n` with the given prime `base`.
 ///
@@ -67,7 +58,7 @@ pub(crate) const HALTON_BASES: [usize; 10] = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29
 /// the first `N` points cover `[0, 1)` more evenly than `N` independent
 /// uniform samples — which is exactly what multi-start wants.
 #[inline]
-pub(crate) fn halton(mut n: usize, base: usize) -> f64 {
+fn halton(mut n: usize, base: usize) -> f64 {
     debug_assert!(base >= 2, "Halton base must be >= 2");
     let mut result = 0.0_f64;
     let mut f = 1.0_f64 / base as f64;
@@ -254,13 +245,6 @@ mod tests {
             !all_equal,
             "per-dimension Halton streams must decouple: got {perturbed:?}"
         );
-    }
-
-    #[test]
-    fn multi_start_config_defaults_are_stable() {
-        let cfg = MultiStartConfig::default();
-        assert_eq!(cfg.num_restarts, 5);
-        assert!((cfg.perturbation_scale - 0.5).abs() < 1e-15);
     }
 
     /// W-37: the perturbation must be ADDITIVE in the parameter space the

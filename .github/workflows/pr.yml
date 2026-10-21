@@ -31,7 +31,7 @@ jobs:
     name: PR gate
     needs: checks
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require every check to pass

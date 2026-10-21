@@ -278,8 +278,6 @@ pub struct DiscountCurveSolveConfig {
     pub df_hard_min: f64,
     /// Finite upper discount-factor bound, strictly above `df_hard_min`.
     pub df_hard_max: f64,
-    /// Minimum time threshold for considering a knot at spot (t=0).
-    pub min_t_spot: f64,
     /// Whether to use a sequential bootstrap to seed a global solve.
     pub bootstrap_seed_global_solve: bool,
     /// Override final-curve monotonicity enforcement (None = policy-driven).
@@ -312,7 +310,6 @@ impl Default for DiscountCurveSolveConfig {
             scan_grid_step: 1e-4,
             df_hard_min: 1e-12,
             df_hard_max: 1e6,
-            min_t_spot: 1e-6,
             bootstrap_seed_global_solve: true,
             allow_non_monotonic_final: None,
             weighting_scheme: ResidualWeightingScheme::default(),
@@ -517,8 +514,6 @@ pub struct CalibrationConfig {
     pub solver: SolverConfig,
     /// Use parallel processing when available (e.g., for independent curves).
     pub use_parallel: bool,
-    /// Enable verbose logging of the calibration process.
-    pub verbose: bool,
     /// Explanation options (opt-in step trace on each step report and on the
     /// plan report). `{"enabled": true}` records every bootstrap knot and
     /// global solve; add `max_entries` to cap the trace. Omitted from the wire
@@ -623,8 +618,7 @@ impl Default for CalibrationConfig {
     fn default() -> Self {
         Self {
             solver: SolverConfig::default(),
-            use_parallel: false, // Deterministic by default
-            verbose: false,
+            use_parallel: false,             // Deterministic by default
             explain: ExplainOpts::default(), // Disabled by default (zero overhead)
             validation_mode: ValidationMode::Error,
             validation: crate::validation::ValidationConfig::default(),
@@ -720,7 +714,6 @@ impl CalibrationConfig {
                 "discount_curve.jacobian_step_size",
                 config.jacobian_step_size,
             ),
-            ("discount_curve.min_t_spot", config.min_t_spot),
         ] {
             if !value.is_finite() || value <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(

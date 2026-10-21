@@ -204,7 +204,6 @@
       "calibrationResultContentHash",
       "calibrationResultResiduals",
       "calibrationResultStepReport",
-      "calibrationResultStepReportJson",
       "calibrationStepBaseCorrelation",
       "calibrationStepCapFloorHullWhite",
       "calibrationStepDiscount",
@@ -222,7 +221,6 @@
       "cdsQuoteUpfront",
       "dryRun",
       "dryRunJson",
-      "hullWhiteParamsSigmaAt",
       "inflationQuoteInflationSwap",
       "inflationQuoteYoyInflationSwap",
       "rateBoundsEmergingMarkets",
@@ -271,9 +269,6 @@
     "kind": "function"
   },
   "calibration.calibrationResultStepReport": {
-    "kind": "function"
-  },
-  "calibration.calibrationResultStepReportJson": {
     "kind": "function"
   },
   "calibration.calibrationResultResiduals": {
@@ -364,9 +359,6 @@
     "kind": "function"
   },
   "calibration.bootstrapHullWhiteSigmaScheduleToCapFloors": {
-    "kind": "function"
-  },
-  "calibration.hullWhiteParamsSigmaAt": {
     "kind": "function"
   },
   "calibration.validateSurface": {

@@ -28,4 +28,6 @@ pub mod variance_observations;
 #[doc(hidden)]
 pub use generic::GenericInstrumentPricer;
 
-pub use trs::{PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel};
+pub use trs::{
+    FinancingLegFlows, PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
+};

@@ -86,10 +86,6 @@
               "description": "The missing curve/surface identifier referenced by the step.",
               "type": "string"
             },
-            "missing_kind": {
-              "description": "Kind of the missing dependency (e.g. `\"discount\"`, `\"surface\"`).",
-              "type": "string"
-            },
             "step_id": {
               "description": "Step identifier.",
               "type": "string"
@@ -111,7 +107,6 @@
             "step_id",
             "step_kind",
             "missing_id",
-            "missing_kind",
             "available"
           ],
           "type": "object"
@@ -315,24 +310,6 @@
           "required": [
             "kind",
             "quote_set",
-            "id"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "One market-datum id of a kind is attached to steps, or merged into an\nenvelope, with two different payloads.",
-          "properties": {
-            "id": {
-              "description": "The datum identifier supplied with conflicting payloads.",
-              "type": "string"
-            },
-            "kind": {
-              "const": "conflicting_market_datum",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
             "id"
           ],
           "type": "object"

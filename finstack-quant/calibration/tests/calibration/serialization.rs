@@ -190,7 +190,6 @@ fn step_params_v2_roundtrip_for_all_variants() {
         sabr_beta: 0.0,
         target_expiries: vec![1.0, 2.0],
         target_tenors: vec![1.0, 5.0],
-        sabr_interpolation: Default::default(),
         calendar_id: None,
         fixed_day_count: None,
         swap_index: Some("USD-SOFR-3M".into()),

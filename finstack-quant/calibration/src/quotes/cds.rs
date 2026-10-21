@@ -1,7 +1,9 @@
 //! CDS market quote schema.
 
 use super::ids::{Pillar, QuoteId};
-use super::validate;
+use finstack_quant_core::validation::{
+    validate_f64_finite, validate_f64_positive, validate_recovery_rate,
+};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::market::conventions::ids::CdsConventionKey;
 use serde::{Deserialize, Serialize};
@@ -203,8 +205,8 @@ impl CdsQuote {
                 recovery_rate,
                 ..
             } => {
-                validate::positive(*spread_bp, "spread_bp")?;
-                validate::unit_interval(*recovery_rate, "recovery_rate")?;
+                validate_f64_positive(*spread_bp, "spread_bp")?;
+                validate_recovery_rate(*recovery_rate)?;
             }
             Self::CdsUpfront {
                 coupon_bp,
@@ -212,9 +214,9 @@ impl CdsQuote {
                 recovery_rate,
                 ..
             } => {
-                validate::positive(*coupon_bp, "coupon_bp")?;
-                validate::finite(*upfront_pct, "upfront_pct")?;
-                validate::unit_interval(*recovery_rate, "recovery_rate")?;
+                validate_f64_positive(*coupon_bp, "coupon_bp")?;
+                validate_f64_finite(*upfront_pct, "upfront_pct")?;
+                validate_recovery_rate(*recovery_rate)?;
             }
         }
         self.validate_market_conventions()

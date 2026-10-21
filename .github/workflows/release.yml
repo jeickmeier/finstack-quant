@@ -34,7 +34,7 @@ jobs:
   # ── Gates ───────────────────────────────────────────────────────
   version:
     name: Version metadata
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Checkout repository
@@ -74,7 +74,7 @@ jobs:
   docs:
     name: Documentation
     needs: version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Rustdoc and the Rust doctests, then the Python extension and the WASM web
     # package for their doc examples, all cold.
     timeout-minutes: 150
@@ -143,7 +143,7 @@ jobs:
   slow-rust:
     name: Test ignored Rust suite
     needs: version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 180
 
     env:
@@ -175,7 +175,7 @@ jobs:
   slow-python:
     name: Test slow Python suite
     needs: version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
 
     env:
@@ -218,7 +218,7 @@ jobs:
   publish-checks:
     name: Rust Publish Checks
     needs: version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     steps:
@@ -243,7 +243,7 @@ jobs:
   semver:
     name: Semver Checks
     needs: version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
 
     env:
@@ -297,13 +297,13 @@ jobs:
           # LTO (Release #142), and macos-14's 3-core runners spend 40+ minutes
           # in rustc on finstack-quant-py and hit the job timeout (Release #143).
           # ── Linux x86_64 ──
-          - { os: linux-x64,   runner: ubuntu-latest,  target: x86_64,  python: "3.12", timeout: 60, lto: fat,  codegen_units: 1 }
-          - { os: linux-x64,   runner: ubuntu-latest,  target: x86_64,  python: "3.13", timeout: 60, lto: fat,  codegen_units: 1 }
-          - { os: linux-x64,   runner: ubuntu-latest,  target: x86_64,  python: "3.14", timeout: 60, lto: fat,  codegen_units: 1 }
+          - { os: linux-x64,   runner: ubuntu-24.04,   target: x86_64,  python: "3.12", timeout: 60, lto: fat,  codegen_units: 1 }
+          - { os: linux-x64,   runner: ubuntu-24.04,   target: x86_64,  python: "3.13", timeout: 60, lto: fat,  codegen_units: 1 }
+          - { os: linux-x64,   runner: ubuntu-24.04,   target: x86_64,  python: "3.14", timeout: 60, lto: fat,  codegen_units: 1 }
           # ── Linux arm64 ──
-          - { os: linux-arm64, runner: ubuntu-latest,  target: aarch64, python: "3.12", timeout: 60, lto: thin, codegen_units: 16 }
-          - { os: linux-arm64, runner: ubuntu-latest,  target: aarch64, python: "3.13", timeout: 60, lto: thin, codegen_units: 16 }
-          - { os: linux-arm64, runner: ubuntu-latest,  target: aarch64, python: "3.14", timeout: 60, lto: thin, codegen_units: 16 }
+          - { os: linux-arm64, runner: ubuntu-24.04,   target: aarch64, python: "3.12", timeout: 60, lto: thin, codegen_units: 16 }
+          - { os: linux-arm64, runner: ubuntu-24.04,   target: aarch64, python: "3.13", timeout: 60, lto: thin, codegen_units: 16 }
+          - { os: linux-arm64, runner: ubuntu-24.04,   target: aarch64, python: "3.14", timeout: 60, lto: thin, codegen_units: 16 }
           # ── macOS arm64 (Apple Silicon) ──
           - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.12", timeout: 90, lto: thin, codegen_units: 16 }
           - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.13", timeout: 90, lto: thin, codegen_units: 16 }
@@ -380,7 +380,7 @@ jobs:
   build-sdist:
     name: Source dist
     needs: [checks, docs, slow-rust, slow-python, publish-checks, semver]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -397,7 +397,7 @@ jobs:
   build-wasm:
     name: WASM / npm
     needs: [checks, docs, slow-rust, slow-python, publish-checks, semver]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 50
     env:
       # `mise run` would otherwise install every tool in mise.toml, including
@@ -436,7 +436,7 @@ jobs:
   publish:
     name: Publish Release
     needs: [build-wheels, build-sdist, build-wasm]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: write

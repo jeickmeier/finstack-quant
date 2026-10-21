@@ -48,28 +48,21 @@ pub struct StrictLoadDiagnostic {
     pub actual_version: Option<u32>,
 }
 
+/// The serde wire tag of a unit enum (`LoadPhase::Build` -> `"build"`).
+fn wire_tag<T: serde::Serialize>(value: &T) -> String {
+    serde_json::to_value(value)
+        .ok()
+        .and_then(|tag| tag.as_str().map(str::to_owned))
+        .unwrap_or_default()
+}
+
 impl StrictLoadDiagnostic {
     /// Project a core contract diagnostic onto the host-facing record.
     fn from_contract(diagnostic: &finstack_quant_core::contract::Diagnostic) -> Self {
-        use finstack_quant_core::contract::{LoadPhase, Severity};
-        let phase = match diagnostic.phase {
-            LoadPhase::Parse => "parse",
-            LoadPhase::Version => "version",
-            LoadPhase::Structure => "structure",
-            LoadPhase::Semantic => "semantic",
-            #[allow(unreachable_patterns)]
-            _ => "unknown",
-        };
-        let severity = match diagnostic.severity {
-            Severity::Error => "error",
-            Severity::Warning => "warning",
-            #[allow(unreachable_patterns)]
-            _ => "unknown",
-        };
         Self {
             code: diagnostic.code.clone(),
-            phase: phase.to_string(),
-            severity: severity.to_string(),
+            phase: wire_tag(&diagnostic.phase),
+            severity: wire_tag(&diagnostic.severity),
             pointer: diagnostic.pointer.clone(),
             message: diagnostic.message.clone(),
             contract: diagnostic.contract.clone(),
@@ -131,7 +124,7 @@ impl EnvelopeError {
 pub enum EnvelopeError {
     /// A step references a curve / surface ID that's not produced by an
     /// earlier step or carried in `market_data` / `prior_market`.
-    #[error("step[{step_index}] '{step_id}' (kind='{step_kind}'): missing {missing_kind} dependency '{missing_id}'. Available: [{}]", available.join(", "))]
+    #[error("step[{step_index}] '{step_id}' (kind='{step_kind}'): missing dependency '{missing_id}'. Available: [{}]", available.join(", "))]
     MissingDependency {
         /// Zero-based index of the offending step in `plan.steps`.
         step_index: usize,
@@ -141,8 +134,6 @@ pub enum EnvelopeError {
         step_kind: String,
         /// The missing curve/surface identifier referenced by the step.
         missing_id: String,
-        /// Kind of the missing dependency (e.g. `"discount"`, `"surface"`).
-        missing_kind: String,
         /// Identifiers available at the time the step would run.
         available: Vec<String>,
     },
@@ -218,13 +209,6 @@ pub enum EnvelopeError {
         /// The unresolved quote identifier.
         id: String,
     },
-    /// One market-datum id of a kind is attached to steps, or merged into an
-    /// envelope, with two different payloads.
-    #[error("market datum id '{id}' has conflicting payloads")]
-    ConflictingMarketDatum {
-        /// The datum identifier supplied with conflicting payloads.
-        id: String,
-    },
     /// Strict bounded contract loading rejected the request or result.
     ///
     /// `message` already lists every retained diagnostic (JSON pointer and
@@ -264,7 +248,6 @@ impl EnvelopeError {
             EnvelopeError::QuoteDataInvalid { .. } => "quote_data_invalid",
             EnvelopeError::DuplicateMarketDatumId { .. } => "duplicate_market_datum_id",
             EnvelopeError::QuoteIdNotInMarketData { .. } => "quote_id_not_in_market_data",
-            EnvelopeError::ConflictingMarketDatum { .. } => "conflicting_market_datum",
             EnvelopeError::JsonSerialize { .. } => "json_serialize",
             EnvelopeError::StrictLoad { .. } => "strict_load",
         }
@@ -283,22 +266,8 @@ impl EnvelopeError {
             | EnvelopeError::QuoteDataInvalid { step_id, .. } => Some(step_id),
             EnvelopeError::DuplicateMarketDatumId { .. }
             | EnvelopeError::QuoteIdNotInMarketData { .. }
-            | EnvelopeError::ConflictingMarketDatum { .. }
             | EnvelopeError::JsonSerialize { .. }
             | EnvelopeError::StrictLoad { .. } => None,
-        }
-    }
-
-    /// Serialize to compact JSON for cross-binding consumption.
-    pub fn to_json(&self) -> String {
-        match serde_json::to_string(self) {
-            Ok(json) => json,
-            Err(err) => serde_json::json!({
-                "kind": "json_serialize",
-                "target": "EnvelopeError",
-                "message": err.to_string(),
-            })
-            .to_string(),
         }
     }
 }
@@ -310,5 +279,24 @@ impl From<EnvelopeError> for finstack_quant_core::Error {
             message: err.to_string(),
             category,
         }
+    }
+}
+
+#[cfg(test)]
+mod wire_tag_tests {
+    use super::*;
+    use finstack_quant_core::contract::{Diagnostic, LoadPhase, Severity};
+
+    #[test]
+    fn build_phase_diagnostics_keep_their_phase() {
+        let diagnostic = Diagnostic::new(
+            "calibration/final-market",
+            LoadPhase::Build,
+            Severity::Error,
+            "bad",
+        );
+        let record = StrictLoadDiagnostic::from_contract(&diagnostic);
+        assert_eq!(record.phase, "build");
+        assert_eq!(record.severity, "error");
     }
 }

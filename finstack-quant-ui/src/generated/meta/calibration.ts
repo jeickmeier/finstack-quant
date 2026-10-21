@@ -19,7 +19,6 @@ export default [
               "df_hard_min": 1e-12,
               "jacobian_step_size": 0.000001,
               "min_scan_grid_points": 20,
-              "min_t_spot": 0.000001,
               "scan_grid_points": 48,
               "scan_grid_step": 0.0001,
               "validation_tolerance": 1e-8,
@@ -78,7 +77,6 @@ export default [
               "tolerance": 1e-10
             },
             "validation_mode": "error",
-            "verbose": false,
             "vol_surface": {
               "validation_tolerance": 0.001
             }
@@ -880,14 +878,6 @@ export default [
     "description": "Extrapolation policy used when interpolating SABR parameters across the\nexpiry–tenor grid for target points that do not have a directly calibrated bucket.",
     "ref": "#/$defs/SurfaceExtrapolationPolicy",
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SurfaceExtrapolationPolicy"
-  },
-  {
-    "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/5/properties/sabr_interpolation",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/5/properties/sabr_interpolation",
-    "default": "bilinear",
-    "description": "SABR parameter interpolation method between expiries/tenors.",
-    "ref": "#/$defs/SabrInterpolationMethod",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SabrInterpolationMethod"
   },
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/5/properties/swap_index",
@@ -2338,13 +2328,6 @@ export default [
     "description": "Minimum required success points in scan before attempting polish.",
     "format": "uint",
     "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_65447e12defc07e99879/properties/min_t_spot",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveSolveConfig/properties/min_t_spot",
-    "default": 0.000001,
-    "description": "Minimum time threshold for considering a knot at spot (t=0).",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_65447e12defc07e99879/properties/scan_grid_points",
@@ -6259,12 +6242,6 @@ export default [
     "description": "Actual/Actual (ISDA) day count convention.\n\nActual days over the actual days in the containing calendar year,\nsplit and summed across year boundaries.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(b) - \"Actual/Actual (ISDA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ISDA\" (A006)\n- **Also known as**: Act/Act (ISDA), Actual/Actual, Act/Act"
   },
   {
-    "path": "#/$defs/d_c3c50fd88be2ae84feeb",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SabrInterpolationMethod",
-    "const": "bilinear",
-    "description": "Interpolation method for SABR parameters across the expiry–tenor grid."
-  },
-  {
     "path": "#/$defs/d_cebddb4a91c1c968bece",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationCurveSolveConfig",
     "description": "Inflation-curve specific numerical solver configuration.\n\nControls the numerical stability and success criteria of inflation curve\nbootstrapping or global solve for CPI curve calibration.\n\n# Examples\n```\nuse finstack_quant_calibration::InflationCurveSolveConfig;\n\nlet config = InflationCurveSolveConfig {\n    validation_tolerance: 1e-6,  // Relax for noisy inflation markets\n    ..Default::default()\n};\n```"
@@ -6376,7 +6353,6 @@ export default [
       "df_hard_min": 1e-12,
       "jacobian_step_size": 0.000001,
       "min_scan_grid_points": 20,
-      "min_t_spot": 0.000001,
       "scan_grid_points": 48,
       "scan_grid_step": 0.0001,
       "validation_tolerance": 1e-8,
@@ -6542,12 +6518,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationMode"
   },
   {
-    "path": "#/$defs/d_e1605cebc97720bf2277/properties/verbose",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationConfig/properties/verbose",
-    "default": false,
-    "description": "Enable verbose logging of the calibration process."
-  },
-  {
     "path": "#/$defs/d_e1605cebc97720bf2277/properties/vol_surface",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationConfig/properties/vol_surface",
     "default": {
@@ -6618,7 +6588,6 @@ export default [
         "df_hard_min": 1e-12,
         "jacobian_step_size": 0.000001,
         "min_scan_grid_points": 20,
-        "min_t_spot": 0.000001,
         "scan_grid_points": 48,
         "scan_grid_step": 0.0001,
         "validation_tolerance": 1e-8,
@@ -6677,7 +6646,6 @@ export default [
         "tolerance": 1e-10
       },
       "validation_mode": "error",
-      "verbose": false,
       "vol_surface": {
         "validation_tolerance": 0.001
       }

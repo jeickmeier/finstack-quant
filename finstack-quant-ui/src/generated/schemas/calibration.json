@@ -17,7 +17,6 @@
             "df_hard_min": 1e-12,
             "jacobian_step_size": 0.000001,
             "min_scan_grid_points": 20,
-            "min_t_spot": 0.000001,
             "scan_grid_points": 48,
             "scan_grid_step": 0.0001,
             "validation_tolerance": 1e-8,
@@ -76,7 +75,6 @@
             "tolerance": 1e-10
           },
           "validation_mode": "error",
-          "verbose": false,
           "vol_surface": {
             "validation_tolerance": 0.001
           }
@@ -598,11 +596,6 @@
               "$ref": "#/$defs/d_0a763a2dd877fcf9287d",
               "default": "error",
               "description": "Extrapolation policy used when interpolating SABR parameters across the\nexpiry–tenor grid for target points that do not have a directly calibrated bucket."
-            },
-            "sabr_interpolation": {
-              "$ref": "#/$defs/d_c3c50fd88be2ae84feeb",
-              "default": "bilinear",
-              "description": "SABR parameter interpolation method between expiries/tenors."
             },
             "swap_index": {
               "anyOf": [
@@ -2264,12 +2257,6 @@
           "format": "uint",
           "minimum": 0,
           "type": "integer"
-        },
-        "min_t_spot": {
-          "default": 0.000001,
-          "description": "Minimum time threshold for considering a knot at spot (t=0).",
-          "format": "double",
-          "type": "number"
         },
         "scan_grid_points": {
           "default": 48,
@@ -5891,11 +5878,6 @@
       ],
       "title": "Day Count"
     },
-    "d_c3c50fd88be2ae84feeb": {
-      "const": "bilinear",
-      "description": "Interpolation method for SABR parameters across the expiry–tenor grid.",
-      "type": "string"
-    },
     "d_cebddb4a91c1c968bece": {
       "additionalProperties": false,
       "description": "Inflation-curve specific numerical solver configuration.\n\nControls the numerical stability and success criteria of inflation curve\nbootstrapping or global solve for CPI curve calibration.\n\n# Examples\n```\nuse finstack_quant_calibration::InflationCurveSolveConfig;\n\nlet config = InflationCurveSolveConfig {\n    validation_tolerance: 1e-6,  // Relax for noisy inflation markets\n    ..Default::default()\n};\n```",
@@ -5995,7 +5977,6 @@
             "df_hard_min": 1e-12,
             "jacobian_step_size": 0.000001,
             "min_scan_grid_points": 20,
-            "min_t_spot": 0.000001,
             "scan_grid_points": 48,
             "scan_grid_step": 0.0001,
             "validation_tolerance": 1e-8,
@@ -6119,11 +6100,6 @@
           "default": "error",
           "description": "Runtime validation mode (warnings vs errors)."
         },
-        "verbose": {
-          "default": false,
-          "description": "Enable verbose logging of the calibration process.",
-          "type": "boolean"
-        },
         "vol_surface": {
           "$ref": "#/$defs/d_41166743d7ec9326bdd4",
           "default": {
@@ -6187,7 +6163,6 @@
               "df_hard_min": 1e-12,
               "jacobian_step_size": 0.000001,
               "min_scan_grid_points": 20,
-              "min_t_spot": 0.000001,
               "scan_grid_points": 48,
               "scan_grid_step": 0.0001,
               "validation_tolerance": 1e-8,
@@ -6246,7 +6221,6 @@
               "tolerance": 1e-10
             },
             "validation_mode": "error",
-            "verbose": false,
             "vol_surface": {
               "validation_tolerance": 0.001
             }

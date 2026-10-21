@@ -216,7 +216,7 @@ pub(crate) fn quote_quality_dataframe<'py>(
 /// Detailed report of one calibration step or of the whole plan.
 ///
 /// Step reports carry raw residuals keyed by quote id. The plan-level report
-/// returned by ``CalibrationResult.report`` additionally carries
+/// returned by ``CalibrationResultEnvelope.report`` additionally carries
 /// ``max_residual_ratio`` / ``rmse_ratio`` (``|residual| / step_tolerance``)
 /// while its ``max_residual`` / ``rmse`` summarize the raw step statistics.
 ///

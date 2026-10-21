@@ -92,6 +92,7 @@ fn cdx_ig_46_curves(as_of: Date) -> MarketContext {
             pillars: &par_pillars,
             recovery_rate: 0.4,
             cds_valuation_convention: Some(CdsValuationConvention::BloombergCdswClean),
+            doc_clause: None,
         },
     )
     .expect("CDX.NA.IG.46 hazard calibration should succeed");

@@ -30221,7 +30221,7 @@ export interface CalibrationNamespace {
    */
   calibrationEnvelopeContentHash(envelopeJson: CalibrationEnvelope | string): string;
   /**
-   * Canonical content hash of a calibration result envelope (twin of Python `CalibrationResult.content_hash`).
+   * Canonical content hash of a calibration result envelope (twin of Python `CalibrationResultEnvelope.content_hash`).
    * @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
    * @returns `"sha256:<hex>"` content hash.
    * @throws Error - Throws a `CalibrationEnvelopeError` if the result is malformed, exceeds the default load limits, its schema marker is missing or unsupported, or it contains a non-finite number.
@@ -30241,7 +30241,7 @@ export interface CalibrationNamespace {
   /**
    * Report of one calibration step, read from a calibration result.
    *
-   * Free-function twin of Python `CalibrationResult.step_report` (Rust
+   * Free-function twin of Python `CalibrationResultEnvelope.step_report` (Rust
    * `CalibrationResult::step_report`).
    * @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
    * @param stepId - Identifier of the calibration step, as given in the plan.
@@ -30253,23 +30253,9 @@ export interface CalibrationNamespace {
     stepId: string
   ): generated.calibration.CalibrationReport;
   /**
-   * Report of one calibration step as a compact JSON string.
-   *
-   * JSON wire twin of `calibrationResultStepReport` and free-function twin
-   * of Python `CalibrationResult.step_report_json`.
-   * @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
-   * @param stepId - Identifier of the calibration step, as given in the plan.
-   * @returns Compact `CalibrationReport` JSON.
-   * @throws Error - Throws a `CalibrationEnvelopeError` if the result is malformed or exceeds the default load limits, and a `FinstackError` with `kind: "not_found"` if no step has the given `stepId` or with `kind: "validation"` if the report cannot be serialized.
-   */
-  calibrationResultStepReportJson(
-    resultJson: CalibrationResultEnvelope | string,
-    stepId: string
-  ): string;
-  /**
    * Per-quote residual rows of one calibration step.
    *
-   * Free-function twin of Python `CalibrationResult.residuals`, which returns
+   * Free-function twin of Python `CalibrationResultEnvelope.residuals`, which returns
    * the same rows (Rust `CalibrationReport::quote_rows`) as a pandas
    * `DataFrame`. `target_value`, `fitted_value` and `sensitivity` are `NaN`
    * unless `CalibrationConfig.compute_diagnostics` was enabled.
@@ -30635,7 +30621,7 @@ export interface CalibrationNamespace {
    * @param currency - ISO-4217 currency code of the surface.
    * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
    * @param volSurfaceId - Identifier of the produced surface; defaults to `id`.
-   * @param params - Optional object (or JSON) of further wire fields: `forward_id`, `vol_convention`, `sabr_beta`, `target_expiries`, `target_tenors`, `sabr_interpolation`, `calendar_id`, `fixed_day_count`, `swap_index`, `vol_tolerance`, `sabr_extrapolation`, `allow_sabr_missing_bucket_fallback`. An entry named like another argument is replaced by that argument.
+   * @param params - Optional object (or JSON) of further wire fields: `forward_id`, `vol_convention`, `sabr_beta`, `target_expiries`, `target_tenors`, `calendar_id`, `fixed_day_count`, `swap_index`, `vol_tolerance`, `sabr_extrapolation`, `allow_sabr_missing_bucket_fallback`. An entry named like another argument is replaced by that argument.
    * @returns A `CalibrationStep` object with `kind: "swaption_vol"`.
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
    */
@@ -30877,17 +30863,6 @@ export interface CalibrationNamespace {
     config: generated.calibration.PiecewiseSigmaCalibrationConfig | string,
     forward?: DiscountCurve | null
   ): [generated.models.HullWhiteParams, generated.calibration.CalibrationReport];
-  /**
-   * Short-rate volatility of a piecewise Hull-White parameter set at a model time.
-   *
-   * Free-function twin of Python `HullWhiteParams.sigma_at` (Rust
-   * `HullWhiteParams::volatility` read with `PiecewiseConstantCurve::value_at`).
-   * @param params - `HullWhiteParams` object (or JSON): `kappa` and the piecewise `volatility` schedule (`times`, `values`).
-   * @param time - Year fraction at which the left-continuous piecewise sigma is read.
-   * @returns Sigma applying at `time`, in absolute rate units per square-root year.
-   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `params` is not a valid `HullWhiteParams` object.
-   */
-  hullWhiteParamsSigmaAt(params: generated.models.HullWhiteParams | string, time: number): number;
   /**
    * Build a zero-coupon inflation swap quote.
    *

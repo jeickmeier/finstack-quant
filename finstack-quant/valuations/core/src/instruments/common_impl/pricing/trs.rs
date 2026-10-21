@@ -49,7 +49,13 @@ use crate::instruments::common_impl::pricing::overnight::{
     OvernightProjectionCurve,
 };
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
+use finstack_quant_cashflows::fixings::ProjectedFixing;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::market_data::fixings::fixing_series_id;
+
+/// Financing-leg `(payment_date, amount)` flows and the `FIXING:` index
+/// observations they project (see [`TrsEngine::cashflows_financing_leg_with_fixings`]).
+pub type FinancingLegFlows = (Vec<(Date, Money)>, Vec<ProjectedFixing>);
 
 /// Project one financing-leg accrual period's floating rate, excluding spread.
 ///
@@ -72,6 +78,8 @@ struct FinancingPeriodProjection {
     year_fraction: f64,
     /// Compound factor `∏(1 + rᵢ dᵢ)` or `1 + rate × τ` for term financing.
     compound_factor: f64,
+    /// Raw index observations the projection used, when requested.
+    fixings: Vec<ProjectedFixing>,
 }
 
 impl FinancingPeriodProjection {
@@ -84,6 +92,7 @@ impl FinancingPeriodProjection {
             rate,
             year_fraction,
             compound_factor,
+            fixings: Vec::new(),
         };
         if !projection.rate.is_finite()
             || !projection.compound_factor.is_finite()
@@ -113,6 +122,7 @@ fn financing_period_projection(
     as_of: Date,
     calendar_id: &str,
     currency: Currency,
+    collect_fixings: bool,
 ) -> finstack_quant_core::Result<FinancingPeriodProjection> {
     match financing.compounding {
         FloatingLegCompounding::SimpleAverage => Err(finstack_quant_core::Error::Validation(
@@ -131,11 +141,19 @@ fn financing_period_projection(
             } else {
                 fwd.rate_between_dates(period_start, period_end, period_year_fraction)?
             };
-            FinancingPeriodProjection::new(
+            let mut projection = FinancingPeriodProjection::new(
                 rate,
                 period_year_fraction,
                 1.0 + rate * period_year_fraction,
-            )
+            )?;
+            if collect_fixings && period_start > as_of {
+                projection.fixings.push(ProjectedFixing {
+                    series_id: fixing_series_id(financing.forward_curve_id.as_str()),
+                    date: period_start,
+                    value: Some(rate),
+                });
+            }
+            Ok(projection)
         }
         compounding @ (FloatingLegCompounding::CompoundedInArrears { .. }
         | FloatingLegCompounding::CompoundedWithObservationShift { .. }
@@ -184,13 +202,23 @@ fn financing_period_projection(
                 compounding: &compounding,
                 fixing_calendar: calendar,
                 compounded_spread: 0.0,
-                need_observation_exposures: false,
+                need_observation_exposures: collect_fixings,
             })?;
-            FinancingPeriodProjection::new(
+            let mut financing_projection = FinancingPeriodProjection::new(
                 projection.rate,
                 projection.accrual_year_fraction,
                 projection.compound_factor,
-            )
+            )?;
+            financing_projection.fixings = projection
+                .observation_exposures
+                .iter()
+                .map(|observation| ProjectedFixing {
+                    series_id: fixing_series_id(financing.forward_curve_id.as_str()),
+                    date: observation.observation_start,
+                    value: Some(observation.projected_rate),
+                })
+                .collect();
+            Ok(financing_projection)
         }
     }
 }
@@ -220,6 +248,7 @@ fn financing_period_rate(
         as_of,
         calendar_id,
         currency,
+        false,
     )?
     .rate)
 }
@@ -429,6 +458,44 @@ impl TrsEngine {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
+        Ok(Self::financing_leg_flows(financing, schedule, notional, market, as_of, false)?.0)
+    }
+
+    /// Financing-leg cashflows together with the raw index observations they
+    /// project, for cashflow exports whose fixings a horizon roll must hold.
+    ///
+    /// # Arguments
+    /// * `financing` — Forward/discount curve ids, spread, day count and
+    ///   compounding of the financing leg.
+    /// * `schedule` — Payment periods, calendar and payment lag.
+    /// * `notional` — Currency amount the coupons accrue on.
+    /// * `market` — Must contain `financing.forward_curve_id`; in-progress
+    ///   periods also read realized `FIXING:{forward_curve_id}` observations.
+    /// * `as_of` — Valuation date; periods paid on or before it are excluded.
+    ///
+    /// # Returns
+    /// The `(payment_date, amount)` flows of [`Self::cashflows_financing_leg`]
+    /// and the `FIXING:{forward_curve_id}` observations projected at `as_of`:
+    /// each future term reset for `simple` legs, each overnight observation for
+    /// compounded legs.
+    pub fn cashflows_financing_leg_with_fixings(
+        financing: &FinancingLegSpec,
+        schedule: &TrsScheduleSpec,
+        notional: Money,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<FinancingLegFlows> {
+        Self::financing_leg_flows(financing, schedule, notional, market, as_of, true)
+    }
+
+    fn financing_leg_flows(
+        financing: &FinancingLegSpec,
+        schedule: &TrsScheduleSpec,
+        notional: Money,
+        market: &MarketContext,
+        as_of: Date,
+        collect_fixings: bool,
+    ) -> finstack_quant_core::Result<FinancingLegFlows> {
         let fwd = market.get_forward(financing.forward_curve_id.as_str())?;
         // For compounded legs, realized fixings for in-progress periods
         // are sourced from MarketContext using the canonical `FIXING:{forward_curve_id}`
@@ -444,6 +511,7 @@ impl TrsEngine {
         let period_schedule = schedule.period_schedule()?;
 
         let mut flows = Vec::new();
+        let mut projected_fixings = Vec::new();
         let currency = notional.currency();
         let spread_decimal = financing.spread_bp.to_f64().ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
@@ -488,14 +556,16 @@ impl TrsEngine {
                 as_of,
                 schedule.params.calendar_id.as_str(),
                 currency,
+                collect_fixings,
             )?;
             let payment = projected.unsigned_coupon(notional.amount(), spread_decimal);
 
             // A completed accrual remains in PV until its lagged payment date.
             flows.push((payment_date, Money::new(payment, currency)?));
+            projected_fixings.extend(projected.fixings);
         }
 
-        Ok(flows)
+        Ok((flows, projected_fixings))
     }
 
     /// Calculates the financing annuity for par spread calculation.
@@ -577,6 +647,7 @@ impl TrsEngine {
                 as_of,
                 schedule.params.calendar_id.as_str(),
                 notional.currency(),
+                false,
             )?
             .year_fraction;
 
@@ -658,6 +729,7 @@ impl TrsEngine {
                 as_of,
                 schedule.params.calendar_id.as_str(),
                 notional.currency(),
+                false,
             )?;
             let payment = projected.unsigned_coupon(notional.amount(), 0.0);
 
@@ -1475,6 +1547,7 @@ mod tests {
             start,
             "usny",
             Currency::USD,
+            false,
         )
         .expect("trs overnight projection");
         let amount = projected.unsigned_coupon(1_000_000.0, 0.0);
