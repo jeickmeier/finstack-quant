@@ -352,10 +352,6 @@ export interface DFcc5A617E836258C508E {
    * this date; spread variance ends at legal expiry.
    */
   exercise_settlement_date?: Date | null;
-  /**
-   * Exercise style
-   */
-  exercise_style: "european" | "american" | "bermudan";
   expiry: Date1;
   id: Id2;
   /**
@@ -379,12 +375,6 @@ export interface DFcc5A617E836258C508E {
    * Option type (Call = right to buy protection, Put = right to sell protection)
    */
   option_type: "call" | "put";
-  /**
-   * Payment date of the option premium, returned by the settlement-date
-   * accessor. This does not change variance time or front-end protection;
-   * the option value excludes the separately agreed trade premium.
-   */
-  premium_settlement_date?: Date | null;
   /**
    * Convention used to select the synthetic underlying CDS accrual start
    * when `underlying_start_date` is not explicitly supplied.

@@ -9,7 +9,6 @@ export default [
         "instrument": {
           "spec": {
             "attributes": {},
-            "discount_curve_id": "USD-OIS",
             "id": "VIX-FUT-2025M03",
             "terms": {
               "contracts": 4.651162790697675,
@@ -3802,7 +3801,7 @@ export default [
   {
     "path": "#/$defs/d_f5452489af2759ebedff",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/volatility_index_future.schema.json#/$defs/VolatilityIndexFuture",
-    "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]; `terms.settlement_price` is the official\nSpecial Opening Quotation (SOQ) in index points.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_equity::vol_index_future::VolatilityIndexFuture;\nuse finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .terms(\n        ListedFutureTerms::new(\n            5.0,\n            1_000.0,\n            Currency::USD,\n            21.50,\n            settlement,\n            settlement,\n            Position::Long,\n        )\n        .unwrap(),\n    )\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```"
+    "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]; `terms.settlement_price` is the official\nSpecial Opening Quotation (SOQ) in index points.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_equity::vol_index_future::VolatilityIndexFuture;\nuse finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .terms(\n        ListedFutureTerms::new(\n            5.0,\n            1_000.0,\n            Currency::USD,\n            21.50,\n            settlement,\n            settlement,\n            Position::Long,\n        )\n        .unwrap(),\n    )\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```"
   },
   {
     "path": "#/$defs/d_f5452489af2759ebedff/properties/attributes",
@@ -3811,13 +3810,6 @@ export default [
     "description": "Attributes for scenario selection and tagging",
     "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_f5452489af2759ebedff/properties/discount_curve_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/volatility_index_future.schema.json#/$defs/VolatilityIndexFuture/properties/discount_curve_id",
-    "description": "Discount curve identifier. **Unused in PV**: the future is daily\nmargined so the mark-to-market is undiscounted, and no Dv01 is\nregistered. Retained for market-data identification/scenario plumbing.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_f5452489af2759ebedff/properties/id",

@@ -82,10 +82,8 @@ fn test_bermudan_schedule_sort_and_lockout() {
     let d3 = date!(2026 - 12 - 01);
     let mut schedule = BermudanSchedule::new(vec![d1, d2, d3]);
     schedule.lockout_end = Some(date!(2026 - 03 - 01));
-    schedule.notice_days = 2;
 
     assert_eq!(schedule.exercise_dates, vec![d2, d1, d3]);
-    assert_eq!(schedule.notice_days, 2);
 
     let effective = schedule.effective_dates();
     assert_eq!(effective, vec![d1, d3]);

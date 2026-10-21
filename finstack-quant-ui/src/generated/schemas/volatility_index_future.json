@@ -7,7 +7,6 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "discount_curve_id": "USD-OIS",
           "id": "VIX-FUT-2025M03",
           "terms": {
             "contracts": 4.651162790697675,
@@ -3599,16 +3598,12 @@
     },
     "d_f5452489af2759ebedff": {
       "additionalProperties": false,
-      "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]; `terms.settlement_price` is the official\nSpecial Opening Quotation (SOQ) in index points.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_equity::vol_index_future::VolatilityIndexFuture;\nuse finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .terms(\n        ListedFutureTerms::new(\n            5.0,\n            1_000.0,\n            Currency::USD,\n            21.50,\n            settlement,\n            settlement,\n            Position::Long,\n        )\n        .unwrap(),\n    )\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```",
+      "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]; `terms.settlement_price` is the official\nSpecial Opening Quotation (SOQ) in index points.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_equity::vol_index_future::VolatilityIndexFuture;\nuse finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .terms(\n        ListedFutureTerms::new(\n            5.0,\n            1_000.0,\n            Currency::USD,\n            21.50,\n            settlement,\n            settlement,\n            Position::Long,\n        )\n        .unwrap(),\n    )\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
           "default": {},
           "description": "Attributes for scenario selection and tagging"
-        },
-        "discount_curve_id": {
-          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Discount curve identifier. **Unused in PV**: the future is daily\nmargined so the mark-to-market is undiscounted, and no Dv01 is\nregistered. Retained for market-data identification/scenario plumbing."
         },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -3638,7 +3633,6 @@
       "required": [
         "id",
         "terms",
-        "discount_curve_id",
         "vol_index_curve_id"
       ],
       "type": "object"

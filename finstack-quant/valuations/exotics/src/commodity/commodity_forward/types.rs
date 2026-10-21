@@ -360,18 +360,6 @@ impl CommodityForward {
         ))
     }
 
-    /// Get the effective notional value at settlement.
-    pub fn notional_value(&self, forward_price: f64) -> f64 {
-        forward_price * self.quantity * self.multiplier
-    }
-
-    /// Check if this forward is at-market (no contract price set).
-    ///
-    /// At-market forwards have NPV ≈ 0 at inception.
-    pub fn is_at_market(&self) -> bool {
-        self.contract_price.is_none()
-    }
-
     /// Get the effective settlement lag in business days.
     ///
     /// Resolution order:
@@ -578,7 +566,7 @@ mod tests {
         assert_eq!(forward.quantity, 1000.0);
         assert_eq!(forward.underlying.currency, Currency::USD);
         assert_eq!(forward.position, Position::Long);
-        assert!(forward.is_at_market());
+        assert!(forward.contract_price.is_none());
     }
 
     #[test]

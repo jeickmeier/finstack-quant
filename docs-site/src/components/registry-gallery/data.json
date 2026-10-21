@@ -12304,7 +12304,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
-        "sha256": "022361d71b5408788ba13abd9e787b41f49ceb5e016b1fbefeb74eb9067deb62"
+        "sha256": "36b34aa6fb0483acce98f11e94a73c3d8adb2706e3166b1c172efe2e2c8ca7cf"
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
@@ -12405,7 +12405,7 @@
     "sources": [
       {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
-        "sha256": "022361d71b5408788ba13abd9e787b41f49ceb5e016b1fbefeb74eb9067deb62"
+        "sha256": "36b34aa6fb0483acce98f11e94a73c3d8adb2706e3166b1c172efe2e2c8ca7cf"
       },
       {
         "path": "finstack-quant/valuations/tests/fixtures/valuation_binding_regressions.json",
@@ -12421,7 +12421,7 @@
       },
       {
         "path": "finstack-quant-wasm/index.d.ts",
-        "sha256": "7c97f7f2b513c0b44bb3397ba7438f065e38b9899a714745e0c3f1d278f30d94"
+        "sha256": "812f4b15e970c693554756b290f087a531b973f26a323939def312e253a9723e"
       },
       {
         "path": "finstack-quant-wasm/src/utils/mod.rs",
@@ -17387,8 +17387,7 @@
             "attributes": {},
             "bermudan_type": "co_terminal",
             "exercise_schedule": {
-              "exercise_dates": ["2026-04-01"],
-              "notice_days": 0
+              "exercise_dates": ["2026-04-01"]
             },
             "instrument_pricing_overrides": {
               "model_config": {
@@ -17671,7 +17670,6 @@
             "coupon_bp": null,
             "credit_curve_id": "CORP-HAZARD",
             "discount_curve_id": "USD-OIS",
-            "exercise_style": "european",
             "expiry": "2025-06-20",
             "id": "CDSOPT-CALL-CORP-5Y",
             "index_factor": 1,

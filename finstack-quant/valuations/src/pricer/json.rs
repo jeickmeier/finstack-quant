@@ -1217,12 +1217,13 @@ mod tests {
     #[test]
     fn validate_instrument_json_rejects_credit_and_convertible_invariants() {
         let mut cds_option = CdsOption::example().expect("CDS option");
-        cds_option.exercise_style = crate::instruments::ExerciseStyle::American;
+        cds_option.exercise_settlement_date =
+            Some(cds_option.expiry - finstack_quant_core::dates::Duration::days(1));
         let json = envelope_json(InstrumentJson::CdsOption(cds_option));
         assert!(validate_instrument_json(&json, None)
-            .expect_err("unsupported exercise style must fail")
+            .expect_err("exercise settlement before expiry must fail")
             .to_string()
-            .contains("European"));
+            .contains("on or after legal expiry"));
 
         let mut convertible = ConvertibleBond::example().expect("convertible");
         convertible.conversion.ratio = None;

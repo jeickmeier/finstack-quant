@@ -84,7 +84,6 @@ use finstack_quant_valuations_core::instruments::ListedFutureTerms;
 ///         )
 ///         .unwrap(),
 ///     )
-///     .discount_curve_id(CurveId::new("USD-OIS"))
 ///     .vol_index_curve_id(CurveId::new("VIX"))
 ///     .build()
 ///     .expect("Valid future");
@@ -108,10 +107,6 @@ pub struct VolatilityIndexFuture {
     /// `terms.settlement_date` is the SOQ date on which the final settlement
     /// price is fixed.
     pub terms: ListedFutureTerms,
-    /// Discount curve identifier. **Unused in PV**: the future is daily
-    /// margined so the mark-to-market is undiscounted, and no Dv01 is
-    /// registered. Retained for market-data identification/scenario plumbing.
-    pub discount_curve_id: CurveId,
     /// Volatility index forward curve identifier.
     pub vol_index_curve_id: CurveId,
     /// Instrument-owned pricing inputs.
@@ -161,7 +156,6 @@ impl VolatilityIndexFuture {
                 date!(2025 - 03 - 19),
                 Position::Long,
             )?)
-            .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_index_curve_id(CurveId::new("VIX"))
             .attributes(Attributes::new())
             .build()
@@ -398,7 +392,6 @@ mod tests {
         let future = VolatilityIndexFuture::builder()
             .id(InstrumentId::new("VIX-ATM"))
             .terms(listed_terms(20.0, Position::Long))
-            .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_index_curve_id(CurveId::new("VIX"))
             .build()
             .expect("valid future");
@@ -421,7 +414,6 @@ mod tests {
         let future = VolatilityIndexFuture::builder()
             .id(InstrumentId::new("VIX-LONG"))
             .terms(listed_terms(22.0, Position::Long))
-            .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_index_curve_id(CurveId::new("VIX"))
             .build()
             .expect("valid future");
@@ -443,7 +435,6 @@ mod tests {
         let future = VolatilityIndexFuture::builder()
             .id(InstrumentId::new("VIX-SHORT"))
             .terms(listed_terms(22.0, Position::Short))
-            .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_index_curve_id(CurveId::new("VIX"))
             .build()
             .expect("valid future");
@@ -461,7 +452,6 @@ mod tests {
         let future = VolatilityIndexFuture::builder()
             .id(InstrumentId::new("VIX-DELTA"))
             .terms(listed_terms(20.0, Position::Long))
-            .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_index_curve_id(CurveId::new("VIX"))
             .build()
             .expect("valid future");
@@ -526,7 +516,6 @@ mod tests {
                 )
                 .expect("terms"),
             )
-            .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_index_curve_id(CurveId::new("VIX"))
             .attributes(Attributes::new())
             .build()

@@ -1,9 +1,10 @@
 //! Typed FX instrument classes and their fluent builders.
 //!
-//! Every FX class exposes its constructors, `fromJson` / `toJson`, `price`,
-//! `metric` and Greeks; `FxForward` and `FxOption` add one getter per public
-//! Rust field, the `Instrument` trait surface and the `FinancialBuilder`
-//! setters.
+//! Every FX class exposes `fromJson` / `toJson`, `price`, `metric` and
+//! Greeks; `FxForward` and `FxOption` add one getter per public Rust field,
+//! the `Instrument` trait surface, Rust presets and the `FinancialBuilder`
+//! setters. A bare spec becomes a class through
+//! `fromJson(instrumentEnvelopeFromSpec(type, spec))`.
 //!
 //! # Monte-Carlo determinism
 //!
@@ -24,22 +25,8 @@ use crate::utils::to_js_err;
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
 
-/// Convert a bare JS spec through the canonical Rust validating constructor.
-fn from_spec<T>(type_tag: &str, spec: JsValue) -> Result<T, JsValue>
-where
-    T: TryFrom<
-        finstack_quant_valuations::instruments::InstrumentJson,
-        Error = finstack_quant_core::Error,
-    >,
-{
-    let spec: serde_json::Value = from_js_json(&spec, "spec")?;
-    let instrument = finstack_quant_valuations::pricer::instrument_from_spec(type_tag, spec)
-        .map_err(to_js_err)?;
-    T::try_from(instrument).map_err(to_js_err)
-}
-
 macro_rules! fx_class {
-    ($rust_name:ident, $js_name:literal, $type_tag:literal, $rust_ty:ty) => {
+    ($rust_name:ident, $js_name:literal, $rust_ty:ty) => {
         instrument_class!(
             #[doc = concat!("Typed WASM wrapper for the Rust FX instrument ", $js_name, ".")]
             $rust_name,
@@ -47,19 +34,6 @@ macro_rules! fx_class {
             $rust_ty
         );
         instrument_pricing!($rust_name, $js_name);
-        #[wasm_bindgen(js_class = $js_name)]
-        impl $rust_name {
-            /// Construct a validated FX instrument from its bare spec.
-            /// @param spec - Bare spec for this exact instrument type, with canonical Rust units and conventions.
-            /// @returns The validated instrument.
-            /// @throws Error - Throws if the spec has the wrong type, cannot be deserialized or fails Rust validation.
-            #[wasm_bindgen(constructor)]
-            pub fn new(spec: JsValue) -> Result<$rust_name, JsValue> {
-                Ok(Self {
-                    inner: from_spec($type_tag, spec)?,
-                })
-            }
-        }
     };
 }
 
@@ -71,10 +45,10 @@ macro_rules! fx_class {
 /// `tests::option_greek_methods_match_the_metric_registry`.
 macro_rules! fx_option_class {
     (
-        $rust_name:ident, $js_name:literal, $type_tag:literal, $rust_ty:ty, $instrument_type:ident,
+        $rust_name:ident, $js_name:literal, $rust_ty:ty, $instrument_type:ident,
         [$(($method:ident, $js_method:ident, $metric:literal, $summary:literal, $returns:literal)),+ $(,)?]
     ) => {
-        fx_class!($rust_name, $js_name, $type_tag, $rust_ty);
+        fx_class!($rust_name, $js_name, $rust_ty);
 
         impl $rust_name {
             /// Metric IDs of the Greek methods this class exposes, in
@@ -150,11 +124,11 @@ macro_rules! fx_option_class {
 /// more Greek entry in the `fx_option_class!` form.
 macro_rules! fx_option {
     (
-        $rust_name:ident, $js_name:literal, $type_tag:literal, $rust_ty:ty, $instrument_type:ident,
+        $rust_name:ident, $js_name:literal, $rust_ty:ty, $instrument_type:ident,
         $theta_returns:literal $(, $extra:tt)* $(,)?
     ) => {
         fx_option_class!(
-            $rust_name, $js_name, $type_tag, $rust_ty, $instrument_type,
+            $rust_name, $js_name, $rust_ty, $instrument_type,
             [
                 (delta, delta, "delta", "Spot delta of the option.", "@returns Cash delta `dPV/dS`: PV change per unit move in the spot rate, including notional scaling."),
                 (gamma, gamma, "gamma", "Spot gamma of the option.", "@returns Cash gamma `d²PV/dS²`: PV per unit-spot squared, including notional scaling."),
@@ -171,28 +145,22 @@ use crate::api::valuations::pricing::parse_market;
 use crate::utils::wire::{js_date, js_wire};
 use finstack_quant_valuations::instruments;
 
-fx_class!(JsFxSpot, "FxSpot", "fx_spot", instruments::FxSpot);
-fx_class!(
-    JsFxForward,
-    "FxForward",
-    "fx_forward",
-    instruments::FxForward
-);
-fx_class!(JsFxSwap, "FxSwap", "fx_swap", instruments::FxSwap);
-fx_class!(JsNdf, "Ndf", "ndf", instruments::Ndf);
+fx_class!(JsFxSpot, "FxSpot", instruments::FxSpot);
+fx_class!(JsFxForward, "FxForward", instruments::FxForward);
+fx_class!(JsFxSwap, "FxSwap", instruments::FxSwap);
+fx_class!(JsNdf, "Ndf", instruments::Ndf);
 fx_class!(
     JsFxVarianceSwap,
     "FxVarianceSwap",
-    "fx_variance_swap",
     instruments::FxVarianceSwap
 );
 
 /// An FX option class exposing every standard Greek: the `fx_option!` five
 /// plus foreign rho, vanna and volga.
 macro_rules! fx_option_with_all_greeks {
-    ($rust_name:ident, $js_name:literal, $type_tag:literal, $rust_ty:ty, $instrument_type:ident, $theta_returns:literal) => {
+    ($rust_name:ident, $js_name:literal, $rust_ty:ty, $instrument_type:ident, $theta_returns:literal) => {
         fx_option!(
-            $rust_name, $js_name, $type_tag, $rust_ty, $instrument_type, $theta_returns,
+            $rust_name, $js_name, $rust_ty, $instrument_type, $theta_returns,
             (foreign_rho, foreignRho, "foreign_rho", "Foreign rate rho of the option.", "@returns Foreign rho: PV change for a 1bp (0.0001) move in the foreign discount rate."),
             (vanna, vanna, "vanna", "Vanna of the option.", "@returns Vanna `d²PV/(dS dσ)`: PV per unit spot per vol point (0.01 absolute vol)."),
             (volga, volga, "volga", "Volga of the option.", "@returns Volga `d²PV/dσ²`: PV per vol-point squared (0.01 absolute vol)."),
@@ -205,7 +173,6 @@ macro_rules! fx_option_with_all_greeks {
 fx_option_with_all_greeks!(
     JsFxOption,
     "FxOption",
-    "fx_option",
     instruments::FxOption,
     FxOption,
     "@returns Model theta per day: annual analytic theta divided by the `metric_pricing_overrides.theta_day_basis` day count (default 365 calendar days); not annualized."
@@ -213,7 +180,6 @@ fx_option_with_all_greeks!(
 fx_option_with_all_greeks!(
     JsQuantoOption,
     "QuantoOption",
-    "quanto_option",
     instruments::QuantoOption,
     QuantoOption,
     "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized."
@@ -221,7 +187,6 @@ fx_option_with_all_greeks!(
 fx_option!(
     JsFxDigitalOption,
     "FxDigitalOption",
-    "fx_digital_option",
     instruments::FxDigitalOption,
     FxDigitalOption,
     "@returns Model theta per day on the `metric_pricing_overrides.theta_day_basis` day count (default 365 calendar days): analytic for cash-or-nothing payouts, a one-day finite-difference decay for asset-or-nothing; not annualized."
@@ -229,7 +194,6 @@ fx_option!(
 fx_option!(
     JsFxTouchOption,
     "FxTouchOption",
-    "fx_touch_option",
     instruments::FxTouchOption,
     FxTouchOption,
     "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized."
@@ -237,7 +201,6 @@ fx_option!(
 fx_option!(
     JsFxBarrierOption,
     "FxBarrierOption",
-    "fx_barrier_option",
     instruments::FxBarrierOption,
     FxBarrierOption,
     "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized.",

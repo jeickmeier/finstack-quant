@@ -107,8 +107,8 @@ option's delivered CDS excludes pre-expiry defaults.
 
 Spread variance uses Actual/365F time from the current valuation date to
 legal expiry. Exercise proceeds are discounted to `exercise_settlement_date`
-(default: expiry). `premium_settlement_date` describes the separately agreed
-trade-premium payment and does not freeze variance or protection windows.
+(default: expiry). The separately agreed trade premium is not part of the
+model value.
 
 ## Settlement
 
@@ -122,9 +122,8 @@ This pricer values the **pre-expiry option only**. It does not create or deliver
 a live underlying CDS position, and valuation at or after a physical exercise
 lifecycle boundary fails explicitly rather than returning a misleading cash
 number. Manual exercise state, partial exercise and post-expiry settlement
-lifecycle are out of scope. Non-European exercise is rejected at pricing time,
-so a deserialized instrument cannot silently fall through to an unsupported
-engine.
+lifecycle are out of scope. Exercise is European by construction: the
+instrument has no exercise-style field.
 
 ## Volatility
 

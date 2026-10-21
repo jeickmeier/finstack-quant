@@ -223,7 +223,6 @@ pub(crate) fn vega(
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<f64> {
-    option.validate_supported_configuration()?;
     let base_sigma = resolve_sigma(option, curves, as_of)?;
     let bumped_sigma = base_sigma + VEGA_VOL_BUMP;
     if bumped_sigma > super::types::MAX_IMPLIED_VOL {

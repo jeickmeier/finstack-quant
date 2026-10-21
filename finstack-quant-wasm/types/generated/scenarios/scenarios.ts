@@ -10023,20 +10023,22 @@ export interface BermudanSwaption {
  *
  * Defines the exercise dates and constraints for a Bermudan swaption.
  * Exercise dates are typically aligned with swap coupon dates.
+ *
+ * Each exercise date is the notification (decision) date on which the holder
+ * elects to exercise, as in QuantLib's `BermudanExercise`; any contractual
+ * notice period is already reflected in where the dates sit, so the schedule
+ * carries no separate notice lag.
  */
 export interface BermudanSchedule {
   /**
-   * Exercise dates (must be sorted, typically on swap coupon dates)
+   * Exercise notification (decision) dates, sorted; typically one notice
+   * period before the swap coupon dates they enter on.
    */
   exercise_dates: DateWire[];
   /**
    * Lockout period end (no exercise before this date)
    */
   lockout_end?: DateWire | null;
-  /**
-   * Notice period in business days before exercise
-   */
-  notice_days: number;
 }
 /**
  * Interest Rate Future instrument.
@@ -11520,10 +11522,6 @@ export interface CdsOption {
    */
   exercise_settlement_date?: DateWire | null;
   /**
-   * Exercise style
-   */
-  exercise_style: ExerciseStyle;
-  /**
    * Option expiry date
    */
   expiry: DateWire;
@@ -11561,12 +11559,6 @@ export interface CdsOption {
    * Option type (Call = right to buy protection, Put = right to sell protection)
    */
   option_type: OptionType;
-  /**
-   * Payment date of the option premium, returned by the settlement-date
-   * accessor. This does not change variance time or front-end protection;
-   * the option value excludes the separately agreed trade premium.
-   */
-  premium_settlement_date?: DateWire | null;
   /**
    * Convention used to select the synthetic underlying CDS accrual start
    * when `underlying_start_date` is not explicitly supplied.
@@ -12421,12 +12413,6 @@ export interface VolatilityIndexFuture {
    * Attributes for scenario selection and tagging
    */
   attributes?: Attributes;
-  /**
-   * Discount curve identifier. **Unused in PV**: the future is daily
-   * margined so the mark-to-market is undiscounted, and no Dv01 is
-   * registered. Retained for market-data identification/scenario plumbing.
-   */
-  discount_curve_id: Id;
   /**
    * Unique identifier.
    */
@@ -13617,12 +13603,6 @@ export interface CommoditySpotOption {
    */
   commodity_type: string;
   /**
-   * Optional market convention for this commodity.
-   *
-   * When set, provides default premium settlement days and calendar.
-   */
-  convention?: CommodityConvention | null;
-  /**
    * Base currency for pricing
    */
   currency: Currency;
@@ -13676,14 +13656,6 @@ export interface CommoditySpotOption {
    * Option type (call or put).
    */
   option_type: OptionType;
-  /**
-   * Premium settlement lag in business days after trade date.
-   *
-   * Standard: T+1 for most exchange-traded options, T+2 for OTC.
-   * If not set and `convention` is provided, uses convention default.
-   * Otherwise defaults to 1 (T+1).
-   */
-  premium_settlement_days?: number | null;
   /**
    * Contract quantity in units.
    */

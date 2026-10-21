@@ -59,8 +59,7 @@
         "exercise_schedule": {
           "exercise_dates": [
             "2026-04-01"
-          ],
-          "notice_days": 0
+          ]
         },
         "instrument_pricing_overrides": {
           "model_config": {

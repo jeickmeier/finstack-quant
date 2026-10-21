@@ -78,11 +78,17 @@ impl std::str::FromStr for CashSettlementMethod {
 ///
 /// Defines the exercise dates and constraints for a Bermudan swaption.
 /// Exercise dates are typically aligned with swap coupon dates.
+///
+/// Each exercise date is the notification (decision) date on which the holder
+/// elects to exercise, as in QuantLib's `BermudanExercise`; any contractual
+/// notice period is already reflected in where the dates sit, so the schedule
+/// carries no separate notice lag.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct BermudanSchedule {
-    /// Exercise dates (must be sorted, typically on swap coupon dates)
+    /// Exercise notification (decision) dates, sorted; typically one notice
+    /// period before the swap coupon dates they enter on.
     #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
@@ -96,8 +102,6 @@ pub struct BermudanSchedule {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub lockout_end: Option<Date>,
-    /// Notice period in business days before exercise
-    pub notice_days: u32,
 }
 
 impl BermudanSchedule {
@@ -110,7 +114,6 @@ impl BermudanSchedule {
         Self {
             exercise_dates,
             lockout_end: None,
-            notice_days: 0,
         }
     }
 

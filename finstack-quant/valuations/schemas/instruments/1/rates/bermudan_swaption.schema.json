@@ -2,10 +2,10 @@
   "$defs": {
     "BermudanSchedule": {
       "additionalProperties": false,
-      "description": "Bermudan exercise schedule specification.\n\nDefines the exercise dates and constraints for a Bermudan swaption.\nExercise dates are typically aligned with swap coupon dates.",
+      "description": "Bermudan exercise schedule specification.\n\nDefines the exercise dates and constraints for a Bermudan swaption.\nExercise dates are typically aligned with swap coupon dates.\n\nEach exercise date is the notification (decision) date on which the holder\nelects to exercise, as in QuantLib's `BermudanExercise`; any contractual\nnotice period is already reflected in where the dates sit, so the schedule\ncarries no separate notice lag.",
       "properties": {
         "exercise_dates": {
-          "description": "Exercise dates (must be sorted, typically on swap coupon dates)",
+          "description": "Exercise notification (decision) dates, sorted; typically one notice\nperiod before the swap coupon dates they enter on.",
           "items": {
             "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
           },
@@ -22,17 +22,10 @@
           ],
           "default": null,
           "description": "Lockout period end (no exercise before this date)"
-        },
-        "notice_days": {
-          "description": "Notice period in business days before exercise",
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
         }
       },
       "required": [
-        "exercise_dates",
-        "notice_days"
+        "exercise_dates"
       ],
       "type": "object"
     },
@@ -497,8 +490,7 @@
               "2036-01-17",
               "2036-07-17"
             ],
-            "lockout_end": null,
-            "notice_days": 0
+            "lockout_end": null
           },
           "id": "BERM-10NC2-USD",
           "notional": {

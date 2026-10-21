@@ -24,9 +24,6 @@ getters!(JsCdsOption, "CdsOption", |i| {
         /// Option type.
         /// @returns `"call"` (right to buy protection) or `"put"` (right to sell protection).
         option_type as optionType => json(i.option_type),
-        /// Exercise style; only European prices.
-        /// @returns `"european"`, `"american"` or `"bermudan"`.
-        exercise_style as exerciseStyle => json(i.exercise_style),
         /// Legal option expiry date.
         /// @returns ISO-8601 expiry date.
         expiry as expiry => date(i.expiry),
@@ -39,9 +36,6 @@ getters!(JsCdsOption, "CdsOption", |i| {
         /// Settlement type of the exercise proceeds.
         /// @returns `"cash"` or `"physical"`.
         settlement as settlement => json(i.settlement),
-        /// Explicit option premium payment date.
-        /// @returns The date, or `null` for the convention settlement lag.
-        premium_settlement_date as premiumSettlementDate => opt_date(i.premium_settlement_date),
         /// Explicit exercise proceeds payment date.
         /// @returns The date, or `null` for legal expiry.
         exercise_settlement_date as exerciseSettlementDate => opt_date(i.exercise_settlement_date),
@@ -126,11 +120,6 @@ setters!(JsCdsOptionBuilder, "CdsOptionBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         option_type as optionType => en,
-        /// Set the exercise style.
-        /// @param value - `"european"`, `"american"` or `"bermudan"`; pricing supports European only.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        exercise_style as exerciseStyle => en,
         /// Set the option expiry date.
         /// @param value - Legal expiry as an ISO-8601 string; must precede the underlying maturity.
         /// @returns The builder, for chaining.
@@ -146,11 +135,6 @@ setters!(JsCdsOptionBuilder, "CdsOptionBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         settlement as settlement => en,
-        /// Set the option premium payment date.
-        /// @param value - Premium payment date as an ISO-8601 string; when never set the CDS convention settlement lag applies.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        premium_settlement_date as premiumSettlementDate => date,
         /// Set the exercise proceeds payment date.
         /// @param value - On or after expiry and before CDS maturity, as an ISO-8601 string; when never set legal expiry is used.
         /// @returns The builder, for chaining.

@@ -579,14 +579,12 @@
             "implied_volatility": 0.3663
           }
         },
-        "premium_settlement_date": "2026-05-12",
         "exercise_settlement_date": "2026-06-23",
         "underlying_start_date": "2026-03-20",
         "underlying_is_index": true,
         "index_factor": 1.0,
         "realized_loss": 0.0,
         "coupon_bp": "100",
-        "exercise_style": "european",
         "settlement": "cash",
         "attributes": {
           "tags": [
