@@ -1,6 +1,6 @@
 //! Non-Deliverable Forward (NDF) instrument module.
 //!
-//! This module provides the [`Ndf`] instrument for modeling non-deliverable
+//! This module provides the [`Ndf`](crate::ndf::Ndf) instrument for modeling non-deliverable
 //! forward contracts on restricted currency pairs.
 //!
 //! # Overview

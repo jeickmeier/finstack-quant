@@ -74,10 +74,10 @@
 //!
 //! # See Also
 //!
-//! - [`FxOption`] for vanilla FX options
-//! - [`FxForward`] for outright forwards
-//! - [`FxBarrierOption`] for barrier options
-//! - [`Ndf`] for non-deliverable forwards
+//! - [`FxOption`](crate::fx_option::FxOption) for vanilla FX options
+//! - [`FxForward`](crate::fx_forward::FxForward) for outright forwards
+//! - [`FxBarrierOption`](crate::fx_barrier_option::FxBarrierOption) for barrier options
+//! - [`Ndf`](crate::ndf::Ndf) for non-deliverable forwards
 
 extern crate self as finstack_quant_valuations_fx;
 

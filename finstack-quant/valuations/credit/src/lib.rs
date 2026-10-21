@@ -68,9 +68,9 @@
 //!
 //! # See Also
 //!
-//! - [`CreditDefaultSwap`] for single-name CDS
-//! - [`CdsIndex`] for credit indices
-//! - [`CdsTranche`] for synthetic CDO tranches
+//! - [`CreditDefaultSwap`](crate::cds::CreditDefaultSwap) for single-name CDS
+//! - [`CdsIndex`](crate::cds_index::CdsIndex) for credit indices
+//! - [`CdsTranche`](crate::cds_tranche::CdsTranche) for synthetic CDO tranches
 //! - hazard curve calibration targets in `calibration::targets::hazard`
 
 /// CDS module - Single-name credit default swaps.
