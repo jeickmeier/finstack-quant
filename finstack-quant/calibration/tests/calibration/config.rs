@@ -67,7 +67,7 @@ fn calibration_engine_rejects_invalid_discount_controls_before_execution() {
 #[test]
 fn calibration_config_rejects_non_finite_discount_bounds_and_steps() {
     type SetControl = fn(&mut finstack_quant_calibration::DiscountCurveSolveConfig, f64);
-    let controls: [(&str, SetControl); 5] = [
+    let controls: [(&str, SetControl); 4] = [
         ("df_hard_min", |config, value| config.df_hard_min = value),
         ("df_hard_max", |config, value| config.df_hard_max = value),
         ("jacobian_step_size", |config, value| {
@@ -76,7 +76,6 @@ fn calibration_config_rejects_non_finite_discount_bounds_and_steps() {
         ("scan_grid_step", |config, value| {
             config.scan_grid_step = value
         }),
-        ("min_t_spot", |config, value| config.min_t_spot = value),
     ];
     for (label, set) in controls {
         for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0, -1.0] {

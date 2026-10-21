@@ -126,7 +126,6 @@
               5.0,
               10.0
             ],
-            "sabr_interpolation": "bilinear",
             "calendar_id": "weekends_only",
             "swap_index": "USD-SOFR-3M",
             "sabr_extrapolation": "clamp",

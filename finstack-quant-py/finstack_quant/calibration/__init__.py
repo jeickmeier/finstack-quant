@@ -21,7 +21,7 @@ CalibrationEnvelope = _calibration.CalibrationEnvelope
 CalibrationEnvelopeError = _calibration.CalibrationEnvelopeError
 CalibrationPlan = _calibration.CalibrationPlan
 CalibrationReport = _calibration.CalibrationReport
-CalibrationResult = _calibration.CalibrationResult
+CalibrationResultEnvelope = _calibration.CalibrationResultEnvelope
 CalibrationStep = _calibration.CalibrationStep
 CalibrationValidationReport = _calibration.CalibrationValidationReport
 CdsQuote = _calibration.CdsQuote
@@ -61,7 +61,7 @@ __all__ = [
     "CalibrationEnvelopeError",
     "CalibrationPlan",
     "CalibrationReport",
-    "CalibrationResult",
+    "CalibrationResultEnvelope",
     "CalibrationStep",
     "CalibrationValidationReport",
     "CdsQuote",

@@ -651,8 +651,9 @@ pub(crate) fn pool_assets_from_py(
     py: Python<'_>,
     value: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<PoolAsset>> {
-    if value.is_instance_of::<pyo3::types::PyString>() {
-        return crate::bindings::module_utils::py_to_serde(py, value, "assets");
+    if let Ok(json) = value.extract::<std::borrow::Cow<'_, str>>() {
+        return serde_json::from_str(&json)
+            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid assets JSON"));
     }
     let items = value.try_iter().map_err(|_| {
         value_error(
