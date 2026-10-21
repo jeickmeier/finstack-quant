@@ -1,8 +1,8 @@
 //! Principal history, exact repayment, and periodic fee regression cases.
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_cashflows::CashflowScheduleBuildSpec;
+use finstack_quant_core::cashflow::CFKind;
 use serde_json::{json, Value};
 
 fn spec(initial: &str) -> Value {

@@ -124,13 +124,7 @@ impl RecoveryModelSpec {
                     "RecoveryModelSpec severity_vector must not be empty".to_string(),
                 ));
             }
-            for (index, severity) in severities.iter().enumerate() {
-                if !severity.is_finite() || !(0.0..=1.0).contains(severity) {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "RecoveryModelSpec severity_vector[{index}] ({severity}) must be in [0.0, 1.0] and finite"
-                    )));
-                }
-            }
+            super::check_unit_vector(severities, "RecoveryModelSpec severity_vector")?;
         }
         Ok(())
     }

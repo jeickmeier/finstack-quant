@@ -43,14 +43,14 @@ impl MetricCalculator for DiscountMarginCalculator {
         // DM is only defined for floating-rate loans; fixed-rate instruments
         // should not request this metric.
         let contractual_margin = match &loan.rate {
-            crate::term_loan::types::RateSpec::Floating(spec) => {
+            finstack_quant_cashflows::builder::RateSpec::Floating(spec) => {
                 spec.spread_bp.to_f64().ok_or_else(|| {
                     finstack_quant_core::Error::Validation(
                         "floating spread_bp is not representable as f64".to_string(),
                     )
                 })? * 1e-4
             }
-            crate::term_loan::types::RateSpec::Fixed { .. } => {
+            finstack_quant_cashflows::builder::RateSpec::Fixed { .. } => {
                 return Err(finstack_quant_core::Error::Validation(
                     "discount margin is only defined for floating-rate loans".to_string(),
                 ));

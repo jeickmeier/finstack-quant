@@ -38,7 +38,7 @@ pub(crate) fn commodity_periods(
         } else {
             BusinessDayConvention::Unadjusted
         },
-        calendar_id: calendar_id.unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
+        calendar_id: calendar_id.unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID),
         end_of_month: false,
         day_count: DayCount::Act365F,
         payment_lag_days: 0,

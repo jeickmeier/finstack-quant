@@ -5,8 +5,8 @@
 //! the other pays a floating price based on an index.
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     calendar_by_id_strict, BusinessDayConvention, Date, DateExt, Tenor,
@@ -464,7 +464,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommoditySwap {
                     ..Default::default()
                 },
             },
-        );
+        )?;
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
         ))

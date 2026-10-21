@@ -2246,68 +2246,34 @@
     }
   },
   "schedule.pv_by_period": {
-    "default_day_count": {
-      "2025Q1": {
-        "USD": {
-          "amount": "0",
-          "currency": "USD"
-        }
-      },
-      "2025Q3": {
-        "USD": {
-          "amount": "29410.7944529988",
-          "currency": "USD"
-        }
-      },
-      "2026Q1": {
-        "USD": {
-          "amount": "28823.6831745697",
-          "currency": "USD"
-        }
-      },
-      "2026Q3": {
-        "USD": {
-          "amount": "28257.58070752098",
-          "currency": "USD"
-        }
-      },
-      "2027Q1": {
-        "USD": {
-          "amount": "950809.836778235",
-          "currency": "USD"
-        }
+    "2025Q1": {
+      "USD": {
+        "amount": "0",
+        "currency": "USD"
       }
     },
-    "act_360": {
-      "2025Q1": {
-        "USD": {
-          "amount": "0",
-          "currency": "USD"
-        }
-      },
-      "2025Q3": {
-        "USD": {
-          "amount": "29410.7944529988",
-          "currency": "USD"
-        }
-      },
-      "2026Q1": {
-        "USD": {
-          "amount": "28823.6831745697",
-          "currency": "USD"
-        }
-      },
-      "2026Q3": {
-        "USD": {
-          "amount": "28257.58070752098",
-          "currency": "USD"
-        }
-      },
-      "2027Q1": {
-        "USD": {
-          "amount": "950809.836778235",
-          "currency": "USD"
-        }
+    "2025Q3": {
+      "USD": {
+        "amount": "29410.7944529988",
+        "currency": "USD"
+      }
+    },
+    "2026Q1": {
+      "USD": {
+        "amount": "28823.6831745697",
+        "currency": "USD"
+      }
+    },
+    "2026Q3": {
+      "USD": {
+        "amount": "28257.58070752098",
+        "currency": "USD"
+      }
+    },
+    "2027Q1": {
+      "USD": {
+        "amount": "950809.836778235",
+        "currency": "USD"
       }
     }
   },

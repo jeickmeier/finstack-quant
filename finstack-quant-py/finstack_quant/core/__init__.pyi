@@ -14,6 +14,7 @@ Examples
 
 """
 
+from finstack_quant.core import cashflow as cashflow
 from finstack_quant.core import config as config
 from finstack_quant.core import currency as currency
 from finstack_quant.core import dates as dates
@@ -49,6 +50,7 @@ class FinstackError(ValueError):
 
 __all__ = [
     "FinstackError",
+    "cashflow",
     "config",
     "currency",
     "dates",

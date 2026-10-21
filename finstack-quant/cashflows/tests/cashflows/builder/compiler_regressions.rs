@@ -1,8 +1,7 @@
 //! Economic regressions for compiled coupon and principal programs.
 
-use finstack_quant_cashflows::{
-    builder::CashFlowSchedule, primitives::CFKind, CashflowScheduleBuildSpec,
-};
+use finstack_quant_cashflows::{builder::CashFlowSchedule, CashflowScheduleBuildSpec};
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::{
     dates::{parse_iso_date, DayCount},
     market_data::{context::MarketContext, term_structures::ForwardCurve},
@@ -90,7 +89,9 @@ fn fixed_coupon_decimal_overflow_returns_an_error() {
 
 #[test]
 fn ex_coupon_rebates_all_principal_segments_of_the_forfeited_payment() {
-    use finstack_quant_cashflows::{AccrualConfig, AccrualIndex, AccrualMethod, ExCouponRule};
+    use finstack_quant_cashflows::accrual::{
+        AccrualConfig, AccrualIndex, AccrualMethod, ExCouponRule,
+    };
 
     let mut value = spec("2025-01-01", "2025-07-01");
     value["notional"]["initial"]["amount"] = json!("100");
@@ -136,8 +137,12 @@ fn ex_coupon_rebates_all_principal_segments_of_the_forfeited_payment() {
                 expected,
             );
             close(
-                finstack_quant_cashflows::accrued_interest_amount(&schedule, date(as_of), &config)
-                    .expect("direct segmented rebate"),
+                finstack_quant_cashflows::accrual::accrued_interest_amount(
+                    &schedule,
+                    date(as_of),
+                    &config,
+                )
+                .expect("direct segmented rebate"),
                 expected,
             );
         }
@@ -155,16 +160,20 @@ fn ex_coupon_future_segment_keeps_the_zero_balance_prefix_in_its_window() {
         "delta": {"amount": "100", "currency": "USD"}
     }]);
     let schedule = build(value, None);
-    let config = finstack_quant_cashflows::AccrualConfig {
-        ex_coupon: Some(finstack_quant_cashflows::ExCouponRule {
+    let config = finstack_quant_cashflows::accrual::AccrualConfig {
+        ex_coupon: Some(finstack_quant_cashflows::accrual::ExCouponRule {
             days_before_coupon: 7,
             calendar_id: None,
         }),
         ..Default::default()
     };
     close(
-        finstack_quant_cashflows::accrued_interest_amount(&schedule, date("2025-06-25"), &config)
-            .expect("future coupon was forfeited despite the zero-balance prefix"),
+        finstack_quant_cashflows::accrual::accrued_interest_amount(
+            &schedule,
+            date("2025-06-25"),
+            &config,
+        )
+        .expect("future coupon was forfeited despite the zero-balance prefix"),
         -0.1,
     );
 }
@@ -178,10 +187,10 @@ fn schedule_act365l_accrual_preserves_the_contractual_leap_denominator() {
     value["coupon_program"][0]["spec"]["frequency"]["count"] = json!(12);
     let schedule = build(value, None);
     close(
-        finstack_quant_cashflows::accrued_interest_amount(
+        finstack_quant_cashflows::accrual::accrued_interest_amount(
             &schedule,
             date("2023-04-01"),
-            &finstack_quant_cashflows::AccrualConfig::default(),
+            &finstack_quant_cashflows::accrual::AccrualConfig::default(),
         )
         .expect("elapsed accrual before the contractual leap day"),
         100.0 * 0.12 * 31.0 / 366.0,

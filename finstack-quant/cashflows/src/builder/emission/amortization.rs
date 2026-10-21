@@ -1,6 +1,6 @@
 //! Amortization cashflow emission.
 
-use crate::builder::orchestrator::{AmortizationSetup, PreparedAmortization};
+use crate::builder::orchestrator::{AmortizationSetup, BuildState, PreparedAmortization};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -10,6 +10,7 @@ use rust_decimal::Decimal;
 
 fn emit_principal_repayment(
     d: Date,
+    payment_date: Date,
     ccy: Currency,
     outstanding: &mut Decimal,
     pay: Decimal,
@@ -24,14 +25,17 @@ fn emit_principal_repayment(
         return Ok(());
     }
 
-    new_flows.push(CashFlow::new(
-        d,
-        None,
-        Money::new(pay.as_f64(), ccy)?,
-        CFKind::Amortization,
-        0.0,
-        None,
-    ));
+    new_flows.push(
+        CashFlow::new(
+            payment_date,
+            None,
+            Money::new(pay.as_f64(), ccy)?,
+            CFKind::Amortization,
+            0.0,
+            None,
+        )
+        .with_principal_date(d),
+    );
     *outstanding -= pay;
     Ok(())
 }
@@ -42,12 +46,11 @@ fn emit_principal_repayment(
 pub(in crate::builder) fn emit_amortization_on(
     d: Date,
     ccy: Currency,
-    outstanding: &mut Decimal,
     setup: &AmortizationSetup,
-    linear_between_installment: Option<Decimal>,
-    is_maturity: bool,
-    new_flows: &mut Vec<CashFlow>,
+    state: &mut BuildState,
 ) -> finstack_quant_core::Result<()> {
+    let outstanding = &mut state.outstanding;
+    let is_maturity = setup.final_amortization_date == Some(d);
     let on_boundary = setup.amort_dates.contains(&d);
     let pay = match &setup.rule {
         PreparedAmortization::LinearTo {
@@ -80,7 +83,7 @@ pub(in crate::builder) fn emit_amortization_on(
         PreparedAmortization::LinearBetween { start, end, .. }
             if on_boundary && d > *start && d <= *end =>
         {
-            if let Some(installment) = linear_between_installment {
+            if let Some(installment) = state.linear_between_installment {
                 if d == *end {
                     *outstanding
                 } else {
@@ -105,5 +108,6 @@ pub(in crate::builder) fn emit_amortization_on(
         }
         _ => Decimal::ZERO,
     };
-    emit_principal_repayment(d, ccy, outstanding, pay, new_flows)
+    let payment_date = setup.payment_dates.get(&d).copied().unwrap_or(d);
+    emit_principal_repayment(d, payment_date, ccy, outstanding, pay, &mut state.flows)
 }

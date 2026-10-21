@@ -4,6 +4,7 @@
 //! the period floor when the overnight fixings straddle zero.
 
 use finstack_quant_cashflows::builder::CouponType;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::builder::{
     FloatingLegCompounding, FloatingRateSpec, OvernightIndexConstraintApplication,
 };
@@ -18,7 +19,7 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_fixed_income::revolving_credit::{
     DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
-use finstack_quant_valuations_fixed_income::term_loan::{AmortizationSpec, RateSpec, TermLoan};
+use finstack_quant_valuations_fixed_income::term_loan::TermLoan;
 use rust_decimal::Decimal;
 use time::macros::date;
 

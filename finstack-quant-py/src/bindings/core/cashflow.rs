@@ -1,6 +1,6 @@
-//! Python bindings for `finstack_quant_cashflows::primitives`.
+//! Python bindings for `finstack_quant_core::cashflow`.
 
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow, CashFlowAccrual};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
@@ -11,10 +11,10 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::wire_methods;
 use crate::errors::core_to_py;
 
-/// Wrapper for [`CFKind`] exposed as `finstack_quant.cashflows.primitives.CFKind`.
+/// Wrapper for [`CFKind`] exposed as `finstack_quant.core.cashflow.CFKind`.
 #[pyclass(
     name = "CFKind",
-    module = "finstack_quant.cashflows.primitives",
+    module = "finstack_quant.core.cashflow",
     frozen,
     eq,
     skip_from_py_object
@@ -165,7 +165,7 @@ pub(crate) fn extract_cf_kind(obj: &Bound<'_, PyAny>) -> PyResult<CFKind> {
 /// Contractual accrual boundaries and conventions, independent of payment date.
 #[pyclass(
     name = "CashFlowAccrual",
-    module = "finstack_quant.cashflows.primitives",
+    module = "finstack_quant.core.cashflow",
     frozen,
     skip_from_py_object
 )]
@@ -284,10 +284,10 @@ impl PyCashFlowAccrual {
     }
 }
 
-/// Wrapper for [`CashFlow`] exposed as `finstack_quant.cashflows.primitives.CashFlow`.
+/// Wrapper for [`CashFlow`] exposed as `finstack_quant.core.cashflow.CashFlow`.
 #[pyclass(
     name = "CashFlow",
-    module = "finstack_quant.cashflows.primitives",
+    module = "finstack_quant.core.cashflow",
     frozen,
     skip_from_py_object
 )]
@@ -500,11 +500,11 @@ impl PyCashFlow {
     }
 }
 
-wire_methods!(PyCashFlow, CashFlow, "CashFlow");
+wire_methods!(PyCashFlow, CashFlow, "CashFlow", validate);
 
-/// Register the `finstack_quant.cashflows.primitives` submodule.
+/// Register the `finstack_quant.core.cashflow` submodule.
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let module = crate::bindings::module_utils::new_submodule(parent, "primitives")?;
+    let module = crate::bindings::module_utils::new_submodule(parent, "cashflow")?;
     module.setattr(
         "__doc__",
         "Cashflow primitives: CashFlow, CFKind, settlement classification.",

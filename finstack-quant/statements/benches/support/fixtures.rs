@@ -15,9 +15,8 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_statements::capital_structure::{EcfSweepSpec, PaymentPriority, WaterfallSpec};
 use finstack_quant_statements::prelude::*;
 use finstack_quant_statements::types::FinancialStatementInstrument;
-use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    AmortizationSpec, RateSpec, TermLoan,
-};
+use finstack_quant_valuations::instruments::fixed_income::term_loan::{TermLoan};
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use time::Month;
 
 /// Issue / as-of date shared by capital-structure fixtures.

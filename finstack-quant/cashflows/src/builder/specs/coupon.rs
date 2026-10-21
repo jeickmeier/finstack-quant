@@ -259,21 +259,19 @@ impl std::fmt::Display for FloatingLegCompounding {
             Self::SimpleAverage => write!(f, "simple_average"),
             Self::CompoundedInArrears { .. } => write!(f, "compounded_in_arrears"),
             Self::CompoundedWithObservationShift { .. } => {
-                write!(f, "compounded_observation_shift")
+                write!(f, "compounded_with_observation_shift")
             }
-            Self::CompoundedWithRateCutoff { .. } => write!(f, "compounded_rate_cutoff"),
+            Self::CompoundedWithRateCutoff { .. } => write!(f, "compounded_with_rate_cutoff"),
         }
     }
 }
 
-/// Default gearing for floating rates.
 fn default_gearing() -> Decimal {
-    Decimal::ONE
+    FloatingRateSpec::DEFAULT_GEARING
 }
 
-/// Default reset lag for floating rates (T-2 standard).
 fn default_reset_lag() -> i32 {
-    2
+    FloatingRateSpec::DEFAULT_RESET_LAG_DAYS
 }
 
 /// Policy for handling floating rate projection failures.
@@ -322,6 +320,27 @@ impl FloatingRateFallback {
     /// when it carries the default value.
     pub fn is_default(&self) -> bool {
         matches!(self, Self::Error)
+    }
+
+    /// Index rate to use when the floating rate cannot be observed or projected.
+    ///
+    /// # Arguments
+    ///
+    /// * `error` - Why the rate is unavailable; returned unchanged under
+    ///   [`Self::Error`].
+    ///
+    /// # Errors
+    ///
+    /// Returns `error` when the policy is [`Self::Error`].
+    pub fn index_rate(
+        &self,
+        error: finstack_quant_core::Error,
+    ) -> finstack_quant_core::Result<f64> {
+        match self {
+            Self::Error => Err(error),
+            Self::SpreadOnly => Ok(0.0),
+            Self::FixedRate(rate) => Ok(rate.as_f64()),
+        }
     }
 }
 
@@ -593,6 +612,18 @@ pub struct FloatingRateSpec {
 }
 
 impl FloatingRateSpec {
+    /// Whether the index floor/cap applies to each overnight observation.
+    ///
+    /// True for overnight compounding with
+    /// [`OvernightIndexConstraintApplication::Daily`]; the period-level rate
+    /// composition must then drop the index bounds, which the observation
+    /// replay has already applied.
+    #[must_use]
+    pub fn applies_daily_index_bounds(&self) -> bool {
+        self.compounding.is_some_and(|method| method.is_overnight())
+            && self.overnight_index_constraints == OvernightIndexConstraintApplication::Daily
+    }
+
     /// Validates the floating rate specification.
     ///
     /// # Validation Rules
@@ -637,10 +668,19 @@ impl FloatingRateSpec {
 }
 
 fn default_gearing_includes_spread() -> bool {
-    true
+    FloatingRateSpec::DEFAULT_GEARING_INCLUDES_SPREAD
 }
 
 impl FloatingRateSpec {
+    /// Gearing applied when a spec omits it: `1` (the index passes through).
+    pub const DEFAULT_GEARING: Decimal = Decimal::ONE;
+
+    /// Whether gearing scales the spread when a spec omits it: `true`.
+    pub const DEFAULT_GEARING_INCLUDES_SPREAD: bool = true;
+
+    /// Reset lag in business days when a spec omits it: `2` (T-2).
+    pub const DEFAULT_RESET_LAG_DAYS: i32 = 2;
+
     /// Shared preset skeleton: unit gearing, no floors/caps, `Error` fallback.
     fn preset(
         forward_curve_id: &str,

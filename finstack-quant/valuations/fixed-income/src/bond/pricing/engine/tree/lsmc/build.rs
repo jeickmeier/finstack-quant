@@ -23,12 +23,12 @@ pub(super) fn contractual_reset_date(start: Date, spec: &FloatingCouponSpec) -> 
         .fixing_calendar_id
         .as_deref()
         .unwrap_or(&spec.schedule.calendar_id);
-    let calendar = calendar_by_id_strict(calendar_id)?;
-    if spec.rate_spec.reset_lag_days == 0 {
-        return Ok(start);
-    }
-    let reset = start.add_business_days(-spec.rate_spec.reset_lag_days, calendar)?;
-    adjust(reset, spec.schedule.business_day_convention, calendar)
+    finstack_quant_cashflows::builder::compute_reset_date(
+        start,
+        spec.rate_spec.reset_lag_days,
+        spec.schedule.business_day_convention,
+        calendar_by_id_strict(calendar_id)?,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -49,15 +49,7 @@ pub(super) fn build_overnight_coupon(
         .rate_spec
         .overnight_basis
         .unwrap_or(spec.schedule.day_count);
-    let day_count_basis = match day_count {
-        DayCount::Act360 => 360.0,
-        DayCount::Act365F => 365.0,
-        other => {
-            return Err(Error::Validation(format!(
-                "bond hazard LSMC overnight basis must be Act360 or Act365F, got {other:?}"
-            )))
-        }
-    };
+    let day_count_basis = finstack_quant_cashflows::builder::overnight_day_count_basis(day_count)?;
     let calendar_id = spec
         .rate_spec
         .fixing_calendar_id
@@ -65,11 +57,6 @@ pub(super) fn build_overnight_coupon(
         .unwrap_or(&spec.schedule.calendar_id);
     let calendar = calendar_by_id_strict(calendar_id)?;
     let observations = OvernightObservationSchedule::compile(start, end, method, calendar)?;
-    if observations.observations().is_empty() && start < end {
-        return Err(Error::Validation(format!(
-            "bond hazard LSMC overnight accrual [{start}, {end}) contains no observations on calendar '{calendar_id}'"
-        )));
-    }
 
     let constraints = OvernightRateConstraints {
         application: spec.rate_spec.overnight_index_constraints,
@@ -83,105 +70,77 @@ pub(super) fn build_overnight_coupon(
     let mut sources = BTreeMap::new();
 
     for observation in observations.observations() {
-        let max_tenor = observation
-            .rate_tenor_days
-            .max(observation.weight_days)
-            .max(1);
-        for tenor_days in 1..=max_tenor {
-            let key = (observation.observation_date, tenor_days);
-            if sources.contains_key(&key) {
-                continue;
+        let key = observation.observation_date;
+        if sources.contains_key(&key) {
+            continue;
+        }
+        let observation_date = observation.observation_date;
+        let published_same_day = observation_date == as_of
+            && fixings.is_some_and(|series| series.value_on_exact(observation_date).is_ok());
+        let source = if observation_date < as_of || published_same_day {
+            match require_fixing_value_exact(fixings, forward_curve_id, observation_date, as_of) {
+                Ok(rate) => OvernightRateSource::Fixed(rate),
+                Err(error) => {
+                    OvernightRateSource::Fixed(spec.rate_spec.fallback.index_rate(error)?)
+                }
             }
-            let observation_date = observation.observation_date;
-            let published_same_day = observation_date == as_of
-                && fixings.is_some_and(|series| series.value_on_exact(observation_date).is_ok());
-            let source = if observation_date < as_of || published_same_day {
-                match require_fixing_value_exact(fixings, forward_curve_id, observation_date, as_of)
-                {
-                    Ok(rate) => OvernightRateSource::Fixed(rate),
-                    Err(error) => OvernightRateSource::Fixed(fallback_index_rate(
-                        &spec.rate_spec.fallback,
-                        error,
-                    )?),
-                }
-            } else if let Some(forward) = forward.as_ref() {
-                if observation_date < forward.base_date() {
-                    OvernightRateSource::Fixed(fallback_index_rate(
-                        &spec.rate_spec.fallback,
-                        Error::Validation(format!(
-                            "overnight observation {observation_date} for index '{forward_curve_id}' precedes forward-curve base {}",
-                            forward.base_date()
-                        )),
-                    )?)
-                } else {
-                    let observation_end = observation_date
-                        .checked_add(Duration::days(i64::from(tenor_days)))
-                        .ok_or_else(|| {
-                            Error::Validation(
-                                "bond hazard LSMC overnight observation end overflows the supported date range"
-                                    .to_string(),
-                            )
-                        })?;
-                    let curve_time = forward.day_count().year_fraction(
-                        forward.base_date(),
-                        observation_date,
-                        DayCountContext::default(),
-                    )?;
-                    let curve_end_time = forward.day_count().year_fraction(
-                        forward.base_date(),
-                        observation_end,
-                        DayCountContext::default(),
-                    )?;
-                    let accrual = f64::from(tenor_days) / day_count_basis;
-                    let curve_accrual = curve_end_time - curve_time;
-                    let base_index_rate =
-                        forward.rate_period(curve_time, curve_end_time) * (curve_accrual / accrual);
-                    if !curve_accrual.is_finite()
-                        || curve_accrual <= 0.0
-                        || !base_index_rate.is_finite()
-                    {
-                        return Err(Error::Validation(format!(
-                            "bond hazard LSMC has an invalid projection interval for overnight observation {observation_date} to {observation_end}"
-                        )));
-                    }
-                    let base_df = discount.df_between_dates(observation_date, observation_end)?;
-                    if !base_df.is_finite() || base_df <= 0.0 {
-                        return Err(Error::Validation(format!(
-                            "bond hazard LSMC has an invalid discount factor for overnight observation {observation_date}"
-                        )));
-                    }
-                    let observation_step = exact_grid_step(times, as_of, observation_date)?;
-                    let end_step = exact_grid_step(times, as_of, observation_end)?;
-                    if observation_step >= end_step {
-                        return Err(Error::Validation(format!(
-                            "bond hazard LSMC overnight observation {observation_date} to {observation_end} maps to one tree step"
-                        )));
-                    }
-                    OvernightRateSource::Conditional(ConditionalRate {
-                        observation_step,
-                        accrual,
-                        base_index_rate,
-                        base_discount_forward: (1.0 / base_df - 1.0) / accrual,
-                        conditional_discount_factors: tree
-                            .conditional_discount_factors(observation_step, end_step)?,
-                    })
-                }
-            } else {
-                OvernightRateSource::Fixed(fallback_index_rate(
-                    &spec.rate_spec.fallback,
-                    Error::Validation(format!(
-                        "forward curve '{forward_curve_id}' is required for stochastic overnight observation {observation_date}"
+        } else if let Some(forward) = forward.as_ref() {
+            if observation_date < forward.base_date() {
+                OvernightRateSource::Fixed(spec.rate_spec.fallback.index_rate(Error::Validation(format!(
+                        "overnight observation {observation_date} for index '{forward_curve_id}' precedes forward-curve base {}",
+                        forward.base_date()
                     )),
                 )?)
-            };
-            sources.insert(key, source);
-        }
+            } else {
+                let base_index_rate = finstack_quant_cashflows::builder::project_overnight_rate(
+                    forward,
+                    observation_date,
+                    day_count_basis,
+                )?;
+                let accrual = 1.0 / day_count_basis;
+                let observation_end = observation_date
+                    .checked_add(Duration::days(1))
+                    .ok_or_else(|| {
+                        Error::Validation(
+                            "bond hazard LSMC overnight observation end overflows the supported date range"
+                                .to_string(),
+                        )
+                    })?;
+                let base_df = discount.df_between_dates(observation_date, observation_end)?;
+                if !base_df.is_finite() || base_df <= 0.0 {
+                    return Err(Error::Validation(format!(
+                        "bond hazard LSMC has an invalid discount factor for overnight observation {observation_date}"
+                    )));
+                }
+                let observation_step = exact_grid_step(times, as_of, observation_date)?;
+                let end_step = exact_grid_step(times, as_of, observation_end)?;
+                if observation_step >= end_step {
+                    return Err(Error::Validation(format!(
+                        "bond hazard LSMC overnight observation {observation_date} to {observation_end} maps to one tree step"
+                    )));
+                }
+                OvernightRateSource::Conditional(ConditionalRate {
+                    observation_step,
+                    accrual,
+                    base_index_rate,
+                    base_discount_forward: (1.0 / base_df - 1.0) / accrual,
+                    conditional_discount_factors: tree
+                        .conditional_discount_factors(observation_step, end_step)?,
+                })
+            }
+        } else {
+            OvernightRateSource::Fixed(spec.rate_spec.fallback.index_rate(Error::Validation(format!(
+                    "forward curve '{forward_curve_id}' is required for stochastic overnight observation {observation_date}"
+                )),
+            )?)
+        };
+        sources.insert(key, source);
     }
 
     let mut max_history_steps = 0_usize;
     for observation in observations.observations() {
         let Some(OvernightRateSource::Conditional(source)) =
-            sources.get(&(observation.observation_date, observation.rate_tenor_days))
+            sources.get(&observation.observation_date)
         else {
             continue;
         };
@@ -201,18 +160,6 @@ pub(super) fn build_overnight_coupon(
             constraints,
         },
     ))
-}
-
-pub(super) fn fallback_index_rate(fallback: &FloatingRateFallback, error: Error) -> Result<f64> {
-    match fallback {
-        FloatingRateFallback::Error => Err(error),
-        FloatingRateFallback::SpreadOnly => Ok(0.0),
-        FloatingRateFallback::FixedRate(rate) => rate.to_f64().ok_or_else(|| {
-            Error::Validation(
-                "bond hazard LSMC floating fallback rate cannot be represented as f64".to_string(),
-            )
-        }),
-    }
 }
 
 pub(super) fn exact_grid_step(times: &[f64], as_of: Date, date: Date) -> Result<usize> {

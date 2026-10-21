@@ -3,8 +3,8 @@ use cf::builder::{
     CashFlowSchedule, FloatingLegCompounding, OvernightObservationSchedule,
     OvernightRateConstraints,
 };
-use cf::primitives::CFKind;
 use finstack_quant_cashflows as cf;
+use finstack_quant_core::cashflow::CFKind;
 use serde_json::{json, Value};
 
 fn spec(issue: &str, maturity: &str) -> Value {
@@ -27,10 +27,10 @@ fn date(s: &str) -> finstack_quant_core::dates::Date {
 }
 fn accrued_json(raw: &str, as_of: &str, config: Option<&str>) -> finstack_quant_core::Result<f64> {
     let schedule: CashFlowSchedule = serde_json::from_str(raw).expect("schedule JSON");
-    let config = config.map_or_else(cf::AccrualConfig::default, |json| {
+    let config = config.map_or_else(cf::accrual::AccrualConfig::default, |json| {
         serde_json::from_str(json).expect("accrual config JSON")
     });
-    cf::accrued_interest_amount(&schedule, date(as_of), &config)
+    cf::accrual::accrued_interest_amount(&schedule, date(as_of), &config)
 }
 fn close(actual: f64, expected: f64) {
     assert!(
@@ -445,11 +445,7 @@ fn funding_outflow_has_no_default_recovery_payment() {
         &vec![1.0; s.get_flows().len()],
         Some(&hazard),
         Some(0.4),
-        cf::aggregation::DateContext::new(
-            date("2025-01-01"),
-            finstack_quant_core::dates::DayCount::Act365F,
-            finstack_quant_core::dates::DayCountContext::default(),
-        ),
+        date("2025-01-01"),
     )
     .expect("PV");
     close(pvs[draw_index], -80.0);

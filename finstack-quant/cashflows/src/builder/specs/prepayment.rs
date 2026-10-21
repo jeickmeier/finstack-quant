@@ -87,8 +87,8 @@ impl PrepaymentModelSpec {
     /// - the ABS `speed` is outside `[0, 1]`
     /// - the vector curve is empty or holds a value outside `[0, 1]`
     ///
-    /// Returns `InputError::NegativeValue`/`Error::Validation` if the
-    /// constant `cpr` is negative or non-finite.
+    /// Returns `Error::Validation` if the constant `cpr` is negative or
+    /// non-finite.
     ///
     /// # References
     ///
@@ -102,7 +102,7 @@ impl PrepaymentModelSpec {
                         "PSA speed_multiplier ({speed_multiplier}) must be finite and non-negative"
                     )));
                 }
-                super::super::credit_rates::psa_cpr(*speed_multiplier, seasoning_months)
+                crate::builder::credit_rates::psa_cpr(*speed_multiplier, seasoning_months)
             }
             PrepaymentModelSpec::CmbsLockout {
                 lockout_months,
@@ -116,7 +116,7 @@ impl PrepaymentModelSpec {
                 }
             }
             PrepaymentModelSpec::Abs { speed } => {
-                return super::super::credit_rates::abs_to_smm(*speed, seasoning_months);
+                return crate::builder::credit_rates::abs_to_smm(*speed, seasoning_months);
             }
             PrepaymentModelSpec::Vector { monthly_cpr } => {
                 vector_at(monthly_cpr, seasoning_months, "monthly_cpr")?
@@ -130,7 +130,7 @@ impl PrepaymentModelSpec {
             )));
         }
 
-        use super::super::credit_rates::cpr_to_smm;
+        use crate::builder::credit_rates::cpr_to_smm;
         cpr_to_smm(cpr)
     }
 
@@ -149,16 +149,10 @@ impl PrepaymentModelSpec {
             ..
         } = self
         {
-            super::super::credit_rates::cpr_to_smm(*cpr)?;
+            crate::builder::credit_rates::cpr_to_smm(*cpr)?;
         }
         if let PrepaymentModelSpec::Vector { monthly_cpr } = self {
-            for (index, cpr) in monthly_cpr.iter().enumerate() {
-                if !cpr.is_finite() || !(0.0..=1.0).contains(cpr) {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "monthly_cpr[{index}] ({cpr}) must be a decimal in [0, 1]"
-                    )));
-                }
-            }
+            super::check_unit_vector(monthly_cpr, "monthly_cpr")?;
         }
         // Month 1 and the PSA/SDA peak cover every branch of the piecewise curves.
         self.smm(1)?;
@@ -279,8 +273,7 @@ impl PrepaymentModelSpec {
     ///
     /// Every month the same share `speed` of the *original* balance prepays,
     /// so the single-month mortality on the remaining balance rises with
-    /// seasoning: `SMM_t = speed / (1 − speed·(t − 1))`. The stored `cpr`
-    /// is the annualized month-1 rate and is ignored by [`Self::smm`].
+    /// seasoning: `SMM_t = speed / (1 − speed·(t − 1))`.
     ///
     /// # Arguments
     ///
@@ -311,9 +304,6 @@ impl PrepaymentModelSpec {
     }
 
     /// Explicit annual CPR per month of seasoning (the last value is held).
-    ///
-    /// The stored `cpr` is the first vector entry and is ignored by
-    /// [`Self::smm`].
     ///
     /// # Arguments
     ///

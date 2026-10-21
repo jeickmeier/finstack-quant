@@ -222,5 +222,11 @@ export const core = {
   kahanSum: wasm.kahanSum,
   neumaierSum: wasm.neumaierSum,
   longestPositiveRun: wasm.longestPositiveRun,
+  cashFlowGetBalanceDate: wasm.cashFlowGetBalanceDate,
+  cashFlowValidate: wasm.cashFlowValidate,
+  cfKindIsCashSettlement: wasm.cfKindIsCashSettlement,
+  cfKindIsInterestLike: wasm.cfKindIsInterestLike,
+  cfKindIsPrincipalLike: wasm.cfKindIsPrincipalLike,
+  cfKindParse: wasm.cfKindParse,
   schema,
 };

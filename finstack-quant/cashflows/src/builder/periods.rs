@@ -4,7 +4,8 @@
 //! builder's date generation and calendar policy.
 
 use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
+    adjust, BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, HolidayCalendar,
+    StubKind, Tenor,
 };
 use finstack_quant_core::InputError;
 
@@ -12,9 +13,52 @@ use super::date_generation::{
     build_schedule_period, effective_frequency, effective_stub, generate_periods_with_adjustment,
     icma_coupon_period, validate_accrual_grid, validate_unique_payment_dates,
 };
-use super::emission::compute_reset_date;
 use super::specs::{RollRule, ScheduleParams};
 use finstack_quant_core::dates::calendar_by_id_strict;
+
+/// Reset (fixing) date of a coupon that accrues from `accrual_start`.
+///
+/// Market standard: reset dates are computed as `accrual_start - reset_lag_days`
+/// **business days** using the fixing calendar (or accrual calendar), then adjusted
+/// to a business day using the specified business-day convention.
+///
+/// With a zero lag, the reset date is exactly the accrual start. Callers that
+/// require a business-day fixing must provide an adjusted accrual start or a
+/// positive reset lag; silently moving an explicit zero-lag reset earlier
+/// changes the contract and can incorrectly turn a new trade into a seasoned
+/// one that requires historical fixings.
+///
+/// # Arguments
+///
+/// * `accrual_start` - Contractual accrual start of the coupon.
+/// * `reset_lag_days` - Non-negative fixing lag in business days.
+/// * `business_day_convention` - Adjustment applied to the lagged date.
+/// * `cal` - Fixing calendar for the business-day lag and adjustment.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` for a negative lag; calendar errors propagate.
+pub fn compute_reset_date(
+    accrual_start: Date,
+    reset_lag_days: i32,
+    business_day_convention: BusinessDayConvention,
+    cal: &dyn HolidayCalendar,
+) -> finstack_quant_core::Result<Date> {
+    if reset_lag_days < 0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "reset_lag_days must be non-negative; got {reset_lag_days}"
+        )));
+    }
+    if reset_lag_days == 0 {
+        return Ok(accrual_start);
+    }
+
+    // Business-day subtraction avoids weekend/holiday traps where calendar-day subtraction
+    // plus ModifiedFollowing could accidentally roll past the accrual start/end.
+    let mut reset_date = accrual_start.add_business_days(-reset_lag_days, cal)?;
+    reset_date = adjust(reset_date, business_day_convention, cal)?;
+    Ok(reset_date)
+}
 
 /// Accrual period with payment timing.
 ///
@@ -169,11 +213,7 @@ pub(crate) fn period_day_count_context<'a>(
             period.unadjusted_start,
             period.unadjusted_end,
             frequency,
-            if matches!(roll_rule, RollRule::None) {
-                stub
-            } else {
-                StubKind::ShortBack
-            },
+            stub,
             end_of_month,
             roll_rule,
         )

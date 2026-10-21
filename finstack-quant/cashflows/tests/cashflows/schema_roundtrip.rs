@@ -27,21 +27,16 @@ struct CashflowEnvelope<T> {
 }
 
 #[test]
-fn cashflows_embeds_every_registered_schema_as_a_resolvable_resource() {
+fn every_registered_cashflow_schema_is_a_resolvable_resource() {
     let resources = finstack_quant_cashflows::schema::resources()
-        .expect("embedded cashflow schemas are valid resources");
-    let mut embedded: Vec<&str> = resources.iter().map(|(uri, _)| uri.as_str()).collect();
-    let mut registered: Vec<&str> = finstack_quant_cashflows::schema::ARTIFACTS
-        .iter()
-        .map(|artifact| artifact.id)
-        .collect();
-    embedded.sort_unstable();
-    registered.sort_unstable();
-    assert_eq!(embedded, registered);
-    assert_eq!(resources.len(), 14);
+        .expect("registered cashflow schemas render as valid resources");
+    assert_eq!(
+        resources.len(),
+        finstack_quant_cashflows::schema::ARTIFACTS.len()
+    );
     assert!(resources
         .iter()
-        .all(|(uri, _)| uri.starts_with(finstack_quant_cashflows::schema::CASHFLOW_SCHEMA_BASE)));
+        .all(|(uri, _)| uri.starts_with("https://finstack_quant.dev/schemas/cashflow/1/")));
 }
 
 // Payload wrapper types for each spec
@@ -212,10 +207,10 @@ fn test_json_bridge_build_validate_flows_and_accrual() {
         serde_json::from_str(&schedule_json).expect("schedule JSON should deserialize");
     assert!(schedule.get_flows().iter().any(|flow| matches!(
         flow.kind,
-        finstack_quant_cashflows::primitives::CFKind::Fixed
-            | finstack_quant_cashflows::primitives::CFKind::FloatReset
-            | finstack_quant_cashflows::primitives::CFKind::Stub
-            | finstack_quant_cashflows::primitives::CFKind::InflationCoupon
+        finstack_quant_core::cashflow::CFKind::Fixed
+            | finstack_quant_core::cashflow::CFKind::FloatReset
+            | finstack_quant_core::cashflow::CFKind::Stub
+            | finstack_quant_core::cashflow::CFKind::InflationCoupon
     )));
     assert_eq!(
         schedule.get_meta().issue_date,
@@ -234,10 +229,10 @@ fn test_json_bridge_build_validate_flows_and_accrual() {
         serde_json::from_str(&dated).expect("dated flow JSON");
     assert_eq!(dated_flows.len(), schedule.get_flows().len());
 
-    let accrued = finstack_quant_cashflows::accrued_interest_amount(
+    let accrued = finstack_quant_cashflows::accrual::accrued_interest_amount(
         &schedule,
         finstack_quant_core::dates::parse_iso_date("2025-02-28").expect("date"),
-        &finstack_quant_cashflows::AccrualConfig::default(),
+        &finstack_quant_cashflows::accrual::AccrualConfig::default(),
     )
     .expect("accrued interest");
     assert!(accrued > 0.0, "expected positive accrued interest");
@@ -335,7 +330,7 @@ fn test_json_bridge_amortizing_schedule_build() {
         serde_json::from_str(&schedule_json).expect("schedule JSON should deserialize");
     assert!(schedule.get_flows().iter().any(|flow| matches!(
         flow.kind,
-        finstack_quant_cashflows::primitives::CFKind::Amortization
+        finstack_quant_core::cashflow::CFKind::Amortization
     )));
 }
 
@@ -689,12 +684,7 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
     let first_coupon = schedule
         .get_flows()
         .iter()
-        .find(|flow| {
-            matches!(
-                flow.kind,
-                finstack_quant_cashflows::primitives::CFKind::FloatReset
-            )
-        })
+        .find(|flow| matches!(flow.kind, finstack_quant_core::cashflow::CFKind::FloatReset))
         .expect("schedule has a floating coupon");
 
     // First coupon (accrues 2025-01-15 -> 2025-04-15): 4.0% fixing + 100 bp
@@ -796,7 +786,7 @@ fn canonical_coupon_and_payment_programs_build_nontrivial_schedule() {
     assert!(schedule
         .get_flows()
         .iter()
-        .any(|flow| flow.kind == finstack_quant_cashflows::primitives::CFKind::Pik));
+        .any(|flow| flow.kind == finstack_quant_core::cashflow::CFKind::Pik));
 }
 
 #[test]

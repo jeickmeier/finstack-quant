@@ -27,7 +27,6 @@ pub(crate) struct StructuredCreditAssumptionRegistry {
     credit_model_defaults: CreditModelDefaultsRecord,
     cmo_collateral_defaults: CmoCollateralDefaultsRecord,
     simulation: SimulationRecord,
-    default_models: DefaultModelsRecord,
     stochastic_calibrations: StochasticCalibrationsRecord,
     deal_profiles: Vec<DealProfileRecord>,
 }
@@ -60,11 +59,6 @@ impl StructuredCreditAssumptionRegistry {
             guarantee_fee_bp: self.cmo_collateral_defaults.guarantee_fee_bp,
             speed_multiplier: self.cmo_collateral_defaults.speed_multiplier,
         }
-    }
-
-    /// Peak annual CDR of the registry SDA curve at 100% speed.
-    pub(crate) fn sda_peak_cdr(&self) -> f64 {
-        self.default_models.sda.peak_cdr
     }
 
     pub(crate) fn pool_balance_cleanup_threshold(&self) -> f64 {
@@ -209,15 +203,6 @@ impl StructuredCreditAssumptionRegistry {
             self.simulation.pool_balance_cleanup_threshold,
             "pool balance cleanup threshold",
         )?;
-        validate_nonzero_u32(self.default_models.sda.peak_month, "SDA peak month")?;
-        finstack_quant_core::validation::validate_f64_unit_interval(
-            self.default_models.sda.peak_cdr,
-            "SDA peak CDR",
-        )?;
-        finstack_quant_core::validation::validate_f64_unit_interval(
-            self.default_models.sda.terminal_cdr,
-            "SDA terminal CDR",
-        )?;
         finstack_quant_core::validation::validate_unique_ids(
             "structured-credit assumptions registry",
             "structured-credit deal profile",
@@ -312,20 +297,6 @@ struct CmoCollateralDefaultsRecord {
 #[serde(deny_unknown_fields)]
 struct SimulationRecord {
     pool_balance_cleanup_threshold: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct DefaultModelsRecord {
-    sda: SdaRecord,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct SdaRecord {
-    peak_month: u32,
-    peak_cdr: f64,
-    terminal_cdr: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

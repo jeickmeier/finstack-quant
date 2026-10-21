@@ -6,7 +6,7 @@ use super::config::{
 };
 use crate::cds_tranche::CdsTranche;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{calendar_by_id_strict, Date, DateExt, HolidayCalendar};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -129,7 +129,7 @@ impl CdsTranchePricer {
     ) -> Result<CashFlowSchedule> {
         tranche.validate()?;
         if as_of >= tranche.maturity {
-            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+            return finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 tranche.day_count,
                 finstack_quant_cashflows::ScheduleBuildOpts {
@@ -148,7 +148,7 @@ impl CdsTranchePricer {
                         maturity: Some(tranche.maturity),
                     },
                 },
-            ));
+            );
         }
         let flows = self
             .project_discountable_rows(tranche, market, as_of)?
@@ -159,7 +159,7 @@ impl CdsTranchePricer {
         // the expected-loss curve is integrated only once.
         let valuation_date = self.calculate_settlement_date(tranche, market, as_of)?;
 
-        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+        finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             tranche.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
@@ -178,7 +178,7 @@ impl CdsTranchePricer {
                     maturity: Some(tranche.maturity),
                 },
             },
-        ))
+        )
     }
 
     pub(super) fn project_discountable_rows(

@@ -40,9 +40,7 @@ fn pool_of(
         equity: 5_500_000.0,
     });
     deal.credit_model.recovery_spec =
-        finstack_quant_valuations_structured_credit::structured_credit::RecoveryModelSpec::with_lag(
-            0.4, 0,
-        );
+        finstack_quant_cashflows::builder::RecoveryModelSpec::with_lag(0.4, 0);
     deal
 }
 

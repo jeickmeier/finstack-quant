@@ -4,7 +4,7 @@
 use super::PrincipalClaim;
 use crate::error::{Error, Result};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::cashflow::{CashFlow, CashFlowAccrual};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::money::Money;

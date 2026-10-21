@@ -14,13 +14,13 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 
+use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_valuations_structured_credit::structured_credit::{
     AbsChargeOffCalculator, AbsCreditEnhancementCalculator, AssetPool, CmbsDscrCalculator,
-    DealType, PoolAsset, PrepaymentModelSpec, StructuredCredit, Tranche, TrancheSeniority,
-    TrancheStructure,
+    DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
 use std::sync::Arc;
 use time::Month;

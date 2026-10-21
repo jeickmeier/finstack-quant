@@ -23,8 +23,9 @@
 //! - Factor loading (β): 0.3-0.5
 //! - CPR volatility (σ): 0.15-0.30
 
-use super::super::{clamped_cpr_to_smm, expected_shocked_smm};
+use super::super::expected_shocked_smm;
 use super::traits::StochasticPrepayment;
+use finstack_quant_cashflows::builder::clamped_cpr_to_smm;
 use finstack_quant_cashflows::builder::smm_to_cpr;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 

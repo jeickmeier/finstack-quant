@@ -262,7 +262,7 @@ impl Bond {
     /// ex-coupon window of a coupon, that coupon is excluded: a buyer settling
     /// in the ex-window does not receive the imminent coupon (market standard,
     /// e.g. UK gilts). Accrued interest is correspondingly negative in that
-    /// window (see [`finstack_quant_cashflows::accrued_interest_amount`]).
+    /// window (see [`finstack_quant_cashflows::accrual::accrued_interest_amount`]).
     ///
     /// Internal pricing engines (discount, hazard, spread solvers) should use
     /// this instead of the public `CashflowProvider::dated_cashflows` which

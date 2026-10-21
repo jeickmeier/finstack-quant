@@ -250,7 +250,7 @@ pub(super) fn schedule_calendar_id(facility: &RevolvingCredit) -> &str {
     facility
         .calendar_id
         .as_deref()
-        .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID)
+        .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID)
 }
 
 /// Convert a reset-effective date to its contractual fixing observation date.
@@ -277,7 +277,7 @@ pub(super) fn floating_fixing_date(
         .fixing_calendar_id
         .as_deref()
         .or(facility_calendar_id)
-        .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID);
+        .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID);
     let calendar = finstack_quant_core::dates::calendar_by_id_strict(calendar_id)?;
     reset_effective_date.add_business_days(-spec.reset_lag_days, calendar)
 }
@@ -424,12 +424,11 @@ pub(super) fn project_revolver_floating_rate(
     }
     let index_rate = if daily_constraints {
         let bound = |rate: f64| {
-            let floored = params
-                .index_floor_bp
-                .map_or(rate, |floor| rate.max(floor * 1e-4));
-            params
-                .index_cap_bp
-                .map_or(floored, |cap| floored.min(cap * 1e-4))
+            finstack_quant_cashflows::builder::apply_bp_bounds(
+                rate,
+                params.index_floor_bp,
+                params.index_cap_bp,
+            )
         };
         let factor = projection
             .observation_exposures

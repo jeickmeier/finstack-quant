@@ -31,7 +31,7 @@
 //! perform FX conversion. Coupon rates are decimals (`0.05` means 5%); fields
 //! ending in `_bp` are basis points. Schedule dates follow the day-count,
 //! calendar, business-day, stub, roll, and payment-lag rules in
-//! [`builder::ScheduleParams`]. [`primitives::CFKind`] is non-exhaustive, so
+//! [`builder::ScheduleParams`]. [`finstack_quant_core::cashflow::CFKind`] is non-exhaustive, so
 //! downstream matches require a catch-all arm.
 //!
 //! # Errors
@@ -76,11 +76,6 @@
 //! - Day-count and schedule conventions: `docs/REFERENCES.md#isda-2006-definitions`
 //! - Bond-market accrued-interest conventions: `docs/REFERENCES.md#icma-rule-book`
 
-/// Cash-flow primitives (`CashFlow`, `CFKind`, `CashFlowAccrual`).
-pub mod primitives {
-    pub use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
-}
-
 /// Currency-preserving aggregation utilities for cashflows.
 pub mod aggregation;
 /// Raw index observations retained for realized-forward scenario rolls.
@@ -91,21 +86,15 @@ pub mod builder;
 
 mod traits;
 
-/// Generic schedule-driven interest accrual engine.
 pub mod accrual;
 mod json;
 #[cfg(feature = "json-schema")]
 pub mod schema;
 
-pub(crate) mod serde_defaults;
-
-pub use accrual::{
-    accrued_interest_amount, AccrualConfig, AccrualIndex, AccrualMethod, ExCouponRule,
-};
-pub use aggregation::PeriodAggregation;
 pub use json::{
     build_cashflow_schedule_json, dated_flows_json, validate_cashflow_schedule_json,
-    CashflowScheduleBuildSpec, CouponLegSpec, DatedFlowJson, PaymentProgramSpec,
+    CashflowScheduleBuildSpec, CouponLegSpec, DatedFlowJson, MarginStepSpec, PaymentProgramSpec,
+    PaymentStepSpec,
 };
 pub use traits::{
     schedule_from_classified_flows, schedule_from_dated_flows, CashflowProvider,

@@ -279,7 +279,8 @@ mod cds_market_edge {
 mod bond_market_edge {
     //! Bond market edge case tests.
 
-    use finstack_quant_cashflows::{accrued_interest_amount, CashflowProvider};
+    use finstack_quant_cashflows::accrual::accrued_interest_amount;
+    use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;

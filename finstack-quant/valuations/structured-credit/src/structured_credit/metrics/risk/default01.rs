@@ -15,7 +15,6 @@
 //! `cdr`): the multiplier is bumped such that the peak CDR (0.60% at 100% SDA)
 //! shifts by 1bp. `Constant`/no-curve specs bump `cdr` directly.
 
-use crate::structured_credit::assumptions::embedded_registry_or_panic;
 use crate::structured_credit::StructuredCredit;
 use finstack_quant_cashflows::builder::DefaultModelSpec;
 use finstack_quant_core::Result;
@@ -30,10 +29,9 @@ fn bumped_default_specs(spec: &DefaultModelSpec) -> (DefaultModelSpec, DefaultMo
         DefaultModelSpec::Sda { speed_multiplier } => {
             // The SDA curve derives CDR from `speed_multiplier` alone; bump the
             // multiplier so the peak CDR moves by 1bp: Δmult = bump / peak.
-            // Peak CDR comes from the same registry the curve itself uses
-            // (0.60% at 100% SDA with the standard values), so the bump
-            // scaling cannot drift from the simulated curve.
-            let sda_peak_cdr = embedded_registry_or_panic().sda_peak_cdr();
+            // The SDA curve reads the same constant, so the bump scaling
+            // cannot drift from the simulated curve.
+            let sda_peak_cdr = finstack_quant_cashflows::builder::SDA_PEAK_CDR;
             let mult_bump = DEFAULT_BUMP_CDR / sda_peak_cdr;
             let mult_up = speed_multiplier + mult_bump;
             let mult_down = (speed_multiplier - mult_bump).max(0.0);

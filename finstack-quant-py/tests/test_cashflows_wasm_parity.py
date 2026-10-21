@@ -50,7 +50,7 @@ from finstack_quant.cashflows.builder import (
     merge_cashflow_schedules,
 )
 from finstack_quant.cashflows.fixings import materialize_fixings
-from finstack_quant.cashflows.primitives import CashFlow, CashFlowAccrual, CFKind
+from finstack_quant.core.cashflow import CashFlow, CashFlowAccrual, CFKind
 from finstack_quant.core.dates import DayCount, Tenor, build_periods
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
@@ -217,10 +217,7 @@ def _accessors() -> Any:
 
 def _pv_by_period() -> Any:
     schedule = bond()
-    return {
-        "default_day_count": wire(schedule.pv_by_period(periods(), market(), "USD-OIS", ISSUE)),
-        "act_360": wire(schedule.pv_by_period(periods(), market(), "USD-OIS", ISSUE, DayCount.ACT_360)),
-    }
+    return wire(schedule.pv_by_period(periods(), market(), "USD-OIS", ISSUE))
 
 
 def _ladder() -> Any:
@@ -233,7 +230,7 @@ def _from_parts() -> Any:
     schedule = bond()
     flows = schedule.get_flows()
     return [
-        wire(CashFlowSchedule.from_parts(flows, schedule.get_notional(), DayCount.THIRTY_360, schedule.get_meta())),
+        wire(CashFlowSchedule.from_flows(flows, schedule.get_notional(), DayCount.THIRTY_360, schedule.get_meta())),
         wire(CashFlowSchedule.from_flows(flows[1:3], Notional.par(1000, "USD"), DayCount.ACT_365F)),
     ]
 
@@ -383,7 +380,7 @@ def _default_models() -> Any:
     models = [
         DefaultModelSpec.constant_cdr(0.03),
         DefaultModelSpec.sda(1.5),
-        DefaultModelSpec.cdr_2pct(),
+        DefaultModelSpec.constant_cdr(0.02),
         DefaultModelSpec.vector([0.01, 0.02, 0.04]),
         DefaultModelSpec.cumulative_loss([0.5, 1.5, 2.0], 0.4),
         DefaultModelSpec.timing(0.1, [15, 30, 30, 15, 10]),

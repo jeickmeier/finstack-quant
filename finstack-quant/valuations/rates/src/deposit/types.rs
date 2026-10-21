@@ -388,27 +388,27 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
         let redemption = self.notional.checked_mul_f64(1.0 + r * yf)?;
         let interest = redemption.checked_sub(self.notional)?;
         let flows = vec![
-            finstack_quant_cashflows::primitives::CashFlow::new(
+            finstack_quant_core::cashflow::CashFlow::new(
                 effective_start,
                 None,
                 self.notional.checked_neg(),
-                finstack_quant_cashflows::primitives::CFKind::Notional,
+                finstack_quant_core::cashflow::CFKind::Notional,
                 0.0,
                 None,
             ),
-            finstack_quant_cashflows::primitives::CashFlow::new(
+            finstack_quant_core::cashflow::CashFlow::new(
                 effective_end,
                 None,
                 self.notional,
-                finstack_quant_cashflows::primitives::CFKind::Notional,
+                finstack_quant_core::cashflow::CFKind::Notional,
                 0.0,
                 None,
             ),
-            finstack_quant_cashflows::primitives::CashFlow::new(
+            finstack_quant_core::cashflow::CashFlow::new(
                 effective_end,
                 None,
                 interest,
-                finstack_quant_cashflows::primitives::CFKind::Fixed,
+                finstack_quant_core::cashflow::CFKind::Fixed,
                 yf,
                 Some(r),
             ),
@@ -421,7 +421,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
                 notional_hint: self.notional()?,
                 ..Default::default()
             },
-        );
+        )?;
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Contractual,
         ))

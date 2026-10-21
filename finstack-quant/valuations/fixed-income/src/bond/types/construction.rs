@@ -225,7 +225,7 @@ impl Bond {
             spec.schedule.business_day_convention = convention.business_day_convention();
             spec.schedule.calendar_id = convention
                 .calendar_id()
-                .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID)
+                .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID)
                 .into();
             spec.schedule.end_of_month =
                 issue_date.end_of_month() == issue_date && maturity.end_of_month() == maturity;
@@ -449,7 +449,7 @@ impl Bond {
             spec.schedule.business_day_convention = convention.business_day_convention();
             spec.schedule.calendar_id = convention
                 .calendar_id()
-                .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID)
+                .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID)
                 .into();
         }
         let bond = Self::builder()
@@ -638,7 +638,7 @@ impl Bond {
         // We compute the mode (most frequent) interval across all consecutive
         // coupon dates, ignoring potential stubs at the front or back. This is
         // more robust than using just the first interval, which may be a stub.
-        use finstack_quant_cashflows::primitives::CFKind;
+        use finstack_quant_core::cashflow::CFKind;
         use finstack_quant_core::dates::Tenor;
         use std::collections::BTreeMap;
 

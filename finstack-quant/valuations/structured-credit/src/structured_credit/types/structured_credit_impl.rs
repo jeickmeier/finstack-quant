@@ -1,10 +1,10 @@
 use super::{
-    CoverageTestSpec, CreditModelConfig, DealFees, DealType, DefaultModelSpec, HedgeSwap,
-    LossAllocationPolicy, MarketConditions, PaymentCalculation, PaymentType, PrepaymentModelSpec,
-    Recipient, RecipientType, RecoveryModelSpec, StructuredCredit, TemplateFees, TrancheSeniority,
-    Waterfall,
+    CoverageTestSpec, CreditModelConfig, DealFees, DealType, HedgeSwap, LossAllocationPolicy,
+    MarketConditions, PaymentCalculation, PaymentType, Recipient, RecipientType, StructuredCredit,
+    TemplateFees, TrancheSeniority, Waterfall,
 };
 use crate::structured_credit::assumptions::embedded_registry_or_panic;
+use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::math::units::DECIMAL_TO_PERCENT;
 use finstack_quant_core::money::Money;

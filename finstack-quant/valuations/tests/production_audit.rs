@@ -163,6 +163,7 @@ fn m2_lsmc_partial_coupon_and_spread_match_cashflows() {
     );
 }
 
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -170,7 +171,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::{cashflow::CFKind, currency::Currency, money::Money};
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    AmortizationSpec, CommitmentFeeBase, DdtlSpec, DrawEvent, RateSpec, TermLoan,
+    CommitmentFeeBase, DdtlSpec, DrawEvent, TermLoan,
 };
 use finstack_quant_valuations::instruments::Bond;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};

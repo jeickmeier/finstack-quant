@@ -5,7 +5,7 @@ use super::config::{
     PAR_SPREAD_TOLERANCE,
 };
 use crate::cds_tranche::CdsTranche;
-use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::{context::MarketContext, term_structures::CreditIndexData};
 use finstack_quant_core::math::binomial_pmf_all_into;
@@ -366,7 +366,7 @@ impl CdsTranchePricer {
                 calendar_id: tranche
                     .calendar_id
                     .as_deref()
-                    .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
+                    .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID),
                 end_of_month: false,
                 day_count: tranche.day_count,
                 payment_lag_days: 0,

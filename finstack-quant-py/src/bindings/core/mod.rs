@@ -1,5 +1,6 @@
 //! Python bindings for the `finstack-quant-core` crate.
 
+pub(crate) mod cashflow;
 pub(crate) mod config;
 pub(crate) mod currency;
 pub mod dates;
@@ -20,6 +21,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.setattr("__doc__", "Bindings for the finstack-quant-core crate.")?;
 
     config::register(py, &m)?;
+    cashflow::register(py, &m)?;
     types::register(py, &m)?;
     currency::register(py, &m)?;
     money::register(py, &m)?;
@@ -44,6 +46,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         py,
         [
             "FinstackError",
+            "cashflow",
             "config",
             "currency",
             "dates",

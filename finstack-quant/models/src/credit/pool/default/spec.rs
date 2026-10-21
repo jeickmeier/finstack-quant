@@ -3,11 +3,11 @@
 //! Provides a serializable specification enum for stochastic default models,
 //! enabling configuration and deferred construction.
 
-use super::super::clamped_cdr_to_mdr;
 use super::{
     CopulaBasedDefault, FactorCorrelatedDefault, IntensityProcessDefault, StochasticDefault,
 };
 use crate::correlation::copula::CopulaSpec;
+use finstack_quant_cashflows::builder::clamped_cdr_to_mdr;
 use finstack_quant_cashflows::builder::DefaultModelSpec;
 
 /// Stochastic default model specification.
@@ -70,7 +70,7 @@ fn default_correlation() -> f64 {
 
 impl Default for StochasticDefaultSpec {
     fn default() -> Self {
-        StochasticDefaultSpec::Deterministic(DefaultModelSpec::cdr_2pct())
+        StochasticDefaultSpec::Deterministic(DefaultModelSpec::constant_cdr(0.02))
     }
 }
 

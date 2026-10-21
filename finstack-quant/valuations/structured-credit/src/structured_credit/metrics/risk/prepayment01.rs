@@ -25,9 +25,6 @@ use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 /// Standard prepayment bump: 1bp (0.0001) of annual CPR
 const PREPAYMENT_BUMP_CPR: f64 = 0.0001;
 
-/// PSA terminal CPR at 100% speed (peak of the seasoning ramp).
-const PSA_TERMINAL_CPR: f64 = 0.06;
-
 /// Build up/down bumped specs and the achieved bump width in annual-CPR terms.
 fn bumped_prepayment_specs(
     spec: &PrepaymentModelSpec,
@@ -36,7 +33,8 @@ fn bumped_prepayment_specs(
         PrepaymentModelSpec::Psa { speed_multiplier } => {
             // The PSA curve derives CPR from `speed_multiplier` alone; bump the
             // multiplier so the peak CPR moves by 1bp: Δmult = bump / 0.06.
-            let mult_bump = PREPAYMENT_BUMP_CPR / PSA_TERMINAL_CPR;
+            let mult_bump =
+                PREPAYMENT_BUMP_CPR / finstack_quant_cashflows::builder::PSA_TERMINAL_CPR;
             let mult_up = speed_multiplier + mult_bump;
             let mult_down = (speed_multiplier - mult_bump).max(0.0);
             let up = PrepaymentModelSpec::Psa {
@@ -45,7 +43,8 @@ fn bumped_prepayment_specs(
             let down = PrepaymentModelSpec::Psa {
                 speed_multiplier: mult_down,
             };
-            let achieved = (mult_up - mult_down) * PSA_TERMINAL_CPR;
+            let achieved =
+                (mult_up - mult_down) * finstack_quant_cashflows::builder::PSA_TERMINAL_CPR;
             (up, down, achieved)
         }
         // ABS speed is a monthly share of the original balance: 1bp of annual

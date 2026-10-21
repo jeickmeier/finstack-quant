@@ -5,7 +5,7 @@
 
 use super::AgencyMbsPassthrough;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -302,7 +302,7 @@ fn schedule_from_projection(
         }
     }
 
-    Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+    finstack_quant_cashflows::schedule_from_classified_flows(
         flows,
         mbs.day_count,
         finstack_quant_cashflows::ScheduleBuildOpts {
@@ -317,7 +317,7 @@ fn schedule_from_projection(
                 maturity: None,
             },
         },
-    ))
+    )
 }
 
 fn end_of_month(date: Date) -> Result<Date> {
@@ -509,7 +509,7 @@ pub(crate) fn price_with_spread(
 mod tests {
     use super::*;
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;

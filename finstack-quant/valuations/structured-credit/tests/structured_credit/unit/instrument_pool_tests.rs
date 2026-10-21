@@ -2,6 +2,7 @@
 //! funding of draws, replenishment, and call/put exercise policies.
 
 use finstack_quant_cashflows::builder::RateSpec;
+use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec};
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
@@ -16,9 +17,9 @@ use finstack_quant_valuations_fixed_income::revolving_credit::{
 };
 use finstack_quant_valuations_fixed_income::term_loan::TermLoan;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation_with_diagnostics, AssetPool, CallExercisePolicy, DealType, DefaultModelSpec,
-    InstrumentCollateral, PrepaymentModelSpec, PutExercisePolicy, SimulationRun, StructuredCredit,
-    Tranche, TrancheSeniority, TrancheStructure,
+    run_simulation_with_diagnostics, AssetPool, CallExercisePolicy, DealType, InstrumentCollateral,
+    PutExercisePolicy, SimulationRun, StructuredCredit, Tranche, TrancheSeniority,
+    TrancheStructure,
 };
 use time::macros::date;
 

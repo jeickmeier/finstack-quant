@@ -130,6 +130,7 @@ fn test_ytm_floating_bond_is_finite_from_price() {
 /// is interpreted as the IRR of the full projected cashflow schedule.
 #[test]
 fn test_ytm_amortizing_bond_is_finite_from_price() {
+    use finstack_quant_cashflows::builder::AmortizationSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -141,7 +142,7 @@ fn test_ytm_amortizing_bond_is_finite_from_price() {
     use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
     use finstack_quant_valuations_core::metrics::MetricId;
     use finstack_quant_valuations_fixed_income::bond::Bond;
-    use finstack_quant_valuations_fixed_income::bond::{AmortizationSpec, CashflowSpec};
+    use finstack_quant_valuations_fixed_income::bond::CashflowSpec;
 
     let as_of = date!(2025 - 01 - 01);
     let maturity = date!(2027 - 01 - 01);

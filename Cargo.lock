@@ -776,7 +776,6 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "smallvec",
  "time",
  "tracing",
 ]

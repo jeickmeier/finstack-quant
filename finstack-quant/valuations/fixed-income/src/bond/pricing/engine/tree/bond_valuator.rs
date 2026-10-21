@@ -350,7 +350,7 @@ impl BondValuator {
         time_steps: Vec<f64>,
         grid_day_count: DayCount,
     ) -> Result<Self> {
-        use finstack_quant_cashflows::primitives::CFKind;
+        use finstack_quant_core::cashflow::CFKind;
 
         if time_steps.len() < 2
             || time_steps[0].abs() > 1e-12
@@ -1229,7 +1229,7 @@ mod tests {
     use super::*;
     use crate::bond::{Bond, CallPut, CallPutSchedule, CashflowSpec, MakeWholeSpec};
     use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-    use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
+    use finstack_quant_core::cashflow::{CFKind, CashFlow};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, DayCountContext, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;

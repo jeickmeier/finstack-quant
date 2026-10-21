@@ -1,4 +1,4 @@
-//! Cashflow primitives: `CFKind` and `CashFlow` computations over wire values.
+//! `finstack_quant_core::cashflow`: `CFKind` and `CashFlow` computations over wire values.
 //!
 //! `CFKind` crosses the boundary as its snake_case wire string (`"fixed"`,
 //! `"pre_payment"`) and `CashFlow` as a plain object; the Rust methods are
@@ -7,13 +7,13 @@
 use crate::utils::input::js_string;
 use crate::utils::wire::js_wire;
 use crate::utils::{date_to_iso, to_js_err, to_js_value};
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use wasm_bindgen::prelude::*;
 
 /// Parse a cashflow kind label into its `CFKind` wire string.
 ///
-/// Matching is exact (Rust `CFKind::from_str`): the label is the snake_case
-/// wire string itself, as used by the `kind` field of a `CashFlow`.
+/// Parsed by Rust `CFKind::from_str`: the snake_case wire string, ASCII case
+/// ignored, plus the aliases `"coupon"` and `"principal"`.
 ///
 /// @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
 /// @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.

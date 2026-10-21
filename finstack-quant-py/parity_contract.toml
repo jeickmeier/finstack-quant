@@ -41,7 +41,7 @@ status = "exists"  # Python package already present
 
 [crates.core.modules]
 canonical     = { python = "finstack_quant.core.canonical",     status = "missing", note = "Rust-only canonical-form normalization infrastructure; no host-language surface planned." }
-cashflow      = { python = "finstack_quant.core.cashflow",      status = "missing", note = "Core cashflow APIs are not yet materialized as a dedicated Python submodule" }
+cashflow      = { python = "finstack_quant.core.cashflow",      status = "exists", note = "Typed CashFlow, CFKind and CashFlowAccrual. The npv/xirr/irr helpers and CFKind::is_principal_repayment (the WAL / principal-repaid kind set) stay Rust-only." }
 config        = { python = "finstack_quant.core.config",        status = "exists" }
 contract      = { python = "finstack_quant.core.contract",      status = "missing", note = "Rust-only API-contract helper infrastructure; no host-language surface planned." }
 currency      = { python = "finstack_quant.core.currency",      status = "exists" }
@@ -66,6 +66,10 @@ schema = { python = "finstack_quant.core.schema", status = "exists", note = "Reg
 [crates.core.module_symbols.schema]
 python_package = "finstack_quant.core.schema"
 public = ["get", "index", "validate"]
+
+[crates.core.module_symbols.cashflow]
+python_package = "finstack_quant.core.cashflow"
+public = ["CFKind", "CashFlow", "CashFlowAccrual"]
 
 # Symbol-level pinning for finstack_quant.core.market_data — every name in
 # `finstack_quant.core.market_data.__all__` must appear here.
@@ -298,19 +302,14 @@ rust_lib   = "finstack-quant/cashflows/src/lib.rs"
 python_package = "finstack_quant.cashflows"
 visibility = "pub"
 status = "exists"
-note = "Typed submodules (primitives/builder/accrual/aggregation) plus the JSON schedule bridge and its typed twins (build_cashflow_schedule / dated_flows, where dated_flows binds CashFlowSchedule::dated_flows). Rust-only (deliberately unbound): rate_helpers::project_index_rate (cross-crate term coupon projection kernel; raw observations are exposed through fixings.ProjectedFixing), the JSON-bridge spec types CashflowScheduleBuildSpec / CouponLegSpec / PaymentProgramSpec / DatedFlowJson (host callers pass dict/JSON to build_cashflow_schedule), the DatedFlow(s) tuple aliases (Python uses list[tuple[date, Money]]), the CashflowProvider / CashflowScheduleSource traits, and the pub(crate)-facing CashFlowSchedule mutators update_flows / try_update_flows / retain_flows / push_flow / into_flows (wrappers are frozen; rebuild via from_flows / scale_amounts instead)."
+note = "Typed submodules (builder/accrual/aggregation/fixings/schema; the CashFlow/CFKind/CashFlowAccrual row types live in finstack_quant.core.cashflow) plus the JSON schedule bridge and its typed twins (build_cashflow_schedule / dated_flows, where dated_flows binds CashFlowSchedule::dated_flows). Rust-only at the crate root (deliberately unbound): the JSON-bridge spec types CashflowScheduleBuildSpec / CouponLegSpec / PaymentProgramSpec / MarginStepSpec / PaymentStepSpec / DatedFlowJson (hosts pass dict/JSON to build_cashflow_schedule), the DatedFlow / DatedFlows tuple aliases (Python uses list[tuple[date, Money]]), the CashflowProvider / CashflowScheduleSource traits, and the in-place CashFlowSchedule mutators update_flows / try_update_flows / retain_flows / push_flow / into_flows (host wrappers are frozen; rebuild via from_flows / scale_amounts instead)."
 
 [crates.cashflows.modules]
 fixings     = { python = "finstack_quant.cashflows.fixings",     status = "exists", note = "Typed raw rate/FX observations and atomic crossed-fixing materialization. Scenario rolls invoke the same Rust helper; WASM binds it as cashflows.materializeFixings over CashFlowSchedule handles or schedule JSON." }
 accrual     = { python = "finstack_quant.cashflows.accrual",     status = "exists", note = "Typed accrual engine" }
-aggregation = { python = "finstack_quant.cashflows.aggregation", status = "exists", note = "Typed period rollups and currency-checked totals. In Python, aggregation.calendar_year_ladder returns list[tuple[int, float, float, float]] over parallel arrays while CashFlowSchedule.calendar_year_ladder returns a pandas.DataFrame view alongside to_dataframe(). Rust-only (deliberately unbound): credit_adjusted_cashflow_pvs and DateContext — a borrow-parameterized PV kernel consumed by valuations pricers, not a host-facing API." }
+aggregation = { python = "finstack_quant.cashflows.aggregation", status = "exists", note = "Typed period rollups and currency-checked totals. In Python, aggregation.calendar_year_ladder returns list[tuple[int, float, float, float]] over parallel arrays while CashFlowSchedule.calendar_year_ladder returns a pandas.DataFrame view alongside to_dataframe(). Rust-only (deliberately unbound): credit_adjusted_cashflow_pvs, the survival-weighted PV kernel consumed by valuations pricers, and weighted_average_life_from_principal, the Act/365F WAL kernel behind CashFlowSchedule.wal and the structured-credit WAL metric." }
 builder     = { python = "finstack_quant.cashflows.builder",     status = "exists", note = "Typed spec + builder + schedule surface; the JSON program bridge remains available on finstack_quant.cashflows" }
-primitives  = { python = "finstack_quant.cashflows.primitives",  status = "exists", note = "Typed CashFlow/CFKind primitives; CashFlow rows also travel inside schedule JSON" }
 schema      = { python = "finstack_quant.cashflows.schema",      status = "exists", note = "Compiled-in JSON Schema resources; package_cashflow_schema is doc(hidden) generator plumbing and stays Rust-only" }
-
-[crates.cashflows.module_symbols.primitives]
-python_package = "finstack_quant.cashflows.primitives"
-public = ["CFKind", "CashFlow", "CashFlowAccrual"]
 
 [crates.cashflows.module_symbols.builder]
 python_package = "finstack_quant.cashflows.builder"
@@ -318,14 +317,21 @@ python_package = "finstack_quant.cashflows.builder"
 # gap is a decision rather than drift), matching builder/mod.rs exactly:
 # floating_replay {CompiledFloatingCoupon, FloatingCouponEconomics,
 # FloatingCouponPeriod, FloatingCouponReplayState, FloatingCouponSettlement,
-# FloatingRateObservation} and overnight {OvernightObservationSchedule,
+# FloatingRateObservation}, overnight {OvernightObservationSchedule,
 # OvernightObservationSlice, OvernightRateAccumulator, OvernightRateConstraints,
-# OvernightRateReplay} (pricer coupon-replay plumbing); SchedulePeriod;
-# project_floating_rate / FloatingRateParams (pricer plumbing);
-# CashflowRepresentation (credit metadata carried inside
-# schedule JSON); evaluate_fee_tiers / FeeTier / DefaultCurve /
-# PrepaymentCurve (spec internals reachable through the spec types); and the
-# credit-rate helpers psa_cpr / PSA_RAMP_MONTHS / PSA_TERMINAL_CPR.
+# OvernightRateReplay, overnight_day_count_basis} and rate_helpers
+# {FloatingRateParams, project_floating_rate, project_index_rate,
+# project_overnight_rate, calculate_floating_rate, observed_term_fixing,
+# apply_bp_bounds} (pricer coupon-replay plumbing; raw observations are exposed
+# through fixings.ProjectedFixing); periods {SchedulePeriod, BuildPeriodsParams,
+# build_periods, build_single_period, period_accrual, compute_reset_date};
+# CashflowRepresentation (credit metadata
+# carried inside schedule JSON); evaluate_fee_tiers / FeeTier / RateSpec /
+# PrincipalEventSpec (spec internals reachable through the spec types); and the
+# credit-rate helpers clamped_cpr_to_smm / clamped_cdr_to_mdr / psa_cpr /
+# PSA_RAMP_MONTHS / PSA_TERMINAL_CPR / SDA_PEAK_CDR. The FloatingRateSpec
+# DEFAULT_GEARING / DEFAULT_GEARING_INCLUDES_SPREAD / DEFAULT_RESET_LAG_DAYS
+# constants are Rust-only; the Python constructor defaults read them.
 note = "Typed CashFlowBuilder includes build_as_of / buildAsOf for explicit fixing cutoffs and matches the Rust coupon-program methods (including fixed_to_float and float_margin_steps); WASM binds CashFlowSchedule / CashFlowBuilder as classes, and the spec types cross as plain objects whose constructors and methods are free functions (see the [parity] ledger)."
 public = [
     "AmortizationSpec", "CashFlowBuilder", "CashFlowMeta", "CashFlowSchedule", "CouponType",
@@ -1923,10 +1929,6 @@ types = { AmortizationSpec = "AmortizationSpec", CashFlowMeta = "CashFlowMeta", 
 js = "cashflows"
 types = { ProjectedFixing = "ProjectedFixing" }
 
-[parity.modules."finstack_quant.cashflows.primitives"]
-js = "cashflows"
-types = { CFKind = "CFKind", CashFlow = "CashFlow", CashFlowAccrual = "CashFlowAccrual" }
-
 [parity.modules."finstack_quant.cashflows.schema"]
 js = "cashflows.schema"
 
@@ -1944,6 +1946,10 @@ js = "core"
 # the WASM class (`core.Currency.usd()`): a facade value cannot hold a wasm
 # handle before `init()` runs, so each constant is a factory.
 constants_on = "core.Currency"
+
+[parity.modules."finstack_quant.core.cashflow"]
+js = "core"
+types = { CFKind = "CFKind", CashFlow = "CashFlow", CashFlowAccrual = "CashFlowAccrual" }
 
 [parity.modules."finstack_quant.core.dates"]
 js = "core"
@@ -2179,13 +2185,6 @@ volQuoteOptionVol = "free-function twin of Python VolQuote.option_vol (Rust VolQ
 volQuoteSwaptionVol = "free-function twin of Python VolQuote.swaption_vol (Rust VolQuote::swaption_vol; member rename)"
 
 [parity.js."cashflows".wasm_only]
-cashFlowGetBalanceDate = "twin of Python CashFlow.get_balance_date (Rust CashFlow::get_balance_date); recorded as a member rename of finstack_quant.cashflows.primitives.CashFlow"
-cashFlowValidate = "twin of Python CashFlow.validate (Rust CashFlow::validate); recorded as a member rename of finstack_quant.cashflows.primitives.CashFlow"
-cfKindIsCashSettlement = "twin of Python CFKind.is_cash_settlement (Rust CFKind::is_cash_settlement); recorded as a member rename of finstack_quant.cashflows.primitives.CFKind"
-cfKindIsInterestLike = "twin of Python CFKind.is_interest_like (Rust CFKind::is_interest_like); recorded as a member rename of finstack_quant.cashflows.primitives.CFKind"
-cfKindIsPrincipalLike = "twin of Python CFKind.is_principal_like (Rust CFKind::is_principal_like); recorded as a member rename of finstack_quant.cashflows.primitives.CFKind"
-cfKindParse = "twin of Python CFKind.parse (Rust CFKind::from_str); recorded as a member rename of finstack_quant.cashflows.primitives.CFKind"
-defaultModelSpecCdr2pct = "twin of Python DefaultModelSpec.cdr_2pct (Rust DefaultModelSpec::cdr_2pct); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
 defaultModelSpecCumulativeDefaultFraction = "twin of Python DefaultModelSpec.cumulative_default_fraction (Rust DefaultModelSpec::cumulative_default_fraction); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
 defaultModelSpecMdr = "twin of Python DefaultModelSpec.mdr (Rust DefaultModelSpec::mdr); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
 defaultModelSpecMdrWithSurvival = "twin of Python DefaultModelSpec.mdr_with_survival (Rust DefaultModelSpec::mdr_with_survival); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
@@ -2218,6 +2217,14 @@ scheduleParamsUsdCorporateBond = "twin of Python ScheduleParams.usd_corporate_bo
 scheduleParamsUsdSofrSwap = "twin of Python ScheduleParams.usd_sofr_swap (Rust ScheduleParams::usd_sofr_swap); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
 scheduleParamsUsdTreasury = "twin of Python ScheduleParams.usd_treasury (Rust ScheduleParams::usd_treasury); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
 scheduleParamsValidate = "twin of Python ScheduleParams.validate (Rust ScheduleParams::validate); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
+
+[parity.js."core".wasm_only]
+cashFlowGetBalanceDate = "twin of Python CashFlow.get_balance_date (Rust CashFlow::get_balance_date); recorded as a member rename of finstack_quant.core.cashflow.CashFlow"
+cashFlowValidate = "twin of Python CashFlow.validate (Rust CashFlow::validate); recorded as a member rename of finstack_quant.core.cashflow.CashFlow"
+cfKindIsCashSettlement = "twin of Python CFKind.is_cash_settlement (Rust CFKind::is_cash_settlement); recorded as a member rename of finstack_quant.core.cashflow.CFKind"
+cfKindIsInterestLike = "twin of Python CFKind.is_interest_like (Rust CFKind::is_interest_like); recorded as a member rename of finstack_quant.core.cashflow.CFKind"
+cfKindIsPrincipalLike = "twin of Python CFKind.is_principal_like (Rust CFKind::is_principal_like); recorded as a member rename of finstack_quant.core.cashflow.CFKind"
+cfKindParse = "twin of Python CFKind.parse (Rust CFKind::from_str); recorded as a member rename of finstack_quant.core.cashflow.CFKind"
 
 [parity.js."covenants".wasm_only]
 covenantConsequenceAccelerateMaturity = "twin of Python CovenantConsequence.accelerate_maturity (Rust CovenantConsequence::AccelerateMaturity); recorded as a member rename of finstack_quant.covenants.CovenantConsequence"
@@ -2649,7 +2656,7 @@ excluded = { custom_principal = "literal", linear_between = "literal", linear_to
 excluded = { split = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.DefaultModelSpec"]
-renames = { cdr_2pct = { js = "cashflows.defaultModelSpecCdr2pct", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::cdr_2pct function is a free function over the wire value" }, mdr = { js = "cashflows.defaultModelSpecMdr", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::mdr function is a free function over the wire value" }, validate = { js = "cashflows.defaultModelSpecValidate", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::validate function is a free function over the wire value" }, cumulative_default_fraction = { js = "cashflows.defaultModelSpecCumulativeDefaultFraction", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::cumulative_default_fraction function is a free function over the wire value" }, mdr_with_survival = { js = "cashflows.defaultModelSpecMdrWithSurvival", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::mdr_with_survival function is a free function over the wire value" } }
+renames = { mdr = { js = "cashflows.defaultModelSpecMdr", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::mdr function is a free function over the wire value" }, validate = { js = "cashflows.defaultModelSpecValidate", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::validate function is a free function over the wire value" }, cumulative_default_fraction = { js = "cashflows.defaultModelSpecCumulativeDefaultFraction", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::cumulative_default_fraction function is a free function over the wire value" }, mdr_with_survival = { js = "cashflows.defaultModelSpecMdrWithSurvival", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::mdr_with_survival function is a free function over the wire value" } }
 excluded = { constant_cdr = "literal", cumulative_loss = "literal", sda = "literal", timing = "literal", vector = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.FeeBase"]
@@ -2684,11 +2691,11 @@ excluded = { with_severity_vector = "literal" }
 [parity.members."finstack_quant.cashflows.builder.ScheduleParams"]
 renames = { annual_actact = { js = "cashflows.scheduleParamsAnnualActact", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::annual_actact function is a free function over the wire value" }, eur_estr_swap = { js = "cashflows.scheduleParamsEurEstrSwap", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::eur_estr_swap function is a free function over the wire value" }, eur_gov_bond = { js = "cashflows.scheduleParamsEurGovBond", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::eur_gov_bond function is a free function over the wire value" }, gbp_sonia_swap = { js = "cashflows.scheduleParamsGbpSoniaSwap", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::gbp_sonia_swap function is a free function over the wire value" }, jpy_tona_swap = { js = "cashflows.scheduleParamsJpyTonaSwap", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::jpy_tona_swap function is a free function over the wire value" }, quarterly_act360 = { js = "cashflows.scheduleParamsQuarterlyAct360", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::quarterly_act360 function is a free function over the wire value" }, semiannual_30360 = { js = "cashflows.scheduleParamsSemiannual30360", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::semiannual_30360 function is a free function over the wire value" }, usd_corporate_bond = { js = "cashflows.scheduleParamsUsdCorporateBond", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::usd_corporate_bond function is a free function over the wire value" }, usd_sofr_swap = { js = "cashflows.scheduleParamsUsdSofrSwap", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::usd_sofr_swap function is a free function over the wire value" }, usd_treasury = { js = "cashflows.scheduleParamsUsdTreasury", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::usd_treasury function is a free function over the wire value" }, validate = { js = "cashflows.scheduleParamsValidate", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::validate function is a free function over the wire value" } }
 
-[parity.members."finstack_quant.cashflows.primitives.CFKind"]
-renames = { is_cash_settlement = { js = "cashflows.cfKindIsCashSettlement", reason = "WASM CFKind values are plain objects; the Rust CFKind::is_cash_settlement function is a free function over the wire value" }, is_interest_like = { js = "cashflows.cfKindIsInterestLike", reason = "WASM CFKind values are plain objects; the Rust CFKind::is_interest_like function is a free function over the wire value" }, is_principal_like = { js = "cashflows.cfKindIsPrincipalLike", reason = "WASM CFKind values are plain objects; the Rust CFKind::is_principal_like function is a free function over the wire value" }, parse = { js = "cashflows.cfKindParse", reason = "WASM CFKind values are plain objects; the exact Rust CFKind::from_str label parser is a free function returning the wire value" } }
+[parity.members."finstack_quant.core.cashflow.CFKind"]
+renames = { is_cash_settlement = { js = "core.cfKindIsCashSettlement", reason = "WASM CFKind values are plain objects; the Rust CFKind::is_cash_settlement function is a free function over the wire value" }, is_interest_like = { js = "core.cfKindIsInterestLike", reason = "WASM CFKind values are plain objects; the Rust CFKind::is_interest_like function is a free function over the wire value" }, is_principal_like = { js = "core.cfKindIsPrincipalLike", reason = "WASM CFKind values are plain objects; the Rust CFKind::is_principal_like function is a free function over the wire value" }, parse = { js = "core.cfKindParse", reason = "WASM CFKind values are plain objects; the Rust CFKind::from_str label parser is a free function returning the wire value" } }
 
-[parity.members."finstack_quant.cashflows.primitives.CashFlow"]
-renames = { get_balance_date = { js = "cashflows.cashFlowGetBalanceDate", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::get_balance_date function is a free function over the wire value" }, validate = { js = "cashflows.cashFlowValidate", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::validate function is a free function over the wire value" } }
+[parity.members."finstack_quant.core.cashflow.CashFlow"]
+renames = { get_balance_date = { js = "core.cashFlowGetBalanceDate", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::get_balance_date function is a free function over the wire value" }, validate = { js = "core.cashFlowValidate", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::validate function is a free function over the wire value" } }
 excluded = { with_accrual = "literal", with_principal_date = "literal", with_principal_delta = "literal" }
 
 [parity.members."finstack_quant.covenants.Covenant"]

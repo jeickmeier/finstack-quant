@@ -1,7 +1,7 @@
 //! Weighted Average Life (WAL) calculator for bonds.
 
 use crate::Bond;
-use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Calculates Weighted Average Life (WAL) for bonds.

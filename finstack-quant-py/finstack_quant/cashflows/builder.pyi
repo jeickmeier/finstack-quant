@@ -31,7 +31,7 @@ import pandas as pd
 
 from finstack_quant.cashflows.aggregation import PeriodAggregation
 from finstack_quant.cashflows.fixings import ProjectedFixing
-from finstack_quant.cashflows.primitives import CashFlow, CFKind
+from finstack_quant.core.cashflow import CashFlow, CFKind
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import BusinessDayConvention, DayCount, Period, StubKind, Tenor
 from finstack_quant.core.market_data import MarketContext
@@ -549,7 +549,7 @@ class CashFlowBuilder:
         ...     PrincipalExchange,
         ...     ScheduleParams,
         ... )
-        >>> from finstack_quant.cashflows.primitives import CFKind
+        >>> from finstack_quant.core.cashflow import CFKind
         >>> from finstack_quant.core.money import Money
         >>> schedule = (
         ...     CashFlowSchedule
@@ -1424,7 +1424,6 @@ class CashFlowSchedule:
         market: MarketContext,
         disc_curve_id: str,
         base: datetime.date,
-        day_count: DayCount | None = None,
         credit_curve_id: str | None = None,
     ) -> PeriodAggregation:
         """
@@ -1441,10 +1440,9 @@ class CashFlowSchedule:
         disc_curve_id : str
             Discount curve identifier.
         base : datetime.date
-            Valuation date used to convert cashflow dates into discount
-            times.
-        day_count : DayCount, optional
-            Day-count convention for discount times (default Act/365F).
+            Valuation date: discount factors and survival are relative to it,
+            and flows on or before it have zero present value. Each curve uses
+            its own day count.
         credit_curve_id : str, optional
             Hazard curve identifier for credit-adjusted present value.
 
@@ -1460,8 +1458,8 @@ class CashFlowSchedule:
         KeyError
             If the discount or hazard curve id cannot be found in *market*.
         ValueError
-            If day-count conversion fails or credit-adjusted inputs are
-            internally inconsistent.
+            If a discount factor or survival probability is invalid, or
+            credit-adjusted inputs are internally inconsistent.
 
         Notes
         -----
@@ -1527,6 +1525,22 @@ class CashFlowSchedule:
         >>> round_tripped = CashFlowSchedule.from_json(schedule.to_json())
         >>> len(round_tripped.get_flows())
         6
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Pickle support via the JSON wire form (``from_json``, ``(to_json(),)``).
+
+        Returns
+        -------
+        tuple
+            ``(from_json, (json,))`` reconstructor pair.
+
+        Raises
+        ------
+        ValueError
+            If the schedule holds a non-finite float that JSON cannot carry.
         """
         ...
 
@@ -1642,46 +1656,6 @@ class CashFlowSchedule:
         ...
 
     @staticmethod
-    def from_parts(
-        flows: list[CashFlow],
-        notional: Notional,
-        day_count: DayCount,
-        meta: CashFlowMeta,
-    ) -> CashFlowSchedule:
-        """
-        Build a schedule from explicit rows, notional, day count and metadata.
-
-        Parameters
-        ----------
-        flows : list[CashFlow]
-            Classified rows in any order (sorted canonically).
-        notional : Notional
-            Representative notional stamped on the schedule.
-        day_count : DayCount
-            Representative day-count convention.
-        meta : CashFlowMeta
-            Schedule-level metadata.
-
-        Returns
-        -------
-        CashFlowSchedule
-            Canonical schedule holding the sorted rows.
-
-        Raises
-        ------
-        TypeError
-            If ``flows`` is not a list of ``CashFlow``.
-
-        Examples
-        --------
-        >>> from finstack_quant.cashflows.builder import CashFlowMeta, CashFlowSchedule, Notional
-        >>> from finstack_quant.core.dates import DayCount
-        >>> len(CashFlowSchedule.from_parts([], Notional.par(1.0, "USD"), DayCount.ACT_360, CashFlowMeta()).get_flows())
-        0
-        """
-        ...
-
-    @staticmethod
     def from_flows(
         flows: list[CashFlow] | pd.DataFrame,
         notional: Notional,
@@ -1693,8 +1667,7 @@ class CashFlowSchedule:
         validating every row.
 
         Both input shapes go through Rust ``CashFlowSchedule::from_flows``,
-        which checks each row (``CashFlow.validate``) before sorting; use
-        ``from_parts`` to assemble rows without validation.
+        which checks each row (``CashFlow.validate``) before sorting.
 
         Parameters
         ----------
@@ -1732,7 +1705,7 @@ class CashFlowSchedule:
         --------
         >>> import datetime
         >>> from finstack_quant.cashflows.builder import CashFlowSchedule, Notional
-        >>> from finstack_quant.cashflows.primitives import CashFlow, CFKind
+        >>> from finstack_quant.core.cashflow import CashFlow, CFKind
         >>> from finstack_quant.core.dates import DayCount
         >>> from finstack_quant.core.money import Money
         >>> flow = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED, 0.0)
@@ -1836,12 +1809,12 @@ class DefaultModelSpec:
     Default rate model used to project defaults across a pool or portfolio.
 
     Constructed via named factories (:meth:`constant_cdr`, :meth:`sda`,
-    :meth:`cdr_2pct`) mirroring the Rust curve presets.
+    :meth:`vector`, ...) mirroring the Rust curve presets.
 
     Examples
     --------
     >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-    >>> DefaultModelSpec.cdr_2pct().curve["cdr"]
+    >>> DefaultModelSpec.constant_cdr(0.02).curve["cdr"]
     0.02
     """
 
@@ -1916,7 +1889,7 @@ class DefaultModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-        >>> DefaultModelSpec.cdr_2pct().curve["cdr"]
+        >>> DefaultModelSpec.constant_cdr(0.02).curve["cdr"]
         0.02
         """
         ...
@@ -2120,7 +2093,7 @@ class DefaultModelSpec:
         >>> from finstack_quant.cashflows.builder import DefaultModelSpec
         >>> round(DefaultModelSpec.timing(0.10, [50.0, 50.0]).cumulative_default_fraction(12), 12)
         0.05
-        >>> DefaultModelSpec.cdr_2pct().cumulative_default_fraction(12) is None
+        >>> DefaultModelSpec.constant_cdr(0.02).cumulative_default_fraction(12) is None
         True
         """
         ...
@@ -2158,7 +2131,7 @@ class DefaultModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-        >>> isinstance(DefaultModelSpec.cdr_2pct().to_json(), str)
+        >>> isinstance(DefaultModelSpec.constant_cdr(0.02).to_json(), str)
         True
         """
         ...
@@ -2186,7 +2159,7 @@ class DefaultModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-        >>> value = DefaultModelSpec.cdr_2pct()
+        >>> value = DefaultModelSpec.constant_cdr(0.02)
         >>> DefaultModelSpec.from_json(value.to_json()).to_json() == value.to_json()
         True
         """

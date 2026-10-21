@@ -119,7 +119,7 @@ impl RevolvingCreditPricer {
             })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
-        Ok(schedule_from_classified_flows(
+        schedule_from_classified_flows(
             flows,
             facility.day_count,
             ScheduleBuildOpts {
@@ -133,7 +133,7 @@ impl RevolvingCreditPricer {
                     maturity: None,
                 },
             },
-        ))
+        )
     }
 
     /// Price with full MC path capture for analysis.

@@ -2,13 +2,13 @@
 //!
 //! Tests that CLO, ABS, RMBS, and CMBS have correct defaults and behavior.
 
+use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    AssetPool, DealType, PoolAsset, PrepaymentModelSpec, StructuredCredit, Tranche,
-    TrancheSeniority, TrancheStructure,
+    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 

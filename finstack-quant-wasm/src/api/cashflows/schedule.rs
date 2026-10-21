@@ -6,15 +6,16 @@
 //! values typed by the generated `cashflows` TypeScript declarations.
 
 use crate::api::core::market_context::JsMarketContext;
-use crate::utils::input::{js_f64, js_f64_seq, js_string, json_text};
+use crate::utils::input::{js_f64, js_f64_seq, js_string};
 use crate::utils::wire::{js_date, js_opt_wire, js_wire};
 use crate::utils::{date_to_iso, to_js_err, to_js_value};
 use finstack_quant_cashflows::builder::{
-    merge_cashflow_schedules, CashFlowBuilder, CashFlowMeta, CashFlowSchedule,
-    CashflowRepresentation, CouponType, FixedCouponSpec, FloatingCouponSpec, Notional,
+    merge_cashflow_schedules as rust_merge_cashflow_schedules, CashFlowBuilder, CashFlowMeta,
+    CashFlowSchedule, CashflowRepresentation, CouponType, FixedCouponSpec, FloatingCouponSpec,
+    Notional,
 };
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_cashflows::{CashflowScheduleBuildSpec, DatedFlowJson, ScheduleBuildOpts};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DayCount, Period};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
@@ -30,7 +31,7 @@ fn dated_flows_wire(flows: Vec<(Date, Money)>) -> Result<JsValue, JsValue> {
     to_js_value(
         &flows
             .into_iter()
-            .map(|(date, amount)| DatedFlowJson { date, amount })
+            .map(DatedFlowJson::from)
             .collect::<Vec<_>>(),
     )
 }
@@ -39,7 +40,7 @@ fn dated_flows_wire(flows: Vec<(Date, Money)>) -> Result<JsValue, JsValue> {
 pub(crate) fn dated_flows_arg(value: &JsValue, label: &str) -> Result<Vec<(Date, Money)>, JsValue> {
     Ok(js_wire::<Vec<DatedFlowJson>>(value, label)?
         .into_iter()
-        .map(|flow| (flow.date, flow.amount))
+        .map(Into::into)
         .collect())
 }
 
@@ -47,7 +48,7 @@ pub(crate) fn dated_flows_arg(value: &JsValue, label: &str) -> Result<Vec<(Date,
 /// day count and metadata.
 ///
 /// Obtain one from `CashFlowSchedule.builder()`, `buildCashflowSchedule`,
-/// `CashFlowSchedule.fromJson` or `CashFlowSchedule.fromParts`. Methods that
+/// `CashFlowSchedule.fromJson` or `CashFlowSchedule.fromFlows`. Methods that
 /// return a schedule return a new handle and leave this one unchanged.
 #[wasm_bindgen(js_name = CashFlowSchedule)]
 #[derive(Clone, Debug)]
@@ -69,34 +70,8 @@ impl JsCashFlowSchedule {
     #[wasm_bindgen]
     pub fn builder() -> JsCashFlowBuilder {
         JsCashFlowBuilder {
-            inner: CashFlowBuilder::default(),
+            inner: CashFlowSchedule::builder(),
         }
-    }
-
-    /// Assemble a schedule from existing flows, notional, day count and metadata.
-    ///
-    /// Flows are put into the canonical schedule order; nothing is validated
-    /// until `validate()` or an analytic runs.
-    ///
-    /// @param flows - `CashFlow` wire objects.
-    /// @param notional - `Notional` wire object: initial balance and amortization rule.
-    /// @param day_count - `DayCount` wire string (for example `"act_360"`) used for accrual and year fractions.
-    /// @param meta - `CashFlowMeta` wire object: representation, calendar ids, commitment, issue date and maturity.
-    /// @returns The assembled `CashFlowSchedule`.
-    /// @throws If an argument does not match its wire type (kind `validation`).
-    #[wasm_bindgen(js_name = fromParts)]
-    pub fn from_parts(
-        flows: JsValue,
-        notional: JsValue,
-        day_count: JsValue,
-        meta: JsValue,
-    ) -> Result<JsCashFlowSchedule, JsValue> {
-        Ok(Self::from_inner(CashFlowSchedule::from_parts(
-            js_wire::<Vec<CashFlow>>(&flows, "flows")?,
-            js_wire::<Notional>(&notional, "notional")?,
-            js_wire::<DayCount>(&day_count, "dayCount")?,
-            js_wire::<CashFlowMeta>(&meta, "meta")?,
-        )))
     }
 
     /// Assemble a schedule from externally supplied flows, validating every row
@@ -104,8 +79,7 @@ impl JsCashFlowSchedule {
     ///
     /// Each flow must pass `CashFlow::validate` (finite amount and rate, a
     /// finite non-negative `accrual_factor`, a reset date not after the payment
-    /// date) before the rows are sorted; use `fromParts` to assemble rows
-    /// without validation. (Python's `from_flows` also reads a pandas
+    /// date) before the rows are sorted. (Python's `from_flows` also reads a pandas
     /// DataFrame; WASM takes the flow list.)
     ///
     /// @param flows - `CashFlow` wire objects.
@@ -138,9 +112,7 @@ impl JsCashFlowSchedule {
     /// @throws If `json` is neither a string nor a plain object (kind `invalid_type`) or does not match the schedule schema (kind `validation`).
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsCashFlowSchedule, JsValue> {
-        serde_json::from_str(&json_text(&json, "json")?)
-            .map(Self::from_inner)
-            .map_err(to_js_err)
+        crate::utils::input::from_js_json::<CashFlowSchedule>(&json, "json").map(Self::from_inner)
     }
 
     /// Serialize the schedule to canonical JSON.
@@ -300,7 +272,6 @@ impl JsCashFlowSchedule {
     /// @param market - `MarketContext` handle holding the discount (and credit) curve.
     /// @param disc_curve_id - Identifier of the discount curve in `market`, for example `"USD-OIS"`.
     /// @param base - ISO-8601 valuation date that discounting starts from.
-    /// @param day_count - Optional `DayCount` wire string for discounting year fractions; omitted means `"act_365f"`.
     /// @param credit_curve_id - Optional identifier of a hazard curve in `market`; omitted means no credit adjustment.
     /// @returns `PeriodAggregation`: `{ periodId: { currency: Money } }` of PV per period and currency.
     /// @throws If a curve is missing from `market` (kind `not_found`), or an argument is malformed or a discount factor cannot be computed (kind `invalid_type` or `validation`).
@@ -311,7 +282,6 @@ impl JsCashFlowSchedule {
         market: &JsMarketContext,
         disc_curve_id: JsValue,
         base: JsValue,
-        day_count: Option<JsValue>,
         credit_curve_id: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let periods = js_wire::<Vec<Period>>(&periods, "periods")?;
@@ -327,7 +297,6 @@ impl JsCashFlowSchedule {
                 &disc_curve_id,
                 credit_curve_id.as_ref(),
                 js_date(&base, "base")?,
-                js_opt_wire::<DayCount>(day_count.as_ref(), "dayCount")?,
             )
             .map_err(to_js_err)?;
         to_js_value(&aggregation)
@@ -716,7 +685,7 @@ pub fn dated_flows(schedule: &JsCashFlowSchedule) -> Result<JsValue, JsValue> {
 /// @param day_count - `DayCount` wire string attached to the schedule for downstream accrual and yield calculations.
 /// @param opts - Optional `ScheduleBuildOpts` wire object (`{ notional_hint?, meta? }`); omitted means a zero notional in the first flow's currency and default metadata.
 /// @returns The `CashFlowSchedule` handle, flows in canonical order.
-/// @throws If an argument does not match its wire type (kind `validation`).
+/// @throws If an argument does not match its wire type, or a flow is invalid (kind `validation`).
 #[wasm_bindgen(js_name = scheduleFromDatedFlows)]
 pub fn schedule_from_dated_flows(
     flows: JsValue,
@@ -730,7 +699,8 @@ pub fn schedule_from_dated_flows(
             js_wire::<CFKind>(&kind, "kind")?,
             js_wire::<DayCount>(&day_count, "dayCount")?,
             js_opt_wire::<ScheduleBuildOpts>(opts.as_ref(), "opts")?.unwrap_or_default(),
-        ),
+        )
+        .map_err(to_js_err)?,
     ))
 }
 
@@ -740,7 +710,7 @@ pub fn schedule_from_dated_flows(
 /// @param day_count - `DayCount` wire string attached to the schedule for downstream accrual and yield calculations.
 /// @param opts - Optional `ScheduleBuildOpts` wire object (`{ notional_hint?, meta? }`); omitted means a zero notional in the first flow's currency and default metadata.
 /// @returns The `CashFlowSchedule` handle, flows in canonical order.
-/// @throws If an argument does not match its wire type (kind `validation`).
+/// @throws If an argument does not match its wire type, or a flow is invalid (kind `validation`).
 #[wasm_bindgen(js_name = scheduleFromClassifiedFlows)]
 pub fn schedule_from_classified_flows(
     flows: JsValue,
@@ -752,7 +722,8 @@ pub fn schedule_from_classified_flows(
             js_wire::<Vec<CashFlow>>(&flows, "flows")?,
             js_wire::<DayCount>(&day_count, "dayCount")?,
             js_opt_wire::<ScheduleBuildOpts>(opts.as_ref(), "opts")?.unwrap_or_default(),
-        ),
+        )
+        .map_err(to_js_err)?,
     ))
 }
 
@@ -787,14 +758,16 @@ pub(crate) fn schedules_arg(
 /// @returns The merged `CashFlowSchedule` handle.
 /// @throws If `schedules` is not an array (kind `invalid_type`) or an argument does not match its wire type (kind `validation`).
 #[wasm_bindgen(js_name = mergeCashflowSchedules)]
-pub fn merge_cashflow_schedules_js(
+pub fn merge_cashflow_schedules(
     schedules: JsValue,
     notional: JsValue,
     day_count: JsValue,
 ) -> Result<JsCashFlowSchedule, JsValue> {
-    Ok(JsCashFlowSchedule::from_inner(merge_cashflow_schedules(
-        schedules_arg(&schedules, "schedules")?,
-        js_wire::<Notional>(&notional, "notional")?,
-        js_wire::<DayCount>(&day_count, "dayCount")?,
-    )))
+    Ok(JsCashFlowSchedule::from_inner(
+        rust_merge_cashflow_schedules(
+            schedules_arg(&schedules, "schedules")?,
+            js_wire::<Notional>(&notional, "notional")?,
+            js_wire::<DayCount>(&day_count, "dayCount")?,
+        ),
+    ))
 }

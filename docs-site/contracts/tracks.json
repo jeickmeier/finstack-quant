@@ -70,7 +70,7 @@
       "finstack_quant.cashflows.builder.FloatingCouponSpec",
       "finstack_quant.cashflows.builder.FloatingRateSpec",
       "finstack_quant.cashflows.builder.ScheduleParams",
-      "finstack_quant.cashflows.primitives.CFKind",
+      "finstack_quant.core.cashflow.CFKind",
       "finstack_quant.core.money.Money",
       "finstack_quant.models.credit.MertonModel",
       "finstack_quant.models.credit.ToggleExerciseModel",

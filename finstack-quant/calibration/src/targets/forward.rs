@@ -264,7 +264,7 @@ impl ForwardCurveTarget {
                             .float_leg
                             .calendar_id
                             .as_deref()
-                            .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
+                            .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID),
                         end_of_month: swap.float_leg.end_of_month,
                         day_count: finstack_quant_core::dates::DayCount::Act365F,
                         payment_lag_days: swap.float_leg.payment_lag_days,

@@ -25,10 +25,6 @@ fn leading_weekend_carry_reuses_one_day_fixing_as_weight_grows() {
     .expect("weekend-start observations");
     assert_eq!(schedule.observations()[0].observation_date, january(3));
     assert_eq!(schedule.observations()[0].weight_days, 2);
-    assert!(schedule
-        .observations()
-        .iter()
-        .all(|slice| slice.rate_tenor_days == 1));
     let mut accumulator = schedule
         .accumulator(360.0, OvernightRateConstraints::default())
         .expect("accumulator");
@@ -36,7 +32,7 @@ fn leading_weekend_carry_reuses_one_day_fixing_as_weight_grows() {
     for cutoff in [january(5), january(6), january(7)] {
         schedule
             .advance(&mut accumulator, cutoff, |slice| {
-                seen.push((slice.observation_date, slice.rate_tenor_days));
+                seen.push(slice.observation_date);
                 Ok(if slice.observation_date == january(3) {
                     0.03
                 } else {
@@ -45,7 +41,7 @@ fn leading_weekend_carry_reuses_one_day_fixing_as_weight_grows() {
             })
             .expect("incremental carry replay");
     }
-    assert_eq!(seen, vec![(january(3), 1), (january(6), 1)]);
+    assert_eq!(seen, vec![january(3), january(6)]);
     let expected = ((1.0 + 0.03 * 2.0 / 360.0) * (1.0 + 0.04 / 360.0) - 1.0) * 360.0 / 3.0;
     assert!((accumulator.result().expect("replay rate").projected_rate - expected).abs() < 1e-12);
 }
@@ -78,7 +74,6 @@ fn in_arrears_compiles_business_observations_with_weekend_weight() {
             .collect::<Vec<_>>(),
         vec![1, 1, 1, 1, 3]
     );
-    assert!(observations.iter().all(|slice| slice.rate_tenor_days == 1));
 
     let replay = schedule
         .replay(
@@ -328,17 +323,13 @@ fn partial_replay_clips_weekend_weight_without_changing_fixing_tenor() {
             360.0,
             OvernightRateConstraints::default(),
             |slice| {
-                seen.push((
-                    slice.observation_date,
-                    slice.weight_days,
-                    slice.rate_tenor_days,
-                ));
+                seen.push((slice.observation_date, slice.weight_days));
                 Ok(0.05)
             },
         )
         .expect("partial weekend replay");
 
-    assert_eq!(seen, vec![(january(10), 2, 1)]);
+    assert_eq!(seen, vec![(january(10), 2)]);
     assert_eq!(replay.weight_days, 2);
     assert!((replay.projected_rate - 0.05).abs() < 1e-12);
 }

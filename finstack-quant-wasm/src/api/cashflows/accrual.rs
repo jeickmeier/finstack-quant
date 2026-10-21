@@ -5,7 +5,8 @@ use super::schedule::JsCashFlowSchedule;
 use crate::utils::wire::{js_date, js_opt_wire, js_wire};
 use crate::utils::{date_to_iso, to_js_err, to_js_value};
 use finstack_quant_cashflows::accrual::{
-    accrued_interest_amount, AccrualConfig, AccrualIndex, ExCouponRule,
+    accrued_interest_amount as rust_accrued_interest_amount, AccrualConfig, AccrualIndex,
+    ExCouponRule,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
@@ -67,13 +68,13 @@ pub fn ex_coupon_rule_is_ex_coupon(
 /// @returns `Money` wire object in the schedule currency; negative inside an ex-coupon window.
 /// @throws If the schedule fails validation or mixes coupon currencies, `config` is not an `AccrualConfig`, or a day-count calculation fails (kind `validation`).
 #[wasm_bindgen(js_name = accruedInterestAmount)]
-pub fn accrued_interest_amount_js(
+pub fn accrued_interest_amount(
     schedule: &JsCashFlowSchedule,
     as_of: JsValue,
     config: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let config = js_opt_wire::<AccrualConfig>(config.as_ref(), "config")?.unwrap_or_default();
-    let amount = accrued_interest_amount(&schedule.inner, js_date(&as_of, "asOf")?, &config)
+    let amount = rust_accrued_interest_amount(&schedule.inner, js_date(&as_of, "asOf")?, &config)
         .map_err(to_js_err)?;
     accrued_money(amount, schedule.inner.get_notional().currency())
 }

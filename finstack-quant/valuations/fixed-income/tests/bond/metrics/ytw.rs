@@ -306,6 +306,7 @@ fn test_ytw_floating_bond_matches_ytm_from_price() {
 /// the same IRR as YTM over the projected cashflows.
 #[test]
 fn test_ytw_amortizing_bond_matches_ytm_from_price() {
+    use finstack_quant_cashflows::builder::AmortizationSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -317,7 +318,7 @@ fn test_ytw_amortizing_bond_matches_ytm_from_price() {
     use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
     use finstack_quant_valuations_core::metrics::MetricId;
     use finstack_quant_valuations_fixed_income::bond::Bond;
-    use finstack_quant_valuations_fixed_income::bond::{AmortizationSpec, CashflowSpec};
+    use finstack_quant_valuations_fixed_income::bond::CashflowSpec;
 
     let as_of = date!(2025 - 01 - 01);
     let maturity = date!(2027 - 01 - 01);

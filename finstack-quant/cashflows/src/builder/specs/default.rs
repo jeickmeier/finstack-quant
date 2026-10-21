@@ -97,8 +97,8 @@ impl DefaultModelSpec {
     /// - cumulative-loss severity is outside `(0, 1]` or the implied defaults
     ///   are non-finite
     ///
-    /// Returns `InputError::NegativeValue`/`Error::Validation` if the
-    /// constant `cdr` is negative or non-finite.
+    /// Returns `Error::Validation` if the constant `cdr` is negative or
+    /// non-finite.
     ///
     /// # References
     ///
@@ -165,7 +165,7 @@ impl DefaultModelSpec {
                 const PEAK_MONTH: u32 = 30;
                 const PLATEAU_END_MONTH: u32 = 60;
                 const TERMINAL_MONTH: u32 = 120;
-                const PEAK_CDR: f64 = 0.006;
+                const PEAK_CDR: f64 = crate::builder::credit_rates::SDA_PEAK_CDR;
                 const TERMINAL_CDR: f64 = 0.0003;
 
                 let base = if seasoning_months <= PEAK_MONTH {
@@ -204,7 +204,7 @@ impl DefaultModelSpec {
             )));
         }
 
-        use super::super::credit_rates::cdr_to_mdr;
+        use crate::builder::credit_rates::cdr_to_mdr;
         cdr_to_mdr(cdr)
     }
 
@@ -319,13 +319,7 @@ impl DefaultModelSpec {
         let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
         match self {
             DefaultModelSpec::Vector { monthly_cdr } => {
-                for (index, cdr) in monthly_cdr.iter().enumerate() {
-                    if !cdr.is_finite() || !(0.0..=1.0).contains(cdr) {
-                        return Err(invalid(format!(
-                            "monthly_cdr[{index}] ({cdr}) must be a decimal in [0, 1]"
-                        )));
-                    }
-                }
+                super::check_unit_vector(monthly_cdr, "monthly_cdr")?;
             }
             DefaultModelSpec::CumulativeLoss {
                 cumulative_net_loss_pct,
@@ -421,28 +415,7 @@ impl DefaultModelSpec {
         Self::Sda { speed_multiplier }
     }
 
-    /// 2% CDR (common baseline).
-    ///
-    /// # Returns
-    ///
-    /// Default model equivalent to [`Self::constant_cdr`] with `cdr = 0.02`.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_cashflows::builder::DefaultModelSpec;
-    ///
-    /// let spec = DefaultModelSpec::cdr_2pct();
-    /// assert_eq!(spec, DefaultModelSpec::Constant { cdr: 0.02 });
-    /// ```
-    pub fn cdr_2pct() -> Self {
-        Self::constant_cdr(0.02)
-    }
-
     /// Explicit annual CDR per month of seasoning (the last value is held).
-    ///
-    /// The stored `cdr` is the first vector entry and is ignored by
-    /// [`Self::mdr`].
     ///
     /// # Arguments
     ///
@@ -467,8 +440,6 @@ impl DefaultModelSpec {
     }
 
     /// Cumulative net loss curve with a constant severity.
-    ///
-    /// The stored `cdr` is zero and ignored by [`Self::mdr`].
     ///
     /// # Arguments
     ///
@@ -503,8 +474,6 @@ impl DefaultModelSpec {
     }
 
     /// Rating-agency default timing over a lifetime cumulative default rate.
-    ///
-    /// The stored `cdr` is zero and ignored by [`Self::mdr`].
     ///
     /// # Arguments
     ///

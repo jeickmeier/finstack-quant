@@ -4,7 +4,6 @@ pub(crate) mod accrual;
 pub(crate) mod aggregation;
 pub(crate) mod builder;
 pub(crate) mod fixings;
-pub(crate) mod primitives;
 mod schema;
 
 use finstack_quant_cashflows::builder::CashFlowMeta;
@@ -12,11 +11,11 @@ use finstack_quant_cashflows::{CashflowScheduleBuildSpec, ScheduleBuildOpts};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
+use crate::bindings::core::cashflow::{extract_cf_kind, PyCashFlow};
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::date_to_py;
 use builder::schedule::{PyCashFlowMeta, PyCashFlowSchedule};
-use primitives::{extract_cf_kind, PyCashFlow};
 
 /// Build a cashflow schedule from a JSON spec and return canonical schedule JSON.
 ///
@@ -346,7 +345,8 @@ fn schedule_from_dated_flows(
     let kind = extract_cf_kind(kind)?;
     let opts = opts.map_or_else(ScheduleBuildOpts::default, |o| o.inner.clone());
     Ok(PyCashFlowSchedule::from_inner(
-        finstack_quant_cashflows::schedule_from_dated_flows(flows, kind, day_count.inner, opts),
+        finstack_quant_cashflows::schedule_from_dated_flows(flows, kind, day_count.inner, opts)
+            .map_err(crate::errors::core_to_py)?,
     ))
 }
 
@@ -371,7 +371,7 @@ fn schedule_from_dated_flows(
 /// --------
 /// >>> import datetime
 /// >>> from finstack_quant.cashflows import schedule_from_classified_flows
-/// >>> from finstack_quant.cashflows.primitives import CashFlow, CFKind
+/// >>> from finstack_quant.core.cashflow import CashFlow, CFKind
 /// >>> from finstack_quant.core.dates import DayCount
 /// >>> from finstack_quant.core.money import Money
 /// >>> flow = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.PIK, 0.0)
@@ -386,14 +386,12 @@ fn schedule_from_classified_flows(
     flows: Vec<PyRef<'_, PyCashFlow>>,
     day_count: PyRef<'_, PyDayCount>,
     opts: Option<PyRef<'_, PyScheduleBuildOpts>>,
-) -> PyCashFlowSchedule {
+) -> PyResult<PyCashFlowSchedule> {
     let flows = flows.iter().map(|f| f.inner.clone()).collect();
     let opts = opts.map_or_else(ScheduleBuildOpts::default, |o| o.inner.clone());
-    PyCashFlowSchedule::from_inner(finstack_quant_cashflows::schedule_from_classified_flows(
-        flows,
-        day_count.inner,
-        opts,
-    ))
+    finstack_quant_cashflows::schedule_from_classified_flows(flows, day_count.inner, opts)
+        .map(PyCashFlowSchedule::from_inner)
+        .map_err(crate::errors::core_to_py)
 }
 
 /// Register the `finstack_quant.cashflows` Python namespace.
@@ -404,7 +402,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "Cashflow schedule construction (typed and JSON), validation, and dated-flow extraction.",
     )?;
 
-    primitives::register(py, &m)?;
     builder::register(py, &m)?;
     accrual::register(py, &m)?;
     aggregation::register(py, &m)?;
@@ -432,7 +429,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "dated_flows",
             "dated_flows_json",
             "fixings",
-            "primitives",
             "schedule_from_classified_flows",
             "schedule_from_dated_flows",
             "schema",

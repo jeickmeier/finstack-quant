@@ -73,7 +73,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCreditTranch
             DealType::Rmbs | DealType::Cmbs => finstack_quant_core::dates::DayCount::Thirty360,
             _ => finstack_quant_core::dates::DayCount::Act360,
         };
-        Ok(schedule_from_classified_flows(
+        schedule_from_classified_flows(
             flows,
             day_count,
             ScheduleBuildOpts {
@@ -84,7 +84,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCreditTranch
                     ..Default::default()
                 },
             },
-        ))
+        )
     }
 }
 

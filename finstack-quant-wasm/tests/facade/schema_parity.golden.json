@@ -1128,7 +1128,7 @@
             "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
             "type_name": "CashflowScheduleBuildSpec",
             "kind": "input",
-            "bytes": 78273
+            "bytes": 78396
           },
           {
             "path": "schemas/cashflow/1/coupon_specs.schema.json",
@@ -1149,7 +1149,7 @@
             "$id": "https://finstack_quant.dev/schemas/cashflow/1/fee_specs.schema.json",
             "type_name": "FeeSpec",
             "kind": "component",
-            "bytes": 8090
+            "bytes": 8213
           },
           {
             "path": "schemas/cashflow/1/floating_coupon_spec.schema.json",
@@ -3402,7 +3402,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
             "type_name": "PoolStats",
             "kind": "output",
-            "bytes": 2449
+            "bytes": 2491
           },
           {
             "path": "schemas/results/1/scenario_table.schema.json",
@@ -3753,7 +3753,7 @@
             "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
             "type_name": "CashflowScheduleBuildSpec",
             "kind": "input",
-            "bytes": 78273
+            "bytes": 78396
           },
           {
             "domain": "cashflows",
@@ -3777,7 +3777,7 @@
             "$id": "https://finstack_quant.dev/schemas/cashflow/1/fee_specs.schema.json",
             "type_name": "FeeSpec",
             "kind": "component",
-            "bytes": 8090
+            "bytes": 8213
           },
           {
             "domain": "cashflows",
@@ -5529,7 +5529,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
             "type_name": "PoolStats",
             "kind": "output",
-            "bytes": 2449
+            "bytes": 2491
           },
           {
             "domain": "valuations",

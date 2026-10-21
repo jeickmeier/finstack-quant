@@ -2,7 +2,7 @@
 
 use super::*;
 use finstack_quant_cashflows::builder::{
-    CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,
+    AmortizationSpec, CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,
 };
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
@@ -91,7 +91,7 @@ fn test_bond_with_custom_cashflows() {
     let expected_flow_count = custom_schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind != finstack_quant_cashflows::primitives::CFKind::Pik)
+        .filter(|cf| cf.kind != finstack_quant_core::cashflow::CFKind::Pik)
         .count();
     assert_eq!(flows.len(), expected_flow_count);
 }
@@ -330,7 +330,7 @@ fn test_bond_floating_value() {
 
 #[test]
 fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
     use time::Duration;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
@@ -432,7 +432,7 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
 #[test]
 fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
     use finstack_quant_cashflows::builder::AmortizationSpec;
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
     use time::Duration;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
@@ -550,8 +550,8 @@ fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
 
 #[test]
 fn test_bond_frn_dated_cashflows_uses_builder() {
-    use finstack_quant_cashflows::primitives::CFKind;
     use finstack_quant_cashflows::CashflowProvider;
+    use finstack_quant_core::cashflow::CFKind;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date");
@@ -617,8 +617,8 @@ fn test_bond_frn_dated_cashflows_uses_builder() {
 #[test]
 fn test_bond_amortization_signed_schedule_preserves_all_flows() {
     use finstack_quant_cashflows::builder::AmortizationSpec;
-    use finstack_quant_cashflows::primitives::CFKind;
     use finstack_quant_cashflows::CashflowProvider;
+    use finstack_quant_core::cashflow::CFKind;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");

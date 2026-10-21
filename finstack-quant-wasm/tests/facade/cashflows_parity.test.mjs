@@ -193,10 +193,7 @@ const cases = {
     withBond((schedule) => json(schedule.withNotional(cashflows.notionalPar(2_000_000, 'USD')))),
   'schedule.pv_by_period': () =>
     withBond((schedule) =>
-      withMarket((market) => ({
-        default_day_count: schedule.pvByPeriod(periods, market, 'USD-OIS', ISSUE),
-        act_360: schedule.pvByPeriod(periods, market, 'USD-OIS', ISSUE, 'act_360'),
-      }))
+      withMarket((market) => schedule.pvByPeriod(periods, market, 'USD-OIS', ISSUE))
     ),
   'schedule.calendar_year_ladder': () =>
     withBond((schedule) =>
@@ -207,7 +204,7 @@ const cases = {
       const flows = schedule.getFlows();
       return [
         json(
-          cashflows.CashFlowSchedule.fromParts(
+          cashflows.CashFlowSchedule.fromFlows(
             flows,
             schedule.getNotional(),
             '30_360',
@@ -359,20 +356,20 @@ const cases = {
     };
     return {
       parse: ['fixed', 'pre_payment', 'collateral_substitution_out'].map((name) =>
-        cashflows.cfKindParse(name)
+        core.cfKindParse(name)
       ),
       interest_like: ['fixed', 'float_reset', 'fee', 'notional'].map((kind) =>
-        cashflows.cfKindIsInterestLike(kind)
+        core.cfKindIsInterestLike(kind)
       ),
       principal_like: ['fixed', 'pik', 'amortization', 'recovery'].map((kind) =>
-        cashflows.cfKindIsPrincipalLike(kind)
+        core.cfKindIsPrincipalLike(kind)
       ),
       cash_settlement: ['fixed', 'pik', 'defaulted_notional', 'notional'].map((kind) =>
-        cashflows.cfKindIsCashSettlement(kind)
+        core.cfKindIsCashSettlement(kind)
       ),
       balance_date: [
-        cashflows.cashFlowGetBalanceDate(flow),
-        cashflows.cashFlowGetBalanceDate({ ...flow, principal_date: '2025-07-11' }),
+        core.cashFlowGetBalanceDate(flow),
+        core.cashFlowGetBalanceDate({ ...flow, principal_date: '2025-07-11' }),
       ],
       with_accrual: { ...flow, accrual },
       with_principal_delta: { ...flow, principal_delta: usd('-1000') },
@@ -422,7 +419,7 @@ const cases = {
     const models = [
       { curve: 'constant', cdr: 0.03 },
       { curve: 'sda', speed_multiplier: 1.5 },
-      cashflows.defaultModelSpecCdr2pct(),
+      { curve: 'constant', cdr: 0.02 },
       { curve: 'vector', monthly_cdr: [0.01, 0.02, 0.04] },
       { curve: 'cumulative_loss', cumulative_net_loss_pct: [0.5, 1.5, 2.0], severity: 0.4 },
       { curve: 'timing', cumulative_default_rate: 0.1, annual_pct: [15, 30, 30, 15, 10] },
@@ -600,8 +597,8 @@ test('spec functions validate through Rust and reject wrong host types', () => {
     cashflows.notionalValidate(JSON.stringify(cashflows.notionalPar(100, 'USD'))),
     undefined
   );
-  assert.equal(cashflows.cfKindIsInterestLike('"fixed"'), true);
-  assert.equal(cashflows.cfKindIsInterestLike('fixed'), true);
+  assert.equal(core.cfKindIsInterestLike('"fixed"'), true);
+  assert.equal(core.cfKindIsInterestLike('fixed'), true);
   assert.equal(cashflows.scheduleParamsValidate(cashflows.scheduleParamsUsdSofrSwap()), undefined);
   assert.throws(
     () =>
@@ -654,7 +651,7 @@ test('spec functions validate through Rust and reject wrong host types', () => {
     kind('validation', /rate/)
   );
   assert.equal(
-    cashflows.cashFlowValidate({
+    core.cashFlowValidate({
       date: '2025-07-15',
       reset_date: null,
       amount: usd('1'),
@@ -666,7 +663,7 @@ test('spec functions validate through Rust and reject wrong host types', () => {
   );
   assert.throws(
     () =>
-      cashflows.cashFlowValidate({
+      core.cashFlowValidate({
         date: '2025-07-15',
         reset_date: '2025-08-01',
         amount: usd('1'),
@@ -676,17 +673,14 @@ test('spec functions validate through Rust and reject wrong host types', () => {
       }),
     kind('validation', /reset_date must not be after payment date/)
   );
+  assert.throws(() => core.cfKindParse('coupon-ish'), kind('validation', /unknown cashflow kind/));
+  assert.throws(() => core.cfKindParse(3), kind('invalid_type', /^name: /));
   assert.throws(
-    () => cashflows.cfKindParse('coupon-ish'),
-    kind('validation', /unknown cashflow kind/)
-  );
-  assert.throws(() => cashflows.cfKindParse(3), kind('invalid_type', /^name: /));
-  assert.throws(
-    () => cashflows.cfKindIsInterestLike('coupon-ish'),
+    () => core.cfKindIsInterestLike('coupon-ish'),
     kind('validation', /kind: unknown variant `coupon-ish`/)
   );
   assert.throws(
-    () => cashflows.defaultModelSpecMdr(cashflows.defaultModelSpecCdr2pct(), 1.5),
+    () => cashflows.defaultModelSpecMdr({ curve: 'constant', cdr: 0.02 }, 1.5),
     kind('invalid_type', /^seasoningMonths: /)
   );
   assert.throws(
@@ -726,7 +720,7 @@ test('spec functions validate through Rust and reject wrong host types', () => {
   });
 });
 
-test('CFCC-008: fromFlows validates every row in Rust; fromParts does not', () => {
+test('CFCC-008: fromFlows validates every row in Rust', () => {
   const row = (overrides) => ({
     date: '2025-07-15',
     reset_date: null,
@@ -737,7 +731,6 @@ test('CFCC-008: fromFlows validates every row in Rust; fromParts does not', () =
     ...overrides,
   });
   const notional = cashflows.notionalPar(1000, 'USD');
-  const meta = cashflows.CashFlowSchedule.fromFlows([], notional, 'act_360').getMeta();
   for (const [bad, pattern] of [
     [row({ accrual_factor: -1 }), /accrual_factor must be non-negative/],
     [row({ reset_date: '2025-08-01' }), /reset_date must not be after payment date/],
@@ -746,8 +739,6 @@ test('CFCC-008: fromFlows validates every row in Rust; fromParts does not', () =
       () => cashflows.CashFlowSchedule.fromFlows([bad], notional, 'act_360'),
       kind('validation', pattern)
     );
-    const raw = cashflows.CashFlowSchedule.fromParts([bad], notional, 'act_360', meta);
-    assert.equal(raw.getFlows().length, 1);
   }
   assert.equal(
     cashflows.CashFlowSchedule.fromFlows([row({})], notional, 'act_360').getFlows().length,
@@ -772,7 +763,7 @@ test('CFCC-010: compounding presets and default-model survival helpers come from
     Math.abs(cashflows.defaultModelSpecCumulativeDefaultFraction(timing, 12) - 0.05) < 1e-12
   );
   assert.equal(
-    cashflows.defaultModelSpecCumulativeDefaultFraction(cashflows.defaultModelSpecCdr2pct(), 12),
+    cashflows.defaultModelSpecCumulativeDefaultFraction({ curve: 'constant', cdr: 0.02 }, 12),
     undefined
   );
   assert.ok(

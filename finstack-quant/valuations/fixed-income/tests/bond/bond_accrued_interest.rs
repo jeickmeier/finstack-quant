@@ -7,12 +7,14 @@
 //! directly. For metrics-interface tests (via `MetricId::Accrued`), see
 //! `metrics/accrued.rs` which validates the integration with the metrics framework.
 
-use finstack_quant_cashflows::{accrued_interest_amount, CashflowProvider};
+use finstack_quant_cashflows::accrual::accrued_interest_amount;
+use finstack_quant_cashflows::accrual::AccrualMethod;
+use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_fixed_income::bond::{AccrualMethod, Bond};
+use finstack_quant_valuations_fixed_income::bond::Bond;
 use time::Month;
 
 fn make_date(y: i32, m: u8, d: u8) -> Date {
@@ -346,7 +348,7 @@ fn test_accrued_interest_amortizing_schedule_driven() {
     let schedule = bond
         .cashflow_schedule(&curves, issue)
         .expect("Full schedule retrieval should succeed in test");
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
     let mut coupon_dates: Vec<(Date, f64)> = Vec::new();
     for cf in schedule.get_flows() {
         if matches!(cf.kind, CFKind::Fixed | CFKind::Stub) {
@@ -375,7 +377,7 @@ fn test_accrued_interest_amortizing_schedule_driven() {
     // Mirror that convention here so the expected value tracks the impl.
     type CouponInfo = (Date, f64, Option<f64>, Option<(Date, Date)>);
     let coupon_info: Vec<CouponInfo> = {
-        use finstack_quant_cashflows::primitives::CFKind;
+        use finstack_quant_core::cashflow::CFKind;
         let mut out: Vec<CouponInfo> = Vec::new();
         for cf in schedule.get_flows() {
             if !matches!(cf.kind, CFKind::Fixed | CFKind::Stub) {

@@ -19,13 +19,6 @@
   "simulation": {
     "pool_balance_cleanup_threshold": 100.0
   },
-  "default_models": {
-    "sda": {
-      "peak_month": 30,
-      "peak_cdr": 0.006,
-      "terminal_cdr": 0.0003
-    }
-  },
   "stochastic_calibrations": {
     "rmbs_profiles": [
       {

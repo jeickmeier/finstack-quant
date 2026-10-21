@@ -304,7 +304,7 @@ mod tests {
     #[test]
     fn amortizing_bond_moic_to_worst_redeems_only_outstanding_principal() {
         use crate::bond::{CallPut, CallPutSchedule};
-        use finstack_quant_cashflows::primitives::CFKind;
+        use finstack_quant_core::cashflow::CFKind;
 
         let curves = Arc::new(MarketContext::new());
         let mut bond = Bond::example_amortizing().expect("amortizing bond");

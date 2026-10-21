@@ -1,12 +1,13 @@
 //! Term loan construction and validation tests.
 
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::builder::{CouponType, FloatingRateSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_fixed_income::term_loan::{
-    AmortizationSpec, LoanCall, LoanCallSchedule, LoanCallType, RateSpec, TermLoan,
+    LoanCall, LoanCallSchedule, LoanCallType, TermLoan,
 };
 use time::macros::date;
 

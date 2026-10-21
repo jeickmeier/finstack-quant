@@ -15,10 +15,10 @@
 mod fixtures;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use finstack_quant_cashflows::accrual::{AccrualConfig, AccrualIndex};
 use finstack_quant_cashflows::builder::{
     AmortizationSpec, CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,
 };
-use finstack_quant_cashflows::{AccrualConfig, AccrualIndex};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::money::Money;
@@ -190,7 +190,7 @@ fn bench_accrued_single(c: &mut Criterion) {
         group.throughput(Throughput::Elements(n));
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
             b.iter(|| {
-                finstack_quant_cashflows::accrued_interest_amount(
+                finstack_quant_cashflows::accrual::accrued_interest_amount(
                     black_box(&schedule),
                     black_box(as_of),
                     black_box(&cfg),
@@ -221,7 +221,7 @@ fn bench_accrued_per_exercise_date(c: &mut Criterion) {
             b.iter(|| {
                 let mut acc = 0.0;
                 for &d in &exercise_dates {
-                    acc += finstack_quant_cashflows::accrued_interest_amount(
+                    acc += finstack_quant_cashflows::accrual::accrued_interest_amount(
                         black_box(&schedule),
                         black_box(d),
                         black_box(&cfg),
@@ -305,7 +305,6 @@ fn bench_pv_by_period_scaling(c: &mut Criterion) {
                         black_box(&disc_id),
                         None,
                         base,
-                        Some(DayCount::Act365F),
                     )
                     .unwrap()
             });

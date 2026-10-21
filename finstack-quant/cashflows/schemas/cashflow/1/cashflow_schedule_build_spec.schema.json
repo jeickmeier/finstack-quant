@@ -635,7 +635,8 @@
                 },
                 "business_day_convention": {
                   "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
-                  "description": "Business-day convention applied to generated fee dates."
+                  "default": "modified_following",
+                  "description": "Business-day convention applied to generated fee dates\n(`ModifiedFollowing` when omitted from the wire form, as for\n[`ScheduleParams`](crate::builder::ScheduleParams))."
                 },
                 "calendar_id": {
                   "description": "Holiday calendar identifier used with `business_day_convention`.\n\nUse `\"weekends_only\"` when only weekend adjustment is required.",
@@ -660,7 +661,6 @@
                 "bp",
                 "frequency",
                 "day_count",
-                "business_day_convention",
                 "calendar_id"
               ],
               "type": "object"

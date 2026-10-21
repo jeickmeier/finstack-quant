@@ -527,7 +527,7 @@ fn mtm_reset_still_emits_notional_rebals_with_overnight_leg() {
     let notional_flows = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == finstack_quant_cashflows::primitives::CFKind::Notional)
+        .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Notional)
         .count();
     assert!(
         notional_flows > 2,

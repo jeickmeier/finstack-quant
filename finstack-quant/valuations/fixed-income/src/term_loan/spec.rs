@@ -16,7 +16,7 @@
 //!
 //! - [`DdtlSpec`]: Delayed-draw term loan features
 //! - [`TermLoanCovenantEvents`]: Covenant-driven events
-//! - [`AmortizationSpec`]: Principal repayment schedules (the shared cashflows
+//! - `AmortizationSpec`: Principal repayment schedules (the shared cashflows
 //!   type; term loans accept every variant except `LinearTo` and
 //!   `StepRemaining`)
 //! - [`LoanCallSchedule`]: Borrower prepayment options
@@ -47,7 +47,6 @@ use rust_decimal::Decimal;
 
 pub use super::super::bond::MakeWholeSpec;
 pub use super::super::loan_terms::{CommitmentStep, DrawEvent, MarginStep, OidEirSpec};
-pub use finstack_quant_cashflows::builder::AmortizationSpec;
 
 /// Original Issue Discount (OID) policy for term loan origination.
 ///

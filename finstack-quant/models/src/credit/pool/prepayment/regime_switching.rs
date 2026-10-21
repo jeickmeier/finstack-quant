@@ -1,7 +1,8 @@
 //! Regime-switching prepayment model.
 
-use super::super::{clamped_cpr_to_smm, expected_shocked_smm};
+use super::super::expected_shocked_smm;
 use super::traits::{PrepaymentState, StochasticPrepayment};
+use finstack_quant_cashflows::builder::clamped_cpr_to_smm;
 
 /// Two-state Markov prepayment model with factor-shocked CPR.
 #[derive(Debug, Clone)]

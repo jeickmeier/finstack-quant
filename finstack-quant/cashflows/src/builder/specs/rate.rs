@@ -77,18 +77,19 @@ impl RateSpec {
         match self {
             Self::Fixed { rate } => Ok(*rate),
             Self::Floating(spec) => {
-                let fwd = market.get_forward(spec.forward_curve_id.as_str())?;
                 let params = crate::builder::FloatingRateParams::try_from(spec)?;
                 let calendar_id = spec
                     .fixing_calendar_id
                     .as_deref()
-                    .unwrap_or("weekends_only");
+                    .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID);
                 let calendar = finstack_quant_core::dates::calendar_by_id_strict(calendar_id)?;
                 let reset_date = finstack_quant_core::dates::DateExt::add_business_days(
                     accrual_start,
                     -spec.reset_lag_days,
                     calendar,
                 )?;
+                // Tranche coupons treat a reset on the valuation date as fixed:
+                // it needs the day's recorded fixing and is never projected.
                 if reset_date <= as_of {
                     if spec.compounding.is_some() {
                         return Err(finstack_quant_core::Error::Validation(
@@ -109,6 +110,7 @@ impl RateSpec {
                         )?;
                     return Ok(crate::builder::calculate_floating_rate(raw, &params));
                 }
+                let fwd = market.get_forward(spec.forward_curve_id.as_str())?;
                 crate::builder::project_floating_rate(
                     accrual_start,
                     fwd.as_ref(),

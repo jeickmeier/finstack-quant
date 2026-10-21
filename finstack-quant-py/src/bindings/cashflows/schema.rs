@@ -6,9 +6,9 @@
 //! validator feeds to its `$ref` resolver. The binding below preserves that
 //! shape as a `dict[str, str]` keyed by the same canonical URI.
 //!
-//! `package_cashflow_schema` is deliberately not bound: it is `#[doc(hidden)]`,
-//! it mutates a schema in place for the schema-generator binary, and it is not
-//! a schema accessor.
+//! The schema packager that externalizes shared definitions is private to the
+//! Rust crate: it mutates a schema in place for the generator and is not a
+//! schema accessor.
 
 use crate::bindings::schema_registry::schema_registry_functions;
 use pyo3::prelude::*;

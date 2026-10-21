@@ -1,7 +1,8 @@
 //! Python bindings for `finstack_quant_cashflows::accrual`.
 
 use finstack_quant_cashflows::accrual::{
-    accrued_interest_amount, AccrualConfig, AccrualIndex, AccrualMethod, ExCouponRule,
+    accrued_interest_amount as rust_accrued_interest_amount, AccrualConfig, AccrualIndex,
+    AccrualMethod, ExCouponRule,
 };
 use finstack_quant_core::money::Money;
 use pyo3::prelude::*;
@@ -434,12 +435,12 @@ impl PyAccrualIndex {
 ///     accrued interest is non-finite.
 /// KeyError
 ///     If a configured ex-coupon calendar id cannot be resolved.
-#[pyfunction(name = "accrued_interest_amount")]
+#[pyfunction]
 #[pyo3(
     signature = (schedule, as_of, config=None),
     text_signature = "(schedule, as_of, config=None)"
 )]
-fn py_accrued_interest_amount(
+fn accrued_interest_amount(
     py: Python<'_>,
     schedule: PyRef<'_, PyCashFlowSchedule>,
     as_of: &Bound<'_, PyAny>,
@@ -449,7 +450,7 @@ fn py_accrued_interest_amount(
     let schedule = schedule.inner.clone();
     let currency = schedule.get_notional().currency();
     let cfg = config.map_or_else(AccrualConfig::default, |c| c.inner.clone());
-    py.detach(move || accrued_interest_amount(&schedule, as_of, &cfg))
+    py.detach(move || rust_accrued_interest_amount(&schedule, as_of, &cfg))
         .and_then(|amount| Money::new(amount, currency))
         .map(PyMoney::from_inner)
         .map_err(core_to_py)
@@ -466,7 +467,7 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     module.add_class::<PyExCouponRule>()?;
     module.add_class::<PyAccrualConfig>()?;
     module.add_class::<PyAccrualIndex>()?;
-    module.add_function(wrap_pyfunction!(py_accrued_interest_amount, &module)?)?;
+    module.add_function(wrap_pyfunction!(accrued_interest_amount, &module)?)?;
 
     let all = PyList::new(
         py,

@@ -1,4 +1,9 @@
-//! Principal-exchange policy for [`CashFlowBuilder`](crate::builder::CashFlowBuilder).
+//! Principal-exchange policy and explicit principal events for
+//! [`CashFlowBuilder`](crate::builder::CashFlowBuilder).
+
+use finstack_quant_core::cashflow::CFKind;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::money::Money;
 
 /// Whether the builder emits issue-funding and maturity-redemption notionals.
 ///
@@ -43,5 +48,49 @@ impl PrincipalExchange {
     #[must_use]
     pub fn is_initial_and_final(&self) -> bool {
         matches!(self, Self::InitialAndFinal)
+    }
+}
+
+/// JSON representation of an explicit principal event.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct PrincipalEventSpec {
+    /// Event date.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub date: Date,
+    /// Cash settlement date, independently adjusted from the economic event date.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub payment_date: Date,
+    /// Outstanding balance delta. Positive increases outstanding, negative repays.
+    pub delta: Money,
+    /// Optional settlement amount before classification-dependent sign handling.
+    /// When omitted, amortization repayments use `-delta` and draws use `delta`.
+    /// Amortization emits this amount as a receipt; other kinds negate it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cash: Option<Money>,
+    /// Cashflow classification to emit.
+    pub kind: CFKind,
+}
+
+impl PrincipalEventSpec {
+    /// Settlement amount before classification-dependent sign handling.
+    ///
+    /// When `cash` is omitted, amortization repayments use `-delta` and all
+    /// other kinds use `delta`.
+    #[must_use]
+    pub(crate) fn resolved_cash(&self) -> Money {
+        self.cash.unwrap_or(match self.kind {
+            CFKind::Amortization => self.delta.checked_neg(),
+            _ => self.delta,
+        })
     }
 }

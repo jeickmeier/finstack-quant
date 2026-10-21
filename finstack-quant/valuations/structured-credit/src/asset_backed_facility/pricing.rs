@@ -446,7 +446,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
                 ));
             }
         }
-        Ok(schedule_from_classified_flows(
+        schedule_from_classified_flows(
             flows,
             self.day_count,
             ScheduleBuildOpts {
@@ -457,7 +457,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
                     ..Default::default()
                 },
             },
-        ))
+        )
     }
 }
 

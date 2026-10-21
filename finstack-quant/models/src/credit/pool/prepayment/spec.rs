@@ -3,10 +3,10 @@
 //! Provides a serializable specification enum for stochastic prepayment models,
 //! enabling configuration and deferred construction.
 
-use super::super::clamped_cpr_to_smm;
 use super::{
     FactorCorrelatedPrepay, RegimeSwitchingPrepay, RichardRollPrepay, StochasticPrepayment,
 };
+use finstack_quant_cashflows::builder::clamped_cpr_to_smm;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
 /// Stochastic prepayment model specification.

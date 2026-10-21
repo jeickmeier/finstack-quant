@@ -2,7 +2,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::{
     cashflow::CashFlow,
     currency::Currency,

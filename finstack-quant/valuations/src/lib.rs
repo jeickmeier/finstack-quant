@@ -102,9 +102,9 @@ pub use finstack_quant_valuations_core::{
     impl_instrument_base, register_generic, register_metrics,
 };
 
-#[doc(hidden)]
-pub use finstack_quant_valuations_core::{__private, contract_specs, serde_defaults};
 pub use finstack_quant_valuations_core::{constants, error, market, recalibration};
+#[doc(hidden)]
+pub use finstack_quant_valuations_core::{contract_specs, serde_defaults};
 /// Pricing dispatch and registry infrastructure.
 pub mod pricer;
 /// Valuation result envelopes and metadata.

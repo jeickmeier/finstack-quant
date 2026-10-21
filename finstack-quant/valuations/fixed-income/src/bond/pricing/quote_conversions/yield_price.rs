@@ -7,7 +7,7 @@ use crate::bond::pricing::ytm_solver::{solve_bond_ytm, YtmPricingSpec};
 use crate::bond::Bond;
 use finstack_quant_cashflows::accrual::AccrualIndex;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
@@ -1205,7 +1205,7 @@ mod tests {
     use super::*;
     use crate::bond::{CallPut, CallPutSchedule, MakeWholeSpec, ProtectionWindow, ReturnFloorSpec};
     use finstack_quant_cashflows::builder::{CashFlowMeta, Notional};
-    use finstack_quant_cashflows::primitives::CashFlow;
+    use finstack_quant_core::cashflow::CashFlow;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;

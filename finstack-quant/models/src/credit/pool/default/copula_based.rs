@@ -20,9 +20,9 @@
 //!
 //! - Li, D. X. (2000). "On Default Correlation: A Copula Function Approach." `docs/REFERENCES.md#li-2000-gaussian-copula`
 
-use super::super::clamped_cdr_to_mdr;
 use super::traits::StochasticDefault;
 use crate::correlation::copula::{Copula, CopulaSpec};
+use finstack_quant_cashflows::builder::clamped_cdr_to_mdr;
 
 /// Copula-based stochastic default model.
 ///

@@ -1,6 +1,7 @@
 //! Term loan cashflow generation tests.
 
 use finstack_quant_cashflows::builder::CouponType;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
@@ -11,7 +12,7 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_fixed_income::term_loan::{
-    AmortizationSpec, CommitmentFeeBase, DdtlSpec, DrawEvent, OidPolicy, RateSpec, TermLoan,
+    CommitmentFeeBase, DdtlSpec, DrawEvent, OidPolicy, TermLoan,
 };
 use time::macros::date;
 
