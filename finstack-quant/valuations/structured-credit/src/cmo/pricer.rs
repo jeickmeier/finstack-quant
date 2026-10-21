@@ -11,7 +11,6 @@ use crate::structured_credit::assumptions::embedded_registry;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
 use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
@@ -80,11 +79,8 @@ pub(crate) fn tranche_cashflows_on(
     let mut waterfall = cmo.waterfall.clone();
 
     let mut tranche_cfs = Vec::new();
+    cmo.reference_tranche()?;
     let ref_id = &cmo.reference_tranche_id;
-
-    waterfall.get_tranche(ref_id).ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!("Tranche {} not found", ref_id))
-    })?;
 
     for cf in &collateral_cfs {
         // Run waterfall for this period
@@ -139,12 +135,7 @@ pub(crate) fn build_reference_tranche_schedule(
     as_of: Date,
     max_periods: Option<u32>,
 ) -> Result<CashFlowSchedule> {
-    let tranche = cmo.reference_tranche().ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!(
-            "Tranche {} not found",
-            cmo.reference_tranche_id
-        ))
-    })?;
+    let tranche = cmo.reference_tranche()?;
     let tranche_cashflows = generate_tranche_cashflows(cmo, as_of, max_periods)?;
     let mut flows = Vec::with_capacity(tranche_cashflows.len() * 2);
 
@@ -252,10 +243,7 @@ fn create_assumed_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyMbsPa
 /// Generates tranche cashflows and discounts them to present value.
 pub(crate) fn price_cmo(cmo: &AgencyCmo, market: &MarketContext, as_of: Date) -> Result<Money> {
     let schedule = build_reference_tranche_schedule(cmo, as_of, None)?;
-    let currency = cmo
-        .reference_tranche()
-        .map(|tranche| tranche.current_face.currency())
-        .unwrap_or(Currency::USD);
+    let currency = cmo.reference_tranche()?.current_face.currency();
 
     if schedule.get_flows().is_empty() {
         return Ok(Money::from((0_i64, currency)));
@@ -275,6 +263,7 @@ pub(crate) fn price_cmo(cmo: &AgencyCmo, market: &MarketContext, as_of: Date) ->
 mod tests {
     use super::*;
     use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCountContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
@@ -768,6 +757,7 @@ mod tests {
 #[cfg(test)]
 mod production_mortgage_audit {
     use super::*;
+    use finstack_quant_core::currency::Currency;
     use time::macros::date;
 
     #[test]
@@ -872,6 +862,7 @@ mod production_mortgage_audit {
 #[cfg(test)]
 mod persistent_pac_regressions {
     use super::*;
+    use finstack_quant_core::currency::Currency;
     use time::macros::date;
 
     #[test]

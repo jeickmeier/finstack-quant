@@ -19,7 +19,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::InstrumentId;
+use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::{HashSet, Result};
 use serde::{Deserialize, Serialize};
 
@@ -165,6 +165,25 @@ impl<'a> CollateralInstrument<'a> {
             Self::Bond(bond) => &bond.id,
             Self::TermLoan(loan) => &loan.id,
             Self::Revolver(facility) => &facility.id,
+        }
+    }
+
+    /// Contractual rate of a term loan or revolver; `None` for a bond, whose
+    /// coupon lives in its cashflow spec.
+    pub(crate) fn loan_rate(self) -> Option<&'a RateSpec> {
+        match self {
+            Self::Bond(_) => None,
+            Self::TermLoan(loan) => Some(&loan.rate),
+            Self::Revolver(facility) => Some(&facility.rate),
+        }
+    }
+
+    /// Hazard curve the instrument names for its default probabilities, if any.
+    pub(crate) fn credit_curve_id(self) -> Option<&'a CurveId> {
+        match self {
+            Self::Bond(bond) => bond.credit_curve_id.as_ref(),
+            Self::TermLoan(loan) => loan.credit_curve_id.as_ref(),
+            Self::Revolver(facility) => facility.credit_curve_id.as_ref(),
         }
     }
 

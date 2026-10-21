@@ -397,18 +397,18 @@ mod tests {
             &deal,
             &market,
             deal.closing_date,
-            &mut super::super::DeterministicPoolFlowSource,
+            Some(&mut super::super::DeterministicPoolFlowSource),
         )
         .expect("baseline");
         let drawn = super::super::simulate_with_source(
             &deal,
             &market,
             deal.closing_date,
-            &mut DrawingSource {
+            Some(&mut DrawingSource {
                 draw_period: 1,
                 draw: 1_000_000.0,
                 period: 0,
-            },
+            }),
         )
         .expect("drawn run passes cash conservation");
 
@@ -460,7 +460,7 @@ mod tests {
             &silent,
             &market,
             silent.closing_date,
-            &mut super::super::DeterministicPoolFlowSource,
+            Some(&mut super::super::DeterministicPoolFlowSource),
         )
         .expect("base");
         let (int_base, prin_base) = totals(&base);
@@ -471,7 +471,7 @@ mod tests {
             &wf,
             &market,
             wf.closing_date,
-            &mut super::super::DeterministicPoolFlowSource,
+            Some(&mut super::super::DeterministicPoolFlowSource),
         )
         .expect("waterfall destination");
         let earned: f64 = run_wf
@@ -505,7 +505,7 @@ mod tests {
             &direct,
             &market,
             direct.closing_date,
-            &mut super::super::DeterministicPoolFlowSource,
+            Some(&mut super::super::DeterministicPoolFlowSource),
         )
         .expect("tranche destination");
         let earned_direct: f64 = run_direct
@@ -537,7 +537,7 @@ mod tests {
             &retain,
             &market,
             retain.closing_date,
-            &mut super::super::DeterministicPoolFlowSource,
+            Some(&mut super::super::DeterministicPoolFlowSource),
         )
         .expect("retain destination");
         let earned_retain: f64 = run_retain

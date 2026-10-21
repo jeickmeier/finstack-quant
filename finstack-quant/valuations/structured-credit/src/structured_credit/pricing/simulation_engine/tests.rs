@@ -37,7 +37,7 @@ mod cases {
                 deal,
                 &market,
                 deal.closing_date,
-                &mut DeterministicPoolFlowSource,
+                Some(&mut DeterministicPoolFlowSource),
             )
             .expect("simulation")
         };
@@ -77,7 +77,7 @@ mod cases {
             &deal,
             &MarketContext::new(),
             deal.closing_date,
-            &mut DeterministicPoolFlowSource,
+            Some(&mut DeterministicPoolFlowSource),
         )
         .expect("bullet simulation");
         let principal: f64 = run
@@ -436,7 +436,7 @@ mod cases {
             &deal,
             &market,
             deal.closing_date,
-            &mut DeterministicPoolFlowSource,
+            Some(&mut DeterministicPoolFlowSource),
         )
         .map(|run| run.tranches)
         .expect("baseline");
@@ -445,7 +445,7 @@ mod cases {
             &deal,
             &market,
             deal.closing_date,
-            &mut DeterministicPoolFlowSource,
+            Some(&mut DeterministicPoolFlowSource),
         )
         .map(|run| run.tranches)
         .expect("funded spread");
@@ -1052,7 +1052,7 @@ mod cases {
             &instrument,
             &market,
             cleanup_test_date(),
-            &mut DeterministicPoolFlowSource,
+            Some(&mut DeterministicPoolFlowSource),
         )
         .map(|run| run.tranches)
         .expect("simulation");
@@ -1190,7 +1190,7 @@ mod cases {
             &build_deal(true),
             &market,
             cc_test_date(),
-            &mut DeterministicPoolFlowSource,
+            Some(&mut DeterministicPoolFlowSource),
         )
         .map(|run| run.tranches)
         .expect("simulation with reinvestment");
@@ -1294,7 +1294,7 @@ mod cases {
             &instrument,
             &market,
             cc_test_date(),
-            &mut DeterministicPoolFlowSource,
+            Some(&mut DeterministicPoolFlowSource),
         )
         .map(|run| run.tranches)
         .expect("simulation");
@@ -1387,7 +1387,7 @@ mod cases {
             &instrument,
             &market,
             cc_test_date(),
-            &mut DeterministicPoolFlowSource,
+            Some(&mut DeterministicPoolFlowSource),
         )
         .map(|run| run.tranches)
         .expect("simulation");
@@ -2652,7 +2652,7 @@ mod cases {
             &instrument,
             &market,
             start,
-            &mut DeterministicPoolFlowSource,
+            Some(&mut DeterministicPoolFlowSource),
         )
         .map(|run| run.tranches)
         .expect("simulation");
@@ -2896,7 +2896,7 @@ mod cases {
                 &build_deal(lag),
                 &market,
                 closing,
-                &mut DeterministicPoolFlowSource,
+                Some(&mut DeterministicPoolFlowSource),
             )
             .map(|run| run.tranches)
             .expect("simulation")

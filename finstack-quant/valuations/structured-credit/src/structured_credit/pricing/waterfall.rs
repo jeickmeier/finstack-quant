@@ -3,7 +3,7 @@
 //! This module contains pure functions for executing waterfall distributions.
 //! All type definitions are in `types::waterfall`.
 
-use super::coverage_tests::TestContext;
+use super::coverage_tests::{TestContext, TestResult};
 use crate::structured_credit::types::{
     AfcSpec, AllocationMode, AssetPool, CoverageRules, CoverageTestAction, CoverageTestSpec,
     DiversionRecord, EquityHistory, FundingSource, LiveCollateral, PaymentCalculation,
@@ -1164,29 +1164,8 @@ pub(super) fn coverage_inputs(
 pub(super) fn evaluate_coverage_tests(
     specs: &[&CoverageTestSpec],
     context: &TestContext<'_>,
-) -> Result<Vec<CoverageTestResult>> {
-    specs
-        .iter()
-        .map(|spec| {
-            let result = spec.evaluate(context)?;
-            Ok(CoverageTestResult {
-                test_id: spec.id.clone(),
-                ratio: result.ratio,
-                passing: result.passing,
-                cure_amount: result.cure_amount,
-            })
-        })
-        .collect()
-}
-
-/// Internal coverage test result with cure amount.
-#[derive(Debug, Clone)]
-pub(super) struct CoverageTestResult {
-    pub(super) test_id: String,
-    pub(super) ratio: f64,
-    pub(super) passing: bool,
-    /// Amount needed to cure the breach (divert to senior principal).
-    cure_amount: Option<Money>,
+) -> Result<Vec<TestResult>> {
+    specs.iter().map(|spec| spec.evaluate(context)).collect()
 }
 
 /// Record principal paid to a tranche within the current waterfall period so

@@ -26,14 +26,16 @@ pub(super) fn effective_recovery(
 }
 
 pub use breakeven_cdr::calculate_tranche_breakeven_cdr;
-pub use convexity::{calculate_tranche_convexity, ConvexityCalculator};
-pub use duration::{
-    calculate_tranche_duration, MacaulayDurationCalculator, ModifiedDurationCalculator,
-};
+pub use convexity::calculate_tranche_convexity;
+pub(crate) use convexity::ConvexityCalculator;
+pub use duration::calculate_tranche_duration;
+pub(crate) use duration::{MacaulayDurationCalculator, ModifiedDurationCalculator};
 pub use oas::{calculate_tranche_oas, OasConfig, OasResult};
 pub use spreads::{
-    calculate_tranche_cs01, calculate_tranche_discount_margin, calculate_tranche_spread_convexity,
-    calculate_tranche_z_spread, BucketedCs01Calculator, Cs01Calculator, SpreadDurationCalculator,
-    ZSpreadCalculator,
+    calculate_tranche_cs01, calculate_tranche_discount_margin, calculate_tranche_z_spread,
 };
-pub use ytm::YtmCalculator;
+pub(crate) use spreads::{
+    calculate_tranche_spread_convexity, BucketedCs01Calculator, Cs01Calculator,
+    SpreadDurationCalculator, ZSpreadCalculator,
+};
+pub(crate) use ytm::YtmCalculator;

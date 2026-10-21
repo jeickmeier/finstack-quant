@@ -14,7 +14,7 @@
 //! yield, WAL, pool metrics) see the deal while every reprice sees the
 //! tranche.
 
-use super::{DealType, StructuredCredit};
+use super::StructuredCredit;
 use finstack_quant_cashflows::{schedule_from_classified_flows, ScheduleBuildOpts};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -69,13 +69,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCreditTranch
         let flows = (self.deal)
             .tranche_cashflows(&self.tranche_id, context, as_of)?
             .detailed_flows;
-        let day_count = match self.deal.deal_type {
-            DealType::Rmbs | DealType::Cmbs => finstack_quant_core::dates::DayCount::Thirty360,
-            _ => finstack_quant_core::dates::DayCount::Act360,
-        };
         Ok(schedule_from_classified_flows(
             flows,
-            day_count,
+            self.deal.deal_type.schedule_day_count(),
             ScheduleBuildOpts {
                 notional_hint: finstack_quant_cashflows::CashflowScheduleSource::notional(self)?,
                 meta: finstack_quant_cashflows::builder::CashFlowMeta {

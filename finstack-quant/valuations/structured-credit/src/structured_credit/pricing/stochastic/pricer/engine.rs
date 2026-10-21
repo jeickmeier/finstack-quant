@@ -63,6 +63,10 @@ const PREPAY_REGIME_SEED_SALT: u64 = 0x5052_4550_4159_5247; // "PREPAYRG"
 /// instrument collateral never perturbs the draws of the other channels.
 const INSTRUMENT_PATH_SEED_SALT: u64 = 0x494E_5354_5255_4D50; // "INSTRUMP"
 
+/// Confidence level of the reported expected shortfall (95% ES) of the deal
+/// and per-tranche path losses.
+const ES_CONFIDENCE: f64 = 0.95;
+
 /// Stochastic pricing engine for structured credit.
 ///
 /// Each scenario path feeds period SMM/MDR/recovery assumptions into the same
@@ -279,13 +283,10 @@ impl StochasticPricer {
             collector.record_output(output);
         }
 
-        collector.finalize(
-            self,
-            StructuredCreditPricingMode::MonteCarlo {
-                num_paths,
-                antithetic,
-            },
-        )
+        collector.finalize(StructuredCreditPricingMode::MonteCarlo {
+            num_paths,
+            antithetic,
+        })
     }
 
     /// Monthly systematic factors of Monte Carlo path `path_index`.
@@ -1195,7 +1196,6 @@ impl TrancheScenarioStats {
         mut self,
         currency: finstack_quant_core::currency::Currency,
         num_paths: usize,
-        es_confidence: f64,
     ) -> Result<TranchePricingResult> {
         let paths = num_paths.max(1) as f64;
         let mean_pv = self.pv_stats.mean();
@@ -1203,7 +1203,7 @@ impl TrancheScenarioStats {
         // Use population variance (n denominator), the established convention
         // for these Monte Carlo loss estimators.
         let loss_std = self.loss_stats.population_variance().sqrt();
-        let es = expected_shortfall(&mut self.losses, es_confidence);
+        let es = expected_shortfall(&mut self.losses, ES_CONFIDENCE);
 
         let price_pct = if self.current_balance > f64::EPSILON {
             mean_pv / self.current_balance * 100.0
@@ -1317,7 +1317,6 @@ impl ScenarioCollector {
 
     fn finalize(
         mut self,
-        pricer: &StochasticPricer,
         pricing_mode: StructuredCreditPricingMode,
     ) -> Result<StochasticPricingResult> {
         let pv_stats = independent_estimator_stats(&self.deal_pvs, self.antithetic)?;
@@ -1326,7 +1325,7 @@ impl ScenarioCollector {
         // Welford population variance avoids catastrophic cancellation when
         // tranche PVs are large (≥ 1e7) and relative dispersion is small.
         let loss_pop_var = self.deal_loss_stats.population_variance();
-        let es = expected_shortfall(&mut self.deal_losses, pricer.config.es_confidence);
+        let es = expected_shortfall(&mut self.deal_losses, ES_CONFIDENCE);
 
         let mut result = StochasticPricingResult::new(
             Money::new(mean_pv, self.currency)?,
@@ -1335,7 +1334,7 @@ impl ScenarioCollector {
             pricing_mode,
         )
         .with_unexpected_loss(Money::new(loss_pop_var.sqrt(), self.currency)?)
-        .with_expected_shortfall(Money::new(es, self.currency)?, pricer.config.es_confidence);
+        .with_expected_shortfall(Money::new(es, self.currency)?, ES_CONFIDENCE);
 
         // Prices are quoted per CURRENT note balance, the same face the
         // deterministic `dirty_price` metric uses, not per pool balance: a
@@ -1379,7 +1378,7 @@ impl ScenarioCollector {
         result.tranche_results = self
             .tranche_stats
             .into_iter()
-            .map(|stats| stats.finalize(self.currency, self.num_paths, pricer.config.es_confidence))
+            .map(|stats| stats.finalize(self.currency, self.num_paths))
             .collect::<Result<Vec<_>>>()?;
 
         Ok(result)
@@ -1559,11 +1558,11 @@ mod tests {
             test_date(),
             test_discount_curve(),
             ScenarioTreeConfig::new(test_date().months_until(instrument.maturity) as usize),
-        )
-        .with_pricing_mode(StructuredCreditPricingMode::MonteCarlo {
-            num_paths: 2,
-            antithetic: false,
-        });
+            StructuredCreditPricingMode::MonteCarlo {
+                num_paths: 2,
+                antithetic: false,
+            },
+        );
         let pricer = StochasticPricer::new(config);
 
         let result = pricer.price(&instrument, &market).expect("price");
@@ -1576,12 +1575,6 @@ mod tests {
     #[test]
     fn scenario_collector_small_sample_interval_uses_independent_estimator_count() {
         let instrument = test_instrument();
-        let config = StochasticPricerConfig::new(
-            test_date(),
-            test_discount_curve(),
-            ScenarioTreeConfig::new(12),
-        );
-        let pricer = StochasticPricer::new(config);
         for antithetic in [false, true] {
             // The independent observations are [1, 3] in either mode:
             // sample variance = 2, standard error = 1, and t_1 is Cauchy.
@@ -1596,13 +1589,10 @@ mod tests {
                 collector.record_deal(pv, 0.0);
             }
             let result = collector
-                .finalize(
-                    &pricer,
-                    StructuredCreditPricingMode::MonteCarlo {
-                        num_paths: 2,
-                        antithetic,
-                    },
-                )
+                .finalize(StructuredCreditPricingMode::MonteCarlo {
+                    num_paths: 2,
+                    antithetic,
+                })
                 .expect("two independent estimators define sampling uncertainty");
             let critical = 1.0 / (std::f64::consts::PI * 0.025).tan();
             assert_eq!(result.npv.amount(), 2.0);
@@ -1664,23 +1654,11 @@ mod tests {
         }
 
         // Extract the deal-level variance directly via the finalize path.
-        // We use a minimal StochasticPricer config just to call finalize.
-        use crate::structured_credit::pricing::stochastic::pricer::config::StochasticPricerConfig;
-        use crate::structured_credit::pricing::stochastic::pricer::ScenarioTreeConfig;
-        let config = StochasticPricerConfig::new(
-            test_date(),
-            test_discount_curve(),
-            ScenarioTreeConfig::new(12),
-        );
-        let pricer = StochasticPricer::new(config);
         let result = collector
-            .finalize(
-                &pricer,
-                StructuredCreditPricingMode::MonteCarlo {
-                    num_paths: n,
-                    antithetic: false,
-                },
-            )
+            .finalize(StructuredCreditPricingMode::MonteCarlo {
+                num_paths: n,
+                antithetic: false,
+            })
             .expect("valid pricing result");
 
         // True population variance = delta² = 0.0025
@@ -1838,12 +1816,15 @@ mod tests {
             tree_config.factor_spec = LatentFactorSpec::single_factor(1.0, kappa);
             tree_config.default_spec =
                 StochasticDefaultSpec::intensity_process(0.10, 1.0, 0.5, 0.8);
-            let config =
-                StochasticPricerConfig::new(test_date(), test_discount_curve(), tree_config)
-                    .with_pricing_mode(StructuredCreditPricingMode::MonteCarlo {
-                        num_paths: 64,
-                        antithetic: false,
-                    });
+            let config = StochasticPricerConfig::new(
+                test_date(),
+                test_discount_curve(),
+                tree_config,
+                StructuredCreditPricingMode::MonteCarlo {
+                    num_paths: 64,
+                    antithetic: false,
+                },
+            );
             StochasticPricer::new(config)
                 .price(&instrument, &market)
                 .expect("MC price")
@@ -1883,8 +1864,12 @@ mod tests {
         };
 
         for (label, tree_config) in [("rmbs", rmbs), ("clo", clo)] {
-            let config =
-                StochasticPricerConfig::new(test_date(), test_discount_curve(), tree_config);
+            let config = StochasticPricerConfig::new(
+                test_date(),
+                test_discount_curve(),
+                tree_config,
+                StructuredCreditPricingMode::default(),
+            );
             let pricer = StochasticPricer::new(config);
 
             let zs = [-2.0, -1.0, 0.0, 1.0, 2.0];
@@ -2099,12 +2084,16 @@ mod per_name_copula_tests {
     ) -> StochasticPricerConfig {
         let mut tree_config = ScenarioTreeConfig::new(num_periods);
         tree_config.default_spec = StochasticDefaultSpec::gaussian_copula(base_cdr, correlation);
-        StochasticPricerConfig::new(close(), discount_curve(), tree_config)
-            .with_pricing_mode(StructuredCreditPricingMode::MonteCarlo {
+        StochasticPricerConfig::new(
+            close(),
+            discount_curve(),
+            tree_config,
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths,
                 antithetic: true,
-            })
-            .with_pool_granularity(granularity)
+            },
+        )
+        .with_pool_granularity(granularity)
     }
 
     /// Build a pricer config with a Student-t-copula default model.
@@ -2133,12 +2122,16 @@ mod per_name_copula_tests {
     ) -> StochasticPricerConfig {
         let mut tree_config = ScenarioTreeConfig::new(num_periods);
         tree_config.default_spec = default_spec;
-        StochasticPricerConfig::new(close(), discount_curve(), tree_config)
-            .with_pricing_mode(StructuredCreditPricingMode::MonteCarlo {
+        StochasticPricerConfig::new(
+            close(),
+            discount_curve(),
+            tree_config,
+            StructuredCreditPricingMode::MonteCarlo {
                 num_paths,
                 antithetic: false,
-            })
-            .with_pool_granularity(granularity)
+            },
+        )
+        .with_pool_granularity(granularity)
     }
 
     fn tranche_pv(result: &StochasticPricingResult, id: &str) -> f64 {

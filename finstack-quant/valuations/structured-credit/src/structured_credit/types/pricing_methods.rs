@@ -155,8 +155,8 @@ impl StructuredCredit {
             tree_config.num_periods = tree_steps.max(1);
         }
         let discount_curve = context.get_discount(self.discount_curve_id.as_str())?;
-        let mut config = StochasticPricerConfig::new(effective_as_of, discount_curve, tree_config)
-            .with_pricing_mode(pricing_mode);
+        let mut config =
+            StochasticPricerConfig::new(effective_as_of, discount_curve, tree_config, pricing_mode);
         if let Some(granularity) = self
             .instrument_pricing_overrides
             .model_config

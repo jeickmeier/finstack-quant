@@ -35,6 +35,43 @@
 pub(crate) const METRIC_TIME_BASIS: finstack_quant_core::dates::DayCount =
     finstack_quant_core::dates::DayCount::Act365F;
 
+/// The flows after `settlement` as `(t, df, amount)`: the year fraction in
+/// [`METRIC_TIME_BASIS`], the discount factor from `settlement` and the
+/// cashflow amount. Every spread, duration and convexity metric folds over
+/// this list, so they measure time and discounting identically.
+///
+/// # Arguments
+///
+/// * `flows` - Dated cashflows; flows on or before `settlement` are dropped.
+/// * `curve` - Discount curve supplying `df_between_dates(settlement, date)`.
+/// * `settlement` - Date the flows are discounted to and timed from.
+///
+/// # Errors
+///
+/// Returns the first year-fraction or discount-factor error, in flow order.
+pub(crate) fn discounted_flows(
+    flows: &[(
+        finstack_quant_core::dates::Date,
+        finstack_quant_core::money::Money,
+    )],
+    curve: &finstack_quant_core::market_data::term_structures::DiscountCurve,
+    settlement: finstack_quant_core::dates::Date,
+) -> finstack_quant_core::Result<Vec<(f64, f64, f64)>> {
+    flows
+        .iter()
+        .filter(|(date, _)| *date > settlement)
+        .map(|(date, amount)| {
+            let t = METRIC_TIME_BASIS.year_fraction(
+                settlement,
+                *date,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )?;
+            let df = curve.df_between_dates(settlement, *date)?;
+            Ok((t, df, amount.amount()))
+        })
+        .collect()
+}
+
 pub(crate) mod deal_specific;
 mod finite;
 pub(crate) mod pool;
@@ -70,27 +107,20 @@ pub(crate) fn reprice_in_scope(
 }
 
 pub use deal_specific::{
-    AbsChargeOffCalculator, AbsCreditEnhancementCalculator, AbsDelinquencyCalculator,
-    AbsExcessSpreadCalculator, AbsPaymentRateCalculator, CmbsDscrCalculator,
+    AbsChargeOffCalculator, AbsCreditEnhancementCalculator, AbsExcessSpreadCalculator,
+    AbsPaymentRateCalculator, CmbsDscrCalculator,
 };
-pub use pool::{CdrCalculator, CloWarfCalculator, CloWasCalculator, CprCalculator, WamCalculator};
-pub use pricing::{
-    calculate_tranche_wal, AccruedCalculator, CleanPriceCalculator, DirtyPriceCalculator,
-    WalCalculator,
-};
+pub use pool::{CdrCalculator, CloWarfCalculator, CprCalculator};
+pub use pricing::calculate_tranche_wal;
 pub use risk::{
     calculate_tranche_breakeven_cdr, calculate_tranche_convexity, calculate_tranche_cs01,
     calculate_tranche_discount_margin, calculate_tranche_duration, calculate_tranche_oas,
-    calculate_tranche_spread_convexity, calculate_tranche_z_spread, ConvexityCalculator,
-    Cs01Calculator, MacaulayDurationCalculator, ModifiedDurationCalculator, OasConfig, OasResult,
-    SpreadDurationCalculator, YtmCalculator, ZSpreadCalculator,
+    calculate_tranche_z_spread, OasConfig, OasResult,
 };
 pub use scenario::{scenario_table, ScenarioCell, ScenarioGrid, ScenarioTable};
 pub use summary::{
     calculate_equity_metrics, calculate_tranche_metrics, EquityMetrics, TrancheMetrics,
 };
-
-// Standalone tranche metric functions are included in the explicit lists above.
 
 /// Register all structured credit metrics
 pub(crate) fn register_structured_credit_metrics(

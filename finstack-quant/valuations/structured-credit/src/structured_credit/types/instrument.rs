@@ -1,4 +1,4 @@
-use super::{DealAccruals, DealType, StructuredCredit, TrancheSeniority};
+use super::{DealAccruals, StructuredCredit, TrancheSeniority};
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::{
     schedule_from_classified_flows, CashflowProvider, ScheduleBuildOpts,
@@ -27,17 +27,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCredit {
                 .into_values()
                 .flat_map(|result| result.detailed_flows.into_iter())
                 .collect();
-        // Use deal-type-appropriate day count convention:
-        // CLO/CBO: ACT/360 (standard for leveraged loan market)
-        // RMBS/CMBS: 30/360 (standard for mortgage market)
-        // ABS/Auto/Card: ACT/360
-        let day_count = match self.deal_type {
-            DealType::Rmbs | DealType::Cmbs => finstack_quant_core::dates::DayCount::Thirty360,
-            _ => finstack_quant_core::dates::DayCount::Act360,
-        };
         Ok(schedule_from_classified_flows(
             detailed_flows,
-            day_count,
+            self.deal_type.schedule_day_count(),
             ScheduleBuildOpts {
                 notional_hint: self.notional()?,
                 meta: finstack_quant_cashflows::builder::CashFlowMeta {

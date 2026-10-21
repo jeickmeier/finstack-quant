@@ -40,7 +40,7 @@ impl ZSpreadCs01 for AssetBackedFacility {
 
 /// Borrowing base on the closing collateral, in currency units.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct AbfBorrowingBaseCalculator;
+pub(crate) struct AbfBorrowingBaseCalculator;
 
 impl MetricCalculator for AbfBorrowingBaseCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
@@ -52,7 +52,7 @@ impl MetricCalculator for AbfBorrowingBaseCalculator {
 /// Borrowing-base cushion: `(borrowing base − drawn) / borrowing base` in
 /// percent (negative when the facility is in deficiency).
 #[derive(Debug, Default, Clone, Copy)]
-pub struct AbfBorrowingBaseCushionCalculator;
+pub(crate) struct AbfBorrowingBaseCushionCalculator;
 
 impl MetricCalculator for AbfBorrowingBaseCushionCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
@@ -70,7 +70,7 @@ impl MetricCalculator for AbfBorrowingBaseCushionCalculator {
 /// Advance-rate utilization: `drawn / borrowing base` as a decimal (above 1
 /// in deficiency).
 #[derive(Debug, Default, Clone, Copy)]
-pub struct AbfAdvanceRateUtilizationCalculator;
+pub(crate) struct AbfAdvanceRateUtilizationCalculator;
 
 impl MetricCalculator for AbfAdvanceRateUtilizationCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
@@ -87,7 +87,7 @@ impl MetricCalculator for AbfAdvanceRateUtilizationCalculator {
 
 /// Lender IRR as an annual decimal (see `AssetBackedFacility::facility_irr`).
 #[derive(Debug, Default, Clone, Copy)]
-pub struct AbfFacilityIrrCalculator;
+pub(crate) struct AbfFacilityIrrCalculator;
 
 impl MetricCalculator for AbfFacilityIrrCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
@@ -100,7 +100,7 @@ impl MetricCalculator for AbfFacilityIrrCalculator {
 /// Residual IRR as an annual decimal: the equity XIRR of the synthetic deal
 /// at par.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct AbfResidualIrrCalculator;
+pub(crate) struct AbfResidualIrrCalculator;
 
 impl MetricCalculator for AbfResidualIrrCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
