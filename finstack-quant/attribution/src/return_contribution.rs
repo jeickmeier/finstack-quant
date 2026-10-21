@@ -206,7 +206,55 @@ struct BrinsonGroup {
 pub fn attribute_return_contribution(
     spec: &ReturnContributionSpec,
 ) -> Result<ReturnContributionResult> {
-    spec.execute()
+    spec.validate_shape()?;
+    let mut warnings = Vec::new();
+    let weighted = spec.weighted_positions(&mut warnings)?;
+    let benchmark_mode = spec.validate_benchmark_mode()?;
+
+    let mut portfolio_return = NeumaierAccumulator::new();
+    for position in &weighted {
+        portfolio_return.add(position.contribution);
+    }
+    let portfolio_return = finite(portfolio_return.total(), "portfolio return")?;
+
+    let benchmark_return = if benchmark_mode {
+        Some(total_benchmark_return(&weighted)?)
+    } else {
+        None
+    };
+
+    let factor_contribution = factor_contributions(&spec.factors)?;
+    let specific_return = if factor_contribution.is_empty() {
+        None
+    } else {
+        let mut factor_total = NeumaierAccumulator::new();
+        for row in &factor_contribution {
+            factor_total.add(row.contribution);
+        }
+        let factor_total = finite(factor_total.total(), "total factor contribution")?;
+        Some(finite(portfolio_return - factor_total, "specific return")?)
+    };
+
+    Ok(ReturnContributionResult {
+        portfolio_return,
+        instrument_contribution: instrument_contributions(&weighted, benchmark_return)?,
+        group_contribution: group_contributions(&weighted)?,
+        factor_contribution,
+        specific_return,
+        benchmark_relative: if benchmark_mode {
+            Some(benchmark_relative(
+                &weighted,
+                portfolio_return,
+                benchmark_return.ok_or_else(|| {
+                    Error::Internal("benchmark mode lost benchmark return".to_string())
+                })?,
+                &mut warnings,
+            )?)
+        } else {
+            None
+        },
+        warnings,
+    })
 }
 
 /// Compute return contribution attribution from a JSON specification.
@@ -248,7 +296,7 @@ pub fn attribute_return_contribution_json(spec_json: &str) -> Result<String> {
 /// The canonical compact JSON re-serialization of the accepted spec.
 pub fn validate_return_contribution_json(spec_json: &str) -> Result<String> {
     let spec = parse_return_contribution_spec(spec_json)?;
-    spec.execute()?;
+    attribute_return_contribution(&spec)?;
     serde_json::to_string(&spec).map_err(|err| {
         Error::Validation(format!(
             "failed to canonicalize return contribution spec: {err}"
@@ -272,58 +320,6 @@ fn finite(value: f64, quantity: &str) -> Result<f64> {
 }
 
 impl ReturnContributionSpec {
-    fn execute(&self) -> Result<ReturnContributionResult> {
-        self.validate_shape()?;
-        let mut warnings = Vec::new();
-        let weighted = self.weighted_positions(&mut warnings)?;
-        let benchmark_mode = self.validate_benchmark_mode()?;
-
-        let mut portfolio_return = NeumaierAccumulator::new();
-        for position in &weighted {
-            portfolio_return.add(position.contribution);
-        }
-        let portfolio_return = finite(portfolio_return.total(), "portfolio return")?;
-
-        let benchmark_return = if benchmark_mode {
-            Some(total_benchmark_return(&weighted)?)
-        } else {
-            None
-        };
-
-        let factor_contribution = factor_contributions(&self.factors)?;
-        let specific_return = if factor_contribution.is_empty() {
-            None
-        } else {
-            let mut factor_total = NeumaierAccumulator::new();
-            for row in &factor_contribution {
-                factor_total.add(row.contribution);
-            }
-            let factor_total = finite(factor_total.total(), "total factor contribution")?;
-            Some(finite(portfolio_return - factor_total, "specific return")?)
-        };
-
-        Ok(ReturnContributionResult {
-            portfolio_return,
-            instrument_contribution: instrument_contributions(&weighted, benchmark_return)?,
-            group_contribution: group_contributions(&weighted)?,
-            factor_contribution,
-            specific_return,
-            benchmark_relative: if benchmark_mode {
-                Some(benchmark_relative(
-                    &weighted,
-                    portfolio_return,
-                    benchmark_return.ok_or_else(|| {
-                        Error::Internal("benchmark mode lost benchmark return".to_string())
-                    })?,
-                    &mut warnings,
-                )?)
-            } else {
-                None
-            },
-            warnings,
-        })
-    }
-
     fn validate_shape(&self) -> Result<()> {
         if self.as_of.trim().is_empty() {
             return Err(Error::Validation(
