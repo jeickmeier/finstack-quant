@@ -13,7 +13,7 @@
 //!
 //! At every step the pricer also accumulates the pathwise money-market
 //! numeraire `B(t) = exp(∫₀ᵗ r ds)` (trapezoidal rule, see
-//! [`crate::rates::hw1f::bank_account`]) and exposes it
+//! [`crate::rates::hw1f::accumulate_bank_factors`]) and exposes it
 //! to payoffs through `StateKey::BankAccount`. Payoffs must discount
 //! simulated cashflows with this pathwise factor — not the deterministic
 //! time-0 curve DF, which would drop the payoff/numeraire correlation.

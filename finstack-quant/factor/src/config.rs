@@ -8,8 +8,8 @@
 
 use super::covariance::FactorCovarianceMatrix;
 use super::matching::MatchingConfig;
-use super::primitives::definition::FactorDefinition;
-use super::primitives::factor_types::{FactorId, FactorType};
+use crate::FactorDefinition;
+use crate::{FactorId, FactorType};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;

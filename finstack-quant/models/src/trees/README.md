@@ -25,7 +25,7 @@ only through the instrument pricers.
 
 | Path | Contents |
 |------|----------|
-| [`tree_framework/`](tree_framework/) | Traits, `NodeState`, evolution parameters, the generic recombining engine |
+| [`tree_framework.rs`](tree_framework.rs) | `TreeValuator`, `NodeState`, `TreeDiscounting`, evolution parameters, the crate-internal recombining engine |
 | [`binomial_tree.rs`](binomial_tree.rs) | `BinomialTree` (CRR, Leisen-Reimer) plus American/European/Bermudan entry points |
 | [`short_rate_tree/`](short_rate_tree/) | `ShortRateTree`: Ho-Lee, Black-Derman-Toy, Black-Karasinski |
 | [`hull_white_tree.rs`](hull_white_tree.rs) | `HullWhiteTree`: 1-factor trinomial in auxiliary x-space |
@@ -87,7 +87,7 @@ Two variants share the `price_recombining_tree` engine:
 
 ```rust
 use finstack_quant_valuations::instruments::{OptionMarketParams, OptionType};
-use finstack_quant_models::trees::BinomialTree;
+use finstack_quant_models::trees::binomial_tree::BinomialTree;
 
 let params = OptionMarketParams::new(
     100.0, // spot
@@ -139,7 +139,7 @@ mean-reverting probabilities) with a Brent solve on the per-step additive shift
 in `x`.
 
 ```rust
-use finstack_quant_models::trees::{ShortRateTree, ShortRateTreeConfig};
+use finstack_quant_models::trees::short_rate_tree::{ShortRateTree, ShortRateTreeConfig};
 
 // Ho-Lee, 100 steps, 80 bp normal vol. Or: ShortRateTreeConfig::bdt(100, 0.20),
 // ShortRateTreeConfig::black_karasinski(100, 0.20, 0.03)
@@ -194,7 +194,7 @@ node's central child plus one node either side): mean reversion pulls the
 central child inward, so the lattice limits its own width.
 
 ```rust
-use finstack_quant_models::trees::{HullWhiteTree, HullWhiteTreeConfig};
+use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
 
 let config = HullWhiteTreeConfig {
     kappa: 0.03,
@@ -244,7 +244,7 @@ backward induction, which is what makes them exact duals and lets the lattice
 reproduce the survival curve as the valuator sees it.
 
 ```rust
-use finstack_quant_models::trees::{RatesCreditConfig, RatesCreditTree};
+use finstack_quant_models::trees::two_factor_rates_credit::{RatesCreditConfig, RatesCreditTree};
 
 let config = RatesCreditConfig {
     steps: 100,
@@ -356,8 +356,9 @@ mise run rust-bench
 
 ## Adding a tree model
 
-1. Add the file (or directory) and declare it in [`mod.rs`](mod.rs) with the
-   public re-exports.
+1. Add the file (or directory) and declare it as a `pub mod` in
+   [`mod.rs`](mod.rs); its items are reached at their child path
+   (`trees::<child>::Item`), with no flat re-export.
 2. Give the tree an inherent pricing method. The shortest path is to build a `RecombiningInputs`
    and call `price_recombining_tree(inputs)` — note it takes the struct **by
    value**. Fields: `steps`, `time_to_maturity`, `valuator`, `prob_up`,

@@ -1,6 +1,6 @@
 //! Independent equity-lattice regression evidence for production remediation.
 
-use finstack_quant_models::trees::BinomialTree;
+use finstack_quant_models::trees::binomial_tree::BinomialTree;
 use finstack_quant_models::types::{OptionMarketParams, OptionType};
 
 #[test]

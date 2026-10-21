@@ -33,8 +33,8 @@ use finstack_quant_models::monte_carlo::process::ou::HullWhite1FProcess;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream};
-use finstack_quant_models::rates::hw1f::config::Hw1fMcConfig;
-use finstack_quant_models::rates::hw1f::mc::money_estimate_from_pairs;
+use finstack_quant_models::rates::hw1f::money_estimate_from_pairs;
+use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 
 fn regression_with_aux_basis<B: BasisFunctions>(
     swap_rates: &[f64],
@@ -330,9 +330,7 @@ impl SwaptionLsmcPricer {
         let bank_factors: Vec<Vec<f64>> = paths
             .iter()
             .map(|path| {
-                finstack_quant_models::rates::hw1f::bank_account::accumulate_bank_factors(
-                    path, time_grid,
-                )
+                finstack_quant_models::rates::hw1f::accumulate_bank_factors(path, time_grid)
             })
             .collect();
 

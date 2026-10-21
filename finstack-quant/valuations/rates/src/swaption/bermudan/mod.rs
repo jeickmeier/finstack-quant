@@ -10,8 +10,8 @@ use finstack_quant_models::rates::clock::ModelDiscountCurve;
 use finstack_quant_models::rates::hull_white::{
     fd_instantaneous_forward, HullWhiteCalibrationParams,
 };
-use finstack_quant_models::trees::HullWhiteTree;
-use finstack_quant_models::trees::HullWhiteTreeConfig;
+use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
+use finstack_quant_models::trees::hull_white_tree::HullWhiteTreeConfig;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
 use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
     resolve_hw1f_params, Hw1fParamFamily,
@@ -33,7 +33,7 @@ use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::process::ou::{
     calibrate_theta_from_curve, HullWhite1FProcess,
 };
-use finstack_quant_models::rates::hw1f::mc::build_event_aligned_grid;
+use finstack_quant_models::rates::hw1f::build_event_aligned_grid;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 
 /// Pricing method for Bermudan swaptions.

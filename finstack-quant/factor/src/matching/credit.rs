@@ -29,8 +29,8 @@ use super::matchers::{FactorMatchEntry, FactorMatchError, FactorMatcher};
 use crate::credit::hierarchy::{
     dimension_key, CreditHierarchySpec, HierarchyDimension, IssuerBetaRow, IssuerTags,
 };
-use crate::primitives::dependency::{DependencyType, MarketDependency};
-use crate::primitives::factor_types::FactorId;
+use crate::FactorId;
+use crate::{DependencyType, MarketDependency};
 use finstack_quant_core::types::{Attributes, IssuerId};
 use serde::{Deserialize, Serialize};
 
@@ -430,7 +430,7 @@ mod tests {
     use crate::credit::hierarchy::{
         AdderVolSource, IssuerBetaMode, IssuerBetaRow, IssuerBetas, IssuerTags,
     };
-    use crate::primitives::dependency::{DependencyType, MarketDependency};
+    use crate::{DependencyType, MarketDependency};
     use finstack_quant_core::types::{Attributes, CurveId, IssuerId};
     use std::collections::BTreeMap;
 

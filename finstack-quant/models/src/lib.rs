@@ -61,10 +61,6 @@ pub mod volatility;
 pub use closed_form::{
     bs_implied_vol, bs_price, vanilla_expiry_payoff, BsGreeks, ForwardGreeks, HestonPricingParams,
 };
-pub use trees::{
-    EvolutionParams, HullWhiteTree, HullWhiteTreeConfig, NodeState, ShortRateTree,
-    ShortRateTreeConfig, TreeDiscounting, TreeValuator,
-};
 pub use types::{ExerciseStyle, OptionType};
 
 /// Compiles the crate `README.md` Rust samples as doctests.

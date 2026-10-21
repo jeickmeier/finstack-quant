@@ -43,8 +43,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
+use finstack_quant_models::trees::short_rate_tree::{ShortRateTree, ShortRateTreeConfig};
+use finstack_quant_models::trees::tree_framework::{NodeState, TreeValuator};
 use finstack_quant_models::trees::two_factor_rates_credit::{NodeCoupon, RatesCreditTree};
-use finstack_quant_models::{NodeState, ShortRateTree, ShortRateTreeConfig, TreeValuator};
 use finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::{
     build_rates_credit_targets, continuous_frp_weight,
 };
@@ -1018,7 +1019,7 @@ mod tests {
     use finstack_quant_core::dates::DayCount;
 
     use finstack_quant_core::money::Money;
-    use finstack_quant_models::NodeState;
+    use finstack_quant_models::trees::tree_framework::NodeState;
     use time::macros::date;
 
     fn dummy_loan() -> TermLoan {

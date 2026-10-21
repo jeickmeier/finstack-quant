@@ -10,7 +10,7 @@ use std::sync::Arc;
 fn m1_hull_white_node_bond_uses_centered_state() {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_models::trees::{HullWhiteTree, HullWhiteTreeConfig};
+    use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
     let curve = DiscountCurve::builder("HW")
         .base_date(Date::from_calendar_date(2025, time::Month::January, 1).expect("date"))
         .knots([(0.0, 1.0), (1.0, 0.98), (3.0, 0.85), (10.0, 0.55)])
@@ -47,7 +47,7 @@ fn m1_scheduled_hw_bond_matches_integrated_ou_moments() {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
-    use finstack_quant_models::trees::{HullWhiteTree, HullWhiteTreeConfig};
+    use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
     let curve = DiscountCurve::flat(
         "HW",
         Date::from_calendar_date(2025, time::Month::January, 1).expect("date"),
@@ -233,7 +233,7 @@ fn m1_hw_bond_option_converges_to_independent_affine_price() {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::special_functions::norm_cdf;
-    use finstack_quant_models::trees::{HullWhiteTree, HullWhiteTreeConfig};
+    use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
     let rate: f64 = 0.04;
     let kappa: f64 = 0.07;
     let sigma: f64 = 0.02;

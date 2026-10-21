@@ -514,7 +514,7 @@ fn validate_decomposition_inputs(
     // which are valid risk inputs: Euler allocation only requires
     // `σ_p = √(wᵀΣw) ≥ 0`.
     if n > 0 {
-        super::math::validate_covariance(covariance, n)?;
+        crate::covariance::validate_covariance(covariance, n)?;
     }
 
     Ok(())

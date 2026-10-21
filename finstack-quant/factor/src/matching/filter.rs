@@ -1,6 +1,6 @@
 //! Configuration and metadata filters for dependency-scoped factor matching.
 //!
-use crate::primitives::dependency::{CurveType, DependencyType, MarketDependency};
+use crate::{CurveType, DependencyType, MarketDependency};
 use finstack_quant_core::types::Attributes;
 use serde::{Deserialize, Serialize};
 

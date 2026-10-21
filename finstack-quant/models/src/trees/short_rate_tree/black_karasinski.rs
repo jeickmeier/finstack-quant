@@ -4,7 +4,8 @@ use finstack_quant_core::{Error, Result};
 
 use crate::trees::hull_white_tree::HullWhiteTree;
 
-use super::{ShortRateTree, TreeCalibrationResult, TreeDiscounting};
+use super::{ShortRateTree, TreeCalibrationResult};
+use crate::trees::tree_framework::TreeDiscounting;
 
 /// Calibrated Black-Karasinski trinomial lattice data.
 ///
