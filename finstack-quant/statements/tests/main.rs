@@ -21,6 +21,8 @@ mod checks_all;
 mod dsl_all;
 #[path = "evaluator_engine.rs"]
 mod evaluator_engine;
+#[path = "evaluator_rollup.rs"]
+mod evaluator_rollup;
 #[path = "evaluator_tests.rs"]
 mod evaluator_tests;
 #[path = "feature_completeness_tests.rs"]

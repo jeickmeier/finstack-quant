@@ -1,6 +1,7 @@
 //! Python bindings for period types from [`finstack_quant_core::dates`].
 
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::macros::{label_enum, wire_methods};
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::{
     build_fiscal_periods, build_periods, FiscalConfig, Period, PeriodId, PeriodKind, PeriodPlan,
@@ -40,60 +41,27 @@ impl PyPeriodKind {
     }
 }
 
+label_enum!(PyPeriodKind, PeriodKind, "PeriodKind", from_name, {
+    /// Daily periods (252 trading days per year).
+    DAILY => Daily,
+    /// Weekly periods.
+    WEEKLY => Weekly,
+    /// Monthly periods.
+    MONTHLY => Monthly,
+    /// Quarterly periods.
+    QUARTERLY => Quarterly,
+    /// Semi-annual periods.
+    SEMI_ANNUAL => SemiAnnual,
+    /// Annual periods.
+    ANNUAL => Annual,
+});
+
 #[pymethods]
 impl PyPeriodKind {
-    /// Daily periods (252 trading days per year).
-    #[classattr]
-    const DAILY: PyPeriodKind = PyPeriodKind {
-        inner: PeriodKind::Daily,
-    };
-    /// Weekly periods.
-    #[classattr]
-    const WEEKLY: PyPeriodKind = PyPeriodKind {
-        inner: PeriodKind::Weekly,
-    };
-    /// Monthly periods.
-    #[classattr]
-    const MONTHLY: PyPeriodKind = PyPeriodKind {
-        inner: PeriodKind::Monthly,
-    };
-    /// Quarterly periods.
-    #[classattr]
-    const QUARTERLY: PyPeriodKind = PyPeriodKind {
-        inner: PeriodKind::Quarterly,
-    };
-    /// Semi-annual periods.
-    #[classattr]
-    const SEMI_ANNUAL: PyPeriodKind = PyPeriodKind {
-        inner: PeriodKind::SemiAnnual,
-    };
-    /// Annual periods.
-    #[classattr]
-    const ANNUAL: PyPeriodKind = PyPeriodKind {
-        inner: PeriodKind::Annual,
-    };
-
-    /// Parse a period kind from a string (e.g. ``"quarterly"``, ``"m"``).
-    ///
-    /// Raises ``ValueError`` when ``name`` is not a kind name or offset alias.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, name)")]
-    fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
-        name.parse::<PeriodKind>()
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
-
     /// Number of periods per year for this frequency.
     #[getter]
     fn periods_per_year(&self) -> u16 {
         self.inner.periods_per_year()
-    }
-
-    /// Annualization factor for this frequency.
-    #[getter]
-    fn annualization_factor(&self) -> f64 {
-        self.inner.annualization_factor()
     }
 
     /// Observation date one period before ``first``.
@@ -129,20 +97,6 @@ impl PyPeriodKind {
                 .prior_observation_date(py_to_date(first)?)
                 .map_err(core_to_py)?,
         )
-    }
-
-    /// Support ``pickle`` by reconstructing through ``from_name``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_name = py.get_type::<Self>().getattr("from_name")?;
-        Ok((from_name, (self.inner.to_string(),)))
-    }
-
-    fn __repr__(&self) -> String {
-        format!("PeriodKind('{}')", self.inner)
-    }
-
-    fn __str__(&self) -> String {
-        self.inner.to_string()
     }
 }
 
@@ -246,12 +200,6 @@ impl PyPeriodId {
             .map_err(core_to_py)
     }
 
-    /// Period code string (e.g. ``"2025Q1"``).
-    #[getter]
-    fn code(&self) -> String {
-        self.inner.to_string()
-    }
-
     /// Gregorian or fiscal year label.
     #[getter]
     fn year(&self) -> i32 {
@@ -276,14 +224,16 @@ impl PyPeriodId {
         self.inner.is_fiscal()
     }
 
-    /// Next period of the same kind and calendar (fiscal daily ids at day 365 need ``next_fiscal``).
-    fn next(&self) -> PyResult<Self> {
-        self.inner.next().map(Self::from_inner).map_err(core_to_py)
-    }
-
-    /// Previous period of the same kind and calendar (fiscal daily ids at day 1 need ``prev_fiscal``).
-    fn prev(&self) -> PyResult<Self> {
-        self.inner.prev().map(Self::from_inner).map_err(core_to_py)
+    /// Move by ``periods`` periods of the same kind and calendar (negative moves back).
+    ///
+    /// Fiscal daily ids can only move within days ``1..=365``; use
+    /// ``next_fiscal`` / ``prev_fiscal`` to cross a fiscal-year end.
+    #[pyo3(text_signature = "(self, periods)")]
+    fn shift(&self, periods: i32) -> PyResult<Self> {
+        self.inner
+            .shift(periods)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     /// Next period using fiscal-year week/day capacity.
@@ -371,27 +321,6 @@ impl PyPeriod {
         self.inner.is_actual
     }
 
-    /// Serialize to the canonical JSON wire form.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "cannot serialize Period"))
-    }
-
-    /// Deserialize from canonical JSON; raises ``ValueError`` on malformed input.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str::<Period>(json)
-            .map(Self::from_inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid Period JSON"))
-    }
-
-    /// Support ``pickle`` through the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "Period(id='{}', start='{}', end='{}', is_actual={})",
@@ -410,6 +339,8 @@ impl PyPeriod {
         self.inner.id.to_string()
     }
 }
+
+wire_methods!(PyPeriod, Period, "Period");
 
 /// A plan containing a contiguous sequence of periods.
 ///
@@ -463,8 +394,10 @@ impl PyPeriodPlan {
             .iter()
             .map(|p| p.id.to_string())
             .collect();
-        let starts: Vec<time::Date> = self.inner.periods.iter().map(|p| p.start).collect();
-        let ends: Vec<time::Date> = self.inner.periods.iter().map(|p| p.end).collect();
+        let starts: Vec<finstack_quant_core::dates::Date> =
+            self.inner.periods.iter().map(|p| p.start).collect();
+        let ends: Vec<finstack_quant_core::dates::Date> =
+            self.inner.periods.iter().map(|p| p.end).collect();
         let actual: Vec<bool> = self.inner.periods.iter().map(|p| p.is_actual).collect();
         let columns = PyDict::new(py);
         columns.set_item("id", ids)?;
@@ -478,27 +411,6 @@ impl PyPeriodPlan {
         )?;
         columns.set_item("is_actual", actual)?;
         crate::bindings::pandas_utils::dict_to_dataframe(py, &columns, None)
-    }
-
-    /// Serialize to the canonical JSON wire form.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "cannot serialize PeriodPlan"))
-    }
-
-    /// Deserialize from canonical JSON; raises ``ValueError`` on malformed input.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str::<PeriodPlan>(json)
-            .map(Self::from_inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid PeriodPlan JSON"))
-    }
-
-    /// Support ``pickle`` through the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
     /// Iterate over the periods in ascending order.
@@ -523,6 +435,8 @@ impl PyPeriodPlan {
         }
     }
 }
+
+wire_methods!(PyPeriodPlan, PeriodPlan, "PeriodPlan");
 
 /// Fiscal year configuration (the month and day the fiscal year starts).
 ///

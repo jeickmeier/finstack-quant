@@ -6,7 +6,6 @@
 use finstack_quant_core::dates::Tenor;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::math::solver::BrentSolver;
-use finstack_quant_core::math::Compounding;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use std::cell::RefCell;
@@ -93,11 +92,8 @@ fn solve_ytm_timed_with(
         if years > 0.0 && fv > 0.0 && target > 0.0 {
             let ratio = fv / target;
             let ytm = match spec.compounding {
-                YieldCompounding::Rate(Compounding::Simple) | YieldCompounding::Moosmuller => {
-                    (ratio - 1.0) / years
-                }
-                YieldCompounding::Rate(Compounding::Annual) => ratio.powf(1.0 / years) - 1.0,
-                YieldCompounding::Rate(Compounding::Continuous) => ratio.ln() / years,
+                YieldCompounding::Rate(rate_comp) => rate_comp.rate_from_df(target / fv, years),
+                YieldCompounding::Moosmuller => (ratio - 1.0) / years,
                 YieldCompounding::Street => {
                     let m = super::quote_conversions::periods_per_year(spec.frequency)?.max(1.0);
                     m * (ratio.powf(1.0 / (m * years)) - 1.0)
@@ -107,10 +103,6 @@ fn solve_ytm_timed_with(
                         "TreasuryActual one-cashflow yield requires numerical inversion"
                             .to_string(),
                     ));
-                }
-                YieldCompounding::Rate(Compounding::Periodic(periods)) => {
-                    let m = f64::from(periods.get()).max(1.0);
-                    m * (ratio.powf(1.0 / (m * years)) - 1.0)
                 }
             };
             return Ok(ytm);
@@ -157,8 +149,8 @@ fn solve_ytm_timed_with(
     // bracket is found, or the objective is non-finite — so non-convergent
     // YTM solves surface as `Err`.
     let solver = BrentSolver::new()
-        .tolerance(tolerance)
-        .max_iterations(max_iterations);
+        .with_tolerance(tolerance)
+        .with_max_iterations(max_iterations);
     let ytm = solver.solve(price_fn, initial_guess)?;
 
     // If any pricing error occurred during objective evaluation, surface it
@@ -277,6 +269,7 @@ pub(crate) fn solve_ytm_timed(
 mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::traits::Discounting;
     use time::Month;
 
     #[test]

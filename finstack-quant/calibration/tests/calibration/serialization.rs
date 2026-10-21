@@ -28,7 +28,7 @@ use finstack_quant_core::market_data::term_structures::Seniority;
 use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::market::conventions::ids::{
     CdsConventionKey, CdsDocClause, SwaptionConventionId,
 };
@@ -63,7 +63,7 @@ fn envelope_v2_roundtrips() {
 
     let mut market_data: Vec<MarketDatum> = Vec::new();
     cal_utils::extend_market_data(&mut market_data, &rates_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("rates".to_string(), cal_utils::quote_set_ids(&rates_quotes));
 
     let plan = CalibrationPlan {
@@ -190,7 +190,6 @@ fn step_params_v2_roundtrip_for_all_variants() {
         sabr_beta: 0.0,
         target_expiries: vec![1.0, 2.0],
         target_tenors: vec![1.0, 5.0],
-        sabr_interpolation: Default::default(),
         calendar_id: None,
         fixed_day_count: None,
         swap_index: Some("USD-SOFR-3M".into()),
@@ -378,7 +377,7 @@ fn base_correlation_params_reject_use_imm_dates() {
         day_count: None,
         business_day_convention: None,
         calendar_id: None,
-        detachment_points: vec![3.0, 7.0],
+        detachment_points: vec![0.03, 0.07],
         roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
     };
     let mut json = serde_json::to_value(&params).expect("serialize");

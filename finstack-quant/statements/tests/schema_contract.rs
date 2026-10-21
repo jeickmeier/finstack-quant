@@ -6,9 +6,9 @@ use std::path::{Path, PathBuf};
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::contract::ContractDescriptor;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, Month, PeriodId};
+use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::money::Money;
-use finstack_quant_statements::adjustments::types::CapBaseMode;
+use finstack_quant_statements::adjustments::CapBaseMode;
 use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};
 use finstack_quant_statements::checks::{
     CheckCategory, CheckFinding, CheckReport, CheckResult, CheckSummary, Materiality, Severity,
@@ -24,6 +24,7 @@ use finstack_quant_statements::types::NodeValueType;
 use finstack_quant_statements::FinancialModelSpec;
 use indexmap::IndexMap;
 use serde_json::{json, Value};
+use time::Month;
 
 const CANONICAL_DECIMAL_PATTERN: &str = r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$";
 
@@ -329,25 +330,6 @@ fn capital_structure_warning_uses_typed_canonical_values() {
         json["capital_structure"]["warning"]["cashflow_date"],
         "2025-03-31"
     );
-}
-
-#[test]
-fn nan_warning_uses_canonical_acronym_spelling() {
-    let warning = EvalWarning::NaNPropagated {
-        node_id: "ratio".to_string(),
-        period: PeriodId::quarter(2025, 1).expect("valid period fixture"),
-    };
-    let value = serde_json::to_value(warning).expect("serialize NaN warning");
-    assert!(value.get("nan_propagated").is_some());
-
-    // schema-rejection-test
-    assert!(serde_json::from_value::<EvalWarning>(json!({
-        "na_n_propagated": {
-            "node_id": "ratio",
-            "period": "2025Q1"
-        }
-    }))
-    .is_err());
 }
 
 #[test]

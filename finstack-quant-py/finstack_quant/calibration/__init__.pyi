@@ -33,12 +33,11 @@ __all__ = [
     "CalibrationEnvelopeError",
     "CalibrationPlan",
     "CalibrationReport",
-    "CalibrationResult",
+    "CalibrationResultEnvelope",
     "CalibrationStep",
     "CalibrationValidationReport",
     "CdsQuote",
     "CdsTrancheQuote",
-    "CollateralEntry",
     "DividendScheduleDatum",
     "FxSpotDatum",
     "InflationQuote",
@@ -2342,107 +2341,8 @@ class DividendScheduleDatum:
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
 
-class CollateralEntry:
-    """A collateral (CSA) currency mapping market datum (``kind == "collateral"``).
-
-    Examples:
-    --------
-    >>> from finstack_quant.calibration import CollateralEntry
-    >>> CollateralEntry("EUR", "USD").csa_currency
-    'USD'
-
-    """
-
-    def __init__(self, id: str, csa_currency: str) -> None:
-        """Build a collateral mapping entry.
-
-        Parameters
-        ----------
-        id : str | Currency
-            Trade-leg currency the CSA mapping applies to (the datum id).
-        csa_currency : str | Currency
-            Collateral (CSA) currency.
-
-        Raises
-        ------
-        ValueError
-            If a currency code is unknown.
-
-        """
-
-    @property
-    def id(self) -> str:
-        """
-        Trade-leg currency code (the datum id).
-
-        This property does not raise.
-
-        Returns
-        -------
-        str
-            Trade-leg currency code (the datum id).
-        """
-
-    @property
-    def csa_currency(self) -> str:
-        """
-        Collateral (CSA) currency code.
-
-        This property does not raise.
-
-        Returns
-        -------
-        str
-            Collateral (CSA) currency code.
-        """
-
-    def to_json(self) -> str:
-        """
-        Serialize to compact JSON.
-
-        Returns
-        -------
-        str
-            Compact JSON encoding of this value.
-
-        Raises
-        ------
-        ValueError
-            If the value cannot be serialized to JSON.
-        """
-
-    @staticmethod
-    def from_json(json: str) -> CollateralEntry:
-        """
-        Rebuild from JSON produced by :meth:`to_json`.
-
-        Parameters
-        ----------
-        json : str
-            JSON produced by :meth:`to_json`.
-
-        Returns
-        -------
-        CollateralEntry
-            The decoded value.
-
-        Raises
-        ------
-        ValueError
-            If ``json`` is malformed or carries unknown fields.
-
-        Examples
-        --------
-        >>> from finstack_quant.calibration import CollateralEntry
-        >>> CollateralEntry.from_json(CollateralEntry("EUR", "USD").to_json()).id
-        'EUR'
-        """
-
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
-    def __repr__(self) -> str: ...
-
 type Quote = RateQuote | CdsQuote | VolQuote | InflationQuote | XccyQuote | CdsTrancheQuote
-type MarketDatum = Quote | FxSpotDatum | PriceDatum | DividendScheduleDatum | CollateralEntry
+type MarketDatum = Quote | FxSpotDatum | PriceDatum | DividendScheduleDatum
 
 class CalibrationStep:
     """One calibration step: a target kind, parameters, and a named quote set.
@@ -3567,17 +3467,6 @@ class CalibrationEnvelope:
 
         """
 
-    def dry_run(self) -> CalibrationValidationReport:
-        """Validate this envelope statically without solving.
-
-        Returns
-        -------
-        CalibrationValidationReport
-            Every static error found in a single pass, plus the step dependency
-            graph. Findings are reported, so this method never raises.
-
-        """
-
     def to_json(self) -> str:
         """
         Serialize the envelope to compact canonical JSON.
@@ -4413,7 +4302,7 @@ class CalibrationValidationReport:
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
 
-class CalibrationResult:
+class CalibrationResultEnvelope:
     """Calibrated market plus the plan-level and per-step calibration reports.
 
     Examples:
@@ -4483,22 +4372,6 @@ class CalibrationResult:
         """
 
     @property
-    def report_json(self) -> str:
-        """
-        JSON twin of :attr:`report`.
-
-        Returns
-        -------
-        str
-            JSON twin of :attr:`report`.
-
-        Raises
-        ------
-        ValueError
-            If the underlying value cannot be serialized to JSON.
-        """
-
-    @property
     def step_ids(self) -> list[str]:
         """
         Identifiers of the steps executed by the plan.
@@ -4524,36 +4397,6 @@ class CalibrationResult:
             Total solver iterations across every step.
         """
 
-    @property
-    def max_residual_ratio(self) -> float:
-        """
-                Largest ``|residual| / step_tolerance`` across every quote.
-
-        Below 1.0 when every quote repriced inside its step's tolerance. Raw
-        per-step residual statistics live on ``step_report(step_id).max_residual``.
-        NaN when no step reported a tolerance-scaled aggregate.
-
-                This property does not raise.
-
-                Returns
-                -------
-                float
-                    Largest ``|residual| / step_tolerance`` across every quote. Below 1.0 when every quote repriced inside its step's tolerance. Raw per-step residual statistics live on ``step_report(step_id).max_residual``. NaN when no step reported a tolerance-scaled aggregate.
-        """
-
-    @property
-    def rmse_ratio(self) -> float:
-        """
-        Root-mean-square ``|residual| / step_tolerance`` across every quote.
-
-        This property does not raise.
-
-        Returns
-        -------
-        float
-            Root-mean-square ``|residual| / step_tolerance`` across every quote.
-        """
-
     def step_report(self, step_id: str) -> CalibrationReport:
         """Return the calibration report for one step.
 
@@ -4566,26 +4409,6 @@ class CalibrationResult:
         -------
         CalibrationReport
             Typed step report with raw residuals keyed by quote id.
-
-        Raises
-        ------
-        KeyError
-            If no step with that identifier exists.
-
-        """
-
-    def step_report_json(self, step_id: str) -> str:
-        """JSON twin of :meth:`step_report`.
-
-        Parameters
-        ----------
-        step_id : str
-            Identifier of the calibration step.
-
-        Returns
-        -------
-        str
-            Compact JSON encoding of the step report.
 
         Raises
         ------
@@ -4626,7 +4449,7 @@ class CalibrationResult:
         pandas.DataFrame
             Columns ``step_id``, ``success``, ``iterations``, ``max_residual``,
             ``rmse`` and ``convergence_reason``. Plan-level aggregates
-            (``max_residual_ratio``, ``rmse_ratio``) are getters on the result.
+            (``max_residual_ratio``, ``rmse_ratio``) are on ``result.report``.
 
         Raises
         ------
@@ -4666,7 +4489,7 @@ class CalibrationResult:
         """
 
     @staticmethod
-    def from_json(json: str) -> CalibrationResult:
+    def from_json(json: str) -> CalibrationResultEnvelope:
         """
         Strictly load a result from JSON.
 
@@ -4679,7 +4502,7 @@ class CalibrationResult:
 
         Returns
         -------
-        CalibrationResult
+        CalibrationResultEnvelope
             The loaded result.
 
         Raises
@@ -4696,8 +4519,8 @@ class CalibrationResult:
 
         Examples
         --------
-        >>> from finstack_quant.calibration import CalibrationResult
-        >>> CalibrationResult.from_json("{")
+        >>> from finstack_quant.calibration import CalibrationResultEnvelope
+        >>> CalibrationResultEnvelope.from_json("{")
         Traceback (most recent call last):
         finstack_quant.portfolio.ContractValidationError: ...
         """
@@ -4855,7 +4678,7 @@ def dry_run_json(
 
 def calibrate(
     envelope: CalibrationEnvelope | dict[str, Any] | str,
-) -> CalibrationResult:
+) -> CalibrationResultEnvelope:
     """Execute a calibration plan and return the calibrated market and reports.
 
     Parameters
@@ -4866,7 +4689,7 @@ def calibrate(
 
     Returns
     -------
-    CalibrationResult
+    CalibrationResultEnvelope
         Calibrated market, plan-level report, per-step reports and residuals.
 
     Raises
@@ -4921,7 +4744,7 @@ def calibrate_bermudan_lmm_base_vol(
     >>> from finstack_quant.calibration import calibrate_bermudan_lmm_base_vol
     >>> calibrate_bermudan_lmm_base_vol("{}", "{}", "2025-01-01")
     Traceback (most recent call last):
-    ValueError: ...
+    finstack_quant.portfolio.ContractValidationError: ...
 
     """
 

@@ -16,7 +16,8 @@
 use pyo3::prelude::*;
 
 use crate::bindings::core::market_data::context::PyMarketContext;
-use crate::bindings::portfolio::types::{PyPortfolio, PyPortfolioValuation};
+use crate::bindings::portfolio::container::PyPortfolio;
+use crate::bindings::portfolio::valuation::PyPortfolioValuation;
 use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::valuations::composite::PyCompositeInstrument;
@@ -267,7 +268,8 @@ pub fn extract_results_ref<'py>(obj: &Bound<'py, PyAny>) -> PyResult<ResultAcces
 }
 
 /// Extract a [`MarketContext`] from a `MarketContext` Python object
-/// (fast path) or a JSON string (fallback).
+/// (fast path) or canonical state JSON (strict contract loader, as
+/// `MarketContext.from_json`).
 ///
 /// Always produces an owned value — prefer [`extract_market_ref`] when only
 /// a reference is needed.
@@ -279,8 +281,7 @@ pub fn extract_market(
         return Ok(ctx.borrow().inner.clone());
     }
     let json: String = obj.extract()?;
-    py.detach(move || serde_json::from_str(&json))
-        .map_err(to_py)
+    crate::bindings::core::market_data::context::load_market_json(py, &json)
 }
 
 /// Extract an optional [`MarketContext`] from `Option<&Bound<'_, PyAny>>`.
@@ -319,8 +320,8 @@ impl std::ops::Deref for MarketAccess<'_> {
     }
 }
 
-/// Borrow a [`MarketContext`] from a typed Python object, or parse from JSON
-/// while releasing the GIL.
+/// Borrow a [`MarketContext`] from a typed Python object, or load canonical
+/// state JSON through the strict contract loader while releasing the GIL.
 pub fn extract_market_ref<'py>(
     py: Python<'py>,
     obj: &Bound<'py, PyAny>,
@@ -329,9 +330,7 @@ pub fn extract_market_ref<'py>(
         return Ok(MarketAccess::Borrowed(ctx.borrow()));
     }
     let json: String = obj.extract()?;
-    let inner: finstack_quant_core::market_data::context::MarketContext = py
-        .detach(move || serde_json::from_str(&json))
-        .map_err(to_py)?;
+    let inner = crate::bindings::core::market_data::context::load_market_json(py, &json)?;
     Ok(MarketAccess::Owned(Box::new(inner)))
 }
 
@@ -369,7 +368,7 @@ pub fn extract_portfolio_ref<'py>(
         return Ok(PortfolioAccess::Borrowed(p.borrow()));
     }
     let json: String = obj.extract()?;
-    let spec: finstack_quant_portfolio::portfolio::PortfolioSpec = py
+    let spec: finstack_quant_portfolio::PortfolioSpec = py
         .detach(move || serde_json::from_str(&json))
         .map_err(to_py)?;
     let portfolio = py
@@ -474,32 +473,22 @@ pub fn extract_basis_points(obj: &Bound<'_, PyAny>) -> PyResult<f64> {
     })
 }
 
-/// Extract a canonical `CreditRating` from a `CreditRating` wrapper or a
-/// rating string (`"BBB-"`, `"Baa3"`, `"bbb-"`; agency notation is normalised
-/// by the core parser).
+/// Parse a canonical serde wire label (e.g. `"senior"`, `"low"`) into `T`.
 ///
 /// # Errors
 ///
-/// Returns `ValueError` when the string is not a recognised rating and
-/// `TypeError` when `obj` is neither a string nor a `CreditRating`.
-pub fn extract_credit_rating(
-    obj: &Bound<'_, PyAny>,
-) -> PyResult<finstack_quant_core::types::CreditRating> {
-    if let Ok(rating) = obj.cast::<crate::bindings::core::types::PyCreditRating>() {
-        return Ok(rating.borrow().inner);
-    }
-    if let Ok(text) = obj.extract::<String>() {
-        return text
-            .parse::<finstack_quant_core::types::CreditRating>()
-            .map_err(crate::errors::core_to_py);
-    }
-    Err(pyo3::exceptions::PyTypeError::new_err(format!(
-        "expected a rating string (e.g. 'BBB-') or a core.types.CreditRating instance, got {}",
-        obj.get_type()
-            .name()
-            .map(|n| n.to_string())
-            .unwrap_or_default()
-    )))
+/// Returns `ValueError` when `label` is not one of `T`'s serde labels.
+pub(crate) fn parse_label<T: serde::de::DeserializeOwned>(label: &str) -> PyResult<T> {
+    finstack_quant_core::wire::serde_parse(label).map_err(crate::errors::core_to_py)
+}
+
+/// Render `value` as its canonical serde wire label.
+///
+/// # Errors
+///
+/// Returns `ValueError` when `value` does not serialize to a string label.
+pub(crate) fn label<T: serde::Serialize>(value: &T) -> PyResult<String> {
+    finstack_quant_core::wire::serde_label(value).map_err(crate::errors::core_to_py)
 }
 
 // ScenarioSpec — typed-or-JSON extraction
@@ -562,7 +551,7 @@ pub fn extract_scenario_specs(
 /// Access to a [`finstack_quant_portfolio::cashflows::PortfolioCashflows`]
 /// ladder without re-parsing JSON when a typed Python object is passed.
 pub enum CashflowsAccess<'py> {
-    Borrowed(PyRef<'py, crate::bindings::portfolio::types::PyPortfolioCashflows>),
+    Borrowed(PyRef<'py, crate::bindings::portfolio::cashflows::PyPortfolioCashflows>),
     Owned(Box<finstack_quant_portfolio::cashflows::PortfolioCashflows>),
 }
 
@@ -582,7 +571,7 @@ pub fn extract_cashflows_ref<'py>(
     py: Python<'py>,
     obj: &Bound<'py, PyAny>,
 ) -> PyResult<CashflowsAccess<'py>> {
-    if let Ok(c) = obj.cast::<crate::bindings::portfolio::types::PyPortfolioCashflows>() {
+    if let Ok(c) = obj.cast::<crate::bindings::portfolio::cashflows::PyPortfolioCashflows>() {
         return Ok(CashflowsAccess::Borrowed(c.borrow()));
     }
     let json: String = obj.extract().map_err(|_| {

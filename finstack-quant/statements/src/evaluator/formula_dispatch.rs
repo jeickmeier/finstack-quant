@@ -15,7 +15,7 @@ use crate::evaluator::formula::{
 };
 use crate::evaluator::formula_aggregates::evaluate_historical_function;
 use finstack_quant_core::expr::{Expr, ExprNode, Function};
-use finstack_quant_core::math::{kahan_sum, quantile, ZERO_TOLERANCE};
+use finstack_quant_core::math::{stats::quantile, summation::kahan_sum, ZERO_TOLERANCE};
 
 /// Evaluate a function call.
 ///
@@ -251,12 +251,14 @@ fn finite_arg_values(
     // hide an upstream problem — surface the count as a warning.
     if dropped > 0 {
         if let Some(id) = node_id {
-            context.push_warning(crate::evaluator::EvalWarning::NonFiniteSkipped {
-                node_id: id.to_string(),
-                period: context.period_id,
-                function: function.to_string(),
-                count: dropped,
-            });
+            context
+                .warnings
+                .push(crate::evaluator::EvalWarning::NonFiniteSkipped {
+                    node_id: id.to_string(),
+                    period: context.period_id,
+                    function: function.to_string(),
+                    count: dropped,
+                });
         }
     }
     Ok(values)

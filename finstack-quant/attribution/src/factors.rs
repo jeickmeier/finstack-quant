@@ -64,7 +64,7 @@
 //! - [`crate::parallel`] - Parallel attribution using this module
 //! - [`crate::waterfall`] - Waterfall attribution using this module
 
-use crate::types::AttributionFactor;
+use crate::AttributionFactor;
 use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
 use finstack_quant_core::market_data::dividends::DividendSchedule;
 use finstack_quant_core::market_data::scalars::InflationIndex;
@@ -81,7 +81,7 @@ use finstack_quant_core::market_data::term_structures::PriceCurve;
 use finstack_quant_core::market_data::term_structures::PriceCurveKind;
 use finstack_quant_core::money::fx::FxMatrix;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations::instruments::MarketDependencies;
 use std::sync::Arc;
 
@@ -105,7 +105,7 @@ use std::sync::Arc;
 /// // Restore FX and volatility surfaces together
 /// let fx_vol = MarketRestoreFlags::FX | MarketRestoreFlags::VOL;
 /// ```
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MarketRestoreFlags(u16);
 
 impl MarketRestoreFlags {
@@ -163,9 +163,6 @@ impl MarketRestoreFlags {
     /// Convenience combination: restore both discount and forward curves (rates family)
     pub const RATES: Self = Self(Self::DISCOUNT_BIT | Self::FORWARD_BIT);
 
-    /// Convenience combination: restore hazard curves (credit family)
-    pub const CREDIT: Self = Self(Self::HAZARD_BIT);
-
     /// Returns flags with all market factor families enabled.
     #[inline]
     pub const fn all() -> Self {
@@ -191,7 +188,7 @@ impl MarketRestoreFlags {
         match factor {
             AttributionFactor::Carry | AttributionFactor::ModelParameters => None,
             AttributionFactor::RatesCurves => Some(Self::RATES),
-            AttributionFactor::CreditCurves => Some(Self::CREDIT),
+            AttributionFactor::CreditCurves => Some(Self::HAZARD),
             AttributionFactor::InflationCurves => Some(Self::INFLATION),
             AttributionFactor::Correlations => Some(Self::CORRELATION),
             AttributionFactor::Fx => Some(Self::FX),
@@ -210,24 +207,6 @@ impl std::ops::BitOr for MarketRestoreFlags {
     }
 }
 
-impl std::ops::BitAnd for MarketRestoreFlags {
-    type Output = Self;
-
-    #[inline]
-    fn bitand(self, rhs: Self) -> Self::Output {
-        Self(self.0 & rhs.0)
-    }
-}
-
-impl std::ops::Not for MarketRestoreFlags {
-    type Output = Self;
-
-    #[inline]
-    fn not(self) -> Self::Output {
-        Self(!self.0 & Self::ALL_BITS)
-    }
-}
-
 /// Unified market snapshot that can hold any combination of factor families.
 ///
 /// Holds curves, FX, volatility surfaces, and market scalars. Extract only the
@@ -236,60 +215,60 @@ impl std::ops::Not for MarketRestoreFlags {
 #[derive(Clone, Default)]
 pub struct MarketSnapshot {
     /// Discount curves indexed by curve ID
-    pub discount_curves: HashMap<CurveId, Arc<DiscountCurve>>,
+    pub discount_curves: FxHashMap<CurveId, Arc<DiscountCurve>>,
     /// Forward curves indexed by curve ID
-    pub forward_curves: HashMap<CurveId, Arc<ForwardCurve>>,
+    pub forward_curves: FxHashMap<CurveId, Arc<ForwardCurve>>,
     /// Hazard curves indexed by curve ID
-    pub hazard_curves: HashMap<CurveId, Arc<HazardCurve>>,
+    pub hazard_curves: FxHashMap<CurveId, Arc<HazardCurve>>,
     /// Inflation curves indexed by curve ID
-    pub inflation_curves: HashMap<CurveId, Arc<InflationCurve>>,
+    pub inflation_curves: FxHashMap<CurveId, Arc<InflationCurve>>,
     /// Base correlation curves indexed by curve ID
-    pub base_correlation_curves: HashMap<CurveId, Arc<BaseCorrelationCurve>>,
+    pub base_correlation_curves: FxHashMap<CurveId, Arc<BaseCorrelationCurve>>,
     /// Basis spread curves indexed by curve ID (populated with the `FORWARD`
     /// flag — rates family).
-    pub basis_spread_curves: HashMap<CurveId, Arc<BasisSpreadCurve>>,
+    pub basis_spread_curves: FxHashMap<CurveId, Arc<BasisSpreadCurve>>,
     /// Parametric (Nelson-Siegel) curves indexed by curve ID (populated with
     /// the `FORWARD` flag — rates family).
-    pub parametric_curves: HashMap<CurveId, Arc<ParametricCurve>>,
+    pub parametric_curves: FxHashMap<CurveId, Arc<ParametricCurve>>,
     /// Volatility-index curves indexed by curve ID (populated when the `VOL`
     /// flag is set).
-    pub vol_index_curves: HashMap<CurveId, Arc<PriceCurve>>,
+    pub vol_index_curves: FxHashMap<CurveId, Arc<PriceCurve>>,
     /// Commodity/price curves indexed by curve ID (populated when the
     /// `SCALARS` flag is set).
-    pub price_curves: HashMap<CurveId, Arc<PriceCurve>>,
+    pub price_curves: FxHashMap<CurveId, Arc<PriceCurve>>,
     /// FX matrix (populated when the `FX` flag is set during extract).
     ///
     /// `None` is a meaningful value on restore: with `FX` flagged it clears FX
     /// from the target market.
     pub fx: Option<Arc<FxMatrix>>,
     /// Volatility surfaces (populated when the `VOL` flag is set during extract).
-    pub surfaces: HashMap<CurveId, Arc<VolSurface>>,
+    pub surfaces: FxHashMap<CurveId, Arc<VolSurface>>,
     /// SABR volatility cubes (populated when the `VOL` flag is set during extract).
-    pub vol_cubes: HashMap<CurveId, Arc<VolCube>>,
+    pub vol_cubes: FxHashMap<CurveId, Arc<VolCube>>,
     /// FX delta-quoted volatility surfaces (populated when the `VOL` flag is set).
-    pub fx_delta_vol_surfaces: HashMap<CurveId, Arc<FxDeltaVolSurface>>,
+    pub fx_delta_vol_surfaces: FxHashMap<CurveId, Arc<FxDeltaVolSurface>>,
     /// Declared volatility IDs that do not also identify their underlying spot.
     /// Retained even when absent from the snapshot to preserve removal semantics.
     pub volatility_scalar_ids: Vec<CurveId>,
     /// Scalar volatility quotes (populated when the `VOL` flag is set).
-    pub volatility_scalars: HashMap<CurveId, MarketScalar>,
+    pub volatility_scalars: FxHashMap<CurveId, MarketScalar>,
     /// Market scalar prices excluding declared volatility (populated with `SCALARS`).
-    pub prices: HashMap<CurveId, MarketScalar>,
+    pub prices: FxHashMap<CurveId, MarketScalar>,
     /// Scalar time series excluding rate fixings (populated when the
     /// `SCALARS` flag is set). `FIXING:`-prefixed series belong to the rates
     /// family — see [`Self::fixing_series`].
-    pub series: HashMap<CurveId, ScalarTimeSeries>,
+    pub series: FxHashMap<CurveId, ScalarTimeSeries>,
     /// Historical rate fixing series (`FIXING:{forward_curve_id}` convention,
     /// populated when the `FORWARD` flag is set). Quant review Note: a
     /// floating-rate reset observed between T0 and T1 is RATES P&L, so fixing
     /// series restore with the forward curves, not with market scalars —
     /// otherwise a single economic rate move is split across two factor lines
     /// with a cross term.
-    pub fixing_series: HashMap<CurveId, ScalarTimeSeries>,
+    pub fixing_series: FxHashMap<CurveId, ScalarTimeSeries>,
     /// Published inflation indices (populated when the `INFLATION` flag is set).
-    pub inflation_indices: HashMap<CurveId, Arc<InflationIndex>>,
+    pub inflation_indices: FxHashMap<CurveId, Arc<InflationIndex>>,
     /// Dividend schedules (populated when the `SCALARS` flag is set)
-    pub dividends: HashMap<CurveId, Arc<DividendSchedule>>,
+    pub dividends: FxHashMap<CurveId, Arc<DividendSchedule>>,
 }
 
 impl MarketSnapshot {

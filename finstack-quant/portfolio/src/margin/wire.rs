@@ -11,7 +11,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_margin::types::SimmSensitivitiesJson;
 use finstack_quant_margin::{ImCollateralResult, ImMethodology, NettingSetId, SimmSensitivities};
 use std::collections::BTreeMap;
@@ -148,12 +148,8 @@ pub(super) struct PortfolioMarginResultWire {
 
 impl From<&PortfolioMarginResult> for PortfolioMarginResultWire {
     fn from(r: &PortfolioMarginResult) -> Self {
-        let mut netting_sets: Vec<NettingSetMargin> = r.by_netting_set.values().cloned().collect();
-        netting_sets.sort_by(|a, b| {
-            a.netting_set_id
-                .to_string()
-                .cmp(&b.netting_set_id.to_string())
-        });
+        let netting_sets: Vec<NettingSetMargin> =
+            r.netting_sets_sorted().into_iter().cloned().collect();
         let degraded_positions = r
             .degraded_positions
             .iter()
@@ -191,7 +187,7 @@ impl From<PortfolioMarginResultWire> for PortfolioMarginResult {
             .into_iter()
             .map(|d| (PositionId::new(d.position_id), d.message))
             .collect();
-        let by_netting_set: HashMap<NettingSetId, NettingSetMargin> = w
+        let by_netting_set: FxHashMap<NettingSetId, NettingSetMargin> = w
             .netting_sets
             .into_iter()
             .map(|wire| {

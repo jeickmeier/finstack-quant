@@ -1,13 +1,14 @@
 //! Term loan pricing tests.
 
 use finstack_quant_cashflows::builder::CouponType;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_fixed_income::term_loan::{AmortizationSpec, RateSpec, TermLoan};
+use finstack_quant_valuations_fixed_income::term_loan::TermLoan;
 use time::macros::date;
 
 use finstack_quant_valuations_test_support::test_helpers::flat_discount_curve;
@@ -184,8 +185,11 @@ fn pv_is_discounted_to_as_of_and_includes_flows_before_settlement() {
         .unwrap();
     let market = MarketContext::new().insert(curve);
 
-    let df = |d: time::Date| (-0.03 * (d - as_of).whole_days() as f64 / 365.0).exp();
-    let coupon = |start: time::Date, end: time::Date| {
+    let df = |d: finstack_quant_core::dates::Date| {
+        (-0.03 * (d - as_of).whole_days() as f64 / 365.0).exp()
+    };
+    let coupon = |start: finstack_quant_core::dates::Date,
+                  end: finstack_quant_core::dates::Date| {
         10_000_000.0 * 0.05 * (end - start).whole_days() as f64 / 360.0
     };
     let dates = [

@@ -41,7 +41,7 @@ from finstack_quant.analytics import Performance
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, FxMatrix, MarketContext
-from finstack_quant.core.math import linalg, longest_positive_run, stats
+from finstack_quant.core.math import linalg, stats
 from finstack_quant.core.money import Money
 from finstack_quant.core.types import Rate
 from finstack_quant.margin import (
@@ -587,7 +587,7 @@ class TestAnalyticsBenchmarks:
         benchmark(_PERFORMANCE_10K.period_stats, 0, "monthly")
 
     def test_longest_positive_run(self, benchmark) -> None:
-        benchmark(longest_positive_run, RETURNS_10K)
+        benchmark(stats.longest_positive_run, RETURNS_10K)
 
 
 # Correlation domain
@@ -960,7 +960,7 @@ class TestPortfolioCompoundWorkflow:
 
         def _run():
             val = value_portfolio(_BENCH_SPEC_JSON_500, _BENCH_MARKET_JSON)
-            agg = aggregate_metrics(val, "USD", _BENCH_MARKET_JSON, "2025-01-15")
+            agg = aggregate_metrics(val, _BENCH_MARKET_JSON)
             cf = aggregate_full_cashflows(_BENCH_SPEC_JSON_500, _BENCH_MARKET_JSON)
             return val, agg, cf
 
@@ -972,7 +972,7 @@ class TestPortfolioCompoundWorkflow:
 
         def _run():
             val = value_portfolio(portfolio, _BENCH_MARKET)
-            agg = aggregate_metrics(val, "USD", _BENCH_MARKET, "2025-01-15")
+            agg = aggregate_metrics(val, _BENCH_MARKET)
             cf = aggregate_full_cashflows(portfolio, _BENCH_MARKET)
             return val, agg, cf
 

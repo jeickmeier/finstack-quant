@@ -134,7 +134,7 @@ impl PricingOptions {
     ///   factor, curve, survival probability, present value) for discounting
     ///   and hazard-rate valuations, capped at `max_entries`. Other models get
     ///   a single entry stating that no per-flow decomposition exists.
-    ///   `ExplainOpts::disabled()` (the default) attaches nothing.
+    ///   `ExplainOpts::default()` (disabled) attaches nothing.
     pub fn with_explain(mut self, explain: ExplainOpts) -> Self {
         self.explain = explain;
         self

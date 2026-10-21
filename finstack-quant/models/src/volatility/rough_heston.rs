@@ -574,10 +574,14 @@ impl RoughHestonFourierParams {
         // short panels: a uniform 12.5-wide first panel leaves a persistent
         // premium bias even when the Riccati time grid has converged.
         let mut grid =
-            finstack_quant_core::math::gauss_legendre_grid(1e-8, 1.0, GL_ORDER, 1).ok()?;
-        grid.extend(finstack_quant_core::math::gauss_legendre_grid(1.0, 5.0, GL_ORDER, 1).ok()?);
+            finstack_quant_core::math::integration::gauss_legendre_grid(1e-8, 1.0, GL_ORDER, 1)
+                .ok()?;
         grid.extend(
-            finstack_quant_core::math::gauss_legendre_grid(
+            finstack_quant_core::math::integration::gauss_legendre_grid(1.0, 5.0, GL_ORDER, 1)
+                .ok()?,
+        );
+        grid.extend(
+            finstack_quant_core::math::integration::gauss_legendre_grid(
                 5.0,
                 DEFAULT_UPPER_LIMIT,
                 GL_ORDER,

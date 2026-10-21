@@ -1,6 +1,7 @@
 //! Base correlation shock adapter.
 //!
-//! Contains helpers for both parallel and bucketed base correlation shocks.
+//! One generator serves both parallel and bucketed base correlation shocks:
+//! a parallel shock is a bucket shock over every detachment point.
 //!
 //! # Clamping Behavior
 //!
@@ -12,14 +13,12 @@ use crate::engine::ExecutionContext;
 use crate::engine::ScenarioEffect;
 use crate::warning::Warning;
 use finstack_quant_core::market_data::bumps::MarketBump;
-use finstack_quant_core::market_data::term_structures::BASE_CORR_DETACHMENT_MATCH_TOLERANCE;
 use finstack_quant_core::types::CurveId;
 
-fn detachment_matches(requested: f64, detachment: f64) -> bool {
-    (requested - detachment).abs() <= BASE_CORR_DETACHMENT_MATCH_TOLERANCE
-}
-
+/// Clamp and no-match warnings for a base-correlation shock; `op` names the
+/// scenario operation in the warning detail.
 fn bump_warnings(
+    op: &str,
     ctx: &ExecutionContext,
     surface_id: &CurveId,
     detachments: Option<&[f64]>,
@@ -29,21 +28,7 @@ fn bump_warnings(
         return Vec::new();
     };
 
-    let matching: Vec<(f64, f64)> = curve
-        .detachment_points()
-        .iter()
-        .copied()
-        .zip(curve.correlations().iter().copied())
-        .filter(|(detachment, _)| {
-            detachments
-                .map(|requested| {
-                    requested
-                        .iter()
-                        .any(|target| detachment_matches(*target, *detachment))
-                })
-                .unwrap_or(true)
-        })
-        .collect();
+    let matching: Vec<(f64, f64)> = curve.bucket_knots(detachments).collect();
 
     let mut warnings = Vec::new();
     if detachments.is_some_and(|requested| !requested.is_empty()) && matching.is_empty() {
@@ -61,7 +46,7 @@ fn bump_warnings(
             Some(Warning::CorrelationClamped {
                 instrument_id: surface_id.as_str().to_string(),
                 detail: format!(
-                    "BaseCorrBucketPts on {surface_id} detachment {detachment:.10} clamped \
+                    "{op} on {surface_id} detachment {detachment:.10} clamped \
                      correlation from requested {bumped:.10} to {clamped:.10}",
                 ),
             })
@@ -71,28 +56,14 @@ fn bump_warnings(
     warnings
 }
 
-/// Generate effects for a parallel base-correlation shock.
-pub(crate) fn base_corr_parallel_effects(
-    surface_id: &CurveId,
-    points: f64,
-    ctx: &ExecutionContext,
-) -> Vec<ScenarioEffect> {
-    let bump = MarketBump::BaseCorrBucketPts {
-        surface_id: surface_id.clone(),
-        detachments: None,
-        points,
-    };
-    let mut effects = vec![ScenarioEffect::MarketBump(bump)];
-    effects.extend(
-        bump_warnings(ctx, surface_id, None, points)
-            .into_iter()
-            .map(ScenarioEffect::Warning),
-    );
-    effects
-}
-
-/// Generate effects for a bucketed base-correlation shock.
-pub(crate) fn base_corr_bucket_effects(
+/// Generate effects for a base-correlation shock.
+///
+/// `detachment_bp` restricts the shock to those detachment points (basis
+/// points, `300` = 3%); `None` shocks every bucket, which is the parallel
+/// shock. `op` is the scenario operation name reported in warnings
+/// (`"BaseCorrParallelPts"` or `"BaseCorrBucketPts"`).
+pub(crate) fn base_corr_effects(
+    op: &str,
     surface_id: &CurveId,
     detachment_bp: Option<&[i32]>,
     points: f64,
@@ -112,7 +83,7 @@ pub(crate) fn base_corr_bucket_effects(
 
     let mut effects = vec![ScenarioEffect::MarketBump(bump)];
     effects.extend(
-        bump_warnings(ctx, surface_id, dets.as_deref(), points)
+        bump_warnings(op, ctx, surface_id, dets.as_deref(), points)
             .into_iter()
             .map(ScenarioEffect::Warning),
     );

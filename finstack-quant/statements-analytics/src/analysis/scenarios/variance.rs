@@ -15,7 +15,7 @@
 //! Basic usage with two `StatementResult`:
 //!
 //! ```rust
-//! use finstack_quant_statements_analytics::analysis::{VarianceAnalyzer, VarianceConfig};
+//! use finstack_quant_statements_analytics::analysis::{run_variance, VarianceConfig};
 //! use finstack_quant_statements::prelude::*;
 //!
 //! # fn main() -> finstack_quant_statements::Result<()> {
@@ -30,7 +30,6 @@
 //! let mgmt_results = evaluator.evaluate(&model)?;
 //! let bank_results = evaluator.evaluate(&model)?;
 //!
-//! let analyzer = VarianceAnalyzer::new(&mgmt_results, &bank_results);
 //! let config = VarianceConfig::new(
 //!     "management_case",
 //!     "bank_case",
@@ -38,7 +37,7 @@
 //!     vec![PeriodId::quarter(2025, 1).expect("valid period fixture")],
 //! );
 //!
-//! let report = analyzer.compute(&config)?;
+//! let report = run_variance(&mgmt_results, &bank_results, &config)?;
 //! assert_eq!(report.rows.len(), 2);
 //! # Ok(())
 //! # }
@@ -46,12 +45,9 @@
 
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::ZERO_TOLERANCE;
-use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
 use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::evaluator::StatementResult;
-use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 
 /// Configuration for variance analysis between two `StatementResult`.
 ///
@@ -133,14 +129,6 @@ pub struct VarianceRow {
     /// absolute variance.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pct_var: Option<f64>,
-
-    /// Optional driver breakdown: `driver → contribution` in the same units
-    /// as the underlying metric.
-    ///
-    /// This is populated by bridge decomposition helpers and can be rendered
-    /// as a "bridge" column in reports.
-    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
-    pub driver_contribution: IndexMap<String, f64>,
 }
 
 /// Full variance report between a baseline and comparison.
@@ -205,21 +193,97 @@ pub struct BridgeChart {
     pub unexplained: f64,
 }
 
-/// Variance analyzer between two evaluated statement results.
-pub struct VarianceAnalyzer<'a> {
+/// Compute absolute and percentage variance for the configured metrics
+/// and periods.
+///
+/// - `abs_var = comparison - baseline`
+/// - `pct_var = abs_var / baseline` (`None` when baseline is ~0 so
+///   callers can distinguish a truly 0% change from an undefined
+///   ratio with a non-trivial absolute move)
+///
+/// # Arguments
+///
+/// * `baseline` - Evaluated baseline scenario results.
+/// * `comparison` - Evaluated comparison scenario results; each metric must
+///   carry the same value type and currency as in `baseline`.
+/// * `config` - Metrics, periods and scenario labels to compare.
+///
+/// # Errors
+///
+/// Returns an invalid-input error for empty metric or period selections,
+/// and a missing-data error when either scenario lacks a requested value.
+pub fn run_variance(
+    baseline: &StatementResult,
+    comparison: &StatementResult,
+    config: &VarianceConfig,
+) -> Result<VarianceReport> {
+    VarianceAnalyzer {
+        baseline,
+        comparison,
+    }
+    .compute(config)
+}
+
+/// Compute a simple additive bridge decomposition for a target metric and period.
+///
+/// The current implementation uses a straightforward "delta driver" approach:
+///
+/// ```text
+/// contribution(driver) = comparison(driver) - baseline(driver)
+/// ```
+///
+/// This is intentionally conservative and does **not** attempt to enforce
+/// that the sum of contributions must equal the total variance of the
+/// target metric: contributions are deltas in *driver* units, not
+/// target-metric sensitivities. The gap is reported explicitly in
+/// [`BridgeChart::unexplained`]. More sophisticated attribution schemes
+/// (including multiplicative drivers such as volume × price) can be
+/// layered on top.
+///
+/// # Arguments
+///
+/// * `baseline` - Evaluated baseline scenario results.
+/// * `comparison` - Evaluated comparison scenario results; each metric must
+///   carry the same value type and currency as in `baseline`.
+/// * `target_metric` - Node whose variance the bridge explains.
+/// * `period` - Period the bridge is computed for.
+/// * `drivers` - Driver nodes, in bridge order.
+/// * `baseline_label` - Label stamped on the baseline side of the chart.
+/// * `comparison_label` - Label stamped on the comparison side of the chart.
+///
+/// # Errors
+///
+/// Returns a missing-data error when the target or any requested driver is
+/// absent from either baseline or comparison at `period`.
+pub fn variance_bridge(
+    baseline: &StatementResult,
+    comparison: &StatementResult,
+    target_metric: &str,
+    period: PeriodId,
+    drivers: &[&str],
+    baseline_label: &str,
+    comparison_label: &str,
+) -> Result<BridgeChart> {
+    VarianceAnalyzer {
+        baseline,
+        comparison,
+    }
+    .bridge_decomposition(
+        target_metric,
+        period,
+        drivers,
+        baseline_label,
+        comparison_label,
+    )
+}
+
+/// The two evaluated scenarios a variance compares.
+struct VarianceAnalyzer<'a> {
     baseline: &'a StatementResult,
     comparison: &'a StatementResult,
 }
 
 impl<'a> VarianceAnalyzer<'a> {
-    /// Create a new variance analyzer.
-    pub fn new(baseline: &'a StatementResult, comparison: &'a StatementResult) -> Self {
-        Self {
-            baseline,
-            comparison,
-        }
-    }
-
     fn validate_units(&self, metric: &str) -> Result<()> {
         if self.baseline.node_value_types.get(metric)
             != self.comparison.node_value_types.get(metric)
@@ -231,19 +295,8 @@ impl<'a> VarianceAnalyzer<'a> {
         Ok(())
     }
 
-    /// Compute absolute and percentage variance for the configured metrics
-    /// and periods.
-    ///
-    /// - `abs_var = comparison - baseline`
-    /// - `pct_var = abs_var / baseline` (`None` when baseline is ~0 so
-    ///   callers can distinguish a truly 0% change from an undefined
-    ///   ratio with a non-trivial absolute move)
-    ///
-    /// # Errors
-    ///
-    /// Returns an invalid-input error for empty metric or period selections,
-    /// and a missing-data error when either scenario lacks a requested value.
-    pub fn compute(&self, config: &VarianceConfig) -> Result<VarianceReport> {
+    /// Compute the variance rows behind [`run_variance`].
+    fn compute(&self, config: &VarianceConfig) -> Result<VarianceReport> {
         if config.metrics.is_empty() {
             return Err(Error::invalid_input(
                 "VarianceConfig.metrics cannot be empty",
@@ -289,7 +342,6 @@ impl<'a> VarianceAnalyzer<'a> {
                     comparison,
                     abs_var,
                     pct_var,
-                    driver_contribution: IndexMap::new(),
                 });
             }
         }
@@ -301,27 +353,8 @@ impl<'a> VarianceAnalyzer<'a> {
         })
     }
 
-    /// Compute a simple additive bridge decomposition for a target metric and period.
-    ///
-    /// The current implementation uses a straightforward "delta driver" approach:
-    ///
-    /// ```text
-    /// contribution(driver) = comparison(driver) - baseline(driver)
-    /// ```
-    ///
-    /// This is intentionally conservative and does **not** attempt to enforce
-    /// that the sum of contributions must equal the total variance of the
-    /// target metric: contributions are deltas in *driver* units, not
-    /// target-metric sensitivities. The gap is reported explicitly in
-    /// [`BridgeChart::unexplained`]. More sophisticated attribution schemes
-    /// (including multiplicative drivers such as volume × price) can be
-    /// layered on top.
-    ///
-    /// # Errors
-    ///
-    /// Returns a missing-data error when the target or any requested driver is
-    /// absent from either baseline or comparison at `period`.
-    pub fn bridge_decomposition(
+    /// Build the bridge chart behind [`variance_bridge`].
+    fn bridge_decomposition(
         &self,
         target_metric: &str,
         period: PeriodId,
@@ -388,89 +421,6 @@ impl<'a> VarianceAnalyzer<'a> {
     }
 }
 
-impl VarianceReport {
-    /// Check if the report is empty.
-    pub fn is_empty(&self) -> bool {
-        self.rows.is_empty()
-    }
-}
-
-impl VarianceReport {
-    /// Export variance rows to a table envelope.
-    ///
-    /// Schema:
-    /// - `period` (String)
-    /// - `metric` (String)
-    /// - `baseline` (Float64)
-    /// - `comparison` (Float64)
-    /// - `abs_var` (Float64)
-    /// - `pct_var` (Float64, nullable)
-    /// - `driver_contribution` (String, nullable)
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the table envelope rejects the generated columns or
-    /// metadata.
-    pub fn to_table(&self) -> Result<TableEnvelope> {
-        let mut periods = Vec::with_capacity(self.rows.len());
-        let mut metrics = Vec::with_capacity(self.rows.len());
-        let mut baselines = Vec::with_capacity(self.rows.len());
-        let mut comparisons = Vec::with_capacity(self.rows.len());
-        let mut abs_vars = Vec::with_capacity(self.rows.len());
-        let mut pct_vars = Vec::with_capacity(self.rows.len());
-        let mut driver_contributions = Vec::with_capacity(self.rows.len());
-
-        for row in &self.rows {
-            periods.push(row.period.to_string());
-            metrics.push(row.metric.clone());
-            baselines.push(row.baseline);
-            comparisons.push(row.comparison);
-            abs_vars.push(row.abs_var);
-            pct_vars.push(row.pct_var);
-
-            if row.driver_contribution.is_empty() {
-                driver_contributions.push(None::<String>);
-            } else {
-                let joined = row
-                    .driver_contribution
-                    .iter()
-                    .map(|(driver, value)| format!("{driver}: {value}"))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                driver_contributions.push(Some(joined));
-            }
-        }
-
-        let mut metadata = IndexMap::new();
-        metadata.insert("layout".to_string(), json!("long"));
-        metadata.insert("source".to_string(), json!("variance_report"));
-
-        TableEnvelope::new_with_metadata(
-            vec![
-                TableColumn::new("period", TableColumnData::String(periods))
-                    .with_role(TableColumnRole::Index),
-                TableColumn::new("metric", TableColumnData::String(metrics))
-                    .with_role(TableColumnRole::Dimension),
-                TableColumn::new("baseline", TableColumnData::Float64(baselines))
-                    .with_role(TableColumnRole::Measure),
-                TableColumn::new("comparison", TableColumnData::Float64(comparisons))
-                    .with_role(TableColumnRole::Measure),
-                TableColumn::new("abs_var", TableColumnData::Float64(abs_vars))
-                    .with_role(TableColumnRole::Measure),
-                TableColumn::new("pct_var", TableColumnData::NullableFloat64(pct_vars))
-                    .with_role(TableColumnRole::Measure),
-                TableColumn::new(
-                    "driver_contribution",
-                    TableColumnData::NullableString(driver_contributions),
-                )
-                .with_role(TableColumnRole::Attribute),
-            ],
-            metadata,
-        )
-        .map_err(Into::into)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -509,7 +459,6 @@ mod tests {
             make_results(&[("revenue", period, 100_000.0), ("ebitda", period, 60_000.0)]);
         let comparison = baseline.clone();
 
-        let analyzer = VarianceAnalyzer::new(&baseline, &comparison);
         let config = VarianceConfig::new(
             "baseline",
             "baseline",
@@ -517,7 +466,8 @@ mod tests {
             vec![period],
         );
 
-        let report = analyzer.compute(&config).expect("variance should succeed");
+        let report =
+            run_variance(&baseline, &comparison, &config).expect("variance should succeed");
         assert_eq!(report.rows.len(), 2);
 
         for row in report.rows {
@@ -534,10 +484,10 @@ mod tests {
         let baseline = make_results(&[("revenue", period, 100.0)]);
         let comparison = make_results(&[("revenue", period, 95.0)]);
 
-        let analyzer = VarianceAnalyzer::new(&baseline, &comparison);
         let config = VarianceConfig::new("baseline", "comparison", vec!["revenue"], vec![period]);
 
-        let report = analyzer.compute(&config).expect("variance should succeed");
+        let report =
+            run_variance(&baseline, &comparison, &config).expect("variance should succeed");
         assert_eq!(report.rows.len(), 1);
 
         let row = &report.rows[0];
@@ -555,10 +505,10 @@ mod tests {
         let baseline = make_results(&[("revenue", period, 0.0)]);
         let comparison = make_results(&[("revenue", period, 10.0)]);
 
-        let analyzer = VarianceAnalyzer::new(&baseline, &comparison);
         let config = VarianceConfig::new("baseline", "comparison", vec!["revenue"], vec![period]);
 
-        let report = analyzer.compute(&config).expect("variance should succeed");
+        let report =
+            run_variance(&baseline, &comparison, &config).expect("variance should succeed");
         let row = &report.rows[0];
 
         // The absolute variance is still meaningful; the ratio is not.
@@ -581,10 +531,16 @@ mod tests {
             ("cogs", period, 75.0),
         ]);
 
-        let analyzer = VarianceAnalyzer::new(&baseline, &comparison);
-        let chart = analyzer
-            .bridge_decomposition("ebitda", period, &["revenue", "cogs"], "base", "cmp")
-            .expect("bridge");
+        let chart = variance_bridge(
+            &baseline,
+            &comparison,
+            "ebitda",
+            period,
+            &["revenue", "cogs"],
+            "base",
+            "cmp",
+        )
+        .expect("bridge");
 
         // Target delta = 10; driver deltas = +10 (revenue) and -5 (cogs).
         let explained: f64 = chart.steps.iter().map(|s| s.contribution).sum();
@@ -617,16 +573,16 @@ mod tests {
             ("cogs", period, 75.0),
         ]);
 
-        let analyzer = VarianceAnalyzer::new(&baseline, &comparison);
-        let chart = analyzer
-            .bridge_decomposition(
-                "ebitda",
-                period,
-                &["revenue", "cogs"],
-                "baseline",
-                "comparison",
-            )
-            .expect("bridge should succeed");
+        let chart = variance_bridge(
+            &baseline,
+            &comparison,
+            "ebitda",
+            period,
+            &["revenue", "cogs"],
+            "baseline",
+            "comparison",
+        )
+        .expect("bridge should succeed");
 
         assert_eq!(chart.target_metric, "ebitda");
         assert_eq!(chart.baseline_value, 100.0);

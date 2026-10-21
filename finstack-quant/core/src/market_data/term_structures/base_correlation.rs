@@ -67,10 +67,10 @@
 //! - O'Kane, D. (2008). *Modelling Single-name and Multi-name Credit Derivatives*.
 //!   Wiley Finance. Chapters 6-8 (Tranche pricing and base correlation). `docs/REFERENCES.md#o-kane-2008`
 
-use crate::error::InputError;
 use crate::market_data::bumps::{BumpSpec, Bumpable};
-use crate::math::interp::{types::Interp, ExtrapolationPolicy, InterpStyle, ValidationPolicy};
+use crate::math::interp::{ExtrapolationPolicy, Interp, InterpStyle, ValidationPolicy};
 use crate::types::CurveId;
+use crate::InputError;
 use crate::Result;
 
 /// Absolute detachment tolerance for bucket shocks.
@@ -78,7 +78,17 @@ use crate::Result;
 /// Scenario detachment filters are already normalized to the same unit as
 /// curve detachments before they reach the curve, so bucket matching should be
 /// exact apart from floating-point roundoff.
-pub const BASE_CORR_DETACHMENT_MATCH_TOLERANCE: f64 = 1.0e-10;
+const BASE_CORR_DETACHMENT_MATCH_TOLERANCE: f64 = 1.0e-10;
+
+/// Whether a bucket filter selects the knot at `detachment`: every knot when
+/// the filter is `None`, else knots within the match tolerance of a request.
+fn bucket_selects(detachment_filter: Option<&[f64]>, detachment: f64) -> bool {
+    detachment_filter.is_none_or(|requested| {
+        requested
+            .iter()
+            .any(|d| (d - detachment).abs() <= BASE_CORR_DETACHMENT_MATCH_TOLERANCE)
+    })
+}
 
 /// Shape diagnostics for a base correlation curve.
 ///
@@ -228,7 +238,10 @@ impl BaseCorrelationCurve {
     /// * `id` - Unique market-data identifier used to register and look up the curve.
     #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> BaseCorrelationCurveBuilder {
-        BaseCorrelationCurveBuilder::new(id)
+        BaseCorrelationCurveBuilder {
+            id: id.into(),
+            points: Vec::new(),
+        }
     }
 
     /// Get the interpolated correlation for a given detachment point.
@@ -309,6 +322,26 @@ impl BaseCorrelationCurve {
         )
     }
 
+    /// Knots `(detachment, correlation)` selected by a bucket-bump filter.
+    ///
+    /// These are exactly the knots [`Self::apply_bucket_bump`] shifts.
+    ///
+    /// # Arguments
+    ///
+    /// * `detachment_filter` - Optional detachment points in percent of portfolio
+    ///   notional; `None` selects every knot. A requested point matches a knot
+    ///   within `1e-10`; finite off-grid values match nothing.
+    pub fn bucket_knots<'a>(
+        &'a self,
+        detachment_filter: Option<&'a [f64]>,
+    ) -> impl Iterator<Item = (f64, f64)> + 'a {
+        self.detachment_points
+            .iter()
+            .copied()
+            .zip(self.correlations.iter().copied())
+            .filter(move |&(det, _)| bucket_selects(detachment_filter, det))
+    }
+
     /// Apply a filtered additive bump to matching detachment points.
     ///
     /// # Arguments
@@ -340,13 +373,7 @@ impl BaseCorrelationCurve {
             .copied()
             .zip(self.correlations.iter().copied())
             .map(|(det, corr)| {
-                let matches = detachment_filter
-                    .map(|flt| {
-                        flt.iter()
-                            .any(|d| (d - det).abs() <= BASE_CORR_DETACHMENT_MATCH_TOLERANCE)
-                    })
-                    .unwrap_or(true);
-                if matches {
+                if bucket_selects(detachment_filter, det) {
                     (det, (corr + points).clamp(0.0, 1.0))
                 } else {
                     (det, corr)
@@ -426,18 +453,6 @@ pub struct BaseCorrelationCurveBuilder {
 }
 
 impl BaseCorrelationCurveBuilder {
-    /// Create a new builder with the given curve ID.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Unique market-data identifier stored on the completed curve.
-    fn new(id: impl Into<CurveId>) -> Self {
-        Self {
-            id: id.into(),
-            points: Vec::new(),
-        }
-    }
-
     /// Append detachment-correlation observations.
     ///
     /// # Arguments

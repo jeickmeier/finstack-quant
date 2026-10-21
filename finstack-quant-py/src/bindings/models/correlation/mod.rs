@@ -12,7 +12,7 @@ use crate::errors::{core_to_py, correlation_to_py};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule, PyType};
 
-use finstack_quant_core::math::linalg::{self, cholesky_correlation};
+use finstack_quant_core::math::linalg;
 use finstack_quant_core::math::probability::{self, CorrelatedBernoulli};
 use finstack_quant_models::correlation::CreditExposure;
 use finstack_quant_models::correlation::{
@@ -1450,10 +1450,13 @@ fn nearest_correlation(
 /// ``usize`` range, and ``TypeError`` if ``n`` is not an integer.
 #[pyfunction]
 #[pyo3(text_signature = "(matrix, n)")]
-fn cholesky_decompose(py: Python<'_>, matrix: &Bound<'_, PyAny>, n: usize) -> PyResult<Vec<f64>> {
+fn cholesky_correlation(py: Python<'_>, matrix: &Bound<'_, PyAny>, n: usize) -> PyResult<Vec<f64>> {
     let matrix = extract_square_matrix(py, matrix, n)?;
-    py.detach(|| cholesky_correlation(&matrix, n).map(|f| f.factor_matrix().to_vec()))
-        .map_err(|e| correlation_to_py(corr::Error::from(e)))
+    py.detach(|| {
+        finstack_quant_core::math::linalg::cholesky_correlation(&matrix, n)
+            .map(|f| f.factor_matrix().to_vec())
+    })
+    .map_err(|e| correlation_to_py(corr::Error::from(e)))
 }
 
 /// Register the `correlation` submodule on the parent module.
@@ -1483,7 +1486,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(joint_probabilities, &m)?)?;
     m.add_function(wrap_pyfunction!(validate_correlation_matrix, &m)?)?;
     m.add_function(wrap_pyfunction!(nearest_correlation, &m)?)?;
-    m.add_function(wrap_pyfunction!(cholesky_decompose, &m)?)?;
+    m.add_function(wrap_pyfunction!(cholesky_correlation, &m)?)?;
     m.add_function(wrap_pyfunction!(simulate_portfolio_loss, &m)?)?;
 
     let all = PyList::new(
@@ -1504,7 +1507,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "RecoveryModel",
             "RecoverySpec",
             "TrancheLossStatistics",
-            "cholesky_decompose",
+            "cholesky_correlation",
             "correlation_bounds",
             "joint_probabilities",
             "nearest_correlation",

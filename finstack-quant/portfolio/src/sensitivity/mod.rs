@@ -1,34 +1,31 @@
-//! Factor sensitivity engines, JSON façade, and position parsing.
+//! Factor sensitivity engines and the portfolio-keyed sensitivity entry points.
 //!
 //! Hosts the engines that consume `&dyn Instrument` and bump-and-reprice
 //! against a `MarketContext`:
 //!
 //! - `DeltaBasedEngine`: linear sensitivity via finite-difference bumps.
-//! - `FullRepricingEngine` + `ScenarioGrid`: P&L profile across a
-//!   scenario grid.
+//! - `FullRepricingEngine`: P&L profile across a symmetric scenario grid.
 //! - `FactorSensitivityEngine`: shared trait.
 //!
-//! `SensitivityMatrix` is re-exported from
-//! [`finstack_quant_factor`] for binding stability; its one wire form
-//! is [`SensitivityMatrixJson`](crate::sensitivity::SensitivityMatrixJson),
+//! The engines return [`finstack_quant_factor::SensitivityMatrix`]; its one
+//! wire form is [`SensitivityMatrixJson`],
 //! shared by both hosts in both directions.
 //!
-//! The `json` submodule holds the JSON-facing helpers used by Python and WASM
-//! bindings; the `positions` submodule parses tagged position JSON into boxed
-//! `Instrument` trait objects via the shared instrument JSON pipeline.
+//! [`compute_factor_sensitivities`] and [`compute_pnl_profiles`] run those
+//! engines over a [`crate::Portfolio`] (rows in position order, weighted by
+//! `Position::scale_factor`, reported in `portfolio.base_currency`).
 
+mod compute;
 mod delta_engine;
-pub(crate) mod json;
-pub(crate) mod positions;
+mod json;
 mod repricing_engine;
 mod traits;
 
+pub use compute::{compute_factor_sensitivities, compute_pnl_profiles};
+pub(crate) use compute::{portfolio_rows, uses_assignment_driven_credit_shock};
 pub(crate) use delta_engine::mapping_to_market_bumps;
 pub use delta_engine::DeltaBasedEngine;
-pub use json::{
-    compute_factor_sensitivities_from_json, compute_pnl_profiles_from_json, SensitivityMatrixJson,
-    DEFAULT_PNL_SCENARIO_POINTS,
-};
-pub use repricing_engine::{FactorPnlProfile, FullRepricingEngine, ScenarioGrid};
+pub use json::{SensitivityMatrixJson, DEFAULT_PNL_SCENARIO_POINTS};
+pub use repricing_engine::{FactorPnlProfile, FullRepricingEngine};
+pub(crate) use traits::exact_factor_market_keys;
 pub use traits::FactorSensitivityEngine;
-pub(crate) use traits::{exact_factor_market_keys, raw_pv_in_base};

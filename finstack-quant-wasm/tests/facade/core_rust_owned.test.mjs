@@ -157,13 +157,15 @@ test('DayCountContext is built by DayCountContextState::try_new', () => {
   const message =
     'Validation error: coupon period start must be before end, got start=1970-01-11 end=1970-01-06';
   assert.throws(() => new core.DayCountContext(null, null, null, [10, 5]), validation(message));
-  // JSON is a snapshot: like Python, an inverted coupon period is rejected
-  // when the context is used (DayCountContextState::to_ctx).
-  const inverted = core.DayCountContext.fromJson(
-    '{"calendar_id":null,"frequency":null,"bus_basis":null,' +
-      '"coupon_period":["1970-01-11","1970-01-06"],"end_is_termination_date":false}'
+  // Like Python, JSON is validated on load through DayCountContextState::try_new.
+  assert.throws(
+    () =>
+      core.DayCountContext.fromJson(
+        '{"calendar_id":null,"frequency":null,"bus_basis":null,' +
+          '"coupon_period":["1970-01-11","1970-01-06"],"end_is_termination_date":false}'
+      ),
+    (e) => e.kind === 'validation' && e.message.includes(message)
   );
-  assert.throws(() => core.DayCount.act360().yearFraction(0, 30, inverted), validation(message));
   const ctx = new core.DayCountContext('nyse', '3M', 252, [10, 20], true);
   assert.equal(ctx.calendarId, 'nyse');
   assert.equal(ctx.frequency.toString(), '3M');
@@ -182,13 +184,14 @@ test('DayCountContext is built by DayCountContextState::try_new', () => {
   }
 });
 
-test('FxMatrix.rate takes an optional policy; rateDefault is gone', () => {
+test('FxMatrix.rate takes an optional policy defaulting to the Rust default', () => {
   const fx = new core.FxMatrix();
   fx.setQuote('EUR', 'USD', 1.1);
   const cashflowDate = core.FxConversionPolicy.cashflowDate();
   assert.equal(fx.rate('EUR', 'USD', '2025-01-02').rate, 1.1);
   assert.equal(fx.rate('EUR', 'USD', '2025-01-02', null).rate, 1.1);
   assert.equal(fx.rate('EUR', 'USD', '2025-01-02', cashflowDate).rate, 1.1);
+  assert.equal(new core.FxConversionPolicy().toString(), 'cashflow_date');
   assert.equal('rateDefault' in fx, false);
   assert.equal('rateWithDefaultPolicy' in fx, false);
 });
@@ -206,7 +209,7 @@ test('FxDeltaVolSurface wing pairing is the Rust constructor check', () => {
 });
 
 test('VolCube keeps the Rust from_grid interpolation default when omitted', () => {
-  const params = [0.01, 0.5, -0.2, 0.4, Number.NaN];
+  const params = [{ alpha: 0.01, beta: 0.5, rho: -0.2, nu: 0.4 }];
   assert.equal(new core.VolCube('C', [1], [2], params, [0.02]).interpolationMode, 'vol');
   assert.equal(
     new core.VolCube('C', [1], [2], params, [0.02], 'total_variance').interpolationMode,
@@ -224,7 +227,7 @@ const hazardOptions = (knots, recoveryRate) => ({
 test('HazardCurve recovery errors and precedence come from the Rust builder', () => {
   assert.throws(
     () => new core.HazardCurve(hazardOptions([1.0, 0.01, 5.0, 0.02], 1.5)),
-    validation('Validation error: recovery_rate must be a decimal fraction in [0, 1], got 1.5')
+    validation('Validation error: Invalid recovery_rate: must be finite and in [0, 1], got 1.5')
   );
   assert.throws(
     () => new core.HazardCurve(hazardOptions([1.0, -0.02], 1.5)),

@@ -61,14 +61,12 @@ pub struct FxVarianceSwap {
     /// Strike variance (annualized)
     pub strike_variance: f64,
     /// Start date of observation period
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start_date: Date,
     /// Contractual end of the observation period.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -76,7 +74,6 @@ pub struct FxVarianceSwap {
     pub maturity: Date,
     /// Optional cash-settlement date. Defaults to the adjusted final observation date.
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -465,7 +462,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxVarianceSwap {
         _context: &MarketContext,
         _as_of: Date,
     ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+        finstack_quant_cashflows::schedule_from_classified_flows(
             Vec::new(),
             self.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
@@ -476,7 +473,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxVarianceSwap {
                     ..Default::default()
                 },
             },
-        ))
+        )
     }
 }
 

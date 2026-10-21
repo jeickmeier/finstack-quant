@@ -281,10 +281,6 @@ test('calibrationResultStepReport, its JSON twin and residuals read one step', (
   assert.equal(report.iterations, expected.iterations);
   assert.deepEqual(Object.keys(report.residuals).sort(), expected.residual_ids);
   assert.equal(
-    JSON.parse(calibration.calibrationResultStepReportJson(result, 'USD-OIS')).iterations,
-    expected.iterations
-  );
-  assert.equal(
     calibration.calibrationResultStepReport(JSON.stringify(result), 'USD-OIS').iterations,
     expected.iterations
   );
@@ -299,7 +295,6 @@ test('calibrationResultStepReport, its JSON twin and residuals read one step', (
   }
   for (const read of [
     calibration.calibrationResultStepReport,
-    calibration.calibrationResultStepReportJson,
     calibration.calibrationResultResiduals,
   ]) {
     assert.throws(

@@ -2,6 +2,57 @@
 
 ## [Unreleased]
 
+### Statements: one path per capability
+
+#### Changed
+
+- `Evaluator::evaluate_prepared` evaluates a model's capital structure exactly as `Evaluator::evaluate` does (an empty market as of the first period's start), so prepared evaluation now yields `cs_cashflows` and `cs.*` values. Before, it skipped the capital structure.
+- `ModelBuilder::with_builtin_metrics` no longer overwrites a node the model already defines with the same id.
+- `ModelBuilder` has no `NeedPeriods`/`Ready` type-state. `periods` returns `Result<Self>`, a second `periods` call fails with "Periods already set", and `build` fails when no timeline was set. `FinancialModelSpec::builder` is removed (Python `.builder`, WASM `financialModelBuilder`); `ModelBuilder::new` is the one entry point.
+- The statements-analytics entry points take the names the bindings already used: `run_sensitivity`, `run_variance`, `variance_bridge`, `explain_formula`, `render_check_report_text`/`_html`, `evaluate_dcf` (was `evaluate_dcf_with_market`). The engine structs behind them are private.
+- `dcf_sensitivity` takes no market argument (Rust, Python and WASM).
+- Each statements and statements-analytics item has one public path: internal modules (`checks::{suite,traits,types,helpers}`, `dsl::{ast,compiler,parser}`, `capital_structure::waterfall`, `registry::dynamic`, `evaluator::formula`, `adjustments::{engine,types}`, `forecast`, and the analysis submodules) are private, with their public items re-exported at the parent. `NormalizationEngine` is replaced by `adjustments::normalize` and `adjustments::merge_into_results`.
+
+#### Removed
+
+- Wire fields, variants and types that had no effect: `DcfOptions.discount_curve_id`, `VarianceRow.driver_contribution`, `EvalWarning::NaNPropagated`, `EclRequest`, `EclStageRequest`, `ExposureEclResult` and the `ecl::portfolio` module, and the toggled-PIK interest path in `calculate_period_flows`.
+- Forwarders and dead analysis API: `EclEngine`, the `config()` accessors, the comps `extract_metric`/`subject_metric` and `Multiple::is_*`/`label`, the analysis `forecast_covenant` forwarder, `VarianceReport::to_table`/`is_empty`, and `statements::formula`.
+- Python `normalize_json` and WASM `normalizeJson`; Python `explain_formula_text`, `pl_summary_report_text` and `validate_scorecard_config`.
+- The 20 WASM constructor functions that only built a plain object (`forecastSpec*`, `adjustment*`, `terminalValueSpec*`, `sensitivityConfigAddParameter`). Pass the object literal instead, e.g. `{ method: 'growth_pct', params: { rate: 0.05 } }`.
+
+### Cashflows: one path per capability
+
+#### Changed
+
+- `CFKind`, `CashFlow` and `CashFlowAccrual` bind where Rust defines them: Python `finstack_quant.core.cashflow` (was `finstack_quant.cashflows.primitives`) and WASM `core.cfKindParse` / `core.cfKindIs*` / `core.cashFlowGetBalanceDate` / `core.cashFlowValidate` (were under `cashflows`).
+- `CashFlowSchedule::builder()` is the only builder entry point. `schedule_from_dated_flows` / `schedule_from_classified_flows` validate their rows and return `Result`. Python and WASM schedules built from host parts are validated.
+- `pv_by_period` drops its unused day-count argument (Rust, Python, WASM); the PV path rejects flows in a currency other than the requested base.
+- `weighted_average_life_from_principal` moves from `builder` to `aggregation`. `CFKind::is_principal_repayment()` names the repayment kind set used by schedule WAL, principal-repaid aggregation and statements.
+- Accrual items and `PeriodAggregation` are reached through `accrual::` and `aggregation::` only; `PrincipalEventSpec` is exported from `builder`, and `MarginStepSpec` / `PaymentStepSpec` from the crate root. `WEEKENDS_ONLY_ID` lives in `core::dates`.
+- `FloatingRateSpec::DEFAULT_GEARING`, `DEFAULT_GEARING_INCLUDES_SPREAD` and `DEFAULT_RESET_LAG_DAYS` are public; the Python constructor uses them. Fee specs default their business-day convention through serde like `ScheduleParams`.
+- Term-loan call exercise builds its outstanding path and accrual indexes once per schedule, not on every tree step.
+
+#### Removed
+
+- `finstack_quant_cashflows::primitives` (use `finstack_quant_core::cashflow`).
+- `CashFlowSchedule::npv` (use `finstack_quant_core::cashflow::npv` over `dated_flows()`), the `IntoIterator` impls on `CashFlowSchedule` (use `into_flows()` / `get_flows()`), `PeriodAggregation::into_inner`, and the six `CashFlowBuilder::get_*` getters (the builder implements `Display`).
+- `builder::emit_inflation_coupons` (inlined at the inflation-linked bond) and `AssetPool::wal_from_cashflows`.
+- `clamped_smm_to_cpr`, `clamped_mdr_to_cdr`, `psa_to_cpr` and `cdr_2pct` (Rust, Python, WASM), and the inert SDA registry record (`SDA_PEAK_CDR` replaces it).
+- Host `from_parts` constructors, `DateContext`, `valuations::__private`, the valuations re-exports of cashflows types, and the cashflows crate-root re-exports of accrual items.
+
+### Statements: scenario forecast overrides, rollups, capital-structure scenarios
+
+#### Added
+
+- `ScenarioDefinition.forecast_overrides` replaces a node's whole `ForecastSpec` in a scenario: the method and every parameter (growth rates, curves, seeds, volatilities, external series, bounds). Child scenarios replace a parent's spec for the same node, and explicit values still win (`Value > Forecast > Formula`). Python `ScenarioSet` accepts a `ForecastSpec` as an override value.
+- `StatementResult::rollup(&model, &RollupSpec)` rolls results up to a coarser frequency (monthly into quarterly, semi-annual or annual; quarterly into semi-annual or annual; semi-annual into annual; fiscal periods keep their `FY` labels). Nodes sum by default; `period_end` nodes take the last source value and `formula` nodes re-evaluate their formula on the rolled-up values. Every target period must be complete. Python `StatementResult.rollup` / `RollupSpec`; WASM `statements.statementResultRollup`.
+- `ScenarioSet::evaluate_all_with_market(&model, &market, as_of)` evaluates every scenario like `Evaluator::evaluate_with_market`. Python `evaluate_scenario_set_with_market`; WASM `statements_analytics.evaluateScenarioSetWithMarket`.
+
+#### Changed
+
+- `Evaluator::evaluate` (and `ScenarioSet::evaluate_all`, Python `evaluate_scenario_set`, WASM `evaluateScenarioSet`) evaluates a model's capital structure from an empty market as of the first period's start, so fixed-rate debt yields `cs_cashflows` and `cs.*` values. Instruments that need market data (floating coupons, swaps, caps, swaptions) now fail with a missing-data error naming the instrument (Python `KeyError`) instead of being skipped silently; evaluate those with `evaluate_with_market`. `evaluate_prepared` still skips the capital structure.
+- Formula checks report a period whose same-period input is missing or non-finite, or whose formula consumes a non-finite value (a `lag` before the first period), as a `warning` "insufficient data" finding that does not fail the check. Such periods previously failed with the configured severity, or aborted the suite when a value was missing. A division by zero over finite inputs still fails.
+
 ### Valuations: verified pricing and risk fixes
 
 #### Fixed

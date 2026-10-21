@@ -702,7 +702,7 @@ fn validate_calibration_quality(
     quality: Option<&TreeCalibrationResult>,
 ) -> Result<()> {
     let quality = quality.ok_or_else(|| {
-        Error::internal(format!(
+        Error::Internal(format!(
             "{model} calibration quality is unavailable after calibration"
         ))
     })?;

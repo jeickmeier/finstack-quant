@@ -111,7 +111,7 @@ pub fn resolve_volatility(
     } else {
         let source = source
             .as_ref()
-            .ok_or_else(|| Error::internal("volatility source missing"))?;
+            .ok_or_else(|| Error::Internal("volatility source missing".into()))?;
         match (convention, request.clamp) {
             (VolatilityConvention::Normal, true) => {
                 source.get_normal_vol_clamped(request.expiry, request.tenor, request.strike)?

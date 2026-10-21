@@ -2,7 +2,7 @@
 
 use super::fmt_f64;
 use finstack_quant_statements::builder::ModelBuilder;
-use finstack_quant_statements::types::{NodeId, NodeSpec, NodeType};
+use finstack_quant_statements::types::{NodeSpec, NodeType};
 
 /// Add a roll-forward structure to the model with a zero opening balance.
 ///
@@ -20,12 +20,12 @@ use finstack_quant_statements::types::{NodeId, NodeSpec, NodeType};
 ///
 /// Builder with the generated nodes inserted. Existing nodes with the same
 /// identifiers are overwritten; final `build()` validates formulas and references.
-pub fn add_roll_forward<State>(
-    builder: ModelBuilder<State>,
+pub fn add_roll_forward(
+    builder: ModelBuilder,
     name: &str,
     increases: &[&str],
     decreases: &[&str],
-) -> ModelBuilder<State> {
+) -> ModelBuilder {
     add_roll_forward_with_opening(builder, name, increases, decreases, 0.0)
 }
 
@@ -49,13 +49,13 @@ pub fn add_roll_forward<State>(
 ///
 /// Builder with the generated nodes inserted. Existing nodes with the same
 /// identifiers are overwritten; final `build()` validates formulas and references.
-pub fn add_roll_forward_with_opening<State>(
-    mut builder: ModelBuilder<State>,
+pub fn add_roll_forward_with_opening(
+    mut builder: ModelBuilder,
     name: &str,
     increases: &[&str],
     decreases: &[&str],
     opening: f64,
-) -> ModelBuilder<State> {
+) -> ModelBuilder {
     let beg_node_id = format!("{}_beg", name);
     let end_node_id = format!("{}_end", name);
 
@@ -67,7 +67,7 @@ pub fn add_roll_forward_with_opening<State>(
         .with_name(format!("{} (Beginning)", name))
         .with_formula(beg_formula);
 
-    let mut end_formula = beg_node_id.clone();
+    let mut end_formula = beg_node_id;
 
     if !increases.is_empty() {
         end_formula.push_str(" + ");
@@ -84,8 +84,8 @@ pub fn add_roll_forward_with_opening<State>(
         .with_name(format!("{} (Ending)", name))
         .with_formula(end_formula);
 
-    builder.insert_node(NodeId::from(beg_node_id), beg_node);
-    builder.insert_node(NodeId::from(end_node_id), end_node);
+    builder.insert_node(beg_node);
+    builder.insert_node(end_node);
 
     builder
 }

@@ -88,7 +88,7 @@ impl ShortRateTree {
         }
 
         values.first().copied().ok_or_else(|| {
-            Error::internal("Black-Karasinski backward induction produced no root value")
+            Error::Internal("Black-Karasinski backward induction produced no root value".into())
         })
     }
 }
@@ -150,15 +150,14 @@ impl ShortRateTree {
     ) -> Result<f64> {
         if self.rates.is_empty() {
             tracing::debug!("ShortRateTree::price called before calibration (rates is empty)");
-            return Err(Error::internal(
-                "short-rate tree must be calibrated before pricing",
+            return Err(Error::Internal(
+                "short-rate tree must be calibrated before pricing".into(),
             ));
         }
         self.validate_lattice_geometry()?;
-        let time_to_maturity =
-            self.time_steps.last().copied().ok_or_else(|| {
-                Error::internal("short-rate tree must be calibrated before pricing")
-            })?;
+        let time_to_maturity = self.time_steps.last().copied().ok_or_else(|| {
+            Error::Internal("short-rate tree must be calibrated before pricing".into())
+        })?;
 
         // Black-Karasinski trinomial lattice: per-node probabilities and
         // capped width with branch switching cannot be expressed through the
@@ -166,7 +165,7 @@ impl ShortRateTree {
         // backward induction.
         if self.config.model == ShortRateModel::BlackKarasinski {
             let lattice = self.bk_trinomial.as_ref().ok_or_else(|| {
-                Error::internal("Black-Karasinski tree has no calibrated trinomial lattice")
+                Error::Internal("Black-Karasinski tree has no calibrated trinomial lattice".into())
             })?;
             return self.price_bk_trinomial(lattice, oas_bp, oas_compounding, valuator);
         }

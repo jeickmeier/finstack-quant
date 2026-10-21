@@ -446,7 +446,6 @@ pub enum CapitalStructureWarning {
         /// Canonical cashflow classification that was excluded.
         cashflow_kind: CFKind,
         /// Original contractual payment date.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -500,15 +499,6 @@ pub enum EvalWarning {
     /// Division by zero encountered
     DivisionByZero {
         /// Identifier of the node that triggered the warning.
-        node_id: String,
-        /// Period in which the warning occurred.
-        #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
-        period: PeriodId,
-    },
-    /// NaN value bubbled up to a node result
-    #[serde(rename = "nan_propagated")]
-    NaNPropagated {
-        /// Identifier of the node that produced the NaN value.
         node_id: String,
         /// Period in which the warning occurred.
         #[cfg_attr(feature = "json-schema", schemars(with = "String"))]

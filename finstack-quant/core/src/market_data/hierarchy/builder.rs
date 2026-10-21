@@ -23,7 +23,7 @@ pub struct HierarchyBuilder {
 impl HierarchyBuilder {
     pub(super) fn new() -> Self {
         Self {
-            hierarchy: MarketDataHierarchy::new(),
+            hierarchy: MarketDataHierarchy::default(),
             current_path: None,
             validation_error: None,
         }
@@ -102,7 +102,7 @@ impl HierarchyBuilder {
     /// # Errors
     ///
     /// Returns the first invalid-path error deferred by [`Self::add_node`], or
-    /// a structural error from [`MarketDataHierarchy::validate`], including a
+    /// a structural hierarchy validation error, including a
     /// duplicate [`crate::types::CurveId`] assigned to multiple hierarchy paths. Builder
     /// calls after an invalid path remain no-ops with respect to that path;
     /// callers should treat an error from `build` as a failed construction.

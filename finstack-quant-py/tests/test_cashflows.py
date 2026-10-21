@@ -89,7 +89,6 @@ def _market_json() -> str:
         "credit_indices": [],
         "fx_delta_vol_surfaces": [],
         "vol_cubes": [],
-        "collateral": {},
         "hierarchy": None,
     })
 
@@ -423,7 +422,7 @@ def test_accrual_retains_contractual_day_count_context(
 
 
 def test_typed_accrual_reference_metadata_roundtrips() -> None:
-    from finstack_quant.cashflows.primitives import CashFlow, CashFlowAccrual, CFKind
+    from finstack_quant.core.cashflow import CashFlow, CashFlowAccrual, CFKind
     from finstack_quant.core.dates import DayCount
     from finstack_quant.core.money import Money
 

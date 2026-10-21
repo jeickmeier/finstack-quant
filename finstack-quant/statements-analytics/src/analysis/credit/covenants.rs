@@ -4,16 +4,13 @@
 //! and the covenant engine, allowing for future compliance checking.
 
 use finstack_quant_core::dates::{Date, PeriodId};
-use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
 use finstack_quant_core::Result;
 use finstack_quant_covenants::{
-    forecast_breaches_generic, forecast_covenant_generic, CovenantEngine, CovenantForecast,
-    CovenantForecastConfig, CovenantSpec, FutureBreach, ModelTimeSeries,
+    forecast_breaches_generic, CovenantEngine, CovenantForecastConfig, FutureBreach,
+    ModelTimeSeries,
 };
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::FinancialModelSpec;
-use indexmap::IndexMap;
-use serde_json::json;
 
 /// Adapter to use Statements StatementResult as a ModelTimeSeries.
 ///
@@ -64,46 +61,6 @@ impl<'a> ModelTimeSeries for StatementsAdapter<'a> {
     }
 }
 
-/// Forecast a single covenant's future compliance using statement results.
-///
-/// Stochastic forecasts require explicit annualized log-volatility of the
-/// covenant metric in `config.volatility`. Earnings-level deviations are not
-/// interchangeable with ratio volatility and are never inferred from drivers.
-///
-/// # Arguments
-///
-/// * `covenant` - Covenant specification to simulate
-/// * `model` - Source statement model used to resolve inclusive period-end dates
-/// * `base_case` - Evaluated base-case statement results
-/// * `periods` - Future periods to test
-/// * `config` - Forecasting configuration for simulation horizon and
-///   distribution assumptions
-///
-/// # Returns
-///
-/// Returns a [`CovenantForecast`] containing projected values, thresholds,
-/// headroom, and breach probabilities by test date.
-///
-/// # Errors
-///
-/// Returns an error if the covenant engine rejects the input series, if model
-/// periods cannot be resolved consistently, or if explicit volatility
-/// parameters are missing or malformed for a stochastic forecast.
-///
-/// # References
-///
-/// - Lognormal breach probability: `docs/REFERENCES.md#glasserman-2004-monte-carlo`
-pub fn forecast_covenant(
-    covenant: &CovenantSpec,
-    model: &FinancialModelSpec,
-    base_case: &StatementResult,
-    periods: &[PeriodId],
-    config: CovenantForecastConfig,
-) -> Result<CovenantForecast> {
-    let adapter = StatementsAdapter::new(base_case, model);
-    forecast_covenant_generic(covenant, &adapter, periods, config)
-}
-
 /// Forecast covenant breaches based on statement results.
 ///
 /// # Arguments
@@ -143,67 +100,17 @@ pub fn forecast_breaches(
     forecast_breaches_generic(covenants, &adapter, &periods, config)
 }
 
-/// Convert a covenant forecast into a serializable table for downstream analysis.
-///
-/// The resulting schema is:
-/// `(test_date, projected_value, threshold, headroom, breach_prob)`.
-///
-/// # Arguments
-///
-/// * `forecast` - Covenant forecast containing aligned test dates, projected
-///   values, thresholds, headroom, and breach probabilities.
-///
-/// # Errors
-///
-/// Returns a validation error if the table envelope invariants are broken.
-pub fn to_table(forecast: &CovenantForecast) -> Result<TableEnvelope> {
-    let dates = forecast
-        .test_dates
-        .iter()
-        .map(|d| d.to_string())
-        .collect::<Vec<_>>();
-
-    let mut metadata = IndexMap::new();
-    metadata.insert("layout".to_string(), json!("long"));
-    metadata.insert("source".to_string(), json!("covenant_forecast"));
-
-    TableEnvelope::new_with_metadata(
-        vec![
-            TableColumn::new("test_date", TableColumnData::String(dates))
-                .with_role(TableColumnRole::Index),
-            TableColumn::new(
-                "projected_value",
-                TableColumnData::NullableFloat64(forecast.projected_values.clone()),
-            )
-            .with_role(TableColumnRole::Measure),
-            TableColumn::new(
-                "threshold",
-                TableColumnData::Float64(forecast.thresholds.clone()),
-            )
-            .with_role(TableColumnRole::Measure),
-            TableColumn::new(
-                "headroom",
-                TableColumnData::NullableFloat64(forecast.headroom.clone()),
-            )
-            .with_role(TableColumnRole::Measure),
-            TableColumn::new(
-                "breach_prob",
-                TableColumnData::Float64(forecast.breach_probability.clone()),
-            )
-            .with_role(TableColumnRole::Measure),
-        ],
-        metadata,
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::dates::{Date, Month, Tenor};
+    use finstack_quant_core::dates::{Date, Tenor};
+    use finstack_quant_covenants::forecast_covenant_generic;
     use finstack_quant_covenants::CovenantType;
     use finstack_quant_covenants::{Covenant, CovenantEngine, CovenantMetricId, CovenantSpec};
     use finstack_quant_statements::evaluator::StatementResult;
     use indexmap::IndexMap;
+    use serde_json::json;
+    use time::Month;
 
     #[test]
     fn fiscal_horizon_uses_model_boundaries() {
@@ -236,11 +143,16 @@ mod tests {
             volatility: Some(0.3),
             ..Default::default()
         };
-        let automatic = forecast_covenant(&spec, &model, &results, &[id], config.clone()).unwrap();
-        let explicit = forecast_covenant(
+        let automatic = forecast_covenant_generic(
             &spec,
-            &model,
-            &results,
+            &StatementsAdapter::new(&results, &model),
+            &[id],
+            config.clone(),
+        )
+        .unwrap();
+        let explicit = forecast_covenant_generic(
+            &spec,
+            &StatementsAdapter::new(&results, &model),
             &[id],
             CovenantForecastConfig {
                 reference_date: Some(date!(2024 - 06 - 30)),
@@ -252,10 +164,9 @@ mod tests {
         assert_eq!(automatic.breach_probability, explicit.breach_probability);
         assert_eq!(automatic.test_dates, vec![date!(2024 - 09 - 30)]);
         let missing: PeriodId = "FY2025Q2".parse().unwrap();
-        assert!(forecast_covenant(
+        assert!(forecast_covenant_generic(
             &spec,
-            &model,
-            &results,
+            &StatementsAdapter::new(&results, &model),
             &[missing],
             CovenantForecastConfig::default()
         )
@@ -301,13 +212,16 @@ mod tests {
                 reference_date: Some(time::macros::date!(2024 - 03 - 31)),
                 ..Default::default()
             };
-            assert!(
-                forecast_covenant(&covenant, &model, &results, &periods, config.clone()).is_err()
-            );
-            let forecast = forecast_covenant(
+            assert!(forecast_covenant_generic(
                 &covenant,
-                &model,
-                &results,
+                &StatementsAdapter::new(&results, &model),
+                &periods,
+                config.clone()
+            )
+            .is_err());
+            let forecast = forecast_covenant_generic(
+                &covenant,
+                &StatementsAdapter::new(&results, &model),
                 &periods,
                 CovenantForecastConfig {
                     volatility: Some(0.2),

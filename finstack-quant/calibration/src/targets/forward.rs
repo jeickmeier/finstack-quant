@@ -9,7 +9,7 @@ use crate::quotes::ExtractQuotes;
 use crate::quotes::MarketQuote;
 use crate::solver::global::GlobalFitOptimizer;
 use crate::solver::traits::GlobalSolveTarget;
-use crate::targets::rate_recipe::recipe_ois_compounding;
+use crate::targets::rate_recipe::rate_calibration_recipe;
 use crate::targets::util::{
     discount_and_forward_curve_ids, prepare_rate_calibration_quotes, pv01_residual_weight,
     ContextScratch,
@@ -18,9 +18,7 @@ use crate::CalibrationReport;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{
-    ForwardCurve, RateCalibrationCurveRole, RateCalibrationRecipe,
-};
+use finstack_quant_core::market_data::term_structures::{ForwardCurve, RateCalibrationCurveRole};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
@@ -104,7 +102,17 @@ impl ForwardCurveTarget {
         )?;
         let prepared_quotes = prepared.quotes;
         let curve_day_count = prepared.curve_day_count;
-        let rate_calibration = Self::rate_calibration(quotes, params, curve_day_count)?;
+        let rate_quotes: Vec<RateQuote> = quotes.extract_quotes();
+        let rate_calibration = rate_calibration_recipe(
+            params.currency,
+            &params.method,
+            curve_day_count,
+            params.conventions.ois_compounding.as_ref(),
+            RateCalibrationCurveRole::Projection {
+                discount_curve_id: params.discount_curve_id.clone(),
+            },
+            &rate_quotes,
+        )?;
 
         let config = global_config.clone();
 
@@ -158,29 +166,6 @@ impl ForwardCurveTarget {
         report.update_solver_config(config.solver);
 
         Ok((curve, report))
-    }
-
-    fn rate_calibration(
-        quotes: &[MarketQuote],
-        params: &ForwardCurveParams,
-        curve_day_count: DayCount,
-    ) -> Result<RateCalibrationRecipe> {
-        let rate_quotes: Vec<RateQuote> = quotes.extract_quotes();
-        Ok(RateCalibrationRecipe {
-            currency: params.currency,
-            method: (&params.method).into(),
-            curve_day_count,
-            ois_compounding: params
-                .conventions
-                .ois_compounding
-                .as_ref()
-                .map(recipe_ois_compounding)
-                .transpose()?,
-            role: RateCalibrationCurveRole::Projection {
-                discount_curve_id: params.discount_curve_id.clone(),
-            },
-            quotes: rate_quotes.iter().map(Into::into).collect(),
-        })
     }
 
     /// Return the reset-date parameter time for quotes whose modeled rate is
@@ -279,7 +264,7 @@ impl ForwardCurveTarget {
                             .float_leg
                             .calendar_id
                             .as_deref()
-                            .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
+                            .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID),
                         end_of_month: swap.float_leg.end_of_month,
                         day_count: finstack_quant_core::dates::DayCount::Act365F,
                         payment_lag_days: swap.float_leg.payment_lag_days,
@@ -741,6 +726,26 @@ mod tests {
         fn clone_box(&self) -> Box<dyn Instrument> {
             Box::new(self.clone())
         }
+    }
+
+    /// A forward step that omits `method` must default to the only method the
+    /// forward target accepts, not to a bootstrap it rejects at solve time.
+    #[test]
+    fn forward_params_default_to_global_solve() {
+        let params: ForwardCurveParams = serde_json::from_value(serde_json::json!({
+            "curve_id": "USD-SOFR-3M",
+            "currency": "USD",
+            "base_date": "2025-01-15",
+            "tenor_years": 0.25,
+            "discount_curve_id": "USD-OIS",
+        }))
+        .expect("forward params without method parse");
+        assert_eq!(
+            params.method,
+            CalibrationMethod::GlobalSolve {
+                use_analytical_jacobian: false
+            }
+        );
     }
 
     #[test]

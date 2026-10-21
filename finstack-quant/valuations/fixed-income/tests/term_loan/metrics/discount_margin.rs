@@ -8,6 +8,7 @@
 
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::FloatingRateSpec;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -20,9 +21,7 @@ use finstack_quant_valuations_core::instruments::pricing_overrides::{
 };
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_fixed_income::term_loan::{
-    AmortizationSpec, LoanCall, LoanCallSchedule, RateSpec, TermLoan,
-};
+use finstack_quant_valuations_fixed_income::term_loan::{LoanCall, LoanCallSchedule, TermLoan};
 use rust_decimal::Decimal;
 use time::macros::date;
 
@@ -200,7 +199,7 @@ fn test_dm_callable_with_quoted_price_succeeds() {
 // `rate` with quarterly compounding on the Act/360 axis. On this market a
 // loan quoted at par must solve to DM == contractual margin.
 
-fn flat_consistent_market(as_of: time::Date, rate: f64) -> MarketContext {
+fn flat_consistent_market(as_of: finstack_quant_core::dates::Date, rate: f64) -> MarketContext {
     // DF(t) = (1 + rate/4)^(-4t): with log-linear interpolation two knots
     // reproduce the exponential exactly, so the quarterly-compounded zero
     // rate equals `rate` at every t.

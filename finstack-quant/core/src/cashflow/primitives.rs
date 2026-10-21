@@ -10,8 +10,8 @@
 //! - [`CFKind`]: Cashflow type enumeration (fixed, floating, principal, etc.)
 
 use crate::dates::{Date, DayCount};
-use crate::error::{InputError, NonFiniteKind};
 use crate::money::Money;
+use crate::{InputError, NonFiniteKind};
 
 /// Keep invalid rate observations from becoming absent rates in JSON.
 fn serialize_optional_rate<S>(rate: &Option<f64>, serializer: S) -> Result<S::Ok, S::Error>
@@ -296,6 +296,24 @@ impl CFKind {
         )
     }
 
+    /// Returns `true` for kinds that repay principal to the lender: amortization,
+    /// prepayment, revolver repayment, and notional (redemption when positive).
+    ///
+    /// Narrower than [`Self::is_principal_like`], which also counts PIK
+    /// capitalization, revolver draws and defaulted notional. Callers that
+    /// weigh repayments (weighted average life, principal-repaid totals) also
+    /// require a positive amount, since a negative notional row is a funding.
+    #[must_use]
+    pub fn is_principal_repayment(self) -> bool {
+        matches!(
+            self,
+            CFKind::Amortization
+                | CFKind::Notional
+                | CFKind::PrePayment
+                | CFKind::RevolvingRepayment
+        )
+    }
+
     /// Returns `true` when this classified flow represents a cash settlement.
     ///
     /// [`CFKind::Pik`] is a capitalization event and
@@ -313,11 +331,9 @@ impl CFKind {
 #[serde(deny_unknown_fields)]
 pub struct CashFlowAccrual {
     /// Contractual accrual-period start date.
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub start: Date,
     /// Contractual accrual-period end date.
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub end: Date,
     /// Day-count convention used for the accrual factor.
@@ -339,11 +355,7 @@ pub struct CashFlowAccrual {
     /// this flow represents only a rate or balance subinterval.
     /// ACT/365L metadata must retain these boundaries to select the original
     /// coupon's denominator; other conventions may leave this field `None`.
-    #[serde(
-        default,
-        with = "crate::wire::optional_date_pair",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<(crate::wire::DateWire, crate::wire::DateWire)>")
@@ -364,11 +376,10 @@ pub struct CashFlowAccrual {
 #[serde(deny_unknown_fields)]
 pub struct CashFlow {
     /// Payment date (or payment date for principal/fee, or reset date for `CFKind::FloatReset`).
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub date: Date,
     /// Optional index reset date (for floating coupons).
-    #[serde(default, with = "crate::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<crate::wire::DateWire>")
@@ -407,11 +418,7 @@ pub struct CashFlow {
     /// Economic date of the principal movement, independent of cash payment.
     /// When absent, principal changes on `date`. Scheduled amortization and
     /// PIK use the contractual accrual boundary even when payment is adjusted.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::wire::optional_date"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<crate::wire::DateWire>")

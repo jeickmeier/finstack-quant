@@ -24,11 +24,6 @@
 /// These constants replace magic numbers scattered throughout the codebase,
 /// providing consistent tolerances and step sizes with documented rationale.
 pub mod numerical {
-    /// Tolerance for checking if a value is effectively zero (1e-10).
-    ///
-    /// Re-exported from [`finstack_quant_core::math::ZERO_TOLERANCE`].
-    pub use finstack_quant_core::math::ZERO_TOLERANCE;
-
     /// Tolerance for comparing floating-point rates and spreads.
     ///
     /// Used when checking if two rates are "equal" for purposes like
@@ -92,11 +87,6 @@ pub mod credit {
     ///
     /// If the risky annuity (denominator) is below this, par spread is undefined.
     pub const PAR_SPREAD_DENOM_TOLERANCE: f64 = 1e-12;
-
-    /// Calendar days per year for settlement delay calculations.
-    ///
-    /// Re-exported from `finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR` (ACT/365 Fixed).
-    pub use finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR;
 }
 
 /// Standard number of trading/business days per year (US equity markets).

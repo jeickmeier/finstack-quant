@@ -9,12 +9,12 @@ use wasm_bindgen::prelude::*;
 /// Materialize the reset observations crossed by a realized-forward market roll.
 ///
 /// Every projected fixing recorded in the schedules' metadata with a date in
-/// `(oldDate, newDate]` is written into a copy of the market as an observed
+/// `[oldDate, newDate]` is written into a copy of the market as an observed
 /// fixing; existing observations take precedence and are kept unchanged.
 ///
 /// @param market - `MarketContext` handle of the pre-roll market; it is not modified.
 /// @param schedules - Schedules projected on `market` at `oldDate`: `CashFlowSchedule` handles (the facade passes them as JSON), canonical JSON strings or plain objects.
-/// @param old_date - ISO-8601 exclusive start of the fixing window.
+/// @param old_date - ISO-8601 inclusive start of the fixing window: same-day projections become observed.
 /// @param new_date - ISO-8601 inclusive end of the window; must be on or after `oldDate`.
 /// @returns A new `MarketContext` handle with the crossed fixings materialized; release it with free().
 /// @throws If the window runs backward, a fixing-series identifier is malformed, a crossed projection is unavailable or non-finite, or two schedules project the same index and date differently (kind `validation`).

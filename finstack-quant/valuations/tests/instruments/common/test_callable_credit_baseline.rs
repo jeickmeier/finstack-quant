@@ -13,16 +13,17 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use finstack_quant_cashflows::builder::CouponType;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve, ParInterp};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule};
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    AmortizationSpec, LoanCall, LoanCallSchedule, LoanCallType, RateSpec, TermLoan,
-    TermLoanTreePricer,
+    LoanCall, LoanCallSchedule, LoanCallType, TermLoan, TermLoanTreePricer,
 };
 use time::macros::date;
 

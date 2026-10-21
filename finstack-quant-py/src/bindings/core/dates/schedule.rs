@@ -3,10 +3,13 @@
 use crate::bindings::core::dates::calendar::extract_business_day_convention;
 use crate::bindings::core::dates::tenor::extract_tenor;
 use crate::bindings::date_utils::py_to_date;
+use crate::bindings::macros::{label_enum, typed_or_label, wire_methods};
 use crate::errors::core_to_py;
-use finstack_quant_core::dates::{Schedule, ScheduleErrorPolicy, ScheduleSpec, StubKind};
+use finstack_quant_core::dates::{
+    Schedule, ScheduleBuilder, ScheduleErrorPolicy, ScheduleSpec, StubKind,
+};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyIterator, PyList, PyModule, PyType};
+use pyo3::types::{PyDict, PyIterator, PyList, PyModule};
 
 /// Stub positioning rule for schedule generation.
 ///
@@ -39,71 +42,25 @@ impl PyStubKind {
     }
 }
 
-#[pymethods]
-impl PyStubKind {
+label_enum!(PyStubKind, StubKind, "StubKind", from_name, {
     /// No stub — periods divide evenly.
-    #[classattr]
-    const NONE: PyStubKind = PyStubKind {
-        inner: StubKind::None,
-    };
+    NONE => None,
     /// Short stub at the front.
-    #[classattr]
-    const SHORT_FRONT: PyStubKind = PyStubKind {
-        inner: StubKind::ShortFront,
-    };
+    SHORT_FRONT => ShortFront,
     /// Short stub at the back.
-    #[classattr]
-    const SHORT_BACK: PyStubKind = PyStubKind {
-        inner: StubKind::ShortBack,
-    };
+    SHORT_BACK => ShortBack,
     /// Long stub at the front.
-    #[classattr]
-    const LONG_FRONT: PyStubKind = PyStubKind {
-        inner: StubKind::LongFront,
-    };
+    LONG_FRONT => LongFront,
     /// Long stub at the back.
-    #[classattr]
-    const LONG_BACK: PyStubKind = PyStubKind {
-        inner: StubKind::LongBack,
-    };
+    LONG_BACK => LongBack,
+});
 
-    /// Parse from a string (e.g. ``"short_front"``, ``"long_back"``); raises
-    /// ``ValueError`` for unknown names.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, name)")]
-    fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
-        name.parse::<StubKind>()
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
-
-    /// Support ``pickle`` by reconstructing through ``from_name``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_name = py.get_type::<Self>().getattr("from_name")?;
-        Ok((from_name, (self.inner.to_string(),)))
-    }
-
-    fn __repr__(&self) -> String {
-        format!("StubKind('{}')", self.inner)
-    }
-
-    fn __str__(&self) -> String {
-        self.inner.to_string()
-    }
-}
-
-/// Extract a [`StubKind`] from a wrapper or its snake_case name.
-fn extract_stub_kind(obj: &Bound<'_, PyAny>) -> PyResult<StubKind> {
-    if let Ok(s) = obj.extract::<PyRef<'_, PyStubKind>>() {
-        return Ok(s.inner);
-    }
-    if let Ok(s) = obj.extract::<String>() {
-        return s.parse::<StubKind>().map_err(core_to_py);
-    }
-    Err(pyo3::exceptions::PyTypeError::new_err(
-        "expected StubKind or str",
-    ))
-}
+typed_or_label!(
+    fn extract_stub_kind -> StubKind,
+    PyStubKind,
+    "StubKind or str",
+    |label| label.parse().map_err(core_to_py)
+);
 
 /// Error handling policy for schedule building.
 ///
@@ -130,72 +87,21 @@ pub struct PyScheduleErrorPolicy {
     pub(crate) inner: ScheduleErrorPolicy,
 }
 
-impl PyScheduleErrorPolicy {
-    fn label(&self) -> PyResult<String> {
-        finstack_quant_core::wire::serde_label(&self.inner).map_err(core_to_py)
-    }
-}
+typed_or_label!(
+    fn extract_error_policy -> ScheduleErrorPolicy,
+    PyScheduleErrorPolicy,
+    "ScheduleErrorPolicy or str",
+    |label| label.parse().map_err(core_to_py)
+);
 
-/// Extract a [`ScheduleErrorPolicy`] from a wrapper or its snake_case name.
-fn extract_error_policy(obj: &Bound<'_, PyAny>) -> PyResult<ScheduleErrorPolicy> {
-    if let Ok(p) = obj.extract::<PyRef<'_, PyScheduleErrorPolicy>>() {
-        return Ok(p.inner);
-    }
-    if let Ok(s) = obj.extract::<String>() {
-        return finstack_quant_core::wire::serde_parse(&s.to_ascii_lowercase()).map_err(core_to_py);
-    }
-    Err(pyo3::exceptions::PyTypeError::new_err(
-        "expected ScheduleErrorPolicy or str",
-    ))
-}
-
-#[pymethods]
-impl PyScheduleErrorPolicy {
+label_enum!(PyScheduleErrorPolicy, ScheduleErrorPolicy, "ScheduleErrorPolicy", from_name, {
     /// Strict — errors are immediately propagated.
-    #[classattr]
-    const STRICT: PyScheduleErrorPolicy = PyScheduleErrorPolicy {
-        inner: ScheduleErrorPolicy::Strict,
-    };
+    STRICT => Strict,
     /// Emit a warning for missing calendars, but continue.
-    #[classattr]
-    const MISSING_CALENDAR_WARNING: PyScheduleErrorPolicy = PyScheduleErrorPolicy {
-        inner: ScheduleErrorPolicy::MissingCalendarWarning,
-    };
+    MISSING_CALENDAR_WARNING => MissingCalendarWarning,
     /// Gracefully return an empty schedule on error.
-    #[classattr]
-    const GRACEFUL_EMPTY: PyScheduleErrorPolicy = PyScheduleErrorPolicy {
-        inner: ScheduleErrorPolicy::GracefulEmpty,
-    };
-
-    /// Parse from the snake_case name (``"strict"``, ``"missing_calendar_warning"``,
-    /// ``"graceful_empty"``), case-insensitively; raises ``ValueError`` otherwise.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, name)")]
-    fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
-        finstack_quant_core::wire::serde_parse(&name.to_ascii_lowercase())
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
-    }
-
-    /// Support ``pickle`` by reconstructing through ``from_name``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_name = py.get_type::<Self>().getattr("from_name")?;
-        Ok((from_name, (self.label()?,)))
-    }
-
-    fn __repr__(&self) -> String {
-        let label = match self.inner {
-            ScheduleErrorPolicy::Strict => "STRICT",
-            ScheduleErrorPolicy::MissingCalendarWarning => "MISSING_CALENDAR_WARNING",
-            ScheduleErrorPolicy::GracefulEmpty => "GRACEFUL_EMPTY",
-        };
-        format!("ScheduleErrorPolicy.{label}")
-    }
-
-    fn __str__(&self) -> PyResult<String> {
-        self.label()
-    }
-}
+    GRACEFUL_EMPTY => GracefulEmpty,
+});
 
 /// Convert a Python spec (``dict`` or JSON string) into a [`ScheduleSpec`].
 fn extract_schedule_spec(obj: &Bound<'_, PyAny>) -> PyResult<ScheduleSpec> {
@@ -266,7 +172,9 @@ impl PySchedule {
     #[staticmethod]
     #[pyo3(text_signature = "(start, end)")]
     fn builder(start: &Bound<'_, PyAny>, end: &Bound<'_, PyAny>) -> PyResult<PyScheduleBuilder> {
-        PyScheduleBuilder::from_dates(start, end)
+        Ok(PyScheduleBuilder {
+            spec: ScheduleSpec::new(py_to_date(start)?, py_to_date(end)?).map_err(core_to_py)?,
+        })
     }
 
     /// Build a schedule from a serialized spec (``dict`` or JSON string)
@@ -280,7 +188,7 @@ impl PySchedule {
     #[staticmethod]
     #[pyo3(text_signature = "(spec)")]
     fn from_spec(spec: &Bound<'_, PyAny>) -> PyResult<Self> {
-        extract_schedule_spec(spec)?
+        ScheduleBuilder::from(extract_schedule_spec(spec)?)
             .build()
             .map(Self::from_inner)
             .map_err(core_to_py)
@@ -355,7 +263,7 @@ impl PySchedule {
         let starts = &self.inner.dates[..n];
         let ends = self.inner.dates.get(1..).unwrap_or_default();
         let to_datetime = py.import("pandas")?.getattr("to_datetime")?;
-        let column = |dates: &[time::Date]| -> PyResult<Bound<'py, PyAny>> {
+        let column = |dates: &[finstack_quant_core::dates::Date]| -> PyResult<Bound<'py, PyAny>> {
             to_datetime.call1((crate::bindings::pandas_utils::dates_to_pylist(py, dates)?,))
         };
         let columns = PyDict::new(py);
@@ -369,27 +277,6 @@ impl PySchedule {
             columns.set_item("fixing_date", column(&self.inner.fixing_dates)?)?;
         }
         crate::bindings::pandas_utils::dict_to_dataframe(py, &columns, None)
-    }
-
-    /// Serialize to the canonical JSON wire form (strict field names).
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "cannot serialize Schedule"))
-    }
-
-    /// Deserialize from canonical JSON; raises ``ValueError`` on malformed input.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str::<Schedule>(json)
-            .map(Self::from_inner)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid Schedule JSON"))
-    }
-
-    /// Support ``pickle`` through the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
     /// Iterate over the unadjusted accrual dates.
@@ -412,6 +299,8 @@ impl PySchedule {
         }
     }
 }
+
+wire_methods!(PySchedule, Schedule, "Schedule");
 
 /// Registry id for a ``HolidayCalendar`` wrapper or calendar-id string.
 ///
@@ -458,16 +347,6 @@ fn calendar_code(obj: &Bound<'_, PyAny>) -> PyResult<String> {
 pub struct PyScheduleBuilder {
     /// Serializable spec accumulating builder state.
     spec: ScheduleSpec,
-}
-
-impl PyScheduleBuilder {
-    pub(crate) fn from_dates(start: &Bound<'_, PyAny>, end: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let s = py_to_date(start)?;
-        let e = py_to_date(end)?;
-        Ok(Self {
-            spec: ScheduleSpec::new(s, e).map_err(core_to_py)?,
-        })
-    }
 }
 
 #[pymethods]
@@ -579,14 +458,14 @@ impl PyScheduleBuilder {
 
     /// Build the schedule.
     ///
-    /// Delegates entirely to the canonical Rust ``ScheduleSpec::build``:
-    /// under the default ``STRICT`` policy an invalid range or any build
-    /// warning raises ``ValueError`` (strict fails closed in Rust). Under
+    /// Delegates entirely to the canonical Rust ``ScheduleBuilder::build``:
+    /// under the default ``STRICT`` policy a generation failure raises
+    /// ``ValueError`` and an unknown calendar id ``KeyError``. Under
     /// ``MISSING_CALENDAR_WARNING`` or ``GRACEFUL_EMPTY`` the schedule is
     /// returned carrying its warnings (inspect via ``Schedule.warnings`` /
     /// ``Schedule.has_warnings()``).
     fn build(&self) -> PyResult<PySchedule> {
-        self.spec
+        ScheduleBuilder::from(self.spec.clone())
             .build()
             .map(PySchedule::from_inner)
             .map_err(core_to_py)

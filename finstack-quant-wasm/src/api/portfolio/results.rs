@@ -2,16 +2,15 @@
 //!
 //! WASM results are plain objects, so a Rust method on a result type is a
 //! function that takes the object (or its JSON) as the first argument. The
-//! validating `Constraint` constructors return the constraint's wire object.
+//! validating `Constraint` exposure shorthands return the constraint's wire
+//! object.
 
-use crate::utils::input::{from_js_json, js_f64, js_json_value, js_opt_string, js_string, js_uint};
+use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, js_uint};
 use crate::utils::{to_js_err, to_js_value, to_js_value_with_bigints};
 use finstack_quant_factor::SensitivityMatrix;
 use finstack_quant_portfolio::attribution::PortfolioAttribution;
 use finstack_quant_portfolio::metrics::PortfolioMetrics;
-use finstack_quant_portfolio::optimization::{
-    Constraint, PortfolioOptimizationResultWire, PositionFilter,
-};
+use finstack_quant_portfolio::optimization::{Constraint, PortfolioOptimizationResult};
 use finstack_quant_portfolio::sensitivity::SensitivityMatrixJson;
 use finstack_quant_portfolio::valuation::PortfolioValuation;
 use wasm_bindgen::prelude::*;
@@ -196,7 +195,7 @@ pub fn portfolio_metrics_get_total(
 /// Trades of an optimization result that open a new position.
 ///
 /// Twin of Python `PortfolioOptimizationResult.new_position_trades` (Rust
-/// `PortfolioOptimizationResultWire::new_position_trades`): the entries of
+/// `PortfolioOptimizationResult::new_position_trades`): the entries of
 /// `trades` whose `trade_type` is `new_position`, in trade-list order.
 /// @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
 /// @returns The matching `TradeSpec` rows; empty for an infeasible solve.
@@ -210,14 +209,14 @@ pub fn portfolio_metrics_get_total(
 pub fn portfolio_optimization_result_new_position_trades(
     result: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let result: PortfolioOptimizationResultWire = from_js_json(&result, "result")?;
+    let result: PortfolioOptimizationResult = from_js_json(&result, "result")?;
     to_js_value(&result.new_position_trades())
 }
 
 /// Approximately binding constraints of an optimization result.
 ///
 /// Twin of Python `PortfolioOptimizationResult.binding_constraints` (Rust
-/// `PortfolioOptimizationResultWire::binding_constraints`): the constraints
+/// `PortfolioOptimizationResult::binding_constraints`): the constraints
 /// whose slack is zero within the solver tolerance.
 /// @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
 /// @returns `[label, slack]` pairs in slack order; empty for an infeasible solve.
@@ -231,15 +230,15 @@ pub fn portfolio_optimization_result_new_position_trades(
 pub fn portfolio_optimization_result_binding_constraints(
     result: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let result: PortfolioOptimizationResultWire = from_js_json(&result, "result")?;
+    let result: PortfolioOptimizationResult = from_js_json(&result, "result")?;
     to_js_value(&result.binding_constraints())
 }
 
 /// Look up one metric's portfolio-wide total, failing when it was not aggregated.
 ///
-/// Twin of Python `PortfolioResult.require_metric` (Rust
-/// `PortfolioMetrics::require_total`, which `PortfolioResult::require_metric`
-/// calls on its metrics).
+/// Twin of Python `PortfolioMetrics.require_total` (Rust
+/// `PortfolioMetrics::require_total`); WASM results are plain objects, so the
+/// method is a free function taking the object.
 /// @param metrics - `PortfolioMetrics` object or JSON from `aggregateMetrics`.
 /// @param metric_id - Fully qualified metric key (for example `dv01` or `bucketed_dv01::USD-OIS::10y`).
 /// @returns The aggregated total in base-currency metric units.
@@ -264,10 +263,10 @@ pub fn portfolio_metrics_require_total(
 /// Executable trade list of an optimization result.
 ///
 /// Twin of Python `PortfolioOptimizationResult.to_trade_list` (Rust
-/// `PortfolioOptimizationResultWire::to_trade_list`): the trades from current
+/// `PortfolioOptimizationResult::to_trade_list`): the trades from current
 /// to target quantities, largest absolute quantity change first.
 /// @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
-/// @returns The `TradeSpec` rows; empty for an infeasible solve (check `is_feasible`).
+/// @returns The `TradeSpec` rows; empty for an infeasible solve (check `portfolioOptimizationResultIsFeasible`).
 ///
 /// # Errors
 ///
@@ -276,8 +275,27 @@ pub fn portfolio_metrics_require_total(
 /// match the optimization-result schema.
 #[wasm_bindgen(js_name = portfolioOptimizationResultToTradeList)]
 pub fn portfolio_optimization_result_to_trade_list(result: JsValue) -> Result<JsValue, JsValue> {
-    let result: PortfolioOptimizationResultWire = from_js_json(&result, "result")?;
+    let result: PortfolioOptimizationResult = from_js_json(&result, "result")?;
     to_js_value(&result.to_trade_list())
+}
+
+/// Whether an optimization result carries a usable solution.
+///
+/// Twin of Python `PortfolioOptimizationResult.is_feasible` (Rust
+/// `PortfolioOptimizationResult::is_feasible`): derived from `status`, which
+/// is the only stored outcome; `true` only for `"optimal"`.
+/// @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
+/// @returns `true` when the status is `"optimal"`.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (kind `invalid_type`) if `result` is not a JSON string
+/// or plain object, and a `FinstackError` (kind `validation`) if it does not
+/// match the optimization-result schema.
+#[wasm_bindgen(js_name = portfolioOptimizationResultIsFeasible)]
+pub fn portfolio_optimization_result_is_feasible(result: JsValue) -> Result<bool, JsValue> {
+    let result: PortfolioOptimizationResult = from_js_json(&result, "result")?;
+    Ok(result.is_feasible())
 }
 
 /// Rebuild the dense matrix from its wire object, validating its dimensions.
@@ -374,75 +392,6 @@ fn constraint_value(
         Some(label) => constraint.with_label(label),
         None => constraint,
     })
-}
-
-/// Build a budget (weight-sum) constraint.
-///
-/// Twin of Python `Constraint.budget` (Rust `Constraint::budget`).
-/// @param rhs - Target sum of weights as a decimal (`1.0` is fully invested); finite and non-negative.
-/// @returns The `Constraint` object `{ budget: { rhs } }`.
-///
-/// # Errors
-///
-/// Throws a `TypeError` (kind `invalid_type`) if `rhs` is not a number, and a
-/// `FinstackError` (kind `validation`) if it is negative or not finite.
-#[wasm_bindgen(js_name = constraintBudget)]
-pub fn constraint_budget(rhs: JsValue) -> Result<JsValue, JsValue> {
-    constraint_value(Constraint::budget(js_f64(&rhs, "rhs")?), None)
-}
-
-/// Build per-position weight bounds for the positions a filter selects.
-///
-/// Twin of Python `Constraint.weight_bounds` (Rust `Constraint::weight_bounds`).
-/// @param filter - `PositionFilter` value selecting the bounded positions: `"all"` or a filter object such as `{ by_entity_id: "FUND" }`.
-/// @param min - Inclusive minimum weight as a decimal fraction of portfolio value.
-/// @param max - Inclusive maximum weight as a decimal fraction of portfolio value.
-/// @param label - Optional label reported in constraint slacks.
-/// @returns The `weight_bounds` `Constraint` object.
-///
-/// # Errors
-///
-/// Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a
-/// `FinstackError` (kind `validation`) if `filter` does not match the schema
-/// or `min > max`.
-#[wasm_bindgen(js_name = constraintWeightBounds)]
-pub fn constraint_weight_bounds(
-    filter: JsValue,
-    min: JsValue,
-    max: JsValue,
-    label: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    // A filter is `"all"` or an object, so the argument is the value itself
-    // (a string is the wire label, not JSON text to parse).
-    let filter: PositionFilter = serde_json::from_value(js_json_value(&filter, "filter")?)
-        .map_err(|error| {
-            to_js_err(finstack_quant_core::Error::Validation(format!(
-                "filter: {error}"
-            )))
-        })?;
-    let min = js_f64(&min, "min")?;
-    let max = js_f64(&max, "max")?;
-    constraint_value(Constraint::weight_bounds(filter, min, max), label.as_ref())
-}
-
-/// Build a maximum-turnover constraint: `sum |w_new - w_current| <= maxTurnover`.
-///
-/// Twin of Python `Constraint.max_turnover` (Rust `Constraint::max_turnover`).
-/// @param max_turnover - Largest allowed gross turnover as a decimal fraction of portfolio value; non-negative.
-/// @param label - Optional label reported in constraint slacks.
-/// @returns The `max_turnover` `Constraint` object.
-///
-/// # Errors
-///
-/// Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a
-/// `FinstackError` (kind `validation`) if `maxTurnover` is negative.
-#[wasm_bindgen(js_name = constraintMaxTurnover)]
-pub fn constraint_max_turnover(
-    max_turnover: JsValue,
-    label: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let max_turnover = js_f64(&max_turnover, "maxTurnover")?;
-    constraint_value(Constraint::max_turnover(max_turnover), label.as_ref())
 }
 
 /// Build an attribute exposure cap: `sum w_i * I[attr == value] <= maxShare`.

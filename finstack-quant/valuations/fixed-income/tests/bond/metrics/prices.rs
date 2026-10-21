@@ -1,6 +1,7 @@
 //! Clean and dirty price calculator tests.
 
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;

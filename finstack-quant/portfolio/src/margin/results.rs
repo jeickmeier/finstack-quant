@@ -3,7 +3,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_margin::{ImCollateralResult, ImMethodology, NettingSetId, SimmSensitivities};
 
 use crate::types::PositionId;
@@ -37,7 +37,7 @@ pub struct NettingSetMargin {
     /// Aggregated sensitivities (for SIMM breakdown)
     pub sensitivities: Option<SimmSensitivities>,
     /// Breakdown by risk class (for SIMM)
-    pub im_breakdown: HashMap<String, Money>,
+    pub im_breakdown: FxHashMap<String, Money>,
 }
 
 impl NettingSetMargin {
@@ -87,7 +87,7 @@ impl NettingSetMargin {
             im_methodology,
             is_approximate: false,
             sensitivities: None,
-            im_breakdown: HashMap::default(),
+            im_breakdown: FxHashMap::default(),
         })
     }
 
@@ -99,7 +99,7 @@ impl NettingSetMargin {
     pub fn with_simm_breakdown(
         mut self,
         sensitivities: SimmSensitivities,
-        breakdown: HashMap<String, Money>,
+        breakdown: FxHashMap<String, Money>,
     ) -> Self {
         self.sensitivities = Some(sensitivities);
         self.im_breakdown = breakdown;
@@ -136,7 +136,7 @@ pub struct PortfolioMarginResult {
     /// Gross IM plus positive VM by netting set; this is not a collateral transfer
     pub total_margin: Money,
     /// One-way IM accounts keyed by contractual CSA ID, in each CSA's currency.
-    pub by_csa: HashMap<String, ImCollateralResult>,
+    pub by_csa: FxHashMap<String, ImCollateralResult>,
     /// Sum of target IM account balances, converted to the reporting currency.
     pub total_required_im_collateral: Money,
     /// Signed IM transfers across CSAs in reporting currency; positive posts.
@@ -144,7 +144,7 @@ pub struct PortfolioMarginResult {
     /// Required IM held in segregated custody, in reporting currency.
     pub total_segregated_im: Money,
     /// Results by netting set
-    pub by_netting_set: HashMap<NettingSetId, NettingSetMargin>,
+    pub by_netting_set: FxHashMap<NettingSetId, NettingSetMargin>,
     /// Number of positions whose MTM was successfully included in a netting set.
     /// Sensitivity or collateral-model failures can still mark them degraded.
     pub total_positions: usize,
@@ -160,6 +160,17 @@ pub struct PortfolioMarginResult {
 }
 
 impl PortfolioMarginResult {
+    /// Netting sets in the canonical wire order: ascending identifier string.
+    ///
+    /// # Returns
+    ///
+    /// Borrowed netting-set results, ordered as the serialized result lists them.
+    pub fn netting_sets_sorted(&self) -> Vec<&NettingSetMargin> {
+        let mut netting_sets: Vec<&NettingSetMargin> = self.by_netting_set.values().collect();
+        netting_sets.sort_by_key(|margin| margin.netting_set_id.to_string());
+        netting_sets
+    }
+
     /// Create a new portfolio margin result.
     ///
     /// # Returns
@@ -173,8 +184,8 @@ impl PortfolioMarginResult {
             total_initial_margin: Money::from((0_i64, base_currency)),
             total_variation_margin: Money::from((0_i64, base_currency)),
             total_margin: Money::from((0_i64, base_currency)),
-            by_netting_set: HashMap::default(),
-            by_csa: HashMap::default(),
+            by_netting_set: FxHashMap::default(),
+            by_csa: FxHashMap::default(),
             total_required_im_collateral: Money::from((0_i64, base_currency)),
             total_im_transfer: Money::from((0_i64, base_currency)),
             total_segregated_im: Money::from((0_i64, base_currency)),

@@ -6,5 +6,5 @@
 pub(crate) mod covenants;
 pub(crate) mod credit_context;
 
-pub use covenants::{forecast_breaches, forecast_covenant, to_table, StatementsAdapter};
+pub use covenants::{forecast_breaches, StatementsAdapter};
 pub use credit_context::{compute_credit_context, CreditContextMetrics, CreditNumeratorNodes};

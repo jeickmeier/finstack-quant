@@ -16,7 +16,7 @@ use std::hint::black_box;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use finstack_quant_core::market_data::hierarchy::HierarchyTarget;
 use finstack_quant_scenarios::{
-    CurveKind, InstrumentType, OperationSpec, ScenarioEngine, ScenarioSpec, TimeRollMode,
+    CurveKind, OperationSpec, ScenarioEngine, ScenarioSpec, TimeRollMode,
 };
 use fixtures::{
     apply_market, apply_with_instruments, compose_specs, hierarchy_hazard_market, hierarchy_market,
@@ -158,7 +158,7 @@ fn scaling_instrument_spread(c: &mut Criterion) {
     let scenario = spec(
         "spread",
         vec![OperationSpec::InstrumentSpreadBpByType {
-            instrument_types: vec![InstrumentType::Bond],
+            instrument_types: vec![finstack_quant_valuations::pricer::InstrumentType::Bond],
             bp: 25.0,
         }],
     );

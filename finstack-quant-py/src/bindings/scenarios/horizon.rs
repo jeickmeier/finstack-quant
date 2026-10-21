@@ -27,9 +27,12 @@ use super::extract::extract_config;
 ///     Valuation date (ISO 8601 accepted, e.g. ``"2025-01-15"``).
 /// scenario : ScenarioSpec | str
 ///     Typed scenario or JSON-serialized ``ScenarioSpec``.
-/// method : str | None, default None
-///     Attribution method: ``"parallel"``, ``"waterfall"``,
-///     ``"metrics_based"``, or ``"taylor"``. ``None`` selects the Rust default
+/// method : str | dict | None, default None
+///     ``AttributionMethod`` wire value: ``"parallel"``, ``"metrics_based"``,
+///     ``{"waterfall": [...factors]}`` (for example
+///     ``{"waterfall": default_waterfall_order()}``) or
+///     ``{"taylor": {...config}}`` (``{"taylor": {}}`` for the defaults),
+///     or the same value as JSON text. ``None`` selects the Rust default
 ///     (``AttributionMethod::default()``, currently ``"parallel"``).
 ///     ``"metrics_based"`` calculates the instrument's applicable subset of
 ///     the default attribution metrics (DV01, CS01, vega, ...) at the opening
@@ -83,7 +86,7 @@ pub(crate) fn compute_horizon_return<'py>(
     market: &Bound<'py, PyAny>,
     as_of: &Bound<'py, PyAny>,
     scenario: &Bound<'py, PyAny>,
-    method: Option<&str>,
+    method: Option<&Bound<'py, PyAny>>,
     config: Option<&Bound<'py, PyAny>>,
     calendar_id: Option<&str>,
 ) -> PyResult<PyHorizonResult> {
@@ -99,20 +102,21 @@ pub(crate) fn compute_horizon_return<'py>(
     let market_ctx = extract_market(py, market)?;
     let date = crate::bindings::date_utils::py_to_date(as_of)?;
     let scenario = crate::bindings::extract::extract_scenario_spec(py, scenario)?;
-    let attribution_method = method
-        .map(finstack_quant_scenarios::horizon::attribution_method_from_str)
-        .transpose()
-        .map_err(scenarios_to_py)?
+    let attribution_method: finstack_quant_attribution::AttributionMethod = method
+        .map(|method| -> PyResult<_> {
+            let json = crate::bindings::module_utils::py_to_json_string(py, method, "method")?;
+            serde_json::from_str(&json)
+                .map_err(|e| crate::errors::serde_json_to_py(e, "invalid attribution method"))
+        })
+        .transpose()?
         .unwrap_or_default();
     let finstack_config = extract_config(config)?;
 
     // Run analysis with the GIL released: horizon attribution revalues the
     // instrument multiple times (potentially rayon-parallel) and can run for
     // seconds on large books.
-    let mut analyzer = finstack_quant_scenarios::horizon::HorizonAnalysis::new(
-        attribution_method,
-        finstack_config,
-    );
+    let mut analyzer =
+        finstack_quant_scenarios::HorizonAnalysis::new(attribution_method, finstack_config);
     if let Some(id) = calendar_id {
         analyzer = analyzer.with_calendar_id(id);
     }
@@ -137,7 +141,7 @@ pub(crate) fn compute_horizon_return<'py>(
 )]
 #[derive(Clone)]
 pub(crate) struct PyHorizonResult {
-    inner: finstack_quant_scenarios::horizon::HorizonResult,
+    inner: finstack_quant_scenarios::HorizonResult,
 }
 
 const HORIZON_COLUMNS: [&str; 11] = [
@@ -252,7 +256,7 @@ impl PyHorizonResult {
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_scenarios::horizon::HorizonResult =
+        let inner: finstack_quant_scenarios::HorizonResult =
             serde_json::from_str(json).map_err(display_to_py)?;
         Ok(Self { inner })
     }

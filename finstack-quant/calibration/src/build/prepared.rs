@@ -1,6 +1,6 @@
 //! Prepared quote envelopes for calibration pipelines.
 
-use crate::build::cds::{build_cds_instrument, resolve_cds_quote_dates};
+use crate::build::cds::{build_cds_instrument, cds_pillar_maturity};
 use crate::build::rates::build_rate_instrument_with_dates;
 use crate::build::xccy::build_xccy_instrument;
 use crate::build::BuildCtx;
@@ -166,7 +166,7 @@ pub(crate) fn prepare_cds_quote(
     day_count: DayCount,
     base_date: Date,
 ) -> Result<PreparedQuote<CdsQuote>> {
-    let maturity_date = resolve_cds_quote_dates(&quote, build_ctx)?.maturity;
+    let maturity_date = cds_pillar_maturity(build_ctx.as_of(), quote.pillar())?;
     let instrument = build_cds_instrument(&quote, build_ctx)?;
     let instrument: Arc<dyn Instrument> = Arc::new(instrument);
 
@@ -186,13 +186,13 @@ mod tests {
     use super::*;
     use crate::quotes::ids::{Pillar, QuoteId};
     use crate::quotes::rates::RateQuote;
-    use finstack_quant_core::HashMap;
+    use finstack_quant_core::FxHashMap;
     use time::Month;
 
     #[test]
     fn prepare_rate_quote_uses_future_period_end_as_pillar() {
         let as_of = Date::from_calendar_date(2025, Month::January, 10).expect("valid date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("forward".to_string(), "USD-SOFR".to_string());
         let ctx = BuildCtx::new(as_of, 1_000_000.0, curve_ids);
@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn prepare_rate_quote_uses_swap_end_as_pillar() {
         let as_of = Date::from_calendar_date(2025, Month::January, 10).expect("valid date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("forward".to_string(), "USD-SOFR".to_string());
         let ctx = BuildCtx::new(as_of, 1_000_000.0, curve_ids);
@@ -267,7 +267,7 @@ mod tests {
     #[test]
     fn prepare_cds_quote_uses_resolved_imm_maturity_as_pillar() {
         let as_of = Date::from_calendar_date(2024, Month::January, 2).expect("valid date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("credit".to_string(), "ABC-CORP".to_string());
         let ctx = BuildCtx::new(as_of, 10_000_000.0, curve_ids);

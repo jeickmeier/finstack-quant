@@ -1,5 +1,8 @@
 use super::cap_floor::solve_cap_floor_sigma_for_fixed_kappa;
-use super::pricing::{cap_floor_periods, forward_rate_from_df, normal_caplet_price};
+use super::pricing::{
+    cap_floor_periods, normal_caplet_price, scheduled_bachelier_cap_floor_price,
+    scheduled_forward_rate,
+};
 use super::swaption::infer_hw_initial_guess;
 use super::targets::{
     HullWhiteSwaptionTarget, PreparedSwaption, SwaptionPayoff, KAPPA_MAX, KAPPA_MIN,
@@ -8,6 +11,92 @@ use super::*;
 use finstack_quant_models::rates::hull_white::{
     hw1f_caplet_forward_rate_normal_vol, hw1f_convexity_adjustment, hw_b, hw_bond_vol,
 };
+
+/// Cap/floor shape for the synthetic-schedule HW1F test helpers below.
+#[derive(Clone, Copy)]
+struct CapFloorPriceSpec {
+    maturity: f64,
+    strike: f64,
+    is_cap: bool,
+    frequency: SwapFrequency,
+}
+
+impl CapFloorPriceSpec {
+    fn new(maturity: f64, strike: f64, is_cap: bool, frequency: SwapFrequency) -> Self {
+        Self {
+            maturity,
+            strike,
+            is_cap,
+            frequency,
+        }
+    }
+
+    fn from_quote(quote: &CapFloorQuote, frequency: SwapFrequency) -> Self {
+        Self::new(quote.maturity, quote.strike, quote.is_cap, frequency)
+    }
+
+    fn schedule(&self) -> CapFloorSchedule {
+        CapFloorSchedule::synthetic(self.maturity, self.frequency)
+    }
+}
+
+/// Flat-normal-vol cap/floor price on a synthetic schedule.
+fn bachelier_cap_floor_price(
+    discount_df: &(dyn Fn(f64) -> f64 + Sync),
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
+    maturity: f64,
+    strike: f64,
+    normal_vol: f64,
+    is_cap: bool,
+    frequency: SwapFrequency,
+) -> f64 {
+    scheduled_bachelier_cap_floor_price(
+        discount_df,
+        forward_df,
+        &CapFloorSchedule::synthetic(maturity, frequency),
+        strike,
+        normal_vol,
+        is_cap,
+    )
+}
+
+/// Exact constant-sigma HW1F cap/floor price (caplets as zero-coupon bond options).
+fn hw1f_cap_floor_price(
+    kappa: f64,
+    sigma: f64,
+    discount_df: &(dyn Fn(f64) -> f64 + Sync),
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
+    spec: CapFloorPriceSpec,
+) -> f64 {
+    let periods: Vec<_> = cap_floor_periods(spec.maturity, spec.frequency).collect();
+    finstack_quant_models::rates::hull_white::hw1f_cap_floor_price(
+        HullWhiteCalibrationParams { kappa, sigma },
+        discount_df,
+        forward_df,
+        &periods,
+        spec.strike,
+        spec.is_cap,
+    )
+}
+
+/// Flat normal vol that reproduces the constant-sigma HW1F cap/floor price.
+fn hw1f_cap_floor_implied_normal_vol(
+    kappa: f64,
+    sigma: f64,
+    discount_df: &(dyn Fn(f64) -> f64 + Sync),
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
+    spec: CapFloorPriceSpec,
+) -> finstack_quant_core::Result<f64> {
+    let target = hw1f_cap_floor_price(kappa, sigma, discount_df, forward_df, spec);
+    scheduled_cap_floor_implied_normal_vol(
+        target,
+        discount_df,
+        forward_df,
+        &spec.schedule(),
+        spec.strike,
+        spec.is_cap,
+    )
+}
 
 #[test]
 fn swap_frequency_display_matches_serde_contract() {
@@ -107,10 +196,17 @@ fn piecewise_cap_floor_bootstrap_recovers_synthetic_segments() {
         .into_iter()
         .map(|maturity| {
             let spec = CapFloorPriceSpec::new(maturity, 0.03, true, SwapFrequency::Quarterly);
-            let target = hw1f_cap_floor_price_with_model(&generated, &discount, &forward, spec)
-                .expect("model price");
+            let target = scheduled_cap_floor_price(
+                &generated,
+                &discount,
+                &forward,
+                &spec.schedule(),
+                spec.strike,
+                spec.is_cap,
+            )
+            .expect("model price");
             let normal_vol = BrentSolver::new()
-                .tolerance(1.0e-12)
+                .with_tolerance(1.0e-12)
                 .solve_in_bracket(
                     |vol| {
                         bachelier_cap_floor_price(
@@ -211,7 +307,7 @@ fn swaption_price_positive() {
 fn swaption_price_monotone_in_sigma() {
     let df_fn = flat_df(0.03);
     let fwd = {
-        let (_, r) = compute_swap_annuity_and_rate(&df_fn, 1.0, 5.0, 2);
+        let (_, r) = compute_swap_annuity_and_rate(&df_fn, 1.0, 5.0, 2, None);
         r
     };
     let p_low = hw1f_swaption_price(0.05, 0.005, &df_fn, 1.0, 5.0, fwd, 2);
@@ -236,7 +332,7 @@ fn swaption_price_monotone_in_sigma() {
 #[test]
 fn item5_hw1f_r_star_extreme_kappa_does_not_explode() {
     let df_fn = flat_df(0.03);
-    let (annuity, fwd) = compute_swap_annuity_and_rate(&df_fn, 1.0, 5.0, 2);
+    let (annuity, fwd) = compute_swap_annuity_and_rate(&df_fn, 1.0, 5.0, 2, None);
 
     for kappa in [1.0e6_f64, 1.0e8, 1.0e10] {
         let price = hw1f_swaption_price(kappa, 0.01, &df_fn, 1.0, 5.0, fwd, 2);
@@ -280,7 +376,8 @@ fn calibrate_hw1f_round_trip() {
     let quotes: Vec<SwaptionQuote> = swaption_specs
         .iter()
         .map(|&(expiry, tenor)| {
-            let (annuity, fwd_rate) = compute_swap_annuity_and_rate(&df_fn, expiry, tenor, ppy);
+            let (annuity, fwd_rate) =
+                compute_swap_annuity_and_rate(&df_fn, expiry, tenor, ppy, None);
             let model_price =
                 hw1f_swaption_price(true_kappa, true_sigma, &df_fn, expiry, tenor, fwd_rate, ppy);
 
@@ -457,7 +554,8 @@ fn hw1f_calibration_recovers_kappa_on_wide_round_trip_grid() {
     let quotes: Vec<SwaptionQuote> = specs
         .iter()
         .map(|&(expiry, tenor)| {
-            let (annuity, fwd_rate) = compute_swap_annuity_and_rate(&df_fn, expiry, tenor, ppy);
+            let (annuity, fwd_rate) =
+                compute_swap_annuity_and_rate(&df_fn, expiry, tenor, ppy, None);
             let model_price =
                 hw1f_swaption_price(true_kappa, true_sigma, &df_fn, expiry, tenor, fwd_rate, ppy);
             let vol = model_price / (annuity * (expiry / (2.0 * std::f64::consts::PI)).sqrt());
@@ -1023,19 +1121,26 @@ fn convexity_adjustment_degenerate_inputs() {
 /// produced a finite forward, defeating the non-finite-price error
 /// contract in the calibration residuals.
 #[test]
-fn forward_rate_from_df_propagates_bad_dfs() {
+fn scheduled_forward_rate_propagates_bad_dfs() {
+    let period = CapletSchedule {
+        fixing_time: 0.25,
+        start_time: 0.25,
+        end_time: 0.5,
+        payment_time: 0.5,
+        accrual: 0.25,
+    };
     let nan_df = |_: f64| f64::NAN;
-    assert!(forward_rate_from_df(&nan_df, 0.25, 0.5).is_nan());
+    assert!(scheduled_forward_rate(&nan_df, &period).is_nan());
 
     let neg_df = |t: f64| if t > 0.3 { -1.0 } else { 1.0 };
-    assert!(forward_rate_from_df(&neg_df, 0.25, 0.5).is_nan());
+    assert!(scheduled_forward_rate(&neg_df, &period).is_nan());
 
     let zero_df = |t: f64| if t > 0.3 { 0.0 } else { 1.0 };
-    assert!(forward_rate_from_df(&zero_df, 0.25, 0.5).is_nan());
+    assert!(scheduled_forward_rate(&zero_df, &period).is_nan());
 
     // Sane curve still produces a sane forward.
     let df_fn = flat_df(0.03);
-    let fwd = forward_rate_from_df(&df_fn, 0.25, 0.5);
+    let fwd = scheduled_forward_rate(&df_fn, &period);
     assert!((fwd - 0.03).abs() < 1e-3, "flat 3% curve forward: {fwd}");
 }
 
@@ -1068,9 +1173,12 @@ fn cap_floor_periods_exclude_spot_caplet_and_expiry_is_fixing_time() {
         true,
         SwapFrequency::Quarterly,
     );
-    let price_t_end: f64 = cap_floor_periods(2.0, SwapFrequency::Quarterly)
-        .map(|(t_start, t_end, accrual)| {
-            let forward = forward_rate_from_df(&df_fn, t_start, t_end);
+    let price_t_end: f64 = CapFloorSchedule::synthetic(2.0, SwapFrequency::Quarterly)
+        .periods
+        .iter()
+        .map(|period| {
+            let (t_end, accrual) = (period.end_time, period.accrual);
+            let forward = scheduled_forward_rate(&df_fn, period);
             normal_caplet_price(forward, 0.03, 0.008, t_end, accrual, df_fn(t_end), true)
         })
         .sum();
@@ -1129,9 +1237,12 @@ fn hw1f_cap_floor_zcb_option_parity() {
         &df_fn,
         CapFloorPriceSpec::new(maturity, strike, false, frequency),
     );
-    let forward_leg: f64 = cap_floor_periods(maturity, frequency)
-        .map(|(t_start, t_end, accrual)| {
-            let fwd = forward_rate_from_df(&df_fn, t_start, t_end);
+    let forward_leg: f64 = CapFloorSchedule::synthetic(maturity, frequency)
+        .periods
+        .iter()
+        .map(|period| {
+            let (t_end, accrual) = (period.end_time, period.accrual);
+            let fwd = scheduled_forward_rate(&df_fn, period);
             df_fn(t_end) * accrual * (fwd - strike)
         })
         .sum();
@@ -1151,9 +1262,12 @@ fn hw1f_zcb_option_caplet_prices_above_old_approximation() {
     let (kappa, sigma) = (0.05, 0.012);
     let spec = CapFloorPriceSpec::new(5.0, 0.04, true, SwapFrequency::Annual);
     let exact = hw1f_cap_floor_price(kappa, sigma, &df_fn, &df_fn, spec);
-    let approx: f64 = cap_floor_periods(spec.maturity, spec.frequency)
-        .map(|(t_start, t_end, accrual)| {
-            let forward = forward_rate_from_df(&df_fn, t_start, t_end);
+    let approx: f64 = CapFloorSchedule::synthetic(spec.maturity, spec.frequency)
+        .periods
+        .iter()
+        .map(|period| {
+            let (t_start, t_end, accrual) = (period.start_time, period.end_time, period.accrual);
+            let forward = scheduled_forward_rate(&df_fn, period);
             let hw_vol = hw1f_caplet_forward_rate_normal_vol(kappa, sigma, t_start, accrual);
             normal_caplet_price(
                 forward,

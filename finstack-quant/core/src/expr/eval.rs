@@ -35,7 +35,7 @@ use smallvec::SmallVec;
 /// let expr = CompiledExpr::new(Expr::column("x"))?;
 ///
 /// let out = expr.eval(&ctx, &cols)?;
-/// assert_eq!(out.values, vec![1.0, 2.0, 3.0]);
+/// assert_eq!(out, vec![1.0, 2.0, 3.0]);
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 #[derive(Clone, Debug)]
@@ -119,8 +119,7 @@ impl CompiledExpr {
     ///   operators, conditionals and elementwise functions only.
     pub fn new(ast: Expr) -> crate::Result<Self> {
         ensure_scalar_evaluable(&ast)?;
-        let meta = crate::config::results_meta(&crate::config::FinstackConfig::default());
-        let plan = DagBuilder::default().build_plan(ast, meta)?;
+        let plan = DagBuilder::default().build_plan(ast)?;
         Ok(Self { plan })
     }
 
@@ -133,10 +132,8 @@ impl CompiledExpr {
     /// than that are truncated. Missing tail values therefore propagate as
     /// NaN rather than being silently zero-filled.
     ///
-    /// The context maps column names to positions in `cols`. The result
-    /// carries a default-config metadata snapshot; evaluation adds no timing
-    /// or parallelism data, and every call recomputes values from the
-    /// supplied columns.
+    /// The context maps column names to positions in `cols`. Every call
+    /// recomputes values from the supplied columns.
     ///
     /// # Errors
     ///
@@ -148,7 +145,7 @@ impl CompiledExpr {
     /// * `ctx` - Column-name to index map used to resolve `Expr` column references.
     /// * `cols` - Column arrays aligned with `ctx`; output length is the first
     ///   column's length.
-    pub fn eval(&self, ctx: &SimpleContext, cols: &[&[f64]]) -> crate::Result<EvaluationResult> {
+    pub fn eval(&self, ctx: &SimpleContext, cols: &[&[f64]]) -> crate::Result<Vec<f64>> {
         let plan = &self.plan;
         tracing::debug!(
             row_count = cols.first().map(|c| c.len()).unwrap_or(0),
@@ -191,17 +188,12 @@ impl CompiledExpr {
             cursor = end;
         }
 
-        let values = offsets
+        Ok(offsets
             .get(plan.root as usize)
             .copied()
             .flatten()
             .map(|(start, end)| arena[start..end].to_vec())
-            .unwrap_or_default();
-
-        Ok(EvaluationResult {
-            values,
-            metadata: plan.meta.clone(),
-        })
+            .unwrap_or_default())
     }
 
     /// Evaluate a single DAG node directly into a provided output slice (arena-based).
@@ -213,7 +205,7 @@ impl CompiledExpr {
         match &node.expr.node {
             ExprNode::Column(name) => {
                 let Some(idx) = env.ctx.index_of(name) else {
-                    return Err(crate::error::InputError::NotFound {
+                    return Err(crate::InputError::NotFound {
                         id: format!("expr column:{name}"),
                     }
                     .into());
@@ -525,7 +517,7 @@ mod tests {
         let expr = Expr::if_then_else(condition, then_branch, else_branch);
 
         let compiled = CompiledExpr::new(expr).expect("elementwise expression compiles");
-        let result = compiled.eval(&ctx, &cols).unwrap().values;
+        let result = compiled.eval(&ctx, &cols).unwrap();
 
         assert_eq!(result.len(), 4);
         assert!((result[0] + 0.5).abs() < 1e-12);

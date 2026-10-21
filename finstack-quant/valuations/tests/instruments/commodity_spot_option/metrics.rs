@@ -6,6 +6,7 @@ use finstack_quant_core::market_data::bumps::{
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOption;
 use finstack_quant_valuations::instruments::Attributes;

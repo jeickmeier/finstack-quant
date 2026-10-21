@@ -838,10 +838,6 @@
       "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
       "type": "string"
     },
-    "EntityId": {
-      "description": "Entity identifier (company, fund, etc.)",
-      "type": "string"
-    },
     "FxConversionPolicy": {
       "description": "Standard FX conversion strategies used to hint FX providers.\n\nThe policy tells a provider *how* the rate will be applied so it can decide\nbetween spot, forward, or averaged sources.",
       "oneOf": [
@@ -861,6 +857,10 @@
           "type": "string"
         }
       ]
+    },
+    "Id": {
+      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
+      "type": "string"
     },
     "MetricId": {
       "description": "Strongly-typed metric identifier.\n\nProvides compile-time validation, autocomplete support, and safe refactoring\nwhen metric names change. Covers bond, IRS, deposit, and risk metrics.\n\nSee unit tests and `examples/` for usage.",
@@ -905,7 +905,7 @@
         "degraded_positions": {
           "description": "Positions that carried no risk measures at all because their valuation\nfell back to PV-only.\n\nMirrored from\n[`PortfolioValuation::degraded_positions`](crate::valuation::PortfolioValuation::degraded_positions)\n(positions with `risk_metrics_complete == false`). Such positions\ncontribute zero to every total without producing a\n[`SkippedMetric`] entry — that field only records non-finite values —\nso this list is the only signal that the aggregate is partial.",
           "items": {
-            "$ref": "#/$defs/PositionId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
@@ -947,13 +947,12 @@
         "degraded_positions": {
           "description": "Positions whose valuation fell back to PV-only because requested risk\nmetrics could not be computed.",
           "items": {
-            "$ref": "#/$defs/PositionId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
         "fx_collapse_policy": {
           "$ref": "#/$defs/FxConversionPolicy",
-          "default": "cashflow_date",
           "description": "FX policy applied when collapsing position values to the base currency.\n\nBase-currency rollups use an explicit spot-equivalent conversion at\n[`as_of`](Self::as_of) through the market FX matrix; this records the\napplied [`FxConversionPolicy`] so the result envelope satisfies the\npolicy-visibility invariant (the FX strategy is stamped, not implied)."
         },
         "position_values": {
@@ -972,13 +971,10 @@
         "as_of",
         "position_values",
         "total_base_currency",
-        "by_entity"
+        "by_entity",
+        "fx_collapse_policy"
       ],
       "type": "object"
-    },
-    "PositionId": {
-      "description": "Position identifier.",
-      "type": "string"
     },
     "PositionMetrics": {
       "description": "Position-level metrics with explicit native currency context.",
@@ -1006,11 +1002,11 @@
       "description": "Result of valuing a single position.\n\nHolds both native-currency and base-currency valuations along with\nthe underlying [`ValuationResult`].",
       "properties": {
         "entity_id": {
-          "$ref": "#/$defs/EntityId",
+          "$ref": "#/$defs/Id",
           "description": "Entity that owns this position"
         },
         "fx_rate": {
-          "description": "Spot FX rate applied to collapse [`value_native`](Self::value_native)\ninto [`value_base`](Self::value_base): units of the portfolio base\ncurrency per one unit of the native currency, observed at the\nvaluation date, so `value_native × fx_rate = value_base` (up to the\nbase currency's `Money` rounding).\n\nAbsent when the native currency is the base currency (no FX lookup is\nmade), and on values deserialized from JSON written before this field\nexisted.",
+          "description": "Spot FX rate applied to collapse [`value_native`](Self::value_native)\ninto [`value_base`](Self::value_base): units of the portfolio base\ncurrency per one unit of the native currency, observed at the\nvaluation date, so `value_native × fx_rate = value_base` (up to the\nbase currency's `Money` rounding).\n\nAbsent when the native currency is the base currency (no FX lookup is\nmade).",
           "format": "double",
           "type": [
             "number",
@@ -1037,7 +1033,7 @@
           "type": "number"
         },
         "position_id": {
-          "$ref": "#/$defs/PositionId",
+          "$ref": "#/$defs/Id",
           "description": "Position identifier"
         },
         "risk_error": {
@@ -1159,8 +1155,7 @@
         "tolerances": {
           "$ref": "#/$defs/ToleranceConfig",
           "default": {
-            "generic_epsilon": 1e-10,
-            "rate_epsilon": 1e-12
+            "generic_epsilon": 1e-10
           },
           "description": "Tolerance settings snapshot for floating-point comparisons."
         },
@@ -1224,7 +1219,7 @@
           "type": "string"
         },
         "position_id": {
-          "$ref": "#/$defs/PositionId",
+          "$ref": "#/$defs/Id",
           "description": "Position that produced the non-finite value."
         },
         "value": {
@@ -1242,17 +1237,12 @@
     },
     "ToleranceConfig": {
       "additionalProperties": false,
-      "description": "Numerical tolerance configuration for floating-point comparisons.\n\nProvides configurable epsilon values for zero-checks in rate calculations\nand generic floating-point comparisons. These defaults are chosen to balance\nnumerical stability with practical precision requirements.\n\n# Examples\n```rust\nuse finstack_quant_core::config::ToleranceConfig;\n\nlet mut tol = ToleranceConfig::default();\nassert_eq!(tol.rate_epsilon, 1e-12);\n\n// Customize for stricter rate comparisons\ntol.rate_epsilon = 1e-14;\n```",
+      "description": "Numerical tolerance configuration for floating-point comparisons.\n\nProvides the configurable epsilon for generic floating-point zero-checks.\nThe default is chosen to balance numerical stability with practical\nprecision requirements.\n\n# Examples\n```rust\nuse finstack_quant_core::config::ToleranceConfig;\n\nlet mut tol = ToleranceConfig::default();\nassert_eq!(tol.generic_epsilon, 1e-10);\n\n// Customize for stricter comparisons\ntol.generic_epsilon = 1e-12;\n```",
       "properties": {
         "generic_epsilon": {
           "$ref": "#/$defs/PositiveF64Wire",
           "default": 1e-10,
           "description": "Epsilon for generic floating-point comparisons (default: 1e-10).\n\nUsed for general numerical comparisons where higher tolerance is acceptable."
-        },
-        "rate_epsilon": {
-          "$ref": "#/$defs/PositiveF64Wire",
-          "default": 1e-12,
-          "description": "Epsilon for rate comparisons (default: 1e-12).\n\nUsed when comparing interest rates, yields, and other small ratios."
         }
       },
       "type": "object"
@@ -1271,8 +1261,7 @@
           "mode": "bankers",
           "output_scale_by_currency": {},
           "tolerances": {
-            "generic_epsilon": 1e-10,
-            "rate_epsilon": 1e-12
+            "generic_epsilon": 1e-10
           },
           "version": 1
         },

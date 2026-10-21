@@ -54,10 +54,10 @@ finstack_quant_valuations::impl_empty_cashflow_provider!(
 
 impl CurveZeroInstrument {
     fn raw_value(&self, market: &MarketContext) -> Result<f64> {
-        Ok(market
-            .get_discount(self.curve_id.as_str())?
-            .zero(self.tenor_years)
-            * self.scale)
+        Ok(market.get_discount(self.curve_id.as_str())?.zero_rate(
+            self.tenor_years,
+            finstack_quant_core::math::Compounding::Continuous,
+        ) * self.scale)
     }
 }
 

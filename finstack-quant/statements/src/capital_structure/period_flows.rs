@@ -18,9 +18,9 @@
 use crate::capital_structure::cashflows::CashflowBreakdown;
 use crate::error::Result;
 use crate::evaluator::{CapitalStructureWarning, EvalWarning};
+use finstack_quant_cashflows::accrual::{accrued_interest_amount, AccrualConfig};
 use finstack_quant_cashflows::builder::{CashFlowSchedule, CashflowRepresentation};
-use finstack_quant_cashflows::primitives::CFKind;
-use finstack_quant_cashflows::{accrued_interest_amount, AccrualConfig};
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::dates::{Date, Period};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -88,10 +88,8 @@ pub(crate) fn period_snapshot_date(period: &Period) -> Date {
 /// Whether a flow returns principal to the lender: amortization, prepayment,
 /// revolver repayment, or a positive notional (redemption) row.
 fn is_principal_repayment(flow: &CashFlow) -> bool {
-    matches!(
-        flow.kind,
-        CFKind::Amortization | CFKind::PrePayment | CFKind::RevolvingRepayment
-    ) || (flow.kind == CFKind::Notional && flow.amount.amount() > 0.0)
+    flow.kind.is_principal_repayment()
+        && (flow.kind != CFKind::Notional || flow.amount.amount() > 0.0)
 }
 
 /// Preserve the cash and economic dates of this period's principal claims.
@@ -136,17 +134,12 @@ pub(crate) fn period_principal_claims(
 ///   residual schedule is provided.
 /// * `period` - The period to extract flows for
 /// * `opening_balance` - Opening balance at the start of the period
-/// * `toggled_pik_capitalized` - Cumulative principal capitalized via the PIK
-///   *toggle* (see [`crate::capital_structure::CapitalStructureState::cumulative_toggled_pik`]).
-///   Used only when `residual_schedule` is `None` to keep the scale basis from
-///   treating toggle-driven compounding as schedule drift; pass zero when no
-///   toggle state exists.
 /// * `market_ctx` - Market context for pricing
 /// * `as_of` - Valuation date used to generate the instrument's full cashflow
 ///   schedule and identify historical versus projected amounts.
 /// * `residual_schedule` - Rebuilt remaining schedule after a prior outstanding
-///   change. When present, period flows are read from this schedule (the
-///   interest engine) and a warning is raised if
+///   change; `None` reads the instrument's raw schedule instead. Period flows
+///   are read from this schedule (the interest engine) and a warning is raised if
 ///   `opening / scheduled_opening` diverges from 1 by more than `1e-6`.
 ///
 /// # Returns
@@ -174,14 +167,12 @@ pub fn calculate_period_flows(
     instrument: &dyn Instrument,
     period: &Period,
     opening_balance: Money,
-    toggled_pik_capitalized: Money,
     market_ctx: &MarketContext,
     as_of: Date,
     residual_schedule: Option<&CashFlowSchedule>,
 ) -> Result<(CashflowBreakdown, Money, Money, Vec<EvalWarning>)> {
     let is_debt = is_debt_kind(instrument.key())?;
     let interest_expense_sign = if is_debt { 1.0 } else { -1.0 };
-    let using_residual = residual_schedule.is_some();
     let full_schedule = match residual_schedule {
         Some(schedule) => schedule.clone(),
         None => instrument.raw_cashflow_schedule(market_ctx, as_of)?,
@@ -197,12 +188,6 @@ pub fn calculate_period_flows(
         return Err(crate::error::Error::currency_mismatch(
             currency,
             opening_balance.currency(),
-        ));
-    }
-    if toggled_pik_capitalized.amount() != 0.0 && toggled_pik_capitalized.currency() != currency {
-        return Err(crate::error::Error::currency_mismatch(
-            currency,
-            toggled_pik_capitalized.currency(),
         ));
     }
     let mut breakdown = CashflowBreakdown::with_currency(currency);
@@ -225,9 +210,7 @@ pub fn calculate_period_flows(
         .unwrap_or(full_schedule.get_notional().initial);
 
     // Residual rebuild is the interest engine. Scale remains only as a
-    // diagnostic (and as a fallback when the caller did not pass a residual):
-    // after a correct rebuild, `opening / scheduled_opening ≈ 1`.
-    const SCALE_WARN_THRESHOLD: f64 = 1.05;
+    // diagnostic: after a correct rebuild, `opening / scheduled_opening ≈ 1`.
     const RESIDUAL_SCALE_TOLERANCE: f64 = 1e-6;
     // Funding establishes principal even from a zero opening. For schedules
     // without an issuance cash leg, recognize their initial face
@@ -290,62 +273,23 @@ pub fn calculate_period_flows(
     } else if scheduled_opening.amount() == 0.0 {
         1.0
     } else {
-        // Toggle-driven PIK capitalization grows the stateful balance beyond
-        // the contractual schedule by design. Exclude that increment from the
-        // clamp basis (so legitimate PIK compounding is never frozen by the
-        // clamp) while still accruing interest on the full stateful balance:
-        // scale = clamp((opening - toggled_pik) / scheduled) + toggled_pik / scheduled.
-        //
-        // The increment is capped at the opening balance because it is only a
-        // *component* of that balance. Once sweeps repay the debt below the
-        // cumulative toggled PIK, an uncapped `pik_part` makes the
-        // `adjusted_opening` floor bind and leaves `scale = pik / scheduled`,
-        // which exceeds `opening / scheduled` — interest would accrue on
-        // principal the borrower no longer owes, compounding every period.
-        // With the cap, an unclamped scale is exactly `opening / scheduled`.
-        let pik_increment = toggled_pik_capitalized
-            .amount()
-            .max(0.0)
-            .min(opening_balance.amount().max(0.0));
-        let adjusted_opening = (opening_balance.amount() - pik_increment).max(0.0);
-        let adjusted_ratio = adjusted_opening / scheduled_opening.amount();
-        let pik_part = pik_increment / scheduled_opening.amount();
-        if using_residual {
-            let residual_scale = opening_balance.amount() / scheduled_opening.amount();
-            if (residual_scale - 1.0).abs() > RESIDUAL_SCALE_TOLERANCE {
-                tracing::warn!(
-                    raw_scale = residual_scale,
-                    period = ?period.id,
-                    "Residual schedule opening diverges from the stateful opening \
-                     (|scale - 1| > {RESIDUAL_SCALE_TOLERANCE}); this signals a rebuild bug."
-                );
-                warnings.push(EvalWarning::CapitalStructure {
-                    period: period.id,
-                    warning: CapitalStructureWarning::ScaleClamped {
-                        raw_ratio: residual_scale,
-                        clamped_ratio: 1.0,
-                    },
-                });
-            }
-            residual_scale
-        } else {
-            if adjusted_ratio > SCALE_WARN_THRESHOLD {
-                tracing::warn!(
-                    raw_scale = adjusted_ratio,
-                    period = ?period.id,
-                    "Scale factor between opening balance (ex toggled-PIK) and scheduled opening exceeds {SCALE_WARN_THRESHOLD}. \
-                     This typically indicates an unscheduled paydown / re-draw mismatch — verify the model."
-                );
-                warnings.push(EvalWarning::CapitalStructure {
-                    period: period.id,
-                    warning: CapitalStructureWarning::ScaleClamped {
-                        raw_ratio: adjusted_ratio,
-                        clamped_ratio: adjusted_ratio,
-                    },
-                });
-            }
-            adjusted_ratio + pik_part
+        let residual_scale = opening_balance.amount() / scheduled_opening.amount();
+        if (residual_scale - 1.0).abs() > RESIDUAL_SCALE_TOLERANCE {
+            tracing::warn!(
+                raw_scale = residual_scale,
+                period = ?period.id,
+                "Residual schedule opening diverges from the stateful opening \
+                 (|scale - 1| > {RESIDUAL_SCALE_TOLERANCE}); this signals a rebuild bug."
+            );
+            warnings.push(EvalWarning::CapitalStructure {
+                period: period.id,
+                warning: CapitalStructureWarning::ScaleClamped {
+                    raw_ratio: residual_scale,
+                    clamped_ratio: 1.0,
+                },
+            });
         }
+        residual_scale
     };
 
     // Keep the economic sign through netting. Negative rates or a zero leg can
@@ -510,13 +454,7 @@ pub fn calculate_period_flows(
     let accrued_interest = if !is_debt {
         0.0
     } else {
-        let accrued_scalar =
-            accrued_interest_amount(&full_schedule, snapshot_date, &AccrualConfig::default())?;
-        if !using_residual && opening_balance.amount() == 0.0 && !has_new_funding {
-            0.0
-        } else {
-            accrued_scalar * scale
-        }
+        accrued_interest_amount(&full_schedule, snapshot_date, &AccrualConfig::default())? * scale
     };
     breakdown.accrued_interest = Money::new(accrued_interest, currency)?;
 
@@ -547,7 +485,7 @@ pub fn calculate_period_flows(
 mod tests {
     use super::*;
     use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::cashflow::CashFlow;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, PeriodId};
@@ -663,7 +601,6 @@ mod tests {
             &instrument,
             &period,
             Money::from((1_000_000_i64, Currency::USD)),
-            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -726,7 +663,6 @@ mod tests {
             &swap,
             &period,
             Money::from((1_000_000_i64, Currency::USD)),
-            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             Some(&instrument.schedule),
@@ -805,7 +741,6 @@ mod tests {
             &instrument,
             &period,
             Money::from((0_i64, Currency::USD)),
-            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -854,7 +789,6 @@ mod tests {
         let (breakdown, _, _, _) = calculate_period_flows(
             &instrument,
             &period,
-            Money::from((0_i64, Currency::USD)),
             Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
@@ -911,7 +845,6 @@ mod tests {
             &instrument,
             &period,
             Money::from((50_000_i64, Currency::USD)),
-            Money::from((160_000_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -960,7 +893,6 @@ mod tests {
             &instrument,
             &period,
             Money::from((1_100_000_i64, Currency::USD)),
-            Money::from((100_000_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -1018,7 +950,6 @@ mod tests {
             &swap,
             &period,
             Money::from((1_000_000_i64, Currency::USD)),
-            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             Some(&instrument.schedule),
@@ -1070,7 +1001,6 @@ mod tests {
             &instrument,
             &period,
             Money::from((0_i64, Currency::USD)),
-            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -1113,7 +1043,6 @@ mod tests {
         let (breakdown, closing_balance, _, warnings) = calculate_period_flows(
             &instrument,
             &period,
-            Money::from((0_i64, Currency::USD)),
             Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
@@ -1189,16 +1118,9 @@ mod tests {
                 end,
                 is_actual: false,
             };
-            let (breakdown, closing, _, warnings) = calculate_period_flows(
-                &instrument,
-                &period,
-                opening,
-                Money::from((0_i64, Currency::USD)),
-                &market_ctx,
-                issue,
-                None,
-            )
-            .expect("period flow calculation should succeed");
+            let (breakdown, closing, _, warnings) =
+                calculate_period_flows(&instrument, &period, opening, &market_ctx, issue, None)
+                    .expect("period flow calculation should succeed");
 
             assert!(
                 warnings.is_empty(),
@@ -1218,76 +1140,6 @@ mod tests {
         }
     }
 
-    /// Toggle-driven PIK capitalization is excluded from the clamp basis:
-    /// the stateful balance legitimately exceeds the scheduled balance by the
-    /// capitalized PIK, so interest must accrue on the full balance with no
-    /// warning. Without the exclusion the same inputs are clamped at 1.10.
-    #[test]
-    fn toggled_pik_capitalization_is_excluded_from_scale_clamp() {
-        let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-        let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
-        let period = Period {
-            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            start,
-            end,
-            is_actual: false,
-        };
-
-        let instrument = SignedFlowInstrument::new(test_schedule(
-            vec![CashFlow::new(
-                Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                None,
-                Money::from((20_000_i64, Currency::USD)),
-                CFKind::Fixed,
-                0.25,
-                Some(0.08),
-            )],
-            1_000_000.0,
-            start,
-        ));
-
-        let market_ctx = MarketContext::new();
-        // Opening balance = scheduled 1.0M + 160k of toggle-capitalized PIK
-        // (raw ratio 1.16, beyond the 1.10 clamp).
-        let (breakdown, _, _, warnings) = calculate_period_flows(
-            &instrument,
-            &period,
-            Money::from((1_160_000_i64, Currency::USD)),
-            Money::from((160_000_i64, Currency::USD)),
-            &market_ctx,
-            start,
-            None,
-        )
-        .expect("period flow calculation should succeed");
-
-        assert!(
-            warnings.is_empty(),
-            "PIK-grown balance must not trigger the scale warning, got {warnings:?}"
-        );
-        assert!(
-            (breakdown.interest_expense_cash.amount() - 23_200.0).abs() < 1e-9,
-            "interest should accrue on the full stateful balance (20k × 1.16), got {}",
-            breakdown.interest_expense_cash.amount()
-        );
-
-        // Without the toggled-PIK exclusion the same inputs warn (no clamp).
-        let (unclamped, _, _, scale_warnings) = calculate_period_flows(
-            &instrument,
-            &period,
-            Money::from((1_160_000_i64, Currency::USD)),
-            Money::from((0_i64, Currency::USD)),
-            &market_ctx,
-            start,
-            None,
-        )
-        .expect("period flow calculation should succeed");
-        assert_eq!(scale_warnings.len(), 1);
-        assert!((unclamped.interest_expense_cash.amount() - 23_200.0).abs() < 1e-9);
-    }
-
-    /// A revolver whose stateful balance was fully swept must not resurrect
-    /// the scheduled balance on a re-draw: the new closing balance is the
-    /// period's draws net of in-period repayments.
     #[test]
     fn revolver_redraw_after_full_sweep_nets_new_funding_against_repayments() {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
@@ -1329,7 +1181,6 @@ mod tests {
         let (breakdown, closing, _, _) = calculate_period_flows(
             &instrument,
             &period,
-            Money::from((0_i64, Currency::USD)),
             Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
@@ -1389,7 +1240,6 @@ mod tests {
             &instrument,
             &period,
             Money::from((500_000_i64, Currency::USD)),
-            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -1432,7 +1282,6 @@ mod tests {
             &instrument,
             &period,
             Money::from((100_000_i64, Currency::USD)),
-            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -1544,7 +1393,6 @@ mod tests {
             &instrument,
             &period,
             scheduled_opening,
-            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             issue,
             None,

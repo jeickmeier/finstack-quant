@@ -12,9 +12,11 @@
 //! failures and `ValueError` otherwise.
 
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
     labeled_values_to_series, serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
 };
+use crate::bindings::statements::parse_period_id;
 use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::statements_analytics::typed::{
     PyBridgeChart, PyScenarioDiff, PyScenarioResults, PyScenarioSet, PySensitivityConfig,
@@ -116,9 +118,8 @@ fn run_sensitivity(
     let model = extract_model_ref(model)?.into_owned();
     let config = extract_sensitivity_config(config)?;
     py.detach(move || {
-        let analyzer =
-            finstack_quant_statements_analytics::analysis::SensitivityAnalyzer::new(&model);
-        let inner = analyzer.run(&config).map_err(statements_to_py)?;
+        let inner = finstack_quant_statements_analytics::analysis::run_sensitivity(&model, &config)
+            .map_err(statements_to_py)?;
         Ok(PySensitivityResult { inner })
     })
 }
@@ -169,7 +170,7 @@ fn generate_tornado_entries(
 ) -> PyResult<Vec<PyTornadoEntry>> {
     let result = extract_sensitivity_result(result)?;
     let period_id: Option<finstack_quant_core::dates::PeriodId> =
-        period.map(|p| p.parse().map_err(core_to_py)).transpose()?;
+        period.map(parse_period_id).transpose()?;
     Ok(
         finstack_quant_statements_analytics::analysis::generate_tornado_entries(
             &result,
@@ -197,7 +198,7 @@ fn generate_tornado_entries(
 /// Returns
 /// -------
 /// VarianceReport
-///     Per-metric, per-period rows including ``driver_contribution``.
+///     Per-metric, per-period variance rows.
 ///
 /// Raises
 /// ------
@@ -228,16 +229,22 @@ fn run_variance(
     let comparison = extract_results_ref(comparison)?.into_owned();
     let config = extract_variance_config(config)?;
     py.detach(move || {
-        let analyzer = finstack_quant_statements_analytics::analysis::VarianceAnalyzer::new(
+        let inner = finstack_quant_statements_analytics::analysis::run_variance(
             &base,
             &comparison,
-        );
-        let inner = analyzer.compute(&config).map_err(statements_to_py)?;
+            &config,
+        )
+        .map_err(statements_to_py)?;
         Ok(PyVarianceReport { inner })
     })
 }
 
 /// Evaluate all scenarios in a scenario set.
+///
+/// Like ``Evaluator.evaluate``, a capital structure is evaluated from an
+/// empty market, which serves fixed-rate instruments; use
+/// ``evaluate_scenario_set_with_market`` for instruments that need market
+/// data.
 ///
 /// Parameters
 /// ----------
@@ -255,9 +262,13 @@ fn run_variance(
 /// ------
 /// ValueError
 ///     If the set is empty, a parent chain cycles, an override is
-///     incompatible with its node, or evaluation fails.
+///     incompatible with its node, a forecast override has invalid
+///     parameters, or evaluation fails.
 /// KeyError
-///     If an override names a node missing from the model.
+///     If an override names a node missing from the model, or a
+///     capital-structure instrument needs market data.
+/// RuntimeError
+///     If capital-structure cashflow generation or the waterfall fails.
 ///
 /// Examples
 /// --------
@@ -281,6 +292,78 @@ fn evaluate_scenario_set(
             .map_err(statements_to_py)?;
         Ok(PyScenarioResults { inner })
     })
+}
+
+/// Evaluate all scenarios in a scenario set against a market as of a date.
+///
+/// Each scenario is evaluated like ``Evaluator.evaluate_with_market``: the
+/// capital structure's instruments are priced from ``market`` as of
+/// ``as_of`` (floating coupons, swaps, caps), so every result carries
+/// ``cs_cashflows``, and explicit actuals not yet available at ``as_of`` are
+/// hidden. The market is shared unchanged by every scenario.
+///
+/// Parameters
+/// ----------
+/// model : FinancialModelSpec | str
+///     A ``FinancialModelSpec`` object or a JSON string.
+/// scenario_set : ScenarioSet | str
+///     A typed scenario set or its JSON serialization.
+/// market : MarketContext | str
+///     Curves, fixings and FX the instruments are priced from, typed or its
+///     canonical JSON.
+/// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
+///     Valuation date for the instruments' cashflows and the cutoff for
+///     explicit-value visibility; ISO ``YYYY-MM-DD`` strings are accepted.
+///
+/// Returns
+/// -------
+/// ScenarioResults
+///     Typed mapping of scenario names to statement results.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If ``as_of`` is not date-like, the set is empty, a parent chain
+///     cycles, an override is incompatible with its node, a forecast override
+///     has invalid parameters, or evaluation fails.
+/// KeyError
+///     If an override names a node missing from the model, or an instrument
+///     needs market data ``market`` lacks.
+/// RuntimeError
+///     If capital-structure cashflow generation or the waterfall fails.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.core.market_data import MarketContext
+/// >>> from finstack_quant.statements import ModelBuilder
+/// >>> from finstack_quant.statements_analytics import ScenarioSet, evaluate_scenario_set_with_market
+/// >>> b = ModelBuilder("m")
+/// >>> _ = b.periods("2025Q1..Q2", None)
+/// >>> _ = b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
+/// >>> results = evaluate_scenario_set_with_market(
+/// ...     b.build(), ScenarioSet({"base": {}, "down": {"revenue": 90.0}}), MarketContext(), "2025-01-01"
+/// ... )
+/// >>> results.names
+/// ['base', 'down']
+#[pyfunction]
+#[pyo3(text_signature = "(model, scenario_set, market, as_of)")]
+fn evaluate_scenario_set_with_market(
+    py: Python<'_>,
+    model: &Bound<'_, PyAny>,
+    scenario_set: &Bound<'_, PyAny>,
+    market: &Bound<'_, PyAny>,
+    as_of: &Bound<'_, PyAny>,
+) -> PyResult<PyScenarioResults> {
+    let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
+    let model = extract_model_ref(model)?;
+    let market = crate::bindings::extract::extract_market_ref(py, market)?;
+    let scenario_set = extract_scenario_set(scenario_set)?;
+    let model_inner: &finstack_quant_statements::FinancialModelSpec = &model;
+    let market_inner: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let inner = py
+        .detach(|| scenario_set.evaluate_all_with_market(model_inner, market_inner, as_of))
+        .map_err(statements_to_py)?;
+    Ok(PyScenarioResults { inner })
 }
 
 /// Compare two evaluated scenarios metric-by-metric.
@@ -341,7 +424,7 @@ fn scenario_diff(
     let results = results.inner.clone();
     let periods = periods
         .iter()
-        .map(|period| period.parse().map_err(core_to_py))
+        .map(|period| parse_period_id(period))
         .collect::<PyResult<Vec<_>>>()?;
     let baseline = baseline.to_string();
     let comparison = comparison.to_string();
@@ -416,25 +499,22 @@ fn variance_bridge(
 ) -> PyResult<PyBridgeChart> {
     let base = extract_results_ref(base)?.into_owned();
     let comparison = extract_results_ref(comparison)?.into_owned();
-    let period = period.parse().map_err(core_to_py)?;
+    let period = parse_period_id(period)?;
     let target_metric = target_metric.to_string();
     let baseline_label = baseline_label.to_string();
     let comparison_label = comparison_label.to_string();
     py.detach(move || {
-        let analyzer = finstack_quant_statements_analytics::analysis::VarianceAnalyzer::new(
+        let driver_refs: Vec<&str> = drivers.iter().map(String::as_str).collect();
+        let inner = finstack_quant_statements_analytics::analysis::variance_bridge(
             &base,
             &comparison,
-        );
-        let driver_refs: Vec<&str> = drivers.iter().map(String::as_str).collect();
-        let inner = analyzer
-            .bridge_decomposition(
-                &target_metric,
-                period,
-                &driver_refs,
-                &baseline_label,
-                &comparison_label,
-            )
-            .map_err(statements_to_py)?;
+            &target_metric,
+            period,
+            &driver_refs,
+            &baseline_label,
+            &comparison_label,
+        )
+        .map_err(statements_to_py)?;
         Ok(PyBridgeChart { inner })
     })
 }
@@ -525,36 +605,12 @@ impl PyForecastMetrics {
         labeled_values_to_series(py, &labels, values, "forecast_metrics")
     }
 
-    /// Serialize to canonical JSON; a non-finite metric (``mape`` with no
-    /// non-zero actual) is written as ``"nan"``, ``"inf"`` or ``"-inf"`` so
-    /// the document round-trips through :meth:`from_json`.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "ForecastMetrics"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``ForecastMetrics`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid ForecastMetrics JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("ForecastMetrics", &self.inner)
     }
 }
+
+wire_methods!(PyForecastMetrics, ForecastMetrics, "ForecastMetrics");
 
 /// Compute forecast accuracy metrics (MAE, MAPE, sMAPE, RMSE).
 ///
@@ -781,8 +837,8 @@ fn goal_seek(
     bounds: Option<(f64, f64)>,
 ) -> PyResult<PyGoalSeekResult> {
     let model = extract_model_ref(model)?.into_owned();
-    let tp: finstack_quant_core::dates::PeriodId = target_period.parse().map_err(core_to_py)?;
-    let dp: finstack_quant_core::dates::PeriodId = driver_period.parse().map_err(core_to_py)?;
+    let tp = parse_period_id(target_period)?;
+    let dp = parse_period_id(driver_period)?;
     let target_node = target_node.to_owned();
     let driver_node = driver_node.to_owned();
 
@@ -901,7 +957,7 @@ impl PyDependencyTracer {
         period: &str,
     ) -> PyResult<String> {
         let results = extract_results_ref(results)?;
-        let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(core_to_py)?;
+        let pid = parse_period_id(period)?;
         let tracer = finstack_quant_statements_analytics::analysis::DependencyTracer::new(
             &self.model,
             &self.graph,
@@ -1012,31 +1068,6 @@ impl PyDependencyTree {
             .collect()
     }
 
-    /// Serialize to canonical JSON (identical to the WASM ``DependencyTracer.dependencyTree`` output).
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "DependencyTree"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``DependencyTree`` document (unknown
-    ///     fields are rejected).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid DependencyTree JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "DependencyTree(node_id={:?}, children={})",
@@ -1045,6 +1076,8 @@ impl PyDependencyTree {
         )
     }
 }
+
+wire_methods!(PyDependencyTree, DependencyTree, "DependencyTree");
 
 /// One component of a formula explanation.
 #[pyclass(
@@ -1168,7 +1201,7 @@ impl PyExplanation {
 
     /// Human-readable multi-line explanation.
     fn to_text(&self) -> String {
-        self.inner.to_string_detailed()
+        self.inner.to_text()
     }
 
     /// Export the breakdown as a pandas ``DataFrame``.
@@ -1191,42 +1224,13 @@ impl PyExplanation {
         serde_rows_to_dataframe_with_schema(py, &rows, &EXPLANATION_COLUMNS)
     }
 
-    /// Serialize to canonical JSON (identical to the WASM ``explainFormula``
-    /// output); a non-finite ``final_value`` or step ``value`` is written as
-    /// ``"nan"``, ``"inf"`` or ``"-inf"`` so the document round-trips.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "Explanation"))
-    }
-
-    /// Deserialize from canonical JSON.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``json`` is not a valid ``Explanation`` document.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid Explanation JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("Explanation", &self.inner)
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(PyExplanation, Explanation, "Explanation");
+impl_repr_html_via_dataframe!(PyExplanation);
 
 /// Explain a formula for a specific node and period.
 ///
@@ -1273,58 +1277,13 @@ fn explain_formula(
 ) -> PyResult<PyExplanation> {
     let model = extract_model_ref(model)?;
     let results = extract_results_ref(results)?;
-    let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(core_to_py)?;
+    let pid = parse_period_id(period)?;
 
-    let explainer =
-        finstack_quant_statements_analytics::analysis::FormulaExplainer::new(&model, &results);
-    let inner = explainer.explain(node_id, &pid).map_err(statements_to_py)?;
+    let inner = finstack_quant_statements_analytics::analysis::explain_formula(
+        &model, &results, node_id, &pid,
+    )
+    .map_err(statements_to_py)?;
     Ok(PyExplanation { inner })
-}
-
-/// Get a detailed text explanation for a formula.
-///
-/// Parameters
-/// ----------
-/// model : FinancialModelSpec | str
-///     A ``FinancialModelSpec`` object or a JSON string.
-/// results : StatementResult | str
-///     A ``StatementResult`` object or a JSON string.
-/// node_id : str
-///     Node whose formula to explain.
-/// period : str
-///     Period string.
-///
-/// Returns
-/// -------
-/// str
-///     Human-readable multi-line explanation (``explain_formula(...).to_text()``).
-///
-/// Raises
-/// ------
-/// KeyError
-///     If ``node_id`` is not in the model or has no value at ``period``.
-/// ValueError
-///     If ``period`` does not parse or a payload is malformed JSON.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.statements import Evaluator, ModelBuilder
-/// >>> from finstack_quant.statements_analytics import explain_formula_text
-/// >>> b = ModelBuilder("m")
-/// >>> _ = b.periods("2025Q1..Q1", None)
-/// >>> _ = b.value("revenue", [("2025Q1", 100.0)])
-/// >>> _ = b.compute("profit", "revenue * 0.5")
-/// >>> model = b.build()
-/// >>> explain_formula_text(model, Evaluator().evaluate(model), "profit", "2025Q1").splitlines()[0]
-/// 'profit [2025Q1] = 50.00'
-#[pyfunction]
-fn explain_formula_text(
-    model: &Bound<'_, PyAny>,
-    results: &Bound<'_, PyAny>,
-    node_id: &str,
-    period: &str,
-) -> PyResult<String> {
-    Ok(explain_formula(model, results, node_id, period)?.to_text())
 }
 
 /// Register analysis functions and classes.
@@ -1339,11 +1298,14 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(generate_tornado_entries, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(run_variance, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(evaluate_scenario_set, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(
+        evaluate_scenario_set_with_market,
+        m
+    )?)?;
     m.add_function(pyo3::wrap_pyfunction!(scenario_diff, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(variance_bridge, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(backtest_forecast, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(goal_seek, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(explain_formula, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(explain_formula_text, m)?)?;
     Ok(())
 }

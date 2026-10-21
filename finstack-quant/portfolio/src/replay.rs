@@ -8,8 +8,6 @@
 //! cashflows. In full-attribution mode, `attribution.total_pnl` includes those
 //! payments. A coupon or redemption therefore creates an expected difference
 //! between these explicitly distinct measures; cash is not reinvested here.
-//!
-//! This module is only available when the `scenarios` feature is enabled.
 
 use crate::attribution::{attribution_endpoint_profile, reduce_prepared, PortfolioAttribution};
 use crate::error::{Error, Result};
@@ -81,7 +79,6 @@ pub struct ReplayConfig {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct JsonSnapshot {
-    #[serde(with = "finstack_quant_core::wire::date")]
     date: Date,
     market: MarketContext,
 }
@@ -280,7 +277,7 @@ pub struct ReplayResult {
     pub skipped_dates: Vec<(Date, String)>,
 }
 
-use crate::portfolio::Portfolio;
+use crate::Portfolio;
 use finstack_quant_core::config::FinstackConfig;
 
 /// Phase-A valuation profile, widened so its results can also serve as the
@@ -308,19 +305,22 @@ fn replay_phase_profile(config: &ReplayConfig, metrics_attribution: bool) -> Eva
     }
 }
 
-fn phase_a_results(
+/// Value `portfolio` once per `(date, market)` snapshot in one evaluation plan.
+///
+/// Results come back in snapshot order; a per-snapshot failure is kept in its
+/// slot so the caller decides whether it aborts the replay.
+fn evaluate_snapshots<'m>(
     portfolio: &Portfolio,
-    timeline: &ReplayTimeline,
-    profile: EvaluationProfile,
+    snapshots: impl IntoIterator<Item = (Date, &'m MarketContext)>,
+    profile: &EvaluationProfile,
     config: &FinstackConfig,
 ) -> Result<Vec<Result<PortfolioValuation>>> {
     let mut plan = PortfolioEvaluationPlan::new(config);
     let portfolio_state = plan.register_portfolio(portfolio);
-    let jobs = timeline
-        .snapshots
-        .iter()
+    let jobs = snapshots
+        .into_iter()
         .map(|(date, market)| {
-            let market_state = plan.register_market(market, *date);
+            let market_state = plan.register_market(market, date);
             plan.register_evaluation(
                 market_state,
                 portfolio_state,
@@ -351,28 +351,15 @@ fn attribution_endpoint_batch(
         return Ok(IndexMap::new());
     }
 
-    let mut plan = PortfolioEvaluationPlan::new(config);
-    let portfolio_state = plan.register_portfolio(portfolio);
-    let jobs = needed
-        .iter()
-        .map(|&index| {
-            let (date, market, _) = &surviving[index];
-            let market_state = plan.register_market(market, *date);
-            plan.register_evaluation(
-                market_state,
-                portfolio_state,
-                profile.clone(),
-                crate::evaluation::PositionExecution::Auto,
-            )
-            .map(|job| (index, job))
-        })
-        .collect::<Result<Vec<_>>>()?;
-    let mut outcome = plan.execute();
-    let mut endpoints = IndexMap::with_capacity(jobs.len());
-    for (index, job) in jobs {
-        endpoints.insert(index, outcome.take_valuation(job));
-    }
-    Ok(endpoints)
+    let valuations = evaluate_snapshots(
+        portfolio,
+        needed
+            .iter()
+            .map(|&index| (surviving[index].0, surviving[index].1)),
+        profile,
+        config,
+    )?;
+    Ok(needed.into_iter().zip(valuations).collect())
 }
 
 fn valuation_matches_endpoint_profile(
@@ -469,7 +456,15 @@ pub fn replay_portfolio(
         compute_attribution && matches!(config.attribution_method, AttributionMethod::MetricsBased);
     let phase_profile = replay_phase_profile(config, metrics_attribution);
 
-    let valuation_results = phase_a_results(portfolio, timeline, phase_profile, finstack_config)?;
+    let valuation_results = evaluate_snapshots(
+        portfolio,
+        timeline
+            .snapshots
+            .iter()
+            .map(|(date, market)| (*date, market)),
+        &phase_profile,
+        finstack_config,
+    )?;
 
     let mut skipped_dates: Vec<(Date, String)> = Vec::new();
     let mut surviving: Vec<(Date, &MarketContext, Option<PortfolioValuation>)> =

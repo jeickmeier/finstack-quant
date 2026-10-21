@@ -27,6 +27,11 @@ use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_statements::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
 
+/// Parse and semantically validate a `FinancialModelSpec` argument (object or JSON).
+pub(super) fn parse_model(model: &JsValue) -> Result<FinancialModelSpec, JsValue> {
+    FinancialModelSpec::from_json(&json_text(model, "model")?).map_err(to_js_err)
+}
+
 /// Run a sensitivity analysis on a financial model.
 ///
 /// Accepts JSON strings for the model spec and sensitivity configuration,
@@ -52,8 +57,8 @@ pub fn run_sensitivity(model_json: JsValue, config_json: JsValue) -> Result<JsVa
     let config: finstack_quant_statements_analytics::analysis::SensitivityConfig =
         serde_json::from_str(config_json).map_err(to_js_err)?;
 
-    let analyzer = finstack_quant_statements_analytics::analysis::SensitivityAnalyzer::new(&model);
-    let result = analyzer.run(&config).map_err(to_js_err)?;
+    let result = finstack_quant_statements_analytics::analysis::run_sensitivity(&model, &config)
+        .map_err(to_js_err)?;
 
     to_js_value(&result)
 }
@@ -89,9 +94,9 @@ pub fn run_variance(
     let config: finstack_quant_statements_analytics::analysis::VarianceConfig =
         serde_json::from_str(config_json).map_err(to_js_err)?;
 
-    let analyzer =
-        finstack_quant_statements_analytics::analysis::VarianceAnalyzer::new(&base, &comparison);
-    let report = analyzer.compute(&config).map_err(to_js_err)?;
+    let report =
+        finstack_quant_statements_analytics::analysis::run_variance(&base, &comparison, &config)
+            .map_err(to_js_err)?;
 
     to_js_value(&report)
 }
@@ -99,13 +104,18 @@ pub fn run_variance(
 /// Evaluate all scenarios in a scenario set against a base model.
 ///
 /// Returns a structured JavaScript object mapping scenario names to their
-/// statement results.
+/// statement results. Like `Evaluator.evaluate`, a capital structure is
+/// evaluated from an empty market, which serves fixed-rate instruments; use
+/// `evaluateScenarioSetWithMarket` for instruments that need market data.
+/// A scenario's `forecast_overrides` replace whole node forecast specs.
 ///
 /// # Errors
 ///
 /// Rejects malformed model or scenario-set JSON, an empty scenario set,
-/// invalid parent chains, overrides of missing nodes, failure to evaluate any
-/// scenario, or failure to serialize the result map to JavaScript.
+/// invalid parent chains, overrides of missing nodes, invalid forecast
+/// overrides, a capital-structure instrument needing market data (kind
+/// `not_found`), failure to evaluate any scenario, or failure to serialize
+/// the result map to JavaScript.
 /// @param model_json - Financial-model specification JSON.
 /// @param scenario_set_json - Scenario-set JSON keyed by scenario name.
 #[wasm_bindgen(js_name = evaluateScenarioSet)]
@@ -123,6 +133,49 @@ pub fn evaluate_scenario_set(
     let results = scenario_set.evaluate_all(&model).map_err(to_js_err)?;
     // `ScenarioResults` is `#[serde(transparent)]`: its wire form is the
     // `{scenario_name: StatementResult}` map.
+    to_js_value(&results)
+}
+
+/// Evaluate all scenarios in a scenario set against a market as of a date.
+///
+/// Twin of Python `evaluate_scenario_set_with_market` (Rust
+/// `ScenarioSet::evaluate_all_with_market`). Each scenario is evaluated like
+/// `Evaluator.evaluateWithMarket`: capital-structure instruments are priced
+/// from `market` as of `asOf` (floating coupons, swaps, caps), so every result
+/// carries `cs_cashflows`, and explicit actuals not yet available at `asOf`
+/// are hidden. `evaluateScenarioSet` evaluates the capital structure from an
+/// empty market, which serves fixed-rate instruments only.
+///
+/// # Errors
+///
+/// Rejects malformed model, scenario-set or market input, an `asOf` that is
+/// not an ISO date, an empty scenario set, invalid parent chains, overrides
+/// of missing or incompatible nodes, invalid forecast overrides, an
+/// instrument needing market data `market` lacks (kind `not_found`), or a
+/// failure to evaluate any scenario.
+/// @param model_json - Financial-model specification JSON.
+/// @param scenario_set_json - Scenario-set JSON keyed by scenario name.
+/// @param market - `MarketContext` state supplying curves, fixings and FX (object or JSON), shared by every scenario.
+/// @param as_of - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments and the cutoff for explicit-value visibility.
+/// @returns Map of scenario name to `StatementResult` plain object.
+#[wasm_bindgen(js_name = evaluateScenarioSetWithMarket)]
+pub fn evaluate_scenario_set_with_market(
+    model_json: JsValue,
+    scenario_set_json: JsValue,
+    market: JsValue,
+    as_of: JsValue,
+) -> Result<JsValue, JsValue> {
+    let model =
+        FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?).map_err(to_js_err)?;
+    let scenario_set: finstack_quant_statements_analytics::analysis::ScenarioSet =
+        serde_json::from_str(&json_text(&scenario_set_json, "scenarioSetJson")?)
+            .map_err(to_js_err)?;
+    let market: finstack_quant_core::market_data::context::MarketContext =
+        crate::utils::input::from_js_json(&market, "market")?;
+    let as_of = crate::utils::wire::js_date(&as_of, "asOf")?;
+    let results = scenario_set
+        .evaluate_all_with_market(&model, &market, as_of)
+        .map_err(to_js_err)?;
     to_js_value(&results)
 }
 
@@ -262,7 +315,7 @@ pub fn generate_tornado_entries(
 ///
 /// # Errors
 ///
-/// Rejects malformed model, terminal-value, options, or market JSON (an
+/// Rejects malformed model, terminal-value or options JSON (an
 /// unknown options key included), model-evaluation failures, a missing UFCF
 /// series or model currency, inconsistent WACC or terminal-value assumptions,
 /// a missing or incomplete exit-multiple metric node, missing bridge inputs,
@@ -272,8 +325,7 @@ pub fn generate_tornado_entries(
 /// @param terminal_value_json - Terminal-value spec JSON selecting whether growth or the exit multiple is shocked.
 /// @param ufcf_node - Node identifier holding monetary unlevered free cash flow in model currency for the forecast periods; omitted uses the canonical "ufcf" node. Gordon Growth / H-Model terminal cash flow requires a complete contiguous calendar year at the forecast end.
 /// @param net_debt_override - Optional net debt in model currency; otherwise requires debt and cash in that currency from a period ending on or before valuation.
-/// @param options_json - Optional Rust `DcfOptions` JSON; every field is optional and a missing one takes its default: `mid_year_convention` (false), `wacc_sensitivity_bump` (0.01 = +/-100 bp), `wacc_denominator_epsilon` (0.005), `max_stable_growth_rate` (0.05), `exit_multiple_bump` (`{"absolute": 1.0}` turns or `{"relative": 0.10}`), `exit_multiple_metric_node` (flow node whose complete trailing year supplies the exit-multiple metric), `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `discount_curve_id`. Unknown keys are rejected.
-/// @param market_json - Optional canonical market-context JSON used for statement evaluation, not WACC discounting.
+/// @param options_json - Optional Rust `DcfOptions` JSON; every field is optional and a missing one takes its default: `mid_year_convention` (false), `wacc_sensitivity_bump` (0.01 = +/-100 bp), `wacc_denominator_epsilon` (0.005), `max_stable_growth_rate` (0.05), `exit_multiple_bump` (`{"absolute": 1.0}` turns or `{"relative": 0.10}`), `exit_multiple_metric_node` (flow node whose complete trailing year supplies the exit-multiple metric), `equity_bridge`, `shares_outstanding`, `valuation_discounts`. Unknown keys are rejected.
 #[wasm_bindgen(js_name = dcfSensitivity)]
 pub fn dcf_sensitivity(
     model_json: JsValue,
@@ -282,7 +334,6 @@ pub fn dcf_sensitivity(
     ufcf_node: Option<JsValue>,
     net_debt_override: Option<JsValue>,
     options_json: Option<JsValue>,
-    market_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let wacc = js_f64(&wacc, "wacc")?;
     let net_debt_override = js_opt_f64(net_debt_override.as_ref(), "netDebtOverride")?;
@@ -292,7 +343,6 @@ pub fn dcf_sensitivity(
     let terminal_value_json: &str = &json_text(&terminal_value_json, "terminalValueJson")?;
     let ufcf_node = js_opt_string(ufcf_node.as_ref(), "ufcfNode")?;
     let options_json = opt_json_text(options_json.as_ref(), "optionsJson")?;
-    let market_json = opt_json_text(market_json.as_ref(), "marketJson")?;
 
     let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
     let terminal_value: finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec =
@@ -301,9 +351,6 @@ pub fn dcf_sensitivity(
         .map(|json| serde_json::from_str(&json).map_err(to_js_err))
         .transpose()?
         .unwrap_or_default();
-    let market: Option<finstack_quant_core::market_data::context::MarketContext> = market_json
-        .map(|json| serde_json::from_str(&json).map_err(to_js_err))
-        .transpose()?;
 
     let result = finstack_quant_statements_analytics::analysis::dcf_sensitivity(
         &model,
@@ -312,7 +359,6 @@ pub fn dcf_sensitivity(
         ufcf_node.as_deref().unwrap_or(DEFAULT_UFCF_NODE),
         net_debt_override,
         &options,
-        market.as_ref(),
     )
     .map_err(to_js_err)?;
 
@@ -493,9 +539,10 @@ pub fn explain_formula(
     let results: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(results_json).map_err(to_js_err)?;
     let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(to_js_err)?;
-    let explainer =
-        finstack_quant_statements_analytics::analysis::FormulaExplainer::new(&model, &results);
-    let explanation = explainer.explain(node_id, &pid).map_err(to_js_err)?;
+    let explanation = finstack_quant_statements_analytics::analysis::explain_formula(
+        &model, &results, node_id, &pid,
+    )
+    .map_err(to_js_err)?;
     let js = crate::utils::to_js_value_numeric(&explanation)?;
     let breakdown = js_sys::Reflect::get(&js, &JsValue::from("breakdown"))?;
     crate::utils::restore_non_finite_rows::<
@@ -530,10 +577,11 @@ pub fn explain_formula_text(
     let results: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(results_json).map_err(to_js_err)?;
     let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(to_js_err)?;
-    let explainer =
-        finstack_quant_statements_analytics::analysis::FormulaExplainer::new(&model, &results);
-    let explanation = explainer.explain(node_id, &pid).map_err(to_js_err)?;
-    Ok(explanation.to_string_detailed())
+    let explanation = finstack_quant_statements_analytics::analysis::explain_formula(
+        &model, &results, node_id, &pid,
+    )
+    .map_err(to_js_err)?;
+    Ok(explanation.to_text())
 }
 
 /// Generate a P&L summary report as formatted text.
@@ -748,7 +796,7 @@ pub fn render_check_report_text(report_json: JsValue) -> Result<String, JsValue>
     let report_json: &str = &json_text(&report_json, "reportJson")?;
     let report: finstack_quant_statements::checks::CheckReport =
         serde_json::from_str(report_json).map_err(to_js_err)?;
-    Ok(finstack_quant_statements_analytics::analysis::CheckReportRenderer::render_text(&report))
+    Ok(finstack_quant_statements_analytics::analysis::render_check_report_text(&report))
 }
 
 /// Render a check report as HTML.
@@ -763,223 +811,5 @@ pub fn render_check_report_html(report_json: JsValue) -> Result<String, JsValue>
     let report_json: &str = &json_text(&report_json, "reportJson")?;
     let report: finstack_quant_statements::checks::CheckReport =
         serde_json::from_str(report_json).map_err(to_js_err)?;
-    Ok(finstack_quant_statements_analytics::analysis::CheckReportRenderer::render_html(&report))
-}
-
-#[cfg(test)]
-mod tests {
-    use finstack_quant_core::dates::PeriodId;
-    use finstack_quant_statements::builder::ModelBuilder;
-    use finstack_quant_statements::types::AmountOrScalar;
-
-    fn test_model_json() -> String {
-        let q1 = PeriodId::quarter(2024, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("test_model")
-            .periods("2024Q1..Q2", None)
-            .expect("periods")
-            .value(
-                "revenue",
-                &[
-                    (q1, AmountOrScalar::scalar(100_000.0)),
-                    (
-                        PeriodId::quarter(2024, 2).expect("valid period fixture"),
-                        AmountOrScalar::scalar(110_000.0),
-                    ),
-                ],
-            )
-            .value(
-                "cogs",
-                &[
-                    (q1, AmountOrScalar::scalar(40_000.0)),
-                    (
-                        PeriodId::quarter(2024, 2).expect("valid period fixture"),
-                        AmountOrScalar::scalar(44_000.0),
-                    ),
-                ],
-            )
-            .compute("gross_profit", "revenue - cogs")
-            .expect("compute")
-            .build()
-            .expect("build");
-        serde_json::to_string(&model).expect("serialize")
-    }
-
-    fn evaluated_results() -> (String, String) {
-        let model_json = test_model_json();
-        let model: finstack_quant_statements::FinancialModelSpec =
-            serde_json::from_str(&model_json).expect("parse");
-        let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
-        let results = evaluator.evaluate(&model).expect("evaluate");
-        let results_json = serde_json::to_string(&results).expect("serialize results");
-        (model_json, results_json)
-    }
-
-    #[test]
-    fn credit_assessment_returns_structured_json() {
-        // `credit_assessment` now returns a `JsValue`, unconstructible off
-        // wasm32; assert the serializable shape it hands to `to_js_value`.
-        let (_, results_json) = evaluated_results();
-        let results: finstack_quant_statements::evaluator::StatementResult =
-            serde_json::from_str(&results_json).expect("parse results");
-        let assessment = finstack_quant_statements_analytics::analysis::CreditAssessment::compute(
-            &results,
-            "2024Q1".parse().expect("period"),
-        );
-        let parsed = serde_json::to_value(&assessment).expect("serialize");
-        assert!(parsed.get("period").is_some());
-        assert!(parsed.get("series").map(|s| s.is_array()).unwrap_or(false));
-    }
-
-    #[test]
-    fn run_sensitivity_diagonal() {
-        let model_json = test_model_json();
-        let config = finstack_quant_statements_analytics::analysis::SensitivityConfig {
-            mode: finstack_quant_statements_analytics::analysis::SensitivityMode::Diagonal,
-            parameters: vec![
-                finstack_quant_statements_analytics::analysis::ParameterSpec {
-                    node_id: "revenue".to_string(),
-                    period_id: PeriodId::quarter(2024, 1).expect("valid period fixture"),
-                    base_value: 100_000.0,
-                    perturbations: vec![-0.1, 0.0, 0.1],
-                },
-            ],
-            target_metrics: vec!["gross_profit".to_string()],
-        };
-        // `run_sensitivity` returns a `JsValue`; exercise the analyzer it
-        // delegates to and assert the serializable shape.
-        let model: finstack_quant_statements::FinancialModelSpec =
-            serde_json::from_str(&model_json).expect("parse model");
-        let analyzer =
-            finstack_quant_statements_analytics::analysis::SensitivityAnalyzer::new(&model);
-        let result = analyzer.run(&config).expect("sensitivity");
-        let parsed = serde_json::to_value(&result).expect("serialize");
-        assert!(parsed.is_object() || parsed.is_array());
-    }
-
-    #[test]
-    fn generate_tornado_from_sensitivity() {
-        let model_json = test_model_json();
-        let config = finstack_quant_statements_analytics::analysis::SensitivityConfig {
-            mode: finstack_quant_statements_analytics::analysis::SensitivityMode::Tornado,
-            parameters: vec![
-                finstack_quant_statements_analytics::analysis::ParameterSpec {
-                    node_id: "revenue".to_string(),
-                    period_id: PeriodId::quarter(2024, 1).expect("valid period fixture"),
-                    base_value: 100_000.0,
-                    perturbations: vec![-0.1, 0.1],
-                },
-            ],
-            target_metrics: vec!["gross_profit".to_string()],
-        };
-        let model: finstack_quant_statements::FinancialModelSpec =
-            serde_json::from_str(&model_json).expect("parse model");
-        let analyzer =
-            finstack_quant_statements_analytics::analysis::SensitivityAnalyzer::new(&model);
-        let result = analyzer.run(&config).expect("sensitivity");
-        let entries = finstack_quant_statements_analytics::analysis::generate_tornado_entries(
-            &result,
-            "gross_profit",
-            None,
-        )
-        .expect("tornado entries");
-        assert!(!entries.is_empty());
-    }
-
-    #[test]
-    fn run_variance_between_two_results() {
-        let (model_json, _) = evaluated_results();
-        let model: finstack_quant_statements::FinancialModelSpec =
-            serde_json::from_str(&model_json).expect("parse model");
-        let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
-        let base = evaluator.evaluate(&model).expect("eval base");
-        let comparison = evaluator.evaluate(&model).expect("eval comparison");
-        let config = finstack_quant_statements_analytics::analysis::VarianceConfig {
-            baseline_label: "base".to_string(),
-            comparison_label: "comp".to_string(),
-            metrics: vec!["revenue".to_string(), "gross_profit".to_string()],
-            periods: vec![PeriodId::quarter(2024, 1).expect("valid period fixture")],
-        };
-        // `run_variance` returns a `JsValue`; assert the report it serializes.
-        let analyzer = finstack_quant_statements_analytics::analysis::VarianceAnalyzer::new(
-            &base,
-            &comparison,
-        );
-        let report = analyzer.compute(&config).expect("variance");
-        let parsed = serde_json::to_value(&report).expect("serialize");
-        assert!(parsed.is_object());
-    }
-
-    #[test]
-    fn evaluate_scenario_set_with_override() {
-        let model_json = test_model_json();
-        let mut overrides = indexmap::IndexMap::new();
-        overrides.insert(
-            "revenue".to_string(),
-            finstack_quant_statements::types::AmountOrScalar::scalar(200_000.0),
-        );
-        let scenario_set = finstack_quant_statements_analytics::analysis::ScenarioSet {
-            scenarios: indexmap::indexmap! {
-                "upside".to_string() => finstack_quant_statements_analytics::analysis::ScenarioDefinition {
-                    parent: None,
-                    overrides,
-                    period_overrides: indexmap::IndexMap::new(),
-                },
-            },
-        };
-        // `evaluate_scenario_set` returns a `JsValue`; assert the map it
-        // serializes.
-        let model: finstack_quant_statements::FinancialModelSpec =
-            serde_json::from_str(&model_json).expect("parse model");
-        let results = scenario_set.evaluate_all(&model).expect("eval");
-        // `ScenarioResults` is `#[serde(transparent)]`, so the value the
-        // binding hands to `to_js_value` is the name -> result map itself.
-        let parsed = serde_json::to_value(&results).expect("serialize");
-        assert_eq!(
-            parsed,
-            serde_json::to_value(&results.scenarios).expect("serialize map")
-        );
-        assert!(parsed.get("upside").is_some());
-    }
-
-    #[test]
-    fn evaluate_scenario_set_rejects_removed_model_id() {
-        // Error paths build a `JsValue`, which aborts off wasm32; assert the
-        // serde rejection the binding surfaces.
-        assert!(
-            serde_json::from_str::<finstack_quant_statements_analytics::analysis::ScenarioSet>(
-                r#"{"scenarios":{"base":{"model_id":"legacy"}}}"#
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn run_checks_includes_formula_checks() {
-        let model_json = test_model_json();
-        let spec_json = serde_json::json!({
-            "name": "formula suite",
-            "builtin_checks": [],
-            "formula_checks": [{
-                "id": "revenue_positive",
-                "name": "Revenue must be positive",
-                "category": "internal_consistency",
-                "severity": "error",
-                "formula": "revenue > 0",
-                "message_template": "Revenue not positive in {period}",
-                "tolerance": null
-            }]
-        })
-        .to_string();
-        let model: finstack_quant_statements::FinancialModelSpec =
-            serde_json::from_str(&model_json).expect("model");
-        let spec: finstack_quant_statements::checks::CheckSuiteSpec =
-            serde_json::from_str(&spec_json).expect("spec");
-        let report = spec
-            .resolve()
-            .expect("resolve")
-            .run_model(&model, None)
-            .expect("run checks");
-
-        assert_eq!(report.results[0].check_id, "revenue_positive");
-    }
+    Ok(finstack_quant_statements_analytics::analysis::render_check_report_html(&report))
 }

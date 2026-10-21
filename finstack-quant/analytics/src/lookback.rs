@@ -4,8 +4,9 @@
 //! [`select_range`] returns a `Range<usize>` into the sorted dates/returns
 //! arrays for a `[period_start, ref_date]` window.
 
-use crate::dates::{Date, DateExt, FiscalConfig, Month};
 use core::ops::Range;
+use finstack_quant_core::dates::{Date, DateExt, FiscalConfig};
+use time::Month;
 
 /// Index range `[period_start, ref_date]` inclusive in a sorted date slice.
 pub(crate) fn select_range(dates: &[Date], period_start: Date, ref_date: Date) -> Range<usize> {
@@ -24,7 +25,7 @@ pub(crate) fn qtd_start_date(ref_date: Date) -> Date {
     let q = ref_date.quarter();
     let quarter_start_month = (q - 1) * 3 + 1;
     let (year, _month, _day) = ref_date.to_calendar_date();
-    crate::dates::create_date(
+    finstack_quant_core::dates::create_date(
         year,
         Month::try_from(quarter_start_month).unwrap_or(Month::January),
         1,
@@ -35,7 +36,7 @@ pub(crate) fn qtd_start_date(ref_date: Date) -> Date {
 /// January 1 of `ref_date`'s calendar year.
 pub(crate) fn ytd_start_date(ref_date: Date) -> Date {
     let (year, _month, _day) = ref_date.to_calendar_date();
-    crate::dates::create_date(year, Month::January, 1).unwrap_or(ref_date)
+    finstack_quant_core::dates::create_date(year, Month::January, 1).unwrap_or(ref_date)
 }
 
 /// Start date of the fiscal year containing `ref_date` under `fiscal_config`.
@@ -48,9 +49,9 @@ pub(crate) fn fytd_start_date(ref_date: Date, fiscal_config: FiscalConfig) -> Da
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::Duration;
+    use time::Duration;
     fn d(y: i32, m: u8, day: u8) -> Date {
-        crate::dates::create_date(y, Month::try_from(m).expect("valid month"), day)
+        finstack_quant_core::dates::create_date(y, Month::try_from(m).expect("valid month"), day)
             .expect("valid date")
     }
 

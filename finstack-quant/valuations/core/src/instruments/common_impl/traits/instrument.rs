@@ -27,11 +27,12 @@ use super::pricing_options::PricingOptions;
 ///
 /// ```rust
 /// use finstack_quant_cashflows::builder::CashFlowSchedule;
-/// use finstack_quant_cashflows::primitives::CFKind;
+/// use finstack_quant_core::cashflow::CFKind;
 /// use finstack_quant_cashflows::{schedule_from_dated_flows, CashflowScheduleSource, ScheduleBuildOpts};
 /// use finstack_quant_core::dates::{Date, DayCount};
 /// use finstack_quant_core::market_data::context::MarketContext;
 /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
+/// use finstack_quant_core::market_data::traits::Discounting;
 /// use finstack_quant_core::money::Money;
 /// use finstack_quant_core::types::{Attributes, CurveId};
 /// use finstack_quant_core::{currency::Currency, Result};
@@ -51,12 +52,12 @@ use super::pricing_options::PricingOptions;
 ///
 /// impl CashflowScheduleSource for ZeroNote {
 ///     fn raw_cashflow_schedule(&self, _: &MarketContext, _: Date) -> Result<CashFlowSchedule> {
-///         Ok(schedule_from_dated_flows(
+///         schedule_from_dated_flows(
 ///             vec![(self.maturity, self.notional)],
 ///             CFKind::Notional,
 ///             DayCount::Act365F,
 ///             ScheduleBuildOpts { notional_hint: Some(self.notional), ..Default::default() },
-///         ))
+///         )
 ///     }
 /// }
 ///

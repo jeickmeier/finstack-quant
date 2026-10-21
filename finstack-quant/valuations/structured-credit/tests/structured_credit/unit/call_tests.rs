@@ -12,7 +12,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     calculate_tranche_metrics, run_simulation, AssetPool, CallAssumption, DealType, PoolAsset,
     ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, Tranche, TrancheCashflows,
@@ -126,7 +126,7 @@ fn clo(cpr: f64) -> StructuredCredit {
     deal
 }
 
-fn simulate(deal: &StructuredCredit) -> HashMap<String, TrancheCashflows> {
+fn simulate(deal: &StructuredCredit) -> FxHashMap<String, TrancheCashflows> {
     run_simulation(deal, &market_with_curves(close()), close()).expect("simulation")
 }
 
@@ -135,11 +135,11 @@ fn metrics(deal: &StructuredCredit, id: &str) -> TrancheMetrics {
         .expect("tranche metrics")
 }
 
-fn last_flow_date(results: &HashMap<String, TrancheCashflows>, id: &str) -> Option<Date> {
+fn last_flow_date(results: &FxHashMap<String, TrancheCashflows>, id: &str) -> Option<Date> {
     results[id].cashflows.last().map(|(date, _)| *date)
 }
 
-fn principal_on(results: &HashMap<String, TrancheCashflows>, id: &str, date: Date) -> f64 {
+fn principal_on(results: &FxHashMap<String, TrancheCashflows>, id: &str, date: Date) -> f64 {
     results[id]
         .principal_flows
         .iter()

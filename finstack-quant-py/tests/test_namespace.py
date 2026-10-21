@@ -67,8 +67,8 @@ class TestCoreNamespace:
         """Market data parent exports should match the parity contract."""
         from finstack_quant.core import market_data
 
-        expected = CONTRACT["crates"]["core"]["market_data"]["public"]
-        assert market_data.__all__ == expected
+        expected = CONTRACT["crates"]["core"]["module_symbols"]["market_data"]["public"]
+        assert set(market_data.__all__) == set(expected)
         for name in expected:
             assert hasattr(market_data, name)
         assert not hasattr(market_data, "check_butterfly")
@@ -213,7 +213,7 @@ class TestCorrelationNamespace:
             LatentTwoFactor,
             RecoveryModel,
             RecoverySpec,
-            cholesky_decompose,
+            cholesky_correlation,
             correlation_bounds,
             joint_probabilities,
             validate_correlation_matrix,
@@ -369,8 +369,8 @@ class TestPortfolioNamespace:
         })
         cashflows = aggregate_full_cashflows(spec_json, MarketContext())
         assert len(cashflows) == 0
-        assert cashflows.num_positions == 0
-        assert cashflows.num_issues == 0
+        assert len(cashflows.by_position) == 0
+        assert len(cashflows.issues) == 0
 
         result = json.loads(cashflows.to_json())
         assert result["events"] == []
@@ -459,7 +459,7 @@ class TestValuationsNamespace:
         for name in (
             "CalibrationEnvelope",
             "CalibrationEnvelopeError",
-            "CalibrationResult",
+            "CalibrationResultEnvelope",
             "calibrate",
             "calibrate_bermudan_lmm_base_vol",
             "dry_run",
@@ -483,12 +483,11 @@ class TestCalibrationNamespace:
             "CalibrationEnvelopeError",
             "CalibrationPlan",
             "CalibrationReport",
-            "CalibrationResult",
+            "CalibrationResultEnvelope",
             "CalibrationStep",
             "CalibrationValidationReport",
             "CdsQuote",
             "CdsTrancheQuote",
-            "CollateralEntry",
             "DividendScheduleDatum",
             "FxSpotDatum",
             "InflationQuote",
@@ -517,7 +516,7 @@ class TestCalibrationNamespace:
             "validate_vol_bounds",
         }
         assert set(calibration.__all__) == expected
-        assert calibration.CalibrationResult.__module__ == "finstack_quant.calibration"
+        assert calibration.CalibrationResultEnvelope.__module__ == "finstack_quant.calibration"
         assert calibration.CalibrationEnvelopeError.__module__ == "finstack_quant.calibration"
 
     def test_models_stub_exports_fourier_pricers(self) -> None:

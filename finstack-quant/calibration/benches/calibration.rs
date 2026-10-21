@@ -25,7 +25,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations_core::metrics::MetricId;
@@ -136,7 +136,7 @@ fn bench_discount_and_forward_steps(c: &mut Criterion) {
 
     c.bench_function("calibration_discount_step", |b| {
         b.iter(|| {
-            let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+            let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
             quote_sets.insert("disc".to_string(), disc_ids.clone());
             let plan = CalibrationPlan {
                 id: "bench_discount".to_string(),
@@ -164,7 +164,7 @@ fn bench_discount_and_forward_steps(c: &mut Criterion) {
         let mut combined_data = disc_data.clone();
         combined_data.extend(quotes_to_data(&fwd_mq));
         b.iter(|| {
-            let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+            let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
             quote_sets.insert("disc".to_string(), disc_ids.clone());
             quote_sets.insert("fwd".to_string(), fwd_ids.clone());
             let plan = CalibrationPlan {
@@ -254,7 +254,7 @@ fn bench_residual_normalization(c: &mut Criterion) {
         let disc_ids = quote_set_ids(&disc_mq);
         let disc_data = quotes_to_data(&disc_mq);
         b.iter(|| {
-            let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+            let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
             quote_sets.insert("disc".to_string(), disc_ids.clone());
             let plan = CalibrationPlan {
                 id: "residual_notional_small".to_string(),
@@ -295,7 +295,7 @@ fn bench_residual_normalization(c: &mut Criterion) {
         let disc_ids = quote_set_ids(&disc_mq);
         let disc_data = quotes_to_data(&disc_mq);
         b.iter(|| {
-            let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+            let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
             quote_sets.insert("disc".to_string(), disc_ids.clone());
             let plan = CalibrationPlan {
                 id: "residual_notional_large".to_string(),
@@ -405,6 +405,8 @@ fn bench_rate_quote_risk_cache(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("rate_quote_risk_portfolio");
     group.sample_size(10);
+    // Uncached: every FRA gets its own provider, so no recalibration is shared
+    // across the portfolio (DV01 is quote-space and needs a provider).
     group.bench_function("4_fras_uncached", |b| {
         b.iter(|| {
             fras.iter()
@@ -413,10 +415,13 @@ fn bench_rate_quote_risk_cache(c: &mut Criterion) {
                         black_box(&market),
                         black_box(as_of),
                         black_box(&[MetricId::Dv01]),
-                        PricingOptions::default(),
+                        PricingOptions::default().with_recalibration_provider(Arc::new(
+                            CachedRecalibrationProvider::new(),
+                        )),
                     )
                 })
                 .collect::<Result<Vec<_>, _>>()
+                .expect("uncached FRA DV01 should price")
         })
     });
     group.bench_function("4_fras_batch_cached", |b| {
@@ -436,6 +441,7 @@ fn bench_rate_quote_risk_cache(c: &mut Criterion) {
                         )
                     })
                     .collect::<Result<Vec<_>, _>>()
+                    .expect("cached FRA DV01 should price")
             },
             BatchSize::SmallInput,
         )

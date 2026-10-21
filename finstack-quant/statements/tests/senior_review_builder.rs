@@ -23,7 +23,7 @@ fn swap_params(id: &str, fixed_rate: f64) -> SwapParams {
     }
 }
 
-fn reject_invalid_instruments<State>(builder: &mut ModelBuilder<State>) {
+fn reject_invalid_instruments(builder: &mut ModelBuilder) {
     let notional = Money::from((100_000_i64, Currency::USD));
     assert!(builder
         .try_add_bond(

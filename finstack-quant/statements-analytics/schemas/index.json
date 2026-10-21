@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corporate_analysis_options.schema.json",
-      "bytes": 27149,
+      "bytes": 27661,
       "kind": "input",
       "path": "schemas/statements_analytics/1/corporate_analysis_options.schema.json",
       "summary": "Optional DCF, coverage, check-suite, valuation-date and LTV settings of the corporate analysis pipeline.",
@@ -92,7 +92,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_options.schema.json",
-      "bytes": 10242,
+      "bytes": 8154,
       "kind": "input",
       "path": "schemas/statements_analytics/1/dcf_options.schema.json",
       "summary": "Optional configuration for DCF valuation beyond the core WACC/terminal parameters.",
@@ -143,24 +143,6 @@
       "summary": "Configuration for ECL calculation.",
       "title": "EclConfig",
       "type_name": "EclConfig"
-    },
-    {
-      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_request.schema.json",
-      "bytes": 4525,
-      "kind": "input",
-      "path": "schemas/statements_analytics/1/ecl_request.schema.json",
-      "summary": "Inputs for probability-weighted ECL from cumulative-PD schedules.",
-      "title": "EclRequest",
-      "type_name": "EclRequest"
-    },
-    {
-      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_stage_request.schema.json",
-      "bytes": 2473,
-      "kind": "input",
-      "path": "schemas/statements_analytics/1/ecl_stage_request.schema.json",
-      "summary": "Inputs for the simplified IFRS 9 stage-classification workflow.",
-      "title": "EclStageRequest",
-      "type_name": "EclStageRequest"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/effective_tax_rate_check.schema.json",
@@ -316,15 +298,6 @@
       "type_name": "PeerStats"
     },
     {
-      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/portfolio_ecl_result.schema.json",
-      "bytes": 23930,
-      "kind": "output",
-      "path": "schemas/statements_analytics/1/portfolio_ecl_result.schema.json",
-      "summary": "Portfolio-level ECL result with stage migration and segment breakdown.",
-      "title": "PortfolioEclResult",
-      "type_name": "PortfolioEclResult"
-    },
-    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/property_template_nodes.schema.json",
       "bytes": 2892,
       "kind": "output",
@@ -332,15 +305,6 @@
       "summary": "Standard node ids for a full property operating statement template.",
       "title": "PropertyTemplateNodes",
       "type_name": "PropertyTemplateNodes"
-    },
-    {
-      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/provision_waterfall.schema.json",
-      "bytes": 2057,
-      "kind": "component",
-      "path": "schemas/statements_analytics/1/provision_waterfall.schema.json",
-      "summary": "Provision movement waterfall between two reporting dates.",
-      "title": "ProvisionWaterfall",
-      "type_name": "ProvisionWaterfall"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/rating_pd_map.schema.json",
@@ -371,7 +335,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_diff.schema.json",
-      "bytes": 3608,
+      "bytes": 3192,
       "kind": "component",
       "path": "schemas/statements_analytics/1/scenario_diff.schema.json",
       "summary": "Variance-style diff between two evaluated scenarios.",
@@ -389,7 +353,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json",
-      "bytes": 23733,
+      "bytes": 27165,
       "kind": "component",
       "path": "schemas/statements_analytics/1/scenario_set.schema.json",
       "summary": "Registry of named scenarios built on top of a base model.",
@@ -433,6 +397,15 @@
       "type_name": "SensitivityResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/stage_result.schema.json",
+      "bytes": 8770,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/stage_result.schema.json",
+      "summary": "IFRS 9 stage classification with its ordered trigger audit trail.",
+      "title": "StageResult",
+      "type_name": "StageResult"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/trend_check.schema.json",
       "bytes": 3394,
       "kind": "component",
@@ -449,6 +422,15 @@
       "summary": "Configuration for variance analysis between two `StatementResult`.",
       "title": "VarianceConfig",
       "type_name": "VarianceConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/weighted_ecl_result.schema.json",
+      "bytes": 12062,
+      "kind": "output",
+      "path": "schemas/statements_analytics/1/weighted_ecl_result.schema.json",
+      "summary": "Probability-weighted ECL across macro scenarios with the per-scenario audit trail.",
+      "title": "WeightedEclResult",
+      "type_name": "WeightedEclResult"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/working_capital_consistency.schema.json",

@@ -73,11 +73,14 @@ impl JsEvaluator {
     /// Twin of Python `Evaluator.evaluate` (Rust `Evaluator::evaluate`).
     /// Non-finite node values and warning values use the canonical strings
     /// `"nan"`, `"inf"` and `"-inf"`, so a `JSON.stringify`/parse round trip
-    /// preserves missing-data semantics.
+    /// preserves missing-data semantics. A capital structure is evaluated
+    /// from an empty market as of the first period's start, so fixed-rate
+    /// debt yields `cs_cashflows`; instruments that need market data need
+    /// `evaluateWithMarket`.
     ///
     /// @param model - `FinancialModelSpec` to evaluate (object or JSON).
-    /// @returns `StatementResult` plain object: node values per period, value types, evaluation metadata and the optional check report.
-    /// @throws Error with kind `validation` if the model is malformed, fails semantic validation, or a formula fails to evaluate; kind `not_found` if a formula references a missing node; kind `computation` for a dependency cycle or a capital-structure failure.
+    /// @returns `StatementResult` plain object: node values per period, value types, evaluation metadata, capital-structure cashflows and the optional check report.
+    /// @throws Error with kind `validation` if the model is malformed, fails semantic validation, or a formula fails to evaluate; kind `not_found` if a formula references a missing node or a capital-structure instrument needs market data; kind `computation` for a dependency cycle or a capital-structure failure.
     pub fn evaluate(&mut self, model: JsValue) -> Result<JsValue, JsValue> {
         let model =
             FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
@@ -87,8 +90,9 @@ impl JsEvaluator {
     /// Evaluate a model against a market context as of a valuation date.
     ///
     /// Twin of Python `Evaluator.evaluate_with_market` (Rust
-    /// `Evaluator::evaluate_with_market`). Required for models with a capital
-    /// structure, whose instruments are priced from the market.
+    /// `Evaluator::evaluate_with_market`). Required when capital-structure
+    /// instruments need market data (floating coupons, swaps, caps) or
+    /// explicit values need an as-of cutoff.
     ///
     /// @param model - `FinancialModelSpec` to evaluate (object or JSON).
     /// @param market - `MarketContext` state supplying curves, quotes and FX (object or JSON).
@@ -106,7 +110,7 @@ impl JsEvaluator {
             FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
         let market: finstack_quant_core::market_data::context::MarketContext =
             from_js_json(&market, "market")?;
-        let as_of = crate::utils::parse_iso_date(&js_string(&as_of, "asOf")?)?;
+        let as_of = crate::utils::wire::js_date(&as_of, "asOf")?;
         to_js_value(
             &self
                 .inner

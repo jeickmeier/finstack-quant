@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
-      "bytes": 22285,
+      "bytes": 22797,
       "kind": "input",
       "path": "schemas/statements/1/check_suite_spec.schema.json",
       "summary": "Serializable check suite: built-in checks, formula checks and filtering configuration.",
@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
-      "bytes": 382388,
+      "bytes": 382412,
       "kind": "input",
       "path": "schemas/statements/1/financial_model_spec.schema.json",
       "summary": "Statement model graph: periods, nodes and the Value > Forecast > Formula precedence.",
@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
-      "bytes": 32581,
+      "bytes": 31774,
       "kind": "output",
       "path": "schemas/statements/1/monte_carlo_results.schema.json",
       "summary": "Percentile summaries of a Monte Carlo statement-model evaluation.",
@@ -64,8 +64,17 @@
       "type_name": "NormalizationResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
+      "bytes": 3898,
+      "kind": "input",
+      "path": "schemas/statements/1/rollup_spec.schema.json",
+      "summary": "Target frequency and per-node methods for rolling statement results up to coarser periods.",
+      "title": "RollupSpec",
+      "type_name": "RollupSpec"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
-      "bytes": 71992,
+      "bytes": 71185,
       "kind": "output",
       "path": "schemas/statements/1/statement_result.schema.json",
       "summary": "Evaluated node values per period, with policy stamps.",

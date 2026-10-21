@@ -3,6 +3,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ForecastEditor } from "./forecast-editor";
 import { MetricEditor } from "./metric-editor";
+import { ScenarioPanel } from "./scenario-panel";
+import {
+  annualRollupSpecJson,
+  initialRollupMethods,
+  rolledPeriods,
+  RollupMethodsEditor,
+  type RollupMethod,
+} from "./rollup";
 import { FinancialModelEditor } from "@/components/finstack/statements/components/financial-model-editor/financial-model-editor";
 import { financialModelModule } from "@/components/finstack/statements/components/financial-model-editor/model";
 import { StatementGrid } from "@/components/finstack/statements/components/statement-grid/statement-grid";
@@ -12,6 +20,10 @@ import { StatementChecks } from "@/components/finstack/statements/components/sta
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
 import { useEvaluateStatement } from "@/hooks/statements/use-evaluate-statement/use-evaluate-statement";
 import { useFinstack } from "@/hooks/shared/use-finstack/use-finstack";
+import {
+  useWorkerQuery,
+  workerQueryOptions,
+} from "@/hooks/shared/use-finstack/query";
 import { useLinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
@@ -21,12 +33,17 @@ import {
   statementCellKey,
   statementRows,
 } from "../../components/statement-grid/projection";
-import type { StatementRequest } from "@/workers/finstack-contract";
+import type {
+  StatementRequest,
+  StatementRollupRequest,
+} from "@/workers/finstack-contract";
 
-type Tab = "statements" | "forecast" | "ratios" | "checks" | "advanced";
+type Tab =
+  "statements" | "forecast" | "scenarios" | "ratios" | "checks" | "advanced";
 const tabs: { id: Tab; label: string }[] = [
   { id: "statements", label: "Statements & editing" },
   { id: "forecast", label: "Forecast & roll forward" },
+  { id: "scenarios", label: "Scenarios" },
   { id: "ratios", label: "Metrics & ratios" },
   { id: "checks", label: "Checks" },
   { id: "advanced", label: "Advanced" },
@@ -41,6 +58,8 @@ export function StatementsWorkbench({
   marketJson,
   asOf,
   defaultCheckSuiteJson,
+  defaultScenarioSetJson,
+  defaultRollupSpecJson,
   selectedKey,
   onSelectedKeyChange,
   onModelAccepted,
@@ -53,6 +72,10 @@ export function StatementsWorkbench({
   asOf?: string;
   /** Optional canonical check suite supplied by the host. */
   defaultCheckSuiteJson?: string;
+  /** Optional native ScenarioSet JSON that seeds the Scenarios tab. */
+  defaultScenarioSetJson?: string;
+  /** Optional native RollupSpec JSON whose methods seed the annual view; otherwise methods follow line tags. */
+  defaultRollupSpecJson?: string;
   selectedKey?: string | null;
   onSelectedKeyChange?: (key: string | null) => void;
   onModelAccepted?: (canonicalJson: string) => void;
@@ -149,6 +172,64 @@ export function StatementsWorkbench({
     () => (result ? serializeHost(result) : null),
     [result],
   );
+  const [periodView, setPeriodView] = useState<"reported" | "annual">(
+    "reported",
+  );
+  const [rollupMethods, setRollupMethods] = useState<Record<
+    string,
+    RollupMethod
+  > | null>(null);
+  const methods = useMemo(() => {
+    if (rollupMethods) return rollupMethods;
+    if (!model) return {};
+    try {
+      return initialRollupMethods(model, defaultRollupSpecJson);
+    } catch {
+      return {};
+    }
+  }, [rollupMethods, model, defaultRollupSpecJson]);
+  const rollupRequest: StatementRollupRequest | null =
+    periodView === "annual" && request && resultJson
+      ? {
+          modelJson: request.modelJson,
+          resultsJson: resultJson,
+          specJson: annualRollupSpecJson(methods),
+        }
+      : null;
+  const rollup = useWorkerQuery((worker) => ({
+    ...workerQueryOptions({
+      client: worker.client,
+      queryKey: [
+        "finstack",
+        worker.session,
+        "statement-rollup",
+        rollupRequest,
+      ] as const,
+      ready: rollupRequest !== null,
+      missing: "Statement worker is not ready",
+      queryFn: (client) => client.call("rollupStatement", rollupRequest!),
+    }),
+    enabled: worker.status === "ready" && rollupRequest !== null,
+  }));
+  const annual = useMemo(
+    () =>
+      model && rollup.data
+        ? {
+            model: { ...model, periods: rolledPeriods(model, rollup.data) },
+            result: rollup.data,
+          }
+        : null,
+    [model, rollup.data],
+  );
+  const reported = periodView === "reported";
+  /** Columns and values the grids show: reported periods or the native annual rollup. */
+  const view = reported
+    ? model && result
+      ? { model, result }
+      : null
+    : rollupRequest
+      ? annual
+      : null;
   const rows = useMemo(() => {
     if (!result || !model) return [];
     try {
@@ -389,7 +470,24 @@ export function StatementsWorkbench({
         className="flex flex-wrap items-center justify-end gap-2 text-xs"
         aria-label="Display units"
       >
-        <span className="text-muted-foreground">Display units</span>
+        <span className="text-muted-foreground">Periods</span>
+        <button
+          type="button"
+          className={`rounded-md border px-2 py-1 ${reported ? "border-primary bg-primary/10 font-semibold" : "border-border"}`}
+          aria-pressed={reported}
+          onClick={() => setPeriodView("reported")}
+        >
+          Reported
+        </button>
+        <button
+          type="button"
+          className={`rounded-md border px-2 py-1 ${reported ? "border-border" : "border-primary bg-primary/10 font-semibold"}`}
+          aria-pressed={!reported}
+          onClick={() => setPeriodView("annual")}
+        >
+          Annual
+        </button>
+        <span className="ml-3 text-muted-foreground">Display units</span>
         <button
           type="button"
           className={`rounded-md border px-2 py-1 ${displayMode === "millions" ? "border-primary bg-primary/10 font-semibold" : "border-border"}`}
@@ -432,69 +530,61 @@ export function StatementsWorkbench({
       {model && result && resultJson && tab === "statements" && (
         <div className="space-y-6">
           <p className="text-xs text-muted-foreground">
-            Select a period above to review it. Click a reported or forecast
-            value to edit in exact units; calculated lines update from their
-            drivers.
+            {reported
+              ? "Select a period above to review it. Click a reported or forecast value to edit in exact units; calculated lines update from their drivers."
+              : "Annual values are rolled up natively from the reported periods. Switch to Reported to edit values."}
           </p>
-          <div className="min-w-0 space-y-8">
-            {sections.income.length > 0 && (
-              <StatementGrid
-                title="Income statement"
-                model={model}
-                result={result}
-                link={link}
-                nodeIds={sections.income}
-                displayMode={displayMode}
-                showType={false}
-                showRaw={false}
-                activePeriod={activePeriod}
-                onEditValue={saveCell}
-              />
-            )}
-            {sections.balance.length > 0 && (
-              <StatementGrid
-                title="Balance sheet & debt"
-                model={model}
-                result={result}
-                link={link}
-                nodeIds={sections.balance}
-                displayMode={displayMode}
-                showType={false}
-                showRaw={false}
-                activePeriod={activePeriod}
-                onEditValue={saveCell}
-              />
-            )}
-            {sections.cash.length > 0 && (
-              <StatementGrid
-                title="Cash flow"
-                model={model}
-                result={result}
-                link={link}
-                nodeIds={sections.cash}
-                displayMode={displayMode}
-                showType={false}
-                showRaw={false}
-                activePeriod={activePeriod}
-                onEditValue={saveCell}
-              />
-            )}
-            {sections.other.length > 0 && (
-              <StatementGrid
-                title="Other lines"
-                model={model}
-                result={result}
-                link={link}
-                nodeIds={sections.other}
-                displayMode={displayMode}
-                showType={false}
-                showRaw={false}
-                activePeriod={activePeriod}
-                onEditValue={saveCell}
-              />
-            )}
-          </div>
-          {activeNode && activePeriod && (
+          {!reported && (
+            <RollupMethodsEditor
+              model={model}
+              nodeIds={nodeIds.length ? nodeIds : Object.keys(model.nodes)}
+              methods={methods}
+              onChange={setRollupMethods}
+            />
+          )}
+          {!reported && rollup.error && (
+            <p
+              role="alert"
+              className="rounded-md border border-error p-3 text-sm text-error"
+            >
+              {rollup.error.message}
+            </p>
+          )}
+          {!view && !rollup.error && (
+            <p className={cardClass} role="status">
+              Rolling up to annual periods…
+            </p>
+          )}
+          {view && (
+            <div className="min-w-0 space-y-8">
+              {(
+                [
+                  ["Income statement", sections.income],
+                  ["Balance sheet & debt", sections.balance],
+                  ["Cash flow", sections.cash],
+                  ["Other lines", sections.other],
+                ] as const
+              ).map(
+                ([title, ids]) =>
+                  ids.length > 0 && (
+                    <StatementGrid
+                      key={title}
+                      title={title}
+                      model={view.model}
+                      result={view.result}
+                      link={link}
+                      nodeIds={ids}
+                      displayMode={displayMode}
+                      showType={false}
+                      showRaw={false}
+                      activePeriod={reported ? activePeriod : null}
+                      onEditValue={reported ? saveCell : undefined}
+                    />
+                  ),
+              )}
+            </div>
+          )}
+          {reported && activeNode && activePeriod && (
             <details className={cardClass}>
               <summary className="cursor-pointer font-semibold">
                 Explain selected value
@@ -530,7 +620,11 @@ export function StatementsWorkbench({
                 model={model}
                 nodeId={id}
                 node={node}
-                onApply={(json) => commit(json, true)}
+                onApply={(forecast) => {
+                  const next = structuredClone(model);
+                  next.nodes[id].forecast = forecast;
+                  return commit(JSON.stringify(next), true);
+                }}
               />
             ))}
             {forecastNodes.length === 0 && (
@@ -616,6 +710,19 @@ export function StatementsWorkbench({
           </aside>
         </div>
       )}
+      {model && request && tab === "scenarios" && (
+        <ScenarioPanel
+          model={model}
+          modelJson={request.modelJson}
+          nodeIds={nodeIds.length ? nodeIds : Object.keys(model.nodes)}
+          marketJson={marketJson}
+          asOf={asOf}
+          activePeriod={activePeriod}
+          displayMode={displayMode}
+          link={link}
+          defaultScenarioSetJson={defaultScenarioSetJson}
+        />
+      )}
       {model && result && tab === "ratios" && (
         <div className="space-y-5">
           <MetricEditor model={model} onApply={(json) => commit(json, true)} />
@@ -624,17 +731,27 @@ export function StatementsWorkbench({
           </p>
           {sections.ratios.length > 0 ? (
             <>
-              <StatementGrid
-                title="Metrics, margins & covenant ratios"
-                model={model}
-                result={result}
-                link={link}
-                nodeIds={sections.ratios}
-                displayMode={displayMode}
-                showType={false}
-                showRaw={false}
-                activePeriod={activePeriod}
-              />
+              {view ? (
+                <StatementGrid
+                  title={
+                    reported
+                      ? "Metrics, margins & covenant ratios"
+                      : "Annual metrics, margins & covenant ratios"
+                  }
+                  model={view.model}
+                  result={view.result}
+                  link={link}
+                  nodeIds={sections.ratios}
+                  displayMode={displayMode}
+                  showType={false}
+                  showRaw={false}
+                  activePeriod={reported ? activePeriod : null}
+                />
+              ) : (
+                <p className={cardClass} role="status">
+                  {rollup.error?.message ?? "Rolling up to annual periods…"}
+                </p>
+              )}
               <div className={cardClass}>
                 <label className="block text-sm">
                   Trend
@@ -650,10 +767,10 @@ export function StatementsWorkbench({
                     ))}
                   </select>
                 </label>
-                {chartId && (
+                {chartId && view && (
                   <StatementChart
-                    model={model}
-                    result={result}
+                    model={view.model}
+                    result={view.result}
                     nodeId={chartId}
                     link={link}
                   />

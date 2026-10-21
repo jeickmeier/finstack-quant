@@ -19,7 +19,7 @@ use finstack_quant_margin::{
 };
 use finstack_quant_portfolio::types::DUMMY_ENTITY_ID;
 use finstack_quant_portfolio::{
-    Entity, Portfolio, PortfolioMarginAggregator, Position, PositionUnit,
+    margin::portfolio_margin, position::Position, position::PositionUnit, types::Entity, Portfolio,
 };
 use finstack_quant_valuations::instruments::{Instrument, MarketDependencies};
 use finstack_quant_valuations::pricer::InstrumentType;
@@ -148,7 +148,7 @@ fn bench_margin_aggregation(c: &mut Criterion) {
     group.sample_size(10);
     let as_of = date!(2025 - 01 - 01);
     let market = MarketContext::new();
-    let collateral_balances = finstack_quant_core::HashMap::default();
+    let collateral_balances = finstack_quant_core::FxHashMap::default();
 
     for &n_positions in &[256_usize, 1_024] {
         let portfolio = margin_portfolio(n_positions, 4, as_of);
@@ -157,16 +157,13 @@ fn bench_margin_aggregation(c: &mut Criterion) {
             &n_positions,
             |b, _| {
                 b.iter(|| {
-                    let mut aggregator = PortfolioMarginAggregator::from_portfolio(&portfolio)
-                        .expect("consistent margin terms");
-                    aggregator
-                        .calculate(
-                            std::hint::black_box(&portfolio),
-                            std::hint::black_box(&market),
-                            as_of,
-                            std::hint::black_box(&collateral_balances),
-                        )
-                        .expect("bench: margin calculate")
+                    portfolio_margin(
+                        std::hint::black_box(&portfolio),
+                        std::hint::black_box(&market),
+                        as_of,
+                        std::hint::black_box(&collateral_balances),
+                    )
+                    .expect("bench: portfolio margin")
                 });
             },
         );

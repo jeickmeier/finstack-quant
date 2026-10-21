@@ -1,8 +1,6 @@
-//! WASM wrapper for the type-state `ModelBuilder`.
+//! WASM wrapper for `ModelBuilder`.
 //!
-//! JavaScript cannot model the Rust type-state, so the two builder states are
-//! one class and readiness is tracked at runtime, exactly as in the Python
-//! binding. Methods update the builder in place and return nothing
+//! Methods update the builder in place and return nothing
 //! (wasm-bindgen cannot return `this`), so calls are written as statements
 //! rather than a chain. Fallible steps use the crate's non-consuming `try_*`
 //! twins, so a bad formula or period range throws without discarding the
@@ -10,10 +8,11 @@
 
 use super::handles::JsRegistry;
 use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, json_text};
+use crate::utils::wire::{js_date, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::{Date, Period, PeriodId};
 use finstack_quant_core::money::Money;
-use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder, NeedPeriods, Ready};
+use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder};
 use finstack_quant_statements::capital_structure::{
     BondConventionParams, SwapConventions, SwapParams, WaterfallSpec,
 };
@@ -23,11 +22,6 @@ use finstack_quant_statements::types::{
 use finstack_quant_statements::FinancialModelSpec;
 use indexmap::IndexMap;
 use wasm_bindgen::prelude::*;
-
-enum BuilderState {
-    NeedPeriods(ModelBuilder<NeedPeriods>),
-    Ready(ModelBuilder<Ready>),
-}
 
 fn invalid(message: &str) -> JsValue {
     to_js_err(finstack_quant_core::Error::Validation(message.to_string()))
@@ -61,10 +55,6 @@ fn meta_value(value: &JsValue) -> Result<serde_json::Value, JsValue> {
     from_js_json(value, "value")
 }
 
-fn iso_date(value: &JsValue, label: &str) -> Result<Date, JsValue> {
-    crate::utils::parse_iso_date(&js_string(value, label)?)
-}
-
 /// Fluent builder for `FinancialModelSpec`.
 ///
 /// Twin of the Python `ModelBuilder` (Rust `ModelBuilder`). Call `periods`
@@ -78,65 +68,32 @@ fn iso_date(value: &JsValue, label: &str) -> Result<Date, JsValue> {
 /// const builder = new statements.ModelBuilder("acme");
 /// builder.periods("2025Q1..Q4", "2025Q1");
 /// builder.valueScalar("revenue", { "2025Q1": 100 });
-/// builder.forecast("revenue", statements.forecastSpecGrowth(0.05));
+/// builder.forecast("revenue", { method: "growth_pct", params: { rate: 0.05 } });
 /// builder.compute("gross_profit", "revenue * 0.6");
 /// const model = builder.build();   // plain FinancialModelSpec object
 /// statements.modelNodeIds(model);  // ["revenue", "gross_profit"]
 /// ```
 #[wasm_bindgen(js_name = ModelBuilder)]
 pub struct JsModelBuilder {
-    inner: Option<BuilderState>,
-}
-
-/// Run a fallible `&mut` capital-structure step in whichever state the builder
-/// is in. The builder is left untouched when the step fails.
-macro_rules! try_in_place {
-    ($self:ident, |$b:ident| $call:expr) => {
-        match $self.inner.as_mut() {
-            Some(BuilderState::NeedPeriods($b)) => $call,
-            Some(BuilderState::Ready($b)) => $call,
-            None => return Err(consumed()),
-        }
-        .map_err(to_js_err)
-    };
-}
-
-/// Run an infallible consuming capital-structure step in whichever state the
-/// builder is in.
-macro_rules! replace_with {
-    ($self:ident, |$b:ident| $call:expr) => {{
-        let next = match $self.take_any()? {
-            BuilderState::NeedPeriods($b) => BuilderState::NeedPeriods($call),
-            BuilderState::Ready($b) => BuilderState::Ready($call),
-        };
-        $self.inner = Some(next);
-        Ok(())
-    }};
+    inner: Option<ModelBuilder>,
 }
 
 impl JsModelBuilder {
-    fn take_any(&mut self) -> Result<BuilderState, JsValue> {
+    fn take(&mut self) -> Result<ModelBuilder, JsValue> {
         self.inner.take().ok_or_else(consumed)
     }
 
-    fn take_ready(&mut self) -> Result<ModelBuilder<Ready>, JsValue> {
-        match self.take_any()? {
-            BuilderState::Ready(builder) => Ok(builder),
-            state @ BuilderState::NeedPeriods(_) => {
-                self.inner = Some(state);
-                Err(invalid("Must call periods() before adding nodes"))
-            }
-        }
+    /// Mutable access without taking ownership, so a failed `try_*` call
+    /// leaves the builder usable.
+    fn builder_mut(&mut self) -> Result<&mut ModelBuilder, JsValue> {
+        self.inner.as_mut().ok_or_else(consumed)
     }
 
-    fn ready_mut(&mut self) -> Result<&mut ModelBuilder<Ready>, JsValue> {
-        match self.inner.as_mut() {
-            Some(BuilderState::Ready(builder)) => Ok(builder),
-            Some(BuilderState::NeedPeriods(_)) => {
-                Err(invalid("Must call periods() before adding nodes"))
-            }
-            None => Err(consumed()),
-        }
+    /// Apply an infallible consuming builder step in place.
+    fn replace(&mut self, step: impl FnOnce(ModelBuilder) -> ModelBuilder) -> Result<(), JsValue> {
+        let builder = self.take()?;
+        self.inner = Some(step(builder));
+        Ok(())
     }
 }
 
@@ -150,9 +107,7 @@ impl JsModelBuilder {
     #[wasm_bindgen(constructor)]
     pub fn new(id: JsValue) -> Result<JsModelBuilder, JsValue> {
         Ok(JsModelBuilder {
-            inner: Some(BuilderState::NeedPeriods(ModelBuilder::new(js_string(
-                &id, "id",
-            )?))),
+            inner: Some(ModelBuilder::new(js_string(&id, "id")?)),
         })
     }
 
@@ -168,7 +123,7 @@ impl JsModelBuilder {
         let spec = FinancialModelSpec::from_json(&json_text(&spec, "spec")?).map_err(to_js_err)?;
         let builder = ModelBuilder::from_spec(spec).map_err(to_js_err)?;
         Ok(JsModelBuilder {
-            inner: Some(BuilderState::Ready(builder)),
+            inner: Some(builder),
         })
     }
 
@@ -187,24 +142,10 @@ impl JsModelBuilder {
     ) -> Result<(), JsValue> {
         let range = js_string(&range, "range")?;
         let actuals_until = js_opt_string(actuals_until.as_ref(), "actualsUntil")?;
-        match self.take_any()? {
-            BuilderState::NeedPeriods(builder) => {
-                match builder.try_periods(&range, actuals_until.as_deref()) {
-                    Ok(ready) => {
-                        self.inner = Some(BuilderState::Ready(ready));
-                        Ok(())
-                    }
-                    Err((builder, error)) => {
-                        self.inner = Some(BuilderState::NeedPeriods(*builder));
-                        Err(to_js_err(error))
-                    }
-                }
-            }
-            state @ BuilderState::Ready(_) => {
-                self.inner = Some(state);
-                Err(invalid("Periods already set"))
-            }
-        }
+        self.builder_mut()?
+            .try_periods(&range, actuals_until.as_deref())
+            .map_err(to_js_err)?;
+        Ok(())
     }
 
     /// Define the model periods from an explicit list.
@@ -217,17 +158,12 @@ impl JsModelBuilder {
     #[wasm_bindgen(js_name = periodsExplicit)]
     pub fn periods_explicit(&mut self, periods: JsValue) -> Result<(), JsValue> {
         let periods: Vec<Period> = from_js_json(&periods, "periods")?;
-        match self.take_any()? {
-            BuilderState::NeedPeriods(builder) => {
-                let ready = builder.periods_explicit(periods).map_err(to_js_err)?;
-                self.inner = Some(BuilderState::Ready(ready));
-                Ok(())
-            }
-            state @ BuilderState::Ready(_) => {
-                self.inner = Some(state);
-                Err(invalid("Periods already set"))
-            }
+        if !self.builder_mut()?.periods_slice().is_empty() {
+            return Err(invalid("Periods already set"));
         }
+        let builder = self.take()?;
+        self.inner = Some(builder.periods_explicit(periods).map_err(to_js_err)?);
+        Ok(())
     }
 
     /// Add a value node holding explicit per-period values.
@@ -237,13 +173,13 @@ impl JsModelBuilder {
     ///
     /// @param node_id - Node identifier, unique within the model.
     /// @param values - Object mapping period id (e.g. `"2025Q1"`) to a number or a `Money` wire object (`{amount, currency}`).
-    /// @throws Error with kind `validation` if `values` is malformed, periods were not set, or the builder was consumed.
+    /// @throws Error with kind `validation` if `values` is malformed or the builder was consumed.
     pub fn value(&mut self, node_id: JsValue, values: JsValue) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
         let values: IndexMap<PeriodId, AmountOrScalar> = from_js_json(&values, "values")?;
         let values: Vec<(PeriodId, AmountOrScalar)> = values.into_iter().collect();
-        let builder = self.take_ready()?;
-        self.inner = Some(BuilderState::Ready(builder.value(node_id, &values)));
+        let builder = self.take()?;
+        self.inner = Some(builder.value(node_id, &values));
         Ok(())
     }
 
@@ -254,14 +190,14 @@ impl JsModelBuilder {
     ///
     /// @param node_id - Node identifier, unique within the model.
     /// @param values - Object mapping period id (e.g. `"2025Q1"`) to a number.
-    /// @throws Error with kind `validation` if `values` is malformed, periods were not set, or the builder was consumed.
+    /// @throws Error with kind `validation` if `values` is malformed or the builder was consumed.
     #[wasm_bindgen(js_name = valueScalar)]
     pub fn value_scalar(&mut self, node_id: JsValue, values: JsValue) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
         let values: IndexMap<PeriodId, f64> = from_js_json(&values, "values")?;
         let values: Vec<(PeriodId, f64)> = values.into_iter().collect();
-        let builder = self.take_ready()?;
-        self.inner = Some(BuilderState::Ready(builder.value_scalar(node_id, &values)));
+        let builder = self.take()?;
+        self.inner = Some(builder.value_scalar(node_id, &values));
         Ok(())
     }
 
@@ -272,14 +208,14 @@ impl JsModelBuilder {
     ///
     /// @param node_id - Node identifier, unique within the model.
     /// @param values - Object mapping period id (e.g. `"2025Q1"`) to a `Money` wire object (`{amount, currency}`); all amounts share one currency.
-    /// @throws Error with kind `validation` if `values` is malformed, periods were not set, or the builder was consumed.
+    /// @throws Error with kind `validation` if `values` is malformed or the builder was consumed.
     #[wasm_bindgen(js_name = valueMoney)]
     pub fn value_money(&mut self, node_id: JsValue, values: JsValue) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
         let values: IndexMap<PeriodId, Money> = from_js_json(&values, "values")?;
         let values: Vec<(PeriodId, Money)> = values.into_iter().collect();
-        let builder = self.take_ready()?;
-        self.inner = Some(BuilderState::Ready(builder.value_money(node_id, &values)));
+        let builder = self.take()?;
+        self.inner = Some(builder.value_money(node_id, &values));
         Ok(())
     }
 
@@ -291,7 +227,7 @@ impl JsModelBuilder {
     ///
     /// @param node_id - Existing node whose values the dates describe.
     /// @param availability_dates - Object mapping period id (e.g. `"2025Q1"`) to the ISO 8601 date its value was published.
-    /// @throws Error with kind `validation` if `availabilityDates` is malformed, the node does not exist, periods were not set, or the builder was consumed.
+    /// @throws Error with kind `validation` if `availabilityDates` is malformed, the node does not exist or the builder was consumed.
     #[wasm_bindgen(js_name = availabilityDates)]
     pub fn availability_dates(
         &mut self,
@@ -305,7 +241,7 @@ impl JsModelBuilder {
             .into_iter()
             .map(|(period, date)| Ok((period, crate::utils::parse_iso_date(&date)?)))
             .collect::<Result<Vec<(PeriodId, Date)>, JsValue>>()?;
-        self.ready_mut()?
+        self.builder_mut()?
             .try_availability_dates(&node_id, &dates)
             .map_err(to_js_err)?;
         Ok(())
@@ -318,11 +254,11 @@ impl JsModelBuilder {
     ///
     /// @param node_id - Node identifier, unique within the model.
     /// @param formula - Statements DSL expression, e.g. `"revenue - cogs"`.
-    /// @throws Error with kind `validation` if the identifier is reserved, the formula is blank or does not parse and compile, periods were not set, or the builder was consumed.
+    /// @throws Error with kind `validation` if the identifier is reserved, the formula is blank or does not parse and compile or the builder was consumed.
     pub fn compute(&mut self, node_id: JsValue, formula: JsValue) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
         let formula = js_string(&formula, "formula")?;
-        self.ready_mut()?
+        self.builder_mut()?
             .try_compute(node_id, formula)
             .map_err(to_js_err)?;
         Ok(())
@@ -338,16 +274,7 @@ impl JsModelBuilder {
     #[wasm_bindgen(js_name = insertNode)]
     pub fn insert_node(&mut self, node: JsValue) -> Result<(), JsValue> {
         let spec: NodeSpec = from_js_json(&node, "node")?;
-        let id = spec.node_id.clone();
-        match self.inner.as_mut() {
-            Some(BuilderState::NeedPeriods(builder)) => {
-                builder.insert_node(id, spec);
-            }
-            Some(BuilderState::Ready(builder)) => {
-                builder.insert_node(id, spec);
-            }
-            None => return Err(consumed()),
-        }
+        self.builder_mut()?.insert_node(spec);
         Ok(())
     }
 
@@ -359,10 +286,10 @@ impl JsModelBuilder {
     ///
     /// @param node_id - Node identifier, unique within the model.
     /// @returns A `MixedNodeBuilder` for the node.
-    /// @throws Error with kind `validation` if periods were not set or the builder was consumed.
+    /// @throws Error with kind `validation` if the builder was consumed.
     pub fn mixed(&mut self, node_id: JsValue) -> Result<JsMixedNodeBuilder, JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
-        let builder = self.take_ready()?;
+        let builder = self.take()?;
         Ok(JsMixedNodeBuilder {
             inner: Some(builder.mixed(node_id)),
         })
@@ -373,13 +300,13 @@ impl JsModelBuilder {
     /// Twin of Python `ModelBuilder.forecast` (Rust `ModelBuilder::forecast`).
     ///
     /// @param node_id - Node whose forecast periods the spec fills.
-    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`), e.g. from `forecastSpecGrowth` (object or JSON).
-    /// @throws Error with kind `validation` if `forecastSpec` is malformed, periods were not set, or the builder was consumed.
+    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
+    /// @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
     pub fn forecast(&mut self, node_id: JsValue, forecast_spec: JsValue) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
         let spec: ForecastSpec = from_js_json(&forecast_spec, "forecastSpec")?;
-        let builder = self.take_ready()?;
-        self.inner = Some(BuilderState::Ready(builder.forecast(node_id, spec)));
+        let builder = self.take()?;
+        self.inner = Some(builder.forecast(node_id, spec));
         Ok(())
     }
 
@@ -389,12 +316,12 @@ impl JsModelBuilder {
     /// `ModelBuilder::where_clause`).
     ///
     /// @param where_clause - Boolean DSL expression; the node evaluates only in periods where it is true.
-    /// @throws Error with kind `validation` if periods were not set or the builder was consumed.
+    /// @throws Error with kind `validation` if the builder was consumed.
     #[wasm_bindgen(js_name = whereClause)]
     pub fn where_clause(&mut self, where_clause: JsValue) -> Result<(), JsValue> {
         let where_clause = js_string(&where_clause, "whereClause")?;
-        let builder = self.take_ready()?;
-        self.inner = Some(BuilderState::Ready(builder.where_clause(where_clause)));
+        let builder = self.take()?;
+        self.inner = Some(builder.where_clause(where_clause));
         Ok(())
     }
 
@@ -404,13 +331,13 @@ impl JsModelBuilder {
     ///
     /// @param key - Metadata key; `"currency"` is read by the evaluator and the DCF to infer the reporting currency.
     /// @param value - Any JSON value (string, number, boolean, array, plain object or `null`), stored as given: a string is not parsed as JSON. For `key = "currency"` pass a three-letter code such as `"USD"`.
-    /// @throws Error with kind `invalid_type` if `value` is not JSON-representable, and kind `validation` if a number is not finite, periods were not set, or the builder was consumed.
+    /// @throws Error with kind `invalid_type` if `value` is not JSON-representable, and kind `validation` if a number is not finite or the builder was consumed.
     #[wasm_bindgen(js_name = withMeta)]
     pub fn with_meta(&mut self, key: JsValue, value: JsValue) -> Result<(), JsValue> {
         let key = js_string(&key, "key")?;
         let value = meta_value(&value)?;
-        let builder = self.take_ready()?;
-        self.inner = Some(BuilderState::Ready(builder.with_meta(key, value)));
+        let builder = self.take()?;
+        self.inner = Some(builder.with_meta(key, value));
         Ok(())
     }
 
@@ -420,10 +347,10 @@ impl JsModelBuilder {
     /// `ModelBuilder::try_with_builtin_metrics`). A failed call leaves the
     /// builder usable.
     ///
-    /// @throws Error with kind `validation` if the built-in catalog cannot be loaded, periods were not set, or the builder was consumed.
+    /// @throws Error with kind `validation` if the built-in catalog cannot be loaded or the builder was consumed.
     #[wasm_bindgen(js_name = withBuiltinMetrics)]
     pub fn with_builtin_metrics(&mut self) -> Result<(), JsValue> {
-        self.ready_mut()?
+        self.builder_mut()?
             .try_with_builtin_metrics()
             .map_err(to_js_err)?;
         Ok(())
@@ -437,7 +364,7 @@ impl JsModelBuilder {
     ///
     /// @param qualified_id - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
     /// @param registry - `Registry` holding the metric and its dependencies.
-    /// @throws Error with kind `not_found` if the metric or a dependency is not in `registry`, and kind `validation` if the identifier is not `namespace.metric` shaped, periods were not set, or the builder was consumed.
+    /// @throws Error with kind `not_found` if the metric or a dependency is not in `registry`, and kind `validation` if the identifier is not `namespace.metric` shaped or the builder was consumed.
     #[wasm_bindgen(js_name = addMetricFromRegistry)]
     pub fn add_metric_from_registry(
         &mut self,
@@ -445,7 +372,7 @@ impl JsModelBuilder {
         registry: &JsRegistry,
     ) -> Result<(), JsValue> {
         let qualified_id = js_string(&qualified_id, "qualifiedId")?;
-        self.ready_mut()?
+        self.builder_mut()?
             .try_add_metric_from_registry(&qualified_id, &registry.inner)
             .map_err(to_js_err)?;
         Ok(())
@@ -476,17 +403,13 @@ impl JsModelBuilder {
         let id = js_string(&id, "id")?;
         let notional: Money = from_js_json(&notional, "notional")?;
         let coupon_rate = js_f64(&coupon_rate, "couponRate")?;
-        let issue = iso_date(&issue_date, "issueDate")?;
-        let maturity = iso_date(&maturity_date, "maturityDate")?;
+        let issue = js_date(&issue_date, "issueDate")?;
+        let maturity = js_date(&maturity_date, "maturityDate")?;
         let curve = js_string(&discount_curve_id, "discountCurveId")?;
-        try_in_place!(self, |b| b.try_add_bond(
-            id,
-            notional,
-            coupon_rate,
-            issue,
-            maturity,
-            curve
-        ))
+        self.builder_mut()?
+            .try_add_bond(id, notional, coupon_rate, issue, maturity, curve)
+            .map_err(to_js_err)?;
+        Ok(())
     }
 
     /// Add a fixed-rate bond with a market convention preset.
@@ -520,11 +443,10 @@ impl JsModelBuilder {
         let coupon_rate =
             finstack_quant_core::types::Rate::from_decimal(js_f64(&coupon_rate, "couponRate")?)
                 .map_err(to_js_err)?;
-        let issue_date = iso_date(&issue_date, "issueDate")?;
-        let maturity_date = iso_date(&maturity_date, "maturityDate")?;
+        let issue_date = js_date(&issue_date, "issueDate")?;
+        let maturity_date = js_date(&maturity_date, "maturityDate")?;
         let convention: finstack_quant_valuations::instruments::BondConvention =
-            finstack_quant_core::wire::serde_parse(&js_string(&convention, "convention")?)
-                .map_err(to_js_err)?;
+            js_wire(&convention, "convention")?;
         let params = BondConventionParams {
             id,
             notional,
@@ -534,7 +456,10 @@ impl JsModelBuilder {
             convention,
             discount_curve_id: js_string(&discount_curve_id, "discountCurveId")?,
         };
-        try_in_place!(self, |b| b.try_add_bond_with_convention(params))
+        self.builder_mut()?
+            .try_add_bond_with_convention(params)
+            .map_err(to_js_err)?;
+        Ok(())
     }
 
     /// Add a pay-fixed interest rate swap to the capital structure (US conventions).
@@ -566,12 +491,15 @@ impl JsModelBuilder {
             id: js_string(&id, "id")?,
             notional: from_js_json(&notional, "notional")?,
             fixed_rate: js_f64(&fixed_rate, "fixedRate")?,
-            start_date: iso_date(&start_date, "startDate")?,
-            maturity_date: iso_date(&maturity_date, "maturityDate")?,
+            start_date: js_date(&start_date, "startDate")?,
+            maturity_date: js_date(&maturity_date, "maturityDate")?,
             discount_curve_id: js_string(&discount_curve_id, "discountCurveId")?,
             forward_curve_id: js_string(&forward_curve_id, "forwardCurveId")?,
         };
-        try_in_place!(self, |b| b.try_add_swap(params))
+        self.builder_mut()?
+            .try_add_swap(params)
+            .map_err(to_js_err)?;
+        Ok(())
     }
 
     /// Add a pay-fixed interest rate swap with explicit leg conventions.
@@ -615,8 +543,8 @@ impl JsModelBuilder {
             id: js_string(&id, "id")?,
             notional: from_js_json(&notional, "notional")?,
             fixed_rate: js_f64(&fixed_rate, "fixedRate")?,
-            start_date: iso_date(&start_date, "startDate")?,
-            maturity_date: iso_date(&maturity_date, "maturityDate")?,
+            start_date: js_date(&start_date, "startDate")?,
+            maturity_date: js_date(&maturity_date, "maturityDate")?,
             discount_curve_id: js_string(&discount_curve_id, "discountCurveId")?,
             forward_curve_id: js_string(&forward_curve_id, "forwardCurveId")?,
         };
@@ -644,8 +572,10 @@ impl JsModelBuilder {
             float_day_count,
             business_day_convention,
         };
-        try_in_place!(self, |b| b
-            .try_add_swap_with_conventions(params, conventions))
+        self.builder_mut()?
+            .try_add_swap_with_conventions(params, conventions)
+            .map_err(to_js_err)?;
+        Ok(())
     }
 
     /// Add a debt instrument to the capital structure.
@@ -667,7 +597,7 @@ impl JsModelBuilder {
         )?)
         .map_err(to_js_err)?;
         let spec = FinancialStatementInstrument::try_from(spec).map_err(to_js_err)?;
-        replace_with!(self, |b| b.add_debt(id, spec))
+        self.replace(|b| b.add_debt(id, spec))
     }
 
     /// Set the reporting currency used for capital-structure totals.
@@ -682,7 +612,7 @@ impl JsModelBuilder {
         let currency: finstack_quant_core::currency::Currency = js_string(&currency, "currency")?
             .parse()
             .map_err(to_js_err)?;
-        replace_with!(self, |b| b.reporting_currency(currency))
+        self.replace(|b| b.reporting_currency(currency))
     }
 
     /// Set the FX conversion policy for capital-structure cashflows.
@@ -694,9 +624,8 @@ impl JsModelBuilder {
     #[wasm_bindgen(js_name = fxPolicy)]
     pub fn fx_policy(&mut self, policy: JsValue) -> Result<(), JsValue> {
         let policy: finstack_quant_core::money::fx::FxConversionPolicy =
-            finstack_quant_core::wire::serde_parse(&js_string(&policy, "policy")?)
-                .map_err(to_js_err)?;
-        replace_with!(self, |b| b.fx_policy(policy))
+            js_wire(&policy, "policy")?;
+        self.replace(|b| b.fx_policy(policy))
     }
 
     /// Attach a waterfall (priority of payments, ECF sweep, PIK toggle, payment classes).
@@ -708,7 +637,7 @@ impl JsModelBuilder {
     /// @throws Error with kind `validation` if `waterfallSpec` is malformed or the builder was consumed.
     pub fn waterfall(&mut self, waterfall_spec: JsValue) -> Result<(), JsValue> {
         let spec: WaterfallSpec = from_js_json(&waterfall_spec, "waterfallSpec")?;
-        replace_with!(self, |b| b.waterfall(spec))
+        self.replace(|b| b.waterfall(spec))
     }
 
     /// Build the model specification.
@@ -717,9 +646,9 @@ impl JsModelBuilder {
     /// builder is consumed.
     ///
     /// @returns The completed `FinancialModelSpec` plain object, accepted by every model-taking function.
-    /// @throws Error with kind `validation` if the model fails semantic validation, periods were not set, or the builder was consumed.
+    /// @throws Error with kind `validation` if the model fails semantic validation or the builder was consumed.
     pub fn build(&mut self) -> Result<JsValue, JsValue> {
-        let builder = self.take_ready()?;
+        let builder = self.take()?;
         to_js_value(&builder.build().map_err(to_js_err)?)
     }
 }
@@ -738,7 +667,7 @@ impl JsModelBuilder {
 /// builder.periods("2025Q1..Q2", "2025Q1");
 /// const mixed = builder.mixed("revenue");
 /// mixed.values({ "2025Q1": 100 });
-/// mixed.forecast(statements.forecastSpecGrowth(0.05));
+/// mixed.forecast({ method: "growth_pct", params: { rate: 0.05 } });
 /// const model = mixed.build().build();
 /// new statements.Evaluator().evaluate(model).nodes.revenue["2025Q2"];  // 105
 /// ```
@@ -795,7 +724,7 @@ impl JsMixedNodeBuilder {
     /// Twin of Python `MixedNodeBuilder.forecast` (Rust
     /// `MixedNodeBuilder::forecast`).
     ///
-    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`), e.g. from `forecastSpecGrowth` (object or JSON).
+    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
     /// @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
     pub fn forecast(&mut self, forecast_spec: JsValue) -> Result<(), JsValue> {
         let spec: ForecastSpec = from_js_json(&forecast_spec, "forecastSpec")?;
@@ -845,23 +774,6 @@ impl JsMixedNodeBuilder {
     pub fn build(&mut self) -> Result<JsModelBuilder, JsValue> {
         let builder = self.take()?;
         let ready = builder.build().map_err(to_js_err)?;
-        Ok(JsModelBuilder {
-            inner: Some(BuilderState::Ready(ready)),
-        })
+        Ok(JsModelBuilder { inner: Some(ready) })
     }
-}
-
-/// Start a model builder for the given identifier.
-///
-/// Free-function twin of Python `FinancialModelSpec.builder` (Rust
-/// `FinancialModelSpec::builder`); the same as `new ModelBuilder(id)`.
-/// @param id - Model identifier stored on the built `FinancialModelSpec`.
-/// @returns A `ModelBuilder` waiting for `periods`.
-///
-/// # Errors
-///
-/// Throws a `TypeError` with kind `invalid_type` if `id` is not a string.
-#[wasm_bindgen(js_name = financialModelBuilder)]
-pub fn financial_model_builder(id: JsValue) -> Result<JsModelBuilder, JsValue> {
-    JsModelBuilder::new(id)
 }

@@ -4,24 +4,24 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use finstack_quant_core::contract::LoadLimits;
-use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::context::{ConvertedMoney, MarketContext};
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::types::CurveId;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::PyModule;
+use pyo3::types::{PyModule, PyString};
 use pyo3::IntoPyObjectExt;
 
 use crate::bindings::core::currency::extract_currency;
-use crate::bindings::core::money::{decimal_to_py, money_from_amount, PyMoney};
+use crate::bindings::core::money::{decimal_to_py, is_python_decimal, money_from_amount, PyMoney};
 use crate::bindings::date_utils::py_to_date;
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::errors::core_to_py;
 
 use super::curves::{
     PyBaseCorrelationCurve, PyCreditIndexData, PyDiscountCurve, PyForwardCurve,
     PyFxDeltaVolSurface, PyHazardCurve, PyInflationCurve, PyPriceCurve, PyVolCube, PyVolSurface,
 };
-use super::fx::PyFxMatrix;
+use super::fx::{PyFxMatrix, PyFxRateResult};
 use super::scalars::{extract_f64, PyInflationIndex, PyScalarTimeSeries};
 
 /// Unified market data container for curves, surfaces, scalars and FX.
@@ -179,7 +179,7 @@ impl PyMarketContext {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``value`` is non-finite (Rust ``MarketScalar::unitless`` / ``Money::new``).
+    ///     If ``value`` is non-finite (Rust ``MarketScalar::from_parts``).
     #[pyo3(signature = (id, value, currency=None), text_signature = "(self, id, value, currency=None)")]
     fn insert_price<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -187,11 +187,14 @@ impl PyMarketContext {
         value: &Bound<'_, PyAny>,
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let scalar = if let Some(raw_currency) = currency {
-            let currency = extract_currency(raw_currency)?;
-            MarketScalar::Price(money_from_amount(value, currency)?)
-        } else {
-            MarketScalar::unitless(extract_f64(value, "price value")?).map_err(core_to_py)?
+        let currency = currency.map(extract_currency).transpose()?;
+        let scalar = match currency {
+            // A Decimal or decimal-text price keeps its exact Decimal amount.
+            Some(currency) if is_python_decimal(value)? || value.is_instance_of::<PyString>() => {
+                MarketScalar::Price(money_from_amount(value, currency)?)
+            }
+            _ => MarketScalar::from_parts(extract_f64(value, "price value")?, currency)
+                .map_err(core_to_py)?,
         };
         slf.inner.insert_price_mut(id, scalar);
         Ok(slf)
@@ -272,30 +275,6 @@ impl PyMarketContext {
     ) -> PyRefMut<'py, Self> {
         slf.inner
             .insert_inflation_index_mut(Arc::clone(&index.inner));
-        slf
-    }
-
-    /// Map a CSA code to a discount curve id for collateral discounting (fluent).
-    ///
-    /// Parameters
-    /// ----------
-    /// csa_code : str
-    ///     Collateral agreement identifier (e.g. ``"USD-CSA"``).
-    /// discount_id : str
-    ///     Id of a discount curve already inserted (or to be inserted) in this context.
-    ///
-    /// Returns
-    /// -------
-    /// MarketContext
-    ///     ``self``.
-    #[pyo3(text_signature = "(self, csa_code, discount_id)")]
-    fn map_collateral<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        csa_code: &str,
-        discount_id: &str,
-    ) -> PyRefMut<'py, Self> {
-        slf.inner
-            .map_collateral_mut(csa_code, CurveId::from(discount_id));
         slf
     }
 
@@ -482,7 +461,10 @@ impl PyMarketContext {
     ///
     /// Returns
     /// -------
-    /// Money
+    /// ConvertedMoney
+    ///     The converted ``amount`` and the applied FX ``rate`` lookup
+    ///     (``None`` for a same-currency input), so callers can record whether
+    ///     the rate was triangulated.
     ///
     /// Raises
     /// ------
@@ -494,14 +476,14 @@ impl PyMarketContext {
         amount: &PyMoney,
         target_currency: &Bound<'_, PyAny>,
         as_of: &Bound<'_, PyAny>,
-    ) -> PyResult<PyMoney> {
+    ) -> PyResult<PyConvertedMoney> {
         self.inner
             .convert_money(
                 amount.inner,
                 extract_currency(target_currency)?,
                 py_to_date(as_of)?,
             )
-            .map(|converted| PyMoney::from_inner(converted.amount))
+            .map(|inner| PyConvertedMoney { inner })
             .map_err(core_to_py)
     }
 
@@ -558,8 +540,7 @@ impl PyMarketContext {
     ///     Keys: ``curve_counts`` (dict of curve type to count), ``total_curves``,
     ///     ``has_fx``, ``surface_count``, ``vol_cube_count``, ``price_count``,
     ///     ``series_count``, ``inflation_index_count``, ``credit_index_count``,
-    ///     ``dividend_schedule_count``, ``fx_delta_vol_surface_count``,
-    ///     ``collateral_mapping_count``.
+    ///     ``dividend_schedule_count``, ``fx_delta_vol_surface_count``.
     #[pyo3(text_signature = "(self)")]
     fn stats<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.stats())
@@ -648,10 +629,7 @@ impl PyMarketContext {
     #[staticmethod]
     #[pyo3(text_signature = "(json, /)")]
     fn from_json(py: Python<'_>, json: &str) -> PyResult<Self> {
-        let (inner, _report) =
-            MarketContext::from_state_slice(json.as_bytes(), &LoadLimits::default())
-                .map_err(|e| crate::errors::contract_to_py(py, e))?;
-        Ok(Self { inner })
+        load_market_json(py, json).map(Self::from_inner)
     }
 
     /// Serialize this market context to compact JSON (round-trips with pricers).
@@ -738,9 +716,113 @@ impl PyMarketContext {
     }
 }
 
-pub(super) const EXPORTS: &[&str] = &["MarketContext"];
+/// Result of ``MarketContext.convert_money``: the converted amount and the FX
+/// rate lookup it used.
+///
+/// ``rate`` is ``None`` when the input was already in the target currency;
+/// otherwise its ``triangulated`` flag records whether the rate was derived
+/// through a pivot currency.
+///
+/// Example
+/// -------
+/// >>> from finstack_quant.core.market_data import FxMatrix, MarketContext
+/// >>> from finstack_quant.core.money import Money
+/// >>> fx = FxMatrix()
+/// >>> fx.set_quote("EUR", "USD", 1.1)
+/// >>> ctx = MarketContext().insert_fx(fx)
+/// >>> converted = ctx.convert_money(Money(100.0, "EUR"), "USD", "2025-01-02")
+/// >>> (round(converted.amount.amount, 6), converted.rate.triangulated)
+/// (110.0, False)
+#[pyclass(
+    name = "ConvertedMoney",
+    module = "finstack_quant.core.market_data",
+    frozen,
+    eq,
+    skip_from_py_object
+)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct PyConvertedMoney {
+    /// Inner Rust conversion outcome.
+    pub(crate) inner: ConvertedMoney,
+}
+
+#[pymethods]
+impl PyConvertedMoney {
+    /// The amount in the target currency.
+    #[getter]
+    fn amount(&self) -> PyMoney {
+        PyMoney::from_inner(self.inner.amount)
+    }
+
+    /// The FX rate lookup behind the conversion; ``None`` for a
+    /// same-currency input.
+    #[getter]
+    fn rate(&self) -> Option<PyFxRateResult> {
+        self.inner
+            .rate
+            .clone()
+            .map(|inner| PyFxRateResult { inner })
+    }
+
+    /// Export as a single-row pandas ``DataFrame``.
+    ///
+    /// Columns: ``amount`` (float), ``currency`` (ISO code), ``rate`` and
+    /// ``triangulated`` (``None`` for a same-currency input).
+    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let row = serde_json::json!({
+            "amount": self.inner.amount.amount(),
+            "currency": self.inner.amount.currency().to_string(),
+            "rate": self.inner.rate.as_ref().map(|rate| rate.rate),
+            "triangulated": self.inner.rate.as_ref().map(|rate| rate.triangulated),
+        });
+        crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema(
+            py,
+            &row,
+            &["amount", "currency", "rate", "triangulated"],
+        )
+    }
+
+    fn __repr__(&self) -> String {
+        let rate = self.inner.rate.as_ref().map_or_else(
+            || "None".to_string(),
+            |rate| {
+                format!(
+                    "FxRateResult(rate={}, triangulated={})",
+                    rate.rate,
+                    if rate.triangulated { "True" } else { "False" }
+                )
+            },
+        );
+        format!(
+            "ConvertedMoney(amount=Money({}, '{}'), rate={rate})",
+            self.inner.amount.amount_decimal(),
+            self.inner.amount.currency()
+        )
+    }
+}
+
+wire_methods!(PyConvertedMoney, ConvertedMoney, "ConvertedMoney");
+impl_repr_html_via_dataframe!(PyConvertedMoney);
+
+/// Strictly load canonical `MarketContext` state JSON through the Rust
+/// contract loader (`from_state_slice` with the default `LoadLimits`),
+/// releasing the GIL while parsing.
+///
+/// # Errors
+///
+/// Raises `ContractValidationError` (with a diagnostics `report`) for
+/// malformed or invalid state and `ContractLimitExceededError` when the input
+/// exceeds the size or nesting limits.
+pub(crate) fn load_market_json(py: Python<'_>, json: &str) -> PyResult<MarketContext> {
+    py.detach(|| MarketContext::from_state_slice(json.as_bytes(), &LoadLimits::default()))
+        .map(|(inner, _report)| inner)
+        .map_err(|e| crate::errors::contract_to_py(py, e))
+}
+
+pub(super) const EXPORTS: &[&str] = &["ConvertedMoney", "MarketContext"];
 
 /// Register `MarketContext` on `finstack_quant.core.market_data`.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyConvertedMoney>()?;
     m.add_class::<PyMarketContext>()
 }

@@ -3,7 +3,7 @@
 use super::super::super::super::types::Bond;
 use super::TreePricer;
 use finstack_quant_core::dates::DateExt;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Duration};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_core::Result;
@@ -11,6 +11,7 @@ use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
 use finstack_quant_models::trees::tree_framework::{NodeState, TreeDiscounting, TreeValuator};
 use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree;
 use finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::continuous_frp_weight;
+use time::Duration;
 
 /// Bond valuator for tree-based pricing of callable/putable bonds.
 ///
@@ -350,7 +351,7 @@ impl BondValuator {
         time_steps: Vec<f64>,
         grid_day_count: DayCount,
     ) -> Result<Self> {
-        use finstack_quant_cashflows::primitives::CFKind;
+        use finstack_quant_core::cashflow::CFKind;
 
         if time_steps.len() < 2
             || time_steps[0].abs() > 1e-12
@@ -1114,8 +1115,8 @@ impl BondValuator {
             )));
         }
         if self.step_discount_factors.len() != self.time_steps.len() {
-            return Err(finstack_quant_core::Error::internal(
-                "BondValuator discount-factor and time grids differ in length",
+            return Err(finstack_quant_core::Error::Internal(
+                "BondValuator discount-factor and time grids differ in length".into(),
             ));
         }
 
@@ -1229,12 +1230,12 @@ mod tests {
     use super::*;
     use crate::bond::{Bond, CallPut, CallPutSchedule, CashflowSpec, MakeWholeSpec};
     use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-    use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
+    use finstack_quant_core::cashflow::{CFKind, CashFlow};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, DayCountContext, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_core::math::map_date_to_step;
+    use finstack_quant_core::math::time_grid::map_date_to_step;
     use finstack_quant_core::money::Money;
     use finstack_quant_models::trees::tree_framework::NodeState;
     use finstack_quant_models::trees::two_factor_rates_credit::{

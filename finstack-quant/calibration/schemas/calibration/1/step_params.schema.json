@@ -387,11 +387,6 @@
         }
       ]
     },
-    "SabrInterpolationMethod": {
-      "const": "bilinear",
-      "description": "Interpolation method for SABR parameters across the expiry–tenor grid.",
-      "type": "string"
-    },
     "Seniority": {
       "description": "Seniority level for credit exposures.\n\nUsed to tag a hazard curve with the seniority of the issuer's debt\nobserved by the curve. Drives the recovery-rate prior in default\nmodelling and selects the right LGD prior in\n`finstack_quant_models::credit::lgd::seniority`.\n\nOrder is **not** total — `SeniorSecured` is strictly senior to `Senior`,\n`Subordinated`, and `Junior`, but the relative ordering of `Subordinated`\nvs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics.",
       "oneOf": [
@@ -607,8 +602,12 @@
         },
         "method": {
           "$ref": "#/$defs/CalibrationMethod",
-          "default": "bootstrap",
-          "description": "Calibration method to use.\n\nForward curves require [`CalibrationMethod::GlobalSolve`]. Sequential\nbootstrap is rejected because contractual off-grid reset intervals\ncouple adjacent rates through projection discount factors."
+          "default": {
+            "global_solve": {
+              "use_analytical_jacobian": false
+            }
+          },
+          "description": "Calibration method to use.\n\nForward curves require [`CalibrationMethod::GlobalSolve`], which is the\ndefault (finite-difference Jacobian). Sequential bootstrap is rejected\nbecause contractual off-grid reset intervals couple adjacent rates\nthrough projection discount factors."
         },
         "tenor_years": {
           "description": "Tenor in years for the forward curve.",
@@ -928,11 +927,6 @@
           "default": "error",
           "description": "Extrapolation policy used when interpolating SABR parameters across the\nexpiry–tenor grid for target points that do not have a directly calibrated bucket."
         },
-        "sabr_interpolation": {
-          "$ref": "#/$defs/SabrInterpolationMethod",
-          "default": "bilinear",
-          "description": "SABR parameter interpolation method between expiries/tenors."
-        },
         "swap_index": {
           "anyOf": [
             {
@@ -1037,7 +1031,7 @@
         },
         "detachment_points": {
           "default": [],
-          "description": "Detachment points (as percentages) for the tranches.",
+          "description": "Expected tranche detachment points as decimals in `(0, 1]` (e.g. `0.03`\nfor 3%), the same unit as `CdsTrancheQuote.detachment`. When non-empty,\nevery quote must match one point and every point must be quoted.",
           "items": {
             "format": "double",
             "type": "number"

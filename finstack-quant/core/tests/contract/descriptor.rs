@@ -1,6 +1,5 @@
 use finstack_quant_core::contract::{
-    ContractDescriptor, ContractError, LoadLimits, DEFAULT_MAX_ARTIFACTS, DEFAULT_MAX_BYTES,
-    DEFAULT_MAX_DEPTH, DEFAULT_MAX_DIAGNOSTICS, DEFAULT_MAX_POSITIONS,
+    ContractDescriptor, ContractError, LoadLimits, DEFAULT_MAX_BYTES,
 };
 
 #[test]
@@ -9,7 +8,6 @@ fn descriptor_defaults_to_a_strict_current_version() {
 
     assert_eq!(descriptor.id, "finstack_quant.instrument");
     assert_eq!(ContractDescriptor::VERSION, 1);
-    assert_eq!(descriptor.schema_string(), "finstack_quant.instrument/1");
 }
 
 #[test]
@@ -86,17 +84,19 @@ fn descriptor_requires_an_explicit_v1_version() {
 fn load_limits_defaults_and_builders_are_explicit() {
     let defaults = LoadLimits::default();
     assert_eq!(defaults.max_bytes, DEFAULT_MAX_BYTES);
-    assert_eq!(defaults.max_artifacts, DEFAULT_MAX_ARTIFACTS);
-    assert_eq!(defaults.max_positions, DEFAULT_MAX_POSITIONS);
-    assert_eq!(defaults.max_depth, DEFAULT_MAX_DEPTH);
-    assert_eq!(defaults.max_diagnostics, DEFAULT_MAX_DIAGNOSTICS);
+    assert_eq!(defaults.max_artifacts, 100_000);
+    assert_eq!(defaults.max_positions, 1_000_000);
+    assert_eq!(defaults.max_depth, 96);
+    assert_eq!(defaults.max_diagnostics, 256);
 
-    let custom = LoadLimits::default()
-        .with_max_bytes(1)
-        .with_max_artifacts(2)
-        .with_max_positions(3)
-        .with_max_depth(4)
-        .with_max_diagnostics(5);
+    let custom = LoadLimits {
+        max_artifacts: 2,
+        max_positions: 3,
+        ..LoadLimits::default()
+    }
+    .with_max_bytes(1)
+    .with_max_depth(4)
+    .with_max_diagnostics(5);
     assert_eq!(custom.max_bytes, 1);
     assert_eq!(custom.max_artifacts, 2);
     assert_eq!(custom.max_positions, 3);

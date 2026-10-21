@@ -159,7 +159,7 @@ impl RoughHestonHybrid {
             ));
         }
         let alpha = hurst + 0.5;
-        let gamma_alpha = finstack_quant_core::math::ln_gamma(alpha).exp();
+        let gamma_alpha = finstack_quant_core::math::special_functions::ln_gamma(alpha).exp();
         let inv_gamma_alpha = 1.0 / gamma_alpha;
 
         let num_steps = times.len() - 1;
@@ -393,7 +393,7 @@ mod tests {
         let noise = p.sigma_v * v0.sqrt() * dw_tilde;
         let kernel_int = dt.powf(alpha) / alpha;
         let noise_weight = dt.powf(alpha - 1.0) / alpha;
-        let inv_gamma = 1.0 / finstack_quant_core::math::ln_gamma(alpha).exp();
+        let inv_gamma = 1.0 / finstack_quant_core::math::special_functions::ln_gamma(alpha).exp();
         let expected_v =
             (v0 + inv_gamma * (drift_rate * kernel_int + noise * noise_weight)).max(0.0);
 
@@ -503,7 +503,8 @@ mod tests {
         let bridge = run([0.0, 0.0, 1.0]);
         let b = brownian[1] - base[1];
         let c = bridge[1] - base[1];
-        let scale = p.sigma_v * p.v0.sqrt() / finstack_quant_core::math::ln_gamma(alpha).exp();
+        let scale = p.sigma_v * p.v0.sqrt()
+            / finstack_quant_core::math::special_functions::ln_gamma(alpha).exp();
         let exact_variance = scale * scale * dt.powf(2.0 * alpha - 1.0) / (2.0 * alpha - 1.0);
         let exact_covariance = scale * dt.powf(alpha) / alpha;
         assert!((b * b + c * c - exact_variance).abs() < 1e-14);
@@ -580,7 +581,7 @@ mod tests {
         // Independent reference: product integration of the mean ODE on a
         // 40× finer grid, with exact per-interval kernel integrals.
         let alpha = h + 0.5;
-        let inv_gamma = 1.0 / finstack_quant_core::math::ln_gamma(alpha).exp();
+        let inv_gamma = 1.0 / finstack_quant_core::math::special_functions::ln_gamma(alpha).exp();
         let m = 2_000usize;
         let dtf = t_end / m as f64;
         let mut mean_v = vec![v0; m + 1];

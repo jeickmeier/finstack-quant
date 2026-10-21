@@ -16,7 +16,7 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::{Attributes, Instrument, MarketDependencies};
 use finstack_quant_valuations::market::conventions::ids::CdsConventionKey;
@@ -50,7 +50,7 @@ pub fn calibrated_hazard_curve(
         })
         .collect::<Vec<_>>();
     let quote_ids = quotes.iter().map(|quote| quote.id().clone()).collect();
-    let mut quote_sets = HashMap::default();
+    let mut quote_sets = FxHashMap::default();
     quote_sets.insert("credit".to_string(), quote_ids);
     let envelope = CalibrationEnvelope {
         schema_url: None,

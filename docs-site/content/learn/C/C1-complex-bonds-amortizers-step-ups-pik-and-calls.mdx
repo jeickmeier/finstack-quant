@@ -152,7 +152,7 @@ The native schedule builder emits fixed and floating cashflow kinds. The JSON br
 from decimal import Decimal
 from finstack_quant.cashflows.builder import (CashFlowSchedule,FixedCouponSpec,
     FloatingCouponSpec,FloatingRateSpec,CouponType,ScheduleParams,AmortizationSpec)
-from finstack_quant.cashflows.primitives import CFKind
+from finstack_quant.core.cashflow import CFKind
 from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import bond_from_cashflows_json
 floating=FloatingCouponSpec(rate_spec=FloatingRateSpec(forward_curve_id="USD-SOFR-3M",

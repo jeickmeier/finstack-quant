@@ -9,12 +9,11 @@
 //! Both are integrated into the [`crate::market_data::context::MarketContext`]
 //! so downstream code can reference them by `CurveId` alongside other curves.
 
-use super::storage::TimeSeriesStorage;
 use crate::currency::Currency;
 use crate::dates::Date;
-use crate::error::InputError;
 use crate::market_data::bumps::{BumpMode, BumpSpec, BumpUnits, Bumpable};
 use crate::types::CurveId;
+use crate::InputError;
 use crate::Result;
 #[cfg(test)]
 use time::Duration as TimeDuration;
@@ -52,25 +51,18 @@ pub enum SeriesInterpolation {
 }
 
 impl std::fmt::Display for SeriesInterpolation {
+    /// Writes the serde label (`step` or `linear`).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Step => write!(f, "step"),
-            Self::Linear => write!(f, "linear"),
-        }
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
     }
 }
 
 impl std::str::FromStr for SeriesInterpolation {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
 
+    /// Parses the serde label; the error names the accepted labels.
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "step" => Ok(Self::Step),
-            "linear" => Ok(Self::Linear),
-            other => Err(crate::Error::Validation(format!(
-                "unknown series interpolation {other:?}; expected \"step\" or \"linear\""
-            ))),
-        }
+        crate::wire::serde_parse(s)
     }
 }
 
@@ -158,6 +150,47 @@ impl MarketScalar {
             ))
         }
     }
+
+    /// Build a scalar from a value and an optional currency: a monetary
+    /// [`MarketScalar::Price`] when `currency` is given, otherwise a
+    /// [`MarketScalar::Unitless`] value.
+    ///
+    /// This is the construction behind host `insert_price(id, value, currency?)`.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Finite observation: a price in major units of `currency`,
+    ///   or a dimensionless value when `currency` is `None`.
+    /// * `currency` - ISO-4217 currency of a monetary price; `None` for a
+    ///   unitless scalar.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is NaN or infinite (or, for a price, not
+    /// representable as a `Money` amount).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::market_data::scalars::MarketScalar;
+    ///
+    /// assert!(matches!(MarketScalar::from_parts(1.2, None)?, MarketScalar::Unitless(_)));
+    /// assert!(matches!(
+    ///     MarketScalar::from_parts(101.5, Some(Currency::USD))?,
+    ///     MarketScalar::Price(_)
+    /// ));
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn from_parts(
+        value: f64,
+        currency: Option<crate::currency::Currency>,
+    ) -> crate::Result<Self> {
+        match currency {
+            Some(currency) => crate::money::Money::new(value, currency).map(Self::Price),
+            None => Self::unitless(value),
+        }
+    }
 }
 
 impl TryFrom<MarketScalarWire> for MarketScalar {
@@ -180,6 +213,80 @@ impl From<MarketScalar> for MarketScalarWire {
             MarketScalar::Unitless(value) => Self::Unitless(value),
             MarketScalar::Price(value) => Self::Price(value),
         }
+    }
+}
+
+/// Columnar date-indexed storage behind [`ScalarTimeSeries`].
+///
+/// Stores dates (days since 1970-01-01) and values in parallel arrays,
+/// sorted ascending with no duplicate dates.
+#[derive(Clone, Debug)]
+struct TimeSeriesStorage {
+    /// Dates as days since epoch (1970-01-01), sorted ascending, no duplicates
+    dates: Box<[i32]>,
+    /// Values aligned with dates
+    values: Box<[f64]>,
+}
+
+impl TimeSeriesStorage {
+    /// Create from unsorted `(days_since_epoch, value)` observations, sorting
+    /// them and rejecting empty input, non-finite values and duplicate dates.
+    fn new(mut observations: Vec<(i32, f64)>) -> Result<Self> {
+        if observations.is_empty() {
+            return Err(crate::Error::Input(InputError::TooFewPoints));
+        }
+        if observations.iter().any(|(_, value)| !value.is_finite()) {
+            return Err(crate::Error::Validation(
+                "time-series observation values must be finite".to_string(),
+            ));
+        }
+
+        observations.sort_by_key(|(date, _)| *date);
+
+        for window in observations.windows(2) {
+            if window[0].0 == window[1].0 {
+                return Err(crate::Error::Input(InputError::NonMonotonicKnots));
+            }
+        }
+
+        let (dates, values): (Vec<_>, Vec<_>) = observations.into_iter().unzip();
+
+        Ok(Self {
+            dates: dates.into_boxed_slice(),
+            values: values.into_boxed_slice(),
+        })
+    }
+
+    /// Length of series.
+    #[inline]
+    fn len(&self) -> usize {
+        self.dates.len()
+    }
+
+    /// Check if empty.
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.dates.is_empty()
+    }
+
+    /// Get all dates as a slice.
+    #[inline]
+    fn dates(&self) -> &[i32] {
+        &self.dates
+    }
+
+    /// Get all values as a slice.
+    #[inline]
+    fn values(&self) -> &[f64] {
+        &self.values
+    }
+
+    /// Iterator over (date, value) pairs.
+    fn iter(&self) -> impl Iterator<Item = (i32, f64)> + '_ {
+        self.dates
+            .iter()
+            .zip(self.values.iter())
+            .map(|(&d, &v)| (d, v))
     }
 }
 
@@ -444,7 +551,7 @@ impl ScalarTimeSeries {
     ///
     /// * `date` - Calendar date in the instrument or market convention for the operation
     pub fn value_on_exact(&self, date: Date) -> Result<f64> {
-        use crate::error::InputError;
+        use crate::InputError;
 
         let q = to_days(date);
         let date_vec = self.data.dates();
@@ -547,7 +654,6 @@ struct ScalarTimeSeriesWire {
     /// Optional currency
     pub currency: Option<Currency>,
     /// Observations as (date, value) pairs
-    #[serde(with = "crate::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(crate::wire::DateWire, f64)>")
@@ -614,7 +720,7 @@ impl Bumpable for MarketScalar {
                 (BumpMode::Multiplicative, BumpUnits::Factor) => {
                     m.checked_mul_f64(spec.value).map(MarketScalar::Price)
                 }
-                _ => Err(crate::error::InputError::UnsupportedBump {
+                _ => Err(crate::InputError::UnsupportedBump {
                     reason: format!(
                         "MarketScalar::Price only supports Additive/{{Fraction,Percent}} or Multiplicative/Factor, got {:?}/{:?}",
                         spec.mode, spec.units
@@ -654,6 +760,20 @@ impl Bumpable for ScalarTimeSeries {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn storage_sorts_observations() {
+        let storage = TimeSeriesStorage::new(vec![(2, 20.0), (0, 10.0), (1, 15.0), (3, 25.0)])
+            .expect("TimeSeriesStorage creation should succeed in test");
+        assert_eq!(storage.len(), 4);
+        assert_eq!(storage.dates(), &[0, 1, 2, 3]);
+        assert_eq!(storage.values(), &[10.0, 15.0, 20.0, 25.0]);
+    }
+
+    #[test]
+    fn storage_rejects_duplicate_dates() {
+        assert!(TimeSeriesStorage::new(vec![(0, 10.0), (1, 15.0), (1, 20.0)]).is_err());
+    }
 
     #[test]
     fn unitless_constructor_rejects_non_finite_values() {
@@ -769,7 +889,7 @@ mod tests {
         assert!(result.is_err());
 
         match result.expect_err("Should fail with too few points") {
-            crate::Error::Input(crate::error::InputError::TooFewPoints) => {
+            crate::Error::Input(crate::InputError::TooFewPoints) => {
                 // Expected error type
             }
             _ => panic!("Expected TooFewPoints error for empty series"),

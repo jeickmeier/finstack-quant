@@ -37,7 +37,7 @@ use finstack_quant_core::money::fx::{FxConversionPolicy, FxPolicyMeta};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
-use crate::types::PnlAttribution;
+use crate::PnlAttribution;
 
 /// Translate a populated `PnlAttribution` from its native pricing currency
 /// into `target_currency`.
@@ -184,7 +184,7 @@ pub fn translate_to_target_currency(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{AttributionMethod, PnlAttribution};
+    use crate::{AttributionMethod, PnlAttribution};
     use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
     use finstack_quant_core::Error;
     use std::sync::Arc;
@@ -427,7 +427,7 @@ mod tests {
     /// identity carry different currency tags.
     #[test]
     fn translate_converts_credit_detail_structs() {
-        use crate::types::{
+        use crate::{
             CreditCarryByLevel, CreditCarryDecomposition, CreditFactorAttribution, LevelCarry,
             LevelPnl,
         };
@@ -587,7 +587,7 @@ mod tests {
 
     #[test]
     fn translate_converts_remaining_detail_maps() {
-        use crate::types::{FxAttribution, RatesCurvesAttribution};
+        use crate::{FxAttribution, RatesCurvesAttribution};
         use finstack_quant_core::types::CurveId;
         use indexmap::IndexMap;
 

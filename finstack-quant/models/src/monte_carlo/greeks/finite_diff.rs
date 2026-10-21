@@ -352,8 +352,8 @@ mod tests {
     use crate::monte_carlo::process::gbm::{GbmParams, GbmProcess};
     use crate::monte_carlo::rng::philox::PhiloxRng;
     use crate::types::OptionType;
+    use finstack_quant_core::math::special_functions::{norm_cdf, norm_pdf};
     use finstack_quant_core::math::time_grid::TimeGrid;
-    use finstack_quant_core::math::{norm_cdf, norm_pdf};
 
     const SPOT: f64 = 100.0;
     const STRIKE: f64 = 100.0;

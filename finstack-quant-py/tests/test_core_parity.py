@@ -24,7 +24,6 @@ from finstack_quant.core.dates import (
     available_calendars,
     build_periods,
     sifma_settlement_date,
-    sifma_settlement_date_for_class,
 )
 from finstack_quant.core.market_data import (
     BaseCorrelationCurve,
@@ -250,7 +249,7 @@ class TestCoreTypesParity:
     def test_credit_rating_notches_are_preserved_and_models_owns_warf(self) -> None:
         assert CreditRating("BBB+") == CreditRating.BBB_PLUS
         assert CreditRating("Baa1") == CreditRating.BBB_PLUS
-        assert CreditRating.BBB_PLUS.name == "BBB+"
+        assert str(CreditRating.BBB_PLUS) == "BBB+"
         assert moodys_warf_factor(CreditRating.BBB_PLUS) > 0.0
 
 
@@ -309,11 +308,6 @@ class TestDayCountParity:
         with pytest.raises(Exception, match="coupon period start must be before end"):
             DayCountContext(coupon_period=(date(2025, 7, 1), date(2025, 1, 1)))
 
-    def test_calendar_metadata_exposes_weekend_rule(self) -> None:
-        metadata = HolidayCalendar("usny").metadata
-        assert metadata is not None
-        assert metadata.weekend_rule == "saturday_sunday"
-
     def test_act_act_afb_and_thirty_360_it(self) -> None:
         """New AFB and Italian conventions parse and match QuantLib formulas."""
         assert DayCount.from_name("act_act_afb") == DayCount.ACT_ACT_AFB
@@ -366,21 +360,21 @@ class TestPeriodParity:
     def test_monthly_period_id(self) -> None:
         """Monthly PeriodId round-trips code, year, index."""
         pid = PeriodId.month(2024, 6)
-        assert pid.code == "2024M06"
+        assert str(pid) == "2024M06"
         assert pid.year == 2024
         assert pid.index == 6
 
     def test_quarterly_period_id(self) -> None:
         """Quarterly PeriodId round-trips."""
         pid = PeriodId.quarter(2024, 2)
-        assert pid.code == "2024Q2"
+        assert str(pid) == "2024Q2"
         assert pid.year == 2024
         assert pid.index == 2
 
     def test_annual_period_id(self) -> None:
         """Annual PeriodId round-trips."""
         pid = PeriodId.annual(2024)
-        assert pid.code == "2024"
+        assert str(pid) == "2024"
         assert pid.year == 2024
 
     def test_invalid_period_ids_are_rejected(self) -> None:
@@ -397,15 +391,15 @@ class TestPeriodParity:
         """Build 4 quarterly periods from a range string."""
         plan = build_periods("2024Q1..Q4", None)
         assert len(plan.periods) == 4
-        assert plan.periods[0].id.code == "2024Q1"
-        assert plan.periods[3].id.code == "2024Q4"
+        assert str(plan.periods[0].id) == "2024Q1"
+        assert str(plan.periods[3].id) == "2024Q4"
 
     def test_build_periods_monthly(self) -> None:
         """Build 12 monthly periods from a range string."""
         plan = build_periods("2024M01..M12", None)
         assert len(plan.periods) == 12
-        assert plan.periods[0].id.code == "2024M01"
-        assert plan.periods[11].id.code == "2024M12"
+        assert str(plan.periods[0].id) == "2024M01"
+        assert str(plan.periods[11].id) == "2024M12"
 
     def test_build_periods_with_actuals(self) -> None:
         """Actuals cutoff correctly partitions periods."""
@@ -422,7 +416,7 @@ def test_sifma_settlement_classes_and_default() -> None:
     assert SifmaSettlementClass.from_agency_term("GNMA", 30) == SifmaSettlementClass.C
     assert SifmaSettlementClass.from_agency_term("FNMA", 15) == SifmaSettlementClass.B
     assert sifma_settlement_date(1, 2026) == date(2026, 1, 14)
-    assert sifma_settlement_date_for_class(1, 2026, SifmaSettlementClass.B) == date(2026, 1, 20)
+    assert sifma_settlement_date(1, 2026, SifmaSettlementClass.B) == date(2026, 1, 20)
 
 
 class TestDiscountCurveParity:
@@ -462,7 +456,7 @@ class TestDiscountCurveParity:
         """exp(-z * t) recovers the discount factor."""
         t = 1.0
         df = curve.df(t)
-        z = curve.zero(t)
+        z = curve.zero_rate(t)
         assert df == pytest.approx(math.exp(-z * t), abs=1e-8)
 
     def test_df_at_time_zero(self, curve: DiscountCurve) -> None:

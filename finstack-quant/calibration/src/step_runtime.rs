@@ -69,7 +69,8 @@ fn attach_validation_result(
     global_config: &CalibrationConfig,
 ) -> CalibrationReport {
     match validation {
-        Ok(()) => report.with_validation_result(true, None),
+        // A passing gate keeps any failure the target already recorded.
+        Ok(()) => report,
         Err(err) => match global_config.validation_mode {
             ValidationMode::Error => report.with_validation_result(false, Some(err.to_string())),
             ValidationMode::Warn => {
@@ -78,6 +79,27 @@ fn attach_validation_result(
                 report
             }
         },
+    }
+}
+
+/// Gate a solved curve with its curve validator and wrap it as a step outcome.
+fn validated_curve_outcome<C>(
+    curve: C,
+    report: CalibrationReport,
+    global_config: &CalibrationConfig,
+) -> StepOutcome
+where
+    C: CurveValidator + Into<CurveStorage>,
+{
+    let report = attach_validation_result(
+        report,
+        curve.validate(&global_config.validation),
+        global_config,
+    );
+    StepOutcome {
+        output: StepOutput::Curve(curve.into()),
+        credit_index_update: None,
+        report,
     }
 }
 
@@ -216,7 +238,7 @@ fn prepare_hw_cap_schedule(
     maturity: finstack_quant_core::dates::Date,
 ) -> Result<CapFloorSchedule> {
     use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
-    use finstack_quant_core::dates::{adjust, DateExt, StubKind};
+    use finstack_quant_core::dates::StubKind;
     use finstack_quant_models::rates::clock::model_time;
     use finstack_quant_valuations_core::market::conventions::{ConventionRegistry, RateIndexKind};
     let convention = ConventionRegistry::try_global()?.require_rate_index(&params.index_id)?;
@@ -231,14 +253,11 @@ fn prepare_hw_cap_schedule(
             "cap/floor HW calibration requires a term index; compounded overnight quote calibration is not supported".into(),
         ));
     }
-    let calendar =
-        finstack_quant_core::dates::calendar_by_id_strict(&convention.market_calendar_id)?;
-    let start = adjust(
-        params
-            .base_date
-            .add_business_days(convention.market_settlement_days, calendar)?,
+    let start = crate::build::helpers::resolve_spot_date(
+        params.base_date,
+        &convention.market_calendar_id,
+        convention.market_settlement_days,
         convention.market_business_day_convention,
-        calendar,
     )?;
     let periods = build_periods(BuildPeriodsParams {
         start,
@@ -314,7 +333,7 @@ pub(crate) fn apply_output(
 }
 
 /// Execute calibration logic for the provided [`StepParams`].
-pub(crate) fn execute_params(
+fn execute_params(
     params: &StepParams,
     quotes: &[MarketQuote],
     context: &MarketContext,
@@ -326,59 +345,19 @@ pub(crate) fn execute_params(
     match params {
         StepParams::Discount(p) => {
             let (curve, report) = DiscountCurveTarget::solve(p, quotes, context, global_config)?;
-            let report = attach_validation_result(
-                report,
-                curve.validate(&global_config.validation),
-                global_config,
-            );
-            let output = StepOutput::Curve(curve.into());
-            Ok(StepOutcome {
-                output,
-                credit_index_update: None,
-                report,
-            })
+            Ok(validated_curve_outcome(curve, report, global_config))
         }
         StepParams::Forward(p) => {
             let (curve, report) = ForwardCurveTarget::solve(p, quotes, context, global_config)?;
-            let report = attach_validation_result(
-                report,
-                curve.validate(&global_config.validation),
-                global_config,
-            );
-            let output = StepOutput::Curve(curve.into());
-            Ok(StepOutcome {
-                output,
-                credit_index_update: None,
-                report,
-            })
+            Ok(validated_curve_outcome(curve, report, global_config))
         }
         StepParams::Hazard(p) => {
             let (curve, report) = HazardCurveTarget::solve(p, quotes, context, global_config)?;
-            let report = attach_validation_result(
-                report,
-                curve.validate(&global_config.validation),
-                global_config,
-            );
-            let output = StepOutput::Curve(curve.into());
-            Ok(StepOutcome {
-                output,
-                credit_index_update: None,
-                report,
-            })
+            Ok(validated_curve_outcome(curve, report, global_config))
         }
         StepParams::Inflation(p) => {
             let (curve, report) = InflationCurveTarget::solve(p, quotes, context, global_config)?;
-            let report = attach_validation_result(
-                report,
-                curve.validate(&global_config.validation),
-                global_config,
-            );
-            let output = StepOutput::Curve(curve.into());
-            Ok(StepOutcome {
-                output,
-                credit_index_update: None,
-                report,
-            })
+            Ok(validated_curve_outcome(curve, report, global_config))
         }
         StepParams::BaseCorrelation(p) => {
             let (curve, index_update, report) =
@@ -399,19 +378,21 @@ pub(crate) fn execute_params(
         StepParams::VolSurface(p) => {
             let (surface, report) = VolSurfaceTarget::solve(p, quotes, context, global_config)?;
             let mut new_report = report;
-            new_report
-                .explanation
-                .get_or_insert_with(|| {
-                    finstack_quant_core::explain::ExplanationTrace::new("vol_surface")
-                })
-                .push(
-                    TraceEntry::ComputationStep {
-                        name: "surface_built".to_string(),
-                        description: "Vol surface constructed".to_string(),
-                        metadata: None,
-                    },
-                    global_config.explain.max_entries,
-                );
+            if global_config.explain.enabled {
+                new_report
+                    .explanation
+                    .get_or_insert_with(|| {
+                        finstack_quant_core::explain::ExplanationTrace::new("vol_surface")
+                    })
+                    .push(
+                        TraceEntry::ComputationStep {
+                            name: "surface_built".to_string(),
+                            description: "Vol surface constructed".to_string(),
+                            metadata: None,
+                        },
+                        global_config.explain.max_entries,
+                    );
+            }
             let new_report = attach_validation_result(
                 new_report,
                 validate_surface(&surface, &global_config.validation),
@@ -732,6 +713,7 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::{
         BaseCorrelationCurve, CreditIndexData, DiscountCurve, HazardCurve,
     };
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::types::{CurveId, UnderlyingId};
     use finstack_quant_models::correlation::CopulaSpec;
     use finstack_quant_models::rates::hull_white::HullWhiteParams;
@@ -908,7 +890,7 @@ mod tests {
         let base_date = Date::from_calendar_date(2025, Month::March, 20).expect("valid date");
         let market = build_student_t_market(base_date, 0.3);
         let quote = build_student_t_quote(STUDENT_T_FIXTURE_UPFRONT_PCT);
-        let mut curve_ids = finstack_quant_core::HashMap::default();
+        let mut curve_ids = finstack_quant_core::FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("credit".to_string(), "CDX.NA.IG".to_string());
         let build_context = crate::build::BuildCtx::new(base_date, 1.0 / (0.07 - 0.03), curve_ids);
@@ -1472,6 +1454,24 @@ mod tests {
         assert!(
             atm_vol > 0.0 && atm_vol < 1.0,
             "ATM SVI vol should be in a realistic range, got {atm_vol}"
+        );
+    }
+
+    #[test]
+    fn passing_runtime_gate_keeps_a_target_validation_failure() {
+        let failed = CalibrationReport::for_type_with_tolerance(
+            "vol_surface",
+            std::collections::BTreeMap::new(),
+            0,
+            1e-6,
+        )
+        .with_validation_result(false, Some("SABR butterfly-spread arbitrage".to_string()));
+        let report = attach_validation_result(failed, Ok(()), &CalibrationConfig::default());
+        assert!(!report.validation_passed);
+        assert!(!report.success);
+        assert_eq!(
+            report.validation_error.as_deref(),
+            Some("SABR butterfly-spread arbitrage")
         );
     }
 }

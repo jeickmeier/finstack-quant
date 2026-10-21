@@ -111,21 +111,6 @@ fn is_missing_required_metrics(
         })
 }
 
-/// Convert a scale-factor holding back to [`crate::position::Position::quantity`] units.
-pub(crate) fn quantity_from_scale(unit: PositionUnit, scale: f64) -> f64 {
-    match unit {
-        PositionUnit::Units | PositionUnit::Notional(_) | PositionUnit::FaceValue => scale,
-        PositionUnit::Percentage => scale * 100.0,
-    }
-}
-
-fn scale_of_quantity(unit: PositionUnit, quantity: f64) -> f64 {
-    match unit {
-        PositionUnit::Units | PositionUnit::Notional(_) | PositionUnit::FaceValue => quantity,
-        PositionUnit::Percentage => quantity / 100.0,
-    }
-}
-
 fn pv_per_scale_unit(pv_base: f64, scale: f64) -> f64 {
     if scale != 0.0 {
         pv_base / scale
@@ -155,7 +140,6 @@ fn require_deal_notional_abs(
 }
 
 /// Build decision items and associated features from the portfolio and trade universe.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn build_decision_space(
     problem: &PortfolioOptimizationProblem,
     valuation: &crate::valuation::PortfolioValuation,
@@ -219,7 +203,7 @@ pub(crate) fn build_decision_space(
         {
             return Err(Error::valuation(
                 position.position_id.clone(),
-                finstack_quant_core::error::ErrorKind::Validation,
+                finstack_quant_core::ErrorKind::Validation,
                 "valuation result missing required metrics",
             ));
         }
@@ -311,9 +295,7 @@ pub(crate) fn build_decision_space(
             )
             .map_err(|e| Error::invalid_input(e.to_string()))?;
 
-            for (k, v) in &candidate.attributes {
-                pos.attributes.insert(k.clone(), v.clone());
-            }
+            pos.attributes.clone_from(&candidate.attributes);
 
             builder = builder.position(pos);
         }
@@ -348,13 +330,13 @@ pub(crate) fn build_decision_space(
             .ok_or_else(|| {
                 Error::valuation(
                     candidate.id.clone(),
-                    finstack_quant_core::error::ErrorKind::NotFound,
+                    finstack_quant_core::ErrorKind::NotFound,
                     "failed to value candidate",
                 )
             })?;
 
         let pv_unit = val_entry.value_base.amount();
-        let unit_scale = scale_of_quantity(candidate.unit, 1.0);
+        let unit_scale = candidate.unit.scale_of(1.0);
         let pv_per_unit = pv_per_scale_unit(pv_unit, unit_scale);
         let deal_notional_abs = if matches!(problem.weighting, WeightingScheme::NotionalWeight) {
             require_deal_notional_abs(

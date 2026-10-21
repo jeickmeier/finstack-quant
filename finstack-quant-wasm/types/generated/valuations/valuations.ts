@@ -1213,7 +1213,7 @@ export type RollRule = "none" | "imm" | "cds_imm";
  *   ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide
  *   evenly by the frequency. Use a stub variant for misaligned schedules.
  *
- * [`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor
+ * [`InputError::NonIntegerScheduleTenor`]: crate::InputError::NonIntegerScheduleTenor
  * - **`ShortFront`**: Short stub period at the start. Schedule is built
  *   backward from the end date, creating a short first period.
  * - **`ShortBack`**: Short stub period at the end. Schedule is built forward
@@ -18180,9 +18180,9 @@ export interface RoundingContext {
 /**
  * Numerical tolerance configuration for floating-point comparisons.
  *
- * Provides configurable epsilon values for zero-checks in rate calculations
- * and generic floating-point comparisons. These defaults are chosen to balance
- * numerical stability with practical precision requirements.
+ * Provides the configurable epsilon for generic floating-point zero-checks.
+ * The default is chosen to balance numerical stability with practical
+ * precision requirements.
  */
 export interface ToleranceConfig {
   /**
@@ -18191,12 +18191,6 @@ export interface ToleranceConfig {
    * Used for general numerical comparisons where higher tolerance is acceptable.
    */
   generic_epsilon?: PositiveF64Wire;
-  /**
-   * Epsilon for rate comparisons (default: 1e-12).
-   *
-   * Used when comparing interest rates, yields, and other small ratios.
-   */
-  rate_epsilon?: PositiveF64Wire;
 }
 /**
  * Rich structured details attached to composite valuation results.
@@ -19903,8 +19897,8 @@ export interface PoolStats {
   /**
    * Weighted average maturity (WAM) in years.
    *
-   * For weighted average life use
-   * [`AssetPool::wal_from_cashflows`].
+   * For weighted average life, which weights principal cashflows rather
+   * than maturities, use the `wal` metric.
    */
   weighted_avg_maturity: number;
   /**

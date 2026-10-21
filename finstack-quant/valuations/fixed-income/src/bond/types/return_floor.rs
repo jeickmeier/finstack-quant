@@ -139,7 +139,6 @@ pub enum ProtectionWindow {
     /// Active only on or after this date (encodes a no-call period ending at
     /// maturity). The floor is not applied to redemptions before `from`.
     From(
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -150,14 +149,12 @@ pub enum ProtectionWindow {
     /// applies only for redemptions with `start <= redemption_date <= end`.
     Between {
         /// First date on which the floor-protected call window opens.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
         )]
         start: Date,
         /// Last date on which the floor-protected call window closes (inclusive).
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")

@@ -48,9 +48,10 @@
 //! - [`generate_cashflows`] for cashflow generation details
 //! - `TermLoan` for the instrument type
 
-use crate::term_loan::types::RateSpec;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::cashflow::npv;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
 use finstack_quant_valuations_core::pricer::{
@@ -460,12 +461,7 @@ impl TermLoanDiscountingPricer {
                 .map(|(_, delta_bp)| *delta_bp)
                 .sum();
             let mut params = base_params.clone();
-            params.spread_bp += rust_decimal::prelude::ToPrimitive::to_f64(&active_delta_bp)
-                .ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(format!(
-                        "margin step {active_delta_bp} bp is not representable as f64"
-                    ))
-                })?;
+            params.spread_bp += active_delta_bp.as_f64();
             let all_in_rate =
                 finstack_quant_cashflows::builder::calculate_floating_rate(raw_fixing, &params);
 
@@ -509,7 +505,7 @@ impl Pricer for TermLoanDiscountingPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::term_loan::spec::AmortizationSpec;
+    use finstack_quant_cashflows::builder::AmortizationSpec;
     use finstack_quant_cashflows::builder::CouponType;
     use finstack_quant_cashflows::builder::FloatingRateSpec;
     use finstack_quant_core::cashflow::CFKind;

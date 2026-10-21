@@ -63,8 +63,11 @@
 use super::{default_quadrature, Copula, DEFAULT_QUADRATURE_ORDER};
 use finstack_quant_core::math::distributions::chi_squared_quantile;
 #[cfg(test)]
-use finstack_quant_core::math::student_t_inv_cdf;
-use finstack_quant_core::math::{norm_cdf, student_t_cdf, GaussHermiteQuadrature};
+use finstack_quant_core::math::special_functions::student_t_inv_cdf;
+use finstack_quant_core::math::{
+    integration::GaussHermiteQuadrature,
+    special_functions::{norm_cdf, student_t_cdf},
+};
 use nalgebra::{DMatrix, SymmetricEigen};
 use std::sync::Arc;
 
@@ -460,7 +463,7 @@ impl Copula for StudentTCopula {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::math::standard_normal_inv_cdf;
+    use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
 
     #[test]
     fn tail_dependence_of_nan_is_nan() {
@@ -985,7 +988,7 @@ mod tests {
 
     #[test]
     fn test_high_df_converges_to_gaussian() {
-        use finstack_quant_core::math::norm_cdf;
+        use finstack_quant_core::math::special_functions::norm_cdf;
 
         let df = 50.0;
         let copula = StudentTCopula::new(df).expect("valid df");

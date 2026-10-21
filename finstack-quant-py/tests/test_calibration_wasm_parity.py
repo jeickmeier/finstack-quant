@@ -146,7 +146,7 @@ def test_validate_calibration_and_dry_run_accept_the_shared_envelope() -> None:
     validated = validate_calibration(envelope)
     assert validated.plan.id == envelope["plan"]["id"]
     assert validated.plan.step_ids == ["USD-OIS"]
-    assert CalibrationEnvelope.from_json(json.dumps(envelope)).dry_run().is_valid
+    assert dry_run(CalibrationEnvelope.from_json(json.dumps(envelope))).is_valid
     assert dry_run(envelope).is_valid
     broken = json.loads(json.dumps(envelope))
     broken["plan"]["steps"][0]["quote_set"] = "missing"
@@ -162,7 +162,6 @@ def test_result_step_report_and_residuals_match_the_shared_golden() -> None:
     assert report.success is expected["success"]
     assert report.iterations == expected["iterations"]
     assert sorted(report.residuals) == expected["residual_ids"]
-    assert json.loads(result.step_report_json("USD-OIS"))["iterations"] == expected["iterations"]
     frame = result.residuals("USD-OIS")
     assert list(frame["quote_id"]) == expected["residual_ids"]
     assert all(abs(value) < 1e-8 for value in frame["residual"])

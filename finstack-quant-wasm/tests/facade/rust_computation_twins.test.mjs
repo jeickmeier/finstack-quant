@@ -38,7 +38,6 @@ const EMPTY_MARKET_FIELDS = {
   credit_indices: [],
   fx_delta_vol_surfaces: [],
   vol_cubes: [],
-  collateral: {},
   hierarchy: null,
 };
 
@@ -55,7 +54,6 @@ const discountCurve = (id, base, rate) => ({
   allow_non_monotonic: false,
   min_forward_tenor: 1e-6,
   rate_calibration: null,
-  calibration_ois_cutoff_days: null,
   fx_policy: null,
 });
 
@@ -78,7 +76,6 @@ const FLAT_USD_MARKET = JSON.stringify({
       allow_non_monotonic: false,
       min_forward_tenor: 1e-6,
       rate_calibration: null,
-      calibration_ois_cutoff_days: null,
       fx_policy: null,
     },
   ],
@@ -485,14 +482,19 @@ test('portfolio cashflow readers net and collapse the Rust ladder', () => {
   ]);
   const collapsed = portfolio.collapseToBaseByDateKind(
     ladder,
-    FLAT_USD_MARKET,
+    core.MarketContext.fromJson(FLAT_USD_MARKET),
     'USD',
     '2024-01-15',
     { USD: 'USD-OIS' }
   );
   assert.deepEqual(collapsed['2027-01-15'].notional, { amount: '500000', currency: 'USD' });
   assert.deepEqual(
-    portfolio.collapseToBaseByDateKind(ladder, FLAT_USD_MARKET, 'USD', '2024-01-15'),
+    portfolio.collapseToBaseByDateKind(
+      ladder,
+      core.MarketContext.fromJson(FLAT_USD_MARKET),
+      'USD',
+      '2024-01-15'
+    ),
     collapsed
   );
   assert.throws(
@@ -510,9 +512,7 @@ test('portfolioMetricsSeries decodes bucketed metrics', () => {
   );
   const metrics = portfolio.aggregateMetrics(
     JSON.stringify(valuation, (_, v) => (typeof v === 'bigint' ? Number(v) : v)),
-    'USD',
-    FLAT_USD_MARKET,
-    '2024-01-15'
+    core.MarketContext.fromJson(FLAT_USD_MARKET)
   );
   const series = portfolio.portfolioMetricsSeries(metrics, 'bucketed_dv01');
   assert.equal(series.length, 11);
@@ -679,7 +679,7 @@ test('calibration content hashes match the Python/Rust hashes', () => {
   );
   assert.equal(
     calibration.calibrationEnvelopeContentHash(envelope),
-    'sha256:0959605bc2b4005f3b8d809eb78c431fe4c6abac03443161fc3a64f35f08843a'
+    'sha256:c71a40f68570b2ef28b67a7809cf7094a4ba3ce9004fac8d9e5101ef57c76cdd'
   );
   // The solved residuals differ from the native build in the last bits
   // (wasm32 libm), so the result hash is pinned against its own JSON text:
@@ -731,7 +731,7 @@ test('pnlBridge and attributePnlMany run the Rust attribution entry points', () 
 
   assert.match(attribution.pnlAttributionExplainText(single), /Total P&L/);
   assert.ok(
-    attribution.pnlAttributionExplainVerboseText(single).length >=
+    attribution.pnlAttributionExplainText(single, true).length >=
       attribution.pnlAttributionExplainText(single).length
   );
   assert.equal(

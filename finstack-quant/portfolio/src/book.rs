@@ -20,16 +20,16 @@ pub(crate) const MAX_BOOK_DEPTH: usize = 512;
 /// membership, referential-integrity, and resource limits cannot diverge.
 pub(crate) fn validate_books<'a>(
     books: &'a IndexMap<BookId, Book>,
-    positions: &finstack_quant_core::HashSet<&PositionId>,
+    positions: &finstack_quant_core::FxHashSet<&PositionId>,
     mut emit: impl FnMut(finstack_quant_core::contract::Diagnostic),
-) -> finstack_quant_core::HashMap<&'a PositionId, &'a BookId> {
+) -> finstack_quant_core::FxHashMap<&'a PositionId, &'a BookId> {
     use finstack_quant_core::contract::{Diagnostic, LoadPhase, Severity};
-    use finstack_quant_core::{HashMap, HashSet};
+    use finstack_quant_core::{FxHashMap, FxHashSet};
 
     let issue = |code, message, pointer| {
         Diagnostic::new(code, LoadPhase::Semantic, Severity::Error, message).with_pointer(pointer)
     };
-    let mut memberships = HashMap::default();
+    let mut memberships = FxHashMap::default();
     if books.len() > MAX_BOOKS {
         emit(issue(
             "portfolio/book-limit",
@@ -41,7 +41,7 @@ pub(crate) fn validate_books<'a>(
         ));
         return memberships;
     }
-    let mut child_parents = HashMap::default();
+    let mut child_parents = FxHashMap::default();
     for (book_id, book) in books {
         if book_id != &book.id {
             emit(issue(
@@ -128,8 +128,8 @@ pub(crate) fn validate_books<'a>(
     }
 
     // Completed paths cache their depth; each parent edge is traversed once.
-    let mut depths: HashMap<&BookId, usize> = HashMap::default();
-    let mut visiting = HashSet::default();
+    let mut depths: FxHashMap<&BookId, usize> = FxHashMap::default();
+    let mut visiting = FxHashSet::default();
     for book_id in books.keys() {
         if depths.contains_key(book_id) {
             continue;
@@ -172,10 +172,13 @@ pub(crate) fn validate_books<'a>(
     memberships
 }
 
-define_string_id! {
-    /// Book identifier.
-    pub struct BookId;
-}
+/// Marker type for portfolio book identifiers.
+#[derive(Debug, Clone, Copy, Default)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct BookTag;
+
+/// Book identifier; serialized as a bare string.
+pub type BookId = finstack_quant_core::types::Id<BookTag>;
 
 /// A book represents a folder-like organizational unit within a portfolio.
 ///
@@ -193,7 +196,7 @@ define_string_id! {
 ///   indefinitely. A portfolio supports at most 100,000 books and 512 levels
 ///   of ancestry, including the root.
 /// - [`Book::child_book_ids`] drives rollup in [`crate::grouping::aggregate_by_book`];
-///   [`crate::portfolio::Portfolio::validate`] checks parent/child consistency
+///   [`crate::Portfolio::validate`] checks parent/child consistency
 ///   between child lists and [`Book::parent_id`]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -241,7 +244,7 @@ impl Book {
     /// use finstack_quant_portfolio::book::Book;
     ///
     /// let book = Book::new("credit", Some("Credit".to_string()));
-    /// assert!(book.is_root());
+    /// assert!(book.parent_id.is_none());
     /// assert_eq!(book.name.as_deref(), Some("Credit"));
     /// ```
     pub fn new(id: impl Into<BookId>, name: Option<String>) -> Self {
@@ -269,15 +272,6 @@ impl Book {
     pub fn with_parent(mut self, parent_id: impl Into<BookId>) -> Self {
         self.parent_id = Some(parent_id.into());
         self
-    }
-
-    /// Check if this is a root book (no parent).
-    ///
-    /// # Returns
-    ///
-    /// `true` when the book has no parent reference.
-    pub fn is_root(&self) -> bool {
-        self.parent_id.is_none()
     }
 
     /// Check if this book contains a specific position.
@@ -327,24 +321,6 @@ impl Book {
             self.child_book_ids.push(child_id);
         }
     }
-
-    /// Remove a position from this book.
-    ///
-    /// # Arguments
-    ///
-    /// * `position_id` - Position identifier to remove.
-    pub fn remove_position(&mut self, position_id: &PositionId) {
-        self.position_ids.retain(|id| id != position_id);
-    }
-
-    /// Remove a child book from this book.
-    ///
-    /// # Arguments
-    ///
-    /// * `child_id` - Child book identifier to remove.
-    pub fn remove_child(&mut self, child_id: &BookId) {
-        self.child_book_ids.retain(|id| id != child_id);
-    }
 }
 
 #[cfg(test)]
@@ -371,7 +347,7 @@ mod tests {
         let book = Book::new("americas", Some("Americas".to_string()));
         assert_eq!(book.id, BookId::new("americas"));
         assert_eq!(book.name, Some("Americas".to_string()));
-        assert!(book.is_root());
+        assert!(book.parent_id.is_none());
         assert!(book.position_ids.is_empty());
         assert!(book.child_book_ids.is_empty());
     }
@@ -381,7 +357,7 @@ mod tests {
         let book = Book::new("credit", Some("Credit".to_string())).with_parent("americas");
         assert_eq!(book.id, BookId::new("credit"));
         assert_eq!(book.parent_id, Some(BookId::new("americas")));
-        assert!(!book.is_root());
+        assert!(book.parent_id.is_some());
     }
 
     #[test]
@@ -410,31 +386,5 @@ mod tests {
         // Adding again should not duplicate
         book.add_child(child_id);
         assert_eq!(book.child_book_ids.len(), 1);
-    }
-
-    #[test]
-    fn test_book_remove_position() {
-        let mut book = Book::new("ig", Some("Investment Grade".to_string()));
-        let pos_id = PositionId::new("pos1");
-
-        book.add_position(pos_id.clone());
-        assert!(book.contains_position(&pos_id));
-
-        book.remove_position(&pos_id);
-        assert!(!book.contains_position(&pos_id));
-        assert!(book.position_ids.is_empty());
-    }
-
-    #[test]
-    fn test_book_remove_child() {
-        let mut book = Book::new("americas", Some("Americas".to_string()));
-        let child_id = BookId::new("credit");
-
-        book.add_child(child_id.clone());
-        assert!(book.contains_child(&child_id));
-
-        book.remove_child(&child_id);
-        assert!(!book.contains_child(&child_id));
-        assert!(book.child_book_ids.is_empty());
     }
 }

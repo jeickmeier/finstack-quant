@@ -1,5 +1,6 @@
 use super::*;
 use crate::bond::{CallPutSchedule, CashflowSpec};
+use finstack_quant_cashflows::builder::FloatingRateFallback;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Tenor};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
@@ -252,12 +253,17 @@ fn early_overnight_payment_finishes_known_weekend_carry() {
     };
     let full = schedule
         .replay(maturity, *day_count_basis, *constraints, |slice| {
-            model.sources[&(slice.observation_date, slice.rate_tenor_days)].rate(&path)
+            model.sources[&slice.observation_date].rate(&path)
         })
         .expect("full known observations");
     let expected = coupon
         .compiled
-        .settle_index_rate(100.0, full.constrained_rate, full.projected_rate)
+        .settle_index_rate(
+            100.0,
+            full.constrained_rate,
+            full.projected_rate,
+            coupon.compiled.period().accrual_factor,
+        )
         .expect("full coupon")
         .cash_amount;
     let config = BondLsmcConfig {
@@ -440,7 +446,12 @@ fn term_act365l_balance_segments_replay_the_full_coupon_leap_denominator() {
         let index_rate = source.rate(&path).expect("term fixing");
         expected += coupon
             .compiled
-            .settle_index_rate(notional, index_rate, index_rate)
+            .settle_index_rate(
+                notional,
+                index_rate,
+                index_rate,
+                coupon.compiled.period().accrual_factor,
+            )
             .expect("segment coupon")
             .cash_amount;
     }
@@ -600,10 +611,7 @@ fn floating_pik_uses_accrual_boundaries_with_lagged_and_early_cash_dates() {
                 );
             }
         }
-        let captured = next
-            .compiled
-            .captured_notional(&cursor.floating[1])
-            .expect("capture");
+        let captured = cursor.floating[1].notional().expect("capture");
         assert!((captured - 100.0 - first_pik).abs() < 1e-10);
         assert_eq!(
             template
@@ -1203,9 +1211,8 @@ fn lagged_term_reset_uses_curve_tenor_and_captures_post_pik_start_balance() {
             .advance_step(&template, &bullet, &sampled, &config, step)
             .expect("forward replay");
     }
-    let captured = coupon
-        .compiled
-        .captured_notional(&cursor.floating[coupon_id])
+    let captured = cursor.floating[coupon_id]
+        .notional()
         .expect("second coupon notional");
     assert!(
         (captured - expected_start_balance).abs() < 1.0e-10,
@@ -1559,7 +1566,7 @@ fn two_time_blocks_match_full_replay_at_cash_amortization_exercise_boundary() {
     let initial_cursor = ReplayCursor::new(&template).expect("initial cursor");
     let checkpoint_zero = TrainingCheckpoint {
         factor: RatesCreditPathCheckpoint::from(&full_path[0]),
-        product: initial_cursor.checkpoint(&template),
+        product: initial_cursor.checkpoint(),
     };
     let mut boundary_cursor = ReplayCursor::new(&template).expect("boundary cursor");
     for step in 0..2 {
@@ -1569,7 +1576,7 @@ fn two_time_blocks_match_full_replay_at_cash_amortization_exercise_boundary() {
     }
     let checkpoint_two = TrainingCheckpoint {
         factor: RatesCreditPathCheckpoint::from(&full_path[2]),
-        product: boundary_cursor.checkpoint(&template),
+        product: boundary_cursor.checkpoint(),
     };
     let mut segment = Vec::new();
     let low = template

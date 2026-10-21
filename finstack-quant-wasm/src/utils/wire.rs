@@ -7,9 +7,10 @@
 //! same document as JSON text, and always parses through `serde_json`, so the
 //! Rust type's `deny_unknown_fields` and validating `Deserialize` apply.
 
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::wire::DecimalWire;
 use serde::de::DeserializeOwned;
-use time::Date;
+use serde::Serialize;
 use wasm_bindgen::JsValue;
 
 use super::input::{from_js_json, js_string};
@@ -145,4 +146,33 @@ pub fn js_decimal(value: &JsValue, label: &str) -> Result<DecimalWire, JsValue> 
             "{label}: {error}"
         )))
     })
+}
+
+/// Parse a serde wire label (`"total_variance"`) into a unit enum (Rust
+/// `wire::serde_parse`).
+///
+/// # Arguments
+///
+/// * `label` - The wire label, already read from the JavaScript argument.
+///
+/// # Errors
+///
+/// Throws a validation error naming the accepted labels when `label` is not
+/// one of them.
+pub fn parse_label<T: DeserializeOwned>(label: &str) -> Result<T, JsValue> {
+    finstack_quant_core::wire::serde_parse(label).map_err(to_js_err)
+}
+
+/// The serde wire label of a unit enum value (Rust `wire::serde_label`).
+///
+/// # Arguments
+///
+/// * `value` - The enum value to render.
+///
+/// # Errors
+///
+/// Throws when `value` does not serialize to a bare string (not expected for
+/// a unit enum).
+pub fn label<T: Serialize>(value: &T) -> Result<String, JsValue> {
+    finstack_quant_core::wire::serde_label(value).map_err(to_js_err)
 }

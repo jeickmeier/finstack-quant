@@ -12,7 +12,6 @@ pub struct HazardCalibrationInput {
     /// Exact serialized typed CDS quote.
     pub quote: serde_json::Value,
     /// Contractual pillar date resolved from the quote and CDS conventions.
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub pillar_date: Date,
     /// Frozen year-fraction pillar time used by the original solve.
@@ -26,11 +25,12 @@ pub struct HazardCalibrationInput {
 /// `HazardCurveParams`, typed CDS quotes, and `CalibrationConfig`. Keeping the
 /// complete serde payloads avoids replacing date pillars with rounded tenors or
 /// silently substituting current defaults for the original solver policy.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "RawHazardCalibrationRecipe")]
 #[cfg_attr(
     feature = "json-schema",
     derive(schemars::JsonSchema),
-    schemars(deny_unknown_fields)
+    schemars(!try_from, deny_unknown_fields)
 )]
 pub struct HazardCalibrationRecipe {
     /// Exact serialized `HazardCurveParams` used for the original solve.
@@ -52,21 +52,16 @@ struct RawHazardCalibrationRecipe {
     calibration_config: serde_json::Value,
 }
 
-impl<'de> Deserialize<'de> for HazardCalibrationRecipe {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let raw = RawHazardCalibrationRecipe::deserialize(deserializer)?;
-        let mut recipe = Self {
-            hazard_params: raw.hazard_params,
-            calibration_inputs: raw.calibration_inputs,
-            spread_risk_inputs: raw.spread_risk_inputs,
-            calibration_config: raw.calibration_config,
-        };
-        recipe.sort_inputs();
-        recipe.validate().map_err(serde::de::Error::custom)?;
-        Ok(recipe)
+impl TryFrom<RawHazardCalibrationRecipe> for HazardCalibrationRecipe {
+    type Error = crate::Error;
+
+    fn try_from(raw: RawHazardCalibrationRecipe) -> crate::Result<Self> {
+        Self::new(
+            raw.hazard_params,
+            raw.calibration_inputs,
+            raw.spread_risk_inputs,
+            raw.calibration_config,
+        )
     }
 }
 

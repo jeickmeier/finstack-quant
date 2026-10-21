@@ -29,6 +29,7 @@ use finstack_quant_attribution::{
     MarketRestoreFlags, MarketSnapshot, TaylorAttributionConfig,
 };
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IssuerId;
 use finstack_quant_factor::credit::hierarchy::{
@@ -49,7 +50,7 @@ use fixtures::{
 use std::collections::BTreeMap;
 use std::hint::black_box;
 use std::sync::Arc;
-use time::{Date, Month};
+use time::Month;
 
 const SHIFT_BP: f64 = 1.0;
 const PORTFOLIO_SIZES: &[usize] = &[10, 100, 1000];

@@ -14,7 +14,7 @@ use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::{HashMap, Result};
+use finstack_quant_core::{FxHashMap, Result};
 use finstack_quant_models::monte_carlo::estimate::{independent_estimator_stats, Estimate};
 use finstack_quant_models::monte_carlo::results::{MoneyEstimate, MonteCarloResult};
 
@@ -76,7 +76,8 @@ impl RevolvingCreditPricer {
         // Insertion order of the first appearance keeps the schedule stable
         // (paths share dates and emission order).
         let mut order: Vec<(Date, Option<Date>, CFKind)> = Vec::new();
-        let mut buckets: HashMap<(Date, Option<Date>, CFKind), ExpectedFlow> = HashMap::default();
+        let mut buckets: FxHashMap<(Date, Option<Date>, CFKind), ExpectedFlow> =
+            FxHashMap::default();
         for path in &enhanced.path_results {
             for cf in path.cashflows.get_flows() {
                 let key = (cf.date, cf.reset_date, cf.kind);
@@ -113,7 +114,7 @@ impl RevolvingCreditPricer {
             })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
-        Ok(schedule_from_classified_flows(
+        schedule_from_classified_flows(
             flows,
             facility.day_count,
             ScheduleBuildOpts {
@@ -127,7 +128,7 @@ impl RevolvingCreditPricer {
                     maturity: None,
                 },
             },
-        ))
+        )
     }
 
     /// Price with full MC path capture for analysis.

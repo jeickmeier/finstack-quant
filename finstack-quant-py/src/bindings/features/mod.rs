@@ -92,7 +92,8 @@ fn wall_datetime(value: &Bound<'_, PyAny>) -> PyResult<time::PrimitiveDateTime> 
         |e: time::error::ComponentRange| pyo3::exceptions::PyValueError::new_err(e.to_string());
     let month = time::Month::try_from(small("month")?).map_err(invalid)?;
     let year: i32 = value.getattr("year")?.extract()?;
-    let date = time::Date::from_calendar_date(year, month, small("day")?).map_err(invalid)?;
+    let date = finstack_quant_core::dates::Date::from_calendar_date(year, month, small("day")?)
+        .map_err(invalid)?;
     let clock = time::Time::from_hms_nano(
         small("hour")?,
         small("minute")?,

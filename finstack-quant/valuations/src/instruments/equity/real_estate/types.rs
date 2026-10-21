@@ -72,7 +72,6 @@ pub struct RealEstateAsset {
     /// rate to a single schedule entry, so a monthly or quarterly schedule
     /// would understate those values by 12x/4x. Flows dated exactly on the
     /// valuation `as_of` are included in PV undiscounted (t = 0).
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -82,7 +81,6 @@ pub struct RealEstateAsset {
     ///
     /// When present, cashflows are valued as `NOI - CapEx` (unlevered net cash flow).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<Vec<(finstack_quant_core::wire::DateWire, f64)>>")
@@ -115,7 +113,6 @@ pub struct RealEstateAsset {
     /// When set, DCF only values unlevered flows up to and including `sale_date`.
     /// Terminal proceeds (if configured) are realized on `sale_date`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -191,7 +188,6 @@ struct RealEstateAssetUnchecked {
     #[serde(default)]
     property_type: Option<RealEstatePropertyType>,
     /// Net operating income schedule (date, amount).
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -201,7 +197,6 @@ struct RealEstateAssetUnchecked {
     ///
     /// When present, cashflows are valued as `NOI - CapEx` (unlevered net cash flow).
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::optional_dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<Vec<(finstack_quant_core::wire::DateWire, f64)>>")
@@ -231,7 +226,6 @@ struct RealEstateAssetUnchecked {
     /// When set, DCF only values unlevered flows up to and including `sale_date`.
     /// Terminal proceeds (if configured) are realized on `sale_date`.
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -622,9 +616,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for RealEstateAsset {
         if let Some((date, amount)) = self.terminal_sale_proceeds(as_of)? {
             flows.push((date, Money::new(amount, self.currency)?));
         }
-        Ok(finstack_quant_cashflows::schedule_from_dated_flows(
+        finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
-            finstack_quant_cashflows::primitives::CFKind::Fixed,
+            finstack_quant_core::cashflow::CFKind::Fixed,
             self.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 meta: finstack_quant_cashflows::builder::CashFlowMeta {
@@ -634,7 +628,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for RealEstateAsset {
                 },
                 ..Default::default()
             },
-        ))
+        )
     }
 }
 

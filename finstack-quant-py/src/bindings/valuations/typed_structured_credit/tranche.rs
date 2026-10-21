@@ -495,7 +495,7 @@ impl PyTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let frequency = crate::bindings::valuations::convert::tenor_from_py(value, "frequency")?;
+        let frequency = crate::bindings::core::dates::tenor::extract_tenor(value)?;
         builder_set!(slf, |b: TrancheBuilderInner| b.frequency(frequency))
     }
 

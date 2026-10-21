@@ -8,7 +8,7 @@ mod materialization_gate;
 use std::collections::HashSet;
 
 use finstack_quant_core::contract::LoadLimits;
-use finstack_quant_portfolio::{InstrumentArtifactCache, Portfolio};
+use finstack_quant_portfolio::{materialization::InstrumentArtifactCache, Portfolio};
 use serde_json::Value;
 
 use materialization_fixtures::{build_fixture, fixture_a, fixture_b, FixtureKind};
@@ -188,7 +188,10 @@ fn validation_only_checks_semantics_without_building_positions_or_indices() {
     assert!(Portfolio::validate_materialization(
         &fixture.bytes,
         &cache,
-        &LoadLimits::default().with_max_positions(7),
+        &LoadLimits {
+            max_positions: 7,
+            ..LoadLimits::default()
+        },
     )
     .is_err());
 }

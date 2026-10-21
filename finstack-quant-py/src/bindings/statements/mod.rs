@@ -10,6 +10,8 @@ pub(crate) mod checks;
 mod dsl;
 pub(crate) mod evaluator;
 pub(crate) mod monte_carlo;
+mod registry;
+mod rollup;
 mod schema;
 pub(crate) mod types;
 
@@ -139,8 +141,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     types::register(py, &m)?;
     capital_structure::register(py, &m)?;
     builder::register(py, &m)?;
+    registry::register(py, &m)?;
     evaluator::register(py, &m)?;
     monte_carlo::register(py, &m)?;
+    rollup::register(py, &m)?;
     dsl::register(py, &m)?;
     adjustments::register(py, &m)?;
     checks::register(py, &m)?;
@@ -176,11 +180,11 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "PaymentClassSpec",
             "PikToggleSpec",
             "Registry",
+            "RollupSpec",
             "StatementResult",
             "WaterfallSpec",
             "merge_into_results",
             "normalize",
-            "normalize_json",
             "parse_and_compile",
             "parse_formula",
             "schema",

@@ -3,12 +3,13 @@
 use crate::build::BuildCtx;
 use crate::quotes::ids::Pillar;
 use crate::quotes::xccy::XccyQuote;
-use finstack_quant_core::dates::fx::fx_spot_date_for_pair;
+use finstack_quant_core::dates::fx::fx_spot_date;
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::dates::{adjust, resolve_joint_calendar};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
+use finstack_quant_valuations_core::instruments::pricing::overnight_conventions::compounding_from_conventions;
 use finstack_quant_valuations_core::instruments::FloatLegSpec;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
@@ -31,26 +32,14 @@ pub(crate) fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result
     let base_index = registry.require_rate_index(&conv.base_index_id)?;
     let quote_index = registry.require_rate_index(&conv.quote_index_id)?;
 
-    let domestic_discount = ctx
-        .curve_id("domestic_discount")
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| format!("{}-OIS", conv.quote_currency));
-    let foreign_discount = ctx
-        .curve_id("foreign_discount")
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| format!("{}-OIS", conv.base_currency));
-    let domestic_forward = ctx
-        .curve_id("domestic_forward")
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| conv.quote_index_id.to_string());
-    let foreign_forward = ctx
-        .curve_id("foreign_forward")
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| conv.base_index_id.to_string());
-    let foreign_compounding =
-        contractual_leg_compounding(conv.base_index_id.as_str(), base_index, &foreign_forward)?;
-    let domestic_compounding =
-        contractual_leg_compounding(conv.quote_index_id.as_str(), quote_index, &domestic_forward)?;
+    let domestic_discount = ctx.require_curve_id("domestic_discount")?.to_string();
+    let foreign_discount = ctx.require_curve_id("foreign_discount")?.to_string();
+    // Each leg projects on its contractual index curve with that index's
+    // compounding.
+    let domestic_forward = conv.quote_index_id.to_string();
+    let foreign_forward = conv.base_index_id.to_string();
+    let foreign_compounding = compounding_from_conventions(base_index)?;
+    let domestic_compounding = compounding_from_conventions(quote_index)?;
 
     let fx_spot = spot_fx.ok_or_else(|| {
         finstack_quant_core::Error::Validation(
@@ -61,7 +50,7 @@ pub(crate) fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result
     // CLS-consistent spot roll: a US holiday on an intermediate day does
     // not delay a USD pair's spot date (2026-06-09 core quant review,
     // FX spot finding).
-    let spot = fx_spot_date_for_pair(
+    let spot = fx_spot_date(
         ctx.as_of(),
         conv.settlement_days,
         conv.base_currency,
@@ -93,8 +82,7 @@ pub(crate) fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result
             day_count: conv.day_count,
             business_day_convention: conv.business_day_convention,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
-            spread_bp: Decimal::try_from(basis_spread_bp)
-                .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?,
+            spread_bp: finstack_quant_core::decimal::f64_to_decimal(basis_spread_bp)?,
             payment_lag_days: base_index.default_payment_lag_days,
             calendar_id: Some(conv.base_calendar_id.clone().into()),
             reset_lag_days: base_index.default_reset_lag_days,
@@ -130,41 +118,6 @@ pub(crate) fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result
         .with_notional_exchange(conv.notional_exchange);
 
     Ok(swap)
-}
-
-/// Compounding follows the contractual rate index, not a curve-id override.
-///
-/// An unregistered forward-curve alias keeps the contractual compounding. A
-/// registered override whose overnight/term kind disagrees with the
-/// convention index is rejected so a term curve cannot silently re-type an
-/// OIS leg.
-///
-/// # Arguments
-///
-/// * `contractual_index_id` - Convention index id used in the error text.
-/// * `contractual_index` - Registry conventions for that contractual index.
-/// * `forward_curve_id` - Pricing-curve override that must not re-type the leg.
-fn contractual_leg_compounding(
-    contractual_index_id: &str,
-    contractual_index: &finstack_quant_valuations_core::market::conventions::RateIndexConventions,
-    forward_curve_id: &str,
-) -> Result<finstack_quant_cashflows::builder::FloatingLegCompounding> {
-    use finstack_quant_valuations_core::instruments::pricing::overnight_conventions::{
-        compounding_from_conventions, rate_index_conventions,
-    };
-
-    let compounding = compounding_from_conventions(contractual_index)?;
-    if let Some(override_conv) = rate_index_conventions(forward_curve_id)? {
-        if override_conv.kind != contractual_index.kind {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "XCCY forward curve '{forward_curve_id}' is a {:?} index but the \
-                 contractual index '{contractual_index_id}' is {:?}; do not re-type \
-                 the leg via a curve-id override",
-                override_conv.kind, contractual_index.kind
-            )));
-        }
-    }
-    Ok(compounding)
 }
 
 fn resolve_far_date(

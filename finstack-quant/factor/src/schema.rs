@@ -1,30 +1,30 @@
 //! JSON Schema generation helpers for factor-model contracts.
 
+use crate::credit::calibration::{CreditCalibrationConfig, CreditCalibrationInputs};
 use crate::credit::decomposition::{LevelsAtDate, PeriodDecomposition};
+use crate::credit::hierarchy::CreditFactorModel;
 use crate::risk::{
     PositionRiskDecomposition, RiskBudgetResult, RiskDecomposition, StressAttribution,
 };
+use crate::FactorModelConfigEnvelope;
 use crate::MarketDependency;
 
 /// The three-issuer, six-date panel behind both credit examples.
 ///
 /// Small enough to read end to end, and shared so the published inputs and the
 /// published model are demonstrably the same calibration.
-fn example_credit_inputs(
-) -> finstack_quant_core::Result<crate::credit::calibration::CreditCalibrationInputs> {
-    use crate::credit::calibration::{
-        CreditCalibrationInputs, GenericFactorSeries, HistoryPanel, IssuerTagPanel,
-    };
+fn example_credit_inputs() -> finstack_quant_core::Result<CreditCalibrationInputs> {
+    use crate::credit::calibration::{GenericFactorSeries, HistoryPanel, IssuerTagPanel};
     use crate::credit::hierarchy::{GenericFactorSpec, IssuerTags};
     use std::collections::BTreeMap;
 
     let months = [
-        finstack_quant_core::dates::Month::January,
-        finstack_quant_core::dates::Month::February,
-        finstack_quant_core::dates::Month::March,
-        finstack_quant_core::dates::Month::April,
-        finstack_quant_core::dates::Month::May,
-        finstack_quant_core::dates::Month::June,
+        time::Month::January,
+        time::Month::February,
+        time::Month::March,
+        time::Month::April,
+        time::Month::May,
+        time::Month::June,
     ];
     let dates = months
         .into_iter()
@@ -204,44 +204,41 @@ fn credit_calibration_config_examples() -> finstack_quant_core::Result<Vec<serde
 /// entry with [`finstack_quant_core::schema::SchemaArtifact::generate`];
 /// `generated_schema` produces only the raw derived document.
 pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
-    finstack_quant_core::schema::SchemaArtifact::new::<
-        crate::credit::calibration::CreditCalibrationConfig,
-    >(
-        "schemas/factor_model/1/credit_calibration_config.schema.json",
-        "https://finstack_quant.dev/schemas/factor_model/1/credit_calibration_config.schema.json",
-        "CreditCalibrationConfig",
-        "Configuration for the deterministic credit factor-model calibrator.",
-    )
+    finstack_quant_core::schema_artifact!(
+    CreditCalibrationConfig,
+    "factor_model",
+    "credit_calibration_config",
+    Component,
+    "Configuration for the deterministic credit factor-model calibrator."
+)
     .with_summary("Estimator choice and bounds for credit factor calibration.")
     .with_examples(credit_calibration_config_examples),
-    finstack_quant_core::schema::SchemaArtifact::new::<
-        crate::credit::calibration::CreditCalibrationInputs,
-    >(
-        "schemas/factor_model/1/credit_calibration_inputs.schema.json",
-        "https://finstack_quant.dev/schemas/factor_model/1/credit_calibration_inputs.schema.json",
-        "CreditCalibrationInputs",
-        "Typed issuer histories, tags, generic factor series, anchor date, and overrides for one credit calibration run.",
-    )
+    finstack_quant_core::schema_artifact!(
+    CreditCalibrationInputs,
+    "factor_model",
+    "credit_calibration_inputs",
+    Component,
+    "Typed issuer histories, tags, generic factor series, anchor date, and overrides for one credit calibration run."
+)
     .with_summary("Observed spread panel feeding credit factor calibration.")
     .with_examples(credit_calibration_inputs_examples),
-    finstack_quant_core::schema::SchemaArtifact::new::<
-        crate::credit::hierarchy::CreditFactorModel,
-    >(
-        "schemas/factor_model/1/credit_factor_model.schema.json",
-        "https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json",
-        "CreditFactorModel",
-        "Fully self-contained credit factor hierarchy model artifact.",
-    )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
+    finstack_quant_core::schema_artifact!(
+    CreditFactorModel,
+    "factor_model",
+    "credit_factor_model",
+    Input,
+    "Fully self-contained credit factor hierarchy model artifact."
+)
     .with_summary("Calibrated credit factor hierarchy, loadable as pricing input.")
     .with_examples(credit_factor_model_examples),
-    finstack_quant_core::schema::SchemaArtifact::new::<crate::FactorModelConfigEnvelope>(
-        "schemas/factor_model/1/factor_model_config.schema.json",
-        "https://finstack_quant.dev/schemas/factor_model/1/factor_model_config.schema.json",
-        "Finstack Quant Factor Model Configuration",
-        "Versioned factor-model configuration with typed factors, covariance, matching, pricing, and risk settings.",
-    )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
+    finstack_quant_core::schema_artifact!(
+    FactorModelConfigEnvelope,
+    "factor_model",
+    "factor_model_config",
+    Input,
+    "Versioned factor-model configuration with typed factors, covariance, matching, pricing, and risk settings.",
+    title = "Finstack Quant Factor Model Configuration"
+)
     .with_summary("Factor definitions, matchers and covariance settings.")
     .with_examples(factor_model_config_examples),
 ];

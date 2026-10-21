@@ -1,6 +1,7 @@
 //! Integration tests for cross-factor gamma metrics.
 
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
@@ -10,7 +11,6 @@ use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::{CrossFactorPair, MetricId};
 use time::macros::date;
-use time::Date;
 
 fn build_discount_curve(id: &str, as_of: Date, rate: f64) -> DiscountCurve {
     DiscountCurve::builder(id)

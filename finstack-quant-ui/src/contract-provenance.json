@@ -68,14 +68,14 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "86b5924fcaa85b1f4e9c221b8632e18f13aec644ee8a2f22a25b341b6b712d66",
+          "sha256": "8ef6e7056970a3eee1838ae34beef9ae1b60018ceb4a28c63c77541aa6dc25bc",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/credit_derivatives/cds_index.schema.json",
-          "sha256": "2fe3277a1e2642d65df5544f457d6a4b5836569b885fe1696948afd2d30d1b85",
+          "sha256": "cba41071fce2a5ce858c9bf1930ca78c211012af9e719ee84ecc9e90017042e9",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -89,14 +89,14 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/credit_derivatives/cds_tranche.schema.json",
-          "sha256": "9f36fd94d71bb6575f603e31275d8e26c321987a7b6a0188ef6a2977fa95fd20",
+          "sha256": "ca44e4f38deb64644ef13e7220acd47ce3059816c3e8087e178df4f70a474c48",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/credit_derivatives/credit_default_swap.schema.json",
-          "sha256": "cdcd3fdc875ec660eac27d78ddb8262bca41bc4021fa027289ba747258872175",
+          "sha256": "b7ef66ef700542ae715b37d927a415b06bf4867c33c3ce8abd3d5a13d67374ef",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -159,7 +159,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/equity/levered_real_estate_equity.schema.json",
-          "sha256": "4a05a41cb10891dd6a8b617ddcb36c1f92c01e54fd465cfc2b17c88522770e5b",
+          "sha256": "5998efcc1749d3258b71030a03fa1246287ee8932330369ba297093565a68c8e",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "8f9ace06eca66e9fa97ae2eaba63cba4b2afb512df15506e1d90e29d594f4a58",
+          "sha256": "d9e1320cc8a8982b37ffb8de2ec8bbe5f27e7a1caaa7c6c3254db4c307de4112",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -285,28 +285,28 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
-          "sha256": "be1995b9a61f808a6f655c6b6becd454b1da7aabf9fb7fe7e947f889e92daa73",
+          "sha256": "2b332e37f7b44ecb23b29f4e1ee9c40174cb6b60667151020407cfe6eac62b7c",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/bond.schema.json",
-          "sha256": "2f0cb4affbd51cd235ca7bdcc46dedb26c415c7277aa7bd37b89d04407ed2ba9",
+          "sha256": "041f77f845a9fb446597416fffa6db32539fe356f2b29238c6f15866e997b893",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/bond_future.schema.json",
-          "sha256": "fd08198188511ac07c278365b7c6f7f26a93b9bb62c8aa563e4e10cf5e13692c",
+          "sha256": "5582756127c692ad190de40aeeab051a4c0253adf7a40cea5f8e7472e2ff5ee3",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/convertible_bond.schema.json",
-          "sha256": "f728e3b26cac59282d552b7397e518f70c49c96e41f0a80a95ab141e8a2c6b5f",
+          "sha256": "f3a116dc056a48b42e5cccc64f9a2a80642b12b2a8a3708d67972919d4e4ae67",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -320,28 +320,28 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/inflation_linked_bond.schema.json",
-          "sha256": "9837a4510bcc7e43b0a35e2b0ac0a4e839d2d4d310845658fdb3c4abe3e1c755",
+          "sha256": "d1daadb11938729c1df744c4b4161794da7d368c5492f58a2140996fc7e3dbbb",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/revolving_credit.schema.json",
-          "sha256": "cc4454763e7301b8ee7a1c187a9037ca7c2d57d8e59fc1c203cb0caa25209a50",
+          "sha256": "8bd5c9b5f4632714c0c1887c8e8478a10027ec33502d2ae86222d401c95bf712",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/structured_credit.schema.json",
-          "sha256": "2650cf1223d67e882b08d8e0ceadb8d32f0e7e58bb5024362a0ddabe4ef6efb3",
+          "sha256": "103ffc0ced9873edee5932aa45e3c34de2788d476402a77758e0d8788d46f17a",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/term_loan.schema.json",
-          "sha256": "3bf6abe30879de7598957008310256100377205bdcc0bfb9d90d2cf4985f90c6",
+          "sha256": "9fd4c8fe3c73ae56807bc4f76ba4a050fc79e739ae492a04b40cd940433a91a8",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -439,21 +439,21 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/basis_swap.schema.json",
-          "sha256": "310adef268bc7a1d454f3894e64e69f5aa07f5f8dca1beb934ec24c25b060370",
+          "sha256": "7787d5b7c4f7581f8e3ee01d11a464cc844b2178539326a41afbec885c7ea8b2",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/bermudan_swaption.schema.json",
-          "sha256": "ee1b6863b27f7021677bed8c03169ab344b998985cf413c7733f8c701010138e",
+          "sha256": "39f39e58e6e3e8565289da5e185b5b08c517b95f864a8cec2f73818c7db6cf39",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/cap_floor.schema.json",
-          "sha256": "7fcd8596156d2a51feeea6c3da67f529318f3ff8e4f45b12e95f2b7fc5c56fa7",
+          "sha256": "3b0a92b1f21bbe1a1a623c8debdce21945e675c37722717d83f312ec377317d2",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -495,7 +495,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/inflation_cap_floor.schema.json",
-          "sha256": "a497403686da479221ce3453404f0e97c86433351da75994c82907165f2e0307",
+          "sha256": "f532d998ad2cdfdfabf6d9ab027b1f9e505f0f66eb05e57007785f7ad6171466",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -523,7 +523,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/interest_rate_swap.schema.json",
-          "sha256": "87bc725939536690516a0584eaa3e26f93263f5c2fd212cb1645049203667786",
+          "sha256": "45a7edb2934bfc60f15e8496a32f5a0debef988bce48208ba1572dc8dbb3a31a",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -537,14 +537,14 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/swaption.schema.json",
-          "sha256": "3be7761c330588d38f3343df4773e4554f81bc714e89375db75dd440b70a2ccb",
+          "sha256": "6f4ef2f2851c2bd1a61defb77a0bc26f1bfb4678d39feb2e3f4231f675271d5b",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/xccy_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/xccy_swap.schema.json",
-          "sha256": "1974fdc6060f3f8e43f64d6a368dae5c2a1141178ce61161c171d37d7c8ba52a",
+          "sha256": "52446473b70d3f748ffb6accdf287f95b2cc0d6f0910ef1851a044db4c7c0400",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -565,7 +565,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "5bdd52f4e8f40e6085f689b565c96a93717fcfe19267afc263da752e047b922c",
+          "sha256": "e0820ba0495d55e4331bf5e576e7310b715eceb86ab91114162a4ed70f7ad877",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -579,7 +579,7 @@
           "uri": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
           "pointer": "#",
           "source": "finstack-quant/calibration/schemas/calibration/1/calibration.schema.json",
-          "sha256": "a39ca0a713346f6ab632324f1568907e64eedd4f178d3520ac7be4d2e3741618",
+          "sha256": "ccd51c0cebd9e994f99c44da65ae8a89f6163e8424ebf37d005ee53cff4b232d",
           "description": "Canonical typed calibration request and result envelope."
         }
       ]
@@ -994,7 +994,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#/$defs/CurveState",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "8c31c58ae70ca4a9306c703af1999e4135c7f2df7cfe17ef708125c0bf806bdf",
+          "sha256": "bd6df250d6505213354b52c167c7dc385508911b4d7538771e2b0151a1200463",
           "description": "Serializable state representation for any curve type.\n\nProduced when persisting market data snapshots through serde."
         }
       ]
@@ -1189,7 +1189,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "5bdd52f4e8f40e6085f689b565c96a93717fcfe19267afc263da752e047b922c",
+          "sha256": "e0820ba0495d55e4331bf5e576e7310b715eceb86ab91114162a4ed70f7ad877",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -1307,19 +1307,19 @@
     {
       "name": "VolCubeConstructor",
       "source": "finstack-quant-wasm/index.d.ts",
-      "declaration": "/**\n * Data-only SABR volatility cube for swaption pricing.\n *\n * Stores calibrated parameter nodes and forwards on an expiry × tenor grid.\n * @example\n * ```typescript\n * import init, { core } from \"finstack-quant-wasm\";\n * await init();\n * const cube = new core.VolCube(\n *   \"USD-SWAPTION\",\n *   [1],\n *   [5],\n *   [0.02, 0.5, -0.2, 0.4, Number.NaN],\n *   [0.03]\n * );\n * console.log(cube.id, cube.interpolationMode);\n * cube.free();\n * ```\n */\nexport interface VolCubeConstructor {\n  /**\n   * Construct a vol cube from a flat SABR parameter array.\n   *\n   * @returns A `VolCube` handle.\n   * @param id - Curve identifier.\n   * @param expiries - Option expiry axis in years (strictly increasing).\n   * @param tenors - Swap tenor axis in years (strictly increasing).\n   * @param paramsFlat - Row-major SABR parameters: either a flat array `[alpha0, beta0, rho0, nu0, shift0, alpha1, …]` of length `expiries.len() * tenors.len() * 5` (pass `NaN` for `shift` to omit it), or an array of `{ alpha, beta, rho, nu, shift? }` objects of length `expiries.len() * tenors.len()`. The `nu` component is nonnegative; zero gives deterministic volatility.\n   * @param forwards - Row-major forward rates, one per grid node.\n   * @param interpolationMode - Interpolation across the expiry axis: `\"vol\"` or `\"total_variance\"`; omitted keeps the Rust `VolCube::from_grid` default (`\"vol\"`).\n   * @throws Error - Throws a JavaScript exception if an axis is empty, non-finite, non-positive, or not strictly increasing; the parameter or forward array has the wrong length or its grid-size product overflows; a forward is non-finite; any SABR node has invalid alpha, beta, rho, nu, or shift; or `interpolationMode` is neither `vol` nor `total_variance`.\n   */\n  new (\n    id: string,\n    expiries: NumericArray,\n    tenors: NumericArray,\n    paramsFlat: NumericArray,\n    forwards: NumericArray,\n    interpolationMode?: string\n  ): VolCube;\n  /**\n   * Deserialize a canonical SABR cube state without flattening parameter nodes.\n   *\n   * @example\n   * ```typescript\n   * import init, { core } from \"finstack-quant-wasm\";\n   * await init();\n   * const cube = core.VolCube.fromJson(\n   *   JSON.stringify({\n   *     id: \"USD-SWAPTION\",\n   *     expiries: [1],\n   *     tenors: [5],\n   *     params: [{ alpha: 0.03, beta: 0.5, rho: -0.2, nu: 0.4, shift: null }],\n   *     forwards: [0.03],\n   *     interpolation_mode: \"vol\",\n   *   })\n   * );\n   * console.log(cube.id);\n   * cube.free();\n   * ```\n   * @param json - Canonical VolCube JSON containing id, expiry and tenor axes in years, row-major SABR nodes and decimal-rate forwards, and interpolation_mode. Missing or null node shifts remain absent; unknown fields are rejected.\n   * @returns A validated VolCube handle owned by the caller; release it with free().\n   * @throws Error - Throws when JSON is malformed, fields are unknown, or native axis, parameter, or forward validation fails.\n   */\n  fromJson(json: JsonInput): VolCube;\n}",
-      "sha256": "7523763f1e3cf85b0065767cbe16547630b62ca0369be056e314360fe1ca7696"
+      "declaration": "/**\n * Data-only SABR volatility cube for swaption pricing.\n *\n * Stores calibrated parameter nodes and forwards on an expiry × tenor grid.\n * @example\n * ```typescript\n * import init, { core } from \"finstack-quant-wasm\";\n * await init();\n * const cube = new core.VolCube(\n *   \"USD-SWAPTION\",\n *   [1],\n *   [5],\n *   [{ alpha: 0.02, beta: 0.5, rho: -0.2, nu: 0.4 }],\n *   [0.03]\n * );\n * console.log(cube.id, cube.interpolationMode);\n * cube.free();\n * ```\n */\nexport interface VolCubeConstructor {\n  /**\n   * Construct a vol cube from SABR parameter nodes (Rust `VolCube::from_grid`).\n   *\n   * @returns A `VolCube` handle.\n   * @param id - Curve identifier.\n   * @param expiries - Option expiry axis in years (strictly increasing).\n   * @param tenors - Swap tenor axis in years (strictly increasing).\n   * @param paramsRowMajor - Row-major SABR nodes (expiry-major): an array of `{ alpha, beta, rho, nu, shift? }` objects (the `SabrParameterData` wire form) of length `expiries.length * tenors.length`; an omitted or `null` `shift` means an unshifted node. The `nu` component is nonnegative; zero gives deterministic volatility.\n   * @param forwardsRowMajor - Row-major forward rates, one per grid node.\n   * @param interpolationMode - Interpolation across the expiry axis: `\"vol\"` or `\"total_variance\"`; omitted keeps the Rust `VolCube::from_grid` default (`\"vol\"`).\n   * @throws Error - Throws a JavaScript exception if an axis is empty, non-finite, non-positive, or not strictly increasing; the parameter or forward array has the wrong length; a node has unknown fields; a forward is non-finite; any SABR node has invalid alpha, beta, rho, nu, or shift; or `interpolationMode` is neither `vol` nor `total_variance`.\n   */\n  new (\n    id: string,\n    expiries: NumericArray,\n    tenors: NumericArray,\n    paramsRowMajor: SabrParameterData[] | string,\n    forwardsRowMajor: NumericArray,\n    interpolationMode?: string\n  ): VolCube;\n  /**\n   * Deserialize a canonical SABR cube state without flattening parameter nodes.\n   *\n   * @example\n   * ```typescript\n   * import init, { core } from \"finstack-quant-wasm\";\n   * await init();\n   * const cube = core.VolCube.fromJson(\n   *   JSON.stringify({\n   *     id: \"USD-SWAPTION\",\n   *     expiries: [1],\n   *     tenors: [5],\n   *     params: [{ alpha: 0.03, beta: 0.5, rho: -0.2, nu: 0.4, shift: null }],\n   *     forwards: [0.03],\n   *     interpolation_mode: \"vol\",\n   *   })\n   * );\n   * console.log(cube.id);\n   * cube.free();\n   * ```\n   * @param json - Canonical VolCube JSON containing id, expiry and tenor axes in years, row-major SABR nodes and decimal-rate forwards, and interpolation_mode. Missing or null node shifts remain absent; unknown fields are rejected.\n   * @returns A validated VolCube handle owned by the caller; release it with free().\n   * @throws Error - Throws when JSON is malformed, fields are unknown, or native axis, parameter, or forward validation fails.\n   */\n  fromJson(json: JsonInput): VolCube;\n}",
+      "sha256": "a761137a98428621950f448677140a6cac9180f2153bf35807f2df5366b2e322"
     },
     {
       "name": "FxDeltaVolSurfaceConstructor",
       "source": "finstack-quant-wasm/index.d.ts",
-      "declaration": "/**\n * FX vol surface quoted in **delta space** (ATM, 25-delta RR/BF, optional\n * 10-delta wings).\n *\n * Stores market-standard FX delta quotes (Wystup 2006, Clark 2011). The delta\n * convention is **forward delta (premium-unadjusted)**.\n * @example\n * ```typescript\n * import init, { core } from \"finstack-quant-wasm\";\n * await init();\n * const surface = new core.FxDeltaVolSurface(\n *   \"EURUSD-VOL\",\n *   [1],\n *   [0.12],\n *   [0.01],\n *   [0.002]\n * );\n * console.log(surface.id, surface.numExpiries);\n * surface.free();\n * ```\n */\nexport interface FxDeltaVolSurfaceConstructor {\n  /**\n   * Construct an FX delta-quoted vol surface with 25-delta wings.\n   *\n   * Optional `rr10d` / `bf10d` add 10-delta wings for richer wing\n   * interpolation. Omit both (`undefined`/`null`) for a three-point smile;\n   * the Rust constructor rejects one without the other.\n   *\n   * @returns An `FxDeltaVolSurface` handle.\n   * @param id - Stable surface identifier.\n   * @param expiries - Strictly increasing positive expiry times (years).\n   * @param atmVols - ATM delta-neutral straddle vols per expiry.\n   * @param rr25d - 25-delta risk reversal per expiry (call vol − put vol).\n   * @param bf25d - 25-delta butterfly per expiry (wing avg − ATM).\n   * @param rr10d - Optional 10-delta risk reversal per expiry.\n   * @param bf10d - Optional 10-delta butterfly per expiry.\n   * @throws Error - Throws a JavaScript exception if `rr10d` and `bf10d` are not both present or both absent; quote arrays are empty or have mismatched lengths; expiries are not finite, positive, and strictly increasing; ATM vols are not finite and positive; or any risk reversal or butterfly is non-finite.\n   */\n  new (\n    id: string,\n    expiries: NumericArray,\n    atmVols: NumericArray,\n    rr25d: NumericArray,\n    bf25d: NumericArray,\n    rr10d?: NumericArray,\n    bf10d?: NumericArray\n  ): FxDeltaVolSurface;\n  /**\n   * Deserialize canonical FX delta quotes without reconstructing positional arrays.\n   *\n   * @example\n   * ```typescript\n   * import init, { core } from \"finstack-quant-wasm\";\n   * await init();\n   * const surface = core.FxDeltaVolSurface.fromJson(\n   *   JSON.stringify({\n   *     id: \"EURUSD\",\n   *     expiries: [1],\n   *     atm_vols: [0.12],\n   *     rr_25d: [0.01],\n   *     bf_25d: [0.002],\n   *     rr_10d: null,\n   *     bf_10d: null,\n   *   })\n   * );\n   * console.log(surface.id);\n   * surface.free();\n   * ```\n   * @param json - Canonical FxDeltaVolSurface JSON with expiries in years and annualized decimal ATM, risk-reversal, and butterfly quotes. Optional 10-delta wings must occur together; unknown fields are rejected.\n   * @returns A validated FxDeltaVolSurface handle owned by the caller; release it with free().\n   * @throws Error - Throws when JSON is malformed, fields are unknown, or native expiry, quote, or wing validation fails.\n   */\n  fromJson(json: JsonInput): FxDeltaVolSurface;\n}",
-      "sha256": "728ae0482b00654ded6d45c9e3c1ff256e6ce724643ef698e4ca25599f7a97a4"
+      "declaration": "/**\n * FX vol surface quoted in **delta space** (ATM, 25-delta RR/BF, optional\n * 10-delta wings).\n *\n * Stores market-standard FX delta quotes (Wystup 2006, Clark 2011). The delta\n * convention is **forward delta (premium-unadjusted)**.\n * @example\n * ```typescript\n * import init, { core } from \"finstack-quant-wasm\";\n * await init();\n * const surface = new core.FxDeltaVolSurface(\n *   \"EURUSD-VOL\",\n *   [1],\n *   [0.12],\n *   [0.01],\n *   [0.002]\n * );\n * console.log(surface.id, surface.expiries.length);\n * surface.free();\n * ```\n */\nexport interface FxDeltaVolSurfaceConstructor {\n  /**\n   * Construct an FX delta-quoted vol surface with 25-delta wings.\n   *\n   * Optional `rr10d` / `bf10d` add 10-delta wings for richer wing\n   * interpolation. Omit both (`undefined`/`null`) for a three-point smile;\n   * the Rust constructor rejects one without the other.\n   *\n   * @returns An `FxDeltaVolSurface` handle.\n   * @param id - Stable surface identifier.\n   * @param expiries - Strictly increasing positive expiry times (years).\n   * @param atmVols - ATM delta-neutral straddle vols per expiry.\n   * @param rr25d - 25-delta risk reversal per expiry (call vol − put vol).\n   * @param bf25d - 25-delta butterfly per expiry (wing avg − ATM).\n   * @param rr10d - Optional 10-delta risk reversal per expiry.\n   * @param bf10d - Optional 10-delta butterfly per expiry.\n   * @throws Error - Throws a JavaScript exception if `rr10d` and `bf10d` are not both present or both absent; quote arrays are empty or have mismatched lengths; expiries are not finite, positive, and strictly increasing; ATM vols are not finite and positive; or any risk reversal or butterfly is non-finite.\n   */\n  new (\n    id: string,\n    expiries: NumericArray,\n    atmVols: NumericArray,\n    rr25d: NumericArray,\n    bf25d: NumericArray,\n    rr10d?: NumericArray,\n    bf10d?: NumericArray\n  ): FxDeltaVolSurface;\n  /**\n   * Deserialize canonical FX delta quotes without reconstructing positional arrays.\n   *\n   * @example\n   * ```typescript\n   * import init, { core } from \"finstack-quant-wasm\";\n   * await init();\n   * const surface = core.FxDeltaVolSurface.fromJson(\n   *   JSON.stringify({\n   *     id: \"EURUSD\",\n   *     expiries: [1],\n   *     atm_vols: [0.12],\n   *     rr_25d: [0.01],\n   *     bf_25d: [0.002],\n   *     rr_10d: null,\n   *     bf_10d: null,\n   *   })\n   * );\n   * console.log(surface.id);\n   * surface.free();\n   * ```\n   * @param json - Canonical FxDeltaVolSurface JSON with expiries in years and annualized decimal ATM, risk-reversal, and butterfly quotes. Optional 10-delta wings must occur together; unknown fields are rejected.\n   * @returns A validated FxDeltaVolSurface handle owned by the caller; release it with free().\n   * @throws Error - Throws when JSON is malformed, fields are unknown, or native expiry, quote, or wing validation fails.\n   */\n  fromJson(json: JsonInput): FxDeltaVolSurface;\n}",
+      "sha256": "03202e93b1f2b5ddf54f934b5052661a0fbeeb802b911627ec957a248015e0f7"
     }
   ],
   "hostContract": {
     "source": "finstack-quant-wasm/schemas/host/1/valuation_result.schema.json",
-    "sha256": "91da98d63e0bd5ee3ff631e29958e056f92b060f87a8f20369504289ffe93d23"
+    "sha256": "b5edf19072b5cbe4a06711403dae1ce5df441b682583303c7bd24eef4627291a"
   },
   "details": [
     {

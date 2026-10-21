@@ -10,7 +10,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_fixed_income::bond::Bond;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     run_simulation, AssetPool, CoverageTestAction, CoverageTestSpec, DealType,
@@ -139,13 +139,13 @@ fn simulate(
     period: Option<ReinvestmentPeriod>,
     cdr: f64,
     tests: Vec<CoverageTestSpec>,
-) -> HashMap<String, TrancheCashflows> {
+) -> FxHashMap<String, TrancheCashflows> {
     let (deal, as_of) = clo(period, cdr, tests);
     let market = market(as_of);
     run_simulation(&deal, &market, as_of).expect("simulation")
 }
 
-fn principal_through(results: &HashMap<String, TrancheCashflows>, id: &str, date: Date) -> f64 {
+fn principal_through(results: &FxHashMap<String, TrancheCashflows>, id: &str, date: Date) -> f64 {
     results[id]
         .principal_flows
         .iter()
@@ -368,7 +368,7 @@ fn reinvest_action_routes_the_cure_into_the_window_budget() {
         breach <= window_end(),
         "the breach happens inside the window"
     );
-    let residual_on = |run: &HashMap<String, TrancheCashflows>| -> f64 {
+    let residual_on = |run: &FxHashMap<String, TrancheCashflows>| -> f64 {
         run["E"]
             .interest_flows
             .iter()

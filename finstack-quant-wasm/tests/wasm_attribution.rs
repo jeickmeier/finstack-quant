@@ -33,7 +33,7 @@ fn bond_json() -> String {
         .expect("instrument envelope JSON")
 }
 
-fn market_json(as_of: time::Date, rate: f64) -> String {
+fn market_json(as_of: finstack_quant_core::dates::Date, rate: f64) -> String {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
 

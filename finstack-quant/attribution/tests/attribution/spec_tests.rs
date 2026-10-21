@@ -23,7 +23,6 @@ fn empty_market_state() -> MarketContextState {
         inflation_indices: vec![],
         dividends: vec![],
         credit_indices: vec![],
-        collateral: BTreeMap::new(),
         fx_delta_vol_surfaces: vec![],
         hierarchy: None,
         vol_cubes: vec![],

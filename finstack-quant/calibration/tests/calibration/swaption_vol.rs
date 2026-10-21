@@ -22,9 +22,10 @@ use finstack_quant_core::dates::{
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::{OptionType, SettlementType, VolatilityModel};
 use finstack_quant_valuations_core::market::conventions::ids::SwaptionConventionId;
 use finstack_quant_valuations_rates::irs::{FixedLegSpec, FloatLegSpec};
@@ -159,7 +160,7 @@ fn swaption_vol_step_builds_and_inserts_surface() {
     let swpt_quotes = create_test_swaption_quotes();
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &swpt_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("swpt".to_string(), cal_utils::quote_set_ids(&swpt_quotes));
 
     let settings = CalibrationConfig {
@@ -187,7 +188,6 @@ fn swaption_vol_step_builds_and_inserts_surface() {
                 sabr_beta: 0.0,
                 target_expiries: vec![1.0],
                 target_tenors: vec![1.0, 5.0],
-                sabr_interpolation: Default::default(),
                 calendar_id: Some("weekends_only".to_string()),
                 fixed_day_count: None,
                 swap_index: Some("USD-SOFR-3M".into()),
@@ -251,7 +251,7 @@ fn calibrated_swaption_surface_is_not_silently_reused_as_strike_surface() {
     let swpt_quotes = create_test_swaption_quotes();
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &swpt_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("swpt".to_string(), cal_utils::quote_set_ids(&swpt_quotes));
 
     let plan = CalibrationPlan {
@@ -272,7 +272,6 @@ fn calibrated_swaption_surface_is_not_silently_reused_as_strike_surface() {
                 sabr_beta: 0.0,
                 target_expiries: vec![1.0],
                 target_tenors: vec![1.0, 5.0],
-                sabr_interpolation: Default::default(),
                 calendar_id: Some("weekends_only".to_string()),
                 fixed_day_count: None,
                 swap_index: Some("USD-SOFR-3M".into()),
@@ -368,7 +367,7 @@ fn swaption_vol_out_of_bounds_targets_error_by_default() {
     let swpt_quotes = create_test_swaption_quotes();
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &swpt_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("swpt".to_string(), cal_utils::quote_set_ids(&swpt_quotes));
 
     let plan = CalibrationPlan {
@@ -389,7 +388,6 @@ fn swaption_vol_out_of_bounds_targets_error_by_default() {
                 sabr_beta: 0.0,
                 target_expiries: vec![0.5],
                 target_tenors: vec![1.0, 5.0],
-                sabr_interpolation: Default::default(),
                 calendar_id: Some("weekends_only".to_string()),
                 fixed_day_count: None,
                 swap_index: Some("USD-SOFR-3M".into()),
@@ -425,7 +423,7 @@ fn swaption_vol_out_of_bounds_targets_can_clamp_when_configured() {
     let swpt_quotes = create_test_swaption_quotes();
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &swpt_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("swpt".to_string(), cal_utils::quote_set_ids(&swpt_quotes));
 
     let plan = CalibrationPlan {
@@ -446,7 +444,6 @@ fn swaption_vol_out_of_bounds_targets_can_clamp_when_configured() {
                 sabr_beta: 0.0,
                 target_expiries: vec![0.5, 1.0],
                 target_tenors: vec![1.0, 5.0],
-                sabr_interpolation: Default::default(),
                 calendar_id: Some("weekends_only".to_string()),
                 fixed_day_count: None,
                 swap_index: Some("USD-SOFR-3M".into()),
@@ -514,7 +511,7 @@ fn swaption_vol_settlement_lag_uses_canonical_tenor_axis() {
         }
         let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
         cal_utils::extend_market_data(&mut market_data, &swpt_quotes);
-        let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+        let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
         quote_sets.insert("swpt".to_string(), cal_utils::quote_set_ids(&swpt_quotes));
         let plan = CalibrationPlan {
             id: "settled-tenor".to_string(),
@@ -539,7 +536,6 @@ fn swaption_vol_settlement_lag_uses_canonical_tenor_axis() {
                     sabr_beta: 0.0,
                     target_expiries: vec![expiry_time],
                     target_tenors: vec![target_tenor],
-                    sabr_interpolation: Default::default(),
                     calendar_id: Some("weekends_only".to_string()),
                     fixed_day_count: Some(DayCount::Act365F),
                     swap_index: Some("USD-SOFR-3M".into()),
@@ -632,7 +628,6 @@ fn calibrate_flat_normal_cube(fixed_day_count: DayCount, tenor_years: i32) -> Ma
                     sabr_beta: 0.0,
                     target_expiries: vec![180.0 / 365.0, 360.0 / 365.0],
                     target_tenors: vec![f64::from(tenor_years)],
-                    sabr_interpolation: Default::default(),
                     calendar_id: Some("weekends_only".into()),
                     fixed_day_count: Some(fixed_day_count),
                     swap_index: Some("USD-SOFR-OIS".into()),

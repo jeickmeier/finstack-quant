@@ -239,7 +239,6 @@ pub struct DiscountedCashFlow {
     /// Currency for all cashflows.
     pub currency: Currency,
     /// Explicit period free cash flows (date, amount pairs).
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -250,7 +249,6 @@ pub struct DiscountedCashFlow {
     /// Terminal value specification.
     pub terminal_value: TerminalValueSpec,
     /// Valuation date (as-of date for the DCF).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -333,7 +331,6 @@ struct DiscountedCashFlowUnchecked {
     /// Currency for all cashflows.
     currency: Currency,
     /// Explicit period free cash flows (date, amount pairs).
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -344,7 +341,6 @@ struct DiscountedCashFlowUnchecked {
     /// Terminal value specification.
     terminal_value: TerminalValueSpec,
     /// Valuation date (as-of date for the DCF).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1131,9 +1127,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for DiscountedCashFlow {
             .map(|(date, amount)| Money::new(*amount, self.currency).map(|money| (*date, money)))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
-        Ok(finstack_quant_cashflows::schedule_from_dated_flows(
+        finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
-            finstack_quant_cashflows::primitives::CFKind::Fixed,
+            finstack_quant_core::cashflow::CFKind::Fixed,
             finstack_quant_core::dates::DayCount::Act365F,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 meta: finstack_quant_cashflows::builder::CashFlowMeta {
@@ -1143,7 +1139,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for DiscountedCashFlow {
                 },
                 ..Default::default()
             },
-        ))
+        )
     }
 }
 

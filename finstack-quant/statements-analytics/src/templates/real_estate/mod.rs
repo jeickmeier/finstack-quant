@@ -27,7 +27,7 @@
 //!   (`dscr`, `debt_yield`, `ltv`) that the caller must define.
 
 use finstack_quant_core::dates::PeriodId;
-use finstack_quant_statements::builder::{ModelBuilder, Ready};
+use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::types::AmountOrScalar;
 
@@ -122,13 +122,13 @@ fn sum_expr_or_zero(nodes: &[&str]) -> String {
 /// # }
 /// ```
 pub fn add_noi_buildup(
-    builder: ModelBuilder<Ready>,
+    builder: ModelBuilder,
     total_revenue_node: &str,
     revenue_nodes: &[&str],
     total_expenses_node: &str,
     expense_nodes: &[&str],
     noi_node: &str,
-) -> Result<ModelBuilder<Ready>> {
+) -> Result<ModelBuilder> {
     let total_rev_expr = sum_expr(revenue_nodes)?;
     let total_exp_expr = sum_expr(expense_nodes)?;
 
@@ -187,11 +187,11 @@ pub fn add_noi_buildup(
 /// # }
 /// ```
 pub fn add_ncf_buildup(
-    builder: ModelBuilder<Ready>,
+    builder: ModelBuilder,
     noi_node: &str,
     capex_nodes: &[&str],
     ncf_node: &str,
-) -> Result<ModelBuilder<Ready>> {
+) -> Result<ModelBuilder> {
     if capex_nodes.is_empty() {
         return builder.compute(ncf_node, noi_node);
     }
@@ -561,10 +561,10 @@ fn apply_free_window(is_free: &mut [bool], start_idx: usize, len: u32) -> Result
 /// # }
 /// ```
 pub fn add_rent_roll(
-    mut builder: ModelBuilder<Ready>,
+    mut builder: ModelBuilder,
     leases: &[LeaseSpec],
     nodes: &RentRollOutputNodes,
-) -> Result<ModelBuilder<Ready>> {
+) -> Result<ModelBuilder> {
     if leases.is_empty() {
         return Err(Error::build("add_rent_roll: expected at least one lease"));
     }
@@ -986,14 +986,14 @@ impl Default for PropertyTemplateNodes {
 /// # }
 /// ```
 pub fn add_property_operating_statement(
-    mut builder: ModelBuilder<Ready>,
+    mut builder: ModelBuilder,
     leases: &[LeaseSpec],
     other_income_nodes: &[&str],
     opex_nodes: &[&str],
     capex_nodes: &[&str],
     management_fee: Option<ManagementFeeSpec>,
     nodes: &PropertyTemplateNodes,
-) -> Result<ModelBuilder<Ready>> {
+) -> Result<ModelBuilder> {
     builder = add_rent_roll(builder, leases, &nodes.rent_roll)?;
 
     // Other income total (optional).

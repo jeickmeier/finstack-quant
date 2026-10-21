@@ -14,7 +14,7 @@
 //! - `FACTOR_TOLERANCE` (1e-12): For year fractions
 //! - `financial_tolerance(notional)`: For money amounts
 
-use crate::cashflows::helpers::financial_tolerance;
+use crate::helpers::financial_tolerance;
 use finstack_quant_cashflows::builder::{AmortizationSpec, CashFlowSchedule, PrincipalExchange};
 use finstack_quant_cashflows::builder::{
     CouponType, FeeSpec, FixedCouponSpec, FloatingCouponSpec, FloatingRateFallback,
@@ -341,8 +341,8 @@ fn ordering_invariants_within_date() {
     let s = b.build(None).unwrap();
 
     // Same-date order: Fixed/Stub -> Amortization -> PIK -> Notional
-    let mut by_date: finstack_quant_core::HashMap<Date, Vec<CFKind>> =
-        finstack_quant_core::HashMap::default();
+    let mut by_date: finstack_quant_core::FxHashMap<Date, Vec<CFKind>> =
+        finstack_quant_core::FxHashMap::default();
     for cf in s.get_flows() {
         by_date.entry(cf.date).or_default().push(cf.kind);
     }
@@ -403,7 +403,12 @@ fn fixed_schedule_npv_equals_sum_cashflows() {
         .build()
         .unwrap();
 
-    let pv = schedule.npv(&curve, curve.base_date()).unwrap();
+    let pv = finstack_quant_core::cashflow::npv(
+        &curve,
+        curve.base_date(),
+        &schedule.dated_flows().unwrap(),
+    )
+    .unwrap();
 
     let expected = schedule
         .get_flows()
@@ -1207,9 +1212,24 @@ fn npv_decreases_with_higher_discount_rate() {
     let curve_5pct = build_curve(0.05);
     let curve_7pct = build_curve(0.07);
 
-    let npv_3pct = schedule.npv(&curve_3pct, curve_3pct.base_date()).unwrap();
-    let npv_5pct = schedule.npv(&curve_5pct, curve_5pct.base_date()).unwrap();
-    let npv_7pct = schedule.npv(&curve_7pct, curve_7pct.base_date()).unwrap();
+    let npv_3pct = finstack_quant_core::cashflow::npv(
+        &curve_3pct,
+        curve_3pct.base_date(),
+        &schedule.dated_flows().unwrap(),
+    )
+    .unwrap();
+    let npv_5pct = finstack_quant_core::cashflow::npv(
+        &curve_5pct,
+        curve_5pct.base_date(),
+        &schedule.dated_flows().unwrap(),
+    )
+    .unwrap();
+    let npv_7pct = finstack_quant_core::cashflow::npv(
+        &curve_7pct,
+        curve_7pct.base_date(),
+        &schedule.dated_flows().unwrap(),
+    )
+    .unwrap();
 
     // Monotonicity: higher discount rate = lower NPV
     assert!(

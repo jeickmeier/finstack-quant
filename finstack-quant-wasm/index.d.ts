@@ -246,7 +246,6 @@ import type {
   FactorPnlProfile,
   FiAttributionResult,
   FiCarinoLinkedResult,
-  FiReconciliationReport,
   GridAttributionResult,
   GridCarinoLinkedResult,
   LinkedReturn,
@@ -262,7 +261,6 @@ import type {
   PositionSpec,
   ReconciliationReport,
   ScenarioPnlBatchItem,
-  ScenarioPnlView,
   SensitivityMatrixJson,
   StressPnl,
   StressResult,
@@ -481,7 +479,6 @@ export type {
   FactorPnlProfile,
   FiAttributionResult,
   FiCarinoLinkedResult,
-  FiReconciliationReport,
   GridAttributionResult,
   GridCarinoLinkedResult,
   LinkedReturn,
@@ -497,7 +494,6 @@ export type {
   PositionSpec,
   ReconciliationReport,
   ScenarioPnlBatchItem,
-  ScenarioPnlView,
   SensitivityMatrixJson,
   StressPnl,
   StressResult,
@@ -660,10 +656,9 @@ export type ReplayStep = WithFields<
 export type ReplayResult = WithFields<generated.portfolio.ReplayResult, { steps: ReplayStep[] }>;
 
 /**
- * Solution of a portfolio optimization problem (Rust `PortfolioOptimizationResult`, serialized
- * through its `PortfolioOptimizationResultWire` form).
+ * Solution of a portfolio optimization problem (Rust `PortfolioOptimizationResult`).
  */
-export type PortfolioOptimizationResult = generated.portfolio.PortfolioOptimizationResultWire;
+export type PortfolioOptimizationResult = generated.portfolio.PortfolioOptimizationResult;
 
 /**
  * A dated amount (Rust `DatedFlowJson`); in `CashFlowSchedule.outstandingByDate`
@@ -799,7 +794,6 @@ export type {
   PeriodDecomposition,
   Portfolio,
   PortfolioBuilder,
-  PortfolioMarginAggregator,
 };
 
 // --- core -----------------------------------------------------------------
@@ -880,12 +874,6 @@ interface Portfolio extends WasmOwned {}
  * calls.
  */
 interface FactorModel extends WasmOwned {}
-/**
- * Portfolio margin aggregator built once from a `Portfolio` and reused across
- * market snapshots; `calculate` returns netting-set initial and variation
- * margin as a plain `PortfolioMarginResult`.
- */
-interface PortfolioMarginAggregator extends WasmOwned {}
 
 /**
  * ISO-4217 currency code wrapper for JavaScript.
@@ -2172,9 +2160,9 @@ export interface MoneyConstructor {
   /**
    * A zero amount in a currency.
    *
+   * @throws If the amount cannot be constructed (not expected for zero).
    * @param currency - ISO-4217 `Currency` object that tags the amount.
    * @returns `Money` with amount `0` in `currency`.
-   * @throws If the amount cannot be constructed (not expected for zero).
    */
   zero(currency: Currency): Money;
 }
@@ -2313,10 +2301,11 @@ export interface RateConstructor {
   /**
    * Create a rate from a whole number of basis points.
    *
-   * Delegates to Rust `Rate::try_from_bp`, which rejects fractional input
-   * rather than silently rounding it: a sub-bp rate quietly rounded to
-   * whole bp is a pricing bug, not a convenience. Use `new Rate(decimal)`,
-   * `Rate.fromPercent`, or `Rate.parse("62.5bp")` for sub-bp rates.
+   * Delegates to Rust `Rate::from_bp` (the twin of Python `Rate.from_bp`).
+   * Fractional input is rejected rather than silently rounded: a sub-bp
+   * rate quietly rounded to whole bp is a pricing bug, not a convenience.
+   * Use `new Rate(decimal)`, `Rate.fromPercent`, or `Rate.parse("62.5bp")`
+   * for sub-bp rates.
    *
    * @example
    * ```javascript
@@ -2325,7 +2314,7 @@ export interface RateConstructor {
    * ```
    * @param bp - Rate in whole basis points (e.g. `500` for 5%).
    * @returns The constructed `Rate`.
-   * @throws If `bp` is non-finite or not a whole number of basis points.
+   * @throws `TypeError` (kind `invalid_type`) if `bp` is not a whole number in the `i32` range.
    */
   fromBp(bp: number): Rate;
   /**
@@ -2398,7 +2387,7 @@ export interface Bps extends WasmOwned {
    * @returns A new `Bps` with the sign removed.
    * @throws `FinstackError` (kind `validation`) when the quote is `-2147483648` bp, whose absolute value has no 32-bit representation.
    */
-  abs(): Bps;
+  checkedAbs(): Bps;
   /**
    * Whether the value is exactly zero.
    *
@@ -2751,9 +2740,9 @@ export interface DayCountContextConstructor {
   /**
    * Deserialize from the canonical JSON wire form produced by `toJson`.
    *
-   * @param json - Canonical DayCountContext JSON text or plain object; unknown fields are rejected. As in Rust and Python, the coupon period is validated when the context is used (`DayCountContextState::to_ctx`).
+   * @param json - Canonical DayCountContext JSON text or plain object; unknown fields are rejected. As in Rust and Python, it is validated on load by `DayCountContextState::try_new`.
    * @returns The parsed `DayCountContext`.
-   * @throws If `json` is malformed or has unknown or mistyped fields.
+   * @throws `FinstackError` (kind `validation`) if `json` is malformed, has unknown or mistyped fields, an inverted coupon period or a zero business-day basis.
    */
   fromJson(json: JsonInput): DayCountContext;
 }
@@ -2952,6 +2941,12 @@ export interface TenorConstructor {
 }
 
 /**
+ * 30/360 day-count variant label accepted by `core.days30360` (Rust
+ * `Thirty360Convention`; parsing is ASCII case-insensitive).
+ */
+export type Thirty360Convention = 'us_sia' | 'isda' | 'european' | 'italian';
+
+/**
  * Discount-curve validation policy: market-standard or negative-rate-friendly.
  */
 export type DiscountCurveValidationMode = 'market_standard' | 'negative_rate_friendly';
@@ -3021,7 +3016,7 @@ export interface DiscountCurveOptions {
  *   dayCount: "act_365f",
  * });
  * curve.df(2.5);          // discount factor at 2.5y
- * curve.zero(2.5);        // continuously-compounded zero rate at 2.5y
+ * curve.zeroRate(2.5);    // continuously-compounded zero rate at 2.5y
  * ```
  */
 export interface DiscountCurve extends WasmOwned {
@@ -3040,13 +3035,6 @@ export interface DiscountCurve extends WasmOwned {
    * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
    */
   df(t: number | string): number;
-  /**
-   * Continuously-compounded zero rate at year fraction or ISO date `t`.
-   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
-   * @returns The continuously-compounded zero rate as a decimal.
-   * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
-   */
-  zero(t: number | string): number;
   /**
    * Continuously-compounded forward rate between `t1` and `t2`.
    * @returns Continuously compounded forward rate as a decimal over `(t1, t2)`.
@@ -3153,7 +3141,7 @@ export interface DiscountCurve extends WasmOwned {
  *   dayCount: "act_365f",
  * });
  * curve.df(2.5);          // discount factor at 2.5y
- * curve.zero(2.5);        // continuously-compounded zero rate at 2.5y
+ * curve.zeroRate(2.5);    // continuously-compounded zero rate at 2.5y
  * ```
  */
 export interface DiscountCurveConstructor {
@@ -3501,7 +3489,7 @@ export interface ForwardCurve extends WasmOwned {
    * accrual growth to the contractual index basis before calculating a coupon
    * with a different accrual convention. Rust instrument pricing performs this
    * conversion from the contractual schedule.
-   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
+   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count; a date on or before the base date reads the rate at curve time zero).
    * @returns Simple forward rate as a decimal, annualized on the curve day count.
    * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
    */
@@ -3739,7 +3727,7 @@ export interface VolCube extends WasmOwned {
  *   "USD-SWAPTION",
  *   [1],
  *   [5],
- *   [0.02, 0.5, -0.2, 0.4, Number.NaN],
+ *   [{ alpha: 0.02, beta: 0.5, rho: -0.2, nu: 0.4 }],
  *   [0.03]
  * );
  * console.log(cube.id, cube.interpolationMode);
@@ -3748,23 +3736,23 @@ export interface VolCube extends WasmOwned {
  */
 export interface VolCubeConstructor {
   /**
-   * Construct a vol cube from a flat SABR parameter array.
+   * Construct a vol cube from SABR parameter nodes (Rust `VolCube::from_grid`).
    *
    * @returns A `VolCube` handle.
    * @param id - Curve identifier.
    * @param expiries - Option expiry axis in years (strictly increasing).
    * @param tenors - Swap tenor axis in years (strictly increasing).
-   * @param paramsFlat - Row-major SABR parameters: either a flat array `[alpha0, beta0, rho0, nu0, shift0, alpha1, …]` of length `expiries.len() * tenors.len() * 5` (pass `NaN` for `shift` to omit it), or an array of `{ alpha, beta, rho, nu, shift? }` objects of length `expiries.len() * tenors.len()`. The `nu` component is nonnegative; zero gives deterministic volatility.
-   * @param forwards - Row-major forward rates, one per grid node.
+   * @param paramsRowMajor - Row-major SABR nodes (expiry-major): an array of `{ alpha, beta, rho, nu, shift? }` objects (the `SabrParameterData` wire form) of length `expiries.length * tenors.length`; an omitted or `null` `shift` means an unshifted node. The `nu` component is nonnegative; zero gives deterministic volatility.
+   * @param forwardsRowMajor - Row-major forward rates, one per grid node.
    * @param interpolationMode - Interpolation across the expiry axis: `"vol"` or `"total_variance"`; omitted keeps the Rust `VolCube::from_grid` default (`"vol"`).
-   * @throws Error - Throws a JavaScript exception if an axis is empty, non-finite, non-positive, or not strictly increasing; the parameter or forward array has the wrong length or its grid-size product overflows; a forward is non-finite; any SABR node has invalid alpha, beta, rho, nu, or shift; or `interpolationMode` is neither `vol` nor `total_variance`.
+   * @throws Error - Throws a JavaScript exception if an axis is empty, non-finite, non-positive, or not strictly increasing; the parameter or forward array has the wrong length; a node has unknown fields; a forward is non-finite; any SABR node has invalid alpha, beta, rho, nu, or shift; or `interpolationMode` is neither `vol` nor `total_variance`.
    */
   new (
     id: string,
     expiries: NumericArray,
     tenors: NumericArray,
-    paramsFlat: NumericArray,
-    forwards: NumericArray,
+    paramsRowMajor: SabrParameterData[] | string,
+    forwardsRowMajor: NumericArray,
     interpolationMode?: string
   ): VolCube;
   /**
@@ -3817,7 +3805,13 @@ export interface FxConversionPolicy extends WasmOwned {
  */
 export interface FxConversionPolicyConstructor {
   /**
-   * JavaScript prototype of `FxConversionPolicy`; instances come from the static factories, not `new`.
+   * The Rust default policy (`FxConversionPolicy::default()`, cashflow date).
+   *
+   * @returns The default conversion policy, the one `FxMatrix.rate` uses when `policy` is omitted.
+   */
+  new (): FxConversionPolicy;
+  /**
+   * JavaScript prototype of `FxConversionPolicy`.
    */
   readonly prototype: FxConversionPolicy;
   /**
@@ -3896,6 +3890,61 @@ export interface FxRateResultConstructor {
    * @throws If `json` is malformed or has unknown or missing fields.
    */
   fromJson(json: JsonInput): FxRateResult;
+}
+
+/**
+ * Result of `MarketContext.convertMoney` (Rust `ConvertedMoney`): the
+ * converted amount and the FX rate lookup it used.
+ */
+export interface ConvertedMoney extends WasmOwned {
+  /**
+   * The amount in the target currency.
+   * @returns The converted `Money`.
+   */
+  readonly amount: Money;
+  /**
+   * The FX rate lookup behind the conversion; `undefined` for a same-currency input.
+   * @returns The applied `FxRateResult`, or `undefined` for a same-currency input.
+   */
+  readonly rate: FxRateResult | undefined;
+  /**
+   * Serialize to the canonical JSON wire form shared with Python `ConvertedMoney.to_json`.
+   *
+   * @returns Compact JSON text with `amount` and `rate`.
+   * @throws If serialization fails (not expected for a valid result).
+   */
+  toJson(): string;
+}
+
+/**
+ * `ConvertedMoney` has no public constructor; instances come from
+ * `MarketContext.convertMoney` or `ConvertedMoney.fromJson`.
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const fx = new core.FxMatrix();
+ * fx.setQuote("EUR", "USD", 1.1);
+ * const market = new core.MarketContext();
+ * market.insertFx(fx);
+ * const usd = new core.Currency("USD");
+ * const converted = market.convertMoney(new core.Money(100, new core.Currency("EUR")), usd, "2025-01-02");
+ * console.log(converted.amount.amount, converted.rate?.triangulated);
+ * ```
+ */
+export interface ConvertedMoneyConstructor {
+  /**
+   * JavaScript prototype of `ConvertedMoney`; instances come from `MarketContext.convertMoney`, not `new`.
+   */
+  readonly prototype: ConvertedMoney;
+  /**
+   * Deserialize from the canonical JSON wire form produced by `toJson`.
+   *
+   * @param json - Canonical ConvertedMoney JSON text or plain object; unknown fields are rejected.
+   * @returns The parsed `ConvertedMoney`.
+   * @throws `FinstackError` (kind `validation`) if `json` is malformed or has unknown or missing fields.
+   */
+  fromJson(json: JsonInput): ConvertedMoney;
 }
 
 /**
@@ -4104,10 +4153,6 @@ export interface FxDeltaVolSurface extends WasmOwned {
    */
   readonly expiries: Float64Array;
   /**
-   * Number of expiry pillars.
-   */
-  readonly numExpiries: number;
-  /**
    * ATM delta-neutral straddle vols per expiry (decimals).
    */
   readonly atmVols: Float64Array;
@@ -4153,7 +4198,7 @@ export interface FxDeltaVolSurface extends WasmOwned {
  *   [0.01],
  *   [0.002]
  * );
- * console.log(surface.id, surface.numExpiries);
+ * console.log(surface.id, surface.expiries.length);
  * surface.free();
  * ```
  */
@@ -4274,7 +4319,7 @@ export interface MarketContext extends WasmOwned {
    * @param value - Finite scalar value: an index level, a spot price, a recovery assumption and so on.
    * @param currency - ISO-4217 code that makes the scalar a monetary price; omitted stores a unitless number.
    * @returns This context, updated in place, so calls can be chained.
-   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an unknown currency or a value that is not finite (Rust `MarketScalar::unitless` / `Money::new`).
+   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an unknown currency or a value that is not finite (Rust `MarketScalar::from_parts`).
    */
   insertPrice(id: string, value: number, currency?: string | null): MarketContext;
   /**
@@ -4301,16 +4346,6 @@ export interface MarketContext extends WasmOwned {
    * @returns This context, updated in place, so calls can be chained.
    */
   insertInflationIndex(index: InflationIndex): MarketContext;
-  /**
-   * Map a CSA code to the discount curve used for collateralised trades
-   * (Rust `MarketContext::map_collateral_mut`).
-   *
-   * @param csaCode - Credit-support-annex code, such as `"USD-CSA"`.
-   * @param discountId - Identifier of the discount curve to use for that CSA; it is resolved when a collateral curve is requested.
-   * @returns This context, updated in place, so calls can be chained.
-   * @throws `TypeError` if an argument is not a string.
-   */
-  mapCollateral(csaCode: string, discountId: string): MarketContext;
   /**
    * Look up a discount curve by id (Rust `MarketContext::get_discount`).
    *
@@ -4437,10 +4472,10 @@ export interface MarketContext extends WasmOwned {
    * @param amount - Monetary amount to convert.
    * @param targetCurrency - Destination `Currency` object; an amount already in it is returned unchanged.
    * @param asOf - ISO-8601 date of the FX rate lookup.
-   * @returns The converted `Money` in `targetCurrency`.
+   * @returns A `ConvertedMoney` holding the converted `amount` in `targetCurrency` and the applied FX `rate` lookup (`undefined` for a same-currency input), whose `triangulated` flag records a pivot-derived rate.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `not_found`) if no FX matrix is attached or the pair has no rate, or kind `validation` for a malformed date.
    */
-  convertMoney(amount: Money, targetCurrency: Currency, asOf: string): Money;
+  convertMoney(amount: Money, targetCurrency: Currency, asOf: string): ConvertedMoney;
   /**
    * Whether any market data is stored under an id (Rust `MarketContext::contains`).
    *
@@ -4470,7 +4505,7 @@ export interface MarketContext extends WasmOwned {
   /**
    * Counts of the stored market data (Rust `MarketContext::stats`).
    *
-   * @returns A plain object with `curve_counts` (count per curve type), `total_curves`, `has_fx`, `surface_count`, `vol_cube_count`, `price_count`, `series_count`, `inflation_index_count`, `credit_index_count`, `dividend_schedule_count`, `fx_delta_vol_surface_count` and `collateral_mapping_count`.
+   * @returns A plain object with `curve_counts` (count per curve type), `total_curves`, `has_fx`, `surface_count`, `vol_cube_count`, `price_count`, `series_count`, `inflation_index_count`, `credit_index_count`, `dividend_schedule_count` and `fx_delta_vol_surface_count`.
    * @throws If the counts cannot be converted (not expected).
    */
   stats(): ContextStats;
@@ -4526,98 +4561,6 @@ export interface MarketContextConstructor {
 }
 
 /**
- * Business-day adjustment convention (ISDA 2006 Definitions, Section 4.12).
- *
- * Each static factory is one Rust `BusinessDayConvention` variant;
- * `toString()` is the canonical snake_case name that `adjust`,
- * `ScheduleBuilder.adjustWith` and the JSON wire format accept.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * const convention = core.BusinessDayConvention.modifiedFollowing();
- * convention.toString(); // "modified_following"
- * core.BusinessDayConvention.fromName("following").toString(); // "following"
- * ```
- */
-export interface BusinessDayConvention extends WasmOwned {
-  /**
-   * Canonical snake_case name of the convention.
-   *
-   * @returns The name accepted by `fromName` and the JSON wire format.
-   */
-  toString(): string;
-}
-
-/**
- * Business-day adjustment convention (ISDA 2006 Definitions, Section 4.12).
- *
- * Each static factory is one Rust `BusinessDayConvention` variant;
- * `toString()` is the canonical snake_case name that `adjust`,
- * `ScheduleBuilder.adjustWith` and the JSON wire format accept.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * const convention = core.BusinessDayConvention.modifiedFollowing();
- * convention.toString(); // "modified_following"
- * core.BusinessDayConvention.fromName("following").toString(); // "following"
- * ```
- */
-export interface BusinessDayConventionConstructor {
-  /**
-   * JavaScript prototype of `BusinessDayConvention`; instances come from the static factories, not `new`.
-   */
-  readonly prototype: BusinessDayConvention;
-  /**
-   * Leave the date unchanged even when it is not a business day.
-   *
-   * @returns The `unadjusted` convention.
-   */
-  unadjusted(): BusinessDayConvention;
-  /**
-   * Roll forward to the next business day.
-   *
-   * @returns The `following` convention.
-   */
-  following(): BusinessDayConvention;
-  /**
-   * Roll forward unless that crosses a month end, then roll backward.
-   *
-   * @returns The `modified_following` convention (the Rust default).
-   */
-  modifiedFollowing(): BusinessDayConvention;
-  /**
-   * Roll backward to the previous business day.
-   *
-   * @returns The `preceding` convention.
-   */
-  preceding(): BusinessDayConvention;
-  /**
-   * Roll backward unless that crosses a month start, then roll forward.
-   *
-   * @returns The `modified_preceding` convention.
-   */
-  modifiedPreceding(): BusinessDayConvention;
-  /**
-   * Roll to the nearest business day (forward on a tie).
-   *
-   * @returns The `nearest` convention.
-   */
-  nearest(): BusinessDayConvention;
-  /**
-   * Parse a convention name (Rust `BusinessDayConvention::from_str`).
-   *
-   * @param name - Convention name such as `"following"`, `"modified_following"` or `"preceding"`; case and `-`/space separators are normalised by the Rust parser.
-   * @returns The matching `BusinessDayConvention`.
-   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no convention matches.
-   */
-  fromName(name: string): BusinessDayConvention;
-}
-
-/**
  * Identifier, display name and weekend rule of a built-in holiday calendar
  * (the Rust `CalendarMetadata`), as returned by `HolidayCalendar.metadata`.
  */
@@ -4634,10 +4577,6 @@ export interface CalendarMetadata {
    * Whether weekends are ignored when classifying holidays.
    */
   ignore_weekends: boolean;
-  /**
-   * Weekend convention of the calendar, such as `"saturday_sunday"`.
-   */
-  weekend_rule: string;
 }
 
 /**
@@ -4654,21 +4593,17 @@ export interface CalendarMetadata {
  * const calendar = new core.HolidayCalendar("nyse");
  * calendar.isHoliday(core.createDate(2025, 1, 1)); // true
  * calendar.isBusinessDay(core.createDate(2025, 1, 6)); // true
- * calendar.code; // "nyse"
+ * calendar.toString(); // "nyse"
  * ```
  */
 export interface HolidayCalendar extends WasmOwned {
   /**
    * Calendar metadata, or `undefined` for union calendars.
    *
-   * A plain `CalendarMetadata` object with `id`, `name`,
-   * `ignore_weekends` and `weekend_rule`.
+   * A plain `CalendarMetadata` object with `id`, `name` and
+   * `ignore_weekends`.
    */
   readonly metadata: CalendarMetadata | undefined;
-  /**
-   * Canonical calendar id: the registry id, or the sorted `a+b` union form.
-   */
-  readonly code: string;
   /**
    * Whether a date is a holiday on this calendar.
    *
@@ -4716,7 +4651,7 @@ export interface HolidayCalendar extends WasmOwned {
  * const calendar = new core.HolidayCalendar("nyse");
  * calendar.isHoliday(core.createDate(2025, 1, 1)); // true
  * calendar.isBusinessDay(core.createDate(2025, 1, 6)); // true
- * calendar.code; // "nyse"
+ * calendar.toString(); // "nyse"
  * ```
  */
 export interface HolidayCalendarConstructor {
@@ -4750,10 +4685,6 @@ export interface PeriodKind extends WasmOwned {
    * Number of periods per year (daily uses the 252 trading-day convention).
    */
   readonly periodsPerYear: number;
-  /**
-   * Factor that scales per-period statistics to annual ones (`periodsPerYear` as a float).
-   */
-  readonly annualizationFactor: number;
   /**
    * Observation date one frequency step before `first` (Rust
    * `PeriodKind::prior_observation_date`).
@@ -4845,16 +4776,12 @@ export interface PeriodKindConstructor {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const q1 = core.PeriodId.quarter(2025, 1);
- * q1.code; // "2025Q1"
- * q1.next().code; // "2025Q2"
- * core.PeriodId.parse("2025M12").next().code; // "2026M01"
+ * q1.toString(); // "2025Q1"
+ * q1.shift(1).toString(); // "2025Q2"
+ * core.PeriodId.parse("2025M12").shift(1).toString(); // "2026M01"
  * ```
  */
 export interface PeriodId extends WasmOwned {
-  /**
-   * Period code, such as `"2025Q1"` (the text `parse` accepts).
-   */
-  readonly code: string;
   /**
    * Calendar (or fiscal) year of the period.
    */
@@ -4872,19 +4799,13 @@ export interface PeriodId extends WasmOwned {
    */
   readonly isFiscal: boolean;
   /**
-   * Step forward to the next period (Rust `PeriodId::next`).
+   * Move by a signed number of periods of the same kind and calendar (Rust `PeriodId::shift`).
    *
-   * @returns The following `PeriodId`, rolling the year where needed.
-   * @throws `FinstackError` (kind `validation`) when the year would overflow, or for a fiscal daily identifier at day 365, whose next day depends on the fiscal calendar (use `nextFiscal`).
+   * @param periods - Whole number of periods to move; negative moves back and `0` returns the identifier unchanged.
+   * @returns The `PeriodId` `periods` steps away, rolling the year where needed.
+   * @throws `TypeError` (kind `invalid_type`) when `periods` is not a whole number; `FinstackError` (kind `validation`) when the year would overflow, or for a fiscal daily identifier that would leave days `1..=365`, whose length depends on the fiscal calendar (use `nextFiscal` / `prevFiscal`).
    */
-  next(): PeriodId;
-  /**
-   * Step back to the previous period (Rust `PeriodId::prev`).
-   *
-   * @returns The preceding `PeriodId`, rolling the year where needed.
-   * @throws `FinstackError` (kind `validation`) when the year would overflow, or for a fiscal daily identifier at day 1, whose previous day depends on the fiscal calendar (use `prevFiscal`).
-   */
-  prev(): PeriodId;
+  shift(periods: number): PeriodId;
   /**
    * Step forward to the next fiscal period (Rust `PeriodId::next_fiscal`).
    *
@@ -4917,9 +4838,9 @@ export interface PeriodId extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const q1 = core.PeriodId.quarter(2025, 1);
- * q1.code; // "2025Q1"
- * q1.next().code; // "2025Q2"
- * core.PeriodId.parse("2025M12").next().code; // "2026M01"
+ * q1.toString(); // "2025Q1"
+ * q1.shift(1).toString(); // "2025Q2"
+ * core.PeriodId.parse("2025M12").shift(1).toString(); // "2026M01"
  * ```
  */
 export interface PeriodIdConstructor {
@@ -5068,147 +4989,6 @@ export interface FiscalConfigConstructor {
 }
 
 /**
- * Stub convention: where an irregular first or last accrual period goes.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * core.StubKind.shortFront().toString(); // "short_front"
- * core.StubKind.fromName("long_back").toString(); // "long_back"
- * ```
- */
-export interface StubKind extends WasmOwned {
-  /**
-   * Canonical snake_case name of the stub rule.
-   *
-   * @returns The name accepted by `fromName` and the JSON wire format.
-   */
-  toString(): string;
-}
-
-/**
- * Stub convention: where an irregular first or last accrual period goes.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * core.StubKind.shortFront().toString(); // "short_front"
- * core.StubKind.fromName("long_back").toString(); // "long_back"
- * ```
- */
-export interface StubKindConstructor {
-  /**
-   * JavaScript prototype of `StubKind`; instances come from the static factories, not `new`.
-   */
-  readonly prototype: StubKind;
-  /**
-   * No stub: the range must divide evenly into the frequency.
-   *
-   * @returns The `none` stub rule (the Rust default).
-   */
-  none(): StubKind;
-  /**
-   * A short irregular period at the start of the schedule.
-   *
-   * @returns The `short_front` stub rule.
-   */
-  shortFront(): StubKind;
-  /**
-   * A short irregular period at the end of the schedule.
-   *
-   * @returns The `short_back` stub rule.
-   */
-  shortBack(): StubKind;
-  /**
-   * A long irregular period at the start of the schedule.
-   *
-   * @returns The `long_front` stub rule.
-   */
-  longFront(): StubKind;
-  /**
-   * A long irregular period at the end of the schedule.
-   *
-   * @returns The `long_back` stub rule.
-   */
-  longBack(): StubKind;
-  /**
-   * Parse a stub rule name (Rust `StubKind::from_str`).
-   *
-   * @param name - Stub name: `"none"`, `"short_front"`, `"short_back"`, `"long_front"` or `"long_back"`.
-   * @returns The matching `StubKind`.
-   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no stub rule matches.
-   */
-  fromName(name: string): StubKind;
-}
-
-/**
- * Policy for recoverable schedule-construction errors.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * core.ScheduleErrorPolicy.strict().toString(); // "strict"
- * core.ScheduleErrorPolicy.fromName("graceful_empty").toString(); // "graceful_empty"
- * ```
- */
-export interface ScheduleErrorPolicy extends WasmOwned {
-  /**
-   * Canonical snake_case name of the policy.
-   *
-   * @returns The name accepted by `fromName` and the JSON wire format.
-   * @throws If the label cannot be produced (not expected).
-   */
-  toString(): string;
-}
-
-/**
- * Policy for recoverable schedule-construction errors.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * core.ScheduleErrorPolicy.strict().toString(); // "strict"
- * core.ScheduleErrorPolicy.fromName("graceful_empty").toString(); // "graceful_empty"
- * ```
- */
-export interface ScheduleErrorPolicyConstructor {
-  /**
-   * JavaScript prototype of `ScheduleErrorPolicy`; instances come from the static factories, not `new`.
-   */
-  readonly prototype: ScheduleErrorPolicy;
-  /**
-   * Fail on any construction error, including an unknown calendar.
-   *
-   * @returns The `strict` policy (the Rust default).
-   */
-  strict(): ScheduleErrorPolicy;
-  /**
-   * Build an unadjusted schedule carrying a warning when the calendar is unknown.
-   *
-   * @returns The `missing_calendar_warning` policy.
-   */
-  missingCalendarWarning(): ScheduleErrorPolicy;
-  /**
-   * Return an empty schedule carrying a warning instead of a recoverable error.
-   *
-   * @returns The `graceful_empty` policy.
-   */
-  gracefulEmpty(): ScheduleErrorPolicy;
-  /**
-   * Parse a policy name (the Rust serde label).
-   *
-   * @param name - Policy name: `"strict"`, `"missing_calendar_warning"` or `"graceful_empty"`.
-   * @returns The matching `ScheduleErrorPolicy`.
-   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no policy matches.
-   */
-  fromName(name: string): ScheduleErrorPolicy;
-}
-
-/**
  * A generated schedule: the accrual grid plus payment and fixing dates.
  *
  * Build one with `Schedule.builder(start, end)` or `Schedule.fromSpec(spec)`.
@@ -5302,7 +5082,7 @@ export interface ScheduleConstructor {
    */
   builder(start: number, end: number): ScheduleBuilder;
   /**
-   * Build a schedule from a persisted specification (Rust `ScheduleSpec::build`).
+   * Build a schedule from a persisted specification (Rust `ScheduleBuilder::build`).
    *
    * @param spec - `ScheduleSpec` JSON text or plain object, such as `ScheduleBuilder.toSpec()` output: ISO `start`/`end`, `frequency` (a `{ count, unit }` tenor), `stub`, `business_day_convention`, `calendar_id`, `end_of_month`, `imm_mode`, `cds_imm_mode`, `error_policy`, `payment_lag_days` and `fixing_lag_business_days`. Unknown fields are rejected.
    * @returns The generated `Schedule`.
@@ -5349,7 +5129,7 @@ export interface ScheduleBuilder extends WasmOwned {
   /**
    * Set the stub rule.
    *
-   * @param stub - Stub name: `"none"`, `"short_front"`, `"short_back"`, `"long_front"` or `"long_back"` (use `stubKind.toString()` for a `StubKind`).
+   * @param stub - Stub name: `"none"`, `"short_front"`, `"short_back"`, `"long_front"` or `"long_back"`, in any ASCII case.
    * @returns This builder, updated in place.
    * @throws `TypeError` if `stub` is not a string; `FinstackError` (kind `validation`) if no stub rule matches.
    */
@@ -5410,7 +5190,7 @@ export interface ScheduleBuilder extends WasmOwned {
   /**
    * Set the policy for recoverable construction errors.
    *
-   * @param policy - Policy name: `"strict"`, `"missing_calendar_warning"` or `"graceful_empty"`.
+   * @param policy - Policy name: `"strict"`, `"missing_calendar_warning"` or `"graceful_empty"`, in any ASCII case.
    * @returns This builder, updated in place.
    * @throws `TypeError` if `policy` is not a string; `FinstackError` (kind `validation`) if no policy matches.
    */
@@ -5423,7 +5203,7 @@ export interface ScheduleBuilder extends WasmOwned {
    */
   toSpec(): ScheduleSpec;
   /**
-   * Generate the schedule (Rust `ScheduleSpec::build`).
+   * Generate the schedule (Rust `ScheduleBuilder::build`).
    *
    * @returns The generated `Schedule`.
    * @throws `FinstackError` (kind `validation`) for an invalid frequency or a generation failure; kind `not_found` for an unknown calendar under the strict policy.
@@ -5467,7 +5247,7 @@ export interface ScheduleBuilderConstructor {
  * await init();
  * const cls = core.SifmaSettlementClass.fromAgencyTerm("FNMA", 15);
  * cls.toString(); // "b"
- * core.sifmaSettlementDateForClass(1, 2026, cls); // epoch days, or undefined
+ * core.sifmaSettlementDate(1, 2026, cls); // epoch days, or undefined
  * ```
  */
 export interface SifmaSettlementClass extends WasmOwned {
@@ -5475,7 +5255,6 @@ export interface SifmaSettlementClass extends WasmOwned {
    * Lower-case class letter (`"a"` through `"d"`), the JSON wire label.
    *
    * @returns The class label.
-   * @throws If the label cannot be produced (not expected).
    */
   toString(): string;
 }
@@ -5491,7 +5270,7 @@ export interface SifmaSettlementClass extends WasmOwned {
  * await init();
  * const cls = core.SifmaSettlementClass.fromAgencyTerm("FNMA", 15);
  * cls.toString(); // "b"
- * core.sifmaSettlementDateForClass(1, 2026, cls); // epoch days, or undefined
+ * core.sifmaSettlementDate(1, 2026, cls); // epoch days, or undefined
  * ```
  */
 export interface SifmaSettlementClassConstructor {
@@ -5536,77 +5315,6 @@ export interface SifmaSettlementClassConstructor {
 }
 
 /**
- * 30/360 day-count variant used by `days30360`.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * const isda = core.Thirty360Convention.isda();
- * core.days30360(core.createDate(2025, 1, 31), core.createDate(2025, 3, 31), isda.toString()); // 60
- * ```
- */
-export interface Thirty360Convention extends WasmOwned {
-  /**
-   * Canonical snake_case name of the variant.
-   *
-   * @returns The name accepted by `fromName` and `days30360`.
-   * @throws If the label cannot be produced (not expected).
-   */
-  toString(): string;
-}
-
-/**
- * 30/360 day-count variant used by `days30360`.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * const isda = core.Thirty360Convention.isda();
- * core.days30360(core.createDate(2025, 1, 31), core.createDate(2025, 3, 31), isda.toString()); // 60
- * ```
- */
-export interface Thirty360ConventionConstructor {
-  /**
-   * JavaScript prototype of `Thirty360Convention`; instances come from the static factories, not `new`.
-   */
-  readonly prototype: Thirty360Convention;
-  /**
-   * 30U/360 (US SIA bond basis).
-   *
-   * @returns The `us_sia` variant.
-   */
-  usSia(): Thirty360Convention;
-  /**
-   * 30/360 ISDA bond basis (ISDA 2006 Section 4.16(f); no February month-end rule).
-   *
-   * @returns The `isda` variant.
-   */
-  isda(): Thirty360Convention;
-  /**
-   * 30E/360 (European): day 31 becomes 30 on both dates.
-   *
-   * @returns The `european` variant.
-   */
-  european(): Thirty360Convention;
-  /**
-   * 30/360 Italian: day 31 and any February day after the 27th become 30.
-   *
-   * @returns The `italian` variant.
-   */
-  italian(): Thirty360Convention;
-  /**
-   * Parse a variant name (the Rust serde label).
-   *
-   * @param name - Variant name: `"us_sia"`, `"isda"`, `"european"` or `"italian"`.
-   * @returns The matching `Thirty360Convention`.
-   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no variant matches.
-   */
-  fromName(name: string): Thirty360Convention;
-}
-
-/**
  * Unit of a tenor: days, weeks, months or years.
  *
  * @example
@@ -5614,14 +5322,14 @@ export interface Thirty360ConventionConstructor {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * core.TenorUnit.months().toString(); // "M"
- * core.TenorUnit.fromChar("y").toString(); // "Y"
+ * core.TenorUnit.fromName("y").toString(); // "Y"
  * ```
  */
 export interface TenorUnit extends WasmOwned {
   /**
    * One-letter unit code: `"D"`, `"W"`, `"M"` or `"Y"`.
    *
-   * @returns The designator accepted by `fromChar` and used in tenor text.
+   * @returns The designator accepted by `fromName` and used in tenor text.
    */
   toString(): string;
 }
@@ -5634,7 +5342,7 @@ export interface TenorUnit extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * core.TenorUnit.months().toString(); // "M"
- * core.TenorUnit.fromChar("y").toString(); // "Y"
+ * core.TenorUnit.fromName("y").toString(); // "Y"
  * ```
  */
 export interface TenorUnitConstructor {
@@ -5667,13 +5375,13 @@ export interface TenorUnitConstructor {
    */
   years(): TenorUnit;
   /**
-   * Parse a one-letter unit code (Rust `TenorUnit::from_char`).
+   * Parse a one-letter unit code (Rust `TenorUnit::from_str`).
    *
-   * @param ch - Exactly one character: `D`, `W`, `M` or `Y`, in either case.
+   * @param name - Exactly one character: `D`, `W`, `M` or `Y`, in either case.
    * @returns The matching `TenorUnit`.
-   * @throws `TypeError` (kind `invalid_type`) if `ch` is not a string; `FinstackError` (kind `validation`) if it is not exactly one of the four unit letters.
+   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if it is not exactly one of the four unit letters.
    */
-  fromChar(ch: string): TenorUnit;
+  fromName(name: string): TenorUnit;
 }
 
 /**
@@ -5683,15 +5391,11 @@ export interface TenorUnitConstructor {
  * ```typescript
  * import init, { core } from "finstack-quant-wasm";
  * await init();
- * core.RoundingMode.bankers().name; // "bankers"
+ * core.RoundingMode.bankers().toString(); // "bankers"
  * core.RoundingMode.fromName("away_from_zero").toJson(); // "\"away_from_zero\""
  * ```
  */
 export interface RoundingMode extends WasmOwned {
-  /**
-   * Lowercase name of the mode, such as `"bankers"`.
-   */
-  readonly name: string;
   /**
    * Serialize to the canonical JSON wire form (a quoted lowercase name).
    *
@@ -5714,7 +5418,7 @@ export interface RoundingMode extends WasmOwned {
  * ```typescript
  * import init, { core } from "finstack-quant-wasm";
  * await init();
- * core.RoundingMode.bankers().name; // "bankers"
+ * core.RoundingMode.bankers().toString(); // "bankers"
  * core.RoundingMode.fromName("away_from_zero").toJson(); // "\"away_from_zero\""
  * ```
  */
@@ -5784,7 +5488,7 @@ export interface RoundingModeConstructor {
  * config.outputScale("JPY"); // 2
  * config.outputScale("USD"); // 2 (the ISO-4217 minor units)
  * const copy = core.FinstackConfig.fromJson(config.toJson());
- * copy.roundingMode.name; // "away_from_zero"
+ * copy.roundingMode.toString(); // "away_from_zero"
  * ```
  */
 export interface FinstackConfig extends WasmOwned {
@@ -5793,7 +5497,7 @@ export interface FinstackConfig extends WasmOwned {
    */
   readonly roundingMode: RoundingMode;
   /**
-   * Numeric tolerances as a plain `ToleranceConfig` object (`rate_epsilon`, `generic_epsilon`).
+   * Numeric tolerances as a plain `ToleranceConfig` object (`generic_epsilon`).
    */
   readonly tolerances: ToleranceConfig;
   /**
@@ -5896,15 +5600,15 @@ export interface FinstackConfig extends WasmOwned {
  * config.outputScale("JPY"); // 2
  * config.outputScale("USD"); // 2 (the ISO-4217 minor units)
  * const copy = core.FinstackConfig.fromJson(config.toJson());
- * copy.roundingMode.name; // "away_from_zero"
+ * copy.roundingMode.toString(); // "away_from_zero"
  * ```
  */
 export interface FinstackConfigConstructor {
   /**
    * Create a configuration from the Rust defaults.
    *
-   * @param roundingMode - Lowercase rounding-mode name (for example `"bankers"`, or `mode.name` of a `RoundingMode`); omitted uses the Rust default, `"bankers"`.
-   * @param tolerances - `ToleranceConfig` object or JSON text with the optional absolute tolerances `rate_epsilon` (default `1e-12`) and `generic_epsilon` (default `1e-10`), both finite and positive; omitted uses the defaults.
+   * @param roundingMode - Lowercase rounding-mode name (for example `"bankers"`, or `mode.toString()` of a `RoundingMode`); omitted uses the Rust default, `"bankers"`.
+   * @param tolerances - `ToleranceConfig` object or JSON text with the optional absolute tolerance `generic_epsilon` (default `1e-10`), finite and positive; omitted uses the default.
    * @returns A new `FinstackConfig`.
    * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an unknown rounding mode, an unknown tolerance field, or a non-positive tolerance.
    */
@@ -5926,15 +5630,11 @@ export interface FinstackConfigConstructor {
  * ```typescript
  * import init, { core } from "finstack-quant-wasm";
  * await init();
- * core.UnknownScalePolicy.fallbackToDefault().name; // "fallback_to_default"
- * core.embeddedRegistry().unknownScalePolicy().name;
+ * core.UnknownScalePolicy.fallbackToDefault().toString(); // "fallback_to_default"
+ * core.embeddedRegistry().unknownScalePolicy().toString();
  * ```
  */
 export interface UnknownScalePolicy extends WasmOwned {
-  /**
-   * Snake_case name of the policy, such as `"fallback_to_default"`.
-   */
-  readonly name: string;
   /**
    * Serialize to the canonical JSON wire form (a quoted snake_case name).
    *
@@ -5946,7 +5646,6 @@ export interface UnknownScalePolicy extends WasmOwned {
    * Snake_case name of the policy (same as `name`).
    *
    * @returns The name accepted by `fromName`.
-   * @throws If the label cannot be produced (not expected).
    */
   toString(): string;
 }
@@ -5958,8 +5657,8 @@ export interface UnknownScalePolicy extends WasmOwned {
  * ```typescript
  * import init, { core } from "finstack-quant-wasm";
  * await init();
- * core.UnknownScalePolicy.fallbackToDefault().name; // "fallback_to_default"
- * core.embeddedRegistry().unknownScalePolicy().name;
+ * core.UnknownScalePolicy.fallbackToDefault().toString(); // "fallback_to_default"
+ * core.embeddedRegistry().unknownScalePolicy().toString();
  * ```
  */
 export interface UnknownScalePolicyConstructor {
@@ -5988,7 +5687,7 @@ export interface UnknownScalePolicyConstructor {
   /**
    * Parse a policy name (the Rust serde label).
    *
-   * @param name - Policy name: `"error"`, `"fallback_to_default"` or `"warn_and_fallback"`.
+   * @param name - Policy name: `"error"`, `"fallback_to_default"` or `"warn_and_fallback"`, in any ASCII case.
    * @returns The matching `UnknownScalePolicy`.
    * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no policy matches.
    */
@@ -6107,16 +5806,12 @@ export interface RatingScaleRegistryConstructor {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const rating = new core.CreditRating("Baa3"); // Moody's spelling
- * rating.name; // "BBB-"
+ * rating.toString(); // "BBB-"
  * rating.isInvestmentGrade(); // true
  * core.CreditRating.bbb().notchesTo("BB"); // 3
  * ```
  */
 export interface CreditRating extends WasmOwned {
-  /**
-   * S&P/Fitch spelling of the rating, such as `"BBB-"`.
-   */
-  readonly name: string;
   /**
    * Whether the rating is investment grade (`BBB-` or better).
    *
@@ -6144,7 +5839,7 @@ export interface CreditRating extends WasmOwned {
   /**
    * Signed notch distance to another rating (Rust `CreditRating::notches_to`).
    *
-   * @param other - Rating text to measure against (S&P/Fitch or Moody's spelling; use `rating.name` for a `CreditRating`).
+   * @param other - Rating text to measure against (S&P/Fitch or Moody's spelling; use `rating.toString()` for a `CreditRating`).
    * @returns Notches from this rating to `other`: positive when `other` is weaker, negative when stronger. `NR` sits between `C` and `D`.
    * @throws `TypeError` if `other` is not a string; `FinstackError` (kind `validation`) if it is not a rating.
    */
@@ -6172,7 +5867,7 @@ export interface CreditRating extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const rating = new core.CreditRating("Baa3"); // Moody's spelling
- * rating.name; // "BBB-"
+ * rating.toString(); // "BBB-"
  * rating.isInvestmentGrade(); // true
  * core.CreditRating.bbb().notchesTo("BB"); // 3
  * ```
@@ -6333,7 +6028,6 @@ export interface CreditRatingConstructor {
    */
   nr(): CreditRating;
 }
-
 
 /**
  * Tags and key/value metadata attached to an instrument or position, used
@@ -7113,7 +6807,7 @@ export interface VolSurfaceConstructor {
    * @param id - Surface identifier, the `MarketContext` lookup key.
    * @param expiries - Option expiries in years, strictly increasing.
    * @param strikes - Secondary-axis coordinates (strikes, or swap tenors in years), strictly increasing.
-   * @param vols - Decimal volatilities, either as a flat row-major grid of `expiries.length * strikes.length` entries or as `expiries.length` rows of `strikes.length` values. Entries must be finite and non-negative.
+   * @param vols - Decimal volatilities as a flat row-major (expiry-major) grid of `expiries.length * strikes.length` entries, finite and non-negative.
    * @param options - Optional `{ secondaryAxis, interpolationMode, quoteType, displacements }`: `secondaryAxis` is `"strike"` or `"tenor"`, `interpolationMode` is `"vol"` or `"total_variance"`, `quoteType` is `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`, and `displacements` holds one shifted-Black displacement per expiry (required for `"shifted_black_lognormal"` quotes). Every omitted key takes the Rust default.
    * @returns The validated `VolSurface`.
    * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an empty or unsorted axis, a grid of the wrong length, a negative or non-finite volatility, an unknown axis, mode or quote-type name, or displacements that do not match the quote convention and the expiry count.
@@ -7594,10 +7288,6 @@ export interface ContextStats {
    * Number of FX delta-quoted volatility surfaces.
    */
   fx_delta_vol_surface_count: number;
-  /**
-   * Number of CSA-code to discount-curve collateral mappings.
-   */
-  collateral_mapping_count: number;
 }
 
 /**
@@ -8019,6 +7709,10 @@ export interface CoreNamespace {
    */
   MarketContext: MarketContextConstructor;
   /**
+   * Result of `MarketContext.convertMoney`: converted amount plus the applied FX rate.
+   */
+  ConvertedMoney: ConvertedMoneyConstructor;
+  /**
    * FX conversion timing-policy constructor.
    */
   FxConversionPolicy: FxConversionPolicyConstructor;
@@ -8269,17 +7963,9 @@ export interface CoreNamespace {
    */
   RatingScaleRegistry: RatingScaleRegistryConstructor;
   /**
-   * 30/360 day-count variant factories used with `core.days30360`.
-   */
-  Thirty360Convention: Thirty360ConventionConstructor;
-  /**
    * Tenor-unit factories (`core.TenorUnit.months()`).
    */
   TenorUnit: TenorUnitConstructor;
-  /**
-   * Business-day convention factories (`core.BusinessDayConvention.following()`).
-   */
-  BusinessDayConvention: BusinessDayConventionConstructor;
   /**
    * Holiday-calendar constructor (`new core.HolidayCalendar("nyse")`).
    */
@@ -8296,14 +7982,6 @@ export interface CoreNamespace {
    * Fiscal-year start constructor and presets (`core.FiscalConfig.usFederal()`).
    */
   FiscalConfig: FiscalConfigConstructor;
-  /**
-   * Schedule stub-rule factories (`core.StubKind.shortFront()`).
-   */
-  StubKind: StubKindConstructor;
-  /**
-   * Schedule error-policy factories (`core.ScheduleErrorPolicy.strict()`).
-   */
-  ScheduleErrorPolicy: ScheduleErrorPolicyConstructor;
   /**
    * Generated date schedule; start with `core.Schedule.builder(start, end)`.
    */
@@ -8371,7 +8049,7 @@ export interface CoreNamespace {
    *
    * @param start - Inclusive accrual start as days since 1970-01-01.
    * @param end - Exclusive accrual end as days since 1970-01-01; an earlier end gives a negative count rather than an error.
-   * @param convention - Variant name: `"us_sia"`, `"isda"`, `"european"` or `"italian"`.
+   * @param convention - Variant name: `"us_sia"`, `"isda"`, `"european"` or `"italian"`, in any ASCII case.
    * @returns The 30/360 day count.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for an unknown variant or a date outside the supported range.
    */
@@ -8597,35 +8275,29 @@ export interface CoreNamespace {
    */
   nextThirdFriday(date: number): number;
   /**
-   * Published SIFMA class A settlement date of a month (Rust `sifma_settlement_date`).
-   *
-   * @param month - Settlement month number, `1` through `12`.
-   * @param year - Settlement year.
-   * @returns The published date as epoch days, or `undefined` when the month is outside the embedded SIFMA calendar (dates are never approximated).
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12`.
-   */
-  sifmaSettlementDate(month: number, year: number): number | undefined;
-  /**
    * Published SIFMA settlement date of a month for one class (Rust
-   * `sifma_settlement_date_for_class`).
+   * `sifma_settlement_date`).
+   *
+   * The published facade makes `settlementClass` optional: an omitted class is
+   * the Rust default `SifmaSettlementClass::default()` (Class A).
    *
    * @param month - Settlement month number, `1` through `12`.
    * @param year - Settlement year.
    * @param settlementClass - Agency-MBS settlement class whose date is requested.
-   * @returns The published date as epoch days, or `undefined` when that month and class are outside the embedded SIFMA calendar.
+   * @returns The published date as epoch days, or `undefined` when that month and class are outside the embedded SIFMA calendar (dates are never approximated).
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12`.
    */
-  sifmaSettlementDateForClass(
+  sifmaSettlementDate(
     month: number,
     year: number,
-    settlementClass: SifmaSettlementClass
+    settlementClass?: SifmaSettlementClass | null
   ): number | undefined;
   /**
    * Projection-only estimate of a SIFMA settlement date (Rust
-   * `estimated_sifma_settlement_date_for_class`).
+   * `estimated_sifma_settlement_date`).
    *
    * The estimate counts business days of the month on the SIFMA calendar; use
-   * `sifmaSettlementDateForClass` for published dates.
+   * `sifmaSettlementDate` for published dates.
    *
    * @param month - Settlement month number, `1` through `12`.
    * @param year - Settlement year.
@@ -8633,7 +8305,7 @@ export interface CoreNamespace {
    * @returns The estimated settlement date as epoch days.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12` or `year` is outside the supported date range.
    */
-  estimatedSifmaSettlementDateForClass(
+  estimatedSifmaSettlementDate(
     month: number,
     year: number,
     settlementClass: SifmaSettlementClass
@@ -8799,6 +8471,68 @@ export interface CoreNamespace {
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `df` is non-finite or not strictly positive.
    */
   studentTInvCdf(p: number, df: number): number;
+
+  /**
+   * Parse a cashflow kind label into its `CFKind` wire string.
+   *
+   * Parsed by Rust `CFKind::from_str`: the snake_case wire string, ASCII case
+   * ignored, plus the aliases `"coupon"` and `"principal"`.
+   *
+   * @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
+   * @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.
+   * @throws If `name` is not a string (kind `invalid_type`) or names no cashflow kind (kind `validation`).
+   */
+  cfKindParse(name: string): generated.cashflows.CFKind;
+
+  /**
+   * Whether a cashflow kind is interest-like (fixed, floating, inflation or stub coupon).
+   *
+   * @param kind - `CFKind` wire string.
+   * @returns `true` for coupon-type kinds; fees, principal and margin kinds are `false`.
+   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
+   */
+  cfKindIsInterestLike(kind: generated.cashflows.CFKind): boolean;
+
+  /**
+   * Whether a cashflow kind changes or returns principal.
+   *
+   * @param kind - `CFKind` wire string.
+   * @returns `true` for notional, PIK, amortization, prepayment, revolving draw/repayment and defaulted-notional kinds.
+   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
+   */
+  cfKindIsPrincipalLike(kind: generated.cashflows.CFKind): boolean;
+
+  /**
+   * Whether a cashflow kind settles in cash.
+   *
+   * Non-cash state rows (`pik`, `defaulted_notional`) are excluded from
+   * settlement sums such as `datedFlows`.
+   *
+   * @param kind - `CFKind` wire string.
+   * @returns `true` when flows of this kind are paid or received in cash.
+   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
+   */
+  cfKindIsCashSettlement(kind: generated.cashflows.CFKind): boolean;
+
+  /**
+   * Date on which a cashflow changes the outstanding balance.
+   *
+   * Mirrors Rust `CashFlow::get_balance_date`: the flow's `principal_date`
+   * when set, otherwise its payment `date`.
+   *
+   * @param flow - `CashFlow` wire object.
+   * @returns ISO-8601 balance date.
+   * @throws If `flow` is not a `CashFlow` (kind `validation`).
+   */
+  cashFlowGetBalanceDate(flow: generated.cashflows.CashFlow): generated.core.DateWire;
+
+  /**
+   * Check a cashflow's invariants.
+   *
+   * @param flow - `CashFlow` wire object.
+   * @throws If `flow` is not a `CashFlow`, its amount, accrual factor or rate is non-finite, its accrual factor is negative, its reset date is after its payment date, or its principal delta is in another currency (kind `validation`).
+   */
+  cashFlowValidate(flow: generated.cashflows.CashFlow): void;
 }
 
 /**
@@ -9482,12 +9216,12 @@ export interface AnalyticsNamespace {
    * Sharpe ratio of one return series (annualized excess mean over
    * annualized sample volatility; the same kernel as `Performance.sharpe`).
    * @param returns - Per-period simple decimal returns in date order.
-   * @param rf - Annualized risk-free rate as a decimal (`0.02` for 2%); defaults to `0`.
+   * @param riskFreeRate - Annualized risk-free rate as a decimal (`0.02` for 2%); defaults to `0`.
    * @param periodsPerYear - Observations per year used to annualize; defaults to `252`.
    * @returns The Sharpe ratio; `±Infinity` when volatility is zero with a non-zero excess return, `NaN` for fewer than two observations, non-finite inputs, or an invalid `periodsPerYear`.
    * @throws Error - Rejects a `returns` value that is not a numeric array.
    */
-  sharpe(returns: NumericArray, rf?: number, periodsPerYear?: number): number;
+  sharpe(returns: NumericArray, riskFreeRate?: number, periodsPerYear?: number): number;
   /**
    * Annualized Sortino ratio of one return series.
    * @param returns - Per-period simple decimal returns in date order.
@@ -10071,6 +9805,34 @@ export interface FactorRiskNamespace {
    * @throws Error - Throws a `validation` error if `decomp` is malformed, and a `not_found` error if the position is not in the decomposition.
    */
   positionComponentVar(decomp: PositionRiskDecomposition | string, positionId: string): number;
+  /**
+   * Decompose portfolio risk into factor and position contributions.
+   *
+   * Uses the parametric (covariance-based) Euler decomposition.  Accepts
+   * the canonical sensitivity-matrix wire object (the output of
+   * `portfolio.computeFactorSensitivities`, or the Python `SensitivityMatrix.to_json`),
+   * a `FactorCovarianceMatrix` JSON, and an optional `RiskMeasure` JSON.
+   *
+   * Returns a structured object with `total_risk`, `measure`, `residual_risk`,
+   * `factor_contributions` (array), `position_factor_contributions` (array),
+   * and `position_residual_contributions` (array; empty for the parametric
+   * decomposer — populated only by credit-aware position decomposers).
+   *
+   * `measure` is the risk measure in its canonical serde form, the same shape
+   * as the `riskMeasureJson` input: `"variance"` or `"volatility"`, or an
+   * object carrying `confidence` for `var` / `expected_shortfall`. The Python
+   * `RiskDecomposition.measure` getter returns the same value.
+   * @returns Returns a structured `RiskDecomposition` object.
+   * @param sensitivitiesJson - Canonical factor-sensitivity JSON with required `base_currency`, ordered `position_ids`/`factor_ids`, and nested `data[position][factor]` rows; `JSON.stringify` the result of `computeFactorSensitivities`. Python `SensitivityMatrix.to_json()` uses the same contract. Unknown fields, inconsistent dimensions, and non-finite entries are rejected.
+   * @param covarianceJson - Factor covariance-matrix JSON aligned with the supplied sensitivities.
+   * @param riskMeasureJson - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
+   * @throws Error - Throws a JavaScript exception (`kind` `validation`) if any JSON input is malformed or has unknown keys; `base_currency` is not an ISO-4217 code; the sensitivity rows do not match `position_ids` / `factor_ids`; sensitivity and covariance factor axes disagree; the covariance matrix or risk measure is invalid; or decomposition produces invalid variance or another non-finite value.
+   */
+  decomposeFactors(
+    sensitivitiesJson: JsonInput,
+    covarianceJson: JsonInput,
+    riskMeasureJson?: JsonInput
+  ): RiskDecomposition;
 }
 
 /**
@@ -11261,7 +11023,7 @@ export interface CorrelationNamespace {
    * @returns The lower-triangular factor `L` with `L * L^T = matrix`, flat row-major.
    * @throws Error - Throws a `validation` error if the length is not `n * n` or the matrix is not a valid positive-semidefinite correlation matrix.
    */
-  choleskyDecompose(matrix: NumericArray, n: number): Float64Array;
+  choleskyCorrelation(matrix: NumericArray, n: number): Float64Array;
   /**
    * Largest path count accepted by `simulatePortfolioLoss`. Twin of the Rust
    * and Python constant `MAX_PORTFOLIO_LOSS_PATHS`.
@@ -11806,9 +11568,7 @@ export interface MonteCarloNamespace {
    * @returns The `PathSummary` object: `num_paths`, `num_simulated_paths`, `dim`, `times`, `factor_names`, and `values` in row-major `[path][time][factor]` order, so factor `f` on path `p` at `times[s]` is `values[(p * times.length + s) * dim + f]`.
    * @throws Error - Throws a `TypeError` if `spec` is neither an object nor JSON text, and a `validation` error if it does not match `PathSimulationSpec`, a process parameter is out of range, the scheme is not available for the process, `fbm` is set for a process that does not consume fractional noise, `initial_state` has the wrong length or lies outside the process's domain, the time grid is invalid, `num_paths` is outside [1, 100000], the output would exceed 64 million stored values, or a simulated state is non-finite.
    */
-  simulatePaths(
-    spec: generated.models.PathSimulationSpec | string
-  ): generated.models.PathSummary;
+  simulatePaths(spec: generated.models.PathSimulationSpec | string): generated.models.PathSummary;
 }
 
 /**
@@ -13573,7 +13333,7 @@ export declare const margin: MarginNamespace;
  * day count and metadata.
  *
  * Obtain one from `CashFlowSchedule.builder()`, `buildCashflowSchedule`,
- * `CashFlowSchedule.fromJson` or `CashFlowSchedule.fromParts`. Methods that
+ * `CashFlowSchedule.fromJson` or `CashFlowSchedule.fromFlows`. Methods that
  * return a schedule return a new handle and leave this one unchanged.
  */
 export interface CashFlowSchedule extends WasmOwned {
@@ -13691,17 +13451,15 @@ export interface CashFlowSchedule extends WasmOwned {
    * @param market - `MarketContext` handle holding the discount (and credit) curve.
    * @param discCurveId - Identifier of the discount curve in `market`, for example `"USD-OIS"`.
    * @param base - ISO-8601 valuation date that discounting starts from.
-   * @param dayCount - Optional `DayCount` wire string for discounting year fractions; omitted means `"act_365f"`.
    * @param creditCurveId - Optional identifier of a hazard curve in `market`; omitted means no credit adjustment.
    * @returns `PeriodAggregation`: `{ periodId: { currency: Money } }` of PV per period and currency.
    * @throws If a curve is missing from `market` (kind `not_found`), or an argument is malformed or a discount factor cannot be computed (kind `invalid_type` or `validation`).
    */
   pvByPeriod(
-    periods: readonly generated.statements.Period[],
+    periods: readonly generated.core.Period[],
     market: MarketContext,
     discCurveId: string,
     base: string,
-    dayCount?: generated.core.DayCount | null,
     creditCurveId?: string | null
   ): generated.cashflows.PeriodAggregation;
   /**
@@ -13740,32 +13498,12 @@ export interface CashFlowScheduleConstructor {
    */
   builder(): CashFlowBuilder;
   /**
-   * Assemble a schedule from existing flows, notional, day count and metadata.
-   *
-   * Flows are put into the canonical schedule order; nothing is validated
-   * until `validate()` or an analytic runs.
-   *
-   * @param flows - `CashFlow` wire objects.
-   * @param notional - `Notional` wire object: initial balance and amortization rule.
-   * @param dayCount - `DayCount` wire string (for example `"act_360"`) used for accrual and year fractions.
-   * @param meta - `CashFlowMeta` wire object: representation, calendar ids, commitment, issue date and maturity.
-   * @returns The assembled `CashFlowSchedule`.
-   * @throws If an argument does not match its wire type (kind `validation`).
-   */
-  fromParts(
-    flows: readonly generated.cashflows.CashFlow[],
-    notional: generated.cashflows.Notional,
-    dayCount: generated.core.DayCount,
-    meta: generated.cashflows.CashFlowMeta
-  ): CashFlowSchedule;
-  /**
    * Assemble a schedule from externally supplied flows, validating every row
    * (Rust `CashFlowSchedule::from_flows`).
    *
    * Each flow must pass `CashFlow::validate` (finite amount and rate, a
    * finite non-negative `accrual_factor`, a reset date not after the payment
-   * date) before the rows are sorted; use `fromParts` to assemble rows
-   * without validation. (Python's `from_flows` also reads a pandas
+   * date) before the rows are sorted. (Python's `from_flows` also reads a pandas
    * DataFrame; WASM takes the flow list.)
    *
    * @param flows - `CashFlow` wire objects.
@@ -13971,7 +13709,6 @@ export interface CashFlowBuilder extends WasmOwned {
    * @throws If a date or schedule is invalid, a required fixing is unavailable, or market data is missing.
    */
   buildAsOf(market: MarketContext, asOf: string): CashFlowSchedule;
-
 }
 
 /**
@@ -14237,7 +13974,7 @@ export interface CashflowsNamespace {
    * @param dayCount - `DayCount` wire string attached to the schedule for downstream accrual and yield calculations.
    * @param opts - Optional `ScheduleBuildOpts` wire object (`{ notional_hint?, meta? }`); omitted means a zero notional in the first flow's currency and default metadata.
    * @returns The `CashFlowSchedule` handle, flows in canonical order.
-   * @throws If an argument does not match its wire type (kind `validation`).
+   * @throws If an argument does not match its wire type, or a flow is invalid (kind `validation`).
    */
   scheduleFromDatedFlows(
     flows: readonly DatedFlowJson[],
@@ -14253,7 +13990,7 @@ export interface CashflowsNamespace {
    * @param dayCount - `DayCount` wire string attached to the schedule for downstream accrual and yield calculations.
    * @param opts - Optional `ScheduleBuildOpts` wire object (`{ notional_hint?, meta? }`); omitted means a zero notional in the first flow's currency and default metadata.
    * @returns The `CashFlowSchedule` handle, flows in canonical order.
-   * @throws If an argument does not match its wire type (kind `validation`).
+   * @throws If an argument does not match its wire type, or a flow is invalid (kind `validation`).
    */
   scheduleFromClassifiedFlows(
     flows: readonly generated.cashflows.CashFlow[],
@@ -14340,7 +14077,7 @@ export interface CashflowsNamespace {
    */
   aggregateByPeriod(
     flows: readonly DatedFlowJson[],
-    periods: readonly generated.statements.Period[]
+    periods: readonly generated.core.Period[]
   ): generated.cashflows.PeriodAggregation;
 
   /**
@@ -14379,12 +14116,12 @@ export interface CashflowsNamespace {
    * Materialize the reset observations crossed by a realized-forward market roll.
    *
    * Every projected fixing recorded in the schedules' metadata with a date in
-   * `(oldDate, newDate]` is written into a copy of the market as an observed
+   * `[oldDate, newDate]` is written into a copy of the market as an observed
    * fixing; existing observations take precedence and are kept unchanged.
    *
    * @param market - `MarketContext` handle of the pre-roll market; it is not modified.
    * @param schedules - Schedules projected on `market` at `oldDate`: `CashFlowSchedule` handles (the facade passes them as JSON), canonical JSON strings or plain objects.
-   * @param oldDate - ISO-8601 exclusive start of the fixing window.
+   * @param oldDate - ISO-8601 inclusive start of the fixing window: same-day projections become observed.
    * @param newDate - ISO-8601 inclusive end of the window; must be on or after `oldDate`.
    * @returns A new `MarketContext` handle with the crossed fixings materialized; release it with free().
    * @throws If the window runs backward, a fixing-series identifier is malformed, a crossed projection is unavailable or non-finite, or two schedules project the same index and date differently (kind `validation`).
@@ -14397,84 +14134,19 @@ export interface CashflowsNamespace {
   ): MarketContext;
 
   /**
-   * Parse a cashflow kind label into its `CFKind` wire string.
-   *
-   * Matching is exact (Rust `CFKind::from_str`): the label is the snake_case
-   * wire string itself, as used by the `kind` field of a `CashFlow`.
-   *
-   * @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
-   * @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.
-   * @throws If `name` is not a string (kind `invalid_type`) or names no cashflow kind (kind `validation`).
-   */
-  cfKindParse(name: string): generated.cashflows.CFKind;
-
-  /**
-   * Whether a cashflow kind is interest-like (fixed, floating, inflation or stub coupon).
-   *
-   * @param kind - `CFKind` wire string.
-   * @returns `true` for coupon-type kinds; fees, principal and margin kinds are `false`.
-   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
-   */
-  cfKindIsInterestLike(kind: generated.cashflows.CFKind): boolean;
-
-  /**
-   * Whether a cashflow kind changes or returns principal.
-   *
-   * @param kind - `CFKind` wire string.
-   * @returns `true` for notional, PIK, amortization, prepayment, revolving draw/repayment and defaulted-notional kinds.
-   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
-   */
-  cfKindIsPrincipalLike(kind: generated.cashflows.CFKind): boolean;
-
-  /**
-   * Whether a cashflow kind settles in cash.
-   *
-   * Non-cash state rows (`pik`, `defaulted_notional`) are excluded from
-   * settlement sums such as `datedFlows`.
-   *
-   * @param kind - `CFKind` wire string.
-   * @returns `true` when flows of this kind are paid or received in cash.
-   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
-   */
-  cfKindIsCashSettlement(kind: generated.cashflows.CFKind): boolean;
-
-  /**
-   * Date on which a cashflow changes the outstanding balance.
-   *
-   * Mirrors Rust `CashFlow::get_balance_date`: the flow's `principal_date`
-   * when set, otherwise its payment `date`.
-   *
-   * @param flow - `CashFlow` wire object.
-   * @returns ISO-8601 balance date.
-   * @throws If `flow` is not a `CashFlow` (kind `validation`).
-   */
-  cashFlowGetBalanceDate(flow: generated.cashflows.CashFlow): generated.core.DateWire;
-
-  /**
-   * Check a cashflow's invariants.
-   *
-   * @param flow - `CashFlow` wire object.
-   * @throws If `flow` is not a `CashFlow`, its amount, accrual factor or rate is non-finite, its accrual factor is negative, its reset date is after its payment date, or its principal delta is in another currency (kind `validation`).
-   */
-  cashFlowValidate(flow: generated.cashflows.CashFlow): void;
-
-  /**
    * Recurring fee quoted in basis points of a drawn or undrawn balance.
    *
    * The argument is the `periodic_bp` payload of `FeeSpec`, parsed by the Rust
-   * serde contract: `stub` defaults to `"short_front"` and `accrual_basis` to
-   * `"point_in_time"`; every other field is required. (Python's
+   * serde contract: `business_day_convention` defaults to `"modified_following"`,
+   * `stub` to `"short_front"` and `accrual_basis` to `"point_in_time"`; every
+   * other field is required. (Python's
    * `FeeSpec.periodic_bp` takes the same fields positionally.)
    *
-   * @param fields - `{ base, bp, frequency, day_count, business_day_convention, calendar_id, stub?, accrual_basis? }`: `base` is a `FeeBase`, `bp` an exact decimal string in basis points per annum (`"25"` = 0.25%), `frequency` a `Tenor`.
+   * @param fields - `{ base, bp, frequency, day_count, business_day_convention?, calendar_id, stub?, accrual_basis? }`: `base` is a `FeeBase`, `bp` an exact decimal string in basis points per annum (`"25"` = 0.25%), `frequency` a `Tenor`.
    * @returns Canonical `FeeSpec` wire value `{ periodic_bp: { ... } }` with defaults filled in.
    * @throws If `fields` is missing a required field, has an unknown field or a field of the wrong shape (kind `validation`).
    */
   feeSpecPeriodicBp(fields: Record<string, unknown>): generated.cashflows.FeeSpec;
-
-
-
-
 
   /**
    * USD SOFR FRN compounding convention: ISDA 2021 observation shift of 2 business days (Rust `FloatingLegCompounding::sofr_observation_shift`).
@@ -14552,14 +14224,6 @@ export interface CashflowsNamespace {
    * @throws If `notional` is not a `Notional`, its initial balance is negative or non-finite, or its amortization rule mixes currencies, exceeds the initial balance, has a percentage outside `[0, 1]` or has dates out of order (kind `validation`).
    */
   notionalValidate(notional: generated.cashflows.Notional): void;
-
-  /**
-   * Constant 2% CDR baseline.
-   *
-   * @returns `DefaultModelSpec` wire object `{ curve: "constant", cdr: 0.02 }`.
-   * @throws If the model cannot be serialized.
-   */
-  defaultModelSpecCdr2pct(): generated.cashflows.DefaultModelSpec;
 
   /**
    * Check a default model's curve parameters.
@@ -18152,7 +17816,6 @@ export interface InterestRateSwap extends WasmOwned {
    * @throws This property does not throw.
    */
   readonly adjustFloatAccrualDates: boolean;
-
 }
 
 /**
@@ -18329,7 +17992,6 @@ export interface InterestRateSwapBuilder extends WasmOwned {
    * @throws Throws for a non-boolean value or an already consumed builder.
    */
   adjustFloatAccrualDates(value: boolean): InterestRateSwapBuilder;
-
 }
 
 /**
@@ -18561,7 +18223,6 @@ export interface SwaptionConstructor {
    * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
    */
   example(): Swaption;
-
 }
 
 /**
@@ -21063,7 +20724,9 @@ export interface ConvertibleBond extends WasmOwned {
    * @returns Canonical settlement record, or `null` while unresolved.
    * @throws Never; returns the stored record.
    */
-  readonly resolvedSettlement: NonNullable<generated.valuations.ConvertibleBond['resolved_settlement']> | null;
+  readonly resolvedSettlement: NonNullable<
+    generated.valuations.ConvertibleBond['resolved_settlement']
+  > | null;
   /**
    * Coupon/cashflow specification in serde form, the same shape as `Bond.cashflow_spec`.
    * @returns `{"fixed": {...}}`, `{"floating": {...}}`, `{"step_up": {...}}` or `{"amortizing": {...}}`; a zero-coupon convertible is a fixed spec with rate `"0"`.
@@ -21316,7 +20979,9 @@ export interface ConvertibleBondBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws for malformed input or a consumed builder; `build()` validates dates, currencies and amounts.
    */
-  resolvedSettlement(value: NonNullable<generated.valuations.ConvertibleBond['resolved_settlement']> | string): ConvertibleBondBuilder;
+  resolvedSettlement(
+    value: NonNullable<generated.valuations.ConvertibleBond['resolved_settlement']> | string
+  ): ConvertibleBondBuilder;
   /**
    * Set the coupon/cashflow specification.
    * @param value - Rust `CashflowSpec` as a plain object or JSON object string (the same shape as `Bond.cashflow_spec`, e.g. `{"fixed": {"coupon_type": "cash", "rate": "0.05", ...schedule}}`); a zero-coupon convertible uses a fixed spec with rate `"0"`.
@@ -27836,7 +27501,6 @@ export interface CreditScoringNamespace {
   ): generated.models.ScoringResult;
 }
 
-
 /**
  * A structured input: JSON text, or the equivalent plain object or array.
  *
@@ -28713,7 +28377,7 @@ export interface RatesNamespace {
  * import init, { core, models } from "finstack-quant-wasm";
  * await init();
  * const cube = new core.VolCube(
- *   "USD-SWAPTION", [1], [5], [0.03, 0.5, -0.2, 0.4, Number.NaN], [0.03]
+ *   "USD-SWAPTION", [1], [5], [{ alpha: 0.03, beta: 0.5, rho: -0.2, nu: 0.4 }], [0.03]
  * );
  * console.log(models.volatility.getCubeVol(cube, 1, 5, 0.03));
  * cube.free();
@@ -30232,7 +29896,7 @@ export interface CalibrationNamespace {
    */
   calibrationEnvelopeContentHash(envelopeJson: CalibrationEnvelope | string): string;
   /**
-   * Canonical content hash of a calibration result envelope (twin of Python `CalibrationResult.content_hash`).
+   * Canonical content hash of a calibration result envelope (twin of Python `CalibrationResultEnvelope.content_hash`).
    * @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
    * @returns `"sha256:<hex>"` content hash.
    * @throws Error - Throws a `CalibrationEnvelopeError` if the result is malformed, exceeds the default load limits, its schema marker is missing or unsupported, or it contains a non-finite number.
@@ -30252,7 +29916,7 @@ export interface CalibrationNamespace {
   /**
    * Report of one calibration step, read from a calibration result.
    *
-   * Free-function twin of Python `CalibrationResult.step_report` (Rust
+   * Free-function twin of Python `CalibrationResultEnvelope.step_report` (Rust
    * `CalibrationResult::step_report`).
    * @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
    * @param stepId - Identifier of the calibration step, as given in the plan.
@@ -30264,23 +29928,9 @@ export interface CalibrationNamespace {
     stepId: string
   ): generated.calibration.CalibrationReport;
   /**
-   * Report of one calibration step as a compact JSON string.
-   *
-   * JSON wire twin of `calibrationResultStepReport` and free-function twin
-   * of Python `CalibrationResult.step_report_json`.
-   * @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
-   * @param stepId - Identifier of the calibration step, as given in the plan.
-   * @returns Compact `CalibrationReport` JSON.
-   * @throws Error - Throws a `CalibrationEnvelopeError` if the result is malformed or exceeds the default load limits, and a `FinstackError` with `kind: "not_found"` if no step has the given `stepId` or with `kind: "validation"` if the report cannot be serialized.
-   */
-  calibrationResultStepReportJson(
-    resultJson: CalibrationResultEnvelope | string,
-    stepId: string
-  ): string;
-  /**
    * Per-quote residual rows of one calibration step.
    *
-   * Free-function twin of Python `CalibrationResult.residuals`, which returns
+   * Free-function twin of Python `CalibrationResultEnvelope.residuals`, which returns
    * the same rows (Rust `CalibrationReport::quote_rows`) as a pandas
    * `DataFrame`. `target_value`, `fitted_value` and `sensitivity` are `NaN`
    * unless `CalibrationConfig.compute_diagnostics` was enabled.
@@ -30646,7 +30296,7 @@ export interface CalibrationNamespace {
    * @param currency - ISO-4217 currency code of the surface.
    * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
    * @param volSurfaceId - Identifier of the produced surface; defaults to `id`.
-   * @param params - Optional object (or JSON) of further wire fields: `forward_id`, `vol_convention`, `sabr_beta`, `target_expiries`, `target_tenors`, `sabr_interpolation`, `calendar_id`, `fixed_day_count`, `swap_index`, `vol_tolerance`, `sabr_extrapolation`, `allow_sabr_missing_bucket_fallback`. An entry named like another argument is replaced by that argument.
+   * @param params - Optional object (or JSON) of further wire fields: `forward_id`, `vol_convention`, `sabr_beta`, `target_expiries`, `target_tenors`, `calendar_id`, `fixed_day_count`, `swap_index`, `vol_tolerance`, `sabr_extrapolation`, `allow_sabr_missing_bucket_fallback`. An entry named like another argument is replaced by that argument.
    * @returns A `CalibrationStep` object with `kind: "swaption_vol"`.
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
    */
@@ -31283,19 +30933,13 @@ export interface AttributionNamespace {
    */
   validateReturnContributionJson(specJson: JsonInput): string;
   /**
-   * Human-readable tree explanation of an attribution, non-zero factors only (twin of Python `PnlAttribution.explain`).
+   * Human-readable tree explanation of an attribution's factor breakdown (twin of Python `PnlAttribution.explain`).
    * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+   * @param showZeros - Optional boolean; `true` lists every factor including zero-valued ones, while omitted or `false` hides zero-valued factors.
    * @returns Multi-line tree text.
-   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
+   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`, and kind `invalid_type` if `showZeros` is not a boolean.
    */
-  pnlAttributionExplainText(pnl: PnlAttribution | string): string;
-  /**
-   * Verbose tree explanation of an attribution, including zero-valued factors (twin of Python `PnlAttribution.explain_verbose`).
-   * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
-   * @returns Multi-line tree text.
-   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
-   */
-  pnlAttributionExplainVerboseText(pnl: PnlAttribution | string): string;
+  pnlAttributionExplainText(pnl: PnlAttribution | string, showZeros?: boolean | null): string;
   /**
    * Share of total P&L, in percent, that an amount represents (twin of Python `PnlAttribution.pct_of_total`).
    * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
@@ -31378,18 +31022,22 @@ export interface Evaluator extends WasmOwned {
    * Twin of Python `Evaluator.evaluate` (Rust `Evaluator::evaluate`).
    * Non-finite node values and warning values use the canonical strings
    * `"nan"`, `"inf"` and `"-inf"`, so a `JSON.stringify`/parse round trip
-   * preserves missing-data semantics.
+   * preserves missing-data semantics. A capital structure is evaluated
+   * from an empty market as of the first period's start, so fixed-rate
+   * debt yields `cs_cashflows`; instruments that need market data need
+   * `evaluateWithMarket`.
    * @param model - `FinancialModelSpec` to evaluate (object or JSON).
-   * @returns `StatementResult` plain object: node values per period, value types, evaluation metadata and the optional check report.
-   * @throws Error with kind `validation` if the model is malformed, fails semantic validation, or a formula fails to evaluate; kind `not_found` if a formula references a missing node; kind `computation` for a dependency cycle or a capital-structure failure.
+   * @returns `StatementResult` plain object: node values per period, value types, evaluation metadata, capital-structure cashflows and the optional check report.
+   * @throws Error with kind `validation` if the model is malformed, fails semantic validation, or a formula fails to evaluate; kind `not_found` if a formula references a missing node or a capital-structure instrument needs market data; kind `computation` for a dependency cycle or a capital-structure failure.
    */
   evaluate(model: JsonInput): StatementResult;
   /**
    * Evaluate a model against a market context as of a valuation date.
    *
    * Twin of Python `Evaluator.evaluate_with_market` (Rust
-   * `Evaluator::evaluate_with_market`). Required for models with a capital
-   * structure, whose instruments are priced from the market.
+   * `Evaluator::evaluate_with_market`). Required when capital-structure
+   * instruments need market data (floating coupons, swaps, caps) or
+   * explicit values need an as-of cutoff.
    * @param model - `FinancialModelSpec` to evaluate (object or JSON).
    * @param market - `MarketContext` state supplying curves, quotes and FX (object or JSON).
    * @param asOf - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments and the cutoff for explicit-value visibility. An actual whose availability date falls after `asOf` is hidden, so the node falls back to its forecast or formula, and a value-only node then fails.
@@ -31561,7 +31209,7 @@ export interface RegistryConstructor {
  * const builder = new statements.ModelBuilder("acme");
  * builder.periods("2025Q1..Q4", "2025Q1");
  * builder.valueScalar("revenue", { "2025Q1": 100 });
- * builder.forecast("revenue", statements.forecastSpecGrowth(0.05));
+ * builder.forecast("revenue", { method: "growth_pct", params: { rate: 0.05 } });
  * builder.compute("gross_profit", "revenue * 0.6");
  * const model = builder.build();   // plain FinancialModelSpec object
  * statements.modelNodeIds(model);  // ["revenue", "gross_profit"]
@@ -31594,7 +31242,7 @@ export interface ModelBuilder extends WasmOwned {
    * Reusing a node identifier replaces its former definition.
    * @param nodeId - Node identifier, unique within the model.
    * @param values - Object mapping period id (e.g. `"2025Q1"`) to a number or a `Money` wire object (`{amount, currency}`).
-   * @throws Error with kind `validation` if `values` is malformed, periods were not set, or the builder was consumed.
+   * @throws Error with kind `validation` if `values` is malformed or the builder was consumed.
    */
   value(nodeId: string, values: Record<string, generated.statements.AmountOrScalar> | string): void;
   /**
@@ -31604,7 +31252,7 @@ export interface ModelBuilder extends WasmOwned {
    * `ModelBuilder::value_scalar`).
    * @param nodeId - Node identifier, unique within the model.
    * @param values - Object mapping period id (e.g. `"2025Q1"`) to a number.
-   * @throws Error with kind `validation` if `values` is malformed, periods were not set, or the builder was consumed.
+   * @throws Error with kind `validation` if `values` is malformed or the builder was consumed.
    */
   valueScalar(nodeId: string, values: Record<string, number> | string): void;
   /**
@@ -31614,7 +31262,7 @@ export interface ModelBuilder extends WasmOwned {
    * `ModelBuilder::value_money`).
    * @param nodeId - Node identifier, unique within the model.
    * @param values - Object mapping period id (e.g. `"2025Q1"`) to a `Money` wire object (`{amount, currency}`); all amounts share one currency.
-   * @throws Error with kind `validation` if `values` is malformed, periods were not set, or the builder was consumed.
+   * @throws Error with kind `validation` if `values` is malformed or the builder was consumed.
    */
   valueMoney(nodeId: string, values: Record<string, generated.statements.Money> | string): void;
   /**
@@ -31625,7 +31273,7 @@ export interface ModelBuilder extends WasmOwned {
    * builder usable.
    * @param nodeId - Existing node whose values the dates describe.
    * @param availabilityDates - Object mapping period id (e.g. `"2025Q1"`) to the ISO 8601 date its value was published.
-   * @throws Error with kind `validation` if `availabilityDates` is malformed, the node does not exist, periods were not set, or the builder was consumed.
+   * @throws Error with kind `validation` if `availabilityDates` is malformed, the node does not exist or the builder was consumed.
    */
   availabilityDates(nodeId: string, availabilityDates: Record<string, string> | string): void;
   /**
@@ -31635,7 +31283,7 @@ export interface ModelBuilder extends WasmOwned {
    * A failed call leaves the builder usable.
    * @param nodeId - Node identifier, unique within the model.
    * @param formula - Statements DSL expression, e.g. `"revenue - cogs"`.
-   * @throws Error with kind `validation` if the identifier is reserved, the formula is blank or does not parse and compile, periods were not set, or the builder was consumed.
+   * @throws Error with kind `validation` if the identifier is reserved, the formula is blank or does not parse and compile or the builder was consumed.
    */
   compute(nodeId: string, formula: string): void;
   /**
@@ -31655,7 +31303,7 @@ export interface ModelBuilder extends WasmOwned {
    * continue with.
    * @param nodeId - Node identifier, unique within the model.
    * @returns A `MixedNodeBuilder` for the node.
-   * @throws Error with kind `validation` if periods were not set or the builder was consumed.
+   * @throws Error with kind `validation` if the builder was consumed.
    */
   mixed(nodeId: string): MixedNodeBuilder;
   /**
@@ -31663,8 +31311,8 @@ export interface ModelBuilder extends WasmOwned {
    *
    * Twin of Python `ModelBuilder.forecast` (Rust `ModelBuilder::forecast`).
    * @param nodeId - Node whose forecast periods the spec fills.
-   * @param forecastSpec - `ForecastSpec` (`method` plus `params`), e.g. from `forecastSpecGrowth` (object or JSON).
-   * @throws Error with kind `validation` if `forecastSpec` is malformed, periods were not set, or the builder was consumed.
+   * @param forecastSpec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
+   * @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
    */
   forecast(nodeId: string, forecastSpec: generated.statements.ForecastSpec | string): void;
   /**
@@ -31673,7 +31321,7 @@ export interface ModelBuilder extends WasmOwned {
    * Twin of Python `ModelBuilder.where_clause` (Rust
    * `ModelBuilder::where_clause`).
    * @param whereClause - Boolean DSL expression; the node evaluates only in periods where it is true.
-   * @throws Error with kind `validation` if periods were not set or the builder was consumed.
+   * @throws Error with kind `validation` if the builder was consumed.
    */
   whereClause(whereClause: string): void;
   /**
@@ -31682,7 +31330,7 @@ export interface ModelBuilder extends WasmOwned {
    * Twin of Python `ModelBuilder.with_meta` (Rust `ModelBuilder::with_meta`).
    * @param key - Metadata key; `"currency"` is read by the evaluator and the DCF to infer the reporting currency.
    * @param value - Any JSON value (string, number, boolean, array, plain object or `null`), stored as given: a string is not parsed as JSON. For `key = "currency"` pass a three-letter code such as `"USD"`.
-   * @throws Error with kind `invalid_type` if `value` is not JSON-representable, and kind `validation` if a number is not finite, periods were not set, or the builder was consumed.
+   * @throws Error with kind `invalid_type` if `value` is not JSON-representable, and kind `validation` if a number is not finite or the builder was consumed.
    */
   withMeta(key: string, value: unknown): void;
   /**
@@ -31691,7 +31339,7 @@ export interface ModelBuilder extends WasmOwned {
    * Twin of Python `ModelBuilder.with_builtin_metrics` (Rust
    * `ModelBuilder::try_with_builtin_metrics`). A failed call leaves the
    * builder usable.
-   * @throws Error with kind `validation` if the built-in catalog cannot be loaded, periods were not set, or the builder was consumed.
+   * @throws Error with kind `validation` if the built-in catalog cannot be loaded or the builder was consumed.
    */
   withBuiltinMetrics(): void;
   /**
@@ -31702,7 +31350,7 @@ export interface ModelBuilder extends WasmOwned {
    * builder usable.
    * @param qualifiedId - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
    * @param registry - `Registry` holding the metric and its dependencies.
-   * @throws Error with kind `not_found` if the metric or a dependency is not in `registry`, and kind `validation` if the identifier is not `namespace.metric` shaped, periods were not set, or the builder was consumed.
+   * @throws Error with kind `not_found` if the metric or a dependency is not in `registry`, and kind `validation` if the identifier is not `namespace.metric` shaped or the builder was consumed.
    */
   addMetricFromRegistry(qualifiedId: string, registry: Registry): void;
   /**
@@ -31851,7 +31499,7 @@ export interface ModelBuilder extends WasmOwned {
    * Twin of Python `ModelBuilder.build` (Rust `ModelBuilder::build`). The
    * builder is consumed.
    * @returns The completed `FinancialModelSpec` plain object, accepted by every model-taking function.
-   * @throws Error with kind `validation` if the model fails semantic validation, periods were not set, or the builder was consumed.
+   * @throws Error with kind `validation` if the model fails semantic validation or the builder was consumed.
    */
   build(): generated.statements.FinancialModelSpec;
 }
@@ -31870,7 +31518,7 @@ export interface ModelBuilder extends WasmOwned {
  * const builder = new statements.ModelBuilder("acme");
  * builder.periods("2025Q1..Q4", "2025Q1");
  * builder.valueScalar("revenue", { "2025Q1": 100 });
- * builder.forecast("revenue", statements.forecastSpecGrowth(0.05));
+ * builder.forecast("revenue", { method: "growth_pct", params: { rate: 0.05 } });
  * builder.compute("gross_profit", "revenue * 0.6");
  * const model = builder.build();   // plain FinancialModelSpec object
  * statements.modelNodeIds(model);  // ["revenue", "gross_profit"]
@@ -31910,7 +31558,7 @@ export interface ModelBuilderConstructor {
  * builder.periods("2025Q1..Q2", "2025Q1");
  * const mixed = builder.mixed("revenue");
  * mixed.values({ "2025Q1": 100 });
- * mixed.forecast(statements.forecastSpecGrowth(0.05));
+ * mixed.forecast({ method: "growth_pct", params: { rate: 0.05 } });
  * const model = mixed.build().build();
  * new statements.Evaluator().evaluate(model).nodes.revenue["2025Q2"];  // 105
  * ```
@@ -31938,7 +31586,7 @@ export interface MixedNodeBuilder extends WasmOwned {
    *
    * Twin of Python `MixedNodeBuilder.forecast` (Rust
    * `MixedNodeBuilder::forecast`).
-   * @param forecastSpec - `ForecastSpec` (`method` plus `params`), e.g. from `forecastSpecGrowth` (object or JSON).
+   * @param forecastSpec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
    * @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
    */
   forecast(forecastSpec: generated.statements.ForecastSpec | string): void;
@@ -31986,7 +31634,7 @@ export interface MixedNodeBuilder extends WasmOwned {
  * builder.periods("2025Q1..Q2", "2025Q1");
  * const mixed = builder.mixed("revenue");
  * mixed.values({ "2025Q1": 100 });
- * mixed.forecast(statements.forecastSpecGrowth(0.05));
+ * mixed.forecast({ method: "growth_pct", params: { rate: 0.05 } });
  * const model = mixed.build().build();
  * new statements.Evaluator().evaluate(model).nodes.revenue["2025Q2"];  // 105
  * ```
@@ -32179,16 +31827,6 @@ export interface StatementsNamespace {
    */
   MixedNodeBuilder: MixedNodeBuilderConstructor;
   /**
-   * Start a model builder for the given identifier.
-   *
-   * Free-function twin of Python `FinancialModelSpec.builder` (Rust
-   * `FinancialModelSpec::builder`); the same as `new ModelBuilder(id)`.
-   * @param id - Model identifier stored on the built `FinancialModelSpec`.
-   * @returns A `ModelBuilder` waiting for `periods`.
-   * @throws Error - Throws a `TypeError` with kind `invalid_type` if `id` is not a string.
-   */
-  financialModelBuilder(id: string): ModelBuilder;
-  /**
    * Value of one node in one period.
    *
    * Free-function twin of Python `StatementResult.get` (Rust
@@ -32268,6 +31906,26 @@ export interface StatementsNamespace {
     resultJson: StatementResult | string,
     nodeId: string
   ): [string, number][];
+  /**
+   * Roll a statement result up to a coarser frequency, such as quarterly to annual.
+   *
+   * Free-function twin of Python `StatementResult.rollup` (Rust
+   * `StatementResult::rollup`). Each target period combines its source
+   * periods node by node: summed by default (flows), the last source value
+   * for `period_end` nodes (balances, LTM metrics), and the node's formula
+   * re-evaluated on the rolled-up values for `formula` nodes (ratios). Every
+   * target period must be complete.
+   * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
+   * @param model - The `FinancialModelSpec` the result was evaluated from (object or JSON); it supplies the period dates and the formulas of `formula` nodes.
+   * @param spec - `RollupSpec`: target `frequency` (`"quarterly"`, `"semi_annual"` or `"annual"`) and per-node `methods` (`"sum"` default, `"period_end"`, `"formula"`) (object or JSON).
+   * @returns `StatementResult` plain object keyed by the target periods (`"2025"`, `"2025H1"`, `"2025Q1"`), without `node_sources`, capital-structure cashflows or a check report.
+   * @throws Error - Throws with kind `validation` if an input is malformed, the target frequency is not a whole multiple of the model's, a target period is incomplete, a method names an unknown node, a `formula` node has no formula or reads `cs.*` values, or a re-evaluated formula fails.
+   */
+  statementResultRollup(
+    resultJson: StatementResult | string,
+    model: JsonInput,
+    spec: generated.statements.RollupSpec | string
+  ): StatementResult;
   /**
    * Period-to-value map of one node.
    *
@@ -32593,229 +32251,6 @@ export interface StatementsNamespace {
     period: string
   ): number;
   /**
-   * Forecast that carries the last value forward unchanged.
-   *
-   * Free-function twin of Python `ForecastSpec.forward_fill` (Rust
-   * `ForecastSpec::forward_fill`).
-   * @returns Plain `ForecastSpec` object (`{method: "forward_fill"}`).
-   * @throws Error - Throws only if the spec cannot be converted to a JavaScript object.
-   */
-  forecastSpecForwardFill(): generated.statements.ForecastSpec;
-  /**
-   * Forecast that compounds the last value at one rate per period.
-   *
-   * Free-function twin of Python `ForecastSpec.growth` (Rust
-   * `ForecastSpec::growth`): `v[t] = v[t-1] * (1 + rate)`.
-   * @param rate - Growth per model period as a decimal (`0.05` = 5%), not annualised.
-   * @returns Plain `ForecastSpec` object with method `growth_pct`.
-   * @throws Error - Throws with kind `invalid_type` if `rate` is not a number.
-   */
-  forecastSpecGrowth(rate: number): generated.statements.ForecastSpec;
-  /**
-   * Forecast that applies a period-specific growth curve.
-   *
-   * Free-function twin of Python `ForecastSpec.curve` (Rust
-   * `ForecastSpec::curve`).
-   * @param curve - One growth rate per forecast period, as decimals per period (`0.05` = 5%), in timeline order.
-   * @returns Plain `ForecastSpec` object with method `curve_pct`.
-   * @throws Error - Throws with kind `invalid_type` if `curve` is not an array of numbers.
-   */
-  forecastSpecCurve(curve: number[] | Float64Array): generated.statements.ForecastSpec;
-  /**
-   * Forecast drawn from a seeded normal distribution.
-   *
-   * Free-function twin of Python `ForecastSpec.normal` (Rust
-   * `ForecastSpec::normal`).
-   * @param mean - Mean of each period's draw, in the node's own units.
-   * @param stdDev - Standard deviation of each draw, in the node's own units; must be non-negative when the model is evaluated.
-   * @param seed - Random seed (non-negative integer or BigInt); the same seed reproduces the same draws.
-   * @returns Plain `ForecastSpec` object with method `normal`.
-   * @throws Error - Throws with kind `invalid_type` if a number argument is not a number or `seed` is not a non-negative integer.
-   */
-  forecastSpecNormal(
-    mean: number,
-    stdDev: number,
-    seed: number | bigint
-  ): generated.statements.ForecastSpec;
-  /**
-   * Forecast drawn from a seeded log-normal distribution.
-   *
-   * Free-function twin of Python `ForecastSpec.log_normal` (Rust
-   * `ForecastSpec::log_normal`).
-   * @param mean - Mean of the underlying normal (log space).
-   * @param stdDev - Standard deviation of the underlying normal (log space); must be non-negative when the model is evaluated.
-   * @param seed - Random seed (non-negative integer or BigInt); the same seed reproduces the same draws.
-   * @returns Plain `ForecastSpec` object with method `log_normal`.
-   * @throws Error - Throws with kind `invalid_type` if a number argument is not a number or `seed` is not a non-negative integer.
-   */
-  forecastSpecLogNormal(
-    mean: number,
-    stdDev: number,
-    seed: number | bigint
-  ): generated.statements.ForecastSpec;
-  /**
-   * Forecast with explicit per-period override values.
-   *
-   * Free-function twin of Python `ForecastSpec.override` (Rust
-   * `ForecastSpec::overrides`). Periods without an override carry the previous
-   * value forward.
-   * @param overrides - Object mapping period id (e.g. `"2025Q3"`) to the value for that period, in the node's own units.
-   * @returns Plain `ForecastSpec` object with method `override`.
-   * @throws Error - Throws with kind `validation` if `overrides` is not an object of numbers keyed by valid period identifiers.
-   */
-  forecastSpecOverride(
-    overrides: Record<string, number> | string
-  ): generated.statements.ForecastSpec;
-  /**
-   * Forecast that repeats a seasonal pattern taken from history.
-   *
-   * Free-function twin of Python `ForecastSpec.seasonal` (Rust
-   * `ForecastSpec::seasonal`).
-   * @param historical - Historical observations in timeline order, in the node's own units.
-   * @param seasonLength - Number of periods in one season (e.g. `4` for quarterly data with an annual cycle).
-   * @param mode - `"additive"` or `"multiplicative"`.
-   * @returns Plain `ForecastSpec` object with method `seasonal`.
-   * @throws Error - Throws with kind `invalid_type` if an argument has the wrong JavaScript type, and kind `validation` if `mode` is not a seasonal mode.
-   */
-  forecastSpecSeasonal(
-    historical: number[] | Float64Array,
-    seasonLength: number,
-    mode: 'additive' | 'multiplicative'
-  ): generated.statements.ForecastSpec;
-  /**
-   * Forecast fitted to a historical time series.
-   *
-   * Free-function twin of Python `ForecastSpec.time_series` (Rust
-   * `ForecastSpec::time_series`).
-   * @param historical - Historical observations in timeline order, in the node's own units.
-   * @returns Plain `ForecastSpec` object with method `time_series`.
-   * @throws Error - Throws with kind `invalid_type` if `historical` is not an array of numbers.
-   */
-  forecastSpecTimeSeries(historical: number[] | Float64Array): generated.statements.ForecastSpec;
-  /**
-   * Forecast that fades the last value toward a target level.
-   *
-   * Free-function twin of Python `ForecastSpec.fade_to_target` (Rust
-   * `ForecastSpec::fade_to_target`).
-   * @param target - Level the node converges to, in the node's own units.
-   * @returns Plain `ForecastSpec` object with method `fade_to_target`.
-   * @throws Error - Throws with kind `invalid_type` if `target` is not a number.
-   */
-  forecastSpecFadeToTarget(target: number): generated.statements.ForecastSpec;
-  /**
-   * Forecast following a seeded mean-reverting process.
-   *
-   * Free-function twin of Python `ForecastSpec.mean_reverting` (Rust
-   * `ForecastSpec::mean_reverting`).
-   * @param longRunMean - Level the process reverts to, in the node's own units.
-   * @param reversionSpeed - Fraction of the gap to the mean closed each period, as a decimal in `[0, 1]`.
-   * @param stdDev - Standard deviation of each period's shock, in the node's own units.
-   * @param seed - Random seed (non-negative integer or BigInt); the same seed reproduces the same path.
-   * @returns Plain `ForecastSpec` object with method `mean_reverting`.
-   * @throws Error - Throws with kind `invalid_type` if a number argument is not a number or `seed` is not a non-negative integer.
-   */
-  forecastSpecMeanReverting(
-    longRunMean: number,
-    reversionSpeed: number,
-    stdDev: number,
-    seed: number | bigint
-  ): generated.statements.ForecastSpec;
-  /**
-   * Forecast that resamples historical observations with a seed.
-   *
-   * Free-function twin of Python `ForecastSpec.bootstrap` (Rust
-   * `ForecastSpec::bootstrap`).
-   * @param historical - Historical observations to resample, in the node's own units.
-   * @param seed - Random seed (non-negative integer or BigInt); the same seed reproduces the same draws.
-   * @returns Plain `ForecastSpec` object with method `bootstrap`.
-   * @throws Error - Throws with kind `invalid_type` if `historical` is not an array of numbers or `seed` is not a non-negative integer.
-   */
-  forecastSpecBootstrap(
-    historical: number[] | Float64Array,
-    seed: number | bigint
-  ): generated.statements.ForecastSpec;
-  /**
-   * Adjustment with fixed amounts per period.
-   *
-   * Free-function twin of Python `Adjustment.fixed` (Rust `Adjustment::fixed`).
-   * @param id - Adjustment identifier, unique within a normalization configuration.
-   * @param name - Human-readable name shown in reports.
-   * @param amounts - Object mapping period id (e.g. `"2025Q1"`) to the signed amount for that period, in the target node's units (positive adds back, negative deducts).
-   * @returns Plain `Adjustment` object.
-   * @throws Error - Throws with kind `validation` if `amounts` is not an object of numbers keyed by valid period identifiers.
-   */
-  adjustmentFixed(
-    id: string,
-    name: string,
-    amounts: Record<string, number> | string
-  ): generated.statements.Adjustment;
-  /**
-   * Adjustment sized as a fraction of another node's value each period.
-   *
-   * Free-function twin of Python `Adjustment.percentage` (Rust
-   * `Adjustment::percentage`).
-   * @param id - Adjustment identifier, unique within a normalization configuration.
-   * @param name - Human-readable name shown in reports.
-   * @param nodeId - Reference node whose per-period value is scaled.
-   * @param percentage - Fraction as a signed decimal (`0.05` = 5%; negative for a deduction).
-   * @returns Plain `Adjustment` object.
-   * @throws Error - Throws with kind `invalid_type` if an argument has the wrong JavaScript type.
-   */
-  adjustmentPercentage(
-    id: string,
-    name: string,
-    nodeId: string,
-    percentage: number
-  ): generated.statements.Adjustment;
-  /**
-   * Copy of an adjustment with a cap measured on the reported base.
-   *
-   * Free-function twin of Python `Adjustment.with_cap` (Rust
-   * `Adjustment::with_cap`).
-   * @param adjustment - `Adjustment` (object or JSON).
-   * @param baseNode - Node the cap is a fraction of; `null` makes `value` an absolute cap in the target node's units.
-   * @param value - Cap as a decimal fraction of `baseNode` (`0.20` = 20%), or an absolute amount when `baseNode` is `null`.
-   * @returns New plain `Adjustment` object with the cap set.
-   * @throws Error - Throws with kind `validation` if `adjustment` is malformed, and kind `invalid_type` if another argument has the wrong JavaScript type.
-   */
-  adjustmentWithCap(
-    adjustment: generated.statements.Adjustment | string,
-    baseNode: string | null | undefined,
-    value: number
-  ): generated.statements.Adjustment;
-  /**
-   * Copy of an adjustment with a cap and an explicit cap-base mode.
-   *
-   * Free-function twin of Python `Adjustment.with_cap_mode` (Rust
-   * `Adjustment::with_cap_mode`).
-   * @param adjustment - `Adjustment` (object or JSON).
-   * @param baseNode - Node the cap is a fraction of; `null` makes `value` an absolute cap in the target node's units.
-   * @param value - Cap as a decimal fraction of `baseNode` (`0.20` = 20%), or an absolute amount when `baseNode` is `null`.
-   * @param baseMode - `"reported"` (cap measured on the reported base) or `"progressive"` (base grows with the adjustments already applied).
-   * @returns New plain `Adjustment` object with the cap set.
-   * @throws Error - Throws with kind `validation` if `adjustment` is malformed or `baseMode` is not a cap-base mode, and kind `invalid_type` if another argument has the wrong JavaScript type.
-   */
-  adjustmentWithCapMode(
-    adjustment: generated.statements.Adjustment | string,
-    baseNode: string | null | undefined,
-    value: number,
-    baseMode: generated.statements.CapBaseMode
-  ): generated.statements.Adjustment;
-  /**
-   * Copy of an adjustment with a grouping category.
-   *
-   * Free-function twin of Python `Adjustment.with_category` (Rust
-   * `Adjustment::with_category`).
-   * @param adjustment - `Adjustment` (object or JSON).
-   * @param category - Grouping label used by reports, e.g. `"one_time"` or `"run_rate"`.
-   * @returns New plain `Adjustment` object with the category set.
-   * @throws Error - Throws with kind `validation` if `adjustment` is malformed, and kind `invalid_type` if `category` is not a string.
-   */
-  adjustmentWithCategory(
-    adjustment: generated.statements.Adjustment | string,
-    category: string
-  ): generated.statements.Adjustment;
-  /**
    * Copy of a normalization configuration with one more adjustment.
    *
    * Free-function twin of Python `NormalizationConfig.add_adjustment` (Rust
@@ -32843,7 +32278,7 @@ export interface StatementsNamespace {
   /**
    * Normalize a target metric by applying an adjustment catalog period by period.
    *
-   * Twin of Python `normalize` (Rust `NormalizationEngine::normalize`).
+   * Twin of Python `normalize` (Rust `adjustments::normalize`).
    * @param results - Evaluated `StatementResult` holding the target node and any reference nodes (object or JSON).
    * @param config - `NormalizationConfig`: target node plus the adjustments to apply (object or JSON).
    * @returns One `NormalizationResult` per period of the target node: base value, each applied adjustment (raw and capped) and the final value.
@@ -32854,23 +32289,10 @@ export interface StatementsNamespace {
     config: generated.statements.NormalizationConfig | string
   ): generated.statements.NormalizationResult[];
   /**
-   * Normalize a target metric and return the results as JSON text.
-   *
-   * JSON wire twin of `normalize` (Python `normalize_json`).
-   * @param results - Evaluated `StatementResult` holding the target node and any reference nodes (object or JSON).
-   * @param config - `NormalizationConfig`: target node plus the adjustments to apply (object or JSON).
-   * @returns JSON array of `NormalizationResult` objects, one per period.
-   * @throws Error - Throws with kind `validation` if an input is malformed, the target node or a referenced node is absent from the results, the configuration is invalid, or the target and a reference node have incompatible units.
-   */
-  normalizeJson(
-    results: StatementResult | string,
-    config: generated.statements.NormalizationConfig | string
-  ): string;
-  /**
    * Write normalized values back into statement results as a node.
    *
    * Twin of Python `merge_into_results` (Rust
-   * `NormalizationEngine::merge_into_results`). Each period's `final_value`
+   * `adjustments::merge_into_results`). Each period's `final_value`
    * becomes node `outputNodeId` with the shared unit (and currency for monetary
    * values), replacing any existing node of that name across all periods. The
    * attached check report is cleared because it describes the values before the
@@ -33249,13 +32671,39 @@ export interface StatementsAnalyticsNamespace {
    * Evaluate all scenarios in a scenario set against a base model.
    *
    * Returns a structured JavaScript object mapping scenario names to their
-   * statement results.
+   * statement results. Like `Evaluator.evaluate`, a capital structure is
+   * evaluated from an empty market, which serves fixed-rate instruments; use
+   * `evaluateScenarioSetWithMarket` for instruments that need market data.
+   * A scenario's `forecast_overrides` replace whole node forecast specs.
    * @returns Statement results keyed by scenario name.
    * @param modelJson - Financial-model specification JSON.
    * @param scenarioSetJson - Scenario-set JSON keyed by scenario name.
-   * @throws Error - Rejects malformed model or scenario-set JSON, an empty scenario set, invalid parent chains, overrides of missing nodes, failure to evaluate any scenario, or failure to serialize the result map to JavaScript.
+   * @throws Error - Rejects malformed model or scenario-set JSON, an empty scenario set, invalid parent chains, overrides of missing nodes, invalid forecast overrides, a capital-structure instrument needing market data (kind `not_found`), failure to evaluate any scenario, or failure to serialize the result map to JavaScript.
    */
   evaluateScenarioSet(modelJson: JsonInput, scenarioSetJson: JsonInput): ScenarioResults;
+  /**
+   * Evaluate all scenarios in a scenario set against a market as of a date.
+   *
+   * Twin of Python `evaluate_scenario_set_with_market` (Rust
+   * `ScenarioSet::evaluate_all_with_market`). Each scenario is evaluated like
+   * `Evaluator.evaluateWithMarket`: capital-structure instruments are priced
+   * from `market` as of `asOf` (floating coupons, swaps, caps), so every result
+   * carries `cs_cashflows`, and explicit actuals not yet available at `asOf`
+   * are hidden. `evaluateScenarioSet` evaluates the capital structure from an
+   * empty market, which serves fixed-rate instruments only.
+   * @param modelJson - Financial-model specification JSON.
+   * @param scenarioSetJson - Scenario-set JSON keyed by scenario name.
+   * @param market - `MarketContext` state supplying curves, fixings and FX (object or JSON), shared by every scenario.
+   * @param asOf - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments and the cutoff for explicit-value visibility.
+   * @returns Map of scenario name to `StatementResult` plain object.
+   * @throws Error - Rejects malformed model, scenario-set or market input, an `asOf` that is not an ISO date, an empty scenario set, invalid parent chains, overrides of missing or incompatible nodes, invalid forecast overrides, an instrument needing market data `market` lacks (kind `not_found`), or a failure to evaluate any scenario.
+   */
+  evaluateScenarioSetWithMarket(
+    modelJson: JsonInput,
+    scenarioSetJson: JsonInput,
+    market: JsonInput,
+    asOf: string
+  ): ScenarioResults;
   /**
    * Scenario comparison table with a `<scenario>_vs_<baseline>_frac` column per non-baseline scenario (twin of Python `ScenarioResults.to_comparison_table`). The baseline is `"base"` when present, otherwise the first scenario.
    * @param scenarioResultsJson - The scenario map returned by `evaluateScenarioSet` (object or JSON).
@@ -33350,9 +32798,8 @@ export interface StatementsAnalyticsNamespace {
    * @param terminalValueJson - Terminal-value spec JSON selecting whether growth or the exit multiple is shocked.
    * @param ufcfNode - Node identifier holding monetary unlevered free cash flow in model currency for the forecast periods; omitted uses the canonical "ufcf" node. Gordon Growth / H-Model terminal cash flow requires a complete contiguous calendar year at the forecast end.
    * @param netDebtOverride - Optional net debt in model currency; otherwise requires debt and cash in that currency from a period ending on or before valuation.
-   * @param optionsJson - Optional Rust `DcfOptions` JSON; every field is optional and a missing one takes its default: `mid_year_convention` (false), `wacc_sensitivity_bump` (0.01 = +/-100 bp), `wacc_denominator_epsilon` (0.005), `max_stable_growth_rate` (0.05), `exit_multiple_bump` (`{"absolute": 1.0}` turns or `{"relative": 0.10}`), `exit_multiple_metric_node` (flow node whose complete trailing year supplies the exit-multiple metric), `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `discount_curve_id`. Unknown keys are rejected.
-   * @param marketJson - Optional canonical market-context JSON used for statement evaluation, not WACC discounting.
-   * @throws Error - Rejects malformed model, terminal-value, options, or market JSON (an unknown options key included), model-evaluation failures, a missing UFCF series or model currency, inconsistent WACC or terminal-value assumptions, a missing or incomplete exit-multiple metric node, missing bridge inputs, valuation failures, or failure to serialize the sensitivity result.
+   * @param optionsJson - Optional Rust `DcfOptions` JSON; every field is optional and a missing one takes its default: `mid_year_convention` (false), `wacc_sensitivity_bump` (0.01 = +/-100 bp), `wacc_denominator_epsilon` (0.005), `max_stable_growth_rate` (0.05), `exit_multiple_bump` (`{"absolute": 1.0}` turns or `{"relative": 0.10}`), `exit_multiple_metric_node` (flow node whose complete trailing year supplies the exit-multiple metric), `equity_bridge`, `shares_outstanding`, `valuation_discounts`. Unknown keys are rejected.
+   * @throws Error - Rejects malformed model, terminal-value or options JSON (an unknown options key included), model-evaluation failures, a missing UFCF series or model currency, inconsistent WACC or terminal-value assumptions, a missing or incomplete exit-multiple metric node, missing bridge inputs, valuation failures, or failure to serialize the sensitivity result.
    */
   dcfSensitivity(
     modelJson: JsonInput,
@@ -33360,8 +32807,7 @@ export interface StatementsAnalyticsNamespace {
     terminalValueJson: JsonInput,
     ufcfNode?: string | null,
     netDebtOverride?: number | null,
-    optionsJson?: JsonInput | null,
-    marketJson?: JsonInput | null
+    optionsJson?: JsonInput | null
   ): DcfSensitivityResult;
   /**
    * Evaluate a leveraged-buyout transaction against a statement model.
@@ -33831,12 +33277,12 @@ export interface StatementsAnalyticsNamespace {
   /**
    * Value a company with a discounted cash flow of its unlevered free cash flow.
    *
-   * Twin of Python `evaluate_dcf` (Rust `evaluate_dcf_with_market`). The model
+   * Twin of Python `evaluate_dcf` (Rust `evaluate_dcf`). The model
    * is evaluated, the UFCF series is discounted at `wacc`, the terminal value
    * is added, and the equity bridge turns enterprise value into equity value.
    * @param model - `FinancialModelSpec` (object or JSON); its metadata must carry a `currency`.
    * @param wacc - Weighted average cost of capital as a decimal (`0.10` = 10%).
-   * @param terminalValue - `TerminalValueSpec`, e.g. from `terminalValueSpecGordonGrowth` (object or JSON).
+   * @param terminalValue - `TerminalValueSpec`, e.g. `{ type: "gordon_growth", stable_growth_rate: 0.02 }` (object or JSON).
    * @param ufcfNode - Node holding unlevered free cash flow; omitted uses the Rust default `"ufcf"`.
    * @param netDebtOverride - Flat net debt in model currency used instead of the model-derived equity bridge.
    * @param options - Optional Rust `DcfOptions`; every field is optional and a missing one takes its Rust default (`mid_year_convention`, `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `exit_multiple_metric_node`, ...). Unknown keys are rejected (object or JSON).
@@ -33872,46 +33318,6 @@ export interface StatementsAnalyticsNamespace {
     market?: JsonInput | null
   ): generated.statements_analytics.CorporateAnalysis;
   /**
-   * Gordon-growth terminal value: a perpetuity growing at a stable rate.
-   *
-   * Free-function twin of Python `TerminalValueSpec.gordon_growth` (Rust
-   * `TerminalValueSpec::GordonGrowth`).
-   * @param stableGrowthRate - Perpetual growth rate as a decimal (`0.02` = 2%); must be below the WACC when valued.
-   * @returns Plain `TerminalValueSpec` object (`{type: "gordon_growth", stable_growth_rate}`).
-   * @throws Error - Throws with kind `invalid_type` if `stableGrowthRate` is not a number.
-   */
-  terminalValueSpecGordonGrowth(stableGrowthRate: number): generated.valuations.TerminalValueSpec;
-  /**
-   * Exit-multiple terminal value: a terminal metric times a multiple.
-   *
-   * Free-function twin of Python `TerminalValueSpec.exit_multiple` (Rust
-   * `TerminalValueSpec::ExitMultiple`).
-   * @param multiple - Exit multiple in turns (`8.5` = 8.5x the terminal metric).
-   * @param terminalMetric - Terminal-year metric (for example EBITDA) in model currency; pass `0` when `DcfOptions.exit_multiple_metric_node` supplies the metric from the model.
-   * @returns Plain `TerminalValueSpec` object (`{type: "exit_multiple", terminal_metric, multiple}`).
-   * @throws Error - Throws with kind `invalid_type` if an argument is not a number.
-   */
-  terminalValueSpecExitMultiple(
-    multiple: number,
-    terminalMetric: number
-  ): generated.valuations.TerminalValueSpec;
-  /**
-   * H-model terminal value: growth fades linearly from a high to a stable rate.
-   *
-   * Free-function twin of Python `TerminalValueSpec.h_model` (Rust
-   * `TerminalValueSpec::HModel`).
-   * @param highGrowthRate - Initial growth rate as a decimal (`0.08` = 8%).
-   * @param stableGrowthRate - Long-run growth rate as a decimal; must be below the WACC when valued.
-   * @param halfLifeYears - Half-life of the growth fade in years (`5` = growth is halfway to stable after five years).
-   * @returns Plain `TerminalValueSpec` object (`{type: "h_model", ...}`).
-   * @throws Error - Throws with kind `invalid_type` if an argument is not a number.
-   */
-  terminalValueSpecHModel(
-    highGrowthRate: number,
-    stableGrowthRate: number,
-    halfLifeYears: number
-  ): generated.valuations.TerminalValueSpec;
-  /**
    * Variance between two evaluated scenarios of a scenario set.
    *
    * Twin of Python `scenario_diff` (Rust `ScenarioSet::diff`).
@@ -33936,7 +33342,7 @@ export interface StatementsAnalyticsNamespace {
    * Decompose a metric's variance between two results across named drivers.
    *
    * Twin of Python `variance_bridge` (Rust
-   * `VarianceAnalyzer::bridge_decomposition`). Driver contributions are raw
+   * `variance_bridge`). Driver contributions are raw
    * deltas in driver units, not sensitivities of the target, so they need not
    * sum to the target variance; the gap is `unexplained`.
    * @param base - Baseline evaluated `StatementResult` (object or JSON).
@@ -34045,22 +33451,6 @@ export interface StatementsAnalyticsNamespace {
     scenario: string
   ): string[];
   /**
-   * Copy of a sensitivity configuration with one more parameter.
-   *
-   * Free-function twin of Python `SensitivityConfig.add_parameter` (Rust
-   * `SensitivityConfig::add_parameter`). Python builds the `ParameterSpec`
-   * from keyword arguments; here it is passed as an object, e.g. from
-   * `parameterSpecWithPercentages`.
-   * @param config - `SensitivityConfig` (object or JSON).
-   * @param parameter - `ParameterSpec`: `node_id`, `period_id`, `base_value` and absolute `perturbations` (object or JSON).
-   * @returns New plain `SensitivityConfig` object.
-   * @throws Error - Throws with kind `validation` if an input is malformed.
-   */
-  sensitivityConfigAddParameter(
-    config: generated.statements_analytics.SensitivityConfig | string,
-    parameter: generated.statements_analytics.ParameterSpec | string
-  ): generated.statements_analytics.SensitivityConfig;
-  /**
    * Value a parameter took in one sensitivity scenario.
    *
    * Free-function twin of Python `SensitivityResult.get_parameter_value` (Rust
@@ -34098,7 +33488,7 @@ export interface StatementsAnalyticsNamespace {
    * Detailed text rendering of a formula explanation.
    *
    * Free-function twin of Python `Explanation.to_text` (Rust
-   * `Explanation::to_string_detailed`).
+   * `Explanation::to_text`).
    * @param explanation - `Explanation` returned by `explainFormula`. Pass the JSON form (non-finite values as `"nan"`, `"inf"`, `"-inf"`) when a value is not finite; a plain object holding `NaN` is rejected at the boundary.
    * @returns Multi-line text: the node, period, final value, formula and each component with its value.
    * @throws Error - Throws with kind `validation` if `explanation` is malformed.
@@ -34504,7 +33894,7 @@ declare class FactorModel {
    *
    * Returns the sensitivity-matrix wire object (`base_currency`,
    * `position_ids`, `factor_ids`, `data` rows), the same shape
-   * `computeFactorSensitivities` returns and `decomposeFactorRisk` accepts.
+   * `computeFactorSensitivities` returns and `models.factor.risk.decomposeFactors` accepts.
    * @param portfolio - Built portfolio; its base currency is the reporting currency of every sensitivity.
    * @param market - `core.MarketContext` handle bumped by the sensitivity engine, including FX for cross-currency positions.
    * @param asOf - ISO-8601 valuation date for sensitivities and spot FX.
@@ -34588,61 +33978,6 @@ declare class FactorModel {
 }
 
 /**
- * Aggregates margin requirements across a portfolio by netting set (Rust
- * `PortfolioMarginAggregator`). Build one with `fromPortfolio`, then call
- * `calculate` for each market snapshot.
- * @example
- * ```typescript
- * import init, { core, portfolio } from "finstack-quant-wasm";
- * await init();
- * const book = portfolio.Portfolio.builder("book", "USD", "2025-01-01").build();
- * const market = new core.MarketContext();
- * const aggregator = portfolio.PortfolioMarginAggregator.fromPortfolio(book);
- * const margin = aggregator.calculate(book, market, "2025-01-01");
- * console.log(margin.total_initial_margin.amount, margin.netting_sets.length);
- * aggregator.free();
- * market.free();
- * book.free();
- * ```
- */
-declare class PortfolioMarginAggregator {
-  private constructor();
-  /**
-   * Create an aggregator from a portfolio.
-   * @param portfolio - Built portfolio whose positions carrying margin metadata seed the netting sets; its base currency is the reporting currency.
-   * @returns A reusable `PortfolioMarginAggregator` handle.
-   * @throws Error - Throws a `FinstackError` (kind `validation`) if positions in one netting set carry conflicting margin specifications.
-   */
-  static fromPortfolio(portfolio: Portfolio): PortfolioMarginAggregator;
-  /**
-   * Calculate margin requirements for the portfolio.
-   *
-   * Returns the `PortfolioMarginResult`: base-currency totals
-   * (`total_initial_margin`, signed `total_variation_margin`,
-   * `total_margin`), the one-way IM accounts `by_csa`, and `netting_sets`
-   * in ascending identifier order. Each netting set carries the netted SIMM
-   * `sensitivities` its initial margin was computed from and the
-   * per-risk-class `im_breakdown`.
-   * @param portfolio - Built portfolio used for mark-to-market and sensitivity lookups; normally the one passed to `fromPortfolio`.
-   * @param market - `core.MarketContext` handle supplying curves and quotes for VM and SIMM sensitivities, and the FX matrix for base-currency reporting.
-   * @param asOf - ISO-8601 valuation date of the margin run.
-   * @param currentImCollateral - Optional one-way IM balances already held, as an object (or JSON) keyed by CSA id with `Money` values (`{ amount, currency }`) in that CSA's currency. Omitted, `undefined`, `null` or a missing key means zero.
-   * @returns The `PortfolioMarginResult` as a plain object.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string or `currentImCollateral` is not a JSON string or plain object, and a `FinstackError` if `asOf` is not an ISO date, `currentImCollateral` does not match the schema or names an unknown CSA id, or a required FX rate is unavailable.
-   */
-  calculate(
-    portfolio: Portfolio,
-    market: MarketContext,
-    asOf: string,
-    currentImCollateral?: Record<string, MoneyValue> | string | null
-  ): PortfolioMarginResult;
-  /**
-   * Release the underlying wasm heap allocation. Do not use this handle after calling `free()`.
-   */
-  free(): void;
-}
-
-/**
  * Namespaced TypeScript entry points for portfolio calculations and types.
  * @example
  * ```typescript
@@ -34671,9 +34006,32 @@ export interface PortfolioNamespace {
    */
   FactorModel: typeof FactorModel;
   /**
-   * Stateful portfolio margin aggregator: netting-set initial and variation margin.
+   * Calculate portfolio margin requirements by netting set (Rust
+   * `margin::portfolio_margin`).
+   * @example
+   * ```typescript
+   * import init, { core, portfolio } from "finstack-quant-wasm";
+   * await init();
+   * const book = portfolio.Portfolio.builder("book", "USD", "2025-01-01").build();
+   * const market = new core.MarketContext();
+   * const margin = portfolio.portfolioMargin(book, market, "2025-01-01");
+   * console.log(margin.total_initial_margin.amount, margin.netting_sets.length);
+   * market.free();
+   * book.free();
+   * ```
+   * @param portfolio - Built portfolio whose positions carrying margin metadata form the netting sets; its base currency is the reporting currency.
+   * @param market - `core.MarketContext` handle supplying curves and quotes for VM and SIMM sensitivities, and the FX matrix for base-currency reporting.
+   * @param asOf - ISO-8601 valuation date of the margin run.
+   * @param currentImCollateral - Optional one-way IM balances already held, as an object (or JSON) keyed by CSA id with `Money` values (`{ amount, currency }`) in that CSA's currency. Omitted, `undefined`, `null` or a missing key means zero.
+   * @returns The `PortfolioMarginResult` as a plain object.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string or `currentImCollateral` is not a JSON string or plain object, and a `FinstackError` if positions in one netting set carry conflicting margin specifications (kind `validation`), `asOf` is not an ISO date, `currentImCollateral` does not match the schema or names an unknown CSA id, or a required FX rate is unavailable.
    */
-  PortfolioMarginAggregator: typeof PortfolioMarginAggregator;
+  portfolioMargin(
+    portfolio: Portfolio,
+    market: MarketContext,
+    asOf: string,
+    currentImCollateral?: Record<string, MoneyValue> | string | null
+  ): PortfolioMarginResult;
   /**
    * Parse and validate a portfolio specification from JSON.
    *
@@ -34700,33 +34058,21 @@ export interface PortfolioNamespace {
    * Binds Rust `carino_link`: accepts a chronological JSON array of
    * `BrinsonPeriodResult` objects (for example `brinsonFachler` outputs) and
    * returns a structured `CarinoLinkedAttribution` object whose linked effects
-   * reconstruct the geometrically compounded active return. Use
-   * `carinoLinkFromSectorPeriods` to link raw sector inputs instead.
+   * reconstruct the geometrically compounded active return. To link raw sector
+   * inputs, attribute each period with `brinsonFachler` first.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param periodsJson - Chronological JSON array of `BrinsonPeriodResult` objects with identical sector ordering in every period.
    * @throws Error - Throws a JavaScript exception if `periodsJson` is malformed, the sequence is empty or changes sector ordering, or a period return is non-finite or at most `-1`.
    */
   carinoLink(periodsJson: JsonInput): CarinoLinkedAttribution;
   /**
-   * Compute Carino-linked multi-period Brinson attribution from raw sector
-   * periods.
-   *
-   * Binds Rust `carino_link_from_sector_periods`: runs `brinsonFachler` on
-   * each period, then Carino-links the results. Returns a structured
-   * `CarinoLinkedAttribution` object.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param periodsJson - Chronological JSON array of periods, each an array of `SectorPeriod` objects (`sector`, `portfolio_weight`, `benchmark_weight`, `portfolio_return`, `benchmark_return`).
-   * @throws Error - Throws a JavaScript exception if `periodsJson` is malformed, any period fails Brinson validation, the sequence is empty or changes sector ordering, or a period return is non-finite or at most `-1`.
-   */
-  carinoLinkFromSectorPeriods(periodsJson: JsonInput): CarinoLinkedAttribution;
-  /**
    * Compute a single-period Campisi fixed-income attribution from JSON.
    *
    * Decomposes both sides into carry / treasury / spread / selection and
    * splits the active return into allocation plus four active component
-   * effects (Campisi 2000). Returns a structured `FiAttributionResult` object;
-   * `JSON.stringify` it to chain into `campisiCarinoLink` or
-   * `campisiReconciliationCheck`.
+   * effects (Campisi 2000). Returns a structured `FiAttributionResult` object
+   * to chain into `campisiCarinoLink` or
+   * `fiAttributionResultReconciliationCheck`.
    *
    * Every snapshot must use the quote-reproducing `z_spread` basis:
    * `spread_duration` is the canonical Z-spread duration, and `spread` plus
@@ -34753,11 +34099,10 @@ export interface PortfolioNamespace {
   /**
    * Carino-link already-computed single-period Campisi results.
    *
-   * Binds Rust `campisi_carino_link`. Each period carries its own
-   * already-applied `period_years`, so periods of *different* lengths (e.g.
-   * act/365 calendar months) link correctly here; prefer this entry point
-   * whenever the periods are not all the same length. Returns a structured
-   * `FiCarinoLinkedResult` object.
+   * Binds Rust `campisi_carino_link`. Attribute each period with
+   * `campisiAttribution` first; each period carries its own already-applied
+   * `period_years`, so periods of *different* lengths (e.g. act/365 calendar
+   * months) link correctly. Returns a structured `FiCarinoLinkedResult` object.
    *
    * Throws if no periods are supplied, sector ordering differs, a consumed
    * top-level return/effect, per-sector linked effect, or sector `total_active`
@@ -34773,36 +34118,24 @@ export interface PortfolioNamespace {
    */
   campisiCarinoLink(periodsJson: JsonInput): FiCarinoLinkedResult;
   /**
-   * Compute per-period Campisi attributions from snapshots and Carino-link them.
-   *
-   * Binds Rust `campisi_carino_link_from_snapshots`. One shared config — hence
-   * one shared `period_years` — is applied to every period, so this entry point
-   * is only correct for equal-length periods; use `campisiCarinoLink` for
-   * unequal periods. Returns a structured `FiCarinoLinkedResult` object.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param periodsJson - Canonical JSON array of `FiPeriodInput` objects, each holding `portfolio` and `benchmark` arrays of `FiPositionSnapshot`.
-   * @param configJson - Canonical JSON `FiAttributionConfig` applied to every period; `period_years` is its only field and is required (no default).
-   * @throws Error - Throws a JavaScript exception if either JSON input is malformed, any period fails Campisi attribution validation, the computed periods fail Carino linking validation, or the result cannot be converted to a JavaScript value.
-   */
-  campisiCarinoLinkFromSnapshots(
-    periodsJson: JsonInput,
-    configJson: JsonInput
-  ): FiCarinoLinkedResult;
-  /**
    * Reconcile the five Campisi effect totals against the active return.
    *
-   * Binds the Rust method `FiAttributionResult::reconciliation_check`. The
+   * Binds the Rust method `FiAttributionResult::reconciliation_check` (Python
+   * `FiAttributionResult.reconciliation_check`); WASM results are plain
+   * objects, so the method is a free function taking the object. The
    * decomposition reconciles by construction (selection is the residual), so
-   * this is a floating-point sanity gate rather than a model check; without it
-   * callers must re-sum the five totals by hand. Returns a structured
-   * `FiReconciliationReport` object with `total_residual`, `is_reconciled`
-   * and `tolerance`.
+   * this is a floating-point sanity gate rather than a model check. Returns a
+   * structured `ReconciliationReport` object with `total_residual`,
+   * `is_reconciled` and `tolerance`.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param resultJson - Canonical JSON `FiAttributionResult` as returned by `campisiAttribution` (`JSON.stringify` its structured result); unknown fields are rejected.
+   * @param result - `FiAttributionResult` object or JSON as returned by `campisiAttribution`; unknown fields are rejected.
    * @param tolerance - Absolute reconciliation tolerance in return units; `1e-10` suits return-space values.
-   * @throws Error - Throws a JavaScript exception if `resultJson` is malformed or does not match `FiAttributionResult`, or if the reconciliation report cannot be converted to a JavaScript value.
+   * @throws Error - Throws a JavaScript exception if `result` is malformed or does not match `FiAttributionResult`, or if the reconciliation report cannot be converted to a JavaScript value.
    */
-  campisiReconciliationCheck(resultJson: JsonInput, tolerance: number): FiReconciliationReport;
+  fiAttributionResultReconciliationCheck(
+    result: FiAttributionResult | string,
+    tolerance: number
+  ): ReconciliationReport;
   /**
    * Build a duration-cell base-return table from a reference universe.
    *
@@ -34953,20 +34286,16 @@ export interface PortfolioNamespace {
    */
   mwrXirr(cashflowsJson: JsonInput): number;
   /**
-   * Aggregate portfolio metrics from a valuation JSON.
+   * Aggregate portfolio metrics from a valuation.
+   *
+   * Metrics are aggregated in the valuation's base currency, with FX spots
+   * read at the valuation's `as_of`.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param valuationJson - `PortfolioValuation` JSON, for example `JSON.stringify(valuePortfolio(...))`.
-   * @param baseCurrency - ISO-4217 base currency in which aggregate portfolio values are reported.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @throws Error - Throws a JavaScript exception if either JSON input is malformed, `baseCurrency` or `asOf` is invalid, valuation currency or date metadata is inconsistent, a required FX conversion is unavailable or invalid, or the metrics cannot be converted to a JavaScript value.
+   * @param valuationJson - `PortfolioValuation` object or JSON, for example the result of `valuePortfolio`.
+   * @param market - `core.MarketContext` handle supplying the FX spots that convert out-of-base metrics.
+   * @throws Error - Throws a JavaScript exception if the valuation input is malformed, a required FX conversion is unavailable or invalid, or the metrics cannot be converted to a JavaScript value.
    */
-  aggregateMetrics(
-    valuationJson: JsonInput,
-    baseCurrency: string,
-    marketJson: JsonInput,
-    asOf: string
-  ): PortfolioMetrics;
+  aggregateMetrics(valuationJson: PortfolioValuation | string, market: MarketContext): PortfolioMetrics;
   /**
    * Decoded series of one base metric from aggregated portfolio metrics (twin of Python `PortfolioMetrics.metric_series`).
    * @param metricsJson - `PortfolioMetrics` from `aggregateMetrics` (object or JSON).
@@ -35028,7 +34357,7 @@ export interface PortfolioNamespace {
   /**
    * Collapse a multi-currency cashflow ladder into the base currency per date and kind (twin of Python `PortfolioCashflows.collapse_to_base_by_date_kind_json`), converting at the CIP forward from the `asOf` spot.
    * @param cashflowsJson - `PortfolioCashflows` from `aggregateFullCashflows` (object or JSON).
-   * @param marketJson - Canonical market-context JSON supplying the FX matrix and discount curves.
+   * @param market - `core.MarketContext` handle supplying the FX matrix and discount curves.
    * @param baseCurrency - ISO-4217 reporting currency.
    * @param asOf - ISO-8601 valuation date for spot FX and the start of each discount interval.
    * @param discountCurves - Optional `{ currency: curveId }` map; a missing entry uses the ISO code as the curve id.
@@ -35037,7 +34366,7 @@ export interface PortfolioNamespace {
    */
   collapseToBaseByDateKind(
     cashflowsJson: PortfolioCashflows | string,
-    marketJson: JsonInput,
+    market: MarketContext,
     baseCurrency: string,
     asOf: string,
     discountCurves?: Record<string, string> | null
@@ -35061,21 +34390,22 @@ export interface PortfolioNamespace {
    * already-built `Portfolio` handle.
    *
    * Values the portfolio against the unshocked market and against the
-   * scenario-shocked market, and returns a JS object with structured `pnl`
-   * (base-currency `total` plus `by_position`) and `report` values. Positions
-   * added or removed by the scenario are zero-filled against the missing side,
-   * so the drill-down always sums to the total.
-   * @returns Scenario-attributable P&L ladder and application report.
+   * scenario-shocked market, and returns the `ScenarioPnlBatchItem`
+   * (`scenario_id`, a structured `pnl` with base-currency `total` plus
+   * `by_position`, and `report`), the same item `scenarioPnlBatch` returns per
+   * scenario. Positions added or removed by the scenario are zero-filled
+   * against the missing side, so the drill-down always sums to the total.
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
    * @param scenarioJson - Canonical JSON payload representing the scenario whose profit-and-loss impact is measured.
    * @param market - Constructed `core.MarketContext` handle supplying the unshocked curves, quotes, and FX data used for the base leg.
+   * @returns The scenario's `ScenarioPnlBatchItem`.
    * @throws Error - Throws a JavaScript exception if the scenario JSON is malformed or invalid, scenario application or either valuation fails, valuation currencies are inconsistent, or the structured result cannot be converted to JavaScript.
    */
   scenarioPnl(
     portfolio: Portfolio,
     scenarioJson: JsonInput,
     market: MarketContext
-  ): ScenarioPnlView;
+  ): ScenarioPnlBatchItem;
   /**
    * Optimize portfolio weights using the LP-based optimizer.
    *
@@ -35102,89 +34432,65 @@ export interface PortfolioNamespace {
   /**
    * Replay a portfolio through dated market snapshots.
    *
-   * Accepts a portfolio spec, an array of dated market snapshots, and a
+   * Accepts a built portfolio, an array of dated market snapshots, and a
    * replay configuration. Returns a structured `ReplayResult` object.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
+   * @param portfolio - Built `Portfolio` handle (from `Portfolio.fromSpec` or `Portfolio.builder`) to revalue at every snapshot.
    * @param snapshotsJson - Market-snapshot JSON array.
-   * @param configJson - `ReplayConfig` JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
-   * @throws Error - Throws a JavaScript exception if any JSON input is malformed; the portfolio, replay configuration, or snapshot dates and ordering are invalid; valuation, attribution, or currency conversion fails; best-effort replay retains no step; or the result cannot be converted to a JavaScript value.
+   * @param configJson - `ReplayConfig` JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from the portfolio's positions when it matters.
+   * @throws Error - Throws a JavaScript exception if any JSON input is malformed; the replay configuration or snapshot dates and ordering are invalid; valuation, attribution, or currency conversion fails; best-effort replay retains no step; or the result cannot be converted to a JavaScript value.
    */
   replayPortfolio(
-    specJson: JsonInput,
+    portfolio: Portfolio,
     snapshotsJson: JsonInput,
     configJson: JsonInput
   ): ReplayResult;
   /**
-   * Compute first-order factor sensitivities using a pre-parsed `core.MarketContext` handle.
+   * Compute the position-by-factor sensitivity matrix of a portfolio.
    *
-   * Avoids reparsing market JSON for repeated factor analytics calls.
-   * @returns Returns a structured `SensitivityMatrixJson` object.
-   * @param positionsJson - Canonical portfolio-positions JSON to bump and revalue.
-   * @param factorsJson - Canonical factor-definition JSON identifying the market factors to shock.
-   * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param baseCurrency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
-   * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
-   * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; a position, factor, or bump-config JSON input is malformed; a factor definition is invalid or unsupported; bumping or repricing fails; or the sensitivity matrix cannot be converted to a JavaScript value.
+   * Each cell is the central difference of the position's base-currency PV
+   * under an up and a down bump of the factor, weighted by the position's scale
+   * factor. Rows follow portfolio position order, columns follow the factors,
+   * and every value is in the portfolio's base currency. Returns the
+   * sensitivity-matrix wire object (`base_currency`, `position_ids`,
+   * `factor_ids`, `data` rows).
+   * @param portfolio - Built portfolio whose positions are the matrix rows; its base currency is the reporting currency.
+   * @param factorsJson - `FactorDefinition` array (object or JSON text); every factor must map to market data, so credit hierarchy factors need `FactorModel.computeSensitivities`.
+   * @param market - `core.MarketContext` handle bumped per factor, including FX for cross-currency positions.
+   * @param asOf - ISO-8601 valuation date for pricing and spot FX.
+   * @param bumpConfigJson - Optional `BumpSizeConfig` (object or JSON text); omit for 1 bp / 1 % per factor type.
+   * @returns The `SensitivityMatrixJson` object.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string or a JSON argument is neither text nor a plain object/array, and a `FinstackError` if `asOf` is not an ISO date, the factors or bump config do not match their schema, a factor is a credit hierarchy factor (kind `validation`), or bumping, repricing or FX conversion fails.
    */
   computeFactorSensitivities(
-    positionsJson: JsonInput,
-    factorsJson: JsonInput,
+    portfolio: Portfolio,
+    factorsJson: FactorDefinition[] | string,
     market: MarketContext,
     asOf: string,
-    baseCurrency: string,
-    bumpConfigJson?: JsonInput
+    bumpConfigJson?: BumpSizeConfig | string
   ): SensitivityMatrixJson;
   /**
-   * Compute scenario P&L profiles using a pre-parsed `core.MarketContext` handle.
-   * @returns Returns a structured `FactorPnlProfile` array.
-   * @param positionsJson - Canonical portfolio-positions JSON to bump and revalue.
-   * @param factorsJson - Canonical factor-definition JSON identifying the market factors to shock.
-   * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param baseCurrency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
-   * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
-   * @param nScenarioPoints - Odd number of evenly spaced bump levels in each P-and-L profile, in `3..=1001`; omit for 5.
-   * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; a position, factor, or bump-config JSON input is malformed; a factor or scenario-point count is invalid or unsupported; bumping or repricing fails; or the profiles cannot be converted to a JavaScript value.
+   * Compute full-repricing scenario P&L profiles of a portfolio, one per factor.
+   *
+   * Each profile holds the scale-factor-weighted P&L of every position at each
+   * grid shift, in the portfolio's base currency.
+   * @param portfolio - Built portfolio whose positions are the profile columns; its base currency is the reporting currency.
+   * @param factorsJson - `FactorDefinition` array (object or JSON text) to shock, in returned profile order.
+   * @param market - `core.MarketContext` handle reused by every scenario.
+   * @param asOf - ISO-8601 valuation date for pricing and spot FX.
+   * @param bumpConfigJson - Optional `BumpSizeConfig` (object or JSON text); omit for 1 bp / 1 % per factor type.
+   * @param nPoints - Odd number of grid points in `3..=1001`; omit for 5 (shifts `[-2, -1, 0, 1, 2]`).
+   * @returns The `FactorPnlProfile` array.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string, `nPoints` is not a whole number, or a JSON argument is neither text nor a plain object/array, and a `FinstackError` if `asOf` is not an ISO date, the factors or bump config do not match their schema, the grid size is invalid or a factor is a credit hierarchy factor (kind `validation`), or bumping, repricing or FX conversion fails.
    */
   computePnlProfiles(
-    positionsJson: JsonInput,
-    factorsJson: JsonInput,
+    portfolio: Portfolio,
+    factorsJson: FactorDefinition[] | string,
     market: MarketContext,
     asOf: string,
-    baseCurrency: string,
-    bumpConfigJson?: JsonInput,
-    nScenarioPoints?: number
+    bumpConfigJson?: BumpSizeConfig | string,
+    nPoints?: number
   ): FactorPnlProfile[];
-  /**
-   * Decompose portfolio risk into factor and position contributions.
-   *
-   * Uses the parametric (covariance-based) Euler decomposition.  Accepts
-   * the canonical sensitivity-matrix wire object (the output of
-   * `computeFactorSensitivities`, or the Python `SensitivityMatrix.to_json`),
-   * a `FactorCovarianceMatrix` JSON, and an optional `RiskMeasure` JSON.
-   *
-   * Returns a structured object with `total_risk`, `measure`, `residual_risk`,
-   * `factor_contributions` (array), `position_factor_contributions` (array),
-   * and `position_residual_contributions` (array; empty for the parametric
-   * decomposer — populated only by credit-aware position decomposers).
-   *
-   * `measure` is the risk measure in its canonical serde form, the same shape
-   * as the `riskMeasureJson` input: `"variance"` or `"volatility"`, or an
-   * object carrying `confidence` for `var` / `expected_shortfall`. The Python
-   * `RiskDecomposition.measure` getter returns the same value.
-   * @returns Returns a structured `RiskDecomposition` object.
-   * @param sensitivitiesJson - Canonical factor-sensitivity JSON with required `base_currency`, ordered `position_ids`/`factor_ids`, and nested `data[position][factor]` rows; `JSON.stringify` the result of `computeFactorSensitivities`. Python `SensitivityMatrix.to_json()` uses the same contract. Unknown fields, inconsistent dimensions, and non-finite entries are rejected.
-   * @param covarianceJson - Factor covariance-matrix JSON aligned with the supplied sensitivities.
-   * @param riskMeasureJson - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
-   * @throws Error - Throws a JavaScript exception (`kind` `validation`) if any JSON input is malformed or has unknown keys; `base_currency` is not an ISO-4217 code; the sensitivity rows do not match `position_ids` / `factor_ids`; sensitivity and covariance factor axes disagree; the covariance matrix or risk measure is invalid; or decomposition produces invalid variance or another non-finite value.
-   */
-  decomposeFactorRisk(
-    sensitivitiesJson: JsonInput,
-    covarianceJson: JsonInput,
-    riskMeasureJson?: JsonInput
-  ): RiskDecomposition;
   /**
    * Fluent portfolio builder class; instances come from `Portfolio.builder`.
    */
@@ -35193,32 +34499,13 @@ export interface PortfolioNamespace {
    * Allocate strategy weights from a `WeightAllocationSpec`.
    *
    * Returns the `WeightAllocationResult` object (`scheme`, per-strategy
-   * `allocations` and portfolio `diagnostics`); `allocateWeightsJson` returns
-   * the same result as a JSON string.
+   * `allocations` and portfolio `diagnostics`). A spec that allocates without
+   * error is valid.
    * @param spec - `WeightAllocationSpec` object or JSON selecting the allocation scheme, the strategy inputs and any covariance data the scheme needs.
    * @returns The `WeightAllocationResult`.
    * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `spec` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `WeightAllocationSpec` schema or violates a scheme invariant.
    */
   allocateWeights(spec: WeightAllocationSpec | string): WeightAllocationResult;
-  /**
-   * Allocate strategy weights and return the result as wire JSON.
-   *
-   * Wire twin of `allocateWeights` (Rust `allocate_weights_json`).
-   * @param specJson - `WeightAllocationSpec` object or JSON.
-   * @returns Compact JSON of the `WeightAllocationResult`.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `specJson` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `WeightAllocationSpec` schema or violates a scheme invariant.
-   */
-  allocateWeightsJson(specJson: WeightAllocationSpec | string): string;
-  /**
-   * Validate a strategy allocation specification and return its canonical JSON.
-   *
-   * The spec is parsed and executed solely for validation; the allocation
-   * itself is discarded (Rust `validate_allocation_json`).
-   * @param specJson - `WeightAllocationSpec` object or JSON.
-   * @returns The canonical compact JSON of the accepted spec.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `specJson` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `WeightAllocationSpec` schema or violates a scheme invariant.
-   */
-  validateAllocationJson(specJson: WeightAllocationSpec | string): string;
   /**
    * Decompose every portfolio position into primitive economic exposures.
    *
@@ -35245,12 +34532,12 @@ export interface PortfolioNamespace {
    * Rolls the decomposition's factor contributions up by credit-hierarchy
    * level. Returns the `CreditVolReport`: `total`, `measure`, the `generic`
    * credit-factor contribution, `by_level` rollups, `idiosyncratic_total` and,
-   * when requested, `by_position_optional` rows.
-   * @param decomposition - `RiskDecomposition` object or JSON, e.g. the output of `decomposeFactorRisk`.
+   * when requested, `by_position` rows.
+   * @param decomposition - `RiskDecomposition` object or JSON, e.g. the output of `models.factor.risk.decomposeFactors`.
    * @param model - `models.factor.credit.CreditFactorModel` handle whose hierarchy names the levels.
-   * @param byPosition - `true` to include the per-position breakdown; `false` leaves `by_position_optional` `null`.
+   * @param byPosition - `true` to include the per-position breakdown; `false` leaves `by_position` `null`.
    * @returns The `CreditVolReport`.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `decomposition` is not a JSON string or plain object or `byPosition` is not a boolean, and a `FinstackError` (kind `validation`) if `decomposition` does not match the `RiskDecomposition` schema.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `decomposition` is not a JSON string or plain object or `byPosition` is not a boolean, and a `FinstackError` (kind `validation`) if `decomposition` does not match the `RiskDecomposition` schema or holds a factor contribution that is neither the generic credit factor nor a bucket of one of `model`'s hierarchy levels.
    */
   buildCreditVolReport(
     decomposition: RiskDecomposition | string,
@@ -35401,7 +34688,7 @@ export interface PortfolioNamespace {
    * Trades of an optimization result that open a new position.
    *
    * Twin of Python `PortfolioOptimizationResult.new_position_trades` (Rust
-   * `PortfolioOptimizationResultWire::new_position_trades`): the entries of
+   * `PortfolioOptimizationResult::new_position_trades`): the entries of
    * `trades` whose `trade_type` is `new_position`, in trade-list order.
    * @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
    * @returns The matching `TradeSpec` rows; empty for an infeasible solve.
@@ -35414,7 +34701,7 @@ export interface PortfolioNamespace {
    * Approximately binding constraints of an optimization result.
    *
    * Twin of Python `PortfolioOptimizationResult.binding_constraints` (Rust
-   * `PortfolioOptimizationResultWire::binding_constraints`): the constraints
+   * `PortfolioOptimizationResult::binding_constraints`): the constraints
    * whose slack is zero within the solver tolerance.
    * @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
    * @returns `[label, slack]` pairs in slack order; empty for an infeasible solve.
@@ -35427,19 +34714,30 @@ export interface PortfolioNamespace {
    * Executable trade list of an optimization result.
    *
    * Twin of Python `PortfolioOptimizationResult.to_trade_list` (Rust
-   * `PortfolioOptimizationResultWire::to_trade_list`): the trades from current
+   * `PortfolioOptimizationResult::to_trade_list`): the trades from current
    * to target quantities, largest absolute quantity change first.
    * @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
-   * @returns The `TradeSpec` rows; empty for an infeasible solve (check `is_feasible`).
+   * @returns The `TradeSpec` rows; empty for an infeasible solve (check `portfolioOptimizationResultIsFeasible`).
    * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `result` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the optimization-result schema.
    */
   portfolioOptimizationResultToTradeList(result: PortfolioOptimizationResult | string): TradeSpec[];
   /**
+   * Whether an optimization result carries a usable solution.
+   *
+   * Twin of Python `PortfolioOptimizationResult.is_feasible` (Rust
+   * `PortfolioOptimizationResult::is_feasible`): derived from `status`, which
+   * is the only stored outcome; `true` only for `"optimal"`.
+   * @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
+   * @returns `true` when the status is `"optimal"`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `result` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the optimization-result schema.
+   */
+  portfolioOptimizationResultIsFeasible(result: PortfolioOptimizationResult | string): boolean;
+  /**
    * Look up one metric's portfolio-wide total, failing when it was not aggregated.
    *
-   * Twin of Python `PortfolioResult.require_metric` (Rust
-   * `PortfolioMetrics::require_total`, which `PortfolioResult::require_metric`
-   * calls on its metrics).
+   * Twin of Python `PortfolioMetrics.require_total` (Rust
+   * `PortfolioMetrics::require_total`); WASM results are plain objects, so the
+   * method is a free function taking the object.
    * @param metrics - `PortfolioMetrics` object or JSON from `aggregateMetrics`.
    * @param metricId - Fully qualified metric key (for example `dv01` or `bucketed_dv01::USD-OIS::10y`).
    * @returns The aggregated total in base-currency metric units.
@@ -35489,42 +34787,6 @@ export interface PortfolioNamespace {
     matrix: SensitivityMatrixJson | string,
     factorIdx: number
   ): Float64Array;
-  /**
-   * Build a budget (weight-sum) constraint.
-   *
-   * Twin of Python `Constraint.budget` (Rust `Constraint::budget`).
-   * @param rhs - Target sum of weights as a decimal (`1.0` is fully invested); finite and non-negative.
-   * @returns The `Constraint` object `{ budget: { rhs } }`.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `rhs` is not a number, and a `FinstackError` (kind `validation`) if it is negative or not finite.
-   */
-  constraintBudget(rhs: number): generated.portfolio.Constraint;
-  /**
-   * Build per-position weight bounds for the positions a filter selects.
-   *
-   * Twin of Python `Constraint.weight_bounds` (Rust `Constraint::weight_bounds`).
-   * @param filter - `PositionFilter` value selecting the bounded positions: `"all"` or a filter object such as `{ by_entity_id: "FUND" }`.
-   * @param min - Inclusive minimum weight as a decimal fraction of portfolio value.
-   * @param max - Inclusive maximum weight as a decimal fraction of portfolio value.
-   * @param label - Optional label reported in constraint slacks.
-   * @returns The `weight_bounds` `Constraint` object.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a `FinstackError` (kind `validation`) if `filter` does not match the schema or `min > max`.
-   */
-  constraintWeightBounds(
-    filter: generated.portfolio.PositionFilter,
-    min: number,
-    max: number,
-    label?: string | null
-  ): generated.portfolio.Constraint;
-  /**
-   * Build a maximum-turnover constraint: `sum |w_new - w_current| <= maxTurnover`.
-   *
-   * Twin of Python `Constraint.max_turnover` (Rust `Constraint::max_turnover`).
-   * @param maxTurnover - Largest allowed gross turnover as a decimal fraction of portfolio value; non-negative.
-   * @param label - Optional label reported in constraint slacks.
-   * @returns The `max_turnover` `Constraint` object.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a `FinstackError` (kind `validation`) if `maxTurnover` is negative.
-   */
-  constraintMaxTurnover(maxTurnover: number, label?: string | null): generated.portfolio.Constraint;
   /**
    * Build an attribute exposure cap: `sum w_i * I[attr == value] <= maxShare`.
    *
@@ -35694,7 +34956,7 @@ export interface ScenariosNamespace {
    * @param marketJson - JSON-serialized `MarketContext`.
    * @param asOf - Valuation date (ISO 8601).
    * @param scenarioJson - JSON-serialized `ScenarioSpec`.
-   * @param method - Attribution method: "parallel", "waterfall", "metrics_based", or "taylor". Omit for the Rust default (`AttributionMethod::default()`, currently "parallel"). "metrics_based" calculates the canonical registry's applicable subset of default attribution metrics at the opening snapshot; metrics unsupported by the instrument type are omitted, while failures calculating selected metrics throw.
+   * @param method - `AttributionMethod` wire value: a unit variant name such as `"parallel"` or `"metrics_based"`, an object such as `{ waterfall: ["carry", "rates_curves"] }` or `{ taylor: {} }`, or the same value as JSON text. Omit for the Rust default (`AttributionMethod::default()`, currently "parallel"). "metrics_based" calculates the canonical registry's applicable subset of default attribution metrics at the opening snapshot; metrics unsupported by the instrument type are omitted, while failures calculating selected metrics throw.
    * @param configJson - Optional FinstackConfig JSON for horizon analysis; omit to use defaults.
    * @param calendarId - Optional built-in holiday calendar (e.g. "nyse", "target") used to business-day adjust `time_roll_forward` targets under `business_days` mode. Omit for a weekends-only calendar; unknown identifiers throw.
    * @returns The serde `HorizonResult` (`attribution`, `initial_value` and `terminal_value` as exact-decimal Money objects, `horizon_days`, null without a time roll, and `scenario_report`) plus `summary`: the Rust-computed `total_return`, `annualized_return`, `currency` and `factor_contributions` that Python exposes as `HorizonResult` accessors. Rust computes every derived value. Undefined derived values are null here and NaN in Python: total return and factor contributions require positive initial value and matching P&L currency; annualization also requires a positive horizon and total return at or above -100%.
@@ -35705,48 +34967,10 @@ export interface ScenariosNamespace {
     marketJson: JsonInput,
     asOf: string,
     scenarioJson: JsonInput,
-    method?: 'parallel' | 'waterfall' | 'metrics_based' | 'taylor',
+    method?: JsonInput,
     configJson?: JsonInput,
     calendarId?: string
   ): HorizonReport;
-  /**
-   * Build an FX spot percent shock operation.
-   *
-   * Free-function twin of Python `OperationSpec.market_fx_pct` (Rust
-   * `OperationSpec::MarketFxPct`).
-   * @param base - ISO-4217 code of the base currency being strengthened or weakened.
-   * @param quote - ISO-4217 code of the quote currency; must differ from `base` to validate.
-   * @param pct - Shock in percentage points (`5.0` = base +5% against quote); validation rejects `pct <= -100`.
-   * @returns The `market_fx_pct` operation object.
-   * @throws Error - Throws a `TypeError` for a non-string code or non-number `pct`, and a `validation` error for an unknown currency code.
-   */
-  operationSpecMarketFxPct(base: string, quote: string, pct: number): OperationSpec;
-  /**
-   * Build an equity price percent shock for a list of identifiers.
-   *
-   * Free-function twin of Python `OperationSpec.equity_price_pct` (Rust
-   * `OperationSpec::EquityPricePct`).
-   * @param ids - Equity price identifiers in the market context; every one receives the shock.
-   * @param pct - Shock in percentage points (`-10.0` = -10%); validation rejects `pct < -100`.
-   * @returns The `equity_price_pct` operation object.
-   * @throws Error - Throws a `TypeError` when `ids` is not an array of strings or `pct` is not a number.
-   */
-  operationSpecEquityPricePct(ids: string[], pct: number): OperationSpec;
-  /**
-   * Build an instrument price percent shock selected by exact attribute match.
-   *
-   * Free-function twin of Python `OperationSpec.instrument_price_pct_by_attr`
-   * (Rust `OperationSpec::InstrumentPricePctByAttr`). Applying it requires an
-   * instrument inventory.
-   * @param attrs - `{key: value}` object or array of `[key, value]` pairs; order is preserved and every pair must match the instrument's attributes.
-   * @param pct - Price shock in percentage points (`-5.0` = -5%).
-   * @returns The `instrument_price_pct_by_attr` operation object.
-   * @throws Error - Throws a `TypeError` for a non-object `attrs` or non-number `pct`, and a `validation` error when `attrs` is not a string-to-string mapping or pair list.
-   */
-  operationSpecInstrumentPricePctByAttr(
-    attrs: Record<string, string> | [string, string][],
-    pct: number
-  ): OperationSpec;
   /**
    * Expand a parallel shift into one operation per curve identifier.
    * @param curveKind - Canonical discount, forward, par_cds, inflation or commodity family label.
@@ -35762,282 +34986,6 @@ export interface ScenariosNamespace {
     bp: number,
     discountCurveId?: string
   ): OperationSpec[];
-  /**
-   * Build a parallel basis-point curve shift for one curve or several.
-   *
-   * Free-function twin of Python `OperationSpec.curve_parallel_bp`. A single
-   * identifier builds Rust `OperationSpec::CurveParallelBp`; an array expands
-   * through Rust `ScenarioSpec::parallel_bp_many` to one operation per
-   * identifier, in the given order.
-   * @param curveKind - Canonical discount, forward, par_cds, inflation or commodity family label.
-   * @param curveId - Identifier of the single curve receiving the shift.
-   * @param bp - Additive basis points; percent of forward for commodity curves.
-   * @param discountCurveId - Optional discount curve used to re-bootstrap ParCDS quotes.
-   * @returns One curve_parallel_bp operation object.
-   * @throws Error - Throws TypeError for non-string identifiers or non-numeric bp, and a validation error for an unknown curve family.
-   */
-  operationSpecCurveParallelBp(
-    curveKind: CurveKind,
-    curveId: string,
-    bp: number,
-    discountCurveId?: string
-  ): OperationSpec;
-  /**
-   * Build node-level basis-point shifts on a curve.
-   *
-   * Free-function twin of Python `OperationSpec.curve_node_bp` (Rust
-   * `OperationSpec::CurveNodeBp`).
-   * @param curveKind - Curve family label: `"discount"`, `"forward"`, `"par_cds"`, `"inflation"` or `"commodity"`.
-   * @param curveId - Identifier of the curve whose pillars are shifted.
-   * @param nodes - Array of `[tenor, bp]` pairs, e.g. `[["2Y", 10], ["10Y", -5]]`; bp is additive basis points (percent of forward for commodity curves).
-   * @param matchMode - Optional pillar alignment label, `"exact"` or `"interpolate"`; omit for the Rust default (`TenorMatchMode::default()`, `"interpolate"`).
-   * @param discountCurveId - Optional discount curve used when re-bootstrapping shocked ParCDS quotes.
-   * @returns The `curve_node_bp` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error for an unknown `curveKind` / `matchMode` label or `nodes` that are not `[string, number]` pairs.
-   */
-  operationSpecCurveNodeBp(
-    curveKind: CurveKind,
-    curveId: string,
-    nodes: [string, number][],
-    matchMode?: TenorMatchMode,
-    discountCurveId?: string
-  ): OperationSpec;
-  /**
-   * Build a parallel shock to a volatility-index curve.
-   *
-   * Free-function twin of Python `OperationSpec.vol_index_parallel_pts` (Rust
-   * `OperationSpec::VolIndexParallelPts`).
-   * @param curveId - Identifier of the volatility-index curve.
-   * @param points - Additive shift in absolute index points (`1.0` moves 18.5 to 19.5).
-   * @returns The `vol_index_parallel_pts` operation object.
-   * @throws Error - Throws a `TypeError` when `curveId` is not a string or `points` is not a number.
-   */
-  operationSpecVolIndexParallelPts(curveId: string, points: number): OperationSpec;
-  /**
-   * Build node-level shocks to a volatility-index curve.
-   *
-   * Free-function twin of Python `OperationSpec.vol_index_node_pts` (Rust
-   * `OperationSpec::VolIndexNodePts`).
-   * @param curveId - Identifier of the volatility-index curve.
-   * @param nodes - Array of `[tenor, points]` pairs; points are additive absolute index points.
-   * @param matchMode - Optional pillar alignment label, `"exact"` or `"interpolate"`; omit for the Rust default (`TenorMatchMode::default()`, `"interpolate"`).
-   * @returns The `vol_index_node_pts` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error for an unknown `matchMode` label or `nodes` that are not `[string, number]` pairs.
-   */
-  operationSpecVolIndexNodePts(
-    curveId: string,
-    nodes: [string, number][],
-    matchMode?: TenorMatchMode
-  ): OperationSpec;
-  /**
-   * Build a parallel shift to a base-correlation surface.
-   *
-   * Free-function twin of Python `OperationSpec.base_corr_parallel_pts` (Rust
-   * `OperationSpec::BaseCorrParallelPts`).
-   * @param surfaceId - Identifier of the base-correlation surface.
-   * @param points - Additive shift in decimal correlation (`0.02` = +0.02, not percentage points).
-   * @returns The `base_corr_parallel_pts` operation object.
-   * @throws Error - Throws a `TypeError` when `surfaceId` is not a string or `points` is not a number.
-   */
-  operationSpecBaseCorrParallelPts(surfaceId: string, points: number): OperationSpec;
-  /**
-   * Build a bucketed shift to a base-correlation surface.
-   *
-   * Free-function twin of Python `OperationSpec.base_corr_bucket_pts` (Rust
-   * `OperationSpec::BaseCorrBucketPts`).
-   * @param surfaceId - Identifier of the base-correlation surface.
-   * @param points - Additive shift in decimal correlation (`0.02` = +0.02).
-   * @param detachmentBp - Optional detachment points to shift, as integer basis points of the capital structure (`300` = 3%); omit to shift every bucket.
-   * @returns The `base_corr_bucket_pts` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error when `detachmentBp` is not an array of 32-bit integers.
-   */
-  operationSpecBaseCorrBucketPts(
-    surfaceId: string,
-    points: number,
-    detachmentBp?: number[]
-  ): OperationSpec;
-  /**
-   * Build a parallel percent shift to a volatility surface.
-   *
-   * Free-function twin of Python `OperationSpec.vol_surface_parallel_pct` (Rust
-   * `OperationSpec::VolSurfaceParallelPct`).
-   * @param volSurfaceId - Identifier of the volatility surface.
-   * @param pct - Relative shift in percentage points (`10.0` scales every vol by 1.10).
-   * @returns The `vol_surface_parallel_pct` operation object.
-   * @throws Error - Throws a `TypeError` when `volSurfaceId` is not a string or `pct` is not a number.
-   */
-  operationSpecVolSurfaceParallelPct(volSurfaceId: string, pct: number): OperationSpec;
-  /**
-   * Build a bucketed percent shock to a volatility surface.
-   *
-   * Free-function twin of Python `OperationSpec.vol_surface_bucket_pct` (Rust
-   * `OperationSpec::VolSurfaceBucketPct`).
-   * @param volSurfaceId - Identifier of the volatility surface.
-   * @param pct - Relative shift in percentage points applied to the selected buckets.
-   * @param tenors - Optional expiry tenors (e.g. `["1M", "1Y"]`) restricting the shock; omit for every expiry.
-   * @param strikes - Optional strikes, in the surface's own strike units, restricting the shock; omit for every strike.
-   * @returns The `vol_surface_bucket_pct` operation object.
-   * @throws Error - Throws a `TypeError` when an argument has the wrong JavaScript type (`tenors` must be an array of strings, `strikes` an array of numbers).
-   */
-  operationSpecVolSurfaceBucketPct(
-    volSurfaceId: string,
-    pct: number,
-    tenors?: string[],
-    strikes?: number[]
-  ): OperationSpec;
-  /**
-   * Build a statement forecast percent change on one node.
-   *
-   * Free-function twin of Python `OperationSpec.stmt_forecast_percent` (Rust
-   * `OperationSpec::StmtForecastPercent`).
-   * @param nodeId - Statement node identifier whose forecast values are scaled.
-   * @param pct - Change in percentage points (`-5.0` = -5%).
-   * @returns The `stmt_forecast_percent` operation object.
-   * @throws Error - Throws a `TypeError` when `nodeId` is not a string or `pct` is not a number.
-   */
-  operationSpecStmtForecastPercent(nodeId: string, pct: number): OperationSpec;
-  /**
-   * Build a statement forecast value assignment on one node.
-   *
-   * Free-function twin of Python `OperationSpec.stmt_forecast_assign` (Rust
-   * `OperationSpec::StmtForecastAssign`).
-   * @param nodeId - Statement node identifier whose forecast values are replaced.
-   * @param value - Replacement forecast value, in the node's own units.
-   * @returns The `stmt_forecast_assign` operation object.
-   * @throws Error - Throws a `TypeError` when `nodeId` is not a string or `value` is not a number.
-   */
-  operationSpecStmtForecastAssign(nodeId: string, value: number): OperationSpec;
-  /**
-   * Build an operation binding a statement rate node to a market curve.
-   *
-   * Free-function twin of Python `OperationSpec.rate_binding` (Rust
-   * `OperationSpec::RateBinding`).
-   * @param binding - `RateBindingSpec` object or JSON: `node_id`, `curve_id`, `tenor`, optional `compounding` (default `"continuous"`) and `day_count`.
-   * @returns The `rate_binding` operation object.
-   * @throws Error - Throws a `TypeError` when `binding` is not an object or JSON string and a `validation` error when it does not match the `RateBindingSpec` contract.
-   */
-  operationSpecRateBinding(binding: RateBindingSpec | string): OperationSpec;
-  /**
-   * Build an instrument spread shock selected by exact attribute match.
-   *
-   * Free-function twin of Python `OperationSpec.instrument_spread_bp_by_attr`
-   * (Rust `OperationSpec::InstrumentSpreadBpByAttr`). Applying it requires an
-   * instrument inventory.
-   * @param attrs - `{key: value}` object or array of `[key, value]` pairs; order is preserved and every pair must match the instrument's attributes.
-   * @param bp - Additive spread shock in basis points (1 bp = 1e-4).
-   * @returns The `instrument_spread_bp_by_attr` operation object.
-   * @throws Error - Throws a `TypeError` for a non-object `attrs` or non-number `bp`, and a `validation` error when `attrs` is not a string-to-string mapping or pair list.
-   */
-  operationSpecInstrumentSpreadBpByAttr(
-    attrs: Record<string, string> | [string, string][],
-    bp: number
-  ): OperationSpec;
-  /**
-   * Build an instrument price percent shock selected by instrument type.
-   *
-   * Free-function twin of Python `OperationSpec.instrument_price_pct_by_type`
-   * (Rust `OperationSpec::InstrumentPricePctByType`). Applying it requires an
-   * instrument inventory.
-   * @param instrumentTypes - Snake_case instrument type identifiers, e.g. `["bond", "cds_index"]`.
-   * @param pct - Price shock in percentage points (`-5.0` = -5%).
-   * @returns The `instrument_price_pct_by_type` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error for an unknown instrument type.
-   */
-  operationSpecInstrumentPricePctByType(instrumentTypes: string[], pct: number): OperationSpec;
-  /**
-   * Build an instrument spread shock selected by instrument type.
-   *
-   * Free-function twin of Python `OperationSpec.instrument_spread_bp_by_type`
-   * (Rust `OperationSpec::InstrumentSpreadBpByType`). Applying it requires an
-   * instrument inventory.
-   * @param instrumentTypes - Snake_case instrument type identifiers, e.g. `["bond", "cds_index"]`.
-   * @param bp - Additive spread shock in basis points (1 bp = 1e-4).
-   * @returns The `instrument_spread_bp_by_type` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error for an unknown instrument type.
-   */
-  operationSpecInstrumentSpreadBpByType(instrumentTypes: string[], bp: number): OperationSpec;
-  /**
-   * Build a structured-credit asset-correlation shock.
-   *
-   * Free-function twin of Python `OperationSpec.asset_correlation_pts` (Rust
-   * `OperationSpec::AssetCorrelationPts`).
-   * @param deltaPts - Additive shift in decimal correlation (`0.05` adds 0.05 to the asset correlation).
-   * @returns The `asset_correlation_pts` operation object.
-   * @throws Error - Throws a `TypeError` when `deltaPts` is not a number.
-   */
-  operationSpecAssetCorrelationPts(deltaPts: number): OperationSpec;
-  /**
-   * Build a structured-credit prepay/default correlation shock.
-   *
-   * Free-function twin of Python `OperationSpec.prepay_default_correlation_pts`
-   * (Rust `OperationSpec::PrepayDefaultCorrelationPts`).
-   * @param deltaPts - Additive shift in decimal correlation between prepayment and default.
-   * @returns The `prepay_default_correlation_pts` operation object.
-   * @throws Error - Throws a `TypeError` when `deltaPts` is not a number.
-   */
-  operationSpecPrepayDefaultCorrelationPts(deltaPts: number): OperationSpec;
-  /**
-   * Build a hierarchy-targeted parallel curve shift.
-   *
-   * Free-function twin of Python `OperationSpec.hierarchy_curve_parallel_bp`
-   * (Rust `OperationSpec::HierarchyCurveParallelBp`).
-   * @param curveKind - Curve family label: `"discount"`, `"forward"`, `"par_cds"`, `"inflation"` or `"commodity"`.
-   * @param target - `HierarchyTarget` object or JSON (`{path, tag_filter?}`) selecting the market-data subtree.
-   * @param bp - Additive shift in basis points (percent of forward for commodity curves).
-   * @param discountCurveId - Optional discount curve used when re-bootstrapping shocked ParCDS quotes.
-   * @returns The `hierarchy_curve_parallel_bp` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error for an unknown `curveKind` label or a `target` that is not a `HierarchyTarget`.
-   */
-  operationSpecHierarchyCurveParallelBp(
-    curveKind: CurveKind,
-    target: HierarchyTarget | string,
-    bp: number,
-    discountCurveId?: string
-  ): OperationSpec;
-  /**
-   * Build a hierarchy-targeted volatility-surface percent shift.
-   *
-   * Free-function twin of Python
-   * `OperationSpec.hierarchy_vol_surface_parallel_pct` (Rust
-   * `OperationSpec::HierarchyVolSurfaceParallelPct`).
-   * @param target - `HierarchyTarget` object or JSON (`{path, tag_filter?}`) selecting the market-data subtree.
-   * @param pct - Relative shift in percentage points applied to every targeted surface.
-   * @returns The `hierarchy_vol_surface_parallel_pct` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error when `target` is not a `HierarchyTarget`.
-   */
-  operationSpecHierarchyVolSurfaceParallelPct(
-    target: HierarchyTarget | string,
-    pct: number
-  ): OperationSpec;
-  /**
-   * Build a hierarchy-targeted equity price percent shift.
-   *
-   * Free-function twin of Python `OperationSpec.hierarchy_equity_price_pct`
-   * (Rust `OperationSpec::HierarchyEquityPricePct`).
-   * @param target - `HierarchyTarget` object or JSON (`{path, tag_filter?}`) selecting the market-data subtree.
-   * @param pct - Price shock in percentage points applied to every targeted equity.
-   * @returns The `hierarchy_equity_price_pct` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error when `target` is not a `HierarchyTarget`.
-   */
-  operationSpecHierarchyEquityPricePct(
-    target: HierarchyTarget | string,
-    pct: number
-  ): OperationSpec;
-  /**
-   * Build a hierarchy-targeted base-correlation parallel shift.
-   *
-   * Free-function twin of Python
-   * `OperationSpec.hierarchy_base_corr_parallel_pts` (Rust
-   * `OperationSpec::HierarchyBaseCorrParallelPts`).
-   * @param target - `HierarchyTarget` object or JSON (`{path, tag_filter?}`) selecting the market-data subtree.
-   * @param points - Additive shift in decimal correlation (`0.02` = +0.02).
-   * @returns The `hierarchy_base_corr_parallel_pts` operation object.
-   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error when `target` is not a `HierarchyTarget`.
-   */
-  operationSpecHierarchyBaseCorrParallelPts(
-    target: HierarchyTarget | string,
-    points: number
-  ): OperationSpec;
   /**
    * Build a time-roll operation moving the valuation horizon forward.
    *

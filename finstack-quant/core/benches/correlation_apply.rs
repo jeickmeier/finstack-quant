@@ -44,7 +44,7 @@ fn bench_correlation_apply(c: &mut Criterion) {
     for &n in &[2usize, 8, 32, 64] {
         let z: Vec<f64> = (0..n).map(|i| ((i % 13) as f64 * 0.07) - 0.4).collect();
 
-        let triangular = CorrelationFactor::from_parts(lower_triangular_factor(n), n, n);
+        let triangular = CorrelationFactor::from_parts(lower_triangular_factor(n), n);
         group.bench_with_input(BenchmarkId::new("triangular", n), &n, |b, _| {
             let mut out = vec![0.0; n];
             b.iter(|| {

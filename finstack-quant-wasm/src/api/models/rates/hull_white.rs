@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use crate::api::core::market_data::JsDiscountCurve;
+use crate::api::core::market_discount::JsDiscountCurve;
 use crate::utils::input::{from_js_json, js_bool, js_f64, js_f64_seq};
 use crate::utils::to_js_err;
 use finstack_quant_models::rates::hull_white::{self, HullWhiteCalibrationParams, HullWhiteParams};

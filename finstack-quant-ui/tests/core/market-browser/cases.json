@@ -264,7 +264,6 @@
               "df_hard_min": 1e-12,
               "jacobian_step_size": 0.000001,
               "min_scan_grid_points": 20,
-              "min_t_spot": 0.000001,
               "scan_grid_points": 48,
               "scan_grid_step": 0.0001,
               "validation_tolerance": 1e-8,
@@ -323,7 +322,6 @@
               "tolerance": 1e-10
             },
             "validation_mode": "error",
-            "verbose": false,
             "vol_surface": {
               "validation_tolerance": 0.001
             }
@@ -448,7 +446,6 @@
             }
           ]
         },
-        "calibration_ois_cutoff_days": null,
         "fx_policy": null
       }
     ],
@@ -472,7 +469,6 @@
     ],
     "fx_delta_vol_surfaces": [],
     "vol_cubes": [],
-    "collateral": {},
     "hierarchy": null
   },
   "supplemental": {
@@ -751,7 +747,6 @@
               "df_hard_min": 1e-12,
               "jacobian_step_size": 0.000001,
               "min_scan_grid_points": 20,
-              "min_t_spot": 0.000001,
               "scan_grid_points": 48,
               "scan_grid_step": 0.0001,
               "validation_tolerance": 1e-8,
@@ -810,7 +805,6 @@
               "tolerance": 1e-10
             },
             "validation_mode": "error",
-            "verbose": false,
             "vol_surface": {
               "validation_tolerance": 0.001
             }
@@ -905,7 +899,6 @@
         "allow_non_monotonic": true,
         "min_forward_tenor": 0.0001,
         "rate_calibration": null,
-        "calibration_ois_cutoff_days": null,
         "fx_policy": null
       },
       {
@@ -938,7 +931,6 @@
         "allow_non_monotonic": false,
         "min_forward_tenor": 0.0001,
         "rate_calibration": null,
-        "calibration_ois_cutoff_days": null,
         "fx_policy": null
       },
       {
@@ -1063,7 +1055,6 @@
             }
           ]
         },
-        "calibration_ois_cutoff_days": null,
         "fx_policy": null
       },
       {
@@ -1101,7 +1092,11 @@
       ]
     },
     "surfaces": [],
-    "prices": {},
+    "prices": {
+      "USD/CSA": {
+        "unitless": 1.25
+      }
+    },
     "series": [],
     "inflation_indices": [],
     "dividends": [],
@@ -1119,9 +1114,6 @@
     ],
     "fx_delta_vol_surfaces": [],
     "vol_cubes": [],
-    "collateral": {
-      "USD/CSA": "NEG-RATES"
-    },
     "hierarchy": {
       "roots": {
         "Rates": {

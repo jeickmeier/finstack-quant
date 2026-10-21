@@ -1,13 +1,13 @@
-//! Finite-difference and repricing utilities for portfolio sensitivities.
+//! Sensitivity engine trait and the repricing helpers both engines share.
 //!
 use crate::dependencies::{resolved_dependencies, MarketFactorKey};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::market_data::bumps::BumpUnits;
 use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
-use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-use finstack_quant_factor::{FactorDefinition, MarketMapping, SensitivityMatrix};
+use finstack_quant_factor::{BumpSizeConfig, FactorDefinition, MarketMapping, SensitivityMatrix};
 use finstack_quant_valuations::instruments::{Instrument, RatesCurveKind};
 
 /// Resolve one factor definition to the exact dependency keys its market bump
@@ -105,7 +105,7 @@ fn push_unique_key(keys: &mut Vec<MarketFactorKey>, key: MarketFactorKey) {
 }
 
 fn dependencies_intersect_factor(
-    dependencies: &finstack_quant_core::HashSet<MarketFactorKey>,
+    dependencies: &finstack_quant_core::FxHashSet<MarketFactorKey>,
     factor_keys: &[MarketFactorKey],
 ) -> bool {
     // FxMatrix rebuilds derived cross rates after any quote bump. A position
@@ -179,45 +179,28 @@ impl FactorRepricingPlan {
     }
 }
 
-/// Price an instrument in its native currency, then convert on `market` at `as_of`.
+/// Bump size and units for `factor`, shared by both sensitivity engines.
 ///
-/// Factor stress, delta, and full-reprice endpoints all use this path so FX
-/// factors flow through the bumped market's spot matrix rather than an
-/// implied PV ratio. Same-currency amounts short-circuit inside
-/// the portfolio spot FX helper. Non-finite native PVs are returned
-/// unchanged so callers can emit their position-specific validation error
-/// without constructing `Money`. Missing FX for a cross-currency position
-/// fails the same way NAV does.
-///
-/// # Arguments
-///
-/// * `instrument` - Instrument to price in its native currency.
-/// * `market` - Market used for both native pricing and the spot FX lookup.
-///   Callers must pass the **bumped** market when computing a shocked PV.
-/// * `as_of` - Valuation date for pricing and the FX matrix query.
-/// * `base_currency` - Reporting currency; same-currency amounts are identity.
+/// The size comes from `bump_config` in the factor type's canonical units.
 ///
 /// # Errors
 ///
-/// Propagates instrument pricing failures and portfolio spot FX conversion
-/// errors (missing FX matrix or missing pair).
-pub(crate) fn raw_pv_in_base(
-    instrument: &dyn Instrument,
-    market: &MarketContext,
-    as_of: Date,
-    base_currency: Currency,
-) -> Result<f64> {
-    let (amount, currency) = instrument.value_raw_with_currency(market, as_of)?;
-    if !amount.is_finite() {
-        return Ok(amount);
+/// Rejects a non-finite or zero bump size.
+pub(crate) fn factor_bump(
+    bump_config: &BumpSizeConfig,
+    factor: &FactorDefinition,
+) -> Result<(f64, BumpUnits)> {
+    let bump_size = bump_config.bump_size_for_factor(&factor.id, &factor.factor_type);
+    if !bump_size.is_finite() || bump_size.abs() < f64::EPSILON {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "factor {:?} has invalid bump size {bump_size}; bump size must be finite and non-zero",
+            factor.id.as_str()
+        )));
     }
-    Ok(
-        crate::fx::convert_to_base(Money::new(amount, currency)?, as_of, market, base_currency)?
-            .amount(),
-    )
+    Ok((bump_size, factor.factor_type.bump_units()))
 }
 
-/// Whether a factor bump can change the FX matrix used by [`raw_pv_in_base`].
+/// Whether a factor bump can change the FX matrix used by [`crate::fx::raw_pv_in_base`].
 ///
 /// Instruments that do not declare an FX dependency still have a translation
 /// effect when their native currency differs from the reporting currency, so
@@ -320,7 +303,7 @@ mod tests {
 
     #[test]
     fn any_fx_quote_affects_triangulated_fx_dependencies() {
-        let dependencies = finstack_quant_core::HashSet::from_iter([MarketFactorKey::fx(
+        let dependencies = finstack_quant_core::FxHashSet::from_iter([MarketFactorKey::fx(
             finstack_quant_core::currency::Currency::EUR,
             finstack_quant_core::currency::Currency::JPY,
         )]);

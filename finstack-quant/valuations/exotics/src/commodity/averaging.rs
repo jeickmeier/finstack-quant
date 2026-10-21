@@ -38,7 +38,7 @@ pub(crate) fn commodity_periods(
         } else {
             BusinessDayConvention::Unadjusted
         },
-        calendar_id: calendar_id.unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
+        calendar_id: calendar_id.unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID),
         end_of_month: false,
         day_count: DayCount::Act365F,
         payment_lag_days: 0,
@@ -69,7 +69,7 @@ pub(crate) fn business_day_average_price(
     // Compensated (Neumaier) summation keeps the average accurate over a
     // long observation window — a multi-month period can sum many hundreds
     // of daily observations.
-    let mut sum = finstack_quant_core::math::NeumaierAccumulator::new();
+    let mut sum = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     let mut count = 0u64;
     let mut current = obs_start;
 

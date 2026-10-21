@@ -19,12 +19,13 @@ use finstack_quant_core::market_data::term_structures::{
     PriceCurveKind,
 };
 use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_models::credit::pool::CorrelationStructure;
 use finstack_quant_scenarios::{
-    ApplicationReport, Compounding, ExecutionContext, HazardBumpMode, OperationSpec,
-    RateBindingSpec, ScenarioEngine, ScenarioSpec,
+    ApplicationReport, ExecutionContext, HazardBumpMode, OperationSpec, RateBindingSpec,
+    ScenarioEngine, ScenarioSpec,
 };
 use finstack_quant_statements::types::{AmountOrScalar, NodeSpec, NodeType};
 use finstack_quant_statements::FinancialModelSpec;

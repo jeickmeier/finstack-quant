@@ -2,7 +2,7 @@
 
 use super::super::common::*;
 use finstack_quant_cashflows::CashflowProvider;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::{
     currency::Currency,
     market_data::context::MarketContext,
@@ -175,7 +175,7 @@ fn test_basis_point_sensitivity() {
 fn test_triangular_arbitrage_absence() {
     // Verify no triangular arbitrage: EUR/USD * USD/JPY = EUR/JPY
     // Need to add EUR/JPY to the mock provider
-    let mut rates = HashMap::default();
+    let mut rates = FxHashMap::default();
     rates.insert((Currency::EUR, Currency::USD), 1.20);
     rates.insert((Currency::USD, Currency::JPY), 110.0);
     rates.insert((Currency::EUR, Currency::JPY), 1.20 * 110.0); // 132.0

@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/carino_linked_attribution.schema.json",
-      "bytes": 6838,
+      "bytes": 6912,
       "kind": "output",
       "path": "schemas/portfolio/1/carino_linked_attribution.schema.json",
       "summary": "Compounded portfolio vs.",
@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/cashflow_aggregation_options.schema.json",
-      "bytes": 681,
+      "bytes": 714,
       "kind": "input",
       "path": "schemas/portfolio/1/cashflow_aggregation_options.schema.json",
       "summary": "Options for `aggregate_full_cashflows`.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/credit_vol_report.schema.json",
-      "bytes": 6417,
+      "bytes": 7684,
       "kind": "output",
       "path": "schemas/portfolio/1/credit_vol_report.schema.json",
       "summary": "Aggregated credit risk grouped by hierarchy level.",
@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/dated_cashflow.schema.json",
-      "bytes": 982,
+      "bytes": 1015,
       "kind": "input",
       "path": "schemas/portfolio/1/dated_cashflow.schema.json",
       "summary": "A dated cashflow amount for money-weighted return calculations.",
@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_assignment_report.schema.json",
-      "bytes": 29563,
+      "bytes": 29452,
       "kind": "output",
       "path": "schemas/portfolio/1/factor_assignment_report.schema.json",
       "summary": "Assignment results for a portfolio-level factor mapping pass.",
@@ -127,24 +127,6 @@
       "type_name": "FiCarinoLinkedResult"
     },
     {
-      "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_period_input.schema.json",
-      "bytes": 4924,
-      "kind": "input",
-      "path": "schemas/portfolio/1/fi_period_input.schema.json",
-      "summary": "One attribution period's raw inputs for multi-period linking.",
-      "title": "FiPeriodInput",
-      "type_name": "FiPeriodInput"
-    },
-    {
-      "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_reconciliation_report.schema.json",
-      "bytes": 1061,
-      "kind": "output",
-      "path": "schemas/portfolio/1/fi_reconciliation_report.schema.json",
-      "summary": "Report from reconciling the five effect totals against the active return, mirroring `crate::attribution` reconciliation conventions.",
-      "title": "FiReconciliationReport",
-      "type_name": "FiReconciliationReport"
-    },
-    {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/grid_carino_linked_result.schema.json",
       "bytes": 8971,
       "kind": "output",
@@ -191,7 +173,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_cashflows.schema.json",
-      "bytes": 53449,
+      "bytes": 54418,
       "kind": "component",
       "path": "schemas/portfolio/1/portfolio_cashflows.schema.json",
       "summary": "Rich portfolio cashflow ladder preserving event classifications.",
@@ -209,7 +191,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_materialization.schema.json",
-      "bytes": 42203,
+      "bytes": 41872,
       "kind": "input",
       "path": "schemas/portfolio/1/portfolio_materialization.schema.json",
       "summary": "Positions, books and their instruments as one content-addressed bundle.",
@@ -218,16 +200,16 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_result.schema.json",
-      "bytes": 17613,
+      "bytes": 18650,
       "kind": "output",
       "path": "schemas/portfolio/1/portfolio_optimization_result.schema.json",
       "summary": "Optimizer weights and diagnostics.",
       "title": "Portfolio Optimization Result",
-      "type_name": "PortfolioOptimizationResultWire"
+      "type_name": "PortfolioOptimizationResult"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_spec.schema.json",
-      "bytes": 56904,
+      "bytes": 58161,
       "kind": "input",
       "path": "schemas/portfolio/1/portfolio_optimization_spec.schema.json",
       "summary": "JSON-serializable specification for a portfolio optimization problem.",
@@ -236,7 +218,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_primitive_exposure_report.schema.json",
-      "bytes": 27744,
+      "bytes": 27641,
       "kind": "output",
       "path": "schemas/portfolio/1/portfolio_primitive_exposure_report.schema.json",
       "summary": "Portfolio primitive decomposition retaining both path and concentration views.",
@@ -245,7 +227,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_result.schema.json",
-      "bytes": 43840,
+      "bytes": 44518,
       "kind": "output",
       "path": "schemas/portfolio/1/portfolio_result.schema.json",
       "summary": "Complete results from portfolio evaluation.",
@@ -254,7 +236,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/position_change.schema.json",
-      "bytes": 1624,
+      "bytes": 2885,
       "kind": "output",
       "path": "schemas/portfolio/1/position_change.schema.json",
       "summary": "Position edits supported by `FactorModel::position_what_if`.",
@@ -263,10 +245,10 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/reconciliation_report.schema.json",
-      "bytes": 969,
+      "bytes": 1101,
       "kind": "output",
       "path": "schemas/portfolio/1/reconciliation_report.schema.json",
-      "summary": "Report from reconciling position-level P&L attribution against portfolio totals.",
+      "summary": "Report from reconciling an attribution's effect buckets against its total.",
       "title": "ReconciliationReport",
       "type_name": "ReconciliationReport"
     },
@@ -281,7 +263,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/replay_config.schema.json",
-      "bytes": 13066,
+      "bytes": 13103,
       "kind": "input",
       "path": "schemas/portfolio/1/replay_config.schema.json",
       "summary": "Configuration for a replay run.",
@@ -290,7 +272,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/replay_result.schema.json",
-      "bytes": 100633,
+      "bytes": 101362,
       "kind": "output",
       "path": "schemas/portfolio/1/replay_result.schema.json",
       "summary": "Full output of a replay run.",
@@ -299,25 +281,16 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
-      "bytes": 86415,
+      "bytes": 86121,
       "kind": "output",
       "path": "schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
-      "summary": "One ordered result from `scenario_pnl_batch`.",
+      "summary": "One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`.",
       "title": "ScenarioPnlBatchItem",
       "type_name": "ScenarioPnlBatchItem"
     },
     {
-      "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_view.schema.json",
-      "bytes": 86204,
-      "kind": "output",
-      "path": "schemas/portfolio/1/scenario_pnl_view.schema.json",
-      "summary": "Scenario-P&L view returned by binding surfaces.",
-      "title": "ScenarioPnlView",
-      "type_name": "ScenarioPnlView"
-    },
-    {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json",
-      "bytes": 92656,
+      "bytes": 92013,
       "kind": "output",
       "path": "schemas/portfolio/1/scenario_revalue_view.schema.json",
       "summary": "Scenario-and-revalue view returned by binding surfaces.",
@@ -326,7 +299,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/sector_period.schema.json",
-      "bytes": 1553,
+      "bytes": 1586,
       "kind": "input",
       "path": "schemas/portfolio/1/sector_period.schema.json",
       "summary": "Per-sector portfolio and benchmark weights and returns for a single attribution period.",
@@ -344,7 +317,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/stress_pnl.schema.json",
-      "bytes": 1195,
+      "bytes": 2464,
       "kind": "output",
       "path": "schemas/portfolio/1/stress_pnl.schema.json",
       "summary": "P&L-only result of a factor-stress scenario.",
@@ -353,7 +326,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/stress_result.schema.json",
-      "bytes": 13202,
+      "bytes": 13099,
       "kind": "output",
       "path": "schemas/portfolio/1/stress_result.schema.json",
       "summary": "Result of a factor-stress scenario.",

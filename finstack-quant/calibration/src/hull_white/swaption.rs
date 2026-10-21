@@ -129,7 +129,7 @@ pub(crate) fn calibrate_hull_white_to_swaptions_with_fn(
             )));
         }
         let (annuity, fwd_rate) =
-            compute_swap_annuity_and_rate_inner(df, q.expiry, q.tenor, ppy, schedule);
+            compute_swap_annuity_and_rate(df, q.expiry, q.tenor, ppy, schedule);
         let market_price = compute_swaption_market_price(
             annuity,
             fwd_rate,
@@ -255,27 +255,6 @@ fn swaption_atm_vega(annuity: f64, fwd_rate: f64, expiry: f64, vol: f64, is_norm
     }
 }
 
-/// Compute annuity and forward swap rate for a swap starting at `t0`
-/// with given `tenor` and `periods_per_year` coupon payments.
-///
-/// The schedule is synthetic (constant `dt = tenor/n_periods`). For real
-/// market day-counts (Act/360 USD SOFR, 30/360 EUR EURIBOR, etc.), use
-/// `compute_swap_annuity_and_rate_inner` with an explicit
-/// [`SwaptionSchedule`].
-///
-/// Test-only: production calibration always calls
-/// [`compute_swap_annuity_and_rate_inner`] directly with the resolved
-/// `Option<SwaptionSchedule>`.
-#[cfg(test)]
-pub(crate) fn compute_swap_annuity_and_rate(
-    df: &(dyn Fn(f64) -> f64 + Sync),
-    t0: f64,
-    tenor: f64,
-    periods_per_year: usize,
-) -> (f64, f64) {
-    compute_swap_annuity_and_rate_inner(df, t0, tenor, periods_per_year, None)
-}
-
 /// Compute annuity and par forward swap rate from a contractual [`SwaptionSchedule`].
 pub(crate) fn contractual_swap_annuity_and_forward(
     df: &(dyn Fn(f64) -> f64 + Sync),
@@ -302,7 +281,11 @@ pub(crate) fn contractual_swap_annuity_and_forward(
     (annuity, fwd_rate)
 }
 
-pub(super) fn compute_swap_annuity_and_rate_inner(
+/// Annuity and par forward swap rate for a swap starting at `t0`.
+///
+/// Uses the contractual `schedule` when present; otherwise a synthetic
+/// constant-`dt` schedule of `tenor * periods_per_year` periods.
+pub(super) fn compute_swap_annuity_and_rate(
     df: &(dyn Fn(f64) -> f64 + Sync),
     t0: f64,
     tenor: f64,
@@ -468,28 +451,8 @@ pub(crate) fn hw1f_swaption_price(
     swap_rate: f64,
     periods_per_year: usize,
 ) -> f64 {
-    hw1f_swaption_price_inner(Hw1fSwaptionPriceInput {
-        kappa,
-        sigma,
-        df,
-        t0,
-        tenor,
-        swap_rate,
-        periods_per_year,
-        schedule: None,
-    })
-}
-
-#[cfg(test)]
-pub(super) struct Hw1fSwaptionPriceInput<'a> {
-    pub(super) kappa: f64,
-    pub(super) sigma: f64,
-    pub(super) df: &'a (dyn Fn(f64) -> f64 + Sync),
-    pub(super) t0: f64,
-    pub(super) tenor: f64,
-    pub(super) swap_rate: f64,
-    pub(super) periods_per_year: usize,
-    pub(super) schedule: Option<&'a SwaptionSchedule>,
+    let cashflows = build_swaption_cashflows(swap_rate, t0, tenor, periods_per_year);
+    hw1f_swaption_price_prepared(kappa, sigma, df, t0, t0, &cashflows)
 }
 
 fn build_swaption_cashflows(
@@ -524,33 +487,6 @@ fn build_swaption_cashflows(
         aggregated.push((time, amount));
     }
     aggregated
-}
-
-#[cfg(test)]
-pub(super) fn hw1f_swaption_price_inner(
-    Hw1fSwaptionPriceInput {
-        kappa,
-        sigma,
-        df,
-        t0,
-        tenor,
-        swap_rate,
-        periods_per_year,
-        schedule,
-    }: Hw1fSwaptionPriceInput<'_>,
-) -> f64 {
-    if let Some(schedule) = schedule {
-        return super::contractual_swaption::price(
-            HullWhiteCalibrationParams { kappa, sigma },
-            df,
-            t0,
-            swap_rate,
-            schedule,
-        )
-        .unwrap_or(f64::NAN);
-    }
-    let cashflow_entries = build_swaption_cashflows(swap_rate, t0, tenor, periods_per_year);
-    hw1f_swaption_price_prepared(kappa, sigma, df, t0, t0, &cashflow_entries)
 }
 
 /// Evaluate an already prepared contractual fixed-bond cashflow schedule.
@@ -690,8 +626,8 @@ pub(super) fn hw1f_swaption_price_prepared(
         let bracket_lo = f0t0 - half_width;
         let bracket_hi = f0t0 + half_width;
         let brent = BrentSolver::new()
-            .tolerance(1e-12)
-            .bracket_bounds(bracket_lo, bracket_hi);
+            .with_tolerance(1e-12)
+            .with_bracket_bounds(bracket_lo, bracket_hi);
         match brent.solve(g, f0t0) {
             Ok(r) => r_star = r,
             Err(_) => {
@@ -791,8 +727,7 @@ mod timing_tests {
     fn swaption_schedule_forward_uses_both_legs_contractual_payments() {
         let df = |time: f64| (-0.03 * time).exp();
         let schedule = lagged_schedule();
-        let (annuity, forward) =
-            compute_swap_annuity_and_rate_inner(&df, 1.0, 1.01, 2, Some(&schedule));
+        let (annuity, forward) = compute_swap_annuity_and_rate(&df, 1.0, 1.01, 2, Some(&schedule));
         let expected_annuity = schedule
             .payment_times
             .iter()
@@ -832,18 +767,19 @@ mod timing_tests {
                 .collect(),
             floating_is_compounded: false,
         };
-        let (_, forward) = compute_swap_annuity_and_rate(&df, 1.0, 1.0, 2);
+        let (_, forward) = compute_swap_annuity_and_rate(&df, 1.0, 1.0, 2, None);
         let synthetic = hw1f_swaption_price(0.05, 0.01, &df, 1.0, 1.0, forward, 2);
-        let explicit = hw1f_swaption_price_inner(Hw1fSwaptionPriceInput {
-            kappa: 0.05,
-            sigma: 0.01,
-            df: &df,
-            t0: 1.0,
-            tenor: 1.0,
-            swap_rate: forward,
-            periods_per_year: 2,
-            schedule: Some(&schedule),
-        });
+        let explicit = super::super::contractual_swaption::price(
+            HullWhiteCalibrationParams {
+                kappa: 0.05,
+                sigma: 0.01,
+            },
+            &df,
+            1.0,
+            forward,
+            &schedule,
+        )
+        .expect("explicit schedule price");
         assert!(
             (explicit - synthetic).abs() < 1.0e-12,
             "{explicit} vs {synthetic}"
@@ -889,7 +825,7 @@ mod timing_tests {
     #[test]
     fn synthetic_prepared_cashflows_preserve_reference_price() {
         let df = |time: f64| (-0.03 * time).exp();
-        let (annuity, forward) = compute_swap_annuity_and_rate(&df, 1.0, 5.0, 2);
+        let (annuity, forward) = compute_swap_annuity_and_rate(&df, 1.0, 5.0, 2, None);
         assert!(annuity > 0.0);
         let cashflows = build_swaption_cashflows(forward, 1.0, 5.0, 2);
         let price = hw1f_swaption_price_prepared(0.05, 0.01, &df, 1.0, 1.0, &cashflows);

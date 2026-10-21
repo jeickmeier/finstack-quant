@@ -23,7 +23,7 @@ use crate::structured_credit::types::{StructuredCredit, TrancheCashflows};
 use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 
 /// Run full deterministic cashflow simulation for a structured credit instrument.
@@ -40,7 +40,7 @@ pub fn run_simulation(
     instrument: &StructuredCredit,
     market: &MarketContext,
     as_of: Date,
-) -> Result<HashMap<String, TrancheCashflows>> {
+) -> Result<FxHashMap<String, TrancheCashflows>> {
     run_simulation_with_diagnostics(instrument, market, as_of).map(|run| run.tranches)
 }
 

@@ -1,21 +1,12 @@
 //! Typed Python wrappers for scenario specifications and template metadata.
 
 use crate::bindings::date_utils::date_to_py;
+use crate::bindings::extract::parse_label;
 use crate::errors::{display_to_py, scenarios_to_py};
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 
 use super::operation_spec::PyOperationSpec;
-
-fn parse_resolution_mode(
-    value: &str,
-) -> PyResult<finstack_quant_core::market_data::hierarchy::ResolutionMode> {
-    finstack_quant_core::wire::serde_parse(value).map_err(crate::errors::core_to_py)
-}
-
-fn parse_hazard_bump_mode(value: &str) -> PyResult<finstack_quant_scenarios::HazardBumpMode> {
-    finstack_quant_core::wire::serde_parse(value).map_err(crate::errors::core_to_py)
-}
 
 /// Validated scenario specification executed by the scenario engine.
 ///
@@ -100,8 +91,12 @@ impl PyScenarioSpec {
                 .map(|operation| operation.inner)
                 .collect(),
             priority,
-            resolution_mode: parse_resolution_mode(resolution_mode)?,
-            hazard_bump_mode: parse_hazard_bump_mode(hazard_bump_mode)?,
+            resolution_mode: parse_label::<
+                finstack_quant_core::market_data::hierarchy::ResolutionMode,
+            >(resolution_mode)?,
+            hazard_bump_mode: parse_label::<finstack_quant_scenarios::HazardBumpMode>(
+                hazard_bump_mode,
+            )?,
         };
         inner.validate().map_err(scenarios_to_py)?;
         Ok(Self { inner })

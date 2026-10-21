@@ -944,7 +944,8 @@ mod tests {
         let sigma = 0.03_f64;
         let rate = 0.5 * sigma * sigma;
         let df = (-rate).exp();
-        let expected_max = 200.0 * rate.exp() * finstack_quant_core::math::norm_cdf(sigma);
+        let expected_max =
+            200.0 * rate.exp() * finstack_quant_core::math::special_functions::norm_cdf(sigma);
         let fixed_reference = df * (expected_max - 100.0);
         let floating_reference = df * expected_max - 100.0;
         let process = GbmProcess::new(GbmParams::new(rate, 0.0, sigma).unwrap());

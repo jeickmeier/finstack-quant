@@ -1,7 +1,7 @@
-//! Finite-difference and repricing utilities for portfolio sensitivities.
+//! Full-repricing engine for per-factor scenario P&L profiles.
 //!
 use super::delta_engine::{mapping_to_market_bumps, validate_position_weights};
-use super::traits::{mapping_bumps_fx, raw_pv_in_base, FactorRepricingPlan};
+use super::traits::{factor_bump, mapping_bumps_fx, FactorRepricingPlan};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -78,7 +78,7 @@ impl<'de> serde::Deserialize<'de> for FactorPnlProfile {
 
 /// Symmetric grid of scenario shifts used by the full repricing engine.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ScenarioGrid {
+pub(crate) struct ScenarioGrid {
     shifts: Vec<f64>,
 }
 
@@ -164,17 +164,6 @@ impl FullRepricingEngine {
         })
     }
 
-    fn validate_bump_size(factor: &FactorDefinition, bump_size: f64) -> Result<()> {
-        if bump_size.is_finite() && bump_size.abs() >= f64::EPSILON {
-            Ok(())
-        } else {
-            Err(Error::Validation(format!(
-                "FullRepricingEngine: factor {:?} has invalid bump size {bump_size}; bump size must be finite and non-zero",
-                factor.id.as_str()
-            )))
-        }
-    }
-
     /// Collect unscaled base-currency PVs on the unbumped market.
     ///
     /// Each instrument is priced native via `value_raw_with_currency`, then
@@ -189,7 +178,7 @@ impl FullRepricingEngine {
         positions
             .iter()
             .map(|(position_id, instrument, _)| {
-                let pv = raw_pv_in_base(*instrument, market, as_of, base_currency)?;
+                let pv = crate::fx::raw_pv_in_base(*instrument, market, as_of, base_currency)?;
                 if !pv.is_finite() {
                     return Err(Error::Validation(format!(
                         "minor 15: non-finite base PV for position '{position_id}' ({pv})"
@@ -235,11 +224,7 @@ impl FullRepricingEngine {
         let repricing_plan = FactorRepricingPlan::build(positions, factors, market);
 
         let compute_profile = |(factor_index, factor): (usize, &FactorDefinition)| {
-            let bump_size = self
-                .bump_config
-                .bump_size_for_factor(&factor.id, &factor.factor_type);
-            let bump_units = factor.factor_type.bump_units();
-            Self::validate_bump_size(factor, bump_size)?;
+            let (bump_size, bump_units) = factor_bump(&self.bump_config, factor)?;
             let affected_positions = repricing_plan.affected(factor_index);
             let reconvert_all = mapping_bumps_fx(&factor.market_mapping);
             let mut position_pnls = Vec::with_capacity(self.scenario_grid.shifts().len());
@@ -265,7 +250,7 @@ impl FullRepricingEngine {
                                 if !affected && !reconvert_all {
                                     return Ok(0.0);
                                 }
-                            let pv = raw_pv_in_base(*instrument, &bumped_market, as_of, base_currency)?;
+                            let pv = crate::fx::raw_pv_in_base(*instrument, &bumped_market, as_of, base_currency)?;
                             if !pv.is_finite() {
                                 let position_id = &positions[position_idx].0;
                                 return Err(Error::Validation(format!(
@@ -299,20 +284,9 @@ impl FullRepricingEngine {
             Ok(profile)
         };
 
-        #[cfg(not(target_arch = "wasm32"))]
-        let profile_results: Vec<Result<FactorPnlProfile>> = {
-            use rayon::prelude::*;
-            factors
-                .par_iter()
-                .enumerate()
-                .map(compute_profile)
-                .collect()
-        };
-
-        #[cfg(target_arch = "wasm32")]
-        let profile_results: Vec<Result<FactorPnlProfile>> =
-            factors.iter().enumerate().map(compute_profile).collect();
-        profile_results.into_iter().collect()
+        finstack_quant_core::parallel::try_map_ordered(0..factors.len(), |index| {
+            compute_profile((index, &factors[index]))
+        })
     }
 }
 
@@ -419,10 +393,10 @@ mod tests {
                     .rate
                     * self.scale);
             }
-            Ok(market
-                .get_discount(self.curve_id.as_str())?
-                .zero(self.tenor_years)
-                * self.scale)
+            Ok(market.get_discount(self.curve_id.as_str())?.zero_rate(
+                self.tenor_years,
+                finstack_quant_core::math::Compounding::Continuous,
+            ) * self.scale)
         }
     }
 

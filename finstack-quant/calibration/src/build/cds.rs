@@ -14,10 +14,8 @@ use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::{
     Attributes, PayReceive, PremiumLegSpec, ProtectionLegSpec,
 };
-use finstack_quant_valuations_core::market::conventions::ids::CdsConventionKey;
 use finstack_quant_valuations_core::market::conventions::{CdsConventionSpec, ConventionRegistry};
 use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
-use rust_decimal::Decimal;
 
 /// Resolved CDS dates used by both builders and calibration prepared quotes.
 #[derive(Debug, Clone, Copy)]
@@ -57,25 +55,22 @@ pub(crate) fn resolve_cds_tenor_maturity(trade_date: Date, tenor: &Tenor) -> Res
     next_semiannual_cds_maturity(raw)
 }
 
-/// Resolve CDS quote dates without requiring callers to inspect the boxed instrument.
-pub(crate) fn resolve_cds_quote_dates(
-    quote: &CdsQuote,
-    ctx: &BuildCtx,
-) -> Result<CdsResolvedDates> {
-    let (convention_key, pillar) = cds_quote_convention_and_pillar(quote);
-    let registry = ConventionRegistry::try_global()?;
-    let conv = registry.resolve_cds(convention_key)?;
-    resolve_cds_dates(ctx, conv, pillar)
-}
-
-fn cds_quote_convention_and_pillar(quote: &CdsQuote) -> (&CdsConventionKey, &Pillar) {
-    match quote {
-        CdsQuote::CdsParSpread {
-            convention, pillar, ..
-        }
-        | CdsQuote::CdsUpfront {
-            convention, pillar, ..
-        } => (convention, pillar),
+/// Scheduled CDS termination date for a quote pillar.
+///
+/// Tenor pillars follow the post-2015 semiannual roll
+/// ([`resolve_cds_tenor_maturity`]); explicit date pillars snap to the
+/// quarterly IMM grid from the unadjusted input date (no business-day
+/// adjustment before roll selection, which could push the date past the
+/// 20th and select the next quarter).
+///
+/// # Arguments
+///
+/// * `trade_date` - Trade (as-of) date anchoring tenor pillars.
+/// * `pillar` - Quote maturity as a tenor or an explicit date.
+pub(crate) fn cds_pillar_maturity(trade_date: Date, pillar: &Pillar) -> Result<Date> {
+    match pillar {
+        Pillar::Tenor(t) => resolve_cds_tenor_maturity(trade_date, t),
+        Pillar::Date(d) => next_cds_date(d.add_days(-1)?),
     }
 }
 
@@ -94,15 +89,7 @@ fn resolve_cds_dates(
     // coupon roll and must not move accrual or protection into the future.
     let start = cds_accrual_start(ctx.as_of())?;
 
-    let maturity = match pillar {
-        Pillar::Tenor(t) => resolve_cds_tenor_maturity(ctx.as_of(), t)?,
-        Pillar::Date(d) => {
-            // Enforce IMM alignment using the unadjusted input date.
-            // Do NOT business-day adjust before roll selection, as that can push
-            // the date past the 20th and cause next_cds_date to return the next quarter.
-            next_cds_date(d.add_days(-1)?)?
-        }
-    };
+    let maturity = cds_pillar_maturity(ctx.as_of(), pillar)?;
 
     Ok(CdsResolvedDates {
         spot,
@@ -141,79 +128,6 @@ fn resolve_cds_dates(
 /// semi-annual roll anchor (20-Mar/20-Sep) on or before the trade date, plus
 /// the tenor, extended to the next standard maturity (20-Jun/20-Dec). Explicit
 /// date pillars are snapped to the quarterly IMM grid unchanged.
-///
-/// # Examples
-///
-/// Building from a par spread quote:
-/// ```rust,ignore
-/// use finstack_quant_calibration::build::BuildCtx;
-/// use finstack_quant_calibration::build::build_cds_instrument;
-/// use finstack_quant_calibration::quotes::cds::CdsQuote;
-/// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-/// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
-/// use finstack_quant_core::dates::Date;
-/// use finstack_quant_core::currency::Currency;
-/// use finstack_quant_core::HashMap;
-///
-/// # fn example() -> finstack_quant_core::Result<()> {
-/// let ctx = BuildCtx::new(
-///     Date::from_calendar_date(2024, time::Month::January, 2).unwrap(),
-///     10_000_000.0,
-///     HashMap::default(),
-/// );
-///
-/// let quote = CdsQuote::CdsParSpread {
-///     id: QuoteId::new("CDS-ABC-CORP-5Y"),
-///     entity: "ABC Corp".to_string(),
-///     convention: CdsConventionKey {
-///         currency: Currency::USD,
-///         doc_clause: CdsDocClause::Cr14,
-///     },
-///     pillar: Pillar::Tenor("5Y".parse().unwrap()),
-///     spread_bp: 150.0,
-///     recovery_rate: 0.40,
-/// };
-///
-/// let instrument = build_cds_instrument(&quote, &ctx)?;
-/// # Ok(())
-/// # }
-/// ```
-///
-/// Building from an upfront quote:
-/// ```rust,ignore
-/// use finstack_quant_calibration::build::BuildCtx;
-/// use finstack_quant_calibration::build::build_cds_instrument;
-/// use finstack_quant_calibration::quotes::cds::CdsQuote;
-/// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-/// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
-/// use finstack_quant_core::dates::Date;
-/// use finstack_quant_core::currency::Currency;
-/// use finstack_quant_core::HashMap;
-///
-/// # fn example() -> finstack_quant_core::Result<()> {
-/// let ctx = BuildCtx::new(
-///     Date::from_calendar_date(2024, time::Month::January, 2).unwrap(),
-///     10_000_000.0,
-///     HashMap::default(),
-/// );
-///
-/// let quote = CdsQuote::CdsUpfront {
-///     id: QuoteId::new("CDS-ABC-CORP-5Y"),
-///     entity: "ABC Corp".to_string(),
-///     convention: CdsConventionKey {
-///         currency: Currency::USD,
-///         doc_clause: CdsDocClause::Cr14,
-///     },
-///     pillar: Pillar::Tenor("5Y".parse().unwrap()),
-///     coupon_bp: 500.0,
-///     upfront_pct: 0.02, // 2% upfront
-///     recovery_rate: 0.40,
-/// };
-///
-/// let instrument = build_cds_instrument(&quote, &ctx)?;
-/// # Ok(())
-/// # }
-/// ```
 ///
 /// # See Also
 ///
@@ -254,7 +168,7 @@ pub(crate) fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<C
         ),
     };
 
-    ProtectionLegSpec::validate_recovery_rate(recovery_rate)?;
+    finstack_quant_core::validation::validate_recovery_rate(recovery_rate)?;
 
     let conv = registry.resolve_cds(convention_key)?;
     let dates = resolve_cds_dates(ctx, conv, pillar)?;
@@ -289,12 +203,7 @@ pub(crate) fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<C
             business_day_convention: conv.business_day_convention,
             calendar_id: Some(conv.calendar_id.clone().into()),
             day_count: conv.day_count,
-            coupon_bp: Decimal::try_from(spread_bp).map_err(|e| {
-                finstack_quant_core::Error::Validation(format!(
-                    "premium.coupon_bp {} cannot be represented as Decimal: {}",
-                    spread_bp, e
-                ))
-            })?,
+            coupon_bp: finstack_quant_core::decimal::f64_to_decimal(spread_bp)?,
             discount_curve_id: CurveId::new(discount_id),
         },
         protection_leg: ProtectionLegSpec {
@@ -323,7 +232,7 @@ mod tests {
     use crate::quotes::ids::{Pillar, QuoteId};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
-    use finstack_quant_core::HashMap;
+    use finstack_quant_core::FxHashMap;
     use finstack_quant_valuations_core::market::conventions::ids::{
         CdsConventionKey, CdsDocClause,
     };
@@ -332,7 +241,7 @@ mod tests {
     fn cds_build_ctx() -> BuildCtx {
         let as_of =
             Date::from_calendar_date(2024, Month::January, 2).expect("valid CDS build date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("credit".to_string(), "ABC-CORP".to_string());
         BuildCtx::new(as_of, 10_000_000.0, curve_ids)
@@ -435,7 +344,7 @@ mod tests {
         for ((ty, tm, td), (ey, em, ed)) in cases {
             let as_of =
                 Date::from_calendar_date(ty, tm, td).expect("valid CDS trade-date test case");
-            let mut curve_ids = HashMap::default();
+            let mut curve_ids = FxHashMap::default();
             curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
             curve_ids.insert("credit".to_string(), "ABC-CORP".to_string());
             let ctx = BuildCtx::new(as_of, 10_000_000.0, curve_ids);
@@ -471,7 +380,7 @@ mod tests {
     fn test_cds_tenor_pillar_runs_from_spot_not_prior_imm_start() -> Result<()> {
         let as_of = Date::from_calendar_date(2026, Month::May, 2)
             .expect("valid CDS spot-date regression date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("credit".to_string(), "IBM-USD-SENIOR".to_string());
         let ctx = BuildCtx::new(as_of, 10_000_000.0, curve_ids);

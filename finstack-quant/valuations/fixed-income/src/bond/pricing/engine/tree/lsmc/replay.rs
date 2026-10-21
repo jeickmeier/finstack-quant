@@ -6,7 +6,7 @@ impl FloatingCoupon {
     /// Resolve full settlement on a copy, preserving the live accrual endpoint.
     fn settlement(
         &self,
-        state: &FloatingRuntimeState,
+        state: &FloatingCouponReplayState,
         path: &[RatesCreditPathState],
     ) -> Result<finstack_quant_cashflows::builder::FloatingCouponSettlement> {
         let mut settlement_state = state.clone();
@@ -17,11 +17,11 @@ impl FloatingCoupon {
                 |slice| {
                     overnight
                         .sources
-                        .get(&(slice.observation_date, slice.rate_tenor_days))
+                        .get(&slice.observation_date)
                         .ok_or_else(|| {
-                            Error::internal(format!(
-                                "bond hazard LSMC has no overnight source for {} / {} day(s)",
-                                slice.observation_date, slice.rate_tenor_days
+                            Error::Internal(format!(
+                                "bond hazard LSMC has no overnight source for {}",
+                                slice.observation_date
                             ))
                         })?
                         .rate(path)
@@ -36,7 +36,7 @@ impl ReplayCursor {
     pub(super) fn new(template: &ReplayTemplate) -> Result<Self> {
         let mut floating = Vec::with_capacity(template.floating.len());
         for coupon in &template.floating {
-            let mut state = coupon.compiled.replay_state();
+            let mut state = FloatingCouponReplayState::default();
             if let Some(rate) = coupon.initial_term_rate {
                 coupon.compiled.observe_term(&mut state, rate)?;
             }
@@ -57,10 +57,12 @@ impl ReplayCursor {
         template: &ReplayTemplate,
         checkpoint: &ProductCheckpoint,
     ) -> Result<Self> {
-        let mut floating = vec![FloatingRuntimeState::default(); template.floating.len()];
+        let mut floating = vec![FloatingCouponReplayState::default(); template.floating.len()];
         for live in &checkpoint.live_floating {
             let slot = floating.get_mut(live.coupon_id).ok_or_else(|| {
-                Error::internal("bond hazard LSMC checkpoint has an invalid floating coupon id")
+                Error::Internal(
+                    "bond hazard LSMC checkpoint has an invalid floating coupon id".into(),
+                )
             })?;
             *slot = live.state.clone();
         }
@@ -72,12 +74,12 @@ impl ReplayCursor {
         })
     }
 
-    pub(super) fn checkpoint(&self, template: &ReplayTemplate) -> ProductCheckpoint {
+    pub(super) fn checkpoint(&self) -> ProductCheckpoint {
         let live_floating = self
             .floating
             .iter()
             .enumerate()
-            .filter(|(coupon_id, state)| template.floating[*coupon_id].compiled.is_live(state))
+            .filter(|(_, state)| state.is_live())
             .map(|(coupon_id, state)| LiveFloatingCheckpoint {
                 coupon_id,
                 state: state.clone(),
@@ -99,22 +101,26 @@ impl ReplayCursor {
         end: Date,
     ) -> Result<()> {
         let coupon = template.floating.get(coupon_id).ok_or_else(|| {
-            Error::internal("bond hazard LSMC overnight coupon id is outside the replay template")
+            Error::Internal(
+                "bond hazard LSMC overnight coupon id is outside the replay template".into(),
+            )
         })?;
         let FloatingRateModel::Overnight(overnight) = &coupon.rate_model else {
             return Ok(());
         };
         let state = self.floating.get_mut(coupon_id).ok_or_else(|| {
-            Error::internal("bond hazard LSMC overnight coupon state is outside the replay cursor")
+            Error::Internal(
+                "bond hazard LSMC overnight coupon state is outside the replay cursor".into(),
+            )
         })?;
         coupon.compiled.advance_overnight(state, end, |slice| {
             overnight
                 .sources
-                .get(&(slice.observation_date, slice.rate_tenor_days))
+                .get(&slice.observation_date)
                 .ok_or_else(|| {
-                    Error::internal(format!(
-                        "bond hazard LSMC has no overnight source for {} / {} day(s)",
-                        slice.observation_date, slice.rate_tenor_days
+                    Error::Internal(format!(
+                        "bond hazard LSMC has no overnight source for {}",
+                        slice.observation_date
                     ))
                 })?
                 .rate(path)
@@ -147,7 +153,7 @@ impl ReplayCursor {
         if let Some(date) = template.step_dates.get(step).copied().flatten() {
             for coupon_id in 0..template.floating.len() {
                 let coupon = &template.floating[coupon_id];
-                if coupon.compiled.is_live(&self.floating[coupon_id])
+                if self.floating[coupon_id].is_live()
                     && matches!(coupon.rate_model, FloatingRateModel::Overnight(_))
                 {
                     self.advance_overnight(
@@ -213,7 +219,7 @@ impl ReplayCursor {
                 coupon.payment_step
             };
             if step == final_step {
-                self.floating[coupon_id] = FloatingRuntimeState::default();
+                self.floating[coupon_id] = FloatingCouponReplayState::default();
             }
         }
         if self.outstanding < -1.0e-8 || !self.outstanding.is_finite() {
@@ -232,8 +238,8 @@ impl ReplayCursor {
                     coupon.compiled.observe_term(state, index_rate)?;
                 }
                 FloatingRateModel::Overnight(_) => {
-                    return Err(Error::internal(
-                        "bond hazard LSMC overnight coupon has a term reset event",
+                    return Err(Error::Internal(
+                        "bond hazard LSMC overnight coupon has a term reset event".into(),
                     ));
                 }
             }
@@ -461,8 +467,9 @@ impl ReplayTemplate {
                 decision_steps
                     .binary_search(&claim.exercise_step)
                     .map_err(|_| {
-                        Error::internal(
-                            "bond hazard LSMC make-whole claim has no matching decision step",
+                        Error::Internal(
+                            "bond hazard LSMC make-whole claim has no matching decision step"
+                                .into(),
                         )
                     })?;
         }
@@ -691,7 +698,10 @@ impl ReplayTemplate {
             .transpose()?
             .unwrap_or((0.0, 0.0));
         let params = floating_spec
-            .map(|spec| params_from_spec(&spec.rate_spec))
+            .map(|spec| {
+                finstack_quant_cashflows::builder::FloatingRateParams::try_from(&spec.rate_spec)
+            })
+            .transpose()?
             .unwrap_or_default();
         params.validate()?;
 
@@ -733,7 +743,9 @@ impl ReplayTemplate {
                 )));
             }
             let spec = floating_spec.ok_or_else(|| {
-                Error::internal("bond hazard LSMC dynamic floating coupon has no specification")
+                Error::Internal(
+                    "bond hazard LSMC dynamic floating coupon has no specification".into(),
+                )
             })?;
             let base_index_rate = group.base_index_rate.ok_or_else(|| {
                 Error::Validation(format!(
@@ -839,7 +851,7 @@ impl ReplayTemplate {
                     payment_date: payment,
                     day_count,
                     day_count_context: group.day_count_context.ok_or_else(|| {
-                        Error::internal("floating coupon is missing day-count context")
+                        Error::Internal("floating coupon is missing day-count context".into())
                     })?,
                     accrual_factor: group.accrual,
                 },
@@ -1158,7 +1170,7 @@ impl ReplayTemplate {
         step: usize,
         path: &[RatesCreditPathState],
         state: StepReplay,
-        floating: &[FloatingRuntimeState],
+        floating: &[FloatingCouponReplayState],
         make_whole_policies: Option<&[RegressionPolicy]>,
     ) -> Result<DecisionSnapshot> {
         let representative_date = self.exercise[step]
@@ -1172,11 +1184,8 @@ impl ReplayTemplate {
             if matches!(&coupon.rate_model, FloatingRateModel::Term(_))
                 && coupon.reset_step <= step
                 && step < coupon.payment_step.max(coupon.effective_end_step)
-                && coupon.compiled.captured_notional(&floating[id]).is_some()
-                && coupon
-                    .compiled
-                    .locked_term_index_rate(&floating[id])
-                    .is_some()
+                && floating[id].notional().is_some()
+                && floating[id].term_index_rate().is_some()
             {
                 let settlement = coupon.compiled.settle(&floating[id])?;
                 if step < coupon.payment_step {
@@ -1279,8 +1288,8 @@ impl ReplayTemplate {
             }
         }
         if decision_snapshots.len() != high_decision - low_decision + 1 {
-            return Err(Error::internal(
-                "bond hazard LSMC block replay missed a decision snapshot",
+            return Err(Error::Internal(
+                "bond hazard LSMC block replay missed a decision snapshot".into(),
             ));
         }
         let oas = config.oas_bp / 10_000.0;
@@ -1369,8 +1378,8 @@ impl ReplayTemplate {
         }
 
         if snapshots.len() != self.decision_steps.len() {
-            return Err(Error::internal(
-                "bond hazard LSMC full replay missed a decision snapshot",
+            return Err(Error::Internal(
+                "bond hazard LSMC full replay missed a decision snapshot".into(),
             ));
         }
 
@@ -1401,7 +1410,7 @@ impl ReplayTemplate {
     pub(super) fn accrued_state(
         &self,
         date: Date,
-        coupon_states: &[FloatingRuntimeState],
+        coupon_states: &[FloatingCouponReplayState],
     ) -> Result<(f64, f64)> {
         let mut cash = 0.0;
         let mut pik = 0.0;
@@ -1491,8 +1500,9 @@ impl ReplayTemplate {
                 Some(
                     self.return_floor
                         .ok_or_else(|| {
-                            Error::internal(
-                                "bond hazard LSMC return-floor date has no floor specification",
+                            Error::Internal(
+                                "bond hazard LSMC return-floor date has no floor specification"
+                                    .into(),
                             )
                         })?
                         .redemption(
@@ -1522,7 +1532,7 @@ impl ReplayTemplate {
                                     return Ok(contractual);
                                 };
                                 let policy = policies.get(*claim_id).ok_or_else(|| {
-                                    Error::internal(format!(
+                                    Error::Internal(format!(
                                         "bond hazard LSMC has no make-whole policy for claim {claim_id}"
                                     ))
                                 })?;

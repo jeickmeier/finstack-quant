@@ -4,7 +4,7 @@ use super::parametric::scale_for_measure;
 use super::tail_multipliers;
 use super::types::{PositionResidualContribution, RiskDecomposition};
 use crate::RiskMeasure;
-use finstack_quant_core::math::standard_normal_inv_cdf;
+use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
 
 /// Add one residual-risk overlay to a factor-only decomposition.
 ///

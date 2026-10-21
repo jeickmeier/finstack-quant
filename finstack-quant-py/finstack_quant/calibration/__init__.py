@@ -21,12 +21,11 @@ CalibrationEnvelope = _calibration.CalibrationEnvelope
 CalibrationEnvelopeError = _calibration.CalibrationEnvelopeError
 CalibrationPlan = _calibration.CalibrationPlan
 CalibrationReport = _calibration.CalibrationReport
-CalibrationResult = _calibration.CalibrationResult
+CalibrationResultEnvelope = _calibration.CalibrationResultEnvelope
 CalibrationStep = _calibration.CalibrationStep
 CalibrationValidationReport = _calibration.CalibrationValidationReport
 CdsQuote = _calibration.CdsQuote
 CdsTrancheQuote = _calibration.CdsTrancheQuote
-CollateralEntry = _calibration.CollateralEntry
 DividendScheduleDatum = _calibration.DividendScheduleDatum
 FxSpotDatum = _calibration.FxSpotDatum
 InflationQuote = _calibration.InflationQuote
@@ -61,12 +60,11 @@ __all__ = [
     "CalibrationEnvelopeError",
     "CalibrationPlan",
     "CalibrationReport",
-    "CalibrationResult",
+    "CalibrationResultEnvelope",
     "CalibrationStep",
     "CalibrationValidationReport",
     "CdsQuote",
     "CdsTrancheQuote",
-    "CollateralEntry",
     "DividendScheduleDatum",
     "FxSpotDatum",
     "InflationQuote",

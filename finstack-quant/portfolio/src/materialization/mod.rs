@@ -1,6 +1,6 @@
 //! Versioned, content-addressed portfolio materialization fast path.
 //!
-//! [`crate::portfolio::PortfolioSpec`] remains the portable embedded
+//! [`crate::PortfolioSpec`] remains the portable embedded
 //! interchange format. This module is the native bulk-loading path for
 //! normalized stores: an allocation-free preflight enforces collection limits,
 //! then the outer document is parsed once into its canonical serde type. Unique
@@ -15,17 +15,17 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::dependencies::DependencyIndex;
-use crate::error::Error;
-use crate::portfolio::Portfolio;
 use crate::position::Position;
 use crate::types::PositionId;
+use crate::Error;
+use crate::Portfolio;
 use cache::{CacheKey, CachedArtifact};
 use finstack_quant_core::canonical::CANONICAL_VERSION;
 use finstack_quant_core::contract::{
     check_json_limits, ContractDescriptor, ContractError, Diagnostic, LoadLimits, LoadPhase,
     Severity, ValidationReport,
 };
-use finstack_quant_core::{HashMap, HashSet};
+use finstack_quant_core::{FxHashMap, FxHashSet};
 use finstack_quant_valuations::instruments::instrument_json_of;
 use finstack_quant_valuations::instruments::{InstrumentEnvelope, MarketDependencies};
 use serde::de::{IgnoredAny, MapAccess, SeqAccess, Visitor};
@@ -52,7 +52,7 @@ struct PreparedArtifact {
 
 struct ValidatedInput {
     bundle: MaterializationInput,
-    decoded: HashMap<String, CachedArtifact>,
+    decoded: FxHashMap<String, CachedArtifact>,
     diagnostics: ValidationReport,
     parse_nanos: Option<u64>,
     validation_nanos: Option<u64>,
@@ -204,7 +204,11 @@ impl Portfolio {
                 diagnostics.push_bounded(limits, missing_artifact_diagnostic(index, materialized));
                 continue;
             };
-            validate_position_semantics(index, materialized, artifact, limits, &mut diagnostics);
+            // A quantity the semantic check rejected is reported once, there.
+            if !validate_position_semantics(index, materialized, artifact, limits, &mut diagnostics)
+            {
+                continue;
+            }
 
             match Position::new(
                 materialized.id.clone(),
@@ -247,7 +251,7 @@ impl Portfolio {
             as_of: bundle.portfolio.as_of,
             entities: bundle.portfolio.entities,
             positions,
-            position_index: HashMap::default(),
+            position_index: FxHashMap::default(),
             dependency_index: DependencyIndex::default(),
             books: bundle.portfolio.books,
             tags: bundle.portfolio.tags,
@@ -340,7 +344,8 @@ impl Portfolio {
                 diagnostics.push_bounded(limits, missing_artifact_diagnostic(index, position));
                 continue;
             };
-            validate_position_semantics(index, position, artifact, limits, &mut diagnostics);
+            let _ =
+                validate_position_semantics(index, position, artifact, limits, &mut diagnostics);
         }
         let semantic_nanos = report::elapsed_nanos(semantic_started);
         if diagnostics.has_errors() {
@@ -393,7 +398,7 @@ impl Portfolio {
         self.validate()?;
 
         let mut instruments = Vec::new();
-        let mut artifact_id_by_hash: HashMap<String, String> = HashMap::default();
+        let mut artifact_id_by_hash: FxHashMap<String, String> = FxHashMap::default();
         let mut positions = Vec::with_capacity(self.positions.len());
         let books = self.books.clone();
 
@@ -491,7 +496,7 @@ fn validate_and_decode(
     let validation_nanos = report::elapsed_nanos(validation_started);
 
     let decode_started = report::start_timer();
-    let mut decoded: HashMap<String, CachedArtifact> = HashMap::default();
+    let mut decoded: FxHashMap<String, CachedArtifact> = FxHashMap::default();
     let mut cache_hits = 0usize;
     let mut dependency_count = 0usize;
     for artifact in prepared {
@@ -585,13 +590,15 @@ fn enforce_materialization_collection_limits(
     enforce_count_limit("books", counts.portfolio.books.0, crate::book::MAX_BOOKS)
 }
 
+/// Record semantic diagnostics for one position; returns `false` when its
+/// quantity is invalid, so the build phase does not report it a second time.
 fn validate_position_semantics(
     index: usize,
     position: &MaterializedPosition,
     artifact: &CachedArtifact,
     limits: &LoadLimits,
     diagnostics: &mut ValidationReport,
-) {
+) -> bool {
     if artifact.instrument.id() != position.instrument_id {
         diagnostics.push_bounded(
             limits,
@@ -632,6 +639,7 @@ fn validate_position_semantics(
             .with_position_id(position.id.to_string()),
         );
     }
+    !invalid_quantity
 }
 
 fn enforce_count_limit(what: &'static str, found: usize, limit: usize) -> crate::Result<()> {
@@ -657,7 +665,7 @@ fn validate_references(
     limits: &LoadLimits,
     report: &mut ValidationReport,
 ) {
-    let mut artifacts: HashMap<&str, usize> = HashMap::default();
+    let mut artifacts: FxHashMap<&str, usize> = FxHashMap::default();
     for (index, artifact) in bundle.instruments.iter().enumerate() {
         if let Some(first) = artifacts.insert(&artifact.artifact_id, index) {
             report.push_bounded(
@@ -677,7 +685,7 @@ fn validate_references(
         }
     }
 
-    let mut positions: HashMap<&PositionId, usize> = HashMap::default();
+    let mut positions: FxHashMap<&PositionId, usize> = FxHashMap::default();
     for (index, position) in bundle.positions.iter().enumerate() {
         if let Some(first) = positions.insert(&position.id, index) {
             report.push_bounded(
@@ -704,7 +712,7 @@ fn validate_references(
 
 fn validate_portfolio_envelope_invariants(
     bundle: &MaterializationInput,
-    positions: &HashMap<&PositionId, usize>,
+    positions: &FxHashMap<&PositionId, usize>,
     limits: &LoadLimits,
     report: &mut ValidationReport,
 ) {
@@ -744,7 +752,7 @@ fn validate_portfolio_envelope_invariants(
         }
     }
 
-    let position_ids: HashSet<_> = positions.keys().copied().collect();
+    let position_ids: FxHashSet<_> = positions.keys().copied().collect();
     crate::book::validate_books(&bundle.portfolio.books, &position_ids, |diagnostic| {
         report.push_bounded(limits, diagnostic);
     });
@@ -771,7 +779,7 @@ fn prepare_artifacts(
     report: &mut ValidationReport,
 ) -> crate::Result<Vec<PreparedArtifact>> {
     let mut prepared = Vec::with_capacity(bundle.instruments.len());
-    let mut hashes: HashMap<String, (usize, String)> = HashMap::default();
+    let mut hashes: FxHashMap<String, (usize, String)> = FxHashMap::default();
 
     for (index, artifact) in bundle.instruments.iter().enumerate() {
         let content_hash = artifact.envelope.content_hash().map_err(Error::Core)?;
@@ -838,8 +846,8 @@ fn prepare_artifacts(
 
 fn position_book_index(
     bundle: &PortfolioMaterializationEnvelope,
-) -> HashMap<PositionId, crate::book::BookId> {
-    let mut by_position = HashMap::default();
+) -> FxHashMap<PositionId, crate::book::BookId> {
+    let mut by_position = FxHashMap::default();
     for (book_id, book) in &bundle.portfolio.books {
         for position_id in &book.position_ids {
             by_position.insert(position_id.clone(), book_id.clone());

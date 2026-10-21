@@ -32,7 +32,7 @@ pub struct JsPeriodKind {
 }
 
 impl JsPeriodKind {
-    const fn wrap(inner: PeriodKind) -> Self {
+    const fn from_inner(inner: PeriodKind) -> Self {
         Self { inner }
     }
 }
@@ -44,7 +44,7 @@ impl JsPeriodKind {
     /// @returns The `daily` frequency.
     #[wasm_bindgen(js_name = daily)]
     pub fn daily() -> Self {
-        Self::wrap(PeriodKind::Daily)
+        Self::from_inner(PeriodKind::Daily)
     }
 
     /// ISO-week periods (52 per year).
@@ -52,7 +52,7 @@ impl JsPeriodKind {
     /// @returns The `weekly` frequency.
     #[wasm_bindgen(js_name = weekly)]
     pub fn weekly() -> Self {
-        Self::wrap(PeriodKind::Weekly)
+        Self::from_inner(PeriodKind::Weekly)
     }
 
     /// Calendar-month periods (12 per year).
@@ -60,7 +60,7 @@ impl JsPeriodKind {
     /// @returns The `monthly` frequency.
     #[wasm_bindgen(js_name = monthly)]
     pub fn monthly() -> Self {
-        Self::wrap(PeriodKind::Monthly)
+        Self::from_inner(PeriodKind::Monthly)
     }
 
     /// Calendar-quarter periods (4 per year).
@@ -68,7 +68,7 @@ impl JsPeriodKind {
     /// @returns The `quarterly` frequency.
     #[wasm_bindgen(js_name = quarterly)]
     pub fn quarterly() -> Self {
-        Self::wrap(PeriodKind::Quarterly)
+        Self::from_inner(PeriodKind::Quarterly)
     }
 
     /// Half-year periods (2 per year).
@@ -76,7 +76,7 @@ impl JsPeriodKind {
     /// @returns The `semi_annual` frequency.
     #[wasm_bindgen(js_name = semiAnnual)]
     pub fn semi_annual() -> Self {
-        Self::wrap(PeriodKind::SemiAnnual)
+        Self::from_inner(PeriodKind::SemiAnnual)
     }
 
     /// Full-year periods (1 per year).
@@ -84,7 +84,7 @@ impl JsPeriodKind {
     /// @returns The `annual` frequency.
     #[wasm_bindgen(js_name = annual)]
     pub fn annual() -> Self {
-        Self::wrap(PeriodKind::Annual)
+        Self::from_inner(PeriodKind::Annual)
     }
 
     /// Parse a frequency name (Rust `PeriodKind::from_str`).
@@ -101,7 +101,7 @@ impl JsPeriodKind {
     pub fn from_name(name: JsValue) -> Result<JsPeriodKind, JsValue> {
         js_string(&name, "name")?
             .parse::<PeriodKind>()
-            .map(Self::wrap)
+            .map(Self::from_inner)
             .map_err(to_js_err)
     }
 
@@ -109,12 +109,6 @@ impl JsPeriodKind {
     #[wasm_bindgen(getter, js_name = periodsPerYear)]
     pub fn periods_per_year(&self) -> u16 {
         self.inner.periods_per_year()
-    }
-
-    /// Factor that scales per-period statistics to annual ones (`periodsPerYear` as a float).
-    #[wasm_bindgen(getter, js_name = annualizationFactor)]
-    pub fn annualization_factor(&self) -> f64 {
-        self.inner.annualization_factor()
     }
 
     /// Observation date one frequency step before `first` (Rust
@@ -156,9 +150,9 @@ impl JsPeriodKind {
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
 /// const q1 = core.PeriodId.quarter(2025, 1);
-/// q1.code; // "2025Q1"
-/// q1.next().code; // "2025Q2"
-/// core.PeriodId.parse("2025M12").next().code; // "2026M01"
+/// q1.toString(); // "2025Q1"
+/// q1.next().toString(); // "2025Q2"
+/// core.PeriodId.parse("2025M12").next().toString(); // "2026M01"
 /// ```
 #[wasm_bindgen(js_name = PeriodId)]
 #[derive(Clone, Copy, Debug)]
@@ -167,7 +161,7 @@ pub struct JsPeriodId {
 }
 
 impl JsPeriodId {
-    fn wrap(inner: PeriodId) -> Self {
+    fn from_inner(inner: PeriodId) -> Self {
         Self { inner }
     }
 }
@@ -189,7 +183,7 @@ impl JsPeriodId {
     pub fn parse(code: JsValue) -> Result<JsPeriodId, JsValue> {
         js_string(&code, "code")?
             .parse::<PeriodId>()
-            .map(Self::wrap)
+            .map(Self::from_inner)
             .map_err(to_js_err)
     }
 
@@ -206,7 +200,7 @@ impl JsPeriodId {
     #[wasm_bindgen(js_name = month)]
     pub fn month(year: JsValue, month: JsValue) -> Result<JsPeriodId, JsValue> {
         PeriodId::month(js_int(&year, "year")?, js_uint(&month, "month")?)
-            .map(Self::wrap)
+            .map(Self::from_inner)
             .map_err(to_js_err)
     }
 
@@ -223,7 +217,7 @@ impl JsPeriodId {
     #[wasm_bindgen(js_name = quarter)]
     pub fn quarter(year: JsValue, quarter: JsValue) -> Result<JsPeriodId, JsValue> {
         PeriodId::quarter(js_int(&year, "year")?, js_uint(&quarter, "quarter")?)
-            .map(Self::wrap)
+            .map(Self::from_inner)
             .map_err(to_js_err)
     }
 
@@ -237,7 +231,7 @@ impl JsPeriodId {
     /// @throws `TypeError` if `year` is not an integer.
     #[wasm_bindgen(js_name = annual)]
     pub fn annual(year: JsValue) -> Result<JsPeriodId, JsValue> {
-        Ok(Self::wrap(PeriodId::annual(js_int(&year, "year")?)))
+        Ok(Self::from_inner(PeriodId::annual(js_int(&year, "year")?)))
     }
 
     /// Build a half-year identifier.
@@ -253,7 +247,7 @@ impl JsPeriodId {
     #[wasm_bindgen(js_name = half)]
     pub fn half(year: JsValue, half: JsValue) -> Result<JsPeriodId, JsValue> {
         PeriodId::half(js_int(&year, "year")?, js_uint(&half, "half")?)
-            .map(Self::wrap)
+            .map(Self::from_inner)
             .map_err(to_js_err)
     }
 
@@ -270,7 +264,7 @@ impl JsPeriodId {
     #[wasm_bindgen(js_name = week)]
     pub fn week(year: JsValue, week: JsValue) -> Result<JsPeriodId, JsValue> {
         PeriodId::week(js_int(&year, "year")?, js_uint(&week, "week")?)
-            .map(Self::wrap)
+            .map(Self::from_inner)
             .map_err(to_js_err)
     }
 
@@ -288,14 +282,8 @@ impl JsPeriodId {
     #[wasm_bindgen(js_name = day)]
     pub fn day(year: JsValue, ordinal: JsValue) -> Result<JsPeriodId, JsValue> {
         PeriodId::day(js_int(&year, "year")?, js_uint(&ordinal, "ordinal")?)
-            .map(Self::wrap)
+            .map(Self::from_inner)
             .map_err(to_js_err)
-    }
-
-    /// Period code, such as `"2025Q1"` (the text `parse` accepts).
-    #[wasm_bindgen(getter, js_name = code)]
-    pub fn code(&self) -> String {
-        self.inner.to_string()
     }
 
     /// Calendar (or fiscal) year of the period.
@@ -313,7 +301,7 @@ impl JsPeriodId {
     /// Frequency of the period as a `PeriodKind`.
     #[wasm_bindgen(getter, js_name = kind)]
     pub fn kind(&self) -> JsPeriodKind {
-        JsPeriodKind::wrap(self.inner.kind())
+        JsPeriodKind::from_inner(self.inner.kind())
     }
 
     /// Whether the identifier uses fiscal-year (`FY…`) semantics.
@@ -322,26 +310,27 @@ impl JsPeriodId {
         self.inner.is_fiscal()
     }
 
-    /// Step forward to the next period (Rust `PeriodId::next`).
+    /// Move by a signed number of periods of the same kind and calendar
+    /// (Rust `PeriodId::shift`).
     ///
-    /// @returns The following `PeriodId`, rolling the year where needed.
-    /// @throws `FinstackError` (kind `validation`) when the year would
-    /// overflow, or for a fiscal daily identifier at day 365, whose next day
-    /// depends on the fiscal calendar (use `nextFiscal`).
-    #[wasm_bindgen(js_name = next)]
-    pub fn next(&self) -> Result<JsPeriodId, JsValue> {
-        self.inner.next().map(Self::wrap).map_err(to_js_err)
-    }
-
-    /// Step back to the previous period (Rust `PeriodId::prev`).
+    /// # Arguments
     ///
-    /// @returns The preceding `PeriodId`, rolling the year where needed.
-    /// @throws `FinstackError` (kind `validation`) when the year would
-    /// overflow, or for a fiscal daily identifier at day 1, whose previous day
-    /// depends on the fiscal calendar (use `prevFiscal`).
-    #[wasm_bindgen(js_name = prev)]
-    pub fn prev(&self) -> Result<JsPeriodId, JsValue> {
-        self.inner.prev().map(Self::wrap).map_err(to_js_err)
+    /// * `periods` - Whole number of periods to move; negative moves back and
+    ///   `0` returns the identifier unchanged.
+    ///
+    /// @returns The `PeriodId` `periods` steps away, rolling the year where needed.
+    /// @throws `TypeError` (kind `invalid_type`) when `periods` is not a whole
+    /// number; `FinstackError` (kind `validation`) when the year would
+    /// overflow, or for a fiscal daily identifier that would leave days
+    /// `1..=365`, whose length depends on the fiscal calendar (use
+    /// `nextFiscal` / `prevFiscal`).
+    #[wasm_bindgen(js_name = shift)]
+    pub fn shift(&self, periods: JsValue) -> Result<JsPeriodId, JsValue> {
+        let periods: i32 = crate::utils::input::js_int(&periods, "periods")?;
+        self.inner
+            .shift(periods)
+            .map(Self::from_inner)
+            .map_err(to_js_err)
     }
 
     /// Step forward to the next fiscal period (Rust `PeriodId::next_fiscal`).
@@ -358,7 +347,7 @@ impl JsPeriodId {
     pub fn next_fiscal(&self, fiscal_config: &JsFiscalConfig) -> Result<JsPeriodId, JsValue> {
         self.inner
             .next_fiscal(fiscal_config.inner)
-            .map(Self::wrap)
+            .map(Self::from_inner)
             .map_err(to_js_err)
     }
 
@@ -376,11 +365,11 @@ impl JsPeriodId {
     pub fn prev_fiscal(&self, fiscal_config: &JsFiscalConfig) -> Result<JsPeriodId, JsValue> {
         self.inner
             .prev_fiscal(fiscal_config.inner)
-            .map(Self::wrap)
+            .map(Self::from_inner)
             .map_err(to_js_err)
     }
 
-    /// Period code (same as `code`).
+    /// Period code, such as `"2025Q1"`.
     ///
     /// @returns The text accepted by `PeriodId.parse`.
     #[wasm_bindgen(js_name = toString)]
@@ -407,7 +396,7 @@ pub struct JsFiscalConfig {
 }
 
 impl JsFiscalConfig {
-    const fn wrap(inner: FiscalConfig) -> Self {
+    const fn from_inner(inner: FiscalConfig) -> Self {
         Self { inner }
     }
 }
@@ -434,7 +423,7 @@ impl JsFiscalConfig {
             js_uint(&start_month, "startMonth")?,
             js_uint(&start_day, "startDay")?,
         )
-        .map(Self::wrap)
+        .map(Self::from_inner)
         .map_err(to_js_err)
     }
 
@@ -443,7 +432,7 @@ impl JsFiscalConfig {
     /// @returns The calendar-year `FiscalConfig`.
     #[wasm_bindgen(js_name = calendarYear)]
     pub fn calendar_year() -> Self {
-        Self::wrap(FiscalConfig::calendar_year())
+        Self::from_inner(FiscalConfig::calendar_year())
     }
 
     /// US federal government fiscal year (1 October).
@@ -451,7 +440,7 @@ impl JsFiscalConfig {
     /// @returns The US federal `FiscalConfig`.
     #[wasm_bindgen(js_name = usFederal)]
     pub fn us_federal() -> Self {
-        Self::wrap(FiscalConfig::us_federal())
+        Self::from_inner(FiscalConfig::us_federal())
     }
 
     /// UK government fiscal year (6 April).
@@ -459,7 +448,7 @@ impl JsFiscalConfig {
     /// @returns The UK `FiscalConfig`.
     #[wasm_bindgen(js_name = uk)]
     pub fn uk() -> Self {
-        Self::wrap(FiscalConfig::uk())
+        Self::from_inner(FiscalConfig::uk())
     }
 
     /// Japanese government fiscal year (1 April).
@@ -467,7 +456,7 @@ impl JsFiscalConfig {
     /// @returns The Japanese `FiscalConfig`.
     #[wasm_bindgen(js_name = japan)]
     pub fn japan() -> Self {
-        Self::wrap(FiscalConfig::japan())
+        Self::from_inner(FiscalConfig::japan())
     }
 
     /// Australian government fiscal year (1 July).
@@ -475,7 +464,7 @@ impl JsFiscalConfig {
     /// @returns The Australian `FiscalConfig`.
     #[wasm_bindgen(js_name = australia)]
     pub fn australia() -> Self {
-        Self::wrap(FiscalConfig::australia())
+        Self::from_inner(FiscalConfig::australia())
     }
 
     /// Month the fiscal year starts in (1 = January).

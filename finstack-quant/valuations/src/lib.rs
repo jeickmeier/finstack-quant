@@ -21,7 +21,7 @@
 //! Financial-instrument pricing, risk, calibration, and cashflow analysis.
 //!
 //! Instruments implement [`crate::instruments::Instrument`], consume market data from
-//! [`finstack_quant_core::market_data::MarketContext`], and dispatch through registered pricing
+//! [`finstack_quant_core::market_data::context::MarketContext`], and dispatch through registered pricing
 //! models. Pricing returns a currency-tagged present value plus requested metrics in
 //! [`crate::results::ValuationResult`].
 //!
@@ -70,7 +70,7 @@
 //! use finstack_quant_core::{
 //!     currency::Currency,
 //!     dates::create_date,
-//!     market_data::MarketContext,
+//!     market_data::context::MarketContext,
 //! };
 //! use finstack_quant_valuations::{
 //!     instruments::{Equity, Instrument, PricingOptions},
@@ -102,9 +102,9 @@ pub use finstack_quant_valuations_core::{
     impl_instrument_base, register_generic, register_metrics,
 };
 
-#[doc(hidden)]
-pub use finstack_quant_valuations_core::{__private, contract_specs, serde_defaults};
 pub use finstack_quant_valuations_core::{constants, error, market, recalibration};
+#[doc(hidden)]
+pub use finstack_quant_valuations_core::{contract_specs, serde_defaults};
 /// Pricing dispatch and registry infrastructure.
 pub mod pricer;
 /// Valuation result envelopes and metadata.

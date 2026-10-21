@@ -13,7 +13,7 @@
 //!
 //! [`dry_run`] parses a JSON envelope and returns the typed report;
 //! [`dry_run_json`] is its JSON-string wire twin for cross-binding
-//! consumption (Python / WASM). [`parse_envelope`] and [`validate_fail_fast`]
+//! consumption (Python / WASM). [`parse_envelope`] and [`validate_calibration`]
 //! are the shared strict-load and fail-fast policies every host entry point
 //! uses.
 
@@ -140,7 +140,6 @@ fn contract_diagnostic(error: &EnvelopeError) -> Diagnostic {
         EnvelopeError::QuoteIdNotInMarketData { quote_set, .. } => {
             format!("/plan/quote_sets/{}", escape_json_pointer(quote_set))
         }
-        EnvelopeError::ConflictingMarketDatum { .. } => "/market_data".to_string(),
         EnvelopeError::JsonSerialize { .. }
         | EnvelopeError::StrictLoad { .. }
         | EnvelopeError::SolverNotConverged { .. } => "/".to_string(),
@@ -155,15 +154,17 @@ fn contract_diagnostic(error: &EnvelopeError) -> Diagnostic {
     .with_contract(CALIBRATION_CONTRACT.id)
 }
 
-fn escape_json_pointer(segment: &str) -> String {
+/// Escape one RFC 6901 JSON-pointer segment (`~` -> `~0`, `/` -> `~1`).
+pub(super) fn escape_json_pointer(segment: &str) -> String {
     segment.replace('~', "~0").replace('/', "~1")
 }
 
 /// Return the first static validation error of `envelope`, if any.
 ///
-/// This is the fail-fast policy shared by [`validate_calibration_json`],
-/// [`engine::calibrate`](super::engine::calibrate) and host bindings;
-/// [`validate`] reports every error instead.
+/// [`validate_calibration_json`] and the host bindings use this fail-fast
+/// policy; [`engine::calibrate`](super::engine::calibrate) applies the same
+/// first-error rule while building its dependency graph, and [`validate`]
+/// reports every error instead.
 ///
 /// # Arguments
 ///
@@ -175,7 +176,7 @@ fn escape_json_pointer(segment: &str) -> String {
 /// Returns the first [`EnvelopeError`] of [`validate`]'s report (duplicate
 /// step ids, undefined or unresolved quote sets, duplicate or invalid market
 /// data, missing dependencies).
-pub fn validate_fail_fast(envelope: &CalibrationEnvelope) -> Result<(), EnvelopeError> {
+pub fn validate_calibration(envelope: &CalibrationEnvelope) -> Result<(), EnvelopeError> {
     match validate(envelope).errors.into_iter().next() {
         Some(error) => Err(error),
         None => Ok(()),
@@ -222,7 +223,7 @@ pub fn dry_run_json(envelope_json: &str) -> Result<String, EnvelopeError> {
 /// centralizes the parse and pretty-serialization path so Python and WASM do
 /// not each reimplement the same validation logic.
 ///
-/// Static validation is fail-fast ([`validate_fail_fast`]): the first
+/// Static validation is fail-fast ([`validate_calibration`]): the first
 /// envelope error is returned. [`dry_run`] lists every static error without
 /// solving.
 ///
@@ -238,7 +239,7 @@ pub fn dry_run_json(envelope_json: &str) -> Result<String, EnvelopeError> {
 /// [`EnvelopeError::JsonSerialize`] if the envelope cannot be serialized.
 pub fn validate_calibration_json(envelope_json: &str) -> Result<String, EnvelopeError> {
     let envelope = parse_envelope(envelope_json)?;
-    validate_fail_fast(&envelope)?;
+    validate_calibration(&envelope)?;
     serialize_pretty_json(&envelope, "CalibrationEnvelope")
 }
 
@@ -579,7 +580,6 @@ fn check_dependencies(
                     step_id: node.step_id.clone(),
                     step_kind: node.kind.clone(),
                     missing_id: read_id.clone(),
-                    missing_kind: "curve".to_string(),
                     available: available.iter().cloned().collect(),
                 });
             }
@@ -800,43 +800,8 @@ mod tests {
         );
     }
 
-    fn deposit(id: &str, rate: f64) -> MarketDatum {
-        MarketDatum::RateQuote(RateQuote::Deposit {
-            id: QuoteId::new(id),
-            index: IndexId::new("USD-SOFR-1M"),
-            pillar: Pillar::Tenor("1M".parse().expect("tenor")),
-            rate,
-        })
-    }
-
     #[test]
-    fn with_market_data_dedups_identical_and_rejects_conflicting_data() {
-        let inputs = || {
-            CalibrationEnvelope::new(
-                empty_envelope("p").plan,
-                vec![deposit("Q1", 0.05), deposit("Q2", 0.06)],
-                Vec::new(),
-            )
-        };
-        let merged = inputs()
-            .with_market_data(vec![deposit("Q1", 0.05), deposit("Q3", 0.07)])
-            .expect("identical repeat merges");
-        assert_eq!(
-            merged
-                .market_data
-                .iter()
-                .map(MarketDatum::id)
-                .collect::<Vec<_>>(),
-            ["Q1", "Q2", "Q3"]
-        );
-        assert!(matches!(
-            inputs().with_market_data(vec![deposit("Q1", 0.055)]),
-            Err(EnvelopeError::ConflictingMarketDatum { .. })
-        ));
-    }
-
-    #[test]
-    fn validate_fail_fast_returns_first_static_error() {
+    fn validate_calibration_returns_first_static_error() {
         let mut env = empty_envelope("fail-fast");
         env.plan
             .steps
@@ -845,8 +810,8 @@ mod tests {
             .steps
             .push(discount_step("b", "missing_b", "EUR-OIS"));
         let first = validate(&env).errors.into_iter().next().expect("errors");
-        assert_eq!(validate_fail_fast(&env), Err(first));
-        assert_eq!(validate_fail_fast(&empty_envelope("ok")), Ok(()));
+        assert_eq!(validate_calibration(&env), Err(first));
+        assert_eq!(validate_calibration(&empty_envelope("ok")), Ok(()));
     }
 
     #[test]
@@ -914,18 +879,15 @@ mod tests {
         {
             assert_eq!(step_id, "discount");
             assert_eq!(quote_id, "USD-DEP-1M");
-            assert!(reason.contains("rate must be finite"));
+            assert!(reason.contains("Invalid rate: must be finite"));
         }
     }
 
     #[test]
     fn missing_or_non_finite_futures_convexity_is_envelope_error() {
-        let expiry = finstack_quant_core::dates::Date::from_calendar_date(
-            2026,
-            finstack_quant_core::dates::Month::March,
-            17,
-        )
-        .expect("valid expiry");
+        let expiry =
+            finstack_quant_core::dates::Date::from_calendar_date(2026, time::Month::March, 17)
+                .expect("valid expiry");
         let mut env = empty_envelope("bad-convexity");
         env.plan
             .quote_sets
@@ -956,7 +918,7 @@ mod tests {
         {
             assert_eq!(step_id, "discount");
             assert_eq!(quote_id, "USD-FUT");
-            assert!(reason.contains("convexity_adjustment must be finite"));
+            assert!(reason.contains("Invalid convexity_adjustment: must be finite"));
         }
 
         env.market_data.clear();
@@ -1205,8 +1167,16 @@ mod tests {
         }
 
         let mut restore_failure = base;
-        restore_failure["result"]["final_market"]["collateral"] =
-            serde_json::json!({"USD-CSA": "MISSING"});
+        restore_failure["result"]["final_market"]["credit_indices"] = serde_json::json!([{
+            "id": "CDX-IG",
+            "num_constituents": 125,
+            "recovery_rate": 0.4,
+            "index_credit_curve_id": "MISSING",
+            "base_correlation_curve_id": "MISSING-BC",
+            "issuer_credit_curve_ids": null,
+            "issuer_recovery_rates": null,
+            "issuer_weights": null
+        }]);
         let bytes = serde_json::to_vec(&restore_failure).expect("restore case serializes");
         let error = CalibrationResultEnvelope::from_slice_strict(&bytes, &LoadLimits::default())
             .expect_err("invalid nested market references must fail");
@@ -1216,11 +1186,11 @@ mod tests {
         let diagnostic = report
             .diagnostics
             .iter()
-            .find(|diagnostic| diagnostic.code == "market-context/missing-collateral-curve")
+            .find(|diagnostic| diagnostic.code == "market-context/missing-credit-index-reference")
             .expect("restore diagnostic");
         assert_eq!(
             diagnostic.pointer.as_deref(),
-            Some("/result/final_market/collateral/USD-CSA")
+            Some("/result/final_market/credit_indices/0/index_credit_curve_id")
         );
     }
 
@@ -1270,7 +1240,9 @@ mod tests {
             .expect("duplicate step error");
         assert_eq!(duplicate.kind_str(), "duplicate_step_id");
         assert_eq!(duplicate.step_id(), Some("duplicate"));
-        assert!(duplicate.to_json().contains("\"duplicate_index\":1"));
+        assert!(serde_json::to_string(&duplicate)
+            .expect("error JSON")
+            .contains("\"duplicate_index\":1"));
     }
 }
 
@@ -1280,7 +1252,7 @@ mod canonical_validation_tests {
     use crate::api::market_datum::{MarketDatum, PriceDatum};
     use crate::api::schema::CalibrationPlan;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::HashMap;
+    use finstack_quant_core::FxHashMap;
 
     #[test]
     fn duplicate_price_id_is_flagged() {
@@ -1321,7 +1293,7 @@ mod canonical_validation_tests {
     #[test]
     fn unresolved_quote_id_is_flagged() {
         use crate::quotes::ids::QuoteId;
-        let mut quote_sets = HashMap::default();
+        let mut quote_sets = FxHashMap::default();
         quote_sets.insert("usd".to_string(), vec![QuoteId::new("MISSING")]);
         let envelope = CalibrationEnvelope {
             schema_url: None,

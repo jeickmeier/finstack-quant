@@ -1,13 +1,10 @@
 //! IFRS 9 staging and expected-credit-loss bindings.
 
-use crate::utils::input::{from_js_json, js_f64, js_opt_f64, js_string};
+use crate::utils::input::{from_js_json, js_f64, js_opt_f64};
+use crate::utils::wire::js_wire;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_statements_analytics::analysis as ecl;
 use wasm_bindgen::prelude::*;
-
-fn parse_stage(value: &JsValue) -> Result<ecl::Stage, JsValue> {
-    finstack_quant_core::wire::serde_parse(&js_string(value, "stage")?).map_err(to_js_err)
-}
 
 /// Classify an exposure into an IFRS 9 stage from directly supplied lifetime PDs.
 ///
@@ -78,7 +75,7 @@ pub fn compute_ecl(
     let pd_schedule: Vec<(f64, f64)> = from_js_json(&pd_schedule, "pdSchedule")?;
     let result = ecl::compute_ecl(
         &exposure,
-        parse_stage(&stage)?,
+        js_wire::<ecl::Stage>(&stage, "stage")?,
         pd_schedule,
         js_opt_f64(bucket_width_years.as_ref(), "bucketWidthYears")?,
         js_opt_f64(
@@ -119,7 +116,7 @@ pub fn compute_ecl_weighted(
     let scenarios: Vec<(f64, Vec<(f64, f64)>)> = from_js_json(&scenarios, "scenarios")?;
     let result = ecl::compute_ecl_weighted(
         &exposure,
-        parse_stage(&stage)?,
+        js_wire::<ecl::Stage>(&stage, "stage")?,
         &scenarios,
         js_opt_f64(bucket_width_years.as_ref(), "bucketWidthYears")?,
         js_opt_f64(

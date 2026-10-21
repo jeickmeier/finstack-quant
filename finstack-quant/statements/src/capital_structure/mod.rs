@@ -92,7 +92,7 @@ pub(crate) mod period_flows;
 mod principal;
 pub(crate) mod residual_schedule;
 mod state;
-pub mod waterfall;
+pub(crate) mod waterfall;
 mod waterfall_spec;
 
 // Curated public facade for capital-structure types and builder inputs.

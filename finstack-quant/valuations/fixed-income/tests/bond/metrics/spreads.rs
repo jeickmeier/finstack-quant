@@ -2,6 +2,7 @@
 
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, InputError};
 use finstack_quant_valuations_core::instruments::Instrument;
@@ -93,6 +94,7 @@ fn test_z_spread_reports_bond_compounding_spread() {
     let target_dirty = bond
         .cashflow_schedule(&market, as_of)
         .unwrap()
+        .into_flows()
         .into_iter()
         .filter(|flow| flow.date > as_of)
         .map(|flow| {
@@ -871,7 +873,7 @@ fn test_callable_bdt_oas_recovers_settlement_date_clean_price() {
     let schedule = bond
         .cashflow_schedule(&market, quote_date)
         .expect("cashflow schedule");
-    let accrued_at_quote = finstack_quant_cashflows::accrued_interest_amount(
+    let accrued_at_quote = finstack_quant_cashflows::accrual::accrued_interest_amount(
         &schedule,
         quote_date,
         &bond.accrual_config(),
@@ -1294,7 +1296,7 @@ fn test_z_spread_solver_convergence_across_spread_regimes() {
         let schedule = base_bond
             .cashflow_schedule(&market, quote_date)
             .expect("build full schedule");
-        let accrued = finstack_quant_cashflows::accrued_interest_amount(
+        let accrued = finstack_quant_cashflows::accrual::accrued_interest_amount(
             &schedule,
             quote_date,
             &base_bond.accrual_config(),
@@ -1664,7 +1666,8 @@ fn callable_i_spread_uses_par_rate_to_workout_and_round_trips() {
         date!(2026 - 07 - 15),
         date!(2027 - 01 - 15),
     ];
-    let df = |d: time::Date| (-r * (d - as_of).whole_days() as f64 / 365.0).exp();
+    let df =
+        |d: finstack_quant_core::dates::Date| (-r * (d - as_of).whole_days() as f64 / 365.0).exp();
     let annuity: f64 = pay_dates.iter().map(|&d| 0.5 * df(d)).sum();
     let par = (1.0 - df(pay_dates[3])) / annuity;
     let expected = 0.03 - par;

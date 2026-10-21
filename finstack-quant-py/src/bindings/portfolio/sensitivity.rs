@@ -3,16 +3,11 @@
 //! Wraps `finstack_quant_portfolio::sensitivity` to expose delta-based and
 //! full-repricing factor sensitivities from Python, with DataFrame export.
 
-use crate::bindings::extract::extract_market;
-use crate::bindings::models::factor::risk::PyRiskDecomposition;
-use crate::bindings::module_utils::py_to_serde;
+use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref, extract_records_json};
 use crate::bindings::pandas_utils::dict_to_dataframe;
-use crate::errors::{core_to_py, display_to_py};
+use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-
-const DEFAULT_PNL_SCENARIO_POINTS: usize =
-    finstack_quant_portfolio::sensitivity::DEFAULT_PNL_SCENARIO_POINTS;
 
 /// Positions-by-factors sensitivity matrix.
 ///
@@ -56,7 +51,7 @@ impl PySensitivityMatrix {
     /// Parse from the canonical wire JSON
     /// (``{base_currency, position_ids, factor_ids, data}``, ``data`` as one
     /// row per position), the shape WASM ``computeFactorSensitivities``
-    /// returns and ``decomposeFactorRisk`` accepts.
+    /// returns and ``models.factor.risk.decomposeFactors`` accepts.
     ///
     /// ``data[position][factor]`` must contain exactly one finite entry per
     /// declared position/factor pair. Malformed shapes and unknown fields raise
@@ -270,199 +265,141 @@ impl PyFactorPnlProfile {
     }
 }
 
-// compute_factor_sensitivities
+/// Deserialize factor definitions from a JSON string, list of dicts or
+/// ``pandas.DataFrame``.
+fn extract_factors(
+    py: Python<'_>,
+    factors: &Bound<'_, PyAny>,
+) -> PyResult<Vec<finstack_quant_factor::FactorDefinition>> {
+    let json = extract_records_json(py, factors, "factors")?;
+    serde_json::from_str(&json).map_err(|e| serde_json_to_py(e, "invalid factors JSON"))
+}
 
-/// Compute first-order factor sensitivities using central finite differences.
+/// Deserialize an optional ``BumpSizeConfig`` from a JSON string or dict.
+fn extract_bump_config(
+    py: Python<'_>,
+    bump_config: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Option<finstack_quant_factor::BumpSizeConfig>> {
+    bump_config
+        .map(|obj| {
+            let json = extract_records_json(py, obj, "bump_config")?;
+            serde_json::from_str(&json).map_err(|e| serde_json_to_py(e, "invalid bump_config JSON"))
+        })
+        .transpose()
+}
+
+/// Compute the position-by-factor sensitivity matrix of a portfolio.
+///
+/// Each cell is the central difference of the position's base-currency PV
+/// under an up and a down bump of the factor, weighted by the position's
+/// scale factor. Rows follow portfolio position order, columns follow
+/// ``factors``, and every value is in ``portfolio.base_currency``.
 ///
 /// Parameters
 /// ----------
-/// positions_json : str | dict | list | pandas.DataFrame
-///     JSON array of position objects, each with ``id`` (str),
-///     ``instrument`` (canonical v1 instrument envelope), and ``weight`` (float).
-/// factors_json : str | dict | list | pandas.DataFrame
-///     JSON array of ``FactorDefinition`` objects.
+/// portfolio : Portfolio | str
+///     Built ``Portfolio`` or ``PortfolioSpec`` JSON.
+/// factors : str | list | pandas.DataFrame
+///     ``FactorDefinition`` array (JSON or records). Every factor must map to
+///     market data; credit hierarchy factors need ``FactorModel``.
 /// market : MarketContext | str
-///     A ``MarketContext`` object or a JSON-serialized ``MarketContext``
-///     string.
+///     Market to bump, including FX for cross-currency positions.
 /// as_of : datetime.date | str
-///     Valuation date, either a date-like object (``datetime.date``,
-///     ``pandas.Timestamp``) or an ISO 8601 string.
-/// base_currency : str
-///     ISO reporting currency for every returned sensitivity or P&L amount; missing FX raises KeyError.
-/// bump_config_json : str, optional
-///     JSON-serialized ``BumpSizeConfig``.  Defaults to 1 bp / 1 % per
-///     factor type.
+///     Valuation date for pricing and spot FX.
+/// bump_config : str | dict, optional
+///     ``BumpSizeConfig``; defaults to 1 bp / 1 % per factor type.
 ///
 /// Returns
 /// -------
 /// SensitivityMatrix
 ///     Positions × factors delta matrix.
 #[pyfunction]
-#[pyo3(signature = (positions_json, factors_json, market, as_of, base_currency, bump_config_json=None))]
+#[pyo3(signature = (portfolio, factors, market, as_of, bump_config=None))]
 fn compute_factor_sensitivities(
     py: Python<'_>,
-    positions_json: &Bound<'_, PyAny>,
-    factors_json: &Bound<'_, PyAny>,
+    portfolio: &Bound<'_, PyAny>,
+    factors: &Bound<'_, PyAny>,
     market: &Bound<'_, PyAny>,
     as_of: &Bound<'_, PyAny>,
-    base_currency: &str,
-    bump_config_json: Option<&str>,
+    bump_config: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PySensitivityMatrix> {
-    let positions_json =
-        crate::bindings::extract::extract_records_json(py, positions_json, "positions")?;
-    let positions_json: &str = &positions_json;
-    let factors_json = crate::bindings::extract::extract_records_json(py, factors_json, "factors")?;
-    let factors_json: &str = &factors_json;
-    let market = extract_market(py, market)?;
-    let date = crate::bindings::date_utils::py_to_date(as_of)?;
-    let base_currency = base_currency
-        .parse::<finstack_quant_core::currency::Currency>()
-        .map_err(core_to_py)?;
-    let positions_json = positions_json.to_owned();
-    let factors_json = factors_json.to_owned();
-    let bump_config_json = bump_config_json.map(str::to_owned);
-
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let factors = extract_factors(py, factors)?;
+    let market = extract_market_ref(py, market)?;
+    let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
+    let bump_config = extract_bump_config(py, bump_config)?;
+    let (portfolio, market) = (&*portfolio, &*market);
+    let base_currency = portfolio.base_currency;
     py.detach(move || {
-        finstack_quant_portfolio::sensitivity::compute_factor_sensitivities_from_json(
-            &positions_json,
-            &factors_json,
-            &market,
-            date,
-            base_currency,
-            bump_config_json.as_deref(),
+        finstack_quant_portfolio::sensitivity::compute_factor_sensitivities(
+            portfolio,
+            &factors,
+            market,
+            as_of,
+            bump_config,
         )
-        .map(|matrix| PySensitivityMatrix::from_inner(matrix, base_currency))
     })
+    .map(|matrix| PySensitivityMatrix::from_inner(matrix, base_currency))
     .map_err(core_to_py)
 }
 
-// compute_pnl_profiles
-
-/// Compute scenario P&L profiles via full repricing across a factor grid.
+/// Compute full-repricing scenario P&L profiles of a portfolio, one per factor.
 ///
 /// Parameters
 /// ----------
-/// positions_json : str | dict | list | pandas.DataFrame
-///     JSON array of position objects (same schema as
-///     :func:`compute_factor_sensitivities`).
-/// factors_json : str | dict | list | pandas.DataFrame
-///     JSON array of ``FactorDefinition`` objects.
+/// portfolio : Portfolio | str
+///     Built ``Portfolio`` or ``PortfolioSpec`` JSON; its positions are the
+///     profile columns and its ``base_currency`` the reporting currency.
+/// factors : str | list | pandas.DataFrame
+///     ``FactorDefinition`` array (JSON or records).
 /// market : MarketContext | str
-///     A ``MarketContext`` object or a JSON-serialized ``MarketContext``
-///     string.
+///     Market reused by every scenario.
 /// as_of : datetime.date | str
-///     Valuation date, either a date-like object (``datetime.date``,
-///     ``pandas.Timestamp``) or an ISO 8601 string.
-/// base_currency : str
-///     ISO reporting currency for every returned sensitivity or P&L amount; missing FX raises KeyError.
-/// bump_config_json : str, optional
-///     JSON-serialized ``BumpSizeConfig``.
-/// n_scenario_points : int, optional
-///     Number of scenario grid points (default 5 → shifts ``[-2, -1, 0, 1, 2]``).
+///     Valuation date for pricing and spot FX.
+/// bump_config : str | dict, optional
+///     ``BumpSizeConfig``; defaults to 1 bp / 1 % per factor type.
+/// n_points : int, optional
+///     Odd number of grid points in ``3..=1001``; defaults to 5
+///     (shifts ``[-2, -1, 0, 1, 2]``).
 ///
 /// Returns
 /// -------
 /// list[FactorPnlProfile]
 ///     One profile per factor, each containing scenario P&L for every position.
 #[pyfunction]
-#[pyo3(
-    signature = (positions_json, factors_json, market, as_of, base_currency, bump_config_json=None, n_scenario_points=DEFAULT_PNL_SCENARIO_POINTS),
-    text_signature = "(positions_json, factors_json, market, as_of, base_currency, bump_config_json=None, n_scenario_points=5)"
-)]
+#[pyo3(signature = (portfolio, factors, market, as_of, bump_config=None, n_points=None))]
 fn compute_pnl_profiles(
-    positions_json: &Bound<'_, PyAny>,
-    factors_json: &Bound<'_, PyAny>,
+    py: Python<'_>,
+    portfolio: &Bound<'_, PyAny>,
+    factors: &Bound<'_, PyAny>,
     market: &Bound<'_, PyAny>,
     as_of: &Bound<'_, PyAny>,
-    base_currency: &str,
-    bump_config_json: Option<&str>,
-    n_scenario_points: usize,
+    bump_config: Option<&Bound<'_, PyAny>>,
+    n_points: Option<usize>,
 ) -> PyResult<Vec<PyFactorPnlProfile>> {
-    let py = market.py();
-    let positions_json =
-        crate::bindings::extract::extract_records_json(py, positions_json, "positions")?;
-    let positions_json: &str = &positions_json;
-    let factors_json = crate::bindings::extract::extract_records_json(py, factors_json, "factors")?;
-    let factors_json: &str = &factors_json;
-    let market = extract_market(py, market)?;
-    let date = crate::bindings::date_utils::py_to_date(as_of)?;
-    let base_currency = base_currency
-        .parse::<finstack_quant_core::currency::Currency>()
-        .map_err(core_to_py)?;
-    let positions_json = positions_json.to_owned();
-    let factors_json = factors_json.to_owned();
-    let bump_config_json = bump_config_json.map(str::to_owned);
-
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let factors = extract_factors(py, factors)?;
+    let market = extract_market_ref(py, market)?;
+    let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
+    let bump_config = extract_bump_config(py, bump_config)?;
+    let (portfolio, market) = (&*portfolio, &*market);
     py.detach(move || {
-        finstack_quant_portfolio::sensitivity::compute_pnl_profiles_from_json(
-            &positions_json,
-            &factors_json,
-            &market,
-            date,
-            base_currency,
-            bump_config_json.as_deref(),
-            n_scenario_points,
+        finstack_quant_portfolio::sensitivity::compute_pnl_profiles(
+            portfolio,
+            &factors,
+            market,
+            as_of,
+            bump_config,
+            n_points,
         )
-        .map(|profiles| {
-            profiles
-                .into_iter()
-                .map(PyFactorPnlProfile::from_inner)
-                .collect()
-        })
+    })
+    .map(|profiles| {
+        profiles
+            .into_iter()
+            .map(PyFactorPnlProfile::from_inner)
+            .collect()
     })
     .map_err(core_to_py)
-}
-
-// decompose_factor_risk
-
-/// Decompose portfolio risk into factor and position contributions.
-///
-/// Uses the parametric (covariance-based) Euler decomposition to attribute
-/// forecasted portfolio risk across factors and individual positions.
-///
-/// Parameters
-/// ----------
-/// sensitivities : SensitivityMatrix
-///     Weighted position × factor sensitivity matrix, as returned by
-///     :func:`compute_factor_sensitivities`.
-/// covariance_json : str | dict | list | pandas.DataFrame
-///     JSON-serialized ``FactorCovarianceMatrix``.  Must use the same factor
-///     IDs and ordering as the sensitivity matrix.
-/// risk_measure : str | dict, optional
-///     Risk measure.  Defaults to ``"variance"``.
-///     Accepts Python strings (``"variance"``, ``"volatility"``) or dicts
-///     (``{"var": {"confidence": 0.99}}``,
-///     ``{"expected_shortfall": {"confidence": 0.975}}``).
-///
-/// Returns
-/// -------
-/// finstack_quant.models.factor.risk.RiskDecomposition
-///     Portfolio-level risk decomposition with factor and position detail.
-#[pyfunction]
-#[pyo3(signature = (sensitivities, covariance_json, risk_measure=None))]
-fn decompose_factor_risk(
-    py: Python<'_>,
-    sensitivities: &PySensitivityMatrix,
-    covariance_json: &Bound<'_, PyAny>,
-    risk_measure: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyRiskDecomposition> {
-    let covariance_json =
-        crate::bindings::extract::extract_records_json(py, covariance_json, "covariance")?;
-    let covariance_json: &str = &covariance_json;
-    let measure: finstack_quant_factor::RiskMeasure = match risk_measure {
-        Some(obj) => py_to_serde(py, obj, "risk_measure")?,
-        None => finstack_quant_factor::RiskMeasure::default(),
-    };
-
-    let matrix = sensitivities.inner.clone();
-    let covariance_json = covariance_json.to_owned();
-    py.detach(move || {
-        let covariance: finstack_quant_factor::FactorCovarianceMatrix =
-            serde_json::from_str(&covariance_json).map_err(display_to_py)?;
-        let result = finstack_quant_factor::risk::decompose_factors(&matrix, &covariance, &measure)
-            .map_err(core_to_py)?;
-        Ok(PyRiskDecomposition::from_inner(result))
-    })
 }
 
 /// Register factor-model functions on the valuations submodule.
@@ -471,6 +408,5 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFactorPnlProfile>()?;
     m.add_function(pyo3::wrap_pyfunction!(compute_factor_sensitivities, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(compute_pnl_profiles, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(decompose_factor_risk, m)?)?;
     Ok(())
 }

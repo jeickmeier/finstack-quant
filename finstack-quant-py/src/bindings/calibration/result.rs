@@ -1,4 +1,4 @@
-//! `CalibrationResult`: calibrated market plus plan-level and per-step reports.
+//! `CalibrationResultEnvelope`: calibrated market plus plan-level and per-step reports.
 
 use super::report::{quote_quality_dataframe, PyCalibrationReport};
 use crate::bindings::core::market_data::context::PyMarketContext;
@@ -25,7 +25,7 @@ use std::sync::OnceLock;
 /// >>> result.success
 /// True
 #[pyclass(
-    name = "CalibrationResult",
+    name = "CalibrationResultEnvelope",
     module = "finstack_quant.calibration",
     skip_from_py_object
 )]
@@ -174,13 +174,6 @@ impl PyCalibrationResult {
         PyCalibrationReport::from_inner(self.inner.result.report.clone())
     }
 
-    /// The plan-level report as a compact JSON string.
-    #[getter]
-    fn report_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner.result.report)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CalibrationReport"))
-    }
-
     /// List of step identifiers in lexicographic step-ID order.
     #[getter]
     fn step_ids(&self) -> Vec<String> {
@@ -191,26 +184,6 @@ impl PyCalibrationResult {
     #[getter]
     fn iterations(&self) -> usize {
         self.inner.result.report.iterations
-    }
-
-    /// Maximum ``|residual| / step_tolerance`` across every quote of every step.
-    ///
-    /// A value below 1.0 means every quote repriced within its step's
-    /// tolerance. Raw per-step residual statistics live on
-    /// ``step_report(step_id).max_residual`` / ``.rmse``.
-    #[getter]
-    fn max_residual_ratio(&self) -> f64 {
-        self.inner
-            .result
-            .report
-            .max_residual_ratio
-            .unwrap_or(f64::NAN)
-    }
-
-    /// Root-mean-square ``|residual| / step_tolerance`` across every quote of every step.
-    #[getter]
-    fn rmse_ratio(&self) -> f64 {
-        self.inner.result.report.rmse_ratio.unwrap_or(f64::NAN)
     }
 
     /// Per-step calibration report.
@@ -233,26 +206,6 @@ impl PyCalibrationResult {
     fn step_report(&self, step_id: &str) -> PyResult<PyCalibrationReport> {
         let report = self.inner.result.step_report(step_id).map_err(core_to_py)?;
         Ok(PyCalibrationReport::from_inner(report.clone()))
-    }
-
-    /// Per-step calibration report as a compact JSON string.
-    ///
-    /// Parameters
-    /// ----------
-    /// step_id : str
-    ///     Identifier of the calibration step.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If no step with the given ``step_id`` exists.
-    /// ValueError
-    ///     If serialization fails.
-    #[pyo3(text_signature = "($self, step_id)")]
-    fn step_report_json(&self, step_id: &str) -> PyResult<String> {
-        let report = self.inner.result.step_report(step_id).map_err(core_to_py)?;
-        serde_json::to_string(report)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize CalibrationReport"))
     }
 
     /// Per-quote residuals of one step as a pandas ``DataFrame``.
@@ -281,8 +234,8 @@ impl PyCalibrationResult {
     /// Columns: ``step_id``, ``success``, ``iterations``, ``max_residual``,
     /// ``rmse`` (raw residual units of each step), ``worst_quote_id``,
     /// ``convergence_reason``. Rows are ordered lexicographically by step ID.
-    /// The plan-level roll-ups (``success``, ``iterations``,
-    /// ``max_residual_ratio``, ``rmse_ratio``) are getters on the result.
+    /// The plan-level roll-ups (``max_residual_ratio``, ``rmse_ratio``) are on
+    /// ``result.report``.
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let n = self.inner.result.step_reports.len();
@@ -318,7 +271,7 @@ impl PyCalibrationResult {
     fn __repr__(&self) -> String {
         let n = self.inner.result.step_reports.len();
         format!(
-            "CalibrationResult(success={}, steps={n}, iterations={}, max_residual_ratio={:.2e})",
+            "CalibrationResultEnvelope(success={}, steps={n}, iterations={}, max_residual_ratio={:.2e})",
             if self.inner.result.report.success {
                 "True"
             } else {

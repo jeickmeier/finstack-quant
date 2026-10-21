@@ -234,7 +234,9 @@ impl PyCovenantEngine {
         as_of: &Bound<'py, PyAny>,
         scope: &str,
     ) -> PyResult<Bound<'py, PyDict>> {
-        let scope = super::spec::parse_scope(scope)?;
+        let scope = crate::bindings::extract::parse_label::<finstack_quant_covenants::CovenantScope>(
+            scope,
+        )?;
         let as_of = py_to_date(as_of)?;
         let source = extract_metrics(metrics)?;
         let reports = py.detach(|| {

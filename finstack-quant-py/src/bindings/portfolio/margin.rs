@@ -13,9 +13,7 @@ use crate::bindings::margin::im::PySimmSensitivities;
 use crate::bindings::margin::types::{PyImCollateralResult, PyImMethodology, PyNettingSetId};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
 use crate::errors::portfolio_to_py;
-use finstack_quant_portfolio::{
-    NettingSetMargin, PortfolioMarginAggregator, PortfolioMarginResult,
-};
+use finstack_quant_portfolio::{margin::NettingSetMargin, margin::PortfolioMarginResult};
 
 /// Column schema for [`PyPortfolioMarginResult::to_dataframe`].
 const NETTING_SET_COLUMNS: &[ColumnSchema<'static>] = &[
@@ -59,13 +57,6 @@ struct ImBreakdownRow<'a> {
     risk_class: &'a str,
     initial_margin: f64,
     currency: String,
-}
-
-/// Netting sets in the canonical wire order (ascending identifier string).
-fn sorted_netting_sets(result: &PortfolioMarginResult) -> Vec<&NettingSetMargin> {
-    let mut netting_sets: Vec<&NettingSetMargin> = result.by_netting_set.values().collect();
-    netting_sets.sort_by_key(|margin| margin.netting_set_id.to_string());
-    netting_sets
 }
 
 /// Margin results for one netting set, in the portfolio base currency.
@@ -300,7 +291,7 @@ impl PyPortfolioMarginResult {
     #[getter]
     fn by_netting_set<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let out = PyDict::new(py);
-        for margin in sorted_netting_sets(&self.inner) {
+        for margin in self.inner.netting_sets_sorted() {
             out.set_item(
                 PyNettingSetId {
                     inner: margin.netting_set_id.clone(),
@@ -345,7 +336,9 @@ impl PyPortfolioMarginResult {
     /// order; amounts are floats in ``currency`` (the base currency).
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<NettingSetRow> = sorted_netting_sets(&self.inner)
+        let rows: Vec<NettingSetRow> = self
+            .inner
+            .netting_sets_sorted()
             .into_iter()
             .map(|margin| NettingSetRow {
                 netting_set_id: margin.netting_set_id.to_string(),
@@ -378,114 +371,77 @@ impl PyPortfolioMarginResult {
 
 crate::bindings::macros::impl_repr_html_via_dataframe!(PyPortfolioMarginResult);
 
-/// Aggregates margin requirements across a portfolio by netting set.
+/// Calculate portfolio margin requirements by netting set.
 ///
-/// Build one with :meth:`from_portfolio`, then call :meth:`calculate` for each
-/// market snapshot. Positions are grouped by the netting set named on their
-/// instrument's margin specification; positions without one are counted in
+/// Groups the portfolio's marginable positions into netting sets from their
+/// instruments' margin metadata and computes initial and variation margin per
+/// netting set, plus one-way CSA IM collateral terms, in the portfolio base
+/// currency. Positions without margin metadata are counted in
 /// ``PortfolioMarginResult.positions_without_margin``.
-#[pyclass(
-    name = "PortfolioMarginAggregator",
-    module = "finstack_quant.portfolio",
-    skip_from_py_object
-)]
-pub struct PyPortfolioMarginAggregator {
-    inner: PortfolioMarginAggregator,
-}
-
-#[pymethods]
-impl PyPortfolioMarginAggregator {
-    /// Create an aggregator from a portfolio.
-    ///
-    /// Parameters
-    /// ----------
-    /// portfolio : Portfolio | str
-    ///     A :class:`Portfolio` object or a JSON-serialized ``PortfolioSpec``.
-    ///
-    /// Returns
-    /// -------
-    /// PortfolioMarginAggregator
-    ///     Aggregator whose netting sets are seeded from the positions that
-    ///     carry margin metadata, reporting in the portfolio base currency.
-    ///
-    /// Raises
-    /// ------
-    /// PortfolioError
-    ///     If positions in one netting set carry conflicting margin
-    ///     specifications.
-    #[staticmethod]
-    #[pyo3(text_signature = "(portfolio)")]
-    fn from_portfolio(py: Python<'_>, portfolio: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let portfolio = extract_portfolio_ref(py, portfolio)?;
-        let inner =
-            PortfolioMarginAggregator::from_portfolio(&portfolio).map_err(portfolio_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Calculate margin requirements for the portfolio.
-    ///
-    /// Parameters
-    /// ----------
-    /// portfolio : Portfolio | str
-    ///     Portfolio used for mark-to-market and sensitivity lookups; normally
-    ///     the one passed to :meth:`from_portfolio`.
-    /// market : MarketContext | str
-    ///     Market data for VM and SIMM sensitivity extraction, and the FX
-    ///     matrix for base-currency reporting.
-    /// as_of : datetime.date | str
-    ///     Valuation date of the margin run.
-    /// current_im_collateral : dict[str, Money] | None
-    ///     One-way IM balances already held, keyed by CSA id, each in that
-    ///     CSA's currency. ``None`` or a missing key means zero.
-    ///
-    /// Returns
-    /// -------
-    /// PortfolioMarginResult
-    ///     Per-netting-set and portfolio-level margin in the base currency.
-    ///
-    /// Raises
-    /// ------
-    /// PortfolioError
-    ///     If ``current_im_collateral`` names an unknown CSA id, or a required
-    ///     FX rate is unavailable.
-    /// TypeError
-    ///     If ``as_of`` is neither a string nor date-like.
-    #[pyo3(signature = (portfolio, market, as_of, current_im_collateral=None))]
-    #[pyo3(text_signature = "($self, portfolio, market, as_of, current_im_collateral=None)")]
-    fn calculate(
-        &mut self,
-        py: Python<'_>,
-        portfolio: &Bound<'_, PyAny>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-        current_im_collateral: Option<HashMap<String, PyMoney>>,
-    ) -> PyResult<PyPortfolioMarginResult> {
-        let portfolio = extract_portfolio_ref(py, portfolio)?;
-        let market = extract_market_ref(py, market)?;
-        let as_of = py_to_date(as_of)?;
-        let collateral: finstack_quant_core::HashMap<String, finstack_quant_core::money::Money> =
-            current_im_collateral
-                .unwrap_or_default()
-                .into_iter()
-                .map(|(csa_id, money)| (csa_id, money.inner))
-                .collect();
-        let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
-        let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
-        let aggregator = &mut self.inner;
-        let inner = py
-            .detach(|| aggregator.calculate(portfolio_ref, market_ref, as_of, &collateral))
-            .map_err(portfolio_to_py)?;
-        Ok(PyPortfolioMarginResult { inner })
-    }
-
-    fn __repr__(&self) -> String {
-        "PortfolioMarginAggregator(...)".to_string()
-    }
+///
+/// Parameters
+/// ----------
+/// portfolio : Portfolio | str
+///     A :class:`Portfolio` object or a JSON-serialized ``PortfolioSpec``.
+/// market : MarketContext | str
+///     Market data for VM and SIMM sensitivity extraction, and the FX
+///     matrix for base-currency reporting.
+/// as_of : datetime.date | str
+///     Valuation date of the margin run.
+/// current_im_collateral : dict[str, Money] | None
+///     One-way IM balances already held, keyed by CSA id, each in that
+///     CSA's currency. ``None`` or a missing key means zero.
+///
+/// Returns
+/// -------
+/// PortfolioMarginResult
+///     Per-netting-set and portfolio-level margin in the base currency.
+///
+/// Raises
+/// ------
+/// PortfolioError
+///     If positions in one netting set carry conflicting margin
+///     specifications, ``current_im_collateral`` names an unknown CSA id, or
+///     a required FX rate is unavailable.
+/// TypeError
+///     If ``as_of`` is neither a string nor date-like.
+#[pyfunction]
+#[pyo3(signature = (portfolio, market, as_of, current_im_collateral=None))]
+#[pyo3(text_signature = "(portfolio, market, as_of, current_im_collateral=None)")]
+fn portfolio_margin(
+    py: Python<'_>,
+    portfolio: &Bound<'_, PyAny>,
+    market: &Bound<'_, PyAny>,
+    as_of: &Bound<'_, PyAny>,
+    current_im_collateral: Option<HashMap<String, PyMoney>>,
+) -> PyResult<PyPortfolioMarginResult> {
+    let portfolio = extract_portfolio_ref(py, portfolio)?;
+    let market = extract_market_ref(py, market)?;
+    let as_of = py_to_date(as_of)?;
+    let collateral: finstack_quant_core::FxHashMap<String, finstack_quant_core::money::Money> =
+        current_im_collateral
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(csa_id, money)| (csa_id, money.inner))
+            .collect();
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let inner = py
+        .detach(|| {
+            finstack_quant_portfolio::margin::portfolio_margin(
+                portfolio_ref,
+                market_ref,
+                as_of,
+                &collateral,
+            )
+        })
+        .map_err(portfolio_to_py)?;
+    Ok(PyPortfolioMarginResult { inner })
 }
 
 pub(super) fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyNettingSetMargin>()?;
     m.add_class::<PyPortfolioMarginResult>()?;
-    m.add_class::<PyPortfolioMarginAggregator>()?;
+    m.add_function(wrap_pyfunction!(portfolio_margin, m)?)?;
     Ok(())
 }

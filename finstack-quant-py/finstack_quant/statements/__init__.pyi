@@ -56,10 +56,10 @@ __all__ = [
     "PaymentClassSpec",
     "PikToggleSpec",
     "Registry",
+    "RollupSpec",
     "StatementResult",
     "WaterfallSpec",
     "normalize",
-    "normalize_json",
     "parse_and_compile",
     "parse_formula",
     "schema",
@@ -245,6 +245,131 @@ class MonteCarloConfig:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+class RollupSpec:
+    """
+    Target frequency and per-node methods for :meth:`StatementResult.rollup`.
+
+    Parameters
+    ----------
+    frequency : str
+        Target frequency: ``"quarterly"``, ``"semi_annual"`` or ``"annual"``
+        (pandas aliases such as ``"Q"`` and ``"A"`` are accepted). It must be
+        coarser than the model's periods and hold a whole number of them.
+    methods : dict[str, str] or None
+        Rollup method per node id: ``"sum"`` (flows, the default for nodes not
+        listed), ``"period_end"`` (balances and trailing metrics such as LTM
+        EBITDA take the last source period) or ``"formula"`` (ratios
+        re-evaluate their formula on the rolled-up values).
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import RollupSpec
+    >>> spec = RollupSpec("annual", {"cash": "period_end", "margin": "formula"})
+    >>> (spec.frequency, spec.methods)
+    ('annual', {'cash': 'period_end', 'margin': 'formula'})
+
+    """
+    def __init__(self, frequency: str, methods: dict[str, str] | None = ...) -> None:
+        """
+        Build a rollup specification.
+
+        Parameters
+        ----------
+        frequency : str
+            Target frequency label (``"quarterly"``, ``"semi_annual"``,
+            ``"annual"`` or a pandas alias).
+        methods : dict[str, str] or None, default None
+            Node id to ``"sum"``, ``"period_end"`` or ``"formula"``; nodes not
+            listed are summed.
+
+        Raises
+        ------
+        ValueError
+            If ``frequency`` or a method is not a recognized label.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> RollupSpec:
+        """
+        Deserialize a rollup specification from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON with ``frequency`` and an optional ``methods`` map, as produced
+            by :meth:`to_json`.
+
+        Returns
+        -------
+        RollupSpec
+            The reconstructed specification.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed, carries unknown fields, or names an
+            unknown frequency or method.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import RollupSpec
+        >>> RollupSpec.from_json('{"frequency": "annual", "methods": {"cash": "period_end"}}').methods
+        {'cash': 'period_end'}
+
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize this specification to canonical JSON.
+
+        Returns
+        -------
+        str
+            Compact JSON accepted by :meth:`from_json` and
+            :meth:`StatementResult.rollup`.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+        ...
+
+    @property
+    def frequency(self) -> str:
+        """
+        Target frequency label.
+
+        Returns
+        -------
+        str
+            ``"quarterly"``, ``"semi_annual"`` or ``"annual"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def methods(self) -> dict[str, str]:
+        """
+        Rollup method label per listed node id; unlisted nodes are summed.
+
+        Returns
+        -------
+        dict[str, str]
+            Node id to ``"sum"``, ``"period_end"`` or ``"formula"``.
+
+        Raises
+        ------
+        ValueError
+            If a method cannot be rendered as its label.
         """
         ...
 
@@ -1649,40 +1774,6 @@ class FinancialModelSpec:
     """
 
     @staticmethod
-    def builder(id: str) -> ModelBuilder:
-        """
-        Start a staged model build.
-
-        The canonical entry point, mirroring Rust's
-        ``FinancialModelSpec::builder(id)`` and the ``Type.builder()`` form
-        every other builder-backed type uses. Constructing
-        :class:`ModelBuilder` directly is equivalent.
-
-        Parameters
-        ----------
-        id : str
-            Stable model identifier.
-
-        Returns
-        -------
-        ModelBuilder
-            A fresh builder awaiting ``periods(...)``.
-
-        Examples
-        --------
-        >>> from finstack_quant.statements import FinancialModelSpec
-        >>> builder = FinancialModelSpec.builder("demo")
-        >>> _ = builder.periods("2025Q1..Q1")
-        >>> builder.build().id
-        'demo'
-
-        Notes
-        -----
-        This constructor does not raise; validation happens in ``build()``.
-        """
-        ...
-
-    @staticmethod
     def from_json(json: str) -> FinancialModelSpec:
         """
         Deserialize a model specification from JSON text.
@@ -2788,7 +2879,7 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If the builder is not ready, was already consumed, or the model violates its semantic invariants.
+            If the builder was already consumed or the model (including its timeline) violates its semantic invariants.
 
         """
         ...
@@ -3394,6 +3485,59 @@ class StatementResult:
         """
         ...
 
+    def rollup(self, model: FinancialModelSpec | str, spec: RollupSpec | str) -> StatementResult:
+        """
+        Roll these results up to a coarser frequency, such as quarterly to annual.
+
+        Each target period combines its source periods node by node: summed by
+        default (flows), the last source value for ``"period_end"`` nodes
+        (balances, LTM metrics), and the node's formula re-evaluated on the
+        rolled-up values for ``"formula"`` nodes (ratios). ``lag`` and other
+        time-series functions then step in target periods. Every target period
+        must be complete.
+
+        Parameters
+        ----------
+        model : FinancialModelSpec | str
+            The model these results were evaluated from, typed or its canonical
+            JSON. It supplies the period dates and the formulas of
+            ``"formula"`` nodes.
+        spec : RollupSpec | str
+            Target frequency and per-node methods, typed or its JSON.
+
+        Returns
+        -------
+        StatementResult
+            Values keyed by the target periods (``"2025"``, ``"2025H1"``,
+            ``"2025Q1"``; fiscal periods keep their ``FY`` prefix), with
+            monetary values and value types. It carries no ``node_sources``,
+            capital-structure cashflows or check report.
+
+        Raises
+        ------
+        ValueError
+            If the JSON is malformed, the target frequency is not a whole
+            multiple of the model's, a target period is incomplete, a method
+            names an unknown node, a ``"formula"`` node has no formula or reads
+            ``cs.*`` values, or a re-evaluated formula fails.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import Evaluator, ModelBuilder, RollupSpec
+        >>> b = ModelBuilder("m")
+        >>> _ = b.periods("2025Q1..Q4", None)
+        >>> _ = b.value("revenue", [(f"2025Q{q}", 100.0) for q in range(1, 5)])
+        >>> _ = b.value("cash", [("2025Q1", 10.0), ("2025Q2", 20.0), ("2025Q3", 30.0), ("2025Q4", 40.0)])
+        >>> _ = b.compute("ebitda", "revenue * 0.25")
+        >>> _ = b.compute("margin", "ebitda / revenue")
+        >>> model = b.build()
+        >>> spec = RollupSpec("annual", {"cash": "period_end", "margin": "formula"})
+        >>> annual = Evaluator().evaluate(model).rollup(model, spec)
+        >>> (annual.get("revenue", "2025"), annual.get("cash", "2025"), annual.get("margin", "2025"))
+        (400.0, 40.0, 0.25)
+        """
+        ...
+
     def to_dated_schedule(
         self,
         model: FinancialModelSpec | str,
@@ -3843,6 +3987,11 @@ class Evaluator:
         """
         Evaluate ``model`` and return numeric results.
 
+        A capital structure is evaluated from an empty market as of the first
+        period's start, so fixed-rate debt yields ``cs_cashflows``;
+        instruments that need market data (floating coupons, swaps, caps)
+        need :meth:`evaluate_with_market`.
+
         Parameters
         ----------
         model:
@@ -3851,14 +4000,16 @@ class Evaluator:
         Returns
         -------
         StatementResult
-            Populated result object.
+            Populated result object, with capital-structure cashflows when the
+            model defines a capital structure.
 
         Raises
         ------
         ValueError
             If a formula is invalid or references an unknown identifier.
         KeyError
-            If a referenced node or required input data is missing.
+            If a referenced node or required input data is missing, or a
+            capital-structure instrument needs market data.
         RuntimeError
             If the dependency graph has a cycle or a capital-structure
             computation fails.
@@ -3875,8 +4026,9 @@ class Evaluator:
         """
         Evaluate ``model`` with market data and an as-of date.
 
-        Use this for capital-structure-aware models and as-of filtering of
-        future actual periods.
+        Use this when capital-structure instruments need market data
+        (floating coupons, swaps, caps) and for as-of filtering of future
+        actual periods.
 
         Parameters
         ----------
@@ -4489,7 +4641,7 @@ def merge_into_results(
 ) -> StatementResult:
     """Write normalized values back into statement results as a node.
 
-    Wraps Rust ``NormalizationEngine::merge_into_results``: each period's
+    Wraps Rust ``adjustments::merge_into_results``: each period's
     ``final_value`` becomes node ``output_node_id`` with the shared unit (and
     currency for monetary values), replacing any existing node of that name
     across all periods. The attached check report is cleared because it
@@ -4533,38 +4685,6 @@ def merge_into_results(
     >>> merged = merge_into_results(results, normalize(results, NormalizationConfig("ebitda")), "adj")
     >>> merged.get("adj", "2025Q2")
     110.0
-    """
-    ...
-
-def normalize_json(results: StatementResult, config: NormalizationConfig) -> str:
-    """Run normalization and return compact canonical JSON.
-
-    Parameters
-    ----------
-    results:
-        Evaluated statement output.
-    config:
-        Target node and adjustment definitions.
-
-    Returns
-    -------
-    str
-        JSON array encoding normalization results.
-
-    Raises
-    ------
-    ValueError
-        If normalization or serialization fails.
-
-    Examples
-    --------
-    >>> from finstack_quant.statements import Evaluator, ModelBuilder, NormalizationConfig, normalize_json
-    >>> builder = ModelBuilder("demo")
-    >>> _ = builder.periods("2025Q1..Q1")
-    >>> _ = builder.value("ebitda", [("2025Q1", 25.0)])
-    >>> result = Evaluator().evaluate(builder.build())
-    >>> '"final_value":25.0' in normalize_json(result, NormalizationConfig("ebitda"))
-    True
     """
     ...
 
@@ -6925,6 +7045,13 @@ class CheckConfig:
 
 class FormulaCheckSpec:
     """A user-defined check expressed as a statements DSL predicate.
+
+    Each period passes, fails (a finding with the configured severity), or
+    has insufficient data: a same-period input is missing or non-finite, or
+    the formula consumes a non-finite value such as a ``lag`` before the first
+    period. Insufficient data is reported as a ``"warning"`` finding naming
+    the inputs and never fails the check. A division by zero over finite
+    inputs still fails.
 
     Examples
     --------

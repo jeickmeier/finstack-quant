@@ -125,7 +125,7 @@ fn make_bond() -> Bond {
     bond
 }
 
-fn flat_discount(base: time::Date) -> DiscountCurve {
+fn flat_discount(base: finstack_quant_core::dates::Date) -> DiscountCurve {
     let r = 0.05_f64;
     DiscountCurve::builder("USD-OIS")
         .base_date(base)
@@ -152,14 +152,13 @@ fn make_market_state(disc: DiscountCurve, haz: HazardCurve) -> MarketContextStat
         inflation_indices: vec![],
         dividends: vec![],
         credit_indices: vec![],
-        collateral: BTreeMap::new(),
         fx_delta_vol_surfaces: vec![],
         hierarchy: None,
         vol_cubes: vec![],
     }
 }
 
-fn flat_market_state(base: time::Date, rate: f64) -> MarketContextState {
+fn flat_market_state(base: finstack_quant_core::dates::Date, rate: f64) -> MarketContextState {
     let discount = flat_discount(base);
     let convention = CdsConventionKey {
         currency: Currency::USD,
@@ -184,7 +183,10 @@ fn flat_market_state(base: time::Date, rate: f64) -> MarketContextState {
     make_market_state(discount, hazard)
 }
 
-fn standard_period() -> (time::Date, time::Date) {
+fn standard_period() -> (
+    finstack_quant_core::dates::Date,
+    finstack_quant_core::dates::Date,
+) {
     (
         create_date(2025, Month::January, 1).unwrap(),
         create_date(2025, Month::January, 2).unwrap(),
@@ -193,7 +195,7 @@ fn standard_period() -> (time::Date, time::Date) {
 
 /// Hazard curve with knots at the standard tenor grid set to the given rates,
 /// used to build a deliberately non-parallel (twisted) hazard move.
-fn twisted_hazard(base: time::Date, rates: &[f64]) -> HazardCurve {
+fn twisted_hazard(base: finstack_quant_core::dates::Date, rates: &[f64]) -> HazardCurve {
     let std_tenors = [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 30.0];
     HazardCurve::builder("ISSUER-A-HAZ")
         .base_date(base)
@@ -718,7 +720,7 @@ fn metrics_based_credit_factor_detail_uses_t1_cs01_baseline() {
     let model = make_model(vec![HierarchyDimension::Rating, HierarchyDimension::Region]);
 
     // Rate drift: 5% → 6% (100 bp parallel).
-    let drift_discount = |base: time::Date, r: f64| {
+    let drift_discount = |base: finstack_quant_core::dates::Date, r: f64| {
         DiscountCurve::builder("USD-OIS")
             .base_date(base)
             .day_count(DayCount::Act365F)
@@ -824,4 +826,106 @@ fn metrics_based_credit_factor_detail_uses_t1_cs01_baseline() {
         "metrics-based generic_pnl {m_generic} must agree with parallel generic_pnl {p_generic} \
          to within 0.5% of credit_pnl {m_total} (M2: same CS01 baseline)"
     );
+}
+
+/// The cascade's factor-unit guard reaches `meta.notes` on the reprice
+/// methods too, not only on the linear back-solve. A generic series quoted
+/// in percent (1.00 -> 1.10, meant as 10bp) explains at least 99x less than
+/// the issuer's 60bp par-spread move.
+#[test]
+fn reprice_methods_surface_the_factor_unit_mismatch_note() {
+    use finstack_quant_core::market_data::scalars::MarketScalar;
+
+    let (as_of_t0, as_of_t1) = standard_period();
+    let mut market_t0 = flat_market_state(as_of_t0, 0.01);
+    let mut market_t1 = flat_market_state(as_of_t1, 0.02);
+    market_t0
+        .prices
+        .insert("cdx.ig.5y".to_string(), MarketScalar::Unitless(1.00));
+    market_t1
+        .prices
+        .insert("cdx.ig.5y".to_string(), MarketScalar::Unitless(1.10));
+
+    for method in [
+        AttributionMethod::Parallel,
+        AttributionMethod::Waterfall(default_waterfall_order()),
+    ] {
+        let spec = AttributionSpec {
+            instrument: InstrumentJson::Bond(make_bond()),
+            inputs: finstack_quant_attribution::AttributionInputs {
+                market_t0: market_t0.clone(),
+                market_t1: market_t1.clone(),
+                as_of_t0,
+                as_of_t1,
+                method: method.clone(),
+                model_params_t0: None,
+                credit_factor_model: Some(Box::new(make_model(vec![HierarchyDimension::Rating]))),
+                credit_factor_detail_options: CreditFactorDetailOptions::default(),
+                config: None,
+                full_cross_attribution: false,
+            },
+        };
+        let attribution = AttributionEnvelope::new(spec)
+            .execute()
+            .expect("attribution should succeed")
+            .result
+            .attribution;
+        assert!(
+            attribution.credit_factor_detail.is_some(),
+            "{method:?}: cascade should run"
+        );
+        assert!(
+            attribution
+                .meta
+                .notes
+                .iter()
+                .any(|note| note.contains("scale mismatch")),
+            "{method:?}: unit-mismatch note missing from {:?}",
+            attribution.meta.notes
+        );
+    }
+}
+
+/// `attribute_pnl` called directly (not through a spec) runs the same
+/// pipeline: the linear methods back-solve the credit-factor detail from the
+/// request's credit model.
+#[test]
+fn request_path_back_solves_credit_detail_for_linear_methods() {
+    use finstack_quant_attribution::{attribute_pnl, AttributionRequest, TaylorAttributionConfig};
+    use finstack_quant_core::config::FinstackConfig;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_valuations::instruments::Instrument;
+    use std::sync::Arc;
+
+    let (as_of_t0, as_of_t1) = standard_period();
+    let market_t0 =
+        MarketContext::try_from(flat_market_state(as_of_t0, 0.01)).expect("opening market");
+    let market_t1 =
+        MarketContext::try_from(flat_market_state(as_of_t1, 0.02)).expect("closing market");
+    let instrument: Arc<dyn Instrument> = Arc::new(make_bond());
+    let model = make_model(vec![HierarchyDimension::Rating]);
+    let config = FinstackConfig::default();
+
+    for method in [
+        AttributionMethod::MetricsBased,
+        AttributionMethod::Taylor(TaylorAttributionConfig::default()),
+    ] {
+        let request = AttributionRequest {
+            credit_factor_model: Some(&model),
+            ..AttributionRequest::new(
+                &instrument,
+                &market_t0,
+                &market_t1,
+                as_of_t0,
+                as_of_t1,
+                &config,
+            )
+        };
+        let attribution = attribute_pnl(&method, &request).expect("attribution");
+        assert!(
+            attribution.credit_factor_detail.is_some(),
+            "{method:?}: no credit_factor_detail; notes = {:?}",
+            attribution.meta.notes
+        );
+    }
 }

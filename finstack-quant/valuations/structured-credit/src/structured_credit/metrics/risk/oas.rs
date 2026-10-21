@@ -30,7 +30,9 @@ use crate::structured_credit::StructuredCredit;
 use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::math::stats::mean_var;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::RandomStream;
@@ -353,8 +355,8 @@ pub fn calculate_tranche_oas(
     };
 
     let solver = BrentSolver::new()
-        .tolerance(config.tolerance)
-        .initial_bracket_size(Some(0.05));
+        .with_tolerance(config.tolerance)
+        .with_initial_bracket_size(Some(0.05));
     let oas = solver.solve(objective, 0.0)?;
 
     // Per-scenario PVs at solved OAS for model price and Monte Carlo error.
@@ -367,15 +369,10 @@ pub fn calculate_tranche_oas(
                 .sum()
         })
         .collect();
-    let mean_pv = path_pvs.iter().sum::<f64>() / path_count;
+    let (mean_pv, var) = mean_var(&path_pvs);
     let model_price = quote.clean_price(mean_pv);
     let price_std_error = if num_paths > 1 && current_balance > 0.0 {
         // Bessel-corrected standard error of the mean: sqrt(var / n).
-        let var = path_pvs
-            .iter()
-            .map(|pv| (pv - mean_pv).powi(2))
-            .sum::<f64>()
-            / (path_count - 1.0);
         (var / path_count).sqrt() / current_balance * 100.0
     } else {
         0.0
@@ -402,7 +399,9 @@ fn monthly_forwards(curve: &DiscountCurve, num_months: usize) -> Vec<f64> {
             let t1 = m as f64 * dt;
             let t2 = (m + 1) as f64 * dt;
             // `forward` only errors on a non-positive interval, impossible here.
-            curve.forward(t1, t2).unwrap_or_else(|_| curve.zero(t2))
+            curve.forward(t1, t2).unwrap_or_else(|_| {
+                curve.zero_rate(t2, finstack_quant_core::math::Compounding::Continuous)
+            })
         })
         .collect()
 }

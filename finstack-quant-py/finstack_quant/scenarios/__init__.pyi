@@ -718,9 +718,10 @@ class ApplicationReport:
 
     Exposed as the :attr:`ApplicationResult.report` attribute of the result
     returned by :func:`apply_scenario`,
-    and as the second element of the tuples returned by
-    :func:`finstack_quant.portfolio.scenario_pnl` and
-    :func:`finstack_quant.portfolio.apply_scenario_and_revalue`.
+    as the second element of the tuple returned by
+    :func:`finstack_quant.portfolio.apply_scenario_and_revalue`, and as the
+    ``report`` of the ``ScenarioPnlBatchItem`` returned by
+    :func:`finstack_quant.portfolio.scenario_pnl`.
 
     Examples
     --------
@@ -1639,7 +1640,7 @@ def compute_horizon_return(
     market: MarketContext | str,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     scenario: ScenarioSpec | str,
-    method: Literal["parallel", "waterfall", "metrics_based", "taylor"] | None = None,
+    method: str | Mapping[str, Any] | None = None,
     config: FinstackConfig | str | None = None,
     calendar_id: str | None = None,
 ) -> HorizonResult:
@@ -1658,8 +1659,12 @@ def compute_horizon_return(
         Valuation date (ISO 8601 accepted).
     scenario : ScenarioSpec | str
         Typed scenario or JSON-serialized ``ScenarioSpec``.
-    method : {"parallel", "waterfall", "metrics_based", "taylor"} | None, default None
-        Attribution method; ``None`` selects the Rust default
+    method : str | dict | None, default None
+        ``AttributionMethod`` wire value: ``"parallel"``,
+        ``"metrics_based"``, ``{"waterfall": [...factors]}`` (for example
+        ``{"waterfall": default_waterfall_order()}``) or
+        ``{"taylor": {...config}}`` (``{"taylor": {}}`` for the defaults), or
+        the same value as JSON text. ``None`` selects the Rust default
         (``AttributionMethod::default()``, currently ``"parallel"``).
         ``"metrics_based"`` calculates the instrument's applicable subset of
         the default attribution metrics (DV01, CS01, vega, ...) at the opening
@@ -3017,7 +3022,8 @@ class OperationSpec:
             curves).
         match_mode : TenorMatchMode | str, optional
             Tenor alignment strategy (``"exact"`` or ``"interpolate"``).
-            Defaults to exact matching.
+            Defaults to ``"interpolate"`` (key-rate bump at the requested
+            tenor); ``"exact"`` requires a matching pillar.
         discount_curve_id : str, optional
             Discount curve used when re-bootstrapping shocked ParCDS quotes.
 
@@ -3086,6 +3092,8 @@ class OperationSpec:
             List of ``(tenor, points)`` pairs.
         match_mode : TenorMatchMode | str, optional
             Tenor alignment strategy (``"exact"`` or ``"interpolate"``).
+            Defaults to ``"interpolate"`` (key-rate bump at the requested
+            tenor); ``"exact"`` requires a matching pillar.
 
         Returns
         -------

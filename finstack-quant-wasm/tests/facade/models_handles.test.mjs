@@ -297,7 +297,7 @@ test('correlation handles expose their accessors and reject bad input', () => {
     () => new correlation.LatentMultiFactor(2, [0.2], [1, 0.5, 0.5, 1]),
     kind('validation')
   );
-  assert.throws(() => correlation.choleskyDecompose([1, 2, 2, 1], 2), kind('validation'));
+  assert.throws(() => correlation.choleskyCorrelation([1, 2, 2, 1], 2), kind('validation'));
 
   const exposures = [
     { id: 'A', notional: 100, default_probability: 0.02, lgd: 0.6, factor_loadings: [0.4] },
@@ -584,7 +584,10 @@ test('volatility helpers take a VolSurface in its canonical wire form', () => {
     'CUBE',
     [1, 2],
     [5],
-    [0.02, 0.5, -0.2, 0.4, Number.NaN, 0.03, 0.5, -0.1, 0.3, Number.NaN],
+    [
+      { alpha: 0.02, beta: 0.5, rho: -0.2, nu: 0.4 },
+      { alpha: 0.03, beta: 0.5, rho: -0.1, nu: 0.3 },
+    ],
     [0.03, 0.035]
   );
   // Materialized surfaces are `core.VolSurface` handles, the type the

@@ -17,7 +17,6 @@
             "df_hard_min": 1e-12,
             "jacobian_step_size": 0.000001,
             "min_scan_grid_points": 20,
-            "min_t_spot": 0.000001,
             "scan_grid_points": 48,
             "scan_grid_step": 0.0001,
             "validation_tolerance": 1e-8,
@@ -76,7 +75,6 @@
             "tolerance": 1e-10
           },
           "validation_mode": "error",
-          "verbose": false,
           "vol_surface": {
             "validation_tolerance": 0.001
           }
@@ -282,8 +280,12 @@
             },
             "method": {
               "$ref": "#/$defs/d_3ae1d648491d93be37b3",
-              "default": "bootstrap",
-              "description": "Calibration method to use.\n\nForward curves require [`CalibrationMethod::GlobalSolve`]. Sequential\nbootstrap is rejected because contractual off-grid reset intervals\ncouple adjacent rates through projection discount factors."
+              "default": {
+                "global_solve": {
+                  "use_analytical_jacobian": false
+                }
+              },
+              "description": "Calibration method to use.\n\nForward curves require [`CalibrationMethod::GlobalSolve`], which is the\ndefault (finite-difference Jacobian). Sequential bootstrap is rejected\nbecause contractual off-grid reset intervals couple adjacent rates\nthrough projection discount factors."
             },
             "tenor_years": {
               "description": "Tenor in years for the forward curve.",
@@ -599,11 +601,6 @@
               "default": "error",
               "description": "Extrapolation policy used when interpolating SABR parameters across the\nexpiry–tenor grid for target points that do not have a directly calibrated bucket."
             },
-            "sabr_interpolation": {
-              "$ref": "#/$defs/d_c3c50fd88be2ae84feeb",
-              "default": "bilinear",
-              "description": "SABR parameter interpolation method between expiries/tenors."
-            },
             "swap_index": {
               "anyOf": [
                 {
@@ -707,7 +704,7 @@
             },
             "detachment_points": {
               "default": [],
-              "description": "Detachment points (as percentages) for the tranches.",
+              "description": "Expected tranche detachment points as decimals in `(0, 1]` (e.g. `0.03`\nfor 3%), the same unit as `CdsTrancheQuote.detachment`. When non-empty,\nevery quote must match one point and every point must be quoted.",
               "items": {
                 "format": "double",
                 "type": "number"
@@ -1863,11 +1860,19 @@
     },
     "d_49947b4265557428e6de": {
       "additionalProperties": false,
-      "description": "Audit metadata and freshness policy for calibration inputs.",
+      "description": "Audit metadata and freshness policy for calibration inputs.\n\nThe snapshot age is `as_of_timestamp - snapshot_timestamp`. Both instants\nare caller inputs, so validation never reads the wall clock and the same\nenvelope always validates the same way.",
       "properties": {
+        "as_of_timestamp": {
+          "default": null,
+          "description": "RFC3339 instant at which freshness is assessed (normally the caller's\nclock when it submits the envelope). Required with `snapshot_timestamp`\nand `max_age_seconds`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "max_age_seconds": {
           "default": null,
-          "description": "Maximum permitted snapshot age in seconds.",
+          "description": "Maximum permitted snapshot age in seconds, measured at `as_of_timestamp`.",
           "format": "uint64",
           "minimum": 0,
           "type": [
@@ -2264,12 +2269,6 @@
           "format": "uint",
           "minimum": 0,
           "type": "integer"
-        },
-        "min_t_spot": {
-          "default": 0.000001,
-          "description": "Minimum time threshold for considering a knot at spot (t=0).",
-          "format": "double",
-          "type": "number"
         },
         "scan_grid_points": {
           "default": 48,
@@ -3671,30 +3670,6 @@
             "params",
             "forwards",
             "interpolation_mode"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Collateral / CSA mapping entry.",
-          "properties": {
-            "csa_currency": {
-              "$ref": "#/$defs/d_be98333e68c25ab5ae57",
-              "description": "Collateral / CSA currency."
-            },
-            "id": {
-              "$ref": "#/$defs/d_be98333e68c25ab5ae57",
-              "description": "Trade-leg currency this CSA mapping applies to."
-            },
-            "kind": {
-              "const": "collateral",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "id",
-            "csa_currency"
           ],
           "type": "object"
         }
@@ -5891,11 +5866,6 @@
       ],
       "title": "Day Count"
     },
-    "d_c3c50fd88be2ae84feeb": {
-      "const": "bilinear",
-      "description": "Interpolation method for SABR parameters across the expiry–tenor grid.",
-      "type": "string"
-    },
     "d_cebddb4a91c1c968bece": {
       "additionalProperties": false,
       "description": "Inflation-curve specific numerical solver configuration.\n\nControls the numerical stability and success criteria of inflation curve\nbootstrapping or global solve for CPI curve calibration.\n\n# Examples\n```\nuse finstack_quant_calibration::InflationCurveSolveConfig;\n\nlet config = InflationCurveSolveConfig {\n    validation_tolerance: 1e-6,  // Relax for noisy inflation markets\n    ..Default::default()\n};\n```",
@@ -5995,7 +5965,6 @@
             "df_hard_min": 1e-12,
             "jacobian_step_size": 0.000001,
             "min_scan_grid_points": 20,
-            "min_t_spot": 0.000001,
             "scan_grid_points": 48,
             "scan_grid_step": 0.0001,
             "validation_tolerance": 1e-8,
@@ -6119,11 +6088,6 @@
           "default": "error",
           "description": "Runtime validation mode (warnings vs errors)."
         },
-        "verbose": {
-          "default": false,
-          "description": "Enable verbose logging of the calibration process.",
-          "type": "boolean"
-        },
         "vol_surface": {
           "$ref": "#/$defs/d_41166743d7ec9326bdd4",
           "default": {
@@ -6187,7 +6151,6 @@
               "df_hard_min": 1e-12,
               "jacobian_step_size": 0.000001,
               "min_scan_grid_points": 20,
-              "min_t_spot": 0.000001,
               "scan_grid_points": 48,
               "scan_grid_step": 0.0001,
               "validation_tolerance": 1e-8,
@@ -6246,7 +6209,6 @@
               "tolerance": 1e-10
             },
             "validation_mode": "error",
-            "verbose": false,
             "vol_surface": {
               "validation_tolerance": 0.001
             }
@@ -6316,14 +6278,6 @@
               "description": "Registered holiday calendar id of the business-day time axis (for\nexample `\"brbd\"` for a Bus/252 curve). Omitted when the day count needs\nno calendar.",
               "type": [
                 "string",
-                "null"
-              ]
-            },
-            "calibration_ois_cutoff_days": {
-              "description": "OIS cut-off (business days) the curve was calibrated under, if any.",
-              "format": "int32",
-              "type": [
-                "integer",
                 "null"
               ]
             },

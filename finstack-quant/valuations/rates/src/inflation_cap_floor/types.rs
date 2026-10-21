@@ -46,6 +46,7 @@ use finstack_quant_core::dates::{
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::InflationLag;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::validation;
@@ -101,14 +102,12 @@ pub struct InflationCapFloor {
     )]
     pub strike: Decimal,
     /// Start date of the first inflation period.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start_date: Date,
     /// End date of the final inflation period.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -307,7 +306,7 @@ impl InflationCapFloor {
             let cal = finstack_quant_core::dates::calendar_by_id_strict(
                 self.calendar_id
                     .as_deref()
-                    .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
+                    .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID),
             )?;
             let pay = finstack_quant_core::dates::adjust(
                 self.maturity,
@@ -327,7 +326,7 @@ impl InflationCapFloor {
                 calendar_id: self
                     .calendar_id
                     .as_deref()
-                    .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
+                    .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID),
                 end_of_month: false,
                 day_count: self.day_count,
                 payment_lag_days: 0,

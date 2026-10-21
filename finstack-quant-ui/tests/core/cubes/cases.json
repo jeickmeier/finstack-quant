@@ -1,6 +1,6 @@
 {
   "source": "finstack-quant/calibration/examples/market_bootstrap/07_swaption_vol_surface.json",
-  "sha256": "f428ab74458aaa5c49113a7ef71c755dad2d63fc5814bb4f665235d135364241",
+  "sha256": "66e28910a393f349396c22471da88e84ff8749c05c16b530788759525e6be977",
   "market": {
     "schema_version": 1,
     "curves": [
@@ -112,7 +112,6 @@
             }
           ]
         },
-        "calibration_ois_cutoff_days": null,
         "fx_policy": null
       },
       {
@@ -329,7 +328,6 @@
         "interpolation_mode": "vol"
       }
     ],
-    "collateral": {},
     "hierarchy": null
   }
 }

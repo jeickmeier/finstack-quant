@@ -264,7 +264,7 @@ impl Bond {
         &self,
         config: &crate::bond::pricing::engine::merton_mc::MertonMcConfig,
         discount_rate: f64,
-        as_of: time::Date,
+        as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<crate::bond::pricing::engine::merton_mc::MertonMcResult> {
         let run = crate::bond::pricing::engine::merton_mc::MertonMcRun::resolve(
             &self.id,
@@ -281,7 +281,7 @@ impl Bond {
         config: &crate::bond::pricing::engine::merton_mc::MertonMcConfig,
         run: &crate::bond::pricing::engine::merton_mc::MertonMcRun,
         discount_rate: f64,
-        as_of: time::Date,
+        as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<crate::bond::pricing::engine::merton_mc::MertonMcResult> {
         use crate::bond::pricing::engine::merton_mc::{
             MertonBondTerms, MertonMcConfig, MertonMcEngine, PikMode, PikSchedule,

@@ -61,6 +61,7 @@ use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
@@ -109,7 +110,7 @@ pub struct FxSpot {
     pub quote_currency: Currency,
     /// Optional explicit settlement (value) date. When set it is only
     /// business-day adjusted and `settlement_days` is ignored.
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -188,7 +189,7 @@ struct FxSpotUnchecked {
     /// Quote currency (the currency used for pricing)
     quote_currency: Currency,
     /// Optional explicit settlement (value) date
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -310,7 +311,7 @@ impl FxSpot {
     ///   applied from this date; an explicit `settlement_date` is only
     ///   business-day-adjusted and ignores `as_of`.
     pub fn effective_settlement_date(&self, as_of: Date) -> Result<Date> {
-        use finstack_quant_core::dates::fx::fx_spot_date_for_pair;
+        use finstack_quant_core::dates::fx::fx_spot_date;
         use finstack_quant_core::dates::{adjust, resolve_joint_calendar};
 
         // Check if we should use joint calendar logic
@@ -337,7 +338,7 @@ impl FxSpot {
                 )
             });
 
-            fx_spot_date_for_pair(
+            fx_spot_date(
                 as_of,
                 settlement_days,
                 self.base_currency,
@@ -612,7 +613,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
         let settle_date = self.effective_settlement_date(as_of)?;
 
         if crate::shared::event_has_occurred(settle_date, as_of) {
-            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+            return finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 finstack_quant_core::dates::DayCount::Act365F,
                 finstack_quant_cashflows::ScheduleBuildOpts {
@@ -623,7 +624,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
                         ..Default::default()
                     },
                 },
-            ));
+            );
         }
 
         let flows = {
@@ -646,7 +647,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
 
         let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
-            finstack_quant_cashflows::primitives::CFKind::Notional,
+            finstack_quant_core::cashflow::CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F, // Standard for FX spot
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: self.notional()?,
@@ -656,7 +657,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
                     ..Default::default()
                 },
             },
-        );
+        )?;
         Ok(schedule)
     }
 }

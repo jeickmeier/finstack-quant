@@ -2,12 +2,14 @@
 
 use finstack_quant_cashflows::builder::AmortizationSpec;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, Month, Tenor};
+use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_portfolio::{
-    flatten_dependencies, Entity, InstrumentArtifact, MaterializedPosition, PortfolioHeader,
-    PortfolioMaterializationEnvelope, PositionId, PositionUnit,
+    dependencies::flatten_dependencies, materialization::InstrumentArtifact,
+    materialization::MaterializedPosition, materialization::PortfolioHeader,
+    materialization::PortfolioMaterializationEnvelope, position::PositionUnit, types::Entity,
+    types::PositionId,
 };
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
 use finstack_quant_valuations::instruments::rates::cms_swap::{CmsSwap, FundingLegSpec};
@@ -16,6 +18,7 @@ use finstack_quant_valuations::instruments::{
 };
 use indexmap::IndexMap;
 use time::macros::date;
+use time::Month;
 
 /// Number of artifacts in the unique-instrument acceptance fixture.
 pub const FIXTURE_A_ARTIFACTS: usize = 5_000;
@@ -128,7 +131,7 @@ pub fn build_fixture(
         .collect();
 
     let envelope = PortfolioMaterializationEnvelope {
-        schema: finstack_quant_portfolio::materialization::PortfolioMaterializationSchema::CURRENT,
+        schema: finstack_quant_portfolio::materialization::PortfolioMaterializationSchema::Materialization,
         portfolio: PortfolioHeader {
             id: format!("materialization-{}", fixture_name(kind)),
             name: Some("Phase 7 deterministic benchmark".to_string()),

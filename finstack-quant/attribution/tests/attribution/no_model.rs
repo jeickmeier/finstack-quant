@@ -58,7 +58,6 @@ fn make_market_state(as_of: finstack_quant_core::dates::Date, rate: f64) -> Mark
         inflation_indices: vec![],
         dividends: vec![],
         credit_indices: vec![],
-        collateral: std::collections::BTreeMap::new(),
         fx_delta_vol_surfaces: vec![],
         hierarchy: None,
         vol_cubes: vec![],

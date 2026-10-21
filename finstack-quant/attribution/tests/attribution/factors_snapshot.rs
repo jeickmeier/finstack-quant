@@ -203,27 +203,6 @@ fn test_market_restore_flags_union() {
 }
 
 #[test]
-fn test_market_restore_flags_intersection() {
-    let rates = MarketRestoreFlags::RATES;
-    let discount_hazard = MarketRestoreFlags::DISCOUNT | MarketRestoreFlags::HAZARD;
-
-    let intersection = rates & discount_hazard;
-    assert!(intersection.contains(MarketRestoreFlags::DISCOUNT));
-    assert!(!intersection.contains(MarketRestoreFlags::FORWARD));
-    assert!(!intersection.contains(MarketRestoreFlags::HAZARD));
-}
-
-#[test]
-fn test_market_restore_flags_complement() {
-    let not_discount = MarketRestoreFlags::all() & !MarketRestoreFlags::DISCOUNT;
-    assert!(!not_discount.contains(MarketRestoreFlags::DISCOUNT));
-    assert!(not_discount.contains(MarketRestoreFlags::FORWARD));
-    assert!(not_discount.contains(MarketRestoreFlags::HAZARD));
-    assert!(not_discount.contains(MarketRestoreFlags::INFLATION));
-    assert!(not_discount.contains(MarketRestoreFlags::CORRELATION));
-}
-
-#[test]
 fn test_market_restore_flags_all_and_empty() {
     let all = MarketRestoreFlags::all();
     assert!(all.contains(MarketRestoreFlags::DISCOUNT));
@@ -232,7 +211,6 @@ fn test_market_restore_flags_all_and_empty() {
     assert!(all.contains(MarketRestoreFlags::INFLATION));
     assert!(all.contains(MarketRestoreFlags::CORRELATION));
     assert!(all.contains(MarketRestoreFlags::RATES));
-    assert!(all.contains(MarketRestoreFlags::CREDIT));
 
     let empty = MarketRestoreFlags::empty();
     assert!(!empty.contains(MarketRestoreFlags::DISCOUNT));
@@ -385,7 +363,7 @@ fn test_restore_equivalence_mixed_curve_types() {
         .insert(create_test_base_correlation_curve("CDX-IG", base_date));
 
     let rates_snap = MarketSnapshot::extract(&market, MarketRestoreFlags::RATES);
-    let credit_snap = MarketSnapshot::extract(&market, MarketRestoreFlags::CREDIT);
+    let credit_snap = MarketSnapshot::extract(&market, MarketRestoreFlags::HAZARD);
     let inflation_snap = MarketSnapshot::extract(&market, MarketRestoreFlags::INFLATION);
     let corr_snap = MarketSnapshot::extract(&market, MarketRestoreFlags::CORRELATION);
 
@@ -398,7 +376,7 @@ fn test_restore_equivalence_mixed_curve_types() {
     assert!(after_rates.get_hazard("CORP-B").is_ok());
 
     let after_credit =
-        MarketSnapshot::restore_market(&after_rates, &credit_snap, MarketRestoreFlags::CREDIT);
+        MarketSnapshot::restore_market(&after_rates, &credit_snap, MarketRestoreFlags::HAZARD);
     assert!(after_credit.get_discount("USD-OIS").is_ok());
     assert!(after_credit.get_hazard("CORP-A").is_ok());
 
@@ -432,19 +410,19 @@ fn test_combined_restore_matches_stacked_restore_for_cross_factor_flags() {
         .insert(create_test_forward_curve("EUR-ESTR", base_date))
         .insert(create_test_hazard_curve("CORP-B", base_date));
 
-    let flags = MarketRestoreFlags::RATES | MarketRestoreFlags::CREDIT | MarketRestoreFlags::FX;
+    let flags = MarketRestoreFlags::RATES | MarketRestoreFlags::HAZARD | MarketRestoreFlags::FX;
     let combined_snapshot = MarketSnapshot::extract(&market_t0, flags);
     let combined = MarketSnapshot::restore_market(&market_t1, &combined_snapshot, flags);
 
     let rates_snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::RATES);
-    let credit_snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::CREDIT);
+    let credit_snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::HAZARD);
     let fx_snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::FX);
     let stacked_rates =
         MarketSnapshot::restore_market(&market_t1, &rates_snapshot, MarketRestoreFlags::RATES);
     let stacked_credit = MarketSnapshot::restore_market(
         &stacked_rates,
         &credit_snapshot,
-        MarketRestoreFlags::CREDIT,
+        MarketRestoreFlags::HAZARD,
     );
     let stacked =
         MarketSnapshot::restore_market(&stacked_credit, &fx_snapshot, MarketRestoreFlags::FX);
@@ -524,7 +502,6 @@ fn test_restore_preserves_families_outside_the_snapshot_model() {
     use finstack_quant_core::market_data::surfaces::SabrParameterData;
     use finstack_quant_core::market_data::surfaces::VolCube;
     use finstack_quant_core::market_data::term_structures::{PriceCurve, PriceCurveKind};
-    use finstack_quant_core::types::CurveId;
 
     let as_of = date!(2025 - 01 - 15);
     let price_curve = PriceCurve::builder("WTI")
@@ -540,21 +517,15 @@ fn test_restore_preserves_families_outside_the_snapshot_model() {
         .knots([(0.0, 15.0), (1.0, 18.0)])
         .build()
         .unwrap();
-    let sabr = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
-    let cube = VolCube::builder("USD-SWAPTION")
-        .expiries(&[1.0])
-        .tenors(&[5.0])
-        .node(sabr, 0.03)
-        .build()
-        .unwrap();
+    let sabr = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
+    let cube = VolCube::from_grid("USD-SWAPTION", &[1.0], &[5.0], &[sabr], &[0.03]).unwrap();
 
     let market_t1 = MarketContext::new()
         .insert(create_test_discount_curve("USD-OIS", as_of))
         .insert(create_test_hazard_curve("ACME-HAZ", as_of))
         .insert(price_curve)
         .insert(vol_index)
-        .insert_vol_cube(cube)
-        .map_collateral("CSA-USD", CurveId::new("USD-OIS"));
+        .insert_vol_cube(cube);
 
     let market_t0 = MarketContext::new().insert(create_test_discount_curve("USD-OIS", as_of));
 
@@ -575,10 +546,6 @@ fn test_restore_preserves_families_outside_the_snapshot_model() {
     assert!(
         restored.get_vol_cube("USD-SWAPTION").is_ok(),
         "SABR vol cube must survive a rates restore"
-    );
-    assert!(
-        restored.get_collateral("CSA-USD").is_ok(),
-        "collateral CSA mapping must survive a rates restore"
     );
 
     // A VOL-flagged restore replaces cubes wholesale: T0 has none, so the

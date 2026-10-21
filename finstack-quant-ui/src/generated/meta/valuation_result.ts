@@ -18,8 +18,7 @@ export default [
             "mode": "bankers",
             "output_scale_by_currency": {},
             "tolerances": {
-              "generic_epsilon": 1e-10,
-              "rate_epsilon": 1e-12
+              "generic_epsilon": 1e-10
             },
             "version": 1
           },
@@ -309,8 +308,7 @@ export default [
         "mode": "bankers",
         "output_scale_by_currency": {},
         "tolerances": {
-          "generic_epsilon": 1e-10,
-          "rate_epsilon": 1e-12
+          "generic_epsilon": 1e-10
         },
         "version": 1
       },
@@ -675,8 +673,7 @@ export default [
     "path": "#/$defs/d_55fd8d302833a65d16f6/properties/tolerances",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/RoundingContext/properties/tolerances",
     "default": {
-      "generic_epsilon": 1e-10,
-      "rate_epsilon": 1e-12
+      "generic_epsilon": 1e-10
     },
     "description": "Tolerance settings snapshot for floating-point comparisons.",
     "ref": "#/$defs/ToleranceConfig",
@@ -755,21 +752,13 @@ export default [
   {
     "path": "#/$defs/d_719f3377340f012e0eb2",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ToleranceConfig",
-    "description": "Numerical tolerance configuration for floating-point comparisons.\n\nProvides configurable epsilon values for zero-checks in rate calculations\nand generic floating-point comparisons. These defaults are chosen to balance\nnumerical stability with practical precision requirements.\n\n# Examples\n```rust\nuse finstack_quant_core::config::ToleranceConfig;\n\nlet mut tol = ToleranceConfig::default();\nassert_eq!(tol.rate_epsilon, 1e-12);\n\n// Customize for stricter rate comparisons\ntol.rate_epsilon = 1e-14;\n```"
+    "description": "Numerical tolerance configuration for floating-point comparisons.\n\nProvides the configurable epsilon for generic floating-point zero-checks.\nThe default is chosen to balance numerical stability with practical\nprecision requirements.\n\n# Examples\n```rust\nuse finstack_quant_core::config::ToleranceConfig;\n\nlet mut tol = ToleranceConfig::default();\nassert_eq!(tol.generic_epsilon, 1e-10);\n\n// Customize for stricter comparisons\ntol.generic_epsilon = 1e-12;\n```"
   },
   {
     "path": "#/$defs/d_719f3377340f012e0eb2/properties/generic_epsilon",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ToleranceConfig/properties/generic_epsilon",
     "default": 1e-10,
     "description": "Epsilon for generic floating-point comparisons (default: 1e-10).\n\nUsed for general numerical comparisons where higher tolerance is acceptable.",
-    "ref": "#/$defs/PositiveF64Wire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/PositiveF64Wire"
-  },
-  {
-    "path": "#/$defs/d_719f3377340f012e0eb2/properties/rate_epsilon",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ToleranceConfig/properties/rate_epsilon",
-    "default": 1e-12,
-    "description": "Epsilon for rate comparisons (default: 1e-12).\n\nUsed when comparing interest rates, yields, and other small ratios.",
     "ref": "#/$defs/PositiveF64Wire",
     "resolvedRef": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/PositiveF64Wire"
   },

@@ -34,10 +34,10 @@ pub(crate) const VARIANCE_TOLERANCE: f64 = 1e-12;
 /// Normal-tail multipliers at `confidence`: the quantile `z = Φ⁻¹(c)` and the
 /// expected-shortfall multiplier `φ(z) / (1 − c)`.
 pub(crate) fn tail_multipliers(confidence: f64) -> (f64, f64) {
-    let z = finstack_quant_core::math::standard_normal_inv_cdf(confidence);
+    let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(confidence);
     (
         z,
-        finstack_quant_core::math::norm_pdf(z) / (1.0 - confidence),
+        finstack_quant_core::math::special_functions::norm_pdf(z) / (1.0 - confidence),
     )
 }
 

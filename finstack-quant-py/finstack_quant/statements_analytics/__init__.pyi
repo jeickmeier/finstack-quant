@@ -106,14 +106,13 @@ __all__ = [
     "evaluate_dcf",
     "evaluate_lbo",
     "evaluate_scenario_set",
+    "evaluate_scenario_set_with_market",
     "explain_formula",
-    "explain_formula_text",
     "generate_tornado_entries",
     "goal_seek",
     "peer_stats",
     "percentile_rank",
     "pl_summary_report",
-    "pl_summary_report_text",
     "regression_fair_value",
     "render_check_report_html",
     "render_check_report_text",
@@ -125,7 +124,6 @@ __all__ = [
     "run_variance",
     "scenario_diff",
     "score_relative_value",
-    "validate_scorecard_config",
     "variance_bridge",
     "wacc",
     "z_score",
@@ -1075,26 +1073,6 @@ class CreditScorecardExtension:
         """
         ...
 
-def validate_scorecard_config(config: ScorecardConfig) -> None:
-    """
-    Validate a scorecard configuration without executing it.
-
-    Parameters
-    ----------
-    config : ScorecardConfig
-        Rating scale, metrics, thresholds, and period policy to validate.
-
-    Raises
-    ------
-    ValueError
-        If the scorecard configuration is internally inconsistent.
-
-    Examples
-    --------
-    >>> from finstack_quant.statements_analytics import ScorecardConfig, validate_scorecard_config
-    >>> validate_scorecard_config(ScorecardConfig())
-
-    """
     ...
 
 # Corkscrew (balance-sheet roll-forward) extension
@@ -8188,12 +8166,16 @@ class ScenarioSet:
 
     Parameters
     ----------
-    scenarios : dict[str, dict[str, float | Money | dict[str, float | Money]]]
-        Scenario name to overrides. Each override value is either a model-wide
-        value applied to every forecast period (``{"revenue": 90.0}``) or a
+    scenarios : dict[str, dict[str, float | Money | dict[str, float | Money] | ForecastSpec]]
+        Scenario name to overrides. Each override value is a model-wide value
+        applied to every forecast period (``{"revenue": 90.0}``), a
         ``{period: value}`` dict applied to the named forecast periods only
-        (``{"growth": {"2025Q3": 0.02}}``); per-period values win over a
-        model-wide value for that period.
+        (``{"growth": {"2025Q3": 0.02}}``), or a ``ForecastSpec`` that
+        replaces the node's forecast (``{"revenue": ForecastSpec.growth(0.02)}``):
+        its method and every parameter, such as curves, seeds and
+        volatilities. Per-period values win over a model-wide value for that
+        period, and explicit values win over the forecast. Across a parent
+        chain the child's forecast replaces the parent's for the same node.
     parents : dict[str, str] | None
         Optional scenario name to parent scenario name for inheritance.
 
@@ -8204,9 +8186,12 @@ class ScenarioSet:
 
     Examples
     --------
+    >>> from finstack_quant.statements import ForecastSpec
     >>> from finstack_quant.statements_analytics import ScenarioSet
     >>> ScenarioSet({"base": {}, "down": {"revenue": {"2025Q2": 90.0}}}, parents={"down": "base"}).names
     ['base', 'down']
+    >>> ScenarioSet({"slow": {"revenue": ForecastSpec.growth(0.01)}}).names
+    ['slow']
     """
     def __init__(self, scenarios: Any, parents: Any | None = None) -> None: ...
     @staticmethod
@@ -10167,22 +10152,19 @@ class VarianceReport:
         Export the variance rows as a pandas ``DataFrame``.
 
         Columns: ``period``, ``metric``, ``baseline``, ``comparison``,
-        ``abs_var``, ``pct_var``, ``driver_contribution``. One row per
+        ``abs_var``, ``pct_var``. One row per
         (metric, period) pair, in report order; an empty report still carries
         the full column schema.
 
         ``baseline``, ``comparison`` and ``abs_var`` are in the metric's own
         units; ``pct_var`` is a decimal fraction (``0.1`` = +10%) and is
-        ``NaN`` where the baseline is effectively zero;
-        ``driver_contribution`` is the ``{driver: contribution}`` dict of
-        ``VarianceRow.driver_contribution`` (an object column, empty dict when
-        no drivers were declared). The scenario labels are report metadata
+        ``NaN`` where the baseline is effectively zero. The scenario labels are report metadata
         (``baseline_label`` / ``comparison_label``) and are not repeated per row.
 
         Returns
         -------
         pd.DataFrame
-            Export the variance rows as a pandas ``DataFrame``. Columns: ``period``, ``metric``, ``baseline``, ``comparison``, ``abs_var``, ``pct_var``, ``driver_contribution``. One row per (metric, period) pair, in report order; an empty report still carries the full column schema. ``baseline``, ``comparison`` and ``abs_var`` are in the metric's own units; ``pct_var`` is a decimal fraction (``0.1`` = +10%) and is ``NaN`` where the baseline is effectively zero; ``driver_contribution`` is the ``{driver: contribution}`` dict of ``VarianceRow.driver_contribution`` (an object column, empty dict when no drivers were declared). The scenario labels are report metadata (``baseline_label`` / ``comparison_label``) and are not repeated per row.
+            Export the variance rows as a pandas ``DataFrame``. Columns: ``period``, ``metric``, ``baseline``, ``comparison``, ``abs_var``, ``pct_var``. One row per (metric, period) pair, in report order; an empty report still carries the full column schema. ``baseline``, ``comparison`` and ``abs_var`` are in the metric's own units; ``pct_var`` is a decimal fraction (``0.1`` = +10%) and is ``NaN`` where the baseline is effectively zero. The scenario labels are report metadata (``baseline_label`` / ``comparison_label``) and are not repeated per row.
 
         Raises
         ------
@@ -10277,20 +10259,6 @@ class VarianceRow:
                 -------
                 float | None
                     Percentage variance ``abs_var / baseline`` as a decimal fraction (``0.1`` = +10%). ``None`` when the baseline is effectively zero, where a ratio would be undefined rather than zero; fall back to ``abs_var`` in that case.
-        """
-    @property
-    def driver_contribution(self) -> Any:
-        """
-                Driver attribution ``{driver_node: contribution}`` computed by the
-        variance analyzer, in the driver's own units; empty when the config
-        declared no drivers.
-
-                This property does not raise.
-
-                Returns
-                -------
-                Any
-                    Driver attribution ``{driver_node: contribution}`` computed by the variance analyzer, in the driver's own units; empty when the config declared no drivers.
         """
 
 class WeightedEclResult:
@@ -10714,7 +10682,6 @@ def dcf_sensitivity(
     ufcf_node: str = "ufcf",
     net_debt_override: float | None = None,
     options: Mapping[str, Any] | str | None = None,
-    market: Any | None = None,
 ) -> DcfSensitivityResult:
     """Rank the headline DCF assumptions by enterprise-value impact.
 
@@ -10752,11 +10719,9 @@ def dcf_sensitivity(
         ``{"relative": 0.10}``), ``mid_year_convention`` (``False``),
         ``exit_multiple_metric_node`` (statement monetary flow node supplying
         the complete trailing-year terminal metric), ``equity_bridge``,
-        ``shares_outstanding``, ``valuation_discounts`` and
-        ``discount_curve_id``. Typed ``EquityBridge`` / ``ValuationDiscounts``
-        values may sit in place of their dicts. ``None`` uses every default.
-    market : MarketContext | str | None
-        Market context for statement evaluation (not WACC discounting).
+        ``shares_outstanding`` and ``valuation_discounts``. Typed
+        ``EquityBridge`` / ``ValuationDiscounts`` values may sit in place of
+        their dicts. ``None`` uses every default.
 
     Returns
     -------
@@ -10834,8 +10799,7 @@ def evaluate_dcf(
         ``exit_multiple_metric_node`` (statement monetary flow node whose
         complete trailing-year sum replaces ``terminal_metric`` on an
         exit-multiple terminal; actual period boundaries must cover one
-        complete contiguous calendar year), ``discount_curve_id`` and the
-        sensitivity knobs. ``None`` uses every default.
+        complete contiguous calendar year) and the sensitivity knobs. ``None`` uses every default.
     market : MarketContext | str | None
         Market context used for statement evaluation (capital-structure curve
         lookups); DCF discounting stays WACC-only. Requires ``as_of``.
@@ -10944,6 +10908,11 @@ def evaluate_lbo(model: Any, config: Mapping[str, Any] | str) -> LboResult:
 def evaluate_scenario_set(model: Any, scenario_set: Any) -> ScenarioResults:
     """Evaluate all scenarios in a scenario set.
 
+    Like ``Evaluator.evaluate``, a capital structure is evaluated from an
+    empty market, which serves fixed-rate instruments; use
+    :func:`evaluate_scenario_set_with_market` for instruments that need market
+    data.
+
     Parameters
     ----------
     model : FinancialModelSpec | str
@@ -10960,9 +10929,13 @@ def evaluate_scenario_set(model: Any, scenario_set: Any) -> ScenarioResults:
     ------
     ValueError
         If the set is empty, a parent chain cycles, an override is
-        incompatible with its node, or evaluation fails.
+        incompatible with its node, a forecast override has invalid
+        parameters, or evaluation fails.
     KeyError
-        If an override names a node missing from the model.
+        If an override names a node missing from the model, or a
+        capital-structure instrument needs market data.
+    RuntimeError
+        If capital-structure cashflow generation or the waterfall fails.
 
     Examples
     --------
@@ -10972,6 +10945,62 @@ def evaluate_scenario_set(model: Any, scenario_set: Any) -> ScenarioResults:
     >>> _ = b.periods("2025Q1..Q2", None)
     >>> _ = b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
     >>> results = evaluate_scenario_set(b.build(), ScenarioSet({"base": {}, "down": {"revenue": 90.0}}))
+    >>> results.names
+    ['base', 'down']
+    """
+
+def evaluate_scenario_set_with_market(
+    model: Any, scenario_set: Any, market: MarketContext | str, as_of: Any
+) -> ScenarioResults:
+    """Evaluate all scenarios in a scenario set against a market as of a date.
+
+    Each scenario is evaluated like ``Evaluator.evaluate_with_market``: the
+    capital structure's instruments are priced from ``market`` as of
+    ``as_of`` (floating coupons, swaps, caps), so every result carries
+    ``cs_cashflows``, and explicit actuals not yet available at ``as_of`` are
+    hidden. The market is shared unchanged by every scenario.
+
+    Parameters
+    ----------
+    model : FinancialModelSpec | str
+        A ``FinancialModelSpec`` object or a JSON string.
+    scenario_set : ScenarioSet | str
+        A typed scenario set or its JSON serialization.
+    market : MarketContext | str
+        Curves, fixings and FX the instruments are priced from, typed or its
+        canonical JSON.
+    as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
+        Valuation date for the instruments' cashflows and the cutoff for
+        explicit-value visibility; ISO ``YYYY-MM-DD`` strings are accepted.
+
+    Returns
+    -------
+    ScenarioResults
+        Typed mapping of scenario names to statement results.
+
+    Raises
+    ------
+    ValueError
+        If ``as_of`` is not date-like, the set is empty, a parent chain
+        cycles, an override is incompatible with its node, a forecast
+        override has invalid parameters, or evaluation fails.
+    KeyError
+        If an override names a node missing from the model, or an instrument
+        needs market data ``market`` lacks.
+    RuntimeError
+        If capital-structure cashflow generation or the waterfall fails.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.statements import ModelBuilder
+    >>> from finstack_quant.statements_analytics import ScenarioSet, evaluate_scenario_set_with_market
+    >>> b = ModelBuilder("m")
+    >>> _ = b.periods("2025Q1..Q2", None)
+    >>> _ = b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
+    >>> results = evaluate_scenario_set_with_market(
+    ...     b.build(), ScenarioSet({"base": {}, "down": {"revenue": 90.0}}), MarketContext(), "2025-01-01"
+    ... )
     >>> results.names
     ['base', 'down']
     """
@@ -11015,40 +11044,6 @@ def explain_formula(model: Any, results: Any, node_id: str, period: str) -> Expl
     >>> model = b.build()
     >>> explain_formula(model, Evaluator().evaluate(model), "profit", "2025Q1").final_value
     50.0
-    """
-
-def explain_formula_text(model: Any, results: Any, node_id: str, period: str) -> str:
-    """Get a detailed text explanation for a formula.
-
-    Parameters
-    ----------
-    model : FinancialModelSpec | str
-        A ``FinancialModelSpec`` object or a JSON string.
-    results : StatementResult | str
-        A ``StatementResult`` object or a JSON string.
-    node_id : str
-        Node whose formula to explain.
-    period : str
-        Period string.
-
-    Returns
-    -------
-    str
-        Human-readable multi-line explanation (``explain_formula(...).to_text()``).
-
-    Raises
-    ------
-    KeyError
-        If ``node_id`` is not in the model or has no value at ``period``.
-    ValueError
-        If ``period`` does not parse or a payload is malformed JSON.
-
-    Examples
-    --------
-    >>> from finstack_quant.statements_analytics import explain_formula_text
-    >>> explain_formula_text("{}", "{}", "ebitda", "2025Q1")
-    Traceback (most recent call last):
-    ValueError: ...
     """
 
 def generate_tornado_entries(result: Any, metric_node: str, period: str | None = None) -> list[TornadoEntry]:
@@ -11240,40 +11235,6 @@ def pl_summary_report(results: Any, line_items: list[str], periods: list[str]) -
     >>> _ = b.value("revenue", [("2025Q1", 1.0), ("2025Q2", 2.0)])
     >>> pl_summary_report(Evaluator().evaluate(b.build()), ["revenue"], ["2025Q1"]).periods
     ['2025Q1']
-    """
-
-def pl_summary_report_text(results: Any, line_items: list[str], periods: list[str]) -> str:
-    """Generate a P&L summary report as formatted text.
-
-    Parameters
-    ----------
-    results : StatementResult | str
-        A ``StatementResult`` object or a JSON string.
-    line_items : list[str]
-        Node ids to include as rows.
-    periods : list[str]
-        Period-id strings for columns.
-
-    Returns
-    -------
-    str
-        Formatted P&L summary report text (same as
-        ``pl_summary_report(...).to_text()``).
-
-    Raises
-    ------
-    ValueError
-        If a period does not parse or ``results`` is malformed JSON.
-
-    Examples
-    --------
-    >>> from finstack_quant.statements import ModelBuilder, Evaluator
-    >>> from finstack_quant.statements_analytics import pl_summary_report_text
-    >>> b = ModelBuilder("m")
-    >>> _ = b.periods("2025Q1..Q2", None)
-    >>> _ = b.value("revenue", [("2025Q1", 1.0), ("2025Q2", 2.0)])
-    >>> pl_summary_report_text(Evaluator().evaluate(b.build()), ["revenue"], ["2025Q1"]).startswith("P&L Summary")
-    True
     """
 
 def regression_fair_value(
@@ -11624,7 +11585,7 @@ def run_variance(base: Any, comparison: Any, config: Any) -> VarianceReport:
     Returns
     -------
     VarianceReport
-        Per-metric, per-period rows including ``driver_contribution``.
+        Per-metric, per-period variance rows.
 
     Raises
     ------

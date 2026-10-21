@@ -58,7 +58,7 @@ pub struct ExecutionContext<'a> {
     pub calendar: Option<&'a dyn finstack_quant_core::dates::HolidayCalendar>,
 
     /// Valuation date operations reference.
-    pub as_of: time::Date,
+    pub as_of: finstack_quant_core::dates::Date,
 }
 
 /// Read-only ParCDS delivery settings threaded through effect generation.
@@ -403,7 +403,7 @@ pub struct RollForwardReport {
 ///
 /// # Examples
 /// ```rust
-/// use finstack_quant_scenarios::engine::ApplicationReport;
+/// use finstack_quant_scenarios::ApplicationReport;
 ///
 /// let report = ApplicationReport {
 ///     operations_applied: 3,

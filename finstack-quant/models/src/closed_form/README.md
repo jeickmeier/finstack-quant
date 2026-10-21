@@ -18,7 +18,7 @@ Within the crate, `closed_form` owns the Black-family `d1`/`d2` helpers
 `crate::instruments::common_impl` — `parameters::OptionType` on every
 call/put-selecting entry point, and `helpers::get_unitless_scalar_strict` in
 the Heston parameter validator. From core it uses `math::special_functions`
-(`norm_cdf`, `norm_pdf`), `math::NeumaierAccumulator`,
+(`norm_cdf`, `norm_pdf`), `math::summation::NeumaierAccumulator`,
 `math` special functions and neutral types such as `BarrierType`. Black and
 Bachelier pricing formulas are owned directly by this module.
 

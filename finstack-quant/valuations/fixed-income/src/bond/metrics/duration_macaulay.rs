@@ -3,8 +3,8 @@
 use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::Bond;
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::constants::numerical::ZERO_TOLERANCE;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use std::borrow::Cow;
 

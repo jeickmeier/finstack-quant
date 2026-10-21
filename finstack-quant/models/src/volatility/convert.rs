@@ -6,8 +6,8 @@
 //! explicit validation and deterministic solver behavior.
 
 use crate::closed_form::{bachelier_call, black_call};
-use finstack_quant_core::error::InputError;
-use finstack_quant_core::math::BrentSolver;
+use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::InputError;
 use finstack_quant_core::Result;
 
 /// Volatility quoting convention.

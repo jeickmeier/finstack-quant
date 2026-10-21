@@ -22,9 +22,8 @@ pub(super) struct StagedInstrumentFlow {
     pub class_rank: u32,
     /// Scheduled principal claim, replaced by its paid amount at Amortization.
     pub scheduled_principal: Money,
-    /// Cash coupon moved into the PIK bucket by the PIK toggle this period.
-    /// Tracked so toggle-driven capitalization can be accumulated in
-    /// `CapitalStructureState::cumulative_toggled_pik`.
+    /// Cash coupon moved into the PIK bucket by the PIK toggle this period;
+    /// it capitalizes into the closing balance at period close.
     pub toggled_pik_moved: Money,
 }
 

@@ -405,7 +405,6 @@ impl CorporateAnalysisBuilder {
                     crate::analysis::valuation::corporate::DcfEvalContext {
                         net_debt_override,
                         options: &dcf_options,
-                        market: self.market.as_ref(),
                     },
                     self.as_of,
                 )
@@ -507,7 +506,7 @@ pub struct CorporateAnalysisOptions {
     pub check_suite: Option<CheckSuiteSpec>,
     /// Valuation date (ISO `YYYY-MM-DD`); required when a market context is
     /// supplied.
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")

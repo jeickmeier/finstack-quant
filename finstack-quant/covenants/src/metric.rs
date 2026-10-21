@@ -1,6 +1,6 @@
 //! Covenant operating metric identifiers and metric lookup sources.
 
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 mod metric_id {
@@ -36,7 +36,7 @@ pub trait CovenantMetricSource: Send + Sync {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct HashMapMetricSource {
-    metrics: HashMap<CovenantMetricId, f64>,
+    metrics: FxHashMap<CovenantMetricId, f64>,
 }
 
 impl HashMapMetricSource {

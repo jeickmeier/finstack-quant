@@ -334,8 +334,10 @@ ATTRIBUTION_COLUMNS = [
     "result_invalid",
 ]
 
-# The nine factor columns this fixture deliberately leaves at zero, so the
-# four it does move stand out.
+# The eight factor columns this fixture deliberately leaves at zero, so the
+# four it does move stand out. The residual is checked separately: it is the
+# Decimal identity `total - factors - fx translation` of the EUR position after
+# FX translation, which can carry sub-precision residue.
 _ATTRIBUTION_UNMOVED = [
     "credit_curves_pnl",
     "inflation_curves_pnl",
@@ -345,7 +347,6 @@ _ATTRIBUTION_UNMOVED = [
     "vol_pnl",
     "model_params_pnl",
     "market_scalars_pnl",
-    "residual",
 ]
 
 
@@ -445,6 +446,8 @@ def test_portfolio_attribution_leaves_untouched_factors_at_zero() -> None:
     _, df = _moving_attribution()
     row = df.iloc[0]
     assert {name: float(row[name]) for name in _ATTRIBUTION_UNMOVED} == dict.fromkeys(_ATTRIBUTION_UNMOVED, 0.0)
+    # Nothing is unexplained: the residual is zero to well below a cent.
+    assert abs(float(row["residual"])) < 1e-12
 
 
 def test_portfolio_attribution_of_an_empty_book_is_all_zero() -> None:
@@ -1211,8 +1214,8 @@ def _portfolio_metrics() -> PortfolioMetrics:
     )
 
 
-def test_portfolio_metrics_to_aggregated_dataframe() -> None:
-    df = _portfolio_metrics().to_aggregated_dataframe()
+def test_portfolio_metrics_to_dataframe_is_aggregated_table() -> None:
+    df = _portfolio_metrics().to_dataframe()
 
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["metric_id", "total"]

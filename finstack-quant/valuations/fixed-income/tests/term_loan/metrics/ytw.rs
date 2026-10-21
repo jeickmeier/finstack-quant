@@ -1,6 +1,7 @@
 //! Yield to worst tests.
 
 use finstack_quant_cashflows::builder::CouponType;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -10,8 +11,7 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::{Instrument, InstrumentPricingOverrides};
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_fixed_income::term_loan::{
-    AmortizationSpec, CommitmentFeeBase, DdtlSpec, DrawEvent, LoanCall, LoanCallSchedule,
-    LoanCallType, RateSpec, TermLoan,
+    CommitmentFeeBase, DdtlSpec, DrawEvent, LoanCall, LoanCallSchedule, LoanCallType, TermLoan,
 };
 use time::macros::date;
 
@@ -406,5 +406,128 @@ fn test_ytw_uses_quoted_clean_price_pct_when_present() {
     assert!(
         ytw_quoted > ytw_base,
         "Lower quoted clean price should increase YTW: base={ytw_base}, quoted={ytw_quoted}"
+    );
+}
+
+/// Semi-annual fixed loan maturing on Saturday 2029-12-15, so the final coupon
+/// and redemption settle on Monday 2029-12-17 under `convention`.
+fn weekend_maturity_loan(convention: BusinessDayConvention) -> TermLoan {
+    TermLoan::builder()
+        .id("TL-YTW-WEEKEND-MAT".into())
+        .currency(Currency::USD)
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .issue_date(date!(2025 - 01 - 15))
+        .maturity(date!(2029 - 12 - 15))
+        .rate(RateSpec::Fixed { rate: 0.06 })
+        .frequency(Tenor::semi_annual())
+        .day_count(DayCount::Act360)
+        .business_day_convention(convention)
+        .calendar_id_opt(None)
+        .stub(StubKind::ShortFront)
+        .discount_curve_id(CurveId::from("USD-OIS"))
+        .amortization(AmortizationSpec::None)
+        .coupon_type(CouponType::Cash)
+        .upfront_fee_opt(None)
+        .ddtl_opt(None)
+        .covenants_opt(None)
+        .attributes(Default::default())
+        .build()
+        .expect("valid weekend-maturity loan")
+}
+
+fn yields(loan: &TermLoan, as_of: Date) -> (f64, f64, f64) {
+    let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
+    let result = loan
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Ytm, MetricId::Ytw, MetricId::custom("ytc")],
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
+        )
+        .expect("pricing should succeed");
+    (
+        *result.measures.get("ytm").expect("ytm"),
+        *result.measures.get("ytw").expect("ytw"),
+        *result.measures.get("ytc").expect("ytc"),
+    )
+}
+
+#[test]
+fn test_ytw_equals_ytm_when_weekend_maturity_rolls_final_payment() {
+    let as_of = date!(2025 - 01 - 15);
+    for convention in [
+        BusinessDayConvention::Following,
+        BusinessDayConvention::ModifiedFollowing,
+    ] {
+        let loan = weekend_maturity_loan(convention);
+        let final_date = loan
+            .dated_cashflows(&MarketContext::new(), as_of)
+            .expect("cashflows")
+            .last()
+            .expect("final flow")
+            .0;
+        assert_eq!(
+            final_date,
+            date!(2029 - 12 - 17),
+            "fixture must roll the final payment past the unadjusted maturity"
+        );
+
+        let (ytm, ytw, _) = yields(&loan, as_of);
+        assert!(
+            (ytw - ytm).abs() < 1e-12,
+            "{convention:?}: non-callable YTW must equal YTM: ytw={ytw}, ytm={ytm}"
+        );
+    }
+}
+
+#[test]
+fn test_ytw_maturity_leg_includes_rolled_final_payment_for_callable_loan() {
+    let as_of = date!(2025 - 01 - 15);
+    let noncallable = weekend_maturity_loan(BusinessDayConvention::ModifiedFollowing);
+    let (ytm, _, _) = yields(&noncallable, as_of);
+
+    let mut loan = noncallable;
+    loan.call_schedule = Some(LoanCallSchedule {
+        calls: vec![LoanCall {
+            date: date!(2027 - 06 - 15),
+            price_pct_of_par: 104.0,
+            call_type: LoanCallType::Hard,
+        }],
+    });
+    let (ytm_callable, ytw, ytc) = yields(&loan, as_of);
+
+    // A call well above par makes the maturity leg the worst case, so YTW is
+    // the maturity yield including the rolled final coupon and redemption.
+    assert!(
+        ytc > ytm_callable,
+        "call must not be the worst leg: ytc={ytc}, ytm={ytm_callable}"
+    );
+    assert!(
+        (ytw - ytm_callable).abs() < 1e-12,
+        "callable YTW maturity leg must equal YTM: ytw={ytw}, ytm={ytm_callable}"
+    );
+    assert!(ytm.is_finite() && ytw > 0.0, "ytw={ytw}");
+}
+
+#[test]
+fn test_yt2y_capped_at_weekend_maturity_equals_ytm() {
+    // Two-year horizon lies past maturity, so YT2Y is the hold-to-maturity
+    // yield and must keep the final payment rolled to Monday.
+    let as_of = date!(2028 - 06 - 14);
+    let loan = weekend_maturity_loan(BusinessDayConvention::ModifiedFollowing);
+    let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
+    let result = loan
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Ytm, MetricId::custom("yt2y")],
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
+        )
+        .expect("pricing should succeed");
+    let ytm = *result.measures.get("ytm").expect("ytm");
+    let yt2y = *result.measures.get("yt2y").expect("yt2y");
+    assert!(
+        (yt2y - ytm).abs() < 1e-12,
+        "YT2Y capped at maturity must equal YTM: yt2y={yt2y}, ytm={ytm}"
     );
 }

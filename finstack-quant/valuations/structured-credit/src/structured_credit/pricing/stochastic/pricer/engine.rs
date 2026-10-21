@@ -1,5 +1,6 @@
 //! Stochastic structured-credit scenario waterfall pricing engine.
 
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_models::monte_carlo::estimate::independent_estimator_stats;
 
 use super::config::StochasticPricerConfig;
@@ -11,12 +12,12 @@ use crate::structured_credit::pricing::simulation_engine::{
 use crate::structured_credit::types::{
     StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority,
 };
-use finstack_quant_cashflows::builder::weighted_average_life_from_principal;
+use finstack_quant_cashflows::aggregation::weighted_average_life_from_principal;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::{HashMap, Result};
+use finstack_quant_core::{FxHashMap, Result};
 use finstack_quant_models::correlation::{CopulaSpec, LatentFactorSpec, RecoverySpec};
 use finstack_quant_models::credit::pool::PrepaymentState;
 use finstack_quant_models::credit::pool::{
@@ -450,7 +451,7 @@ impl StochasticPricer {
         // Counterfactual tranche cashflows of the same path with revolver
         // draws accruing at their fair spread; `None` without stochastic
         // revolvers.
-        let mut counterfactual: Option<HashMap<String, TrancheCashflows>> = None;
+        let mut counterfactual: Option<FxHashMap<String, TrancheCashflows>> = None;
         let run = match prepared.instrument_schedules.as_ref() {
             Some(schedules) => {
                 let (rng, negate) = self.instrument_path_rng(path_index, antithetic);
@@ -1418,10 +1419,11 @@ mod tests {
     use super::*;
     use crate::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
     use crate::structured_credit::{
-        AssetPool, DealType, DefaultModelSpec, PoolAsset, RecoveryModelSpec, Tranche,
-        TrancheCashflows, TrancheSeniority, TrancheStructure,
+        AssetPool, DealType, PoolAsset, Tranche, TrancheCashflows, TrancheSeniority,
+        TrancheStructure,
     };
     use finstack_quant_cashflows::builder::RateSpec;
+    use finstack_quant_cashflows::builder::{DefaultModelSpec, RecoveryModelSpec};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DateExt};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -1978,10 +1980,10 @@ mod per_name_copula_tests {
     use super::*;
     use crate::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
     use crate::structured_credit::{
-        AssetPool, DealType, DefaultModelSpec, PoolAsset, RecoveryModelSpec, Tranche,
-        TrancheSeniority, TrancheStructure,
+        AssetPool, DealType, PoolAsset, Tranche, TrancheSeniority, TrancheStructure,
     };
     use finstack_quant_cashflows::builder::RateSpec;
+    use finstack_quant_cashflows::builder::{DefaultModelSpec, RecoveryModelSpec};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::context::MarketContext;

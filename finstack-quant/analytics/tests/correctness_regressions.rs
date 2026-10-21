@@ -1,6 +1,7 @@
 //! Regression tests pinning analytics metric values.
 use finstack_quant_analytics::{CagrDayCount, Performance, ReturnKind};
-use finstack_quant_core::dates::{Date, Month, PeriodKind};
+use finstack_quant_core::dates::{Date, PeriodKind};
+use time::Month;
 
 fn d(year: i32, month: Month, day: u8) -> Date {
     Date::from_calendar_date(year, month, day).expect("valid date")

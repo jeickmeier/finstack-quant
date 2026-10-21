@@ -26,7 +26,7 @@ use time::Month;
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DateExt; // Imports DateExt
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use rust_decimal::Decimal;
 
 // Helper to create date validly
@@ -163,7 +163,7 @@ fn test_all_quote_types_instrument_construction() {
     ];
 
     // Build instruments using current builders to ensure quote compatibility.
-    let mut curve_ids = HashMap::default();
+    let mut curve_ids = FxHashMap::default();
     curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
     curve_ids.insert("forward".to_string(), "USD-LIBOR-3M".to_string());
     curve_ids.insert("credit".to_string(), "NA-HY-Curve".to_string());

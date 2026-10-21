@@ -97,7 +97,7 @@ test('HazardCurve recovery validation is the Rust builder check, in its order', 
     (error) =>
       error.kind === 'validation' &&
       error.message ===
-        'Validation error: recovery_rate must be a decimal fraction in [0, 1], got 1.5'
+        'Validation error: Invalid recovery_rate: must be finite and in [0, 1], got 1.5'
   );
   // Knots are validated before recovery, exactly as in Python.
   assert.throws(

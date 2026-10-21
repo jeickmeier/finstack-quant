@@ -13,10 +13,11 @@ use crate::evaluator::formula::{
     evaluate_non_negative_integer_arg, require_args,
 };
 use crate::evaluator::results::EvalWarning;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::{DayCount, DayCountContext, PeriodId, PeriodKind};
 use finstack_quant_core::expr::{Expr, ExprNode};
 use finstack_quant_core::math::ZERO_TOLERANCE;
-use time::{Date, Duration, Weekday};
+use time::Duration;
 
 /// Offset exactly in calendar periods, independent of the number of stored observations.
 /// Out-of-range dates have no observation and return `None` without a linear walk.
@@ -50,7 +51,8 @@ fn historical_expression_value(
 ) -> Result<f64> {
     match &expr.node {
         ExprNode::Column(name) => Ok(context
-            .get_historical_value(name, &target_period)
+            .history
+            .get_value(name, &target_period)
             .unwrap_or(f64::NAN)),
         ExprNode::CsRef {
             component,
@@ -187,7 +189,7 @@ pub(crate) fn eval_pct_change(
             context.period_id
         );
         if let Some(id) = node_id {
-            context.push_warning(EvalWarning::DivisionByZero {
+            context.warnings.push(EvalWarning::DivisionByZero {
                 node_id: id.to_string(),
                 period: context.period_id,
             });
@@ -259,7 +261,7 @@ pub(crate) fn eval_growth_rate(
             context.period_id
         );
         if let Some(id) = node_id {
-            context.push_warning(EvalWarning::DivisionByZero {
+            context.warnings.push(EvalWarning::DivisionByZero {
                 node_id: id.to_string(),
                 period: context.period_id,
             });
@@ -314,10 +316,7 @@ fn period_observation_date(period: PeriodId, context: &EvaluationContext) -> Opt
         return None;
     }
     match period.kind() {
-        PeriodKind::Daily => Date::from_ordinal_date(period.year(), period.index()).ok(),
-        PeriodKind::Weekly => {
-            Date::from_iso_week_date(period.year(), period.index() as u8, Weekday::Sunday).ok()
-        }
+        PeriodKind::Daily | PeriodKind::Weekly => period.bounds().ok()?.1.previous_day(),
         _ => None,
     }
 }

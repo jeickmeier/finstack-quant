@@ -7,8 +7,8 @@
 //! rebuild interval `k`, scheduled rebuilds cost `O(n + n * window / k)`;
 //! numerical recovery can trigger additional rebuilds.
 
-use crate::dates::Date;
-use finstack_quant_core::math::neumaier_sum;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 
 use super::return_based::invalid_annualization_factor;
@@ -126,13 +126,6 @@ pub struct DatedSeries {
 }
 
 impl DatedSeries {
-    /// An empty series of `metric` (no complete window).
-    #[inline]
-    #[must_use]
-    pub(crate) fn empty(metric: RollingMetric) -> Self {
-        Self::with_capacity(metric, 0)
-    }
-
     /// Allocate an empty series of `metric` with capacity for `cap` points.
     #[inline]
     #[must_use]
@@ -182,7 +175,7 @@ pub(crate) fn rolling_sharpe(
 ) -> DatedSeries {
     let n = returns.len().min(dates.len());
     if n < window || window == 0 {
-        return DatedSeries::empty(RollingMetric::Sharpe);
+        return DatedSeries::with_capacity(RollingMetric::Sharpe, 0);
     }
     if window < 2 || invalid_annualization_factor(true, ann_factor) {
         return nan_series(RollingMetric::Sharpe, dates, window - 1, n - window + 1);
@@ -226,7 +219,7 @@ pub(crate) fn rolling_volatility(
 ) -> DatedSeries {
     let n = returns.len().min(dates.len());
     if n < window || window == 0 {
-        return DatedSeries::empty(RollingMetric::Volatility);
+        return DatedSeries::with_capacity(RollingMetric::Volatility, 0);
     }
     if window < 2 || invalid_annualization_factor(true, ann_factor) {
         return nan_series(RollingMetric::Volatility, dates, window - 1, n - window + 1);
@@ -270,7 +263,7 @@ pub(crate) fn rolling_sortino(
 ) -> DatedSeries {
     let n = returns.len().min(dates.len());
     if n < window || window == 0 {
-        return DatedSeries::empty(RollingMetric::Sortino);
+        return DatedSeries::with_capacity(RollingMetric::Sortino, 0);
     }
     if window < 2 || invalid_annualization_factor(true, ann_factor) || !mar.is_finite() {
         return nan_series(RollingMetric::Sortino, dates, window - 1, n - window + 1);
@@ -304,7 +297,7 @@ fn recompute_log_sum(window: &[f64]) -> NeumaierAccumulator {
 pub(crate) fn rolling_returns(returns: &[f64], dates: &[Date], window: usize) -> DatedSeries {
     let n = returns.len().min(dates.len());
     if n < window || window == 0 {
-        return DatedSeries::empty(RollingMetric::Return);
+        return DatedSeries::with_capacity(RollingMetric::Return, 0);
     }
     let count = n - window + 1;
     let mut values = Vec::with_capacity(count);
@@ -441,8 +434,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::{Duration, Month};
     use crate::risk_metrics::return_based::{sortino, volatility};
+    use time::{Duration, Month};
     fn jan1(year: i32) -> Date {
         Date::from_calendar_date(year, Month::January, 1).expect("valid date")
     }

@@ -40,7 +40,8 @@ use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, DayCount
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
-use finstack_quant_core::math::NeumaierAccumulator;
+use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 use rust_decimal::prelude::ToPrimitive;
 
@@ -165,7 +166,7 @@ fn financing_period_projection(
                         currency,
                         "TRS financing",
                     )?
-                } else if calendar_id == finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID {
+                } else if calendar_id == finstack_quant_core::dates::WEEKENDS_ONLY_ID {
                     &finstack_quant_core::dates::WEEKENDS_ONLY
                 } else {
                     super::overnight::resolve_overnight_fixing_calendar(
@@ -759,6 +760,7 @@ mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
     use rust_decimal::Decimal;
@@ -1364,7 +1366,7 @@ mod tests {
             year_fraction,
             Tenor::quarterly(),
             as_of,
-            finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID,
+            finstack_quant_core::dates::WEEKENDS_ONLY_ID,
             Currency::USD,
         )
         .expect_err("started term period without fixing must fail");
@@ -1382,7 +1384,7 @@ mod tests {
             year_fraction,
             Tenor::quarterly(),
             as_of,
-            finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID,
+            finstack_quant_core::dates::WEEKENDS_ONLY_ID,
             Currency::USD,
         )
         .expect("exact reset fixing");
@@ -1397,7 +1399,7 @@ mod tests {
             year_fraction,
             Tenor::quarterly(),
             as_of,
-            finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID,
+            finstack_quant_core::dates::WEEKENDS_ONLY_ID,
             Currency::USD,
         )
         .expect("future term period projects");

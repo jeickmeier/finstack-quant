@@ -220,7 +220,7 @@ impl PyForecastMethod {
 )]
 #[derive(Clone, PartialEq)]
 pub struct PyForecastSpec {
-    pub(super) inner: finstack_quant_statements::types::ForecastSpec,
+    pub(crate) inner: finstack_quant_statements::types::ForecastSpec,
 }
 
 impl PyForecastSpec {
@@ -960,28 +960,6 @@ impl PyFinancialModelSpec {
 
 #[pymethods]
 impl PyFinancialModelSpec {
-    /// Start a staged model build.
-    ///
-    /// The canonical entry point, mirroring Rust's
-    /// `FinancialModelSpec::builder(id)` and the ``Type.builder()`` form every
-    /// other builder-backed type uses. Constructing
-    /// :class:`~finstack_quant.statements.ModelBuilder` directly is equivalent.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Stable model identifier.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     A fresh builder awaiting ``periods(...)``.
-    #[staticmethod]
-    #[pyo3(text_signature = "(id)")]
-    fn builder(id: &str) -> crate::bindings::statements::builder::PyModelBuilder {
-        crate::bindings::statements::builder::PyModelBuilder::start(id)
-    }
-
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
     ///
     /// Reconstruction goes through the same strict serde round-trip as

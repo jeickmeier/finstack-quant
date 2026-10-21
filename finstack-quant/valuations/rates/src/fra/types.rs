@@ -10,6 +10,7 @@ use finstack_quant_core::dates::{
     adjust, calendar_by_id_strict, BusinessDayConvention, Date, DayCount,
 };
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
@@ -68,21 +69,18 @@ pub struct ForwardRateAgreement {
     pub notional: Money,
     /// Rate fixing date. If `None`, inferred from `start_date - reset_lag_days` business days.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub fixing_date: Option<Date>,
     /// Interest period start date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start_date: Date,
     /// Interest period end date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -157,8 +155,11 @@ impl ForwardRateAgreement {
         validation::validate_date_range_strict(self.start_date, self.maturity, "FRA")?;
 
         validation::validate_money_finite(self.notional, "FRA notional")?;
-        validation::validate_money_gt_with(self.notional, 0.0, |amount| {
-            format!("FRA notional must be positive, got {}", amount)
+        validation::require_with(self.notional.amount() > 0.0, || {
+            format!(
+                "FRA notional must be positive, got {}",
+                self.notional.amount()
+            )
         })?;
 
         if let Some(observed) = self.observed_fixing {
@@ -304,7 +305,11 @@ impl ForwardRateAgreement {
         };
 
         // Warn if forward rate is outside reasonable bounds (likely data error)
-        if validation::rate_outside_range(forward_rate, MIN_REASONABLE_RATE, MAX_REASONABLE_RATE) {
+        if crate::rate_validation::rate_outside_range(
+            forward_rate,
+            MIN_REASONABLE_RATE,
+            MAX_REASONABLE_RATE,
+        ) {
             tracing::warn!(
                 instrument_id = %self.id.as_str(),
                 forward_rate,
@@ -443,7 +448,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
     ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         // Settlement at start of accrual period; if already settled, no flows
         if self.start_date <= as_of {
-            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+            return finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 self.day_count,
                 finstack_quant_cashflows::ScheduleBuildOpts {
@@ -454,7 +459,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
                         ..Default::default()
                     },
                 },
-            ));
+            );
         }
 
         let flows = {
@@ -467,13 +472,13 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
 
         let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
-            finstack_quant_cashflows::primitives::CFKind::Fixed,
+            finstack_quant_core::cashflow::CFKind::Fixed,
             self.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: self.notional()?,
                 ..Default::default()
             },
-        );
+        )?;
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
         ))

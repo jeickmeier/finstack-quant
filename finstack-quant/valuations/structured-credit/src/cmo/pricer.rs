@@ -10,10 +10,11 @@ use super::waterfall::execute_waterfall_with_principal_breakdown;
 use crate::structured_credit::assumptions::embedded_registry;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::Result;
@@ -180,7 +181,7 @@ pub(crate) fn build_reference_tranche_schedule(
         }
     }
 
-    Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+    finstack_quant_cashflows::schedule_from_classified_flows(
         flows,
         DayCount::Thirty360,
         finstack_quant_cashflows::ScheduleBuildOpts {
@@ -195,7 +196,7 @@ pub(crate) fn build_reference_tranche_schedule(
                 maturity: None,
             },
         },
-    ))
+    )
 }
 
 /// Create assumed collateral for CMO valuation.
@@ -272,7 +273,7 @@ pub(crate) fn price_cmo(cmo: &AgencyCmo, market: &MarketContext, as_of: Date) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::dates::DayCountContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;

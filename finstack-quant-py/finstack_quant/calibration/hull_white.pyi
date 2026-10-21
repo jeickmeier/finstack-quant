@@ -515,7 +515,50 @@ class CapFloorCalibrationConfig:
             Solver starting point, or None.
         """
 
-    def __reduce__(self) -> tuple[Any, tuple[float, str, float | None, HullWhiteCalibrationParams | None]]: ...
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            Compact JSON encoding of this configuration.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> CapFloorCalibrationConfig:
+        """
+        Rebuild a configuration from JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON produced by :meth:`to_json`.
+
+        Returns
+        -------
+        CapFloorCalibrationConfig
+            The decoded configuration.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.calibration.hull_white import CapFloorCalibrationConfig
+        >>> cfg = CapFloorCalibrationConfig(1e-4, frequency="quarterly", fixed_kappa=0.05)
+        >>> CapFloorCalibrationConfig.from_json(cfg.to_json()).fit_tolerance == cfg.fit_tolerance
+        True
+        """
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
 
 class PiecewiseSigmaCalibrationConfig:
@@ -629,14 +672,57 @@ class PiecewiseSigmaCalibrationConfig:
             Caplet payment frequency.
         """
 
-    def __reduce__(self) -> tuple[Any, tuple[float, float, float, float, str]]: ...
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            Compact JSON encoding of this configuration.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> PiecewiseSigmaCalibrationConfig:
+        """
+        Rebuild a configuration from JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON produced by :meth:`to_json`.
+
+        Returns
+        -------
+        PiecewiseSigmaCalibrationConfig
+            The decoded configuration.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.calibration.hull_white import PiecewiseSigmaCalibrationConfig
+        >>> cfg = PiecewiseSigmaCalibrationConfig(0.03, 1e-4, 0.05, 1e-4)
+        >>> PiecewiseSigmaCalibrationConfig.from_json(cfg.to_json()).fit_tolerance == cfg.fit_tolerance
+        True
+        """
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
 
 def calibrate_hull_white_to_swaptions(
     discount: DiscountCurve,
     quotes: list[SwaptionQuote],
     fit_tolerance: float,
-    frequency: str = "semi_annual",
+    frequency: str | None = None,
     initial_guess: HullWhiteCalibrationParams | None = None,
 ) -> tuple[HullWhiteCalibrationParams, CalibrationReport]:
     """Fit scalar Hull-White parameters to at-the-money swaption quotes.
@@ -653,9 +739,9 @@ def calibrate_hull_white_to_swaptions(
         quotes use decimal rate volatility (0.0001 is one basis point); Black
         quotes use relative volatility. A poor fit returns a report with
         ``success=False``; callers must inspect it before using the parameters.
-    frequency : str, default "semi_annual"
+    frequency : str | None, default None
         Fixed-leg payment frequency: ``"annual"``, ``"semi_annual"`` or
-        ``"quarterly"``.
+        ``"quarterly"``; None uses the Rust default (``"semi_annual"``).
     initial_guess : HullWhiteCalibrationParams | None, default None
         Solver starting point; Rust defaults when None.
 

@@ -1,17 +1,17 @@
 //! Series, correlation, lookback, and period-aggregation methods on
 //! [`Performance`].
 
-use super::{LookbackReturns, Performance};
+use super::{invalid_return_series, LookbackReturns, Performance};
 use crate::aggregation::{group_period_buckets, period_stats_inner, PeriodStats, PeriodicReturn};
-use crate::dates::{Date, FiscalConfig, PeriodKind};
 use crate::drawdown::{drawdown_details, to_drawdown_series, DrawdownEpisode};
 use crate::lookback;
-use crate::math::linalg::{
+use crate::returns::{comp_sum, comp_total, excess_returns};
+use finstack_quant_core::dates::{Date, FiscalConfig, PeriodKind};
+use finstack_quant_core::math::linalg::{
     nearest_correlation, unflatten_square, validate_correlation_matrix, NearestCorrelationOpts,
 };
-use crate::math::stats::{correlation, mean_var};
-use crate::math::summation::NeumaierAccumulator;
-use crate::returns::{comp_sum, comp_total, excess_returns};
+use finstack_quant_core::math::stats::{correlation, mean_var};
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 
 impl Performance {
     /// Per-period simple returns for each ticker.
@@ -51,7 +51,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
     /// `ticker_idx` is outside the loaded ticker columns.
     ///
     /// # Arguments
@@ -62,7 +62,7 @@ impl Performance {
         &self,
         ticker_idx: usize,
         n: usize,
-    ) -> crate::Result<Vec<DrawdownEpisode>> {
+    ) -> finstack_quant_core::Result<Vec<DrawdownEpisode>> {
         self.ensure_ticker_idx(ticker_idx)?;
         let (dd, dates) = self.active_drawdown_path(ticker_idx);
         Ok(drawdown_details(&dd, dates, n))
@@ -76,23 +76,23 @@ impl Performance {
     /// uses pairwise intersecting spans. Any non-finite off-diagonal or
     /// zero-variance pair is an error (no silent `NaN` display matrix).
     /// The flattened matrix is then checked with
-    /// [`crate::math::linalg::validate_correlation_matrix`]; on failure it
+    /// [`finstack_quant_core::math::linalg::validate_correlation_matrix`]; on failure it
     /// is repaired with Higham's nearest-correlation projection.
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when a pair
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when a pair
     /// is degenerate, an off-diagonal is non-finite, or Higham repair fails.
     ///
     /// # Returns
     ///
     /// `(matrix, repaired)`. `matrix` is `n × n` in [`Self::ticker_names`]
     /// order with a unit diagonal and passes
-    /// [`crate::math::linalg::validate_correlation_matrix`]. `repaired` is
+    /// [`finstack_quant_core::math::linalg::validate_correlation_matrix`]. `repaired` is
     /// `true` when the raw pairwise matrix failed that validation and was
     /// projected to the nearest valid correlation matrix, so a reader can
     /// tell a clean estimate from a repaired one.
-    pub fn correlation_matrix(&self) -> crate::Result<(Vec<Vec<f64>>, bool)> {
+    pub fn correlation_matrix(&self) -> finstack_quant_core::Result<(Vec<Vec<f64>>, bool)> {
         let n = self.ticker_names().len();
         let mut matrix = vec![vec![0.0; n]; n];
         if n == 0 {
@@ -178,7 +178,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
     /// `rf.len()` does not equal the active panel date count.
     ///
     /// # Returns
@@ -189,18 +189,18 @@ impl Performance {
         &self,
         rf: &[f64],
         nperiods: Option<f64>,
-    ) -> crate::Result<Vec<Vec<f64>>> {
+    ) -> finstack_quant_core::Result<Vec<Vec<f64>>> {
         let panel_len = self.active_dates().len();
         if rf.len() != panel_len {
-            return Err(crate::error::InputError::InvalidReturnSeries {
-                ticker: "<rf>".into(),
-                index: rf.len(),
-                reason: format!(
+            return Err(invalid_return_series(
+                "<rf>",
+                rf.len(),
+                format!(
                     "rf.len() = {} does not match active date grid length {}",
                     rf.len(),
                     panel_len
                 ),
-            }
+            )
             .into());
         }
         let nperiods = nperiods.unwrap_or(self.ann());
@@ -272,14 +272,14 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
     /// `ticker_idx` is outside the loaded ticker columns.
     pub fn period_stats(
         &self,
         ticker_idx: usize,
         aggregation_frequency: PeriodKind,
         fiscal_config: Option<FiscalConfig>,
-    ) -> crate::Result<PeriodStats> {
+    ) -> finstack_quant_core::Result<PeriodStats> {
         self.ensure_ticker_idx(ticker_idx)?;
         let grouped = group_period_buckets(
             self.active_dates_for_ticker_unchecked(ticker_idx),
@@ -322,81 +322,72 @@ impl Performance {
     }
 }
 
-fn pair_correlation(lhs: &[f64], rhs: &[f64], i: usize, j: usize) -> crate::Result<f64> {
+fn pair_correlation(
+    lhs: &[f64],
+    rhs: &[f64],
+    i: usize,
+    j: usize,
+) -> finstack_quant_core::Result<f64> {
     if lhs.len() < 2 || rhs.len() < 2 {
-        return Err(crate::error::InputError::InvalidReturnSeries {
-            ticker: format!("<{i},{j}>"),
-            index: lhs.len().min(rhs.len()),
-            reason: format!(
-                "correlation pair ({i}, {j}) has fewer than 2 overlapping observations"
-            ),
-        }
+        return Err(invalid_return_series(
+            format!("<{i},{j}>"),
+            lhs.len().min(rhs.len()),
+            format!("correlation pair ({i}, {j}) has fewer than 2 overlapping observations"),
+        )
         .into());
     }
     let (_, var_l) = mean_var(lhs);
     let (_, var_r) = mean_var(rhs);
     if var_l == 0.0 || var_r == 0.0 {
-        return Err(crate::error::InputError::InvalidReturnSeries {
-            ticker: format!("<{i},{j}>"),
-            index: 0,
-            reason: format!("correlation pair ({i}, {j}) has a zero-variance series"),
-        }
+        return Err(invalid_return_series(
+            format!("<{i},{j}>"),
+            0,
+            format!("correlation pair ({i}, {j}) has a zero-variance series"),
+        )
         .into());
     }
     let corr = correlation(lhs, rhs);
     if !corr.is_finite() {
-        return Err(crate::error::InputError::InvalidReturnSeries {
-            ticker: format!("<{i},{j}>"),
-            index: 0,
-            reason: format!("correlation pair ({i}, {j}) produced a non-finite coefficient"),
-        }
+        return Err(invalid_return_series(
+            format!("<{i},{j}>"),
+            0,
+            format!("correlation pair ({i}, {j}) produced a non-finite coefficient"),
+        )
         .into());
     }
     Ok(corr)
 }
 
-fn flatten_matrix(matrix: &[Vec<f64>]) -> Vec<f64> {
-    matrix.iter().flatten().copied().collect()
-}
-
-fn finalize_correlation_matrix(matrix: Vec<Vec<f64>>) -> crate::Result<(Vec<Vec<f64>>, bool)> {
+fn finalize_correlation_matrix(
+    matrix: Vec<Vec<f64>>,
+) -> finstack_quant_core::Result<(Vec<Vec<f64>>, bool)> {
     let n = matrix.len();
-    let flat = flatten_matrix(&matrix);
+    let flat: Vec<f64> = matrix.iter().flatten().copied().collect();
     if validate_correlation_matrix(&flat, n).is_ok() {
         return Ok((matrix, false));
     }
-    let repaired =
-        nearest_correlation(&flat, n, NearestCorrelationOpts::default()).map_err(|err| {
-            crate::error::InputError::InvalidReturnSeries {
-                ticker: "<correlation>".into(),
-                index: 0,
-                reason: err.to_string(),
-            }
-        })?;
+    let repaired = nearest_correlation(&flat, n, NearestCorrelationOpts::default())
+        .map_err(|err| invalid_return_series("<correlation>", 0, err.to_string()))?;
     if validate_correlation_matrix(&repaired, n).is_err() {
-        return Err(crate::error::InputError::InvalidReturnSeries {
-            ticker: "<correlation>".into(),
-            index: 0,
-            reason: "Higham repair did not produce a valid correlation matrix".into(),
-        }
+        return Err(invalid_return_series(
+            "<correlation>",
+            0,
+            "Higham repair did not produce a valid correlation matrix",
+        )
         .into());
     }
-    let repaired = unflatten_square(&repaired, n).map_err(|err| {
-        crate::error::InputError::InvalidReturnSeries {
-            ticker: "<correlation>".into(),
-            index: 0,
-            reason: err.to_string(),
-        }
-    })?;
+    let repaired = unflatten_square(&repaired, n)
+        .map_err(|err| invalid_return_series("<correlation>", 0, err.to_string()))?;
     Ok((repaired, true))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::{Month, PeriodKind};
-    use crate::math::linalg::validate_correlation_matrix;
     use crate::Performance;
+    use finstack_quant_core::dates::PeriodKind;
+    use finstack_quant_core::math::linalg::validate_correlation_matrix;
+    use time::Month;
 
     fn jan(day: u8) -> Date {
         Date::from_calendar_date(2024, Month::January, day).expect("valid date")

@@ -627,17 +627,6 @@ export type MarketDatum =
        * second axis.
        */
       tenors: number[];
-    }
-  | {
-      /**
-       * Collateral / CSA currency.
-       */
-      csa_currency: valuations.Currency;
-      /**
-       * Trade-leg currency this CSA mapping applies to.
-       */
-      id: valuations.Currency;
-      kind: "collateral";
     };
 /**
  * A stable identifier for a market quote (e.g., "USD-OIS-SWAP-5Y").
@@ -907,9 +896,10 @@ export type CalibrationStep =
       /**
        * Calibration method to use.
        *
-       * Forward curves require [`CalibrationMethod::GlobalSolve`]. Sequential
-       * bootstrap is rejected because contractual off-grid reset intervals
-       * couple adjacent rates through projection discount factors.
+       * Forward curves require [`CalibrationMethod::GlobalSolve`], which is the
+       * default (finite-difference Jacobian). Sequential bootstrap is rejected
+       * because contractual off-grid reset intervals couple adjacent rates
+       * through projection discount factors.
        */
       method?: CalibrationMethod;
       /**
@@ -1163,10 +1153,6 @@ export type CalibrationStep =
        */
       sabr_extrapolation?: SurfaceExtrapolationPolicy;
       /**
-       * SABR parameter interpolation method between expiries/tenors.
-       */
-      sabr_interpolation?: SabrInterpolationMethod;
-      /**
        * Optional floating index identifier used to resolve market swap conventions.
        *
        * Swaption forward/par rate calculations require swap schedule conventions (fixed frequency,
@@ -1233,7 +1219,9 @@ export type CalibrationStep =
        */
       day_count?: valuations.DayCount | null;
       /**
-       * Detachment points (as percentages) for the tranches.
+       * Expected tranche detachment points as decimals in `(0, 1]` (e.g. `0.03`
+       * for 3%), the same unit as `CdsTrancheQuote.detachment`. When non-empty,
+       * every quote must match one point and every point must be quoted.
        */
       detachment_points?: number[];
       /**
@@ -1683,10 +1671,6 @@ export type Seniority = "senior_secured" | "senior" | "subordinated" | "junior";
  */
 export type SurfaceExtrapolationPolicy = "error" | "clamp";
 /**
- * Interpolation method for SABR parameters across the expiry–tenor grid.
- */
-export type SabrInterpolationMethod = "bilinear";
-/**
  * Volatility quoting convention for swaptions.
  */
 export type SwaptionVolConvention =
@@ -1819,10 +1803,6 @@ export type PriorMarketObject =
        * no calendar.
        */
       calendar_id?: string | null;
-      /**
-       * OIS cut-off (business days) the curve was calibrated under, if any.
-       */
-      calibration_ois_cutoff_days?: number | null;
       /**
        * Day count convention for discount time basis
        */
@@ -2524,10 +2504,6 @@ export type CurveState =
        */
       calendar_id?: string | null;
       /**
-       * OIS cut-off (business days) the curve was calibrated under, if any.
-       */
-      calibration_ois_cutoff_days?: number | null;
-      /**
        * Day count convention for discount time basis
        */
       day_count: valuations.DayCount;
@@ -2836,10 +2812,6 @@ export type EnvelopeError =
        */
       missing_id: string;
       /**
-       * Kind of the missing dependency (e.g. `"discount"`, `"surface"`).
-       */
-      missing_kind: string;
-      /**
        * Step identifier.
        */
       step_id: string;
@@ -2963,14 +2935,6 @@ export type EnvelopeError =
        * The named quote set in `plan.quote_sets`.
        */
       quote_set: string;
-      [k: string]: unknown;
-    }
-  | {
-      /**
-       * The datum identifier supplied with conflicting payloads.
-       */
-      id: string;
-      kind: "conflicting_market_datum";
       [k: string]: unknown;
     }
   | {
@@ -3723,9 +3687,10 @@ export type StepParams =
       /**
        * Calibration method to use.
        *
-       * Forward curves require [`CalibrationMethod::GlobalSolve`]. Sequential
-       * bootstrap is rejected because contractual off-grid reset intervals
-       * couple adjacent rates through projection discount factors.
+       * Forward curves require [`CalibrationMethod::GlobalSolve`], which is the
+       * default (finite-difference Jacobian). Sequential bootstrap is rejected
+       * because contractual off-grid reset intervals couple adjacent rates
+       * through projection discount factors.
        */
       method?: CalibrationMethod;
       /**
@@ -3947,10 +3912,6 @@ export type StepParams =
        */
       sabr_extrapolation?: SurfaceExtrapolationPolicy;
       /**
-       * SABR parameter interpolation method between expiries/tenors.
-       */
-      sabr_interpolation?: SabrInterpolationMethod;
-      /**
        * Optional floating index identifier used to resolve market swap conventions.
        *
        * Swaption forward/par rate calculations require swap schedule conventions (fixed frequency,
@@ -4009,7 +3970,9 @@ export type StepParams =
        */
       day_count?: valuations.DayCount | null;
       /**
-       * Detachment points (as percentages) for the tranches.
+       * Expected tranche detachment points as decimals in `(0, 1]` (e.g. `0.03`
+       * for 3%), the same unit as `CdsTrancheQuote.detachment`. When non-empty,
+       * every quote must match one point and every point must be quoted.
        */
       detachment_points?: number[];
       /**
@@ -4506,10 +4469,6 @@ export interface CalibrationConfig {
    */
   validation_mode?: ValidationMode;
   /**
-   * Enable verbose logging of the calibration process.
-   */
-  verbose?: boolean;
-  /**
    * Volatility-surface specific solver configuration (SABR and SVI).
    */
   vol_surface?: VolSurfaceSolveConfig;
@@ -4551,10 +4510,6 @@ export interface DiscountCurveSolveConfig {
    * Minimum required success points in scan before attempting polish.
    */
   min_scan_grid_points?: number;
-  /**
-   * Minimum time threshold for considering a knot at spot (t=0).
-   */
-  min_t_spot?: number;
   /**
    * Number of points in the initial geometric scan grid.
    */
@@ -4775,10 +4730,20 @@ export interface InflationCurveSolveConfig {
 }
 /**
  * Audit metadata and freshness policy for calibration inputs.
+ *
+ * The snapshot age is `as_of_timestamp - snapshot_timestamp`. Both instants
+ * are caller inputs, so validation never reads the wall clock and the same
+ * envelope always validates the same way.
  */
 export interface MarketFreshnessPolicy {
   /**
-   * Maximum permitted snapshot age in seconds.
+   * RFC3339 instant at which freshness is assessed (normally the caller's
+   * clock when it submits the envelope). Required with `snapshot_timestamp`
+   * and `max_age_seconds`.
+   */
+  as_of_timestamp?: string | null;
+  /**
+   * Maximum permitted snapshot age in seconds, measured at `as_of_timestamp`.
    */
   max_age_seconds?: number | null;
   /**
@@ -5695,9 +5660,9 @@ export interface RoundingContext {
 /**
  * Numerical tolerance configuration for floating-point comparisons.
  *
- * Provides configurable epsilon values for zero-checks in rate calculations
- * and generic floating-point comparisons. These defaults are chosen to balance
- * numerical stability with practical precision requirements.
+ * Provides the configurable epsilon for generic floating-point zero-checks.
+ * The default is chosen to balance numerical stability with practical
+ * precision requirements.
  */
 export interface ToleranceConfig {
   /**
@@ -5706,12 +5671,6 @@ export interface ToleranceConfig {
    * Used for general numerical comparisons where higher tolerance is acceptable.
    */
   generic_epsilon?: PositiveF64Wire;
-  /**
-   * Epsilon for rate comparisons (default: 1e-12).
-   *
-   * Used when comparing interest rates, yields, and other small ratios.
-   */
-  rate_epsilon?: PositiveF64Wire;
 }
 /**
  * Complete calibration result with market snapshot and diagnostics.
@@ -5743,12 +5702,6 @@ export interface CalibrationResult {
  * persisted to JSON and reconstructed deterministically.
  */
 export interface MarketContextState {
-  /**
-   * Collateral CSA mappings
-   */
-  collateral: {
-    [k: string]: string;
-  };
   /**
    * Credit index aggregates (references curves by ID)
    */

@@ -1,11 +1,21 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import init, { core, scenarios, valuations } from '../../index.js';
+import init, { attribution, core, scenarios, valuations } from '../../index.js';
 
 await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
 });
+
+// Every attribution method in its AttributionMethod wire form.
+function horizonMethods() {
+  return [
+    ['parallel', 'parallel'],
+    ['waterfall', { waterfall: attribution.defaultWaterfallOrder() }],
+    ['metrics_based', 'metrics_based'],
+    ['taylor', { taylor: {} }],
+  ];
+}
 
 function depositFixture() {
   return {
@@ -45,7 +55,6 @@ function depositFixture() {
           allow_non_monotonic: false,
           min_forward_tenor: 1e-6,
           rate_calibration: null,
-          calibration_ois_cutoff_days: null,
           fx_policy: null,
         },
       ],
@@ -58,7 +67,6 @@ function depositFixture() {
       credit_indices: [],
       fx_delta_vol_surfaces: [],
       vol_cubes: [],
-      collateral: {},
       hierarchy: null,
     }),
   };
@@ -156,8 +164,8 @@ test('horizon facade uses null for undefined returns', () => {
   assert.ok(Object.values(matured.summary.factor_contributions).every((value) => value === null));
 });
 
-for (const method of ['parallel', 'waterfall', 'metrics_based', 'taylor']) {
-  test(`horizon ${method} supports standard fixed-income instruments`, () => {
+for (const [name, method] of horizonMethods()) {
+  test(`horizon ${name} supports standard fixed-income instruments`, () => {
     const { instrument, market } = depositFixture();
     const bond = valuations.instruments.Bond.fixed(
       'HORIZON-BOND',
@@ -261,12 +269,12 @@ test('floating horizons preserve opening-day and crossed fixings for every metho
       JSON.stringify(rolled.market),
       rolled.report.time_roll.new_date
     ).value;
-    for (const method of ['parallel', 'waterfall', 'metrics_based', 'taylor']) {
+    for (const [name, method] of horizonMethods()) {
       const result = scenarios.computeHorizonReturn(instrument, market, origin, spec, method);
       assert.ok(Number.isFinite(Number(result.initial_value.amount)));
       assert.ok(Number.isFinite(Number(result.terminal_value.amount)));
-      assert.deepEqual(result.initial_value, opening, `${issueDate} ${method} opening`);
-      assert.deepEqual(result.terminal_value, closing, `${issueDate} ${method} closing`);
+      assert.deepEqual(result.initial_value, opening, `${issueDate} ${name} opening`);
+      assert.deepEqual(result.terminal_value, closing, `${issueDate} ${name} closing`);
       assert.equal(result.horizon_days, 4);
       assert.ok(Number.isFinite(result.summary.total_return));
       assert.deepEqual(result.scenario_report.warnings, []);
@@ -301,7 +309,6 @@ test('scenario facade returns reusable shocked instrument copies', () => {
     credit_indices: [],
     fx_delta_vol_surfaces: [],
     vol_cubes: [],
-    collateral: {},
     hierarchy: null,
   });
   const op = { kind: 'instrument_price_pct_by_type', instrument_types: ['bond'], pct: -60 };
@@ -355,7 +362,6 @@ const OIS_MARKET = {
       allow_non_monotonic: false,
       min_forward_tenor: 1e-6,
       rate_calibration: null,
-      calibration_ois_cutoff_days: null,
       fx_policy: null,
     },
   ],
@@ -368,7 +374,6 @@ const OIS_MARKET = {
   credit_indices: [],
   fx_delta_vol_surfaces: [],
   vol_cubes: [],
-  collateral: {},
   hierarchy: null,
 };
 const DEPOSIT = {
@@ -542,7 +547,7 @@ test('computeHorizonReturn returns the Rust summary and matches Python', () => {
   assert.deepEqual(explicit.summary, result.summary);
   assert.throws(
     () => scenarios.computeHorizonReturn(DEPOSIT, OIS_MARKET, AS_OF, HOLD_1M_UP_25, 'bogus'),
-    (error) => error.kind === 'validation' && /Unknown attribution method/.test(error.message)
+    (error) => error.kind === 'validation' && /unknown variant `bogus`/.test(error.message)
   );
   assert.throws(
     () =>

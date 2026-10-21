@@ -9,6 +9,7 @@ use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
@@ -307,8 +308,8 @@ pub fn calculate_tranche_z_spread(
 
     // Solve the relative-price objective with a scale-independent tolerance.
     let solver = BrentSolver::new()
-        .tolerance(Z_SPREAD_SOLVER_TOLERANCE)
-        .initial_bracket_size(Some(Z_SPREAD_INITIAL_BRACKET));
+        .with_tolerance(Z_SPREAD_SOLVER_TOLERANCE)
+        .with_initial_bracket_size(Some(Z_SPREAD_INITIAL_BRACKET));
 
     let z_spread = solver.solve(objective, 0.0)?;
 

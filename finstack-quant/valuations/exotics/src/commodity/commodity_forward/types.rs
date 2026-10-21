@@ -5,10 +5,11 @@
 //! with an optional quoted forward override (`quoted_forward`).
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_core::Result;
@@ -123,7 +124,6 @@ pub struct CommodityForward {
     #[builder(default = 1.0)]
     pub multiplier: f64,
     /// Settlement/delivery date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -524,7 +524,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommodityForward {
                     ..Default::default()
                 },
             },
-        );
+        )?;
         Ok(schedule)
     }
 }

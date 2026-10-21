@@ -128,14 +128,10 @@ pub enum InterpStyle {
     PiecewiseQuadraticForward,
 }
 
+// Display / FromStr are the serde names (`rename_all = "snake_case"`).
 impl std::fmt::Display for ExtrapolationPolicy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let label = match self {
-            ExtrapolationPolicy::FlatZero => "flat_zero",
-            ExtrapolationPolicy::FlatForward => "flat_forward",
-            ExtrapolationPolicy::None => "none",
-        };
-        f.write_str(label)
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
     }
 }
 
@@ -143,27 +139,13 @@ impl std::str::FromStr for ExtrapolationPolicy {
     type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "flat_zero" => Ok(Self::FlatZero),
-            "flat_forward" => Ok(Self::FlatForward),
-            "none" => Ok(Self::None),
-            _ => Err(crate::Error::Validation(format!(
-                "unknown extrapolation policy {s:?}"
-            ))),
-        }
+        crate::wire::serde_parse(s)
     }
 }
 
 impl std::fmt::Display for InterpStyle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let label = match self {
-            InterpStyle::Linear => "linear",
-            InterpStyle::LogLinear => "log_linear",
-            InterpStyle::MonotoneConvex => "monotone_convex",
-            InterpStyle::CubicHermite => "cubic_hermite",
-            InterpStyle::PiecewiseQuadraticForward => "piecewise_quadratic_forward",
-        };
-        f.write_str(label)
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
     }
 }
 
@@ -171,16 +153,7 @@ impl std::str::FromStr for InterpStyle {
     type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "linear" => Ok(Self::Linear),
-            "log_linear" => Ok(Self::LogLinear),
-            "monotone_convex" => Ok(Self::MonotoneConvex),
-            "cubic_hermite" => Ok(Self::CubicHermite),
-            "piecewise_quadratic_forward" => Ok(Self::PiecewiseQuadraticForward),
-            _ => Err(crate::Error::Validation(format!(
-                "unknown interpolation style {s:?}"
-            ))),
-        }
+        crate::wire::serde_parse(s)
     }
 }
 

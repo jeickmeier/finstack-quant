@@ -14,7 +14,7 @@
 //! passes `discount` when the caller omits it, which is the Rust default
 //! (`forward: None` projects on the discount curve).
 
-use crate::api::core::market_data::JsDiscountCurve;
+use crate::api::core::market_discount::JsDiscountCurve;
 use crate::api::models::rates::hull_white::JsHullWhiteParams;
 use crate::utils::input::{from_js_json, js_f64, js_opt_string};
 use crate::utils::{to_js_err, to_js_value};

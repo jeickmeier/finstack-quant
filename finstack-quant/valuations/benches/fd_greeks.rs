@@ -111,7 +111,7 @@ fn create_barrier_option() -> BarrierOption {
 
 fn create_asian_option() -> AsianOption {
     // Monthly fixings over the 1y life; all strictly after `as_of`.
-    let fixing_dates: Vec<time::Date> = (1..=12)
+    let fixing_dates: Vec<finstack_quant_core::dates::Date> = (1..=12)
         .map(|m| Date::from_calendar_date(2025, Month::try_from(m).unwrap(), 28).unwrap())
         .collect();
     // Cap MC paths: each FD greek reprices the full simulation, so the

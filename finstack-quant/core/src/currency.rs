@@ -87,8 +87,7 @@
 //! assert_eq!(currency, Currency::USD);
 //!
 //! // To numeric code
-//! let code: u16 = Currency::EUR.into();
-//! assert_eq!(code, 978);
+//! assert_eq!(Currency::EUR.numeric(), 978);
 //!
 //! // Display formatting
 //! assert_eq!(format!("{}", Currency::GBP), "GBP");
@@ -119,48 +118,22 @@ include!("generated/currency_generated.rs");
 ///
 /// This is the only currency-text parser: `FromStr`, `TryFrom<&str>` and
 /// every host binding go through it, so a bad code always reports
-/// [`InputError::UnknownCurrency`](crate::error::InputError::UnknownCurrency)
+/// [`InputError::UnknownCurrency`](crate::InputError::UnknownCurrency)
 /// naming the rejected text.
 fn unknown_currency_code(code: &str) -> crate::Error {
-    crate::error::InputError::UnknownCurrency {
+    crate::InputError::UnknownCurrency {
         code: code.to_string(),
     }
     .into()
 }
 
 impl Currency {
-    /// ISO-4217 decimal precision for this currency (e.g. USD → 2).
-    /// Falls back to 2 decimal places for unknown currency codes.
-    #[inline]
-    pub fn decimals(self) -> u8 {
-        MINOR_UNITS.get(&self.numeric()).copied().unwrap_or(2)
-    }
-
     /// ISO 4217 numeric code as `u16`.
     #[inline]
     pub const fn numeric(self) -> u16 {
         self as u16
     }
 }
-
-impl From<Currency> for u16 {
-    #[inline]
-    fn from(c: Currency) -> u16 {
-        c as u16
-    }
-}
-
-/// Error type for failed currency conversion from numeric code.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TryFromCurrencyError(pub u16);
-
-impl core::fmt::Display for TryFromCurrencyError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "invalid ISO 4217 currency code: {}", self.0)
-    }
-}
-
-impl core::error::Error for TryFromCurrencyError {}
 
 #[cfg(test)]
 mod tests {
@@ -248,7 +221,7 @@ mod tests {
 
     #[test]
     fn test_currency_parse_error_names_code_and_does_not_trim() {
-        use crate::error::{ErrorKind, InputError};
+        use crate::{ErrorKind, InputError};
         for code in [" USD ", "USD\n", "XXX", "é€x"] {
             let err = code.parse::<Currency>().expect_err("rejected code");
             assert_eq!(err.kind(), ErrorKind::Validation);
@@ -320,7 +293,7 @@ mod tests {
 
     #[test]
     fn test_currency_error_display() {
-        use crate::error::{Error, InputError};
+        use crate::{Error, InputError};
         let error: Error = InputError::NegativeValue.into();
         assert_eq!(format!("{}", error), "Values must be non-negative");
     }
@@ -342,8 +315,6 @@ mod tests {
         for &code in &codes {
             let currency =
                 Currency::try_from(code).expect("Currency conversion should succeed in test");
-            let back: u16 = currency.into();
-            assert_eq!(code, back);
             assert_eq!(currency.numeric(), code);
         }
 

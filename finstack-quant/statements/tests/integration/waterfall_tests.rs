@@ -1,6 +1,7 @@
 //! Integration tests for Cash Flow Waterfall & Sweep Mechanics
 
 use finstack_quant_cashflows::builder::CouponType;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, PeriodId, StubKind, Tenor,
@@ -13,9 +14,7 @@ use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::capital_structure::{EcfSweepSpec, WaterfallSpec};
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, FinancialStatementInstrument};
-use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    AmortizationSpec, RateSpec, TermLoan,
-};
+use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use time::Month;
 
 #[test]
@@ -170,7 +169,7 @@ fn test_ecf_sweep_basic() {
 
 mod period_flow_waterfall_integration {
     use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::cashflow::CashFlow;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Period, PeriodId};
@@ -319,23 +318,11 @@ mod period_flow_waterfall_integration {
                 .get("TL-PIK")
                 .copied()
                 .expect("opening balance");
-            let toggled_pik = state
-                .cumulative_toggled_pik
-                .get("TL-PIK")
-                .copied()
-                .unwrap_or_else(|| Money::new(0.0, Currency::USD).expect("valid money fixture"));
 
             let residual = state.residual_schedules.get("TL-PIK");
-            let (breakdown, _, _, warnings) = calculate_period_flows(
-                &instrument,
-                &period,
-                opening,
-                toggled_pik,
-                &market_ctx,
-                issue,
-                residual,
-            )
-            .expect("period flows");
+            let (breakdown, _, _, warnings) =
+                calculate_period_flows(&instrument, &period, opening, &market_ctx, issue, residual)
+                    .expect("period flows");
             assert!(
                 warnings.is_empty(),
                 "PIK compounding must not trigger the scale clamp in quarter {i}, got {warnings:?}"
@@ -468,7 +455,6 @@ mod period_flow_waterfall_integration {
             &instrument,
             &q1,
             Money::new(notional, Currency::USD).expect("valid money fixture"),
-            Money::new(0.0, Currency::USD).expect("valid money fixture"),
             &market_ctx,
             issue,
             residual,
@@ -508,16 +494,9 @@ mod period_flow_waterfall_integration {
         state.advance_period();
         let opening = state.opening_balances["TL-1"];
         let residual = state.residual_schedules.get("TL-1");
-        let (q2_flows, _, _, q2_warnings) = calculate_period_flows(
-            &instrument,
-            &q2,
-            opening,
-            Money::new(0.0, Currency::USD).expect("valid money fixture"),
-            &market_ctx,
-            issue,
-            residual,
-        )
-        .expect("q2 flows");
+        let (q2_flows, _, _, q2_warnings) =
+            calculate_period_flows(&instrument, &q2, opening, &market_ctx, issue, residual)
+                .expect("q2 flows");
         assert!(
             q2_warnings.is_empty(),
             "rebuilt residual must not emit a scale warning, got {q2_warnings:?}"
@@ -567,16 +546,9 @@ mod period_flow_waterfall_integration {
         );
 
         let opening = state.opening_balances["TL-1"];
-        let (breakdown, _, _, warnings) = calculate_period_flows(
-            &instrument,
-            &period,
-            opening,
-            Money::new(0.0, Currency::USD).expect("valid money fixture"),
-            &market_ctx,
-            issue,
-            None,
-        )
-        .expect("period flows");
+        let (breakdown, _, _, warnings) =
+            calculate_period_flows(&instrument, &period, opening, &market_ctx, issue, None)
+                .expect("period flows");
         assert!(warnings.is_empty());
 
         let mut contractual: IndexMap<

@@ -68,7 +68,8 @@ Every module (`mod.rs` or standalone file) must have a module-level doc comment 
 //!
 //! # Examples
 //! ```rust
-//! use finstack_quant_core::math::{BrentSolver, mean, variance};
+//! use finstack_quant_core::math::solver::BrentSolver;
+//! use finstack_quant_core::math::stats::{mean, variance};
 //!
 //! // Root finding with Brent's method
 //! let solver = BrentSolver::new();

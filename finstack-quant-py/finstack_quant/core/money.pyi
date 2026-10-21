@@ -41,15 +41,14 @@ class Money:
     monetary amount with an ISO-4217 currency. Arithmetic is checked: addition
     and subtraction require matching currencies, and invalid/non-finite inputs
     are rejected. ``amount_decimal`` exposes the stored amount losslessly;
-    ``amount`` is its interoperable ``float`` view.
+    ``amount`` is its interoperable ``float`` view. Use :meth:`from_decimal`
+    for an exact ``decimal.Decimal`` amount.
 
     Parameters
     ----------
-    amount : decimal.Decimal | float | int | str
-        Finite monetary amount. ``Decimal`` and decimal strings
-        (``"1234.56"``) are parsed exactly. ``float`` and ``int`` inputs are
-        converted through their finite Python ``float`` value before being
-        stored as Rust ``Decimal``.
+    amount : float | int
+        Finite monetary amount, converted through its Python ``float`` value
+        before being stored as Rust ``Decimal``.
     currency : Currency | str
         ISO-4217 currency (object or alphabetic code string).
     config : FinstackConfig | None
@@ -59,8 +58,9 @@ class Money:
     Raises
     ------
     ValueError
-        If *amount* is non-finite, malformed, or cannot fit an exact 96-bit
-        Decimal with at most 28 fractional digits, or *currency* is invalid.
+        If *amount* is non-finite or *currency* is invalid.
+    TypeError
+        If *amount* is not a ``float`` or ``int``.
 
     Examples
     --------
@@ -70,7 +70,7 @@ class Money:
     'USD 100.00'
     >>> usd_100 * 1.5
     Money(150.0, 'USD')
-    >>> Money("1234567.891", "USD").format_with(group=",")
+    >>> Money(1234567.891, "USD").format_with(group=",")
     'USD 1,234,567.89'
     >>> Money(300.0, "USD") / Money(100.0, "USD")
     3.0
@@ -78,43 +78,41 @@ class Money:
 
     def __init__(
         self,
-        amount: Union[float, int, Decimal, str],
+        amount: Union[float, int],
         currency: Union[Currency, str],
         config: Optional[FinstackConfig] = None,
     ) -> None:
         """
-        Construct from an amount and a currency.
+        Construct from a ``float``/``int`` amount and a currency.
 
         Parameters
         ----------
-        amount : float | int | decimal.Decimal | str
-            Finite monetary amount. ``Decimal`` and ``str`` inputs never pass
-            through ``float`` (no IEEE 754 round-trip) and must be exactly
-            representable as a Rust ``Decimal`` (96-bit mantissa, at most 28
-            fractional digits); more precise input raises ``ValueError``.
-            Whitespace around a ``str`` amount is ignored (Rust
-            ``decimal::parse_decimal``). ``float``/``int`` follow standard
-            IEEE 754 semantics.
+        amount : float | int
+            Finite monetary amount (IEEE 754 ``float`` semantics). Use
+            :meth:`from_decimal` for an exact ``decimal.Decimal`` amount.
         currency : Currency | str
             Currency object or ISO-4217 alphabetic code string
             (case-insensitive, not trimmed).
         config : FinstackConfig | None
             Optional config whose rounding mode and ingest scale are applied
-            to every amount type after exact decimal parsing (``Decimal``/``str``
-            amounts round without going through ``float``).
+            to the amount.
 
         Raises
         ------
         ValueError
-            If *amount* is non-finite, malformed, or needs precision beyond a
-            96-bit Decimal with at most 28 fractional digits, or *currency* is invalid.
+            If *amount* is non-finite or *currency* is invalid.
         TypeError
-            If *amount* is not a number, ``Decimal`` or ``str``.
+            If *amount* is not a ``float`` or ``int``.
         """
         ...
 
     @classmethod
-    def from_decimal(cls, amount: Decimal, currency: Union[Currency, str]) -> Money:
+    def from_decimal(
+        cls,
+        amount: Decimal,
+        currency: Union[Currency, str],
+        config: Optional[FinstackConfig] = None,
+    ) -> Money:
         """
         Construct from a ``decimal.Decimal`` without going through ``float``.
 
@@ -127,14 +125,21 @@ class Money:
         Parameters
         ----------
         amount : decimal.Decimal
-            Decimal monetary amount.
+            Decimal monetary amount (subclasses accepted).
         currency : Currency | str
             Currency object or ISO-4217 code string.
+        config : FinstackConfig | None
+            Optional config whose rounding mode and ingest scale are applied
+            to the exact amount (Rust ``Money::from_decimal_with_config``);
+            the rounding never goes through ``float``.
 
         Raises
         ------
         ValueError
-            If *amount* cannot be parsed or *currency* is invalid.
+            If *amount* is non-finite or not exactly representable as a Rust
+            ``Decimal``, or *currency* is invalid.
+        TypeError
+            If *amount* is not a ``decimal.Decimal``.
 
         Returns
         -------
@@ -147,50 +152,6 @@ class Money:
         >>> from finstack_quant.core.money import Money
         >>> Money.from_decimal(Decimal("1.25"), "USD").format_with()
         'USD 1.25'
-
-        """
-        ...
-
-    @classmethod
-    def from_decimal_str(cls, amount: str, currency: Union[Currency, str]) -> Money:
-        """
-        Construct from exact decimal text, rejecting inexact amounts.
-
-        Unlike JSON deserialization, this
-        entry point never routes the amount through ``float`` or tolerates
-        lossy re-rendering: the text must be exactly representable as a Rust
-        ``Decimal`` (96-bit mantissa, at most 28 fractional digits). For
-        scientific input the mantissa itself must be exact before the
-        exponent is applied. The currency is a tag only; no FX conversion is
-        performed.
-
-        Parameters
-        ----------
-        amount : str
-            Exact decimal amount text in major currency units, in fixed-point
-            (``"1234.56"``) or scientific (``"1.2345e3"``) notation.
-        currency : Currency | str
-            Currency object or ISO-4217 code string.
-
-        Returns
-        -------
-        Money
-            Decimal-backed amount equal to the supplied text exactly.
-
-        Raises
-        ------
-        ValueError
-            If *amount* is malformed, non-finite, requires more precision
-            than ``Decimal`` can hold, or underflows its supported scale;
-            or if *currency* is invalid.
-        TypeError
-            If *amount* or *currency* has an unsupported host type.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.money import Money
-        >>> Money.from_decimal_str("1.245", "USD").amount_decimal
-        Decimal('1.245')
 
         """
         ...
@@ -277,7 +238,7 @@ class Money:
     def format_with(
         self,
         decimals: int | None = None,
-        show_currency: bool = True,
+        show_currency: bool | None = None,
         group: str | None = None,
         rounding: Union[RoundingMode, str, None] = None,
     ) -> str:
@@ -292,8 +253,9 @@ class Money:
         decimals : int | None
             Number of decimal places, inclusive range ``0`` to ``1_000_000``.
             Defaults to the currency's minor units.
-        show_currency : bool
-            Whether to prepend the currency code (default ``True``).
+        show_currency : bool | None
+            Whether to prepend the currency code; ``None`` (the default)
+            selects the Rust default, ``True``.
         group : str | None
             Single-character thousands separator (e.g. ``","``); ``None``
             disables grouping.

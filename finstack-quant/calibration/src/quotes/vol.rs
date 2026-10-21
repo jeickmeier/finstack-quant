@@ -70,7 +70,6 @@ pub enum VolQuote {
         /// Underlying identifier
         underlying: UnderlyingId,
         /// Option expiry
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -88,14 +87,12 @@ pub enum VolQuote {
         /// Unique identifier for the quote.
         id: QuoteId,
         /// Option expiry
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
         )]
         expiry: Date,
         /// Underlying swap maturity date
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -119,7 +116,6 @@ pub enum VolQuote {
         /// Unique identifier for the quote.
         id: QuoteId,
         /// Cap/floor maturity or caplet expiry.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -161,11 +157,13 @@ impl VolQuote {
 
     /// Validate the quote before calibration or bumping.
     pub fn validate(&self) -> Result<()> {
-        use super::validate;
+        use finstack_quant_core::validation::{
+            validate_f64_finite, validate_f64_non_negative, validate_f64_positive,
+        };
         match self {
             Self::OptionVol { strike, vol, .. } => {
-                validate::positive(*strike, "strike")?;
-                validate::non_negative(*vol, "vol")
+                validate_f64_positive(*strike, "strike")?;
+                validate_f64_non_negative(*vol, "vol")
             }
             Self::SwaptionVol {
                 expiry,
@@ -179,12 +177,12 @@ impl VolQuote {
                         "swaption volatility maturity must be after expiry".to_string(),
                     ));
                 }
-                validate::finite(*strike, "strike")?;
-                validate::non_negative(*vol, "vol")
+                validate_f64_finite(*strike, "strike")?;
+                validate_f64_non_negative(*vol, "vol")
             }
             Self::CapFloorVol { strike, vol, .. } => {
-                validate::finite(*strike, "strike")?;
-                validate::non_negative(*vol, "vol")
+                validate_f64_finite(*strike, "strike")?;
+                validate_f64_non_negative(*vol, "vol")
             }
         }
     }

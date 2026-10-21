@@ -16,7 +16,6 @@ pub enum FeeSpec {
     /// Fixed fee paid once on a specified date.
     Fixed {
         /// Payment date of the fixed fee.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -41,7 +40,10 @@ pub enum FeeSpec {
         frequency: Tenor,
         /// Day-count convention used to annualize the fee accrual.
         day_count: DayCount,
-        /// Business-day convention applied to generated fee dates.
+        /// Business-day convention applied to generated fee dates
+        /// (`ModifiedFollowing` when omitted from the wire form, as for
+        /// [`ScheduleParams`](crate::builder::ScheduleParams)).
+        #[serde(default)]
         business_day_convention: BusinessDayConvention,
         /// Holiday calendar identifier used with `business_day_convention`.
         ///
@@ -49,7 +51,7 @@ pub enum FeeSpec {
         calendar_id: String,
         /// Stub-handling rule for irregular first or last fee periods
         /// (`ShortFront` when omitted from the wire form).
-        #[serde(default = "crate::serde_defaults::stub_short_front")]
+        #[serde(default = "crate::builder::specs::schedule::stub_short_front")]
         stub: StubKind,
         /// How the outstanding balance is sampled for fee calculation.
         #[serde(default, skip_serializing_if = "FeeAccrualBasis::is_default")]

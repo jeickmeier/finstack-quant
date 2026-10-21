@@ -58,7 +58,7 @@
 /// # Example
 ///
 /// ```rust
-/// use finstack_quant_core::math::kahan_sum;
+/// use finstack_quant_core::math::summation::kahan_sum;
 ///
 /// // Summing many small values where naive summation loses precision
 /// let values: Vec<f64> = (0..1_000_000).map(|_| 0.1).collect();
@@ -119,7 +119,7 @@ where
 /// # Example
 ///
 /// ```rust
-/// use finstack_quant_core::math::neumaier_sum;
+/// use finstack_quant_core::math::summation::neumaier_sum;
 ///
 /// // Mixed-sign values where naive summation loses precision
 /// let values = [1e16, 1.0, -1e16];
@@ -152,7 +152,7 @@ where
 /// # Example
 ///
 /// ```rust
-/// use finstack_quant_core::math::NeumaierAccumulator;
+/// use finstack_quant_core::math::summation::NeumaierAccumulator;
 ///
 /// let mut acc = NeumaierAccumulator::new();
 /// for x in [1e16, 1.0, -1e16] {

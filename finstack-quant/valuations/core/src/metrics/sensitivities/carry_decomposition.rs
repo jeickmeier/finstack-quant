@@ -27,6 +27,7 @@ use crate::metrics::sensitivities::theta::{
 };
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
 use std::sync::Arc;
 

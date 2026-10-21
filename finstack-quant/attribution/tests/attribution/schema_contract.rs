@@ -268,7 +268,6 @@ fn attribution_schema_validates_non_empty_market_data() {
         "pinned_quotes": []
     });
     market["prices"]["ACME-SPOT"] = json!({"unitless": 101.25});
-    market["collateral"]["ACME-CSA"] = json!("USD-OIS");
 
     validate_fixture(&schema, &fixture);
 }

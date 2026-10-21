@@ -239,13 +239,8 @@ pub(crate) fn hazard_with_deal_quote_override(
         Pillar::Date(deal_override.contract_end),
         deal_override.spread_bp,
     );
-    let build_ctx = crate::build::BuildCtx::new(
-        hazard.base_date(),
-        1.0,
-        finstack_quant_core::HashMap::default(),
-    );
     let contractual_pillar =
-        crate::build::cds::resolve_cds_quote_dates(&deal_quote, &build_ctx)?.maturity;
+        crate::build::cds::cds_pillar_maturity(hazard.base_date(), deal_quote.pillar())?;
     let contractual_time = hazard.day_count().year_fraction(
         hazard.base_date(),
         contractual_pillar,
@@ -355,14 +350,17 @@ fn replay_once(
                     || bump_for_pillar(input.pillar_time, spread_bump),
                     |(_, bump_bp)| bump_bp,
                 );
-            MarketQuote::Cds(
-                input
-                    .quote
-                    .with_recovery_rate(request.recovery_rate)
-                    .bump_spread_bp(bump_bp),
-            )
+            let quote = input.quote.with_recovery_rate(request.recovery_rate);
+            // The identity replay feeds the original (possibly upfront)
+            // calibration inputs unbumped; bumped replays use par-spread
+            // `spread_risk_inputs`, the only quotes with a spread to shift.
+            if bump_bp == 0.0 {
+                Ok(MarketQuote::Cds(quote))
+            } else {
+                Ok(MarketQuote::Cds(quote.bump_spread_bp(bump_bp)?))
+            }
         })
-        .collect::<Vec<_>>();
+        .collect::<finstack_quant_core::Result<Vec<_>>>()?;
     let step = StepParams::Hazard(params.clone());
     let (context, report) =
         step_runtime::execute_params_and_apply(&step, &market_quotes, request.context, config)?;
@@ -694,7 +692,7 @@ pub(crate) fn replay_hazard_at_horizon(
         ));
     }
     params.base_date = rolled.base_date();
-    let mut curve_ids = finstack_quant_core::HashMap::default();
+    let mut curve_ids = finstack_quant_core::FxHashMap::default();
     curve_ids.insert("discount".to_string(), params.discount_curve_id.to_string());
     curve_ids.insert("credit".to_string(), params.curve_id.to_string());
     let build_ctx = crate::build::BuildCtx::new(params.base_date, params.notional, curve_ids)

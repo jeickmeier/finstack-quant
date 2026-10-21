@@ -2,9 +2,10 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use finstack_quant_cashflows::builder::CouponType;
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-use finstack_quant_cashflows::primitives::CFKind;
 use finstack_quant_cashflows::CashflowScheduleSource;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::dates::{build_periods, Date, DayCount, StubKind};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -19,7 +20,7 @@ use finstack_quant_statements::prelude::*;
 use finstack_quant_statements::types::FinancialStatementInstrument;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    AmortizationSpec, CommitmentFeeBase, DdtlSpec, DrawEvent, OidPolicy, RateSpec, TermLoan,
+    CommitmentFeeBase, DdtlSpec, DrawEvent, OidPolicy, TermLoan,
 };
 use finstack_quant_valuations::instruments::PayReceive;
 use indexmap::IndexMap;
@@ -99,16 +100,9 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
         }
         let expected_expense = (-net).max(0.0);
         let expected_income = net.max(0.0);
-        let (flows, closing, funding, _) = calculate_period_flows(
-            &swap,
-            &period,
-            swap.notional,
-            Money::from((0_i64, Currency::USD)),
-            &market,
-            as_of,
-            None,
-        )
-        .expect("declared IRS period flows");
+        let (flows, closing, funding, _) =
+            calculate_period_flows(&swap, &period, swap.notional, &market, as_of, None)
+                .expect("declared IRS period flows");
         assert_eq!(closing.amount(), 0.0);
         assert_eq!(funding.amount(), 0.0);
         assert_eq!(flows.debt_balance.amount(), 0.0);
@@ -128,7 +122,6 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
         let (_, closing, funding, _) = calculate_period_flows(
             &swap,
             &period,
-            Money::from((0_i64, Currency::USD)),
             Money::from((0_i64, Currency::USD)),
             &market,
             as_of,
@@ -253,7 +246,6 @@ fn placeholder_rate_option_schedule_is_rejected_explicitly() {
     let error = calculate_period_flows(
         &option,
         &period,
-        Money::from((0_i64, Currency::USD)),
         Money::from((0_i64, Currency::USD)),
         &MarketContext::new(),
         as_of,
@@ -472,6 +464,115 @@ fn loan_issuance_is_funded_once_before_on_and_after_first_period_start() {
 }
 
 #[test]
+fn plain_evaluate_generates_fixed_rate_capital_structure_cashflows() {
+    let q1 = PeriodId::quarter(2025, 1).expect("valid quarter");
+    let q2 = PeriodId::quarter(2025, 2).expect("valid quarter");
+    let mut fixed = loan(date!(2024 - 01 - 01));
+    fixed.rate = RateSpec::Fixed { rate: 0.08 };
+    let mut model = ModelBuilder::new("plain capital structure")
+        .add_debt("TL", FinancialStatementInstrument::TermLoan(fixed))
+        .periods("2025Q1..2025Q2", None)
+        .expect("valid periods")
+        .value(
+            "cash",
+            &[
+                (q1, AmountOrScalar::scalar(10.0)),
+                (q2, AmountOrScalar::scalar(12.0)),
+            ],
+        )
+        .compute("interest", "cs.interest_expense.TL")
+        .expect("valid capital-structure formula")
+        .build()
+        .expect("valid model");
+
+    let plain = Evaluator::new().evaluate(&model).expect("plain evaluation");
+    let empty_market = Evaluator::new()
+        .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 01))
+        .expect("empty-market evaluation");
+
+    let cashflows = plain
+        .cs_cashflows
+        .as_ref()
+        .expect("capital-structure cashflows");
+    assert_eq!(
+        serde_json::to_value(cashflows).expect("serialize"),
+        serde_json::to_value(empty_market.cs_cashflows.as_ref().expect("cashflows"))
+            .expect("serialize"),
+    );
+    for period in [q1, q2] {
+        let interest = plain.get("interest", &period).expect("interest");
+        assert!(interest > 1.9 && interest < 2.1, "{period}: {interest}");
+        assert_eq!(
+            plain.get("interest", &period),
+            empty_market.get("interest", &period)
+        );
+    }
+
+    // Prepared evaluation (sensitivity, goal seek) sees the same capital
+    // structure as plain evaluation.
+    let mut evaluator = Evaluator::new();
+    let plan = evaluator.prepare(&model).expect("prepare");
+    let prepared = evaluator
+        .evaluate_prepared(&model, &plan)
+        .expect("prepared evaluation");
+    assert_eq!(
+        serde_json::to_value(prepared.cs_cashflows.as_ref().expect("prepared cashflows"))
+            .expect("serialize"),
+        serde_json::to_value(cashflows).expect("serialize"),
+    );
+    for period in [q1, q2] {
+        assert_eq!(
+            prepared.get("interest", &period),
+            plain.get("interest", &period)
+        );
+    }
+
+    // No as-of cutoff: an actual is used as given, where evaluating with a
+    // market as of the first period's start would hide it until period end.
+    model.periods[0].is_actual = true;
+    let plain = Evaluator::new().evaluate(&model).expect("plain evaluation");
+    assert_eq!(
+        plain.node_sources["cash"][&q1],
+        finstack_quant_statements::evaluator::CellSource::Value
+    );
+    assert_eq!(plain.get("cash", &q1), Some(10.0));
+    assert!(plain.cs_cashflows.is_some());
+}
+
+#[test]
+fn plain_evaluate_names_instruments_that_need_market_data() {
+    let swap = crate::dsl_all::rates_support::usd_irs_swap(
+        "IRS".into(),
+        Money::from((100_000_i64, Currency::USD)),
+        0.01,
+        date!(2025 - 01 - 01),
+        date!(2027 - 01 - 01),
+        PayReceive::Pay,
+    )
+    .expect("canonical IRS");
+    let q1 = PeriodId::quarter(2025, 1).expect("valid quarter");
+    let model = ModelBuilder::new("floating capital structure")
+        .add_debt("IRS", FinancialStatementInstrument::InterestRateSwap(swap))
+        .periods("2025Q1..2025Q1", None)
+        .expect("valid periods")
+        .value("cash", &[(q1, AmountOrScalar::scalar(10.0))])
+        .build()
+        .expect("valid model");
+
+    let err = Evaluator::new()
+        .evaluate(&model)
+        .expect_err("a swap needs a forward curve");
+    assert_eq!(err.kind(), finstack_quant_core::ErrorKind::NotFound);
+    let message = err.to_string();
+    assert!(message.contains("'IRS'"), "{message}");
+    assert!(message.contains("evaluate_with_market"), "{message}");
+
+    Evaluator::new()
+        .evaluate_with_market(&model, &swap_market(0.03), date!(2025 - 01 - 01))
+        .expect("the swap evaluates against a market");
+}
+
+#[test]
 fn bond_issuance_is_funded_once_before_on_and_after_first_period_start() {
     let q1 = PeriodId::quarter(2025, 1).expect("valid quarter");
     let q2 = PeriodId::quarter(2025, 2).expect("valid quarter");
@@ -571,7 +672,6 @@ fn oid_funding_preserves_loan_face_and_cash_at_boundaries() {
                 &loan,
                 &periods[0],
                 opening,
-                zero,
                 &market,
                 periods[0].start,
                 None,
@@ -759,7 +859,6 @@ fn oid_funding_rejects_cash_currency_different_from_principal() {
         &instrument,
         &period,
         zero,
-        zero,
         &MarketContext::new(),
         period.start,
         None,
@@ -791,7 +890,6 @@ fn schedule_without_funding_books_issuance_once_and_does_not_resurrect_paid_debt
                 &instrument,
                 &periods[0],
                 opening,
-                zero,
                 &market,
                 periods[0].start,
                 None,
@@ -821,7 +919,6 @@ fn schedule_without_funding_books_issuance_once_and_does_not_resurrect_paid_debt
             &instrument,
             &periods[1],
             zero,
-            zero,
             &market,
             periods[0].start,
             None,
@@ -844,7 +941,6 @@ fn implicit_issuance_rejects_negative_principal_and_keeps_zero_at_zero() {
         &no_funding_schedule(-100.0, date!(2025 - 01 - 15)),
         &period,
         zero,
-        zero,
         &market,
         period.start,
         None,
@@ -854,7 +950,6 @@ fn implicit_issuance_rejects_negative_principal_and_keeps_zero_at_zero() {
     let (_, closing, funding, _) = calculate_period_flows(
         &no_funding_schedule(0.0, date!(2025 - 01 - 15)),
         &period,
-        zero,
         zero,
         &market,
         period.start,

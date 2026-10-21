@@ -19,10 +19,10 @@ use finstack_quant_cashflows::builder::{
     FloatingCouponReplayState, FloatingRateObservation, OvernightObservationSchedule,
     OvernightRateConstraints,
 };
-use finstack_quant_cashflows::builder::{CouponType, FloatingCouponSpec, FloatingRateFallback};
-use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
+use finstack_quant_cashflows::builder::{CouponType, FloatingCouponSpec};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::calendar_by_id_strict;
-use finstack_quant_core::dates::{adjust, Date, DateExt, DayCount, DayCountContext, Duration};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::{fixing_series_id, require_fixing_value_exact};
 use finstack_quant_core::market_data::traits::Discounting;
@@ -37,11 +37,11 @@ use finstack_quant_models::trees::two_factor_rates_credit::{
     RatesCreditPathCheckpoint, RatesCreditPathState, RatesCreditTree,
 };
 use finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_mc_paths;
-use finstack_quant_valuations_core::instruments::common_impl::pricing::floating_reset_descriptors::params_from_spec;
 use finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::continuous_frp_weight;
 use rust_decimal::prelude::ToPrimitive;
 use smallvec::SmallVec;
 use std::collections::{BTreeMap, BTreeSet};
+use time::Duration;
 
 mod build;
 mod policy;
@@ -199,7 +199,9 @@ pub(crate) fn price_bond_lsmc(
         || train_seed == make_whole_seed
         || make_whole_seed == pricing_seed
     {
-        return Err(Error::internal("bond hazard LSMC seed domains collided"));
+        return Err(Error::Internal(
+            "bond hazard LSMC seed domains collided".into(),
+        ));
     }
 
     let pricing_estimators = config.paths;
@@ -336,7 +338,7 @@ fn training_boundaries(template: &ReplayTemplate) -> Result<Vec<usize>> {
         .len()
         .checked_sub(1)
         .ok_or_else(|| {
-            Error::internal("bond hazard LSMC requires at least one decision transition")
+            Error::Internal("bond hazard LSMC requires at least one decision transition".into())
         })?;
     let block_len = training_block_len(transitions);
     let mut boundaries = Vec::with_capacity(transitions.div_ceil(block_len) + 1);
@@ -379,21 +381,21 @@ fn build_training_checkpoints(
                 {
                     let prefix_step = step.saturating_sub(template.max_rate_history_steps);
                     let factor = sampled.get(prefix_step).ok_or_else(|| {
-                        Error::internal(
-                            "bond hazard LSMC checkpoint prefix is outside sampled path",
+                        Error::Internal(
+                            "bond hazard LSMC checkpoint prefix is outside sampled path".into(),
                         )
                     })?;
                     checkpoints[boundary_index].push(TrainingCheckpoint {
                         factor: RatesCreditPathCheckpoint::from(factor),
-                        product: cursor.checkpoint(template),
+                        product: cursor.checkpoint(),
                     });
                     boundary_index += 1;
                 }
                 cursor.advance_step(template, bond, &sampled, config, step)?;
             }
             if boundary_index != boundaries.len() {
-                return Err(Error::internal(
-                    "bond hazard LSMC failed to capture every training boundary",
+                return Err(Error::Internal(
+                    "bond hazard LSMC failed to capture every training boundary".into(),
                 ));
             }
         }
@@ -402,8 +404,8 @@ fn build_training_checkpoints(
         .iter()
         .any(|boundary| boundary.len() != simulated_paths)
     {
-        return Err(Error::internal(
-            "bond hazard LSMC checkpoint count does not match physical path count",
+        return Err(Error::Internal(
+            "bond hazard LSMC checkpoint count does not match physical path count".into(),
         ));
     }
     Ok(checkpoints)

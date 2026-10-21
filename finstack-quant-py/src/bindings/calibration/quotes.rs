@@ -18,7 +18,7 @@ use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::core_to_py;
 use finstack_quant_calibration::api::market_datum::{
-    CollateralEntry, DividendScheduleDatum, FxSpotDatum, MarketDatum, PriceDatum,
+    DividendScheduleDatum, FxSpotDatum, MarketDatum, PriceDatum,
 };
 use finstack_quant_calibration::quotes::cds::CdsQuote;
 use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
@@ -1305,70 +1305,6 @@ wire_methods!(
     "DividendScheduleDatum"
 );
 
-/// Collateral (CSA) currency mapping market datum (``kind == "collateral"``).
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.calibration import CollateralEntry
-/// >>> c = CollateralEntry("EUR", "USD")
-/// >>> c.id, c.csa_currency
-/// ('EUR', 'USD')
-#[pyclass(
-    name = "CollateralEntry",
-    module = "finstack_quant.calibration",
-    frozen,
-    skip_from_py_object
-)]
-#[derive(Clone)]
-pub struct PyCollateralEntry {
-    pub(crate) inner: CollateralEntry,
-}
-
-#[pymethods]
-impl PyCollateralEntry {
-    /// Build a collateral mapping entry.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str | Currency
-    ///     Trade-leg currency the CSA mapping applies to (the datum id).
-    /// csa_currency : str | Currency
-    ///     Collateral (CSA) currency.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a currency code is unknown.
-    #[new]
-    #[pyo3(text_signature = "(id, csa_currency)")]
-    fn new(id: &Bound<'_, PyAny>, csa_currency: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self {
-            inner: CollateralEntry {
-                id: extract_currency(id)?,
-                csa_currency: extract_currency(csa_currency)?,
-            },
-        })
-    }
-
-    /// Trade-leg currency code (the datum id).
-    #[getter]
-    fn id(&self) -> String {
-        self.inner.id.to_string()
-    }
-
-    /// Collateral (CSA) currency code.
-    #[getter]
-    fn csa_currency(&self) -> String {
-        self.inner.csa_currency.to_string()
-    }
-
-    fn __repr__(&self) -> String {
-        repr_from_serde("CollateralEntry", &self.inner)
-    }
-}
-
-wire_methods!(PyCollateralEntry, CollateralEntry, "CollateralEntry");
-
 /// Convert one market-data entry (typed quote or datum, or dict) into a `MarketDatum`.
 pub(crate) fn extract_market_datum(
     py: Python<'_>,
@@ -1400,9 +1336,6 @@ pub(crate) fn extract_market_datum(
     }
     if let Ok(datum) = obj.cast::<PyDividendScheduleDatum>() {
         return Ok(MarketDatum::DividendSchedule(datum.borrow().inner.clone()));
-    }
-    if let Ok(datum) = obj.cast::<PyCollateralEntry>() {
-        return Ok(MarketDatum::Collateral(datum.borrow().inner.clone()));
     }
     let value = py_to_json_value(py, obj, "market datum")?;
     from_value(value, "market datum (expected {\"kind\": ..., ...})")

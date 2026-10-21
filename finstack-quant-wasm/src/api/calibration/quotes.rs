@@ -28,7 +28,7 @@ fn js_pillar(value: &JsValue, label: &str) -> Result<Pillar, JsValue> {
     }
 }
 
-fn js_date(value: &JsValue, label: &str) -> Result<time::Date, JsValue> {
+fn js_date(value: &JsValue, label: &str) -> Result<finstack_quant_core::dates::Date, JsValue> {
     parse_iso_date(&js_string(value, label)?)
 }
 

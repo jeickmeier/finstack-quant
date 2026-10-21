@@ -5,7 +5,7 @@
 //! optional contract rate override.
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -75,7 +75,6 @@ pub struct FxForward {
     /// Quote currency (domestic currency, denominator of the pair, PV currency).
     pub quote_currency: Currency,
     /// Maturity/settlement date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -140,7 +139,6 @@ struct FxForwardUnchecked {
     /// Quote currency (domestic currency, denominator of the pair, PV currency).
     quote_currency: Currency,
     /// Maturity/settlement date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -333,7 +331,7 @@ impl FxForward {
         business_day_convention: Option<finstack_quant_core::dates::BusinessDayConvention>,
         end_of_month: bool,
     ) -> finstack_quant_core::Result<Self> {
-        use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date_for_pair};
+        use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date};
         let settlement_days = settlement_days
             .unwrap_or_else(|| Self::standard_settlement_days(base_currency, quote_currency));
         let business_day_convention = business_day_convention
@@ -342,7 +340,7 @@ impl FxForward {
         // CLS-consistent spot roll: a US holiday on an intermediate day does not
         // delay a USD pair's spot date (FX spot convention
         // finding).
-        let spot_date = fx_spot_date_for_pair(
+        let spot_date = fx_spot_date(
             trade_date,
             settlement_days,
             base_currency,
@@ -662,7 +660,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         self.validate()?;
         if crate::shared::event_has_occurred(self.maturity, as_of) {
-            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+            return finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 finstack_quant_core::dates::DayCount::Act365F,
                 finstack_quant_cashflows::ScheduleBuildOpts {
@@ -673,7 +671,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
                         ..Default::default()
                     },
                 },
-            ));
+            );
         }
         let contract_rate = self.contractual_forward_rate(market, as_of)?;
         let base_amount = Money::new(self.notional.amount(), self.base_currency)?;
@@ -698,7 +696,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
                     ..Default::default()
                 },
             },
-        );
+        )?;
         Ok(schedule)
     }
 }

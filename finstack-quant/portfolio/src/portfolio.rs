@@ -11,7 +11,7 @@ use crate::position::Position;
 use crate::types::{Entity, EntityId, PositionId};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -57,7 +57,7 @@ pub struct Portfolio {
     ///
     /// Rebuilt automatically via [`rebuild_index`] when constructing a portfolio
     /// through the builder or `from_spec`.
-    pub(crate) position_index: HashMap<PositionId, usize>,
+    pub(crate) position_index: FxHashMap<PositionId, usize>,
 
     /// Inverted index mapping market factor keys to affected position indices.
     ///
@@ -90,6 +90,7 @@ pub struct Portfolio {
 /// `Arc<dyn Instrument>`).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PortfolioSpec {
     /// Portfolio identifier
     pub id: String,
@@ -119,17 +120,17 @@ pub struct PortfolioSpec {
 }
 
 impl Portfolio {
-    /// Create a [`crate::builder::PortfolioBuilder`] for constructing a portfolio.
+    /// Create a [`crate::PortfolioBuilder`] for constructing a portfolio.
     ///
     /// This is the single canonical entry point for portfolio construction.
-    /// The builder validates invariants on [`crate::builder::PortfolioBuilder::build`].
+    /// The builder validates invariants on [`crate::PortfolioBuilder::build`].
     ///
     /// # Arguments
     ///
     /// * `id` - Stable string identifier used for lookup and serialization of this object
     #[must_use]
-    pub fn builder(id: impl Into<String>) -> crate::builder::PortfolioBuilder {
-        crate::builder::PortfolioBuilder::new(id)
+    pub fn builder(id: impl Into<String>) -> crate::PortfolioBuilder {
+        crate::PortfolioBuilder::new(id)
     }
 
     /// Rebuild both derived caches: the position-ID lookup and the
@@ -137,7 +138,7 @@ impl Portfolio {
     ///
     /// Call this after mutating `positions` directly to keep the O(1) lookup
     /// and the selective-repricing index valid.
-    pub fn rebuild_index(&mut self) {
+    pub(crate) fn rebuild_index(&mut self) {
         self.position_index = self
             .positions
             .iter()
@@ -178,14 +179,14 @@ impl Portfolio {
     /// new row.
     pub fn add_position(&mut self, position: Position) -> Result<()> {
         if self.position_index.contains_key(&position.position_id) {
-            return Err(Error::validation(format!(
+            return Err(Error::invalid_input(format!(
                 "Duplicate position ID: {}",
                 position.position_id
             )));
         }
         if let Some(book_id) = &position.book_id {
             let book = self.books.get_mut(book_id).ok_or_else(|| {
-                Error::validation(format!(
+                Error::invalid_input(format!(
                     "Position '{}' references non-existent book '{}'",
                     position.position_id, book_id
                 ))
@@ -213,28 +214,7 @@ impl Portfolio {
     /// duplicate position IDs or references an unknown book. Book memberships
     /// are rebuilt from the replacement positions. The portfolio is left unchanged on error.
     pub fn set_positions(&mut self, positions: Vec<Position>) -> Result<()> {
-        use finstack_quant_core::HashSet;
-
-        let mut seen_ids = HashSet::default();
-        for position in &positions {
-            if !seen_ids.insert(&position.position_id) {
-                return Err(Error::validation(format!(
-                    "Duplicate position ID: {}",
-                    position.position_id
-                )));
-            }
-        }
-
-        for position in &positions {
-            if let Some(book_id) = &position.book_id {
-                if !self.books.contains_key(book_id) {
-                    return Err(Error::validation(format!(
-                        "Position '{}' references non-existent book '{}'",
-                        position.position_id, book_id
-                    )));
-                }
-            }
-        }
+        check_position_ids_and_books(&positions, &self.books)?;
         for book in self.books.values_mut() {
             book.position_ids.clear();
         }
@@ -292,22 +272,12 @@ impl Portfolio {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::ValidationFailed`] when duplicate position IDs are found,
+    /// Returns [`Error::InvalidInput`] when duplicate position IDs are found,
     /// [`Error::UnknownEntity`] when a position references an entity
     /// that is not present in [`Portfolio::entities`], or when a cycle is detected
     /// in the book hierarchy.
     pub fn validate(&self) -> Result<()> {
-        use finstack_quant_core::HashSet;
-
-        let mut seen_ids: finstack_quant_core::HashSet<_> = HashSet::default();
         for position in &self.positions {
-            if !seen_ids.insert(&position.position_id) {
-                return Err(Error::validation(format!(
-                    "Duplicate position ID: {}",
-                    position.position_id
-                )));
-            }
-
             if !self.entities.contains_key(&position.entity_id) {
                 return Err(Error::UnknownEntity {
                     position_id: position.position_id.clone(),
@@ -315,19 +285,9 @@ impl Portfolio {
                 });
             }
         }
-
-        // Validate book references before hierarchy traversal so missing books
-        // or positions fail directly instead of being treated as empty groups.
-        for position in &self.positions {
-            if let Some(book_id) = &position.book_id {
-                if !self.books.contains_key(book_id) {
-                    return Err(Error::validation(format!(
-                        "Position '{}' references non-existent book '{}'",
-                        position.position_id, book_id
-                    )));
-                }
-            }
-        }
+        // Book references are checked before hierarchy traversal so missing
+        // books or positions fail directly instead of being treated as empty groups.
+        let seen_ids = check_position_ids_and_books(&self.positions, &self.books)?;
         let mut first_issue = None;
         let memberships = crate::book::validate_books(&self.books, &seen_ids, |issue| {
             if first_issue.is_none() {
@@ -335,12 +295,12 @@ impl Portfolio {
             }
         });
         if let Some(message) = first_issue {
-            return Err(Error::validation(message));
+            return Err(Error::invalid_input(message));
         }
         for position in &self.positions {
             let membership = memberships.get(&position.position_id).copied();
             if membership != position.book_id.as_ref() {
-                return Err(Error::validation(format!(
+                return Err(Error::invalid_input(format!(
                     "Position '{}' book_id {:?} disagrees with book membership {:?}",
                     position.position_id, position.book_id, membership
                 )));
@@ -403,7 +363,7 @@ impl Portfolio {
             as_of: spec.as_of,
             entities: spec.entities,
             positions,
-            position_index: HashMap::default(),
+            position_index: FxHashMap::default(),
             dependency_index: DependencyIndex::default(),
             evaluation_state_id: 0,
             books: spec.books,
@@ -417,6 +377,33 @@ impl Portfolio {
 
         Ok(portfolio)
     }
+}
+
+/// Reject duplicate position IDs and positions that name an unknown book.
+///
+/// Returns the set of position IDs for the book-membership checks that follow.
+fn check_position_ids_and_books<'a>(
+    positions: &'a [Position],
+    books: &IndexMap<BookId, Book>,
+) -> Result<finstack_quant_core::FxHashSet<&'a PositionId>> {
+    let mut seen_ids = finstack_quant_core::FxHashSet::default();
+    for position in positions {
+        if !seen_ids.insert(&position.position_id) {
+            return Err(Error::invalid_input(format!(
+                "Duplicate position ID: {}",
+                position.position_id
+            )));
+        }
+        if let Some(book_id) = &position.book_id {
+            if !books.contains_key(book_id) {
+                return Err(Error::invalid_input(format!(
+                    "Position '{}' references non-existent book '{}'",
+                    position.position_id, book_id
+                )));
+            }
+        }
+    }
+    Ok(seen_ids)
 }
 
 #[cfg(test)]

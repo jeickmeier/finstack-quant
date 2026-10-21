@@ -15,7 +15,9 @@ mod replay_tests {
     };
     use finstack_quant_portfolio::types::Entity;
     use finstack_quant_portfolio::Portfolio;
-    use finstack_quant_portfolio::{PortfolioValuationOptions, RequestedMetrics};
+    use finstack_quant_portfolio::{
+        valuation::PortfolioValuationOptions, valuation::RequestedMetrics,
+    };
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
     use finstack_quant_valuations::instruments::{Attributes, Instrument, PricingOptions};
     use finstack_quant_valuations::metrics::MetricId;
@@ -127,7 +129,7 @@ mod replay_tests {
             .unwrap()
     }
 
-    fn market_at_rate(as_of: time::Date, rate_bp: f64) -> MarketContext {
+    fn market_at_rate(as_of: finstack_quant_core::dates::Date, rate_bp: f64) -> MarketContext {
         let rate = rate_bp / 10_000.0;
         let curve = DiscountCurve::builder("USD")
             .base_date(as_of)

@@ -9,14 +9,13 @@ use super::*;
 ///
 /// This struct captures all parameters needed to generate a schedule of dates
 /// for cashflows, coupons, or other periodic events. It can be deserialized
-/// from configuration files and converted to a runtime [`ScheduleBuilder`].
+/// from configuration files and built through
+/// `ScheduleBuilder::from(spec).build()`.
 pub struct ScheduleSpec {
     /// Start date of the schedule.
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub start: Date,
     /// End date (maturity) of the schedule.
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub end: Date,
     /// Payment frequency (e.g., quarterly, monthly).
@@ -48,10 +47,8 @@ pub struct ScheduleSpec {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct ScheduleSpecWire {
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     start: Date,
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     end: Date,
     frequency: Tenor,
@@ -109,7 +106,7 @@ impl ScheduleSpec {
     /// Returns InvalidDateRange if start is after end.
     pub fn new(start: Date, end: Date) -> crate::Result<Self> {
         if start > end {
-            return Err(crate::error::InputError::InvalidDateRange.into());
+            return Err(crate::InputError::InvalidDateRange.into());
         }
         Ok(Self {
             start,
@@ -132,8 +129,8 @@ impl ScheduleSpec {
     ///
     /// Sets `frequency` to quarterly, `stub` to [`StubKind::ShortBack`],
     /// turns `imm_mode` on and `cds_imm_mode` off. As on the builder, a later
-    /// change to `frequency` or `stub` wins: [`build`](Self::build) uses the
-    /// stored values as they are.
+    /// change to `frequency` or `stub` wins: [`ScheduleBuilder::build`] uses
+    /// the stored values as they are.
     ///
     /// # Examples
     /// ```rust
@@ -185,33 +182,5 @@ impl ScheduleSpec {
         self.cds_imm_mode = true;
         self.imm_mode = false;
         self
-    }
-
-    /// Reconstruct a [`Schedule`] using the persisted configuration.
-    ///
-    /// This applies the same scheduling rules as [`ScheduleBuilder`], including
-    /// stub handling, end-of-month logic, standard or CDS IMM mode, and the
-    /// configured error policy. The stored `frequency` and `stub` are used as
-    /// they are in every mode; [`with_imm`](Self::with_imm) and
-    /// [`with_cds_imm`](Self::with_cds_imm) set them to the IMM defaults. Business-day adjustment is enabled only when
-    /// both `business_day_convention` and `calendar_id` are present; either
-    /// value alone leaves dates unadjusted.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if both IMM modes are selected, the date range or
-    /// frequency is invalid, a strict calendar lookup or business-day
-    /// adjustment fails, or schedule generation fails. With
-    /// [`ScheduleErrorPolicy::MissingCalendarWarning`], a missing calendar
-    /// produces an unadjusted schedule carrying a warning. With
-    /// [`ScheduleErrorPolicy::GracefulEmpty`], recoverable builder errors
-    /// instead produce an empty schedule with a graceful-fallback warning;
-    /// mutually exclusive IMM modes always remain errors.
-    pub fn build(&self) -> crate::Result<Schedule> {
-        let mut spec = self.clone();
-        if spec.business_day_convention.is_none() {
-            spec.calendar_id = None;
-        }
-        ScheduleBuilder { spec, cal: None }.build()
     }
 }

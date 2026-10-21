@@ -194,7 +194,7 @@ fn test_default_spec_shapes_drive_monthly_rates() {
 
     sc.credit_model.default_spec = DefaultModelSpec::sda(1.5);
 
-    // Canonical PSA SDA shape (registry `default_models.sda`): CDR peaks at
+    // Canonical PSA SDA shape (`finstack_quant_cashflows::builder::SDA_PEAK_CDR`): CDR peaks at
     // 0.6% in month 30, plateaus through month 60 and declines to 0.03%.
     let sda_peak_month: u32 = 30;
     let sda_peak_cdr: f64 = 0.006;

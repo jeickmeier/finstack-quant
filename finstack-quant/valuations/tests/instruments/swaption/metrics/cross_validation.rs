@@ -77,7 +77,7 @@ fn test_metric_stability_across_maturities() {
 /// Both analytic identities and bumps hold the settlement annuity fixed.
 #[test]
 fn positive_time_greeks_match_frozen_annuity_formulas_and_bumps() {
-    use finstack_quant_core::math::{norm_cdf, norm_pdf};
+    use finstack_quant_core::math::special_functions::{norm_cdf, norm_pdf};
     use finstack_quant_models::closed_form::{
         bachelier_call, bachelier_put, black_call, black_put,
     };

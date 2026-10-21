@@ -1,21 +1,22 @@
 //! Scenario application for portfolios.
 //!
-//! Applies [`ScenarioSpec`](finstack_quant_scenarios::spec::ScenarioSpec) to a
+//! Applies [`ScenarioSpec`](finstack_quant_scenarios::ScenarioSpec) to a
 //! cloned market context and a borrowed-or-owned portfolio state, then
 //! optionally re-values with the stressed data.
 
 use crate::error::{Error, Result};
-use crate::portfolio::Portfolio;
 use crate::types::PositionId;
-use crate::{evaluation::PositionInvalidation, MarketFactorKey};
+use crate::Portfolio;
+use crate::{dependencies::MarketFactorKey, evaluation::PositionInvalidation};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_scenarios::engine::{
+use finstack_quant_core::ErrorKind;
+use finstack_quant_scenarios::{
     ApplicationReport, ExecutionContext, ScenarioChangeManifest, ScenarioEngine,
     ScenarioMarketTarget,
 };
-use finstack_quant_scenarios::spec::{CurveKind, ScenarioSpec};
+use finstack_quant_scenarios::{CurveKind, ScenarioSpec};
 use finstack_quant_valuations::instruments::{Instrument, RatesCurveKind};
 use finstack_quant_valuations::recalibration::RecalibrationProvider;
 use indexmap::IndexMap;
@@ -132,6 +133,9 @@ fn selective_invalidation(
 /// * `portfolio` - Portfolio to borrow or clone according to scenario effects.
 /// * `scenario` - Scenario specification describing desired transformations.
 /// * `market` - Market data context subject to the scenario operations.
+/// * `config` - Library configuration handed to the scenario engine.
+/// * `provider` - Optional recalibration provider for market rebuilds; `None`
+///   uses the engine default.
 ///
 /// # Returns
 ///
@@ -141,33 +145,7 @@ fn selective_invalidation(
 /// # Errors
 ///
 /// Returns [`Error::ScenarioError`] when the scenario engine reports a failure.
-///
-/// # Examples
-///
-/// ```no_run
-/// use finstack_quant_core::market_data::context::MarketContext;
-/// use finstack_quant_portfolio::scenarios::apply_and_revalue;
-/// use finstack_quant_scenarios::spec::ScenarioSpec;
-///
-/// # fn main() -> finstack_quant_portfolio::Result<()> {
-/// # let portfolio: finstack_quant_portfolio::Portfolio = unimplemented!("Provide a portfolio");
-/// # let market: MarketContext = unimplemented!("Provide market data");
-/// # let scenario: ScenarioSpec = unimplemented!("Provide a scenario");
-/// let finstack_quant_portfolio::scenarios::ScenarioRevalueView { valuation: _valuation, report } = apply_and_revalue(&portfolio, &scenario, &market, &Default::default())?;
-/// println!("Applied {} effects", report.operations_applied);
-/// # Ok(())
-/// # }
-/// ```
 fn apply_scenario<'a>(
-    portfolio: &'a Portfolio,
-    scenario: &ScenarioSpec,
-    market: &MarketContext,
-    config: &finstack_quant_core::config::FinstackConfig,
-) -> Result<AppliedScenarioState<'a>> {
-    apply_scenario_with_provider(portfolio, scenario, market, config, None)
-}
-
-fn apply_scenario_with_provider<'a>(
     portfolio: &'a Portfolio,
     scenario: &ScenarioSpec,
     market: &MarketContext,
@@ -200,15 +178,16 @@ fn apply_scenario_with_provider<'a>(
     };
     let report = engine
         .apply(scenario, &mut ctx)
-        .map_err(|e| Error::ScenarioError(e.to_string()))?;
+        .map_err(|e| Error::scenario(e.kind(), e.to_string()))?;
     let as_of = ctx.as_of;
     drop(ctx);
 
     let portfolio = if scenario.mutates_instruments() {
         let mut portfolio_copy = portfolio.clone();
         let instruments = instruments.ok_or_else(|| {
-            Error::ScenarioError(
-                "scenario classified as instrument-mutating without instrument state".to_string(),
+            Error::scenario(
+                ErrorKind::Validation,
+                "scenario classified as instrument-mutating without instrument state",
             )
         })?;
         replace_portfolio_instruments(&mut portfolio_copy, instruments)?;
@@ -233,7 +212,7 @@ fn replace_portfolio_instruments(
     let position_count = portfolio.positions.len();
     let instrument_count = instruments.len();
     if position_count != instrument_count {
-        return Err(Error::ScenarioError(format!(
+        return Err(Error::scenario(ErrorKind::Validation, format!(
             "MO-16: scenario engine returned {instrument_count} instruments for {position_count} portfolio positions"
         )));
     }
@@ -276,20 +255,20 @@ fn replace_portfolio_instruments(
 /// ```no_run
 /// use finstack_quant_core::config::FinstackConfig;
 /// use finstack_quant_core::market_data::context::MarketContext;
-/// use finstack_quant_portfolio::scenarios::apply_and_revalue;
-/// use finstack_quant_scenarios::spec::ScenarioSpec;
+/// use finstack_quant_portfolio::scenarios::apply_scenario_and_revalue;
+/// use finstack_quant_scenarios::ScenarioSpec;
 ///
 /// # fn main() -> finstack_quant_portfolio::Result<()> {
 /// # let portfolio: finstack_quant_portfolio::Portfolio = unimplemented!("Provide a portfolio");
 /// # let market: MarketContext = unimplemented!("Provide market data");
 /// # let scenario: ScenarioSpec = unimplemented!("Provide a scenario");
 /// let config = FinstackConfig::default();
-/// let finstack_quant_portfolio::scenarios::ScenarioRevalueView { valuation, report: _report } = apply_and_revalue(&portfolio, &scenario, &market, &config)?;
+/// let finstack_quant_portfolio::scenarios::ScenarioRevalueView { valuation, report: _report } = apply_scenario_and_revalue(&portfolio, &scenario, &market, &config)?;
 /// println!("Stressed total: {}", valuation.total_base_currency);
 /// # Ok(())
 /// # }
 /// ```
-pub fn apply_and_revalue(
+pub fn apply_scenario_and_revalue(
     portfolio: &Portfolio,
     scenario: &ScenarioSpec,
     market: &MarketContext,
@@ -300,7 +279,7 @@ pub fn apply_and_revalue(
         market,
         as_of,
         report,
-    } = apply_scenario(portfolio, scenario, market, config)?;
+    } = apply_scenario(portfolio, scenario, market, config, None)?;
     let mut plan = crate::evaluation::PortfolioEvaluationPlan::new(config);
     let market_state = plan.register_owned_market(market, as_of);
     let portfolio_state = match portfolio {
@@ -348,27 +327,8 @@ pub struct ScenarioPnl {
     pub by_position: IndexMap<PositionId, Money>,
 }
 
-/// Scenario-P&L view returned by binding surfaces.
-///
-/// Mirrors [`ScenarioRevalueView`] so callers keep scenario provenance
-/// (which operations were applied, which were skipped) alongside the P&L.
-///
-/// This pre-1.0 API intentionally has no alias under its former
-/// persistence-implying name:
-///
-/// ```compile_fail
-/// use finstack_quant_portfolio::scenarios::ScenarioPnlEnvelope;
-/// ```
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct ScenarioPnlView {
-    /// Scenario-attributable profit and loss.
-    pub pnl: ScenarioPnl,
-    /// Scenario application report.
-    pub report: ApplicationReport,
-}
-
-/// One ordered result from [`scenario_pnl_batch`].
+/// One scenario's P&L with its provenance: the result of [`scenario_pnl`] and
+/// each ordered entry of [`scenario_pnl_batch`].
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ScenarioPnlBatchItem {
@@ -429,7 +389,7 @@ fn diff_valuations(
 /// reports the difference per position and in total. Both legs require the
 /// canonical PV pricing path; a pricing failure aborts rather than switching
 /// either leg independently to `Instrument::value`. Unlike
-/// [`apply_and_revalue`], this function does not compute the standard risk set.
+/// [`apply_scenario_and_revalue`], this function does not compute the standard risk set.
 ///
 /// The arithmetic stays in [`Money`] end to end (Decimal-backed): position
 /// deltas are currency-checked subtractions of the base-currency position
@@ -462,8 +422,9 @@ fn diff_valuations(
 ///
 /// # Returns
 ///
-/// [`Result`] containing the [`ScenarioPnl`] ladder together with the scenario
-/// [`ApplicationReport`], so the P&L is never separated from its provenance.
+/// [`ScenarioPnlBatchItem`] holding the scenario `id`, the [`ScenarioPnl`]
+/// ladder and the scenario [`ApplicationReport`], so the P&L is never
+/// separated from its provenance.
 ///
 /// # Errors
 ///
@@ -478,13 +439,13 @@ fn diff_valuations(
 /// use finstack_quant_core::config::FinstackConfig;
 /// use finstack_quant_core::market_data::context::MarketContext;
 /// use finstack_quant_portfolio::scenarios::scenario_pnl;
-/// use finstack_quant_scenarios::spec::ScenarioSpec;
+/// use finstack_quant_scenarios::ScenarioSpec;
 ///
 /// # fn main() -> finstack_quant_portfolio::Result<()> {
 /// # let portfolio: finstack_quant_portfolio::Portfolio = unimplemented!("Provide a portfolio");
 /// # let market: MarketContext = unimplemented!("Provide market data");
 /// # let scenario: ScenarioSpec = unimplemented!("Provide a scenario");
-/// let finstack_quant_portfolio::scenarios::ScenarioPnlView { pnl, report } = scenario_pnl(&portfolio, &scenario, &market, &FinstackConfig::default())?;
+/// let finstack_quant_portfolio::scenarios::ScenarioPnlBatchItem { pnl, report, .. } = scenario_pnl(&portfolio, &scenario, &market, &FinstackConfig::default())?;
 /// println!("Scenario P&L: {} over {} operations", pnl.total, report.operations_applied);
 /// # Ok(())
 /// # }
@@ -494,16 +455,10 @@ pub fn scenario_pnl(
     scenario: &ScenarioSpec,
     market: &MarketContext,
     config: &finstack_quant_core::config::FinstackConfig,
-) -> Result<ScenarioPnlView> {
-    let mut results =
-        scenario_pnl_batch(portfolio, std::slice::from_ref(scenario), market, config)?;
-    let result = results
+) -> Result<ScenarioPnlBatchItem> {
+    scenario_pnl_batch(portfolio, std::slice::from_ref(scenario), market, config)?
         .pop()
-        .ok_or_else(|| Error::ScenarioError("scenario batch returned no result".to_string()))?;
-    Ok(ScenarioPnlView {
-        pnl: result.pnl,
-        report: result.report,
-    })
+        .ok_or_else(|| Error::scenario(ErrorKind::Validation, "scenario batch returned no result"))
 }
 
 /// Compute ordered P&L results for multiple scenarios while sharing one base valuation.
@@ -556,7 +511,7 @@ pub fn scenario_pnl_batch(
         let mut applied = Vec::with_capacity(wave.len());
         let mut application_error = None;
         for scenario in wave {
-            match apply_scenario_with_provider(
+            match apply_scenario(
                 portfolio,
                 scenario,
                 market,
@@ -639,7 +594,7 @@ mod tests {
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
-    use finstack_quant_scenarios::spec::{CurveKind, OperationSpec};
+    use finstack_quant_scenarios::{CurveKind, OperationSpec};
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
     use finstack_quant_valuations::instruments::{Attributes, Instrument};
     use finstack_quant_valuations::pricer::InstrumentType;
@@ -785,7 +740,7 @@ mod tests {
             .output_scale
             .set_scale(Currency::USD, 4)
             .expect("valid decimal scale");
-        let result = apply_scenario(&portfolio, &scenario, &market, &config);
+        let result = apply_scenario(&portfolio, &scenario, &market, &config, None);
         assert!(result.is_ok());
 
         let applied = result.expect("test should succeed");
@@ -796,18 +751,53 @@ mod tests {
                 .report
                 .meta
                 .as_ref()
-                .and_then(|meta| meta
-                    .rounding
-                    .get_output_scale_by_currency()
-                    .get(&Currency::USD))
-                .copied(),
+                .map(|meta| meta.rounding.output_scale(Currency::USD)),
             Some(4),
             "scenario provenance must use the caller's active configuration"
         );
     }
 
     #[test]
-    fn test_apply_and_revalue() {
+    fn missing_curve_scenario_error_keeps_not_found_kind() {
+        let portfolio = Portfolio::builder("TEST")
+            .base_currency(Currency::USD)
+            .as_of(date!(2024 - 01 - 01))
+            .build()
+            .expect("test should succeed");
+        let scenario = ScenarioSpec {
+            id: "missing_curve".to_string(),
+            name: None,
+            description: None,
+            operations: vec![OperationSpec::CurveParallelBp {
+                curve_kind: CurveKind::Discount,
+                curve_id: "NO-SUCH-CURVE".into(),
+                discount_curve_id: None,
+                bp: 50.0,
+            }],
+            priority: 0,
+            resolution_mode: Default::default(),
+            hazard_bump_mode: Default::default(),
+        };
+
+        let err = apply_scenario(
+            &portfolio,
+            &scenario,
+            &build_test_market(),
+            &FinstackConfig::default(),
+            None,
+        )
+        .err()
+        .expect("a shock on a missing curve must fail");
+        assert!(matches!(err, Error::ScenarioError { .. }), "{err}");
+        assert_eq!(err.kind(), ErrorKind::NotFound, "{err}");
+        assert_eq!(
+            finstack_quant_core::Error::from(err).kind(),
+            ErrorKind::NotFound
+        );
+    }
+
+    #[test]
+    fn test_apply_scenario_and_revalue() {
         let as_of = date!(2024 - 01 - 01);
 
         let deposit = Deposit::builder()
@@ -854,7 +844,7 @@ mod tests {
             hazard_bump_mode: Default::default(),
         };
 
-        let result = apply_and_revalue(&portfolio, &scenario, &market, &config);
+        let result = apply_scenario_and_revalue(&portfolio, &scenario, &market, &config);
         assert!(result.is_ok());
     }
 
@@ -896,7 +886,7 @@ mod tests {
         let err = replace_portfolio_instruments(&mut portfolio, Vec::new())
             .expect_err("MO-16: mismatched scenario result length must fail");
         assert!(
-            matches!(err, Error::ScenarioError(_)),
+            matches!(err, Error::ScenarioError { .. }),
             "unexpected error: {err}"
         );
     }
@@ -957,9 +947,10 @@ mod tests {
         let market = build_test_market();
         let config = FinstackConfig::default();
 
-        let crate::scenarios::ScenarioPnlView {
+        let crate::scenarios::ScenarioPnlBatchItem {
             pnl,
             report: _report,
+            ..
         } = scenario_pnl(&portfolio, &scenario_with(Vec::new()), &market, &config)
             .expect("test should succeed");
 
@@ -1037,7 +1028,7 @@ mod tests {
             bp: 50.0,
         }]);
 
-        let crate::scenarios::ScenarioPnlView { pnl, report } =
+        let crate::scenarios::ScenarioPnlBatchItem { pnl, report, .. } =
             scenario_pnl(&portfolio, &scenario, &market, &config).expect("test should succeed");
 
         assert!(report.operations_applied > 0);

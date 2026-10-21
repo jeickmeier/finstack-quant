@@ -28,6 +28,7 @@ run_sensitivity = _sa.run_sensitivity
 generate_tornado_entries = _sa.generate_tornado_entries
 run_variance = _sa.run_variance
 evaluate_scenario_set = _sa.evaluate_scenario_set
+evaluate_scenario_set_with_market = _sa.evaluate_scenario_set_with_market
 scenario_diff = _sa.scenario_diff
 variance_bridge = _sa.variance_bridge
 backtest_forecast = _sa.backtest_forecast
@@ -37,13 +38,11 @@ dcf_sensitivity = _sa.dcf_sensitivity
 evaluate_lbo = _sa.evaluate_lbo
 wacc = _sa.wacc
 run_corporate_analysis = _sa.run_corporate_analysis
-pl_summary_report_text = _sa.pl_summary_report_text
 credit_assessment_report_text = _sa.credit_assessment_report_text
 credit_assessment = _sa.credit_assessment
 DependencyTracer = _sa.DependencyTracer
 DependencyTree = _sa.DependencyTree
 explain_formula = _sa.explain_formula
-explain_formula_text = _sa.explain_formula_text
 run_checks = _sa.run_checks
 run_three_statement_checks = _sa.run_three_statement_checks
 run_credit_underwriting_checks = _sa.run_credit_underwriting_checks
@@ -69,7 +68,6 @@ ScorecardMetric = _sa.ScorecardMetric
 ScorecardConfig = _sa.ScorecardConfig
 ScorecardReport = _sa.ScorecardReport
 CreditScorecardExtension = _sa.CreditScorecardExtension
-validate_scorecard_config = _sa.validate_scorecard_config
 
 # Corkscrew roll-forwards
 AccountType = _sa.AccountType
@@ -220,14 +218,13 @@ __all__: list[str] = [
     "evaluate_dcf",
     "evaluate_lbo",
     "evaluate_scenario_set",
+    "evaluate_scenario_set_with_market",
     "explain_formula",
-    "explain_formula_text",
     "generate_tornado_entries",
     "goal_seek",
     "peer_stats",
     "percentile_rank",
     "pl_summary_report",
-    "pl_summary_report_text",
     "regression_fair_value",
     "render_check_report_html",
     "render_check_report_text",
@@ -239,7 +236,6 @@ __all__: list[str] = [
     "run_variance",
     "scenario_diff",
     "score_relative_value",
-    "validate_scorecard_config",
     "variance_bridge",
     "wacc",
     "z_score",

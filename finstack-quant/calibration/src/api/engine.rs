@@ -203,11 +203,6 @@ impl ExecuteError {
             },
         }
     }
-
-    /// Serialize the stable error payload as compact wire JSON.
-    pub fn to_json(&self) -> String {
-        self.details().to_json()
-    }
 }
 
 fn core_error_category(error: &finstack_quant_core::Error) -> String {
@@ -501,6 +496,9 @@ fn aggregate_plan_report(
     );
     if let Some(timestamp) = config.market_freshness.snapshot_timestamp.as_ref() {
         report.update_metadata("market_snapshot_timestamp", timestamp);
+    }
+    if let Some(timestamp) = config.market_freshness.as_of_timestamp.as_ref() {
+        report.update_metadata("market_as_of_timestamp", timestamp);
     }
     report.update_metadata("type", "plan_execution");
     report.update_metadata(
@@ -1029,7 +1027,7 @@ mod tests {
         assert_eq!(details.category, "validation");
         assert!(details.cause.contains("missing discount curve"));
         let wire: serde_json::Value =
-            serde_json::from_str(&preflight.to_json()).expect("compact error JSON");
+            serde_json::from_str(&preflight.details().to_json()).expect("compact error JSON");
         assert_eq!(wire["stage"], "preflight");
 
         let solver = ExecuteError::envelope(

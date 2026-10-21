@@ -43,15 +43,13 @@
 //! ModelParameters), set `full_cross_attribution = true` on the
 //! [`crate::AttributionRequest`].
 
-use super::credit_cascade::{
-    build_credit_factor_attribution, note_unplanned_cascade, plan_credit_cascade, CreditCascadeStep,
+use crate::credit_cascade::{
+    build_credit_factor_attribution, plan_credit_cascade, CreditCascadeStep,
 };
-use super::factors::*;
-use super::helpers::*;
-use super::model_params;
-use super::types::*;
-use crate::policy_map::try_map_policy;
+use crate::factors::*;
+use crate::helpers::*;
 use crate::AttributionRequest;
+use crate::{AttributionFactor, AttributionMethod, CrossFactorDetail, PnlAttribution};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -105,11 +103,13 @@ struct FactorSpec {
     label: &'static str,
 }
 
-const fn spec(
-    factor: AttributionFactor,
-    flags: MarketRestoreFlags,
-    label: &'static str,
-) -> FactorSpec {
+/// A factor restoring its own family ([`MarketRestoreFlags::for_factor`]);
+/// model parameters restore nothing from the market.
+const fn spec(factor: AttributionFactor, label: &'static str) -> FactorSpec {
+    let flags = match MarketRestoreFlags::for_factor(&factor) {
+        Some(flags) => flags,
+        None => MarketRestoreFlags::empty(),
+    };
     FactorSpec {
         factor,
         flags,
@@ -117,52 +117,25 @@ const fn spec(
     }
 }
 
-const RATES: FactorSpec = spec(
-    AttributionFactor::RatesCurves,
-    MarketRestoreFlags::RATES,
-    "Rates",
-);
-const DISCOUNT: FactorSpec = spec(
-    AttributionFactor::RatesCurves,
-    MarketRestoreFlags::DISCOUNT,
-    "Discount",
-);
-const FORWARD: FactorSpec = spec(
-    AttributionFactor::RatesCurves,
-    MarketRestoreFlags::FORWARD,
-    "Forward",
-);
-const CREDIT: FactorSpec = spec(
-    AttributionFactor::CreditCurves,
-    MarketRestoreFlags::CREDIT,
-    "Credit",
-);
-const INFLATION: FactorSpec = spec(
-    AttributionFactor::InflationCurves,
-    MarketRestoreFlags::INFLATION,
-    "Inflation",
-);
-const CORRELATIONS: FactorSpec = spec(
-    AttributionFactor::Correlations,
-    MarketRestoreFlags::CORRELATION,
-    "Correlations",
-);
-const FX: FactorSpec = spec(AttributionFactor::Fx, MarketRestoreFlags::FX, "FX");
-const VOL: FactorSpec = spec(
-    AttributionFactor::Volatility,
-    MarketRestoreFlags::VOL,
-    "Vol",
-);
-const SCALARS: FactorSpec = spec(
-    AttributionFactor::MarketScalars,
-    MarketRestoreFlags::SCALARS,
-    "Spot",
-);
-const MODEL_PARAMS: FactorSpec = spec(
-    AttributionFactor::ModelParameters,
-    MarketRestoreFlags::empty(),
-    "ModelParameters",
-);
+const RATES: FactorSpec = spec(AttributionFactor::RatesCurves, "Rates");
+const CREDIT: FactorSpec = spec(AttributionFactor::CreditCurves, "Credit");
+const INFLATION: FactorSpec = spec(AttributionFactor::InflationCurves, "Inflation");
+const CORRELATIONS: FactorSpec = spec(AttributionFactor::Correlations, "Correlations");
+const FX: FactorSpec = spec(AttributionFactor::Fx, "FX");
+const VOL: FactorSpec = spec(AttributionFactor::Volatility, "Vol");
+const SCALARS: FactorSpec = spec(AttributionFactor::MarketScalars, "Spot");
+const MODEL_PARAMS: FactorSpec = spec(AttributionFactor::ModelParameters, "ModelParameters");
+/// Full-cross rates halves: discount and forward curves as factors of their own.
+const DISCOUNT: FactorSpec = FactorSpec {
+    factor: AttributionFactor::RatesCurves,
+    flags: MarketRestoreFlags::DISCOUNT,
+    label: "Discount",
+};
+const FORWARD: FactorSpec = FactorSpec {
+    factor: AttributionFactor::RatesCurves,
+    flags: MarketRestoreFlags::FORWARD,
+    label: "Forward",
+};
 
 /// Default factors, in the order of the module-level algorithm.
 const DEFAULT_FACTORS: [FactorSpec; 8] = [
@@ -393,7 +366,6 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
         credit_factor_detail_options,
         ..
     } = *request;
-    validate_attribution_period(as_of_t0, as_of_t1)?;
     let recalibration_provider = CachedRecalibrationProvider::new();
     let dependencies = instrument.market_dependencies()?;
 
@@ -481,7 +453,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
             note,
         };
         if spec.factor == AttributionFactor::ModelParameters {
-            let (stage, reprice) = match model_params::with_model_params(instrument, &params_t0) {
+            let (stage, reprice) = match instrument_at_t0(instrument, Some(&params_t0)) {
                 Ok(restored) => ("repricing", restored.value(market_t1, as_of_t1)),
                 Err(e) => ("parameter modification", Err(e)),
             };
@@ -542,29 +514,20 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
             continue;
         };
         num_repricings += 1;
+        // Carry is not a restore factor. Discount and forward both land in
+        // rates on the full-cross path, so factor P&L adds into its field.
+        if spec.factor != AttributionFactor::Carry {
+            let field = attribution.factor_pnl_mut(&spec.factor);
+            *field = field.checked_add(pnl)?;
+        }
         match spec.factor {
-            // Discount and forward both land in rates on the full-cross path.
-            AttributionFactor::RatesCurves => {
-                attribution.rates_curves_pnl = attribution.rates_curves_pnl.checked_add(pnl)?;
-            }
-            AttributionFactor::CreditCurves => {
-                attribution.credit_curves_pnl = pnl;
-                val_with_t0_credit = Some(reprice);
-            }
-            AttributionFactor::InflationCurves => attribution.inflation_curves_pnl = pnl,
-            AttributionFactor::Correlations => attribution.correlations_pnl = pnl,
-            AttributionFactor::Fx => {
-                attribution.fx_pnl = pnl;
-                stamp_fx_policy(
-                    &mut attribution,
-                    ccy,
-                    "Combined FX exposure and translation P&L (see parallel.rs for details)",
-                );
-            }
-            AttributionFactor::Volatility => attribution.vol_pnl = pnl,
-            AttributionFactor::MarketScalars => attribution.market_scalars_pnl = pnl,
-            AttributionFactor::ModelParameters => attribution.model_params_pnl = pnl,
-            AttributionFactor::Carry => {}
+            AttributionFactor::CreditCurves => val_with_t0_credit = Some(reprice),
+            AttributionFactor::Fx => stamp_fx_policy(
+                &mut attribution,
+                ccy,
+                "Combined FX exposure and translation P&L (see parallel.rs for details)",
+            ),
+            _ => {}
         }
         active.push((spec, reprice));
     }
@@ -640,61 +603,63 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
     // telescope closes to `credit_curves_pnl` without any residual back-solve,
     // so cross-bp convexity never leaks into `curve_shape_pnl`.
     if let Some(model) = credit_factor_model {
-        match plan_credit_cascade(model, instrument, market_t0, market_t1)? {
-            Some(cascade) => {
-                // T1 market with T0 hazard for the issuer's curves.
-                let market_t0_credit = MarketSnapshot::restore_market(
-                    market_t1,
-                    &credit_snapshot,
-                    MarketRestoreFlags::CREDIT,
-                );
+        if let Some(cascade) = plan_credit_cascade(
+            model,
+            instrument,
+            market_t0,
+            market_t1,
+            &mut attribution.meta.notes,
+        )? {
+            // T1 market with T0 hazard for the issuer's curves.
+            let market_t0_credit = MarketSnapshot::restore_market(
+                market_t1,
+                &credit_snapshot,
+                MarketRestoreFlags::HAZARD,
+            );
 
-                // Base value for the cascade: exactly the reference point
-                // `credit_curves_pnl` is measured against. Reuse the credit
-                // factor's reprice when present; otherwise reprice once here.
-                let base_credit_val = match val_with_t0_credit {
-                    Some(v) => v,
-                    None => {
-                        num_repricings += 1;
-                        instrument.value(&market_t0_credit, as_of_t1)?
-                    }
-                };
-
-                // Reprice each step's end-state market. Standalone attribution
-                // can fan these out; portfolio callers pass `Serial` so the
-                // outer position loop owns Rayon.
-                let steps = cascade.steps_with_cumulative_bp();
-                let reprice_step = |(step, cumulative_bp): &(&CreditCascadeStep, f64)| {
-                    let market_step = cascade.step_market(
-                        step,
-                        *cumulative_bp,
-                        market_t0,
-                        &market_t0_credit,
-                        market_t1,
-                        &recalibration_provider,
-                    )?;
-                    instrument.value(&market_step, as_of_t1)
-                };
-                let step_values: Vec<Money> =
-                    try_map_policy(execution_policy, &steps, reprice_step)?;
-                num_repricings += step_values.len();
-
-                // Telescope to per-step P&Ls: V_k − V_{k−1}, V_0 = base_credit_val.
-                let mut step_pnls: Vec<Money> = Vec::with_capacity(cascade.steps.len());
-                let mut prev = base_credit_val;
-                for v in &step_values {
-                    step_pnls.push(compute_pnl(prev, *v, ccy, market_t1, as_of_t1)?);
-                    prev = *v;
+            // Base value for the cascade: exactly the reference point
+            // `credit_curves_pnl` is measured against. Reuse the credit
+            // factor's reprice when present; otherwise reprice once here.
+            let base_credit_val = match val_with_t0_credit {
+                Some(v) => v,
+                None => {
+                    num_repricings += 1;
+                    instrument.value(&market_t0_credit, as_of_t1)?
                 }
+            };
 
-                attribution.credit_factor_detail = Some(build_credit_factor_attribution(
-                    model,
-                    &cascade,
-                    credit_factor_detail_options,
-                    &step_pnls,
-                )?);
+            // Reprice each step's end-state market. Standalone attribution
+            // can fan these out; portfolio callers pass `Serial` so the
+            // outer position loop owns Rayon.
+            let steps = cascade.steps_with_cumulative_bp();
+            let reprice_step = |(step, cumulative_bp): &(&CreditCascadeStep, f64)| {
+                let market_step = cascade.step_market(
+                    step,
+                    *cumulative_bp,
+                    market_t0,
+                    &market_t0_credit,
+                    market_t1,
+                    &recalibration_provider,
+                )?;
+                instrument.value(&market_step, as_of_t1)
+            };
+            let step_values: Vec<Money> = try_map_policy(execution_policy, &steps, reprice_step)?;
+            num_repricings += step_values.len();
+
+            // Telescope to per-step P&Ls: V_k − V_{k−1}, V_0 = base_credit_val.
+            let mut step_pnls: Vec<Money> = Vec::with_capacity(cascade.steps.len());
+            let mut prev = base_credit_val;
+            for v in &step_values {
+                step_pnls.push(compute_pnl(prev, *v, ccy, market_t1, as_of_t1)?);
+                prev = *v;
             }
-            None => note_unplanned_cascade(&mut attribution, instrument.id(), "parallel"),
+
+            attribution.credit_factor_detail = Some(build_credit_factor_attribution(
+                model,
+                &cascade,
+                credit_factor_detail_options,
+                &step_pnls,
+            )?);
         }
     }
 
@@ -729,6 +694,7 @@ mod tests {
     }
 
     use super::*;
+    use crate::ExecutionPolicy;
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
@@ -799,7 +765,9 @@ mod tests {
         }
 
         fn base_value(&self, market: &MarketContext, _as_of: Date) -> Result<Money> {
-            let rate = market.get_discount("USD-OIS")?.zero(1.0);
+            let rate = market
+                .get_discount("USD-OIS")?
+                .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous);
             let hazard = market.get_hazard("ACME-HAZ")?.hazard_rate(1.0);
             Ok(
                 Money::new(1_000_000.0 * rate * hazard, Currency::USD)

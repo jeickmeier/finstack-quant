@@ -19,7 +19,7 @@ fn accrued_interest(
         cashflows::schedule::JsCashFlowSchedule::from_json(JsValue::from(schedule_json))?;
     let config = config_json.map(js_sys::JSON::parse).transpose()?;
     let money =
-        cashflows::accrual::accrued_interest_amount_js(&schedule, JsValue::from(as_of), config)?;
+        cashflows::accrual::accrued_interest_amount(&schedule, JsValue::from(as_of), config)?;
     let text: String = js_sys::JSON::stringify(&money)?.into();
     let money: serde_json::Value = serde_json::from_str(&text).unwrap();
     Ok(match &money["amount"] {
@@ -57,7 +57,8 @@ fn cashflow_spec_json() -> String {
 fn market_context_json() -> String {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    let base = time::Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
+    let base = finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+        .unwrap();
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80)])
@@ -192,7 +193,8 @@ fn floating_market_context_json() -> String {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 
-    let base = time::Date::from_calendar_date(2025, time::Month::January, 15).unwrap();
+    let base = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 15)
+        .unwrap();
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80)])

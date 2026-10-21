@@ -56,7 +56,7 @@ impl MertonModel {
     pub fn to_hazard_curve(
         &self,
         id: &str,
-        base_date: time::Date,
+        base_date: finstack_quant_core::dates::Date,
         tenors: &[f64],
         recovery: f64,
         day_count: DayCount,
@@ -159,7 +159,9 @@ mod tests {
     #[test]
     fn to_hazard_curve_survival_matches_pd() {
         let m = MertonModel::new(100.0, 0.25, 80.0, 0.04).expect("valid");
-        let base = time::Date::from_calendar_date(2026, time::Month::March, 1).expect("valid date");
+        let base =
+            finstack_quant_core::dates::Date::from_calendar_date(2026, time::Month::March, 1)
+                .expect("valid date");
         let hc = m
             .to_hazard_curve(
                 "TEST",
@@ -182,7 +184,9 @@ mod tests {
     #[test]
     fn to_hazard_curve_hazard_rates_positive() {
         let m = MertonModel::new(100.0, 0.30, 80.0, 0.04).expect("valid");
-        let base = time::Date::from_calendar_date(2026, time::Month::March, 1).expect("valid date");
+        let base =
+            finstack_quant_core::dates::Date::from_calendar_date(2026, time::Month::March, 1)
+                .expect("valid date");
         let hc = m
             .to_hazard_curve("TEST2", base, &[1.0, 3.0, 5.0], 0.40, DayCount::Act365F)
             .expect("hc");
@@ -198,7 +202,9 @@ mod tests {
 
     #[test]
     fn to_hazard_curve_riskier_firm_higher_hazard() {
-        let base = time::Date::from_calendar_date(2026, time::Month::March, 1).expect("valid date");
+        let base =
+            finstack_quant_core::dates::Date::from_calendar_date(2026, time::Month::March, 1)
+                .expect("valid date");
         let m_safe = MertonModel::new(100.0, 0.15, 50.0, 0.04).expect("valid");
         let m_risky = MertonModel::new(100.0, 0.30, 85.0, 0.04).expect("valid");
         let hc_safe = m_safe
@@ -218,7 +224,9 @@ mod tests {
         // V < B with positive drift can make terminal PD fall with horizon,
         // which implies increasing survival and a negative hazard segment.
         let m = MertonModel::new(98.0, 0.30, 100.0, 0.10).expect("valid");
-        let base = time::Date::from_calendar_date(2026, time::Month::March, 1).expect("valid date");
+        let base =
+            finstack_quant_core::dates::Date::from_calendar_date(2026, time::Month::March, 1)
+                .expect("valid date");
 
         let survival_1y = 1.0 - m.default_probability(1.0);
         let survival_5y = 1.0 - m.default_probability(5.0);
@@ -238,7 +246,9 @@ mod tests {
         // which previously slipped past the monotonic-survival check and emitted
         // a NaN hazard knot (-ln(1)/0). It must now be rejected.
         let m = MertonModel::new(120.0, 0.25, 100.0, 0.05).expect("valid");
-        let base = time::Date::from_calendar_date(2026, time::Month::March, 1).expect("valid date");
+        let base =
+            finstack_quant_core::dates::Date::from_calendar_date(2026, time::Month::March, 1)
+                .expect("valid date");
         let result = m.to_hazard_curve("DUP", base, &[1.0, 5.0, 5.0], 0.40, DayCount::Act365F);
         assert!(
             result.is_err(),
@@ -251,7 +261,9 @@ mod tests {
     #[test]
     fn to_hazard_curve_rejects_recovery_inconsistent_with_credit_grades() {
         let m = MertonModel::credit_grades(25.0, 0.50, 80.0, 0.04, 0.30, 0.40).expect("cg");
-        let base = time::Date::from_calendar_date(2026, time::Month::March, 1).expect("valid date");
+        let base =
+            finstack_quant_core::dates::Date::from_calendar_date(2026, time::Month::March, 1)
+                .expect("valid date");
         assert!(m
             .to_hazard_curve("CG", base, &[1.0, 5.0], 0.60, DayCount::Act365F)
             .is_err());
@@ -263,7 +275,9 @@ mod tests {
     #[test]
     fn to_hazard_curve_honours_the_requested_day_count() {
         let m = MertonModel::new(100.0, 0.25, 80.0, 0.04).expect("valid");
-        let base = time::Date::from_calendar_date(2026, time::Month::March, 1).expect("valid date");
+        let base =
+            finstack_quant_core::dates::Date::from_calendar_date(2026, time::Month::March, 1)
+                .expect("valid date");
         let hc = m
             .to_hazard_curve("DC", base, &[1.0, 5.0], 0.40, DayCount::Act360)
             .expect("hc");

@@ -267,7 +267,7 @@ impl HaircutImCalculator {
         as_of: Date,
         breakdown_key: impl Into<String>,
     ) -> ImResult {
-        let mut breakdown = finstack_quant_core::HashMap::default();
+        let mut breakdown = finstack_quant_core::FxHashMap::default();
         breakdown.insert(breakdown_key.into(), amount);
         ImResult::with_breakdown(
             amount,

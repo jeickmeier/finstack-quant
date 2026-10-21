@@ -128,7 +128,10 @@ test('VolCube round trips JSON and exposes its nodes', () => {
     'CUBE',
     [1, 2],
     [5],
-    [0.02, 0.5, -0.2, 0.4, Number.NaN, 0.03, 0.5, -0.1, 0.3, 0.01],
+    [
+      { alpha: 0.02, beta: 0.5, rho: -0.2, nu: 0.4 },
+      { alpha: 0.03, beta: 0.5, rho: -0.1, nu: 0.3, shift: 0.01 },
+    ],
     [0.03, 0.035]
   );
   assert.deepEqual([...cube.expiries], [1, 2]);

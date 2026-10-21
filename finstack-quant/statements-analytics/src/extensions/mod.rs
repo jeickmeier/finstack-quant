@@ -1,10 +1,10 @@
 //! Concrete extension implementations.
 //!
-//! - [`crate::extensions::corkscrew`] — roll-forward validation for balance-sheet accounts
-//! - [`crate::extensions::scorecards`] — credit scorecard rating assignment
+//! - [`CorkscrewExtension`] — roll-forward validation for balance-sheet accounts
+//! - [`CreditScorecardExtension`] — credit scorecard rating assignment
 
-pub mod corkscrew;
-pub mod scorecards;
+mod corkscrew;
+mod scorecards;
 
 pub use corkscrew::{
     AccountType, CorkscrewAccount, CorkscrewConfig, CorkscrewExtension, CorkscrewReport,

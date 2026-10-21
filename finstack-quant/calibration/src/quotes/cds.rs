@@ -1,7 +1,9 @@
 //! CDS market quote schema.
 
 use super::ids::{Pillar, QuoteId};
-use super::validate;
+use finstack_quant_core::validation::{
+    validate_f64_finite, validate_f64_positive, validate_recovery_rate,
+};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::market::conventions::ids::CdsConventionKey;
 use serde::{Deserialize, Serialize};
@@ -153,17 +155,29 @@ impl CdsQuote {
         }
     }
 
-    /// Bump by spread in basis points (e.g., `1.0` = 1bp).
+    /// Return a copy of this par-spread quote with its spread shifted by `bump_bp`.
     ///
     /// # Arguments
-    /// * `bump_bp` - Additive shift in basis points applied to `spread_bp` (par spread) or `coupon_bp` (upfront).
-    pub fn bump_spread_bp(&self, bump_bp: f64) -> Self {
+    /// * `bump_bp` - Additive shift in basis points applied to `spread_bp`
+    ///   (`1.0` = 1bp).
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for [`CdsQuote::CdsUpfront`]: its running
+    /// coupon is contractual (25/100/500/1000bp), so it carries no quoted spread
+    /// to bump. Convert upfront quotes to par-spread quotes before bumping.
+    pub fn bump_spread_bp(&self, bump_bp: f64) -> finstack_quant_core::Result<Self> {
         let mut quote = self.clone();
         match &mut quote {
             Self::CdsParSpread { spread_bp, .. } => *spread_bp += bump_bp,
-            Self::CdsUpfront { coupon_bp, .. } => *coupon_bp += bump_bp,
+            Self::CdsUpfront { id, .. } => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CDS quote '{id}' is an upfront quote: its contractual coupon cannot be \
+                     spread-bumped; convert it to a par-spread quote first"
+                )));
+            }
         }
-        quote
+        Ok(quote)
     }
 
     /// Return a copy of this quote with `recovery_rate` replaced.
@@ -203,8 +217,8 @@ impl CdsQuote {
                 recovery_rate,
                 ..
             } => {
-                validate::positive(*spread_bp, "spread_bp")?;
-                validate::unit_interval(*recovery_rate, "recovery_rate")?;
+                validate_f64_positive(*spread_bp, "spread_bp")?;
+                validate_recovery_rate(*recovery_rate)?;
             }
             Self::CdsUpfront {
                 coupon_bp,
@@ -212,9 +226,9 @@ impl CdsQuote {
                 recovery_rate,
                 ..
             } => {
-                validate::positive(*coupon_bp, "coupon_bp")?;
-                validate::finite(*upfront_pct, "upfront_pct")?;
-                validate::unit_interval(*recovery_rate, "recovery_rate")?;
+                validate_f64_positive(*coupon_bp, "coupon_bp")?;
+                validate_f64_finite(*upfront_pct, "upfront_pct")?;
+                validate_recovery_rate(*recovery_rate)?;
             }
         }
         self.validate_market_conventions()

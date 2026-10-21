@@ -75,7 +75,6 @@
         "allow_non_monotonic": false,
         "min_forward_tenor": 1e-06,
         "rate_calibration": null,
-        "calibration_ois_cutoff_days": null,
         "fx_policy": null
       },
       {
@@ -368,7 +367,6 @@
               "df_hard_min": 1e-12,
               "jacobian_step_size": 1e-06,
               "min_scan_grid_points": 20,
-              "min_t_spot": 1e-06,
               "scan_grid_points": 48,
               "scan_grid_step": 0.0001,
               "validation_tolerance": 1e-08,
@@ -427,7 +425,6 @@
               "tolerance": 1e-10
             },
             "validation_mode": "error",
-            "verbose": false,
             "vol_surface": {
               "validation_tolerance": 0.001
             }
@@ -455,7 +452,6 @@
     "credit_indices": [],
     "fx_delta_vol_surfaces": [],
     "vol_cubes": [],
-    "collateral": {},
     "hierarchy": null
   },
   "market_t1": {
@@ -486,7 +482,6 @@
         "allow_non_monotonic": false,
         "min_forward_tenor": 1e-06,
         "rate_calibration": null,
-        "calibration_ois_cutoff_days": null,
         "fx_policy": null
       },
       {
@@ -779,7 +774,6 @@
               "df_hard_min": 1e-12,
               "jacobian_step_size": 1e-06,
               "min_scan_grid_points": 20,
-              "min_t_spot": 1e-06,
               "scan_grid_points": 48,
               "scan_grid_step": 0.0001,
               "validation_tolerance": 1e-08,
@@ -838,7 +832,6 @@
               "tolerance": 1e-10
             },
             "validation_mode": "error",
-            "verbose": false,
             "vol_surface": {
               "validation_tolerance": 0.001
             }
@@ -866,7 +859,6 @@
     "credit_indices": [],
     "fx_delta_vol_surfaces": [],
     "vol_cubes": [],
-    "collateral": {},
     "hierarchy": null
   },
   "as_of_t0": "2025-01-01",

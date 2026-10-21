@@ -7,7 +7,8 @@
 //! `generated_schema` produces only the raw derived document and drifts from
 //! the checked-in bytes.
 
-use finstack_quant_core::schema::{SchemaArtifact, SchemaKind};
+use crate::AttributionInputs;
+use finstack_quant_core::schema::SchemaArtifact;
 
 use crate::{AttributionEnvelope, AttributionResultEnvelope};
 
@@ -28,54 +29,20 @@ fn attribution_result_examples() -> finstack_quant_core::Result<Vec<serde_json::
     };
     let as_of_t0 = date(time::Month::January, 1)?;
     let as_of_t1 = date(time::Month::February, 1)?;
-    let zero = Money::from((0_i64, Currency::USD));
-    let attribution = crate::PnlAttribution {
-        total_pnl: Money::from((12500_i64, Currency::USD)),
-        mark_to_market_pnl: None,
-        pv_t0: None,
-        pv_t1: None,
-        carry: Money::from((12500_i64, Currency::USD)),
-        rates_curves_pnl: zero,
-        credit_curves_pnl: zero,
-        inflation_curves_pnl: zero,
-        correlations_pnl: zero,
-        fx_pnl: zero,
-        fx_translation_pnl: zero,
-        vol_pnl: zero,
-        cross_factor_pnl: zero,
-        model_params_pnl: zero,
-        market_scalars_pnl: zero,
-        residual: zero,
-        carry_detail: None,
-        rates_detail: None,
-        credit_detail: None,
-        inflation_detail: None,
-        correlations_detail: None,
-        fx_detail: None,
-        vol_detail: None,
-        cross_factor_detail: None,
-        model_params_detail: None,
-        scalars_detail: None,
-        credit_factor_detail: None,
-        credit_carry_decomposition: None,
-        waterfall_steps: Vec::new(),
-        sensitivity_steps: Vec::new(),
-        meta: crate::AttributionMeta {
-            t0: as_of_t0,
-            t1: as_of_t1,
-            method: crate::AttributionMethod::default(),
-            instrument_id: "DEP_3M".to_string(),
-            num_repricings: 1,
-            tolerance_abs: 1e-6,
-            tolerance_pct: 1e-6,
-            residual_pct: 0.0,
-            rounding: Default::default(),
-            fx_policy: None,
-            execution_policy: None,
-            notes: Vec::new(),
-        },
-        result_invalid: false,
-    };
+    let mut attribution = crate::PnlAttribution::new(
+        Money::from((12500_i64, Currency::USD)),
+        "DEP_3M",
+        as_of_t0,
+        as_of_t1,
+        crate::AttributionMethod::default(),
+    );
+    attribution.mark_to_market_pnl = None;
+    attribution.carry = attribution.total_pnl;
+    attribution.residual = Money::from((0_i64, Currency::USD));
+    attribution.meta.num_repricings = 1;
+    attribution.meta.tolerance_abs = 1e-6;
+    attribution.meta.tolerance_pct = 1e-6;
+    attribution.meta.residual_pct = 0.0;
     let results_meta = finstack_quant_core::config::results_meta(
         &finstack_quant_core::config::FinstackConfig::default(),
     );
@@ -149,30 +116,33 @@ fn attribution_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>>
 
 /// The crate's complete schema registry, sorted by artifact path.
 pub const ARTIFACTS: &[SchemaArtifact] = &[
-    SchemaArtifact::new::<AttributionEnvelope>(
-        "schemas/attribution/1/attribution.schema.json",
-        "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
-        "Finstack Quant Attribution Specification",
+    finstack_quant_core::schema_artifact!(
+        AttributionEnvelope,
+        "attribution",
+        "attribution",
+        Input,
         "Complete specification for P&L attribution runs with instrument and market snapshots",
+        title = "Finstack Quant Attribution Specification"
     )
-    .with_kind(SchemaKind::Input)
     .with_summary("One multi-period P&L attribution run: positions, markets and method.")
     .with_examples(attribution_examples),
-    SchemaArtifact::new::<crate::AttributionInputs>(
-        "schemas/attribution/1/attribution_inputs.schema.json",
-        "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
-        "Finstack Quant Shared Attribution Inputs",
+    finstack_quant_core::schema_artifact!(
+        AttributionInputs,
+        "attribution",
+        "attribution_inputs",
+        Input,
         "Shared market snapshots, dates, method and options for a batch of instruments",
+        title = "Finstack Quant Shared Attribution Inputs"
     )
-    .with_kind(SchemaKind::Input)
     .with_summary("Shared attribution settings without an instrument payload."),
-    SchemaArtifact::new::<AttributionResultEnvelope>(
-        "schemas/attribution/1/attribution_result.schema.json",
-        "https://finstack_quant.dev/schemas/attribution/1/attribution_result.schema.json",
-        "Finstack Quant Attribution Result",
+    finstack_quant_core::schema_artifact!(
+        AttributionResultEnvelope,
+        "attribution",
+        "attribution_result",
+        Output,
         "Complete result of a P&L attribution run including factor decomposition and metadata",
+        title = "Finstack Quant Attribution Result"
     )
-    .with_kind(SchemaKind::Output)
     .with_summary("Attributed P&L by effect and grouping, with policy stamps.")
     .with_examples(attribution_result_examples),
 ];

@@ -33,83 +33,93 @@ const core = (message) => message.replace(/^Validation error: /, '');
 const validation = (text) => (error) =>
   error.kind === 'validation' && error.message.includes(core(text));
 
+// Python `OperationSpec.<variant>(...)` constructors only build the wire
+// object, so their WASM twin is that TypeScript literal (`literal` in the
+// parity ledger). The golden `expected` value is the Python-built literal;
+// WASM must accept it unchanged. `parallel_bp_many` and `time_roll_forward`
+// do work in Rust and keep WASM functions.
+const COMPUTING_CONSTRUCTORS = {
+  parallel_bp_many: 'parallelBpMany',
+  time_roll_forward: 'operationSpecTimeRollForward',
+};
+
 for (const [index, { py, args, expected }] of GOLDEN.constructors.entries()) {
-  const name = py === 'parallel_bp_many' ? 'parallelBpMany' : `operationSpec${pascal(py)}`;
-  const pythonName = py === 'parallel_bp_many' ? py : `OperationSpec.${py}`;
-  test(`${name} matches Python ${pythonName} (case ${index})`, () => {
-    const built = scenarios[name](...args);
-    assert.deepEqual(built, expected);
-    for (const operation of [built].flat()) {
-      assert.equal(scenarios.operationSpecValidate(operation), undefined);
-    }
+  const name = COMPUTING_CONSTRUCTORS[py];
+  if (name !== undefined) {
+    test(`${name} matches Python ${py} (case ${index})`, () => {
+      const built = scenarios[name](...args);
+      assert.deepEqual(built, expected);
+      for (const operation of [built].flat()) {
+        assert.equal(scenarios.operationSpecValidate(operation), undefined);
+      }
+    });
+    continue;
+  }
+  test(`Python OperationSpec.${py} literal is a valid WASM operation (case ${index})`, () => {
+    assert.equal(scenarios[`operationSpec${pascal(py)}`], undefined);
+    assert.equal(scenarios.operationSpecValidate(expected), undefined);
+    assert.equal(scenarios.operationSpecValidate(JSON.stringify(expected)), undefined);
   });
 }
 
-test('every Python OperationSpec constructor has a golden case', () => {
+test('only the computing OperationSpec members have WASM functions', () => {
+  const functions = Object.keys(scenarios)
+    .filter((key) => key.startsWith('operationSpec'))
+    .sort();
+  assert.deepEqual(functions, [
+    'operationSpecMutatesInstruments',
+    'operationSpecRequiresInstruments',
+    'operationSpecTimeRollForward',
+    'operationSpecValidate',
+  ]);
   const covered = new Set(GOLDEN.constructors.map(({ py }) => py));
-  const constructors = Object.keys(scenarios).filter(
-    (key) =>
-      key.startsWith('operationSpec') &&
-      ![
-        'operationSpecValidate',
-        'operationSpecRequiresInstruments',
-        'operationSpecMutatesInstruments',
-      ].includes(key)
-  );
-  assert.equal(constructors.length, 24);
-  assert.deepEqual(
-    constructors.filter((key) => ![...covered].some((py) => key === `operationSpec${pascal(py)}`)),
-    []
-  );
+  assert.equal(covered.size, 25);
 });
 
-test('operation constructors accept structured targets and bindings as JSON text', () => {
-  const [{ args, expected }] = GOLDEN.constructors.filter(
-    ({ py }) => py === 'hierarchy_equity_price_pct'
-  );
-  assert.deepEqual(
-    scenarios.operationSpecHierarchyEquityPricePct(JSON.stringify(args[0]), args[1]),
-    expected
-  );
-  const [binding] = GOLDEN.constructors.filter(({ py }) => py === 'rate_binding');
-  assert.deepEqual(
-    scenarios.operationSpecRateBinding(JSON.stringify(binding.args[0])),
-    binding.expected
-  );
-});
-
-test('operation constructors reject wrong types and unknown labels', () => {
-  assert.throws(() => scenarios.operationSpecMarketFxPct('EUR', 'USD', '5'), TypeError);
-  assert.throws(
-    () => scenarios.operationSpecMarketFxPct('EUR', 'ZZZ', 5),
-    (error) => error.kind === 'validation'
-  );
-  assert.throws(
-    () => scenarios.operationSpecCurveParallelBp('bogus', 'USD-OIS', 1),
-    (error) => error.kind === 'validation' && /bogus/.test(error.message)
-  );
-  assert.throws(() => scenarios.operationSpecCurveParallelBp('discount', 5, 1), TypeError);
-  assert.throws(
-    () => scenarios.operationSpecCurveParallelBp('discount', ['USD-OIS'], 1),
-    TypeError
-  );
+test('computing constructors reject wrong types and unknown labels', () => {
   assert.deepEqual(scenarios.parallelBpMany('discount', [], 1), []);
   assert.throws(
-    () => scenarios.operationSpecCurveNodeBp('discount', 'USD-OIS', [['2Y', 1]], 'nearest'),
-    (error) => error.kind === 'validation'
+    () => scenarios.parallelBpMany('bogus', ['USD-OIS'], 1),
+    (error) => error.kind === 'validation' && /bogus/.test(error.message)
   );
-  assert.throws(
-    () => scenarios.operationSpecInstrumentPricePctByType(['not_an_instrument'], 1),
-    (error) => error.kind === 'validation' && /not_an_instrument/.test(error.message)
-  );
+  assert.throws(() => scenarios.parallelBpMany('discount', 'USD-OIS', 1), TypeError);
   assert.throws(
     () => scenarios.operationSpecTimeRollForward('1M', true, 'weekly'),
     (error) => error.kind === 'validation'
   );
   assert.throws(() => scenarios.operationSpecTimeRollForward('1M', 'yes'), TypeError);
+});
+
+test('operationSpecValidate rejects malformed literals', () => {
   assert.throws(
-    () => scenarios.operationSpecHierarchyEquityPricePct({ paths: ['Credit'] }, 1),
+    () =>
+      scenarios.operationSpecValidate({
+        kind: 'market_fx_pct',
+        base: 'EUR',
+        quote: 'ZZZ',
+        pct: 5,
+      }),
     (error) => error.kind === 'validation'
+  );
+  assert.throws(
+    () =>
+      scenarios.operationSpecValidate({
+        kind: 'curve_node_bp',
+        curve_kind: 'discount',
+        curve_id: 'USD-OIS',
+        nodes: [['2Y', 1]],
+        match_mode: 'nearest',
+      }),
+    (error) => error.kind === 'validation'
+  );
+  assert.throws(
+    () =>
+      scenarios.operationSpecValidate({
+        kind: 'instrument_price_pct_by_type',
+        instrument_types: ['not_an_instrument'],
+        pct: 1,
+      }),
+    (error) => error.kind === 'validation' && /not_an_instrument/.test(error.message)
   );
 });
 
@@ -139,7 +149,7 @@ test('operationSpecValidate rejects what Python OperationSpec.validate rejects',
 test('scenario enum literals are the Python wire values', () => {
   // Python `CurveKind.par_cds()` and friends have no WASM function: the
   // TypeScript literal of the generated type is the twin, and it is the value
-  // the constructors and rate bindings consume.
+  // operation literals and rate bindings carry.
   const enums = GOLDEN.enums;
   for (const [type, variants] of Object.entries(enums)) {
     const prefix = type[0].toLowerCase() + type.slice(1);
@@ -150,24 +160,25 @@ test('scenario enum literals are the Python wire values', () => {
   assert.equal(enums.CurveKind.par_cds, 'par_cds');
   assert.deepEqual(enums.Compounding.quarterly, { periodic: 4 });
   for (const curveKind of Object.values(enums.CurveKind)) {
-    assert.equal(
-      scenarios.operationSpecCurveParallelBp(curveKind, 'ACME', 1).curve_kind,
-      curveKind
-    );
+    const operation = { kind: 'curve_parallel_bp', curve_kind: curveKind, curve_id: 'ACME', bp: 1 };
+    assert.equal(scenarios.operationSpecValidate(operation), undefined);
   }
   for (const rollMode of Object.values(enums.TimeRollMode)) {
     assert.equal(scenarios.operationSpecTimeRollForward('1M', false, rollMode).roll_mode, rollMode);
   }
   for (const matchMode of Object.values(enums.TenorMatchMode)) {
-    assert.equal(
-      scenarios.operationSpecVolIndexNodePts('VIX', [['1M', 1]], matchMode).match_mode,
-      matchMode
-    );
+    const operation = {
+      kind: 'vol_index_node_pts',
+      curve_id: 'VIX',
+      nodes: [['1M', 1]],
+      match_mode: matchMode,
+    };
+    assert.equal(scenarios.operationSpecValidate(operation), undefined);
   }
   for (const compounding of Object.values(enums.Compounding)) {
     const binding = { node_id: 'rate', curve_id: 'USD-OIS', tenor: '1Y', compounding };
     assert.equal(scenarios.rateBindingSpecValidate(binding), undefined);
-    assert.deepEqual(scenarios.operationSpecRateBinding(binding).binding.compounding, compounding);
+    assert.equal(scenarios.operationSpecValidate({ kind: 'rate_binding', binding }), undefined);
   }
 });
 

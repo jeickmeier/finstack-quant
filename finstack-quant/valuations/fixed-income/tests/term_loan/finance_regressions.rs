@@ -1,5 +1,6 @@
 //! Loan cashflow and call-exercise regressions from the finance review.
 
+use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::builder::{FloatingLegCompounding, FloatingRateSpec};
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
@@ -12,7 +13,7 @@ use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_core::pricer::ModelKey;
 use finstack_quant_valuations_fixed_income::term_loan::{
-    AmortizationSpec, LoanCall, LoanCallSchedule, LoanCallType, MakeWholeSpec, RateSpec, TermLoan,
+    LoanCall, LoanCallSchedule, LoanCallType, MakeWholeSpec, TermLoan,
 };
 use time::macros::date;
 use time::{Duration, Weekday};

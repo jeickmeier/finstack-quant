@@ -10,7 +10,7 @@ from finstack_quant.models.correlation import (
     CorrelatedBernoulli,
     LatentFactorSpec,
     LatentMultiFactor,
-    cholesky_decompose,
+    cholesky_correlation,
     correlation_bounds,
     joint_probabilities,
     nearest_correlation,
@@ -196,7 +196,7 @@ class TestCholeskyDecompose:
 
     def test_identity(self) -> None:
         """Cholesky of 2x2 identity is identity."""
-        lower = cholesky_decompose([1.0, 0.0, 0.0, 1.0], 2)
+        lower = cholesky_correlation([1.0, 0.0, 0.0, 1.0], 2)
         assert lower[0] == pytest.approx(1.0)
         assert lower[1] == pytest.approx(0.0)
         assert lower[2] == pytest.approx(0.0)
@@ -204,7 +204,7 @@ class TestCholeskyDecompose:
 
     def test_correlated(self) -> None:
         """Factor matrix for [[1, 0.5], [0.5, 1]] satisfies A A^T = R."""
-        lower = cholesky_decompose([1.0, 0.5, 0.5, 1.0], 2)
+        lower = cholesky_correlation([1.0, 0.5, 0.5, 1.0], 2)
         assert len(lower) == 4
         a00, a01, a10, a11 = lower
         # AA^T should recover the original correlation matrix
@@ -236,14 +236,14 @@ def test_matrix_helpers_accept_two_dimensional_input() -> None:
     import pytest
 
     from finstack_quant.models.correlation import (
-        cholesky_decompose,
+        cholesky_correlation,
         nearest_correlation,
         validate_correlation_matrix,
     )
 
     rows = [[1.0, 0.3], [0.3, 1.0]]
     assert validate_correlation_matrix(rows, 2) is None
-    assert cholesky_decompose(rows, 2) == cholesky_decompose([1.0, 0.3, 0.3, 1.0], 2)
+    assert cholesky_correlation(rows, 2) == cholesky_correlation([1.0, 0.3, 0.3, 1.0], 2)
     assert nearest_correlation(rows, 2) == pytest.approx([1.0, 0.3, 0.3, 1.0])
     # The Rust `flatten_square_matrix` owns the nested-shape check.
     with pytest.raises(ValueError, match="matrix must have 3 rows, got 2"):
@@ -252,7 +252,7 @@ def test_matrix_helpers_accept_two_dimensional_input() -> None:
         validate_correlation_matrix([1.0, 0.0, 0.0, 1.0], 3)
 
 
-@pytest.mark.parametrize("operation", [validate_correlation_matrix, nearest_correlation, cholesky_decompose])
+@pytest.mark.parametrize("operation", [validate_correlation_matrix, nearest_correlation, cholesky_correlation])
 @pytest.mark.parametrize("matrix", [[], [[]]])
 def test_matrix_helpers_reject_dimension_product_overflow(
     operation: Callable[..., object], matrix: list[object]

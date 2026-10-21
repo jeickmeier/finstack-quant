@@ -25,7 +25,8 @@ use crate::irs::{InterestRateSwap, PayReceive};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
-use finstack_quant_core::math::NeumaierAccumulator;
+use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
@@ -121,8 +122,8 @@ impl InterestRateSwap {
             if flow.date > as_of
                 && matches!(
                     flow.kind,
-                    finstack_quant_cashflows::primitives::CFKind::Fixed
-                        | finstack_quant_cashflows::primitives::CFKind::Stub
+                    finstack_quant_core::cashflow::CFKind::Fixed
+                        | finstack_quant_core::cashflow::CFKind::Stub
                 )
             {
                 let discount = disc.df_between_dates(as_of, flow.date)?;

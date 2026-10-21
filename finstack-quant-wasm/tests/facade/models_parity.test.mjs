@@ -277,7 +277,10 @@ const cube = () =>
     'CUBE',
     [1, 2],
     [5],
-    [0.02, 0.5, -0.2, 0.4, Number.NaN, 0.03, 0.5, -0.1, 0.3, Number.NaN],
+    [
+      { alpha: 0.02, beta: 0.5, rho: -0.2, nu: 0.4 },
+      { alpha: 0.03, beta: 0.5, rho: -0.1, nu: 0.3 },
+    ],
     [0.03, 0.035]
   );
 const surfaceVols = (surface) => Array.from(surface.vols);
@@ -514,8 +517,8 @@ const CASES = {
       list(correlation.LatentMultiFactor.uncorrelated(2, [0.2, 0.3]).correlationMatrix),
     ];
   },
-  'correlation.cholesky_decompose': () =>
-    list(correlation.choleskyDecompose([1.0, 0.5, 0.5, 1.0], 2)),
+  'correlation.cholesky_correlation': () =>
+    list(correlation.choleskyCorrelation([1.0, 0.5, 0.5, 1.0], 2)),
   'correlation.simulate_portfolio_loss': () => {
     const config = {
       num_paths: 2000,

@@ -55,7 +55,8 @@
 //!
 //! ```
 //! use finstack_quant_analytics::Performance;
-//! use finstack_quant_core::dates::{Date, Month, PeriodKind};
+//! use finstack_quant_core::dates::{Date, PeriodKind};
+//! use time::Month;
 //!
 //! let dates: Vec<Date> = (1..=10)
 //!     .map(|d| Date::from_calendar_date(2025, Month::January, d).unwrap())
@@ -76,10 +77,6 @@
 //! - Sharpe ratio: `docs/REFERENCES.md#sharpe1966`
 //! - Expected shortfall: `docs/REFERENCES.md#artzner1999CoherentRisk`
 //! - Active-portfolio context: `docs/REFERENCES.md#grinoldKahn1999ActivePortfolio`
-
-pub(crate) use finstack_quant_core::{dates, error, math};
-
-pub(crate) type Result<T> = finstack_quant_core::Result<T>;
 
 pub(crate) mod aggregation;
 pub(crate) mod benchmark;

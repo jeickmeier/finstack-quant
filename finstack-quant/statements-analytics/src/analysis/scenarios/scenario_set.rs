@@ -7,7 +7,7 @@
 //! supports simple parent chaining with override merging, and can:
 //! - Evaluate all scenarios into a [`ScenarioResults`] envelope.
 //! - Compute variance-style diffs between two scenarios using
-//!   [`VarianceAnalyzer`].
+//!   [`run_variance`].
 //! - Export wide comparison tables as serializable table envelopes.
 //!
 //! The wire format is intentionally simple and mirrors the design docs:
@@ -22,25 +22,32 @@
 //!     },
 //!     "stress": {
 //!       "parent": "downside",
-//!       "overrides": { "revenue_growth": -0.15 }
+//!       "overrides": { "revenue_growth": -0.15 },
+//!       "forecast_overrides": {
+//!         "revenue": { "method": "curve_pct", "params": { "curve": [-0.05, 0.0, 0.02] } }
+//!       }
 //!     }
 //!   }
 //! }
 //! ```
 //!
-//! In the first implementation, `overrides` is interpreted as a map of
-//! `node_id → scalar`, where the scalar is broadcast as an explicit value
-//! for **all periods** of the given node. This leverages the existing
-//! precedence rules (`Value > Forecast > Formula`) to override model drivers
-//! in a deterministic way without introducing new forecast semantics.
+//! `overrides` maps `node_id → value`, broadcast as an explicit value over
+//! every forecast period of the node; `period_overrides` sets single forecast
+//! periods. Both rely on the precedence rules (`Value > Forecast > Formula`).
+//! `forecast_overrides` replaces a node's whole forecast specification, so a
+//! scenario can change any forecast method or parameter: growth rates, curves,
+//! seeds and volatilities of stochastic methods, external series, bounds.
 
-use crate::analysis::{VarianceAnalyzer, VarianceConfig, VarianceReport};
-use finstack_quant_core::dates::PeriodId;
+use crate::analysis::{run_variance, VarianceConfig, VarianceReport};
+use finstack_quant_core::dates::{Date, PeriodId};
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
 use finstack_quant_statements::error::{Error, Result};
-use finstack_quant_statements::evaluator::StatementResult;
-use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec};
+use finstack_quant_statements::evaluator::{Evaluator, StatementResult};
+use finstack_quant_statements::types::{
+    AmountOrScalar, FinancialModelSpec, ForecastSpec, NodeType,
+};
 use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -48,7 +55,8 @@ use serde_json::json;
 /// Definition for a single named scenario.
 ///
 /// Scenarios are attached to a base [`FinancialModelSpec`] and specify an
-/// optional parent plus typed scalar or monetary overrides for named nodes.
+/// optional parent plus typed scalar or monetary value overrides and forecast
+/// specification overrides for named nodes.
 ///
 /// The JSON representation mirrors the design docs example:
 ///
@@ -58,7 +66,7 @@ use serde_json::json;
 ///   "overrides": { "revenue_growth": -0.05, "margin": -0.02 }
 /// }
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ScenarioDefinition {
@@ -86,6 +94,22 @@ pub struct ScenarioDefinition {
     /// clear a parent's per-period overrides for other periods.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub period_overrides: IndexMap<String, IndexMap<PeriodId, AmountOrScalar>>,
+
+    /// Forecast overrides for model nodes, keyed by `node_id`.
+    ///
+    /// Each entry replaces the node's whole [`ForecastSpec`] in this scenario:
+    /// the method and every parameter it reads (growth rates, `curve`
+    /// paths, `seed`, `std_dev` and other stochastic parameters, external
+    /// `series`, `min` / `max` bounds). A node without a forecast gains one.
+    /// Across a parent chain the child's spec replaces the parent's for the
+    /// same node. Parameters are validated when the scenario is evaluated.
+    ///
+    /// The forecast fills forecast periods only, and explicit values still
+    /// win (`Value > Forecast > Formula`): a value override, a per-period
+    /// override or a model value in a forecast period hides the forecast in
+    /// that period.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub forecast_overrides: IndexMap<String, ForecastSpec>,
 }
 
 /// Registry of named scenarios built on top of a base model.
@@ -130,7 +154,10 @@ impl ScenarioSet {
     ///
     /// Parent scenarios are resolved first, with child overrides applied
     /// last. Each scenario is evaluated independently starting from the
-    /// provided `base_model`.
+    /// provided `base_model`, like [`Evaluator::evaluate`]: a capital
+    /// structure is evaluated from an empty market, which serves fixed-rate
+    /// instruments. Use [`ScenarioSet::evaluate_all_with_market`] when
+    /// instruments need market data.
     ///
     /// # Arguments
     ///
@@ -143,8 +170,10 @@ impl ScenarioSet {
     /// # Errors
     ///
     /// Returns an error if the scenario set is empty, if parent chains are
-    /// invalid, if overrides reference missing nodes, or if model evaluation
-    /// fails for any scenario.
+    /// invalid, if overrides reference missing nodes or are incompatible with
+    /// them, if a forecast override has invalid parameters, or if model
+    /// evaluation fails for any scenario (including a capital-structure
+    /// instrument that needs market data).
     ///
     /// # Examples
     ///
@@ -168,6 +197,7 @@ impl ScenarioSet {
     ///     ScenarioDefinition {
     ///         parent: None,
     ///         period_overrides: IndexMap::new(),
+    ///         forecast_overrides: IndexMap::new(),
     ///         overrides: IndexMap::new(),
     ///     },
     /// );
@@ -176,6 +206,7 @@ impl ScenarioSet {
     ///     ScenarioDefinition {
     ///         parent: Some("base".to_string()),
     ///         period_overrides: IndexMap::new(),
+    ///         forecast_overrides: IndexMap::new(),
     ///         overrides: IndexMap::from([(
     ///             "revenue".to_string(),
     ///             AmountOrScalar::scalar(90.0),
@@ -189,6 +220,86 @@ impl ScenarioSet {
     /// # }
     /// ```
     pub fn evaluate_all(&self, base_model: &FinancialModelSpec) -> Result<ScenarioResults> {
+        self.evaluate_each(base_model, |evaluator, model| evaluator.evaluate(model))
+    }
+
+    /// Evaluate all scenarios against a base model, a market and an as-of date.
+    ///
+    /// Each scenario is evaluated like [`Evaluator::evaluate_with_market`]:
+    /// capital-structure instruments generate their cashflows from `market`
+    /// as of `as_of`, so floating debt and hedges are priced and every result
+    /// carries `cs_cashflows`, and explicit actuals not yet available at
+    /// `as_of` are hidden. [`ScenarioSet::evaluate_all`] also evaluates the
+    /// capital structure, but from an empty market, which serves fixed-rate
+    /// instruments only.
+    ///
+    /// # Arguments
+    ///
+    /// * `base_model` - Baseline model that each scenario overrides.
+    /// * `market` - Curves, fixings and FX the capital-structure instruments
+    ///   are priced from; shared unchanged by every scenario.
+    /// * `as_of` - Valuation date for the instruments' cashflows and the
+    ///   explicit-value visibility cutoff, as in
+    ///   [`Evaluator::evaluate_with_market`].
+    ///
+    /// # Returns
+    ///
+    /// Returns [`ScenarioResults`] keyed by scenario name in insertion order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the scenario set is empty, a parent chain is
+    /// invalid, an override references a missing node or is incompatible with
+    /// it, a forecast override has invalid parameters, an instrument needs
+    /// market data `market` lacks, or evaluation fails for any scenario.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_core::dates::PeriodId;
+    /// use finstack_quant_core::market_data::context::MarketContext;
+    /// use finstack_quant_statements::builder::ModelBuilder;
+    /// use finstack_quant_statements::types::AmountOrScalar;
+    /// use finstack_quant_statements_analytics::analysis::{ScenarioDefinition, ScenarioSet};
+    /// use indexmap::IndexMap;
+    /// use time::macros::date;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let period = PeriodId::quarter(2025, 1)?;
+    /// let model = ModelBuilder::new("scenario-model")
+    ///     .periods("2025Q1..Q1", None)?
+    ///     .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
+    ///     .build()?;
+    /// let set = ScenarioSet {
+    ///     scenarios: IndexMap::from([("base".to_string(), ScenarioDefinition::default())]),
+    /// };
+    ///
+    /// let results =
+    ///     set.evaluate_all_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 01))?;
+    /// assert_eq!(results.len(), 1);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [`Evaluator::evaluate_with_market`]: finstack_quant_statements::evaluator::Evaluator::evaluate_with_market
+    pub fn evaluate_all_with_market(
+        &self,
+        base_model: &FinancialModelSpec,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<ScenarioResults> {
+        self.evaluate_each(base_model, |evaluator, model| {
+            evaluator.evaluate_with_market(model, market, as_of)
+        })
+    }
+
+    /// Apply each scenario's resolved overrides to a copy of `base_model` and
+    /// evaluate it with `evaluate`.
+    fn evaluate_each(
+        &self,
+        base_model: &FinancialModelSpec,
+        evaluate: impl Fn(&mut Evaluator, &FinancialModelSpec) -> Result<StatementResult>,
+    ) -> Result<ScenarioResults> {
         if self.scenarios.is_empty() {
             return Err(Error::invalid_input(
                 "ScenarioSet.scenarios cannot be empty",
@@ -197,13 +308,12 @@ impl ScenarioSet {
 
         let mut out = IndexMap::new();
 
-        for (name, _) in &self.scenarios {
+        for name in self.scenarios.keys() {
             let merged_overrides = self.resolve_overrides(name)?;
             let mut model = base_model.clone();
             apply_overrides(&mut model, &merged_overrides)?;
 
-            let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
-            let results = evaluator.evaluate(&model)?;
+            let results = evaluate(&mut Evaluator::new(), &model)?;
             out.insert(name.clone(), results);
         }
 
@@ -212,7 +322,7 @@ impl ScenarioSet {
 
     /// Compute a variance-style diff between two evaluated scenarios.
     ///
-    /// This delegates to [`VarianceAnalyzer`] under the hood so that
+    /// This delegates to [`run_variance`] under the hood so that
     /// scenario diffs share the same semantics as other variance reports.
     ///
     /// # Arguments
@@ -256,11 +366,13 @@ impl ScenarioSet {
     ///     ("base".to_string(), ScenarioDefinition {
     ///         parent: None,
     ///         period_overrides: IndexMap::new(),
+    ///         forecast_overrides: IndexMap::new(),
     ///         overrides: IndexMap::new(),
     ///     }),
     ///     ("downside".to_string(), ScenarioDefinition {
     ///         parent: Some("base".to_string()),
     ///         period_overrides: IndexMap::new(),
+    ///         forecast_overrides: IndexMap::new(),
     ///         overrides: IndexMap::from([(
     ///             "revenue".to_string(),
     ///             AmountOrScalar::scalar(90.0),
@@ -299,7 +411,6 @@ impl ScenarioSet {
             Error::invalid_input(format!("Unknown comparison scenario '{comparison}'"))
         })?;
 
-        let analyzer = VarianceAnalyzer::new(baseline_results, comparison_results);
         let config = VarianceConfig::new(
             baseline.to_string(),
             comparison.to_string(),
@@ -307,7 +418,7 @@ impl ScenarioSet {
             periods.to_vec(),
         );
 
-        let variance = analyzer.compute(&config)?;
+        let variance = run_variance(baseline_results, comparison_results, &config)?;
 
         Ok(ScenarioDiff {
             baseline: baseline.to_string(),
@@ -344,11 +455,13 @@ impl ScenarioSet {
     ///     ("base".to_string(), ScenarioDefinition {
     ///         parent: None,
     ///         period_overrides: IndexMap::new(),
+    ///         forecast_overrides: IndexMap::new(),
     ///         overrides: IndexMap::new(),
     ///     }),
     ///     ("stress".to_string(), ScenarioDefinition {
     ///         parent: Some("base".to_string()),
     ///         period_overrides: IndexMap::new(),
+    ///         forecast_overrides: IndexMap::new(),
     ///         overrides: IndexMap::new(),
     ///     }),
     /// ]);
@@ -362,25 +475,20 @@ impl ScenarioSet {
         let mut lineage = Vec::new();
         let mut seen = IndexSet::new();
         let mut current = Some(scenario);
-        let mut steps = 0usize;
-        let max_steps = self.scenarios.len().saturating_add(1);
 
+        // Every step inserts a new name into `seen` and must find it in
+        // `scenarios`, so the walk ends within `scenarios.len()` steps.
         while let Some(name) = current {
-            steps += 1;
-            if steps > max_steps {
-                return Err(Error::invalid_input(
-                    "Scenario parent chain exceeded maximum depth; check for cycles or corrupted data",
-                ));
-            }
             if !seen.insert(name.to_string()) {
                 return Err(Error::invalid_input(format!(
                     "Cycle detected in scenario parents at '{name}'"
                 )));
             }
 
-            let def = self.scenarios.get(name).ok_or_else(|| {
-                Error::invalid_input(format!("Unknown scenario '{name}' in trace()"))
-            })?;
+            let def = self
+                .scenarios
+                .get(name)
+                .ok_or_else(|| Error::invalid_input(format!("Unknown scenario '{name}'")))?;
 
             lineage.push(name.to_string());
             current = def.parent.as_deref();
@@ -399,36 +507,12 @@ impl ScenarioSet {
         let mut merged = IndexMap::new();
         let mut merged_periods: IndexMap<String, IndexMap<PeriodId, AmountOrScalar>> =
             IndexMap::new();
-        let mut stack = Vec::new();
-        let mut seen = IndexSet::new();
-        let mut current = Some(name);
-        let mut steps = 0usize;
-        let max_steps = self.scenarios.len().saturating_add(1);
-
-        while let Some(scenario_name) = current {
-            steps += 1;
-            if steps > max_steps {
-                return Err(Error::invalid_input(
-                    "Scenario parent chain exceeded maximum depth; check for cycles or corrupted data",
-                ));
-            }
-            if !seen.insert(scenario_name.to_string()) {
-                return Err(Error::invalid_input(format!(
-                    "Cycle detected in scenario parents at '{scenario_name}'"
-                )));
-            }
-
-            let def = self.scenarios.get(scenario_name).ok_or_else(|| {
-                Error::invalid_input(format!("Unknown scenario '{scenario_name}'"))
-            })?;
-            stack.push(scenario_name);
-            current = def.parent.as_deref();
-        }
+        let mut merged_forecasts = IndexMap::new();
 
         // Merge from oldest ancestor → target scenario so that later overrides win.
-        while let Some(scenario_name) = stack.pop() {
-            // Scenario was verified to exist when pushed onto the stack
-            if let Some(def) = self.scenarios.get(scenario_name) {
+        for scenario_name in self.trace(name)? {
+            // `trace` verified every scenario in the lineage exists.
+            if let Some(def) = self.scenarios.get(scenario_name.as_str()) {
                 for (node_id, value) in &def.overrides {
                     merged.insert(node_id.clone(), *value);
                 }
@@ -438,12 +522,16 @@ impl ScenarioSet {
                         entry.insert(*period, *value);
                     }
                 }
+                for (node_id, forecast) in &def.forecast_overrides {
+                    merged_forecasts.insert(node_id.clone(), forecast.clone());
+                }
             }
         }
 
         Ok(ResolvedOverrides {
             model_wide: merged,
             per_period: merged_periods,
+            forecasts: merged_forecasts,
         })
     }
 }
@@ -452,6 +540,7 @@ impl ScenarioSet {
 struct ResolvedOverrides {
     model_wide: IndexMap<String, AmountOrScalar>,
     per_period: IndexMap<String, IndexMap<PeriodId, AmountOrScalar>>,
+    forecasts: IndexMap<String, ForecastSpec>,
 }
 
 impl ScenarioResults {
@@ -543,11 +632,13 @@ impl ScenarioResults {
     ///     ("base".to_string(), ScenarioDefinition {
     ///         parent: None,
     ///         period_overrides: IndexMap::new(),
+    ///         forecast_overrides: IndexMap::new(),
     ///         overrides: IndexMap::new(),
     ///     }),
     ///     ("downside".to_string(), ScenarioDefinition {
     ///         parent: Some("base".to_string()),
     ///         period_overrides: IndexMap::new(),
+    ///         forecast_overrides: IndexMap::new(),
     ///         overrides: IndexMap::from([(
     ///             "revenue".to_string(),
     ///             AmountOrScalar::scalar(90.0),
@@ -695,11 +786,28 @@ impl ScenarioResults {
 
 /// Apply typed scenario overrides to forecast periods.
 ///
-/// Model-wide overrides are written to every forecast period first; per-period
-/// overrides are then written on top, so they win for their own period. A
-/// per-period override naming a period that is not a forecast period of the
-/// model is rejected.
+/// Forecast overrides replace the node's forecast specification (making the
+/// node `Mixed`, as [`ModelBuilder::forecast`] does). Model-wide value
+/// overrides are written to every forecast period next; per-period overrides
+/// are then written on top, so they win for their own period. A per-period
+/// override naming a period that is not a forecast period of the model is
+/// rejected.
+///
+/// [`ModelBuilder::forecast`]: finstack_quant_statements::builder::ModelBuilder::forecast
 fn apply_overrides(model: &mut FinancialModelSpec, overrides: &ResolvedOverrides) -> Result<()> {
+    for (node_id, forecast) in &overrides.forecasts {
+        forecast.validate().map_err(|err| {
+            Error::forecast(format!(
+                "Scenario forecast override for node '{node_id}' is invalid: {err}"
+            ))
+        })?;
+        let node = model
+            .get_node_mut(node_id)
+            .ok_or_else(|| Error::invalid_input(format!("Node '{node_id}' not found in model")))?;
+        node.forecast = Some(forecast.clone());
+        node.node_type = NodeType::Mixed;
+    }
+
     if overrides.model_wide.is_empty() && overrides.per_period.is_empty() {
         return Ok(());
     }
@@ -786,6 +894,7 @@ mod tests {
             ScenarioDefinition {
                 parent: None,
                 period_overrides: IndexMap::new(),
+                forecast_overrides: IndexMap::new(),
                 overrides: IndexMap::new(),
             },
         );
@@ -797,6 +906,7 @@ mod tests {
             ScenarioDefinition {
                 parent: Some("base".to_string()),
                 period_overrides: IndexMap::new(),
+                forecast_overrides: IndexMap::new(),
                 overrides: downside_overrides,
             },
         );
@@ -808,6 +918,7 @@ mod tests {
             ScenarioDefinition {
                 parent: Some("downside".to_string()),
                 period_overrides: IndexMap::new(),
+                forecast_overrides: IndexMap::new(),
                 overrides: stress_overrides,
             },
         );

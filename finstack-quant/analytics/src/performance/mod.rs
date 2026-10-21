@@ -6,7 +6,7 @@
 
 use std::collections::HashSet;
 
-use crate::dates::{Date, PeriodKind};
+use finstack_quant_core::dates::{Date, PeriodKind};
 
 use super::drawdown::to_drawdown_series;
 use super::returns::pairwise_returns;
@@ -30,7 +30,8 @@ mod serialization;
 ///
 /// ```rust
 /// use finstack_quant_analytics::Performance;
-/// use finstack_quant_core::dates::{Date, Month, PeriodKind};
+/// use finstack_quant_core::dates::{Date, PeriodKind};
+/// use time::Month;
 ///
 /// let dates: Vec<Date> = (1..=6)
 ///     .map(|d| Date::from_calendar_date(2025, Month::January, d).unwrap())
@@ -113,8 +114,8 @@ fn invalid_return_series(
     ticker: impl Into<String>,
     index: usize,
     reason: impl Into<String>,
-) -> crate::error::InputError {
-    crate::error::InputError::InvalidReturnSeries {
+) -> finstack_quant_core::InputError {
+    finstack_quant_core::InputError::InvalidReturnSeries {
         ticker: ticker.into(),
         index,
         reason: reason.into(),
@@ -126,7 +127,7 @@ fn invalid_return_series(
 /// Several lookback and aggregation paths use [`slice::partition_point`] on
 /// the internal date grid; both rely on strictly ascending order. Validating
 /// once at the boundary keeps the rest of the crate slice-only.
-fn validate_strictly_ascending_dates(dates: &[Date]) -> crate::Result<()> {
+fn validate_strictly_ascending_dates(dates: &[Date]) -> finstack_quant_core::Result<()> {
     for (idx, pair) in dates.windows(2).enumerate() {
         let (prev, next) = (pair[0], pair[1]);
         if next <= prev {
@@ -152,11 +153,41 @@ fn validate_strictly_ascending_dates(dates: &[Date]) -> crate::Result<()> {
     Ok(())
 }
 
+/// Shape checks shared by [`Performance::new`] and [`Performance::from_returns`]:
+/// non-empty columns and dates, strictly ascending dates, and one ticker name
+/// per column. `what` names the value columns (`"prices"` / `"returns"`) in
+/// the error text.
+fn check_panel_inputs(
+    dates: &[Date],
+    n_columns: usize,
+    n_names: usize,
+    what: &str,
+) -> finstack_quant_core::Result<()> {
+    if n_columns == 0 || dates.is_empty() {
+        return Err(
+            invalid_return_series("<panel>", 0, format!("{what} or dates is empty")).into(),
+        );
+    }
+    validate_strictly_ascending_dates(dates)?;
+    if n_names != n_columns {
+        return Err(invalid_return_series(
+            "<panel>",
+            0,
+            format!("ticker_names.len() = {n_names} does not match {what}.len() = {n_columns}"),
+        )
+        .into());
+    }
+    Ok(())
+}
+
 fn valid_price(value: f64) -> bool {
     value.is_finite() && value > 0.0
 }
 
-fn validate_edge_missing_prices(col: &[f64], ticker: &str) -> crate::Result<(usize, usize)> {
+fn validate_edge_missing_prices(
+    col: &[f64],
+    ticker: &str,
+) -> finstack_quant_core::Result<(usize, usize)> {
     let Some(first) = col.iter().position(|&value| valid_price(value)) else {
         return Err(invalid_return_series(
             ticker,
@@ -211,7 +242,7 @@ fn price_column_to_returns(
     col: &[f64],
     ticker: &str,
     expected_price_len: usize,
-) -> crate::Result<(Vec<f64>, TickerSpan)> {
+) -> finstack_quant_core::Result<(Vec<f64>, TickerSpan)> {
     if col.len() != expected_price_len {
         return Err(invalid_return_series(
             ticker,
@@ -235,7 +266,7 @@ fn return_column_to_span(
     col: Vec<f64>,
     ticker: &str,
     expected_len: usize,
-) -> crate::Result<(Vec<f64>, TickerSpan)> {
+) -> finstack_quant_core::Result<(Vec<f64>, TickerSpan)> {
     if col.len() != expected_len {
         return Err(invalid_return_series(
             ticker,
@@ -305,7 +336,10 @@ fn local_range(span: TickerSpan, global: TickerSpan) -> core::ops::Range<usize> 
     start..end
 }
 
-fn build_synthetic_price_dates(dates: &[Date], frequency: PeriodKind) -> crate::Result<Vec<Date>> {
+fn build_synthetic_price_dates(
+    dates: &[Date],
+    frequency: PeriodKind,
+) -> finstack_quant_core::Result<Vec<Date>> {
     let Some(&first) = dates.first() else {
         return Ok(Vec::new());
     };
@@ -447,7 +481,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when:
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when:
     ///
     /// * `prices` or `dates` is empty.
     /// * `ticker_names.len() != prices.len()` or ticker names are duplicated.
@@ -465,7 +499,8 @@ impl Performance {
     ///
     /// ```rust
     /// use finstack_quant_analytics::Performance;
-    /// use finstack_quant_core::dates::{Date, Month, PeriodKind};
+    /// use finstack_quant_core::dates::{Date, PeriodKind};
+    /// use time::Month;
     ///
     /// let dates: Vec<Date> = (1..=10)
     ///     .map(|d| Date::from_calendar_date(2025, Month::January, d).unwrap())
@@ -487,23 +522,8 @@ impl Performance {
         ticker_names: Vec<String>,
         benchmark_ticker: Option<&str>,
         frequency: PeriodKind,
-    ) -> crate::Result<Self> {
-        if prices.is_empty() || dates.is_empty() {
-            return Err(invalid_return_series("<panel>", 0, "prices or dates is empty").into());
-        }
-        validate_strictly_ascending_dates(&dates)?;
-        if ticker_names.len() != prices.len() {
-            return Err(invalid_return_series(
-                "<panel>",
-                0,
-                format!(
-                    "ticker_names.len() = {} does not match prices.len() = {}",
-                    ticker_names.len(),
-                    prices.len()
-                ),
-            )
-            .into());
-        }
+    ) -> finstack_quant_core::Result<Self> {
+        check_panel_inputs(&dates, prices.len(), ticker_names.len(), "prices")?;
 
         let mut returns_matrix: Vec<Vec<f64>> = Vec::with_capacity(prices.len());
         let mut return_spans: Vec<TickerSpan> = Vec::with_capacity(prices.len());
@@ -560,23 +580,8 @@ impl Performance {
         ticker_names: Vec<String>,
         benchmark_ticker: Option<&str>,
         frequency: PeriodKind,
-    ) -> crate::Result<Self> {
-        if returns.is_empty() || dates.is_empty() {
-            return Err(invalid_return_series("<panel>", 0, "returns or dates is empty").into());
-        }
-        validate_strictly_ascending_dates(&dates)?;
-        if ticker_names.len() != returns.len() {
-            return Err(invalid_return_series(
-                "<panel>",
-                0,
-                format!(
-                    "ticker_names.len() = {} does not match returns.len() = {}",
-                    ticker_names.len(),
-                    returns.len()
-                ),
-            )
-            .into());
-        }
+    ) -> finstack_quant_core::Result<Self> {
+        check_panel_inputs(&dates, returns.len(), ticker_names.len(), "returns")?;
 
         let mut all_returns: Vec<Vec<f64>> = Vec::with_capacity(returns.len());
         let mut return_spans: Vec<TickerSpan> = Vec::with_capacity(returns.len());
@@ -607,7 +612,7 @@ impl Performance {
         ticker_names: Vec<String>,
         benchmark_ticker: Option<&str>,
         frequency: PeriodKind,
-    ) -> crate::Result<Self> {
+    ) -> finstack_quant_core::Result<Self> {
         if price_dates.len() < 2 || returns.is_empty() {
             return Err(invalid_return_series("<panel>", 0, "returns or dates is empty").into());
         }
@@ -747,7 +752,7 @@ impl Performance {
     ///
     /// `Ok(())` on success, or an [`Error::Validation`](finstack_quant_core::Error::Validation) if `ticker` is
     /// not found among the loaded tickers.
-    pub fn reset_bench_ticker(&mut self, ticker: &str) -> crate::Result<()> {
+    pub fn reset_bench_ticker(&mut self, ticker: &str) -> finstack_quant_core::Result<()> {
         let idx = self
             .ticker_names
             .iter()
@@ -788,14 +793,14 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::NotFound`] when `ticker` is not
+    /// Returns [`finstack_quant_core::InputError::NotFound`] when `ticker` is not
     /// among the loaded ticker names.
-    pub fn ticker_index(&self, ticker: &str) -> crate::Result<usize> {
+    pub fn ticker_index(&self, ticker: &str) -> finstack_quant_core::Result<usize> {
         self.ticker_names
             .iter()
             .position(|name| name == ticker)
             .ok_or_else(|| {
-                crate::error::InputError::NotFound {
+                finstack_quant_core::InputError::NotFound {
                     id: format!("ticker '{ticker}' (loaded: {:?})", self.ticker_names),
                 }
                 .into()
@@ -808,11 +813,11 @@ impl Performance {
     /// `cdar`, `parametric_var`, `cornish_fisher_var`, `modified_sharpe`)
     /// route through this guard so a confidence such as `95.0` or `1.0`
     /// surfaces as an explicit error rather than a `NaN` column.
-    fn ensure_confidence(confidence: f64) -> crate::Result<()> {
+    fn ensure_confidence(confidence: f64) -> finstack_quant_core::Result<()> {
         if confidence.is_finite() && confidence > 0.0 && confidence < 1.0 {
             Ok(())
         } else {
-            Err(crate::error::Error::Validation(format!(
+            Err(finstack_quant_core::Error::Validation(format!(
                 "confidence must lie in the open interval (0, 1); got {confidence}"
             )))
         }
@@ -823,9 +828,9 @@ impl Performance {
     /// A window longer than the active series still yields an empty
     /// [`crate::DatedSeries`] (there is simply no complete window); a zero
     /// window is a caller error and is rejected here.
-    fn ensure_window(window: usize) -> crate::Result<()> {
+    fn ensure_window(window: usize) -> finstack_quant_core::Result<()> {
         if window == 0 {
-            Err(crate::error::Error::Validation(
+            Err(finstack_quant_core::Error::Validation(
                 "rolling window must be at least 1 observation".to_string(),
             ))
         } else {
@@ -838,7 +843,7 @@ impl Performance {
     /// Per-ticker public methods route through this guard so an invalid index
     /// surfaces as an explicit error instead of silently producing an empty
     /// slice that downstream metrics turn into a plausible-looking `0.0`.
-    fn ensure_ticker_idx(&self, ticker_idx: usize) -> crate::Result<()> {
+    fn ensure_ticker_idx(&self, ticker_idx: usize) -> finstack_quant_core::Result<()> {
         if ticker_idx >= self.ticker_names.len() {
             tracing::debug!(
                 ticker_idx,
@@ -878,7 +883,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
     /// `ticker_idx` is outside the loaded ticker columns.
     ///
     /// # Arguments
@@ -890,7 +895,7 @@ impl Performance {
     ///
     /// The ticker's simple (non-compounded) returns as decimal fractions,
     /// e.g. `0.01` for `+1%`, in date order.
-    pub fn returns_for_ticker(&self, ticker_idx: usize) -> crate::Result<Vec<f64>> {
+    pub fn returns_for_ticker(&self, ticker_idx: usize) -> finstack_quant_core::Result<Vec<f64>> {
         self.ensure_ticker_idx(ticker_idx)?;
         Ok(self.active_returns(ticker_idx).to_vec())
     }
@@ -907,13 +912,16 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
     /// `ticker_idx` is outside the loaded ticker columns.
     ///
     /// # Arguments
     ///
     /// * `ticker_idx` - Zero-based column index of the ticker in the loaded performance panel.
-    pub fn active_dates_for_ticker(&self, ticker_idx: usize) -> crate::Result<&[Date]> {
+    pub fn active_dates_for_ticker(
+        &self,
+        ticker_idx: usize,
+    ) -> finstack_quant_core::Result<&[Date]> {
         self.ensure_ticker_idx(ticker_idx)?;
         Ok(self.active_dates_for_ticker_unchecked(ticker_idx))
     }
@@ -939,7 +947,7 @@ impl Performance {
     }
 
     fn ann(&self) -> f64 {
-        self.frequency.annualization_factor()
+        f64::from(self.frequency.periods_per_year())
     }
 
     /// Map a per-ticker closure over all tickers in column order.

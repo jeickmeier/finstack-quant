@@ -4,11 +4,11 @@
 //! columns. Lookups use column indices — no per-period `String` maps.
 
 use crate::types::NodeId;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::{Period, PeriodId, PeriodKind};
 use indexmap::IndexMap;
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use time::Date;
 
 /// Columnar history of evaluated node values, one row per period.
 #[derive(Debug, Clone, Default)]
@@ -150,12 +150,6 @@ impl PeriodHistory {
     #[must_use]
     pub fn len(&self) -> usize {
         self.rows.len()
-    }
-
-    /// Whether no periods have been stored.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.rows.is_empty()
     }
 
     /// Whether a row exists for `period`.

@@ -115,7 +115,6 @@ pub struct EquityTotalReturnSwap {
     /// unavailable.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -155,7 +154,6 @@ pub struct EquityTotalReturnSwap {
     /// not add continuous-yield dividend return to avoid double counting.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -221,7 +219,6 @@ struct EquityTotalReturnSwapUnchecked {
     /// the valuation date; the first period may use `initial_level` instead.
     /// Pricing errors when the current period's start level is unavailable.
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -256,7 +253,6 @@ struct EquityTotalReturnSwapUnchecked {
     /// When non-empty, pricing uses explicit period dividend pass-through and does
     /// not add continuous-yield dividend return to avoid double counting.
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -457,7 +453,10 @@ impl EquityTotalReturnSwap {
             if !amount.is_finite() || *amount < 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "EquityTRS '{}' discrete_dividends[{}] amount = {} on {} must be finite and non-negative",
-                    self.id.as_str(), i, amount, date
+                    self.id.as_str(),
+                    i,
+                    amount,
+                    date
                 )));
             }
         }
@@ -641,9 +640,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap 
     ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let (flows, projected_fixings) =
             crate::equity_trs::pricer::net_cashflows(self, context, as_of)?;
-        Ok(finstack_quant_cashflows::schedule_from_dated_flows(
+        finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
-            finstack_quant_cashflows::primitives::CFKind::Fixed,
+            finstack_quant_core::cashflow::CFKind::Fixed,
             self.financing_leg.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
@@ -654,7 +653,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap 
                     ..Default::default()
                 },
             },
-        ))
+        )
     }
 }
 

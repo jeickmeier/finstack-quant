@@ -1,8 +1,8 @@
 //! Portfolio valuation and aggregation.
 
-use crate::error::Result;
-use crate::portfolio::Portfolio;
 use crate::types::{EntityId, PositionId};
+use crate::Portfolio;
+use crate::Result;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -39,8 +39,7 @@ pub struct PositionValue {
     /// base currency's `Money` rounding).
     ///
     /// Absent when the native currency is the base currency (no FX lookup is
-    /// made), and on values deserialized from JSON written before this field
-    /// existed.
+    /// made).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fx_rate: Option<f64>,
 
@@ -102,7 +101,6 @@ pub struct PositionValue {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PortfolioValuation {
     /// Valuation date carried through from the portfolio.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -129,7 +127,6 @@ pub struct PortfolioValuation {
     /// [`as_of`](Self::as_of) through the market FX matrix; this records the
     /// applied [`FxConversionPolicy`] so the result envelope satisfies the
     /// policy-visibility invariant (the FX strategy is stamped, not implied).
-    #[serde(default = "default_fx_collapse_policy")]
     pub fx_collapse_policy: FxConversionPolicy,
 
     /// Request-local compatibility stamp used only for safe selective reuse.
@@ -139,12 +136,6 @@ pub struct PortfolioValuation {
     /// portfolio state and therefore falls back to a full evaluation.
     #[serde(skip)]
     pub(crate) provenance: Option<crate::evaluation::EvaluationProvenance>,
-}
-
-/// Default FX policy stamped on a [`PortfolioValuation`]: the spot-equivalent
-/// `as_of` conversion used by the portfolio spot FX helper.
-fn default_fx_collapse_policy() -> FxConversionPolicy {
-    FxConversionPolicy::CashflowDate
 }
 
 impl PortfolioValuation {
@@ -177,16 +168,6 @@ impl PortfolioValuation {
     /// * `entity_id` - Entity identifier to query (accepts `&str` or `&EntityId`).
     pub fn get_entity_value(&self, entity_id: &str) -> Option<&Money> {
         self.by_entity.get(entity_id)
-    }
-
-    /// Whether any position fell back to PV-only because its risk metrics
-    /// failed.
-    ///
-    /// Equivalent to `!self.degraded_positions.is_empty()`. Provided as a
-    /// named predicate so risk-report dashboards can read intent off the
-    /// call site instead of reasoning about empty-vector semantics.
-    pub fn has_degraded_risk(&self) -> bool {
-        !self.degraded_positions.is_empty()
     }
 }
 
@@ -289,7 +270,7 @@ impl RequestedMetrics {
 /// `false` only when a PV-preserving best-effort fallback is intentional.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct PortfolioValuationOptions {
     /// When `true` (default), any failure to compute the risk metrics
     /// requested of a position causes the entire portfolio valuation to fail.
@@ -340,14 +321,14 @@ impl Default for PortfolioValuationOptions {
 ///
 /// # Errors
 ///
-/// Returns [`crate::error::Error`] in the following cases:
+/// Returns [`crate::Error`] in the following cases:
 ///
-/// - [`crate::error::Error::ValuationError`] - Instrument pricing failed for a
+/// - [`crate::Error::ValuationError`] - Instrument pricing failed for a
 ///   position, or a requested risk metric failed while `strict_risk` is `true`
 ///   (the default)
-/// - [`crate::error::Error::MissingMarketData`] - FX matrix unavailable for cross-currency conversion
-/// - [`crate::error::Error::FxConversionFailed`] - Required FX rate not found in the matrix
-/// - [`crate::error::Error::Core`] - Monetary arithmetic overflow during aggregation
+/// - [`crate::Error::MissingMarketData`] - FX matrix unavailable for cross-currency conversion
+/// - [`crate::Error::FxConversionFailed`] - Required FX rate not found in the matrix
+/// - [`crate::Error::Core`] - Monetary arithmetic overflow during aggregation
 ///
 /// # Parallelism
 ///

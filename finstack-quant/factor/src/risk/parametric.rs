@@ -112,7 +112,8 @@ pub(super) fn scale_for_measure(
         }
         RiskMeasure::VaR { confidence } => {
             // Loss convention: VaR is reported as a negative number.
-            let z_score = finstack_quant_core::math::standard_normal_inv_cdf(*confidence);
+            let z_score =
+                finstack_quant_core::math::special_functions::standard_normal_inv_cdf(*confidence);
             if sigma > 0.0 {
                 (-sigma * z_score, -z_score * sigma.recip())
             } else {

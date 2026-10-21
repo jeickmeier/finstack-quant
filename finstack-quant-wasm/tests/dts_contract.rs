@@ -731,7 +731,7 @@ fn scenarios_dts_matches_structured_surface() {
     );
     assert!(contains_ignoring_ws(
         &dts,
-        "computeHorizonReturn(instrumentJson: JsonInput, marketJson: JsonInput, asOf: string, scenarioJson: JsonInput, method?: 'parallel' | 'waterfall' | 'metrics_based' | 'taylor', configJson?: JsonInput, calendarId?: string): HorizonReport;",
+        "computeHorizonReturn(instrumentJson: JsonInput, marketJson: JsonInput, asOf: string, scenarioJson: JsonInput, method?: JsonInput, configJson?: JsonInput, calendarId?: string): HorizonReport;",
     ));
     assert!(declares_type(&dts, "HorizonResult"));
     assert!(contains_ignoring_ws(
@@ -743,10 +743,12 @@ fn scenarios_dts_matches_structured_surface() {
         "applyScenario(scenarioJson: JsonInput, marketJson: JsonInput, asOf: string, modelJson?: JsonInput, instrumentsJson?: JsonInput, configJson?: JsonInput): ApplicationEnvelope;",
     ));
     assert!(!dts.contains("buildScenarioSpec("));
-    // Free-function twins of the Python OperationSpec / HorizonResult members:
-    // the omitted trailing arguments resolve to the Rust defaults.
+    // Free-function twins of the Python OperationSpec / HorizonResult members
+    // that compute in Rust: the omitted trailing arguments resolve to the Rust
+    // defaults. Variant constructors are TypeScript literals, not functions.
+    assert!(!dts.contains("operationSpecCurveParallelBp("));
     for signature in [
-        "operationSpecCurveParallelBp(curveKind: CurveKind, curveId: string, bp: number, discountCurveId?: string): OperationSpec;",
+        "parallelBpMany(curveKind: CurveKind, curveIds: string[], bp: number, discountCurveId?: string): OperationSpec[];",
         "operationSpecTimeRollForward(period: string, applyShocks?: boolean, rollMode?: TimeRollMode): OperationSpec;",
         "horizonResultExplainText(result: HorizonReport | HorizonResult | string): string;",
         "horizonResultFactorContribution(result: HorizonReport | HorizonResult | string, factor: AttributionFactor): number;",
@@ -833,11 +835,7 @@ fn campisi_dts_declarations_pin_their_argument_lists() {
     ));
     assert!(contains_signature(
         &dts,
-        "campisiCarinoLinkFromSnapshots(periodsJson: JsonInput, configJson: JsonInput): FiCarinoLinkedResult;",
-    ));
-    assert!(contains_signature(
-        &dts,
-        "campisiReconciliationCheck(resultJson: JsonInput, tolerance: number): FiReconciliationReport;",
+        "fiAttributionResultReconciliationCheck(result: FiAttributionResult | string, tolerance: number): ReconciliationReport;",
     ));
 
     // The results-based linker must not grow a config argument: it links
@@ -1087,7 +1085,7 @@ fn statements_analytics_dts_matches_runtime_exports() {
     // Rust `DcfOptions` document, not a hand-picked subset of scalars.
     assert!(contains_ignoring_ws(
         &dts,
-        "dcfSensitivity(modelJson: JsonInput, wacc: number, terminalValueJson: JsonInput, ufcfNode?: string | null, netDebtOverride?: number | null, optionsJson?: JsonInput | null, marketJson?: JsonInput | null): DcfSensitivityResult;",
+        "dcfSensitivity(modelJson: JsonInput, wacc: number, terminalValueJson: JsonInput, ufcfNode?: string | null, netDebtOverride?: number | null, optionsJson?: JsonInput | null): DcfSensitivityResult;",
     ));
     // evaluateLbo takes the Rust `LboConfig` (check mappings included) and
     // returns its check report.
@@ -1316,12 +1314,16 @@ fn core_market_data_dts_exposes_data_only_vol_cube() {
     }
     let constructor = interface_block(&dts, "VolCubeConstructor");
     assert!(constructor.contains("interpolationMode?: string"));
-    for input in ["expiries", "tenors", "paramsFlat", "forwards"] {
+    for input in ["expiries", "tenors", "forwardsRowMajor"] {
         assert!(
             contains_ignoring_ws(constructor, &format!("{input}: NumericArray")),
             "VolCube constructor must accept NumericArray for {input}"
         );
     }
+    assert!(
+        contains_ignoring_ws(constructor, "paramsRowMajor: SabrParameterData[] | string"),
+        "VolCube constructor takes SABR node objects (or their JSON text)"
+    );
 }
 
 #[test]
@@ -1335,7 +1337,6 @@ fn core_market_data_dts_exposes_data_only_fx_surface_and_rate_result() {
         surface,
         "readonly expiries: Float64Array;"
     ));
-    assert!(contains_signature(surface, "readonly numExpiries: number;"));
     for removed_method in ["pillarVols(", "impliedVol("] {
         assert!(
             !surface.contains(removed_method),
@@ -1815,7 +1816,7 @@ fn rust_computation_twins_are_declared() {
         "calibrationResultContentHash(resultJson: CalibrationResultEnvelope | string): string;",
         "attributePnlMany(inputs: AttributionInputs | string, instruments: JsonInput[] | string): PnlAttribution[];",
         "attributeReturnContribution(spec: JsonInput): ReturnContributionResult;",
-        "pnlAttributionExplainText(pnl: PnlAttribution | string): string;",
+        "pnlAttributionExplainText(pnl: PnlAttribution | string, showZeros?: boolean | null): string;",
         "financialModelContentHash(modelJson: JsonInput): string;",
         "nodeToDatedSchedule(modelJson: JsonInput, resultJson: StatementResult | string, nodeId: string, convention?: 'end' | 'start' | null): [string, number][];",
         "scenarioComparisonTable(scenarioResultsJson: ScenarioResults | string, metrics: string[]): TableEnvelope;",
@@ -1856,7 +1857,7 @@ fn typed_cashflows_and_covenants_surface_is_declared() {
         "build(market?: MarketContext | null): CashFlowSchedule;",
         "buildCashflowSchedule(spec: generated.cashflows.CashflowScheduleBuildSpec | string, market?: MarketContext | null): CashFlowSchedule;",
         "scaleAmounts(scale: number): CashFlowSchedule;",
-        "pvByPeriod(periods: readonly generated.statements.Period[], market: MarketContext, discCurveId: string, base: string, dayCount?: generated.core.DayCount | null, creditCurveId?: string | null): generated.cashflows.PeriodAggregation;",
+        "pvByPeriod(periods: readonly generated.core.Period[], market: MarketContext, discCurveId: string, base: string, creditCurveId?: string | null): generated.cashflows.PeriodAggregation;",
         "fixedToFloat(switchDate: string, fixed: generated.cashflows.FixedCouponSpec, floating: generated.cashflows.FloatingCouponSpec): CashFlowBuilder;",
         "accruedInterestAmount(schedule: CashFlowSchedule, asOf: string, config?: generated.cashflows.AccrualConfig | null): MoneyValue;",
         "accruedAt(asOf: string): MoneyValue;",

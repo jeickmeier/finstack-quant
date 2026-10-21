@@ -94,7 +94,6 @@ pub struct FxDigitalOption {
     /// is the notional of foreign currency delivered)
     pub payout_amount: Money,
     /// Option expiry date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

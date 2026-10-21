@@ -41,10 +41,10 @@
 
 use crate::volatility::arbitrage::DEFAULT_ARBITRAGE_TOLERANCE;
 use crate::volatility::dupire::{dupire_node, MoneynessLookup};
-use finstack_quant_core::error::InputError;
 use finstack_quant_core::market_data::surfaces::{
     VolGridOpts, VolQuoteType, VolSurface, VolSurfaceAxis,
 };
+use finstack_quant_core::InputError;
 use finstack_quant_core::{Error, Result};
 
 fn validate_implied_surface(surface: &VolSurface, forwards: &[f64]) -> Result<()> {
@@ -554,7 +554,18 @@ mod tests {
         let (base, forwards) = test_surface();
         let shifted = base.clone().with_displacements(&[20.0; 4]).unwrap();
         let normal = base.clone().with_quote_type(VolQuoteType::Normal).unwrap();
-        let tenor_grid = base.with_secondary_axis(VolSurfaceAxis::Tenor);
+        let tenor_grid = VolSurface::from_grid_opts(
+            base.id(),
+            base.expiries(),
+            base.strikes(),
+            base.vols(),
+            VolGridOpts {
+                secondary_axis: VolSurfaceAxis::Tenor,
+                ..VolGridOpts::default()
+            },
+            None,
+        )
+        .expect("tenor surface");
         for surface in [shifted, normal, tenor_grid] {
             let expected_error = LocalVolSurface::from_implied_vol(&surface, &forwards)
                 .expect_err("unshifted Black extraction must reject incompatible metadata")

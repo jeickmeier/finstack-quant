@@ -1,22 +1,25 @@
 //! Portfolio-level P&L attribution bindings.
 
-use crate::bindings::attribution::pnl_attribution::PyPnlAttribution;
+use crate::bindings::attribution::pnl_attribution::{PyPnlAttribution, WIDE_COLUMNS};
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};
 use crate::bindings::module_utils::py_to_json_string;
 use crate::bindings::pandas_utils::{
-    dict_to_dataframe, serde_object_to_single_row_dataframe_with_schema,
+    serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
+    ColumnSchema,
 };
 use crate::errors::{display_to_py, portfolio_to_py, serde_json_to_py};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-/// Reconciliation of the portfolio factor buckets against ``total_pnl``.
+/// Reconciliation of an attribution's effect buckets against its total.
 ///
-/// Returned by :meth:`PortfolioAttribution.reconciliation_check`. The residual
-/// is ``total_pnl - (sum of factor buckets + fx_translation_pnl)`` in the
-/// portfolio base currency; ``is_reconciled`` is forced ``False`` when the
-/// attribution was flagged invalid, whatever the numeric residual.
+/// Returned by :meth:`PortfolioAttribution.reconciliation_check`, where the
+/// residual is ``total_pnl - (sum of factor buckets + fx_translation_pnl)`` in
+/// the portfolio base currency and ``is_reconciled`` is forced ``False`` when
+/// the attribution was flagged invalid, and by
+/// :meth:`FiAttributionResult.reconciliation_check`, where it is
+/// ``active_return`` minus the five Campisi effect totals in return units.
 #[pyclass(
     name = "ReconciliationReport",
     module = "finstack_quant.portfolio",
@@ -36,19 +39,21 @@ crate::bindings::macros::wire_methods!(
 
 #[pymethods]
 impl PyReconciliationReport {
-    /// Unexplained base-currency amount after all buckets are summed.
+    /// Unexplained amount after all buckets are summed (base currency for P&L
+    /// attribution, return units for Campisi attribution).
     #[getter]
     fn total_residual(&self) -> f64 {
         self.inner.total_residual
     }
 
-    /// Whether ``abs(total_residual) <= tolerance`` and the attribution is valid.
+    /// Whether ``abs(total_residual) <= tolerance`` (and, for P&L attribution,
+    /// the attribution is valid).
     #[getter]
     fn is_reconciled(&self) -> bool {
         self.inner.is_reconciled
     }
 
-    /// Absolute base-currency tolerance used for the check.
+    /// Absolute tolerance used for the check, in the units of ``total_residual``.
     #[getter]
     fn tolerance(&self) -> f64 {
         self.inner.tolerance
@@ -162,43 +167,46 @@ impl PyPortfolioAttribution {
     /// Export the per-position native-currency attributions as a pandas
     /// ``DataFrame``, one row per position.
     ///
-    /// Columns: ``position_id``, ``currency`` (native), ``total_pnl``,
-    /// ``carry``, ``rates_curves_pnl``, ``credit_curves_pnl``,
-    /// ``inflation_curves_pnl``, ``correlations_pnl``, ``fx_pnl``,
-    /// ``cross_factor_pnl``, ``vol_pnl``, ``model_params_pnl``,
-    /// ``market_scalars_pnl``, ``residual``, ``result_invalid``.
+    /// Each row is ``position_id`` followed by the canonical Rust wide row
+    /// (``finstack_quant_attribution::long_rows::pnl_attribution_wide_row``) of
+    /// that position's attribution, the same columns as
+    /// :meth:`finstack_quant.attribution.PnlAttribution.to_dataframe`:
+    /// ``instrument_id``, ``method``, ``t0``, ``t1``, ``currency`` (native),
+    /// ``total_pnl``, ``mark_to_market_pnl``, ``pv_t0``, ``pv_t1``, ``carry``,
+    /// ``rates_curves_pnl``, ``credit_curves_pnl``, ``inflation_curves_pnl``,
+    /// ``correlations_pnl``, ``fx_pnl``, ``fx_translation_pnl``, ``vol_pnl``,
+    /// ``cross_factor_pnl``, ``model_params_pnl``, ``market_scalars_pnl``,
+    /// ``residual``, ``residual_pct``, ``num_repricings``, ``result_invalid``.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If a position attribution mixes currencies across its factors.
     #[pyo3(text_signature = "(self)")]
     fn to_position_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows = &self.inner.by_position;
-        let data = PyDict::new(py);
-        let ids: Vec<&str> = rows.keys().map(|id| id.as_str()).collect();
-        data.set_item("position_id", ids)?;
-        let currencies: Vec<String> = rows
-            .values()
-            .map(|a| a.total_pnl.currency().to_string())
-            .collect();
-        data.set_item("currency", currencies)?;
-        macro_rules! money_column {
-            ($name:literal, $field:ident) => {
-                let values: Vec<f64> = rows.values().map(|a| a.$field.amount()).collect();
-                data.set_item($name, values)?;
-            };
+        #[derive(serde::Serialize)]
+        struct PositionRow<'a> {
+            position_id: &'a str,
+            #[serde(flatten)]
+            row: finstack_quant_attribution::long_rows::PnlAttributionWideRow,
         }
-        money_column!("total_pnl", total_pnl);
-        money_column!("carry", carry);
-        money_column!("rates_curves_pnl", rates_curves_pnl);
-        money_column!("credit_curves_pnl", credit_curves_pnl);
-        money_column!("inflation_curves_pnl", inflation_curves_pnl);
-        money_column!("correlations_pnl", correlations_pnl);
-        money_column!("fx_pnl", fx_pnl);
-        money_column!("cross_factor_pnl", cross_factor_pnl);
-        money_column!("vol_pnl", vol_pnl);
-        money_column!("model_params_pnl", model_params_pnl);
-        money_column!("market_scalars_pnl", market_scalars_pnl);
-        money_column!("residual", residual);
-        let invalid: Vec<bool> = rows.values().map(|a| a.result_invalid).collect();
-        data.set_item("result_invalid", invalid)?;
-        dict_to_dataframe(py, &data, None)
+        let rows =
+            self.inner
+                .by_position
+                .iter()
+                .map(|(id, attribution)| {
+                    finstack_quant_attribution::long_rows::pnl_attribution_wide_row(attribution)
+                        .map(|row| PositionRow {
+                            position_id: id.as_str(),
+                            row,
+                        })
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(crate::errors::core_to_py)?;
+        let columns: Vec<ColumnSchema<'static>> = std::iter::once(("position_id", "str"))
+            .chain(WIDE_COLUMNS)
+            .collect();
+        serde_rows_to_dataframe_with_schema(py, &rows, &columns)
     }
 
     /// Human-readable explanation tree of the portfolio-level buckets with
@@ -418,7 +426,7 @@ fn attribute_portfolio_pnl(
         .map(|value| py_to_json_string(py, value, "config"))
         .transpose()?;
     let (method, config): (
-        finstack_quant_portfolio::attribution::AttributionMethod,
+        finstack_quant_attribution::AttributionMethod,
         finstack_quant_core::config::FinstackConfig,
     ) = py.detach(move || {
         let method = serde_json::from_str(&method_json)

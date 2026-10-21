@@ -4,9 +4,14 @@ use super::types::*;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{int_values_to_series, values_to_series};
 use crate::errors::analytics_to_py;
-use finstack_quant_analytics as fa;
+use finstack_quant_analytics::{
+    CagrDayCount, Performance, ReturnKind, DEFAULT_ANNUALIZE, DEFAULT_CONFIDENCE,
+    DEFAULT_DRAWDOWN_COUNT, DEFAULT_FREQUENCY, DEFAULT_MAR, DEFAULT_PERIODIC_FREQUENCY,
+    DEFAULT_PERIODS_PER_YEAR, DEFAULT_RISK_FREE_RATE, DEFAULT_ROLLING_WINDOW,
+};
 use finstack_quant_core::dates::{FiscalConfig, HolidayCalendar, PeriodKind};
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyTypeError;
@@ -15,22 +20,15 @@ use pyo3::types::PyDict;
 
 type PyPeriodicReturnPanel<'py> = Vec<Vec<(Bound<'py, PyAny>, f64)>>;
 
-/// Resolve optional fiscal-year-start month/day through the Rust rule
-/// ([`FiscalConfig::from_parts`]): `None` when both are omitted, otherwise the
-/// omitted half is January / the 1st.
-fn make_fiscal_config(month: Option<u8>, day: Option<u8>) -> PyResult<Option<FiscalConfig>> {
-    FiscalConfig::from_parts(month, day).map_err(analytics_to_py)
-}
-
-fn parse_cagr_day_count(day_count: Option<&Bound<'_, PyAny>>) -> PyResult<fa::CagrDayCount> {
+fn parse_cagr_day_count(day_count: Option<&Bound<'_, PyAny>>) -> PyResult<CagrDayCount> {
     let Some(value) = day_count.filter(|value| !value.is_none()) else {
-        return Ok(fa::CagrDayCount::default());
+        return Ok(CagrDayCount::default());
     };
     if let Ok(day_count) = value.extract::<PyRef<'_, PyDayCount>>() {
-        return Ok(fa::CagrDayCount::DayCount(day_count.inner));
+        return Ok(CagrDayCount::DayCount(day_count.inner));
     }
     if let Ok(label) = value.extract::<String>() {
-        return label.parse::<fa::CagrDayCount>().map_err(analytics_to_py);
+        return label.parse::<CagrDayCount>().map_err(analytics_to_py);
     }
     Err(PyTypeError::new_err(
         "day_count must be None, 'act365_25', a DayCount name such as 'act_365f', or a DayCount",
@@ -77,7 +75,7 @@ fn extract_f64_vec(obj: &Bound<'_, PyAny>, label: &str) -> PyResult<Vec<f64>> {
 /// Decomposed DataFrame: dates, column-major numeric values, and ticker names.
 struct DataFramePanel {
     /// Chronological observation dates.
-    dates: Vec<time::Date>,
+    dates: Vec<finstack_quant_core::dates::Date>,
     /// `columns[ticker_idx][date_idx]`.
     columns: Vec<Vec<f64>>,
     /// Column names from the DataFrame.
@@ -174,24 +172,24 @@ fn series_to_frame<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>
 }
 
 type PerformanceBuilder = fn(
-    Vec<time::Date>,
+    Vec<finstack_quant_core::dates::Date>,
     Vec<Vec<f64>>,
     Vec<String>,
     Option<&str>,
     PeriodKind,
-) -> finstack_quant_core::Result<fa::Performance>;
+) -> finstack_quant_core::Result<Performance>;
 
 /// Build a `Performance` from pre-extracted panel arrays using the given Rust constructor.
 fn build_performance_with(
     py: Python<'_>,
-    dates: Vec<time::Date>,
+    dates: Vec<finstack_quant_core::dates::Date>,
     columns: Vec<Vec<f64>>,
     ticker_names: Vec<String>,
     benchmark_ticker: Option<&str>,
     frequency: Option<&str>,
     ctor: PerformanceBuilder,
 ) -> PyResult<PyPerformance> {
-    let period_kind = parse_frequency(frequency, fa::DEFAULT_FREQUENCY)?;
+    let period_kind = parse_frequency(frequency, DEFAULT_FREQUENCY)?;
     let inner = py
         .detach(|| ctor(dates, columns, ticker_names, benchmark_ticker, period_kind))
         .map_err(analytics_to_py)?;
@@ -209,7 +207,7 @@ fn build_performance_with(
 /// yields correctly-named columns.
 #[pyclass(name = "Performance", module = "finstack_quant.analytics")]
 pub(super) struct PyPerformance {
-    inner: fa::Performance,
+    inner: Performance,
 }
 
 impl PyPerformance {
@@ -278,7 +276,7 @@ impl PyPerformance {
             panel.ticker_names,
             benchmark_ticker,
             frequency,
-            fa::Performance::new,
+            Performance::new,
         )
     }
 
@@ -301,7 +299,7 @@ impl PyPerformance {
             ticker_names,
             benchmark_ticker,
             frequency,
-            fa::Performance::new,
+            Performance::new,
         )
     }
 
@@ -331,7 +329,7 @@ impl PyPerformance {
             panel.ticker_names,
             benchmark_ticker,
             frequency,
-            fa::Performance::from_returns,
+            Performance::from_returns,
         )
     }
 
@@ -354,7 +352,7 @@ impl PyPerformance {
             ticker_names,
             benchmark_ticker,
             frequency,
-            fa::Performance::from_returns,
+            Performance::from_returns,
         )
     }
 
@@ -475,7 +473,7 @@ impl PyPerformance {
     /// -------
     /// pandas.Series
     ///     Mean return indexed by ticker name.
-    #[pyo3(signature = (annualize = fa::DEFAULT_ANNUALIZE))]
+    #[pyo3(signature = (annualize = DEFAULT_ANNUALIZE))]
     fn mean_return<'py>(&self, py: Python<'py>, annualize: bool) -> PyResult<Bound<'py, PyAny>> {
         let values = self.inner.mean_return(annualize);
         values_to_series(py, values, self.inner.ticker_names(), "mean_return")
@@ -487,7 +485,7 @@ impl PyPerformance {
     /// -------
     /// pandas.Series
     ///     Standard deviation of returns indexed by ticker name.
-    #[pyo3(signature = (annualize = fa::DEFAULT_ANNUALIZE))]
+    #[pyo3(signature = (annualize = DEFAULT_ANNUALIZE))]
     fn volatility<'py>(&self, py: Python<'py>, annualize: bool) -> PyResult<Bound<'py, PyAny>> {
         let values = self.inner.volatility(annualize);
         values_to_series(py, values, self.inner.ticker_names(), "volatility")
@@ -502,7 +500,7 @@ impl PyPerformance {
     /// -------
     /// pandas.Series
     ///     Sharpe ratio indexed by ticker name.
-    #[pyo3(signature = (risk_free_rate = fa::DEFAULT_RISK_FREE_RATE))]
+    #[pyo3(signature = (risk_free_rate = DEFAULT_RISK_FREE_RATE))]
     fn sharpe<'py>(&self, py: Python<'py>, risk_free_rate: f64) -> PyResult<Bound<'py, PyAny>> {
         let values = self.inner.sharpe(risk_free_rate);
         values_to_series(py, values, self.inner.ticker_names(), "sharpe")
@@ -517,7 +515,7 @@ impl PyPerformance {
     /// -------
     /// pandas.Series
     ///     Sortino ratio indexed by ticker name.
-    #[pyo3(signature = (mar = fa::DEFAULT_MAR))]
+    #[pyo3(signature = (mar = DEFAULT_MAR))]
     fn sortino<'py>(&self, py: Python<'py>, mar: f64) -> PyResult<Bound<'py, PyAny>> {
         let values = self.inner.sortino(mar);
         values_to_series(py, values, self.inner.ticker_names(), "sortino")
@@ -565,7 +563,7 @@ impl PyPerformance {
     /// -------
     /// pandas.Series
     ///     Historical value at risk indexed by ticker name.
-    #[pyo3(signature = (confidence = fa::DEFAULT_CONFIDENCE))]
+    #[pyo3(signature = (confidence = DEFAULT_CONFIDENCE))]
     fn value_at_risk<'py>(&self, py: Python<'py>, confidence: f64) -> PyResult<Bound<'py, PyAny>> {
         let values = self
             .inner
@@ -580,7 +578,7 @@ impl PyPerformance {
     /// -------
     /// pandas.Series
     ///     Expected shortfall indexed by ticker name.
-    #[pyo3(signature = (confidence = fa::DEFAULT_CONFIDENCE))]
+    #[pyo3(signature = (confidence = DEFAULT_CONFIDENCE))]
     fn expected_shortfall<'py>(
         &self,
         py: Python<'py>,
@@ -657,7 +655,7 @@ impl PyPerformance {
     /// -------
     /// pandas.Series
     ///     Downside deviation indexed by ticker name.
-    #[pyo3(signature = (mar = fa::DEFAULT_MAR))]
+    #[pyo3(signature = (mar = DEFAULT_MAR))]
     fn downside_deviation<'py>(&self, py: Python<'py>, mar: f64) -> PyResult<Bound<'py, PyAny>> {
         let values = self.inner.downside_deviation(mar);
         values_to_series(py, values, self.inner.ticker_names(), "downside_deviation")
@@ -719,7 +717,7 @@ impl PyPerformance {
     /// -------
     /// pandas.Series
     ///     Omega ratio indexed by ticker name.
-    #[pyo3(signature = (threshold = fa::DEFAULT_MAR))]
+    #[pyo3(signature = (threshold = DEFAULT_MAR))]
     fn omega_ratio<'py>(&self, py: Python<'py>, threshold: f64) -> PyResult<Bound<'py, PyAny>> {
         let values = self.inner.omega_ratio(threshold);
         values_to_series(py, values, self.inner.ticker_names(), "omega_ratio")
@@ -735,7 +733,7 @@ impl PyPerformance {
     /// -------
     /// pandas.Series
     ///     Treynor ratio indexed by ticker name.
-    #[pyo3(signature = (risk_free_rate = fa::DEFAULT_RISK_FREE_RATE))]
+    #[pyo3(signature = (risk_free_rate = DEFAULT_RISK_FREE_RATE))]
     fn treynor<'py>(&self, py: Python<'py>, risk_free_rate: f64) -> PyResult<Bound<'py, PyAny>> {
         let values = self.inner.treynor(risk_free_rate);
         values_to_series(py, values, self.inner.ticker_names(), "treynor")
@@ -806,7 +804,7 @@ impl PyPerformance {
     ///     CAGR minus the annualized risk-free rate, divided by the pain
     ///     index and indexed by ticker name. Non-finite risk-free rates
     ///     give ``NaN``, including when the pain index is zero.
-    #[pyo3(signature = (risk_free_rate = fa::DEFAULT_RISK_FREE_RATE))]
+    #[pyo3(signature = (risk_free_rate = DEFAULT_RISK_FREE_RATE))]
     fn pain_ratio<'py>(&self, py: Python<'py>, risk_free_rate: f64) -> PyResult<Bound<'py, PyAny>> {
         let values = self
             .inner
@@ -821,7 +819,7 @@ impl PyPerformance {
     /// -------
     /// pandas.Series
     ///     Tail ratio indexed by ticker name.
-    #[pyo3(signature = (confidence = fa::DEFAULT_CONFIDENCE))]
+    #[pyo3(signature = (confidence = DEFAULT_CONFIDENCE))]
     fn tail_ratio<'py>(&self, py: Python<'py>, confidence: f64) -> PyResult<Bound<'py, PyAny>> {
         let values = self.inner.tail_ratio(confidence).map_err(analytics_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "tail_ratio")
@@ -858,7 +856,7 @@ impl PyPerformance {
     /// -------
     /// pandas.Series
     ///     Parametric value at risk indexed by ticker name.
-    #[pyo3(signature = (confidence = fa::DEFAULT_CONFIDENCE, horizon_periods = None))]
+    #[pyo3(signature = (confidence = DEFAULT_CONFIDENCE, horizon_periods = None))]
     fn parametric_var<'py>(
         &self,
         py: Python<'py>,
@@ -881,7 +879,7 @@ impl PyPerformance {
     /// -------
     /// pandas.Series
     ///     Cornish-Fisher modified value at risk indexed by ticker name.
-    #[pyo3(signature = (confidence = fa::DEFAULT_CONFIDENCE, horizon_periods = None))]
+    #[pyo3(signature = (confidence = DEFAULT_CONFIDENCE, horizon_periods = None))]
     fn cornish_fisher_var<'py>(
         &self,
         py: Python<'py>,
@@ -901,7 +899,7 @@ impl PyPerformance {
     /// -------
     /// pandas.Series
     ///     Conditional drawdown at risk indexed by ticker name.
-    #[pyo3(signature = (confidence = fa::DEFAULT_CONFIDENCE))]
+    #[pyo3(signature = (confidence = DEFAULT_CONFIDENCE))]
     fn cdar<'py>(&self, py: Python<'py>, confidence: f64) -> PyResult<Bound<'py, PyAny>> {
         let values = self.inner.cdar(confidence).map_err(analytics_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "cdar")
@@ -913,7 +911,7 @@ impl PyPerformance {
     /// -------
     /// pandas.Series
     ///     M-squared measure indexed by ticker name.
-    #[pyo3(signature = (risk_free_rate = fa::DEFAULT_RISK_FREE_RATE))]
+    #[pyo3(signature = (risk_free_rate = DEFAULT_RISK_FREE_RATE))]
     fn m_squared<'py>(&self, py: Python<'py>, risk_free_rate: f64) -> PyResult<Bound<'py, PyAny>> {
         let values = self.inner.m_squared(risk_free_rate);
         values_to_series(py, values, self.inner.ticker_names(), "m_squared")
@@ -931,7 +929,7 @@ impl PyPerformance {
     /// -------
     /// pandas.Series
     ///     Modified Sharpe ratio indexed by ticker name.
-    #[pyo3(signature = (risk_free_rate = fa::DEFAULT_RISK_FREE_RATE, confidence = fa::DEFAULT_CONFIDENCE))]
+    #[pyo3(signature = (risk_free_rate = DEFAULT_RISK_FREE_RATE, confidence = DEFAULT_CONFIDENCE))]
     fn modified_sharpe<'py>(
         &self,
         py: Python<'py>,
@@ -952,7 +950,7 @@ impl PyPerformance {
     /// pandas.Series
     ///     Sterling ratio indexed by ticker name. Non-finite risk-free
     ///     rates give ``NaN``, including when no drawdowns are observed.
-    #[pyo3(signature = (risk_free_rate = fa::DEFAULT_RISK_FREE_RATE, n = fa::DEFAULT_DRAWDOWN_COUNT))]
+    #[pyo3(signature = (risk_free_rate = DEFAULT_RISK_FREE_RATE, n = DEFAULT_DRAWDOWN_COUNT))]
     fn sterling_ratio<'py>(
         &self,
         py: Python<'py>,
@@ -973,7 +971,7 @@ impl PyPerformance {
     /// pandas.Series
     ///     Burke ratio indexed by ticker name. Non-finite risk-free rates
     ///     give ``NaN``, including when no drawdowns are observed.
-    #[pyo3(signature = (risk_free_rate = fa::DEFAULT_RISK_FREE_RATE, n = fa::DEFAULT_DRAWDOWN_COUNT))]
+    #[pyo3(signature = (risk_free_rate = DEFAULT_RISK_FREE_RATE, n = DEFAULT_DRAWDOWN_COUNT))]
     fn burke_ratio<'py>(
         &self,
         py: Python<'py>,
@@ -1032,7 +1030,7 @@ impl PyPerformance {
         py: Python<'py>,
         frequency: Option<&str>,
     ) -> PyResult<PyPeriodicReturnPanel<'py>> {
-        let kind = parse_frequency(frequency, fa::DEFAULT_PERIODIC_FREQUENCY)?;
+        let kind = parse_frequency(frequency, DEFAULT_PERIODIC_FREQUENCY)?;
         let panel = self.inner.periodic_returns(kind);
         panel
             .into_iter()
@@ -1108,7 +1106,7 @@ impl PyPerformance {
     }
 
     /// Greeks (annualized Jensen alpha, beta, R²) for each ticker vs benchmark.
-    #[pyo3(signature = (risk_free_rate = fa::DEFAULT_RISK_FREE_RATE))]
+    #[pyo3(signature = (risk_free_rate = DEFAULT_RISK_FREE_RATE))]
     fn greeks(&self, risk_free_rate: f64) -> Vec<PyGreeksResult> {
         self.inner
             .greeks(risk_free_rate)
@@ -1118,7 +1116,7 @@ impl PyPerformance {
     }
 
     /// Rolling greeks for a specific ticker.
-    #[pyo3(signature = (ticker_idx, window = fa::DEFAULT_ROLLING_WINDOW, risk_free_rate = fa::DEFAULT_RISK_FREE_RATE))]
+    #[pyo3(signature = (ticker_idx, window = DEFAULT_ROLLING_WINDOW, risk_free_rate = DEFAULT_RISK_FREE_RATE))]
     fn rolling_greeks(
         &self,
         py: Python<'_>,
@@ -1137,7 +1135,7 @@ impl PyPerformance {
     }
 
     /// Rolling volatility for a specific ticker.
-    #[pyo3(signature = (ticker_idx, window = fa::DEFAULT_ROLLING_WINDOW))]
+    #[pyo3(signature = (ticker_idx, window = DEFAULT_ROLLING_WINDOW))]
     fn rolling_volatility(
         &self,
         py: Python<'_>,
@@ -1152,7 +1150,7 @@ impl PyPerformance {
     }
 
     /// Rolling Sortino for a specific ticker.
-    #[pyo3(signature = (ticker_idx, window = fa::DEFAULT_ROLLING_WINDOW, mar = fa::DEFAULT_MAR))]
+    #[pyo3(signature = (ticker_idx, window = DEFAULT_ROLLING_WINDOW, mar = DEFAULT_MAR))]
     fn rolling_sortino(
         &self,
         py: Python<'_>,
@@ -1168,7 +1166,7 @@ impl PyPerformance {
     }
 
     /// Rolling Sharpe for a specific ticker.
-    #[pyo3(signature = (ticker_idx, window = fa::DEFAULT_ROLLING_WINDOW, risk_free_rate = fa::DEFAULT_RISK_FREE_RATE))]
+    #[pyo3(signature = (ticker_idx, window = DEFAULT_ROLLING_WINDOW, risk_free_rate = DEFAULT_RISK_FREE_RATE))]
     fn rolling_sharpe(
         &self,
         py: Python<'_>,
@@ -1187,7 +1185,7 @@ impl PyPerformance {
     }
 
     /// Drawdown episodes for a specific ticker.
-    #[pyo3(signature = (ticker_idx, n = fa::DEFAULT_DRAWDOWN_COUNT))]
+    #[pyo3(signature = (ticker_idx, n = DEFAULT_DRAWDOWN_COUNT))]
     fn drawdown_details(
         &self,
         ticker_idx: &Bound<'_, PyAny>,
@@ -1215,7 +1213,7 @@ impl PyPerformance {
     /// or a fitted coefficient, annualized intercept, or residual volatility
     /// cannot be represented as a finite value. Constant responses retain
     /// undefined NaN R-squared statistics.
-    #[pyo3(signature = (ticker_idx, factor_returns, return_kind = None, risk_free_rate = fa::DEFAULT_RISK_FREE_RATE))]
+    #[pyo3(signature = (ticker_idx, factor_returns, return_kind = None, risk_free_rate = DEFAULT_RISK_FREE_RATE))]
     fn multi_factor_greeks(
         &self,
         py: Python<'_>,
@@ -1226,8 +1224,7 @@ impl PyPerformance {
     ) -> PyResult<PyMultiFactorResult> {
         let ticker_idx = self.resolve_ticker(ticker_idx)?;
         let refs: Vec<&[f64]> = factor_returns.iter().map(|v| v.as_slice()).collect();
-        let kind =
-            fa::ReturnKind::from_label(return_kind, risk_free_rate).map_err(analytics_to_py)?;
+        let kind = ReturnKind::from_label(return_kind, risk_free_rate).map_err(analytics_to_py)?;
         py.detach(|| self.inner.multi_factor_greeks(ticker_idx, &refs, kind))
             .map(|r| PyMultiFactorResult { inner: r })
             .map_err(analytics_to_py)
@@ -1261,7 +1258,8 @@ impl PyPerformance {
         fiscal_year_start_day: Option<u8>,
     ) -> PyResult<PyLookbackReturns> {
         let d = py_to_date(&ref_date)?;
-        let fc = make_fiscal_config(fiscal_year_start_month, fiscal_year_start_day)?;
+        let fc = FiscalConfig::from_parts(fiscal_year_start_month, fiscal_year_start_day)
+            .map_err(analytics_to_py)?;
         Ok(PyLookbackReturns {
             inner: self.inner.lookback_returns(d, fc),
         })
@@ -1277,8 +1275,9 @@ impl PyPerformance {
         fiscal_year_start_day: Option<u8>,
     ) -> PyResult<PyPeriodStats> {
         let ticker_idx = self.resolve_ticker(ticker_idx)?;
-        let pk = parse_frequency(aggregation_frequency, fa::DEFAULT_PERIODIC_FREQUENCY)?;
-        let fc = make_fiscal_config(fiscal_year_start_month, fiscal_year_start_day)?;
+        let pk = parse_frequency(aggregation_frequency, DEFAULT_PERIODIC_FREQUENCY)?;
+        let fc = FiscalConfig::from_parts(fiscal_year_start_month, fiscal_year_start_day)
+            .map_err(analytics_to_py)?;
         Ok(PyPeriodStats {
             inner: self
                 .inner
@@ -1300,7 +1299,7 @@ impl PyPerformance {
     /// :meth:`sortino`, :meth:`downside_deviation`, or :meth:`omega_ratio`
     /// directly for non-zero thresholds. ``confidence`` applies to
     /// ``value_at_risk``, ``expected_shortfall``, and ``tail_ratio``.
-    #[pyo3(signature = (risk_free_rate = fa::DEFAULT_RISK_FREE_RATE, confidence = fa::DEFAULT_CONFIDENCE))]
+    #[pyo3(signature = (risk_free_rate = DEFAULT_RISK_FREE_RATE, confidence = DEFAULT_CONFIDENCE))]
     fn to_dataframe<'py>(
         &self,
         py: Python<'py>,
@@ -1316,31 +1315,6 @@ impl PyPerformance {
         envelope_to_pandas(py, &table)?.call_method1("set_index", ("ticker",))
     }
 
-    /// Serialize authoritative engine inputs (dates, returns, spans, benchmark,
-    /// frequency, active window) to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_to_json(&self.inner)
-    }
-
-    /// Rebuild an engine from :meth:`to_json` output.
-    ///
-    /// Revalidates dates, returns, spans, unique names, benchmark, and active
-    /// window, then rebuilds caches. Raises ``ValueError`` for invalid inputs
-    /// or unknown fields, including obsolete serialized caches.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: fa::Performance = serde_json::from_str(json)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid Performance JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` (and therefore ``copy.deepcopy``, ``joblib``,
-    /// ``multiprocessing``) via the :meth:`to_json` / :meth:`from_json` pair.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        pickle_reduce_json::<Self>(py, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Returns a compact summary of the serialized fields, with collections
@@ -1352,6 +1326,8 @@ impl PyPerformance {
     }
 }
 
+wire_methods!(PyPerformance, Performance, "Performance");
+
 /// Sharpe ratio of one return series.
 ///
 /// Annualized excess arithmetic mean over annualized sample volatility, the
@@ -1361,7 +1337,7 @@ impl PyPerformance {
 /// ----------
 /// returns : sequence of float | numpy.ndarray | pandas.Series
 ///     Per-period simple decimal returns (``0.01`` is +1%) in date order.
-/// rf : float, default 0.0
+/// risk_free_rate : float, default 0.0
 ///     Annualized risk-free rate as a decimal (``0.02`` for 2%),
 ///     geometrically decompounded to the observation frequency.
 /// periods_per_year : float, default 252
@@ -1385,10 +1361,14 @@ impl PyPerformance {
 /// >>> round(sharpe([0.01, -0.02, 0.015, 0.003], 0.0, 252), 4)
 /// 2.0034
 #[pyfunction]
-#[pyo3(signature = (returns, rf = fa::DEFAULT_RISK_FREE_RATE, periods_per_year = fa::DEFAULT_PERIODS_PER_YEAR))]
-fn sharpe(returns: &Bound<'_, PyAny>, rf: f64, periods_per_year: f64) -> PyResult<f64> {
+#[pyo3(signature = (returns, risk_free_rate = DEFAULT_RISK_FREE_RATE, periods_per_year = DEFAULT_PERIODS_PER_YEAR))]
+fn sharpe(returns: &Bound<'_, PyAny>, risk_free_rate: f64, periods_per_year: f64) -> PyResult<f64> {
     let returns = extract_f64_vec(returns, "returns")?;
-    Ok(fa::sharpe(&returns, rf, periods_per_year))
+    Ok(finstack_quant_analytics::sharpe(
+        &returns,
+        risk_free_rate,
+        periods_per_year,
+    ))
 }
 
 /// Annualized Sortino ratio of one return series.
@@ -1420,10 +1400,14 @@ fn sharpe(returns: &Bound<'_, PyAny>, rf: f64, periods_per_year: f64) -> PyResul
 /// >>> sortino([0.01, -0.02, 0.015, 0.003]) > 0
 /// True
 #[pyfunction]
-#[pyo3(signature = (returns, mar = fa::DEFAULT_MAR, periods_per_year = fa::DEFAULT_PERIODS_PER_YEAR))]
+#[pyo3(signature = (returns, mar = DEFAULT_MAR, periods_per_year = DEFAULT_PERIODS_PER_YEAR))]
 fn sortino(returns: &Bound<'_, PyAny>, mar: f64, periods_per_year: f64) -> PyResult<f64> {
     let returns = extract_f64_vec(returns, "returns")?;
-    Ok(fa::sortino(&returns, mar, periods_per_year))
+    Ok(finstack_quant_analytics::sortino(
+        &returns,
+        mar,
+        periods_per_year,
+    ))
 }
 
 /// Annualized sample volatility (n−1 denominator) of one return series.
@@ -1453,10 +1437,13 @@ fn sortino(returns: &Bound<'_, PyAny>, mar: f64, periods_per_year: f64) -> PyRes
 /// >>> round(volatility([0.01, -0.01, 0.01, -0.01], 252), 4)
 /// 0.1833
 #[pyfunction]
-#[pyo3(signature = (returns, periods_per_year = fa::DEFAULT_PERIODS_PER_YEAR))]
+#[pyo3(signature = (returns, periods_per_year = DEFAULT_PERIODS_PER_YEAR))]
 fn volatility(returns: &Bound<'_, PyAny>, periods_per_year: f64) -> PyResult<f64> {
     let returns = extract_f64_vec(returns, "returns")?;
-    Ok(fa::volatility(&returns, periods_per_year))
+    Ok(finstack_quant_analytics::volatility(
+        &returns,
+        periods_per_year,
+    ))
 }
 
 /// Maximum peak-to-trough drawdown of one return series.
@@ -1486,7 +1473,7 @@ fn volatility(returns: &Bound<'_, PyAny>, periods_per_year: f64) -> PyResult<f64
 #[pyfunction]
 fn max_drawdown(returns: &Bound<'_, PyAny>) -> PyResult<f64> {
     let returns = extract_f64_vec(returns, "returns")?;
-    Ok(fa::max_drawdown(&returns))
+    Ok(finstack_quant_analytics::max_drawdown(&returns))
 }
 
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {

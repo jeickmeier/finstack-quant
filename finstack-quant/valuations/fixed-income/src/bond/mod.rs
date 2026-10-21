@@ -120,12 +120,10 @@ pub mod pricing;
 mod types;
 
 pub use cashflow_spec::CashflowSpec;
-pub use finstack_quant_cashflows::accrual::AccrualMethod;
 #[doc(hidden)]
 pub use metrics::price_yield_spread::asw::{asw_market_with_forward, asw_par_with_forward};
 #[doc(hidden)]
 pub use metrics::{DiscountMarginCalculator, ZSpreadCalculator};
-pub use types::AmortizationSpec;
 pub use types::Bond;
 pub use types::BondBuilder;
 pub use types::BondSettlementConvention;
@@ -142,6 +140,7 @@ mod tests {
     use crate::bond::{pricing::settlement, Bond, BondSettlementConvention, CashflowSpec};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations_core::instruments::common_impl::parameters::BondConvention;

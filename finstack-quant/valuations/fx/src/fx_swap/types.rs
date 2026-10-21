@@ -13,7 +13,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 
 use finstack_quant_cashflows::builder::{merge_cashflow_schedules, CashFlowSchedule, Notional};
-use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
 
 /// FX Swap instrument definition
@@ -35,14 +35,12 @@ pub struct FxSwap {
     /// Quote currency (domestic)
     pub quote_currency: Currency,
     /// Near leg settlement date (spot leg)
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub near_date: Date,
     /// Far leg settlement date (forward leg)
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -107,14 +105,12 @@ struct FxSwapUnchecked {
     /// Quote currency (domestic).
     quote_currency: Currency,
     /// Near leg settlement date (spot leg).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     near_date: Date,
     /// Far leg settlement date (forward leg).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -257,11 +253,11 @@ impl FxSwap {
         business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
         end_of_month: bool,
     ) -> finstack_quant_core::Result<Self> {
-        use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date_for_pair};
+        use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date};
         // CLS-consistent spot roll: a US holiday on an intermediate day does not
         // delay a USD pair's spot date (FX spot convention
         // finding).
-        let near_date = fx_spot_date_for_pair(
+        let near_date = fx_spot_date(
             trade_date,
             settlement_days,
             base_currency,
@@ -342,7 +338,7 @@ impl FxSwap {
         } else {
             vec![(payment_date, amount)]
         };
-        Ok(finstack_quant_cashflows::schedule_from_dated_flows(
+        finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
             CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
@@ -350,7 +346,7 @@ impl FxSwap {
                 notional_hint: Some(Money::new(amount.amount().abs(), amount.currency())?),
                 ..Default::default()
             },
-        ))
+        )
     }
 }
 
@@ -440,7 +436,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
 
         self.validate()?;
         if crate::shared::event_has_occurred(self.far_date, as_of) {
-            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+            return finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 finstack_quant_core::dates::DayCount::Act365F,
                 finstack_quant_cashflows::ScheduleBuildOpts {
@@ -451,7 +447,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
                         ..Default::default()
                     },
                 },
-            ));
+            );
         }
 
         let ctx = FxSwapPricingContext::build(self, curves, as_of)?;

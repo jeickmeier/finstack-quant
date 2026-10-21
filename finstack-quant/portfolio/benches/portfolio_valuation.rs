@@ -30,7 +30,7 @@ use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::valuation::{
     revalue_affected, value_portfolio, PortfolioValuationOptions, RequestedMetrics,
 };
-use finstack_quant_portfolio::{MarketFactorKey, Portfolio};
+use finstack_quant_portfolio::{dependencies::MarketFactorKey, Portfolio};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::RatesCurveKind;
 use rust_decimal_macros::dec;

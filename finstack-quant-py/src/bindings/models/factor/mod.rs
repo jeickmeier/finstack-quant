@@ -70,6 +70,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "StressPositionEntry",
             "TailScenarioBreakdown",
             "build_stress_attribution",
+            "decompose_factors",
             "evaluate_risk_budget",
             "historical_var_decomposition",
             "parametric_var_decomposition",

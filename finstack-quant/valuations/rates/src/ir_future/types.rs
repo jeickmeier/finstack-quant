@@ -88,7 +88,6 @@ pub struct InterestRateFuture {
     ///
     /// Defaults to `terms.last_trading_date` when omitted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -98,7 +97,6 @@ pub struct InterestRateFuture {
     ///
     /// Defaults to 2 calendar days after fixing date when omitted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -108,7 +106,6 @@ pub struct InterestRateFuture {
     ///
     /// Defaults to `period_start + contract_specs.delivery_months` months when omitted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -344,7 +341,7 @@ impl InterestRateFuture {
             period_start.add_months(self.contract_specs.delivery_months as i32)?
         };
         if period_end <= period_start {
-            return Err(finstack_quant_core::error::InputError::InvalidDateRange.into());
+            return Err(finstack_quant_core::InputError::InvalidDateRange.into());
         }
         Ok((fixing, period_start, period_end))
     }
@@ -944,7 +941,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InterestRateFuture {
         _curves: &MarketContext,
         _as_of: Date,
     ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+        finstack_quant_cashflows::schedule_from_classified_flows(
             Vec::new(),
             self.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
@@ -955,7 +952,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InterestRateFuture {
                     ..Default::default()
                 },
             },
-        ))
+        )
     }
 }
 
@@ -1122,10 +1119,19 @@ mod tests {
         for surface in [
             base.clone(),
             base.clone().with_displacements(&[0.02]).unwrap(),
-            base.clone()
-                .with_quote_type(VolQuoteType::Normal)
-                .unwrap()
-                .with_secondary_axis(VolSurfaceAxis::Tenor),
+            finstack_quant_core::market_data::surfaces::VolSurface::from_grid_opts(
+                base.id(),
+                base.expiries(),
+                base.strikes(),
+                base.vols(),
+                finstack_quant_core::market_data::surfaces::VolGridOpts {
+                    secondary_axis: VolSurfaceAxis::Tenor,
+                    quote_type: VolQuoteType::Normal,
+                    ..finstack_quant_core::market_data::surfaces::VolGridOpts::default()
+                },
+                None,
+            )
+            .expect("tenor surface"),
         ] {
             assert!(future
                 .calculate_convexity_adjusted_rate(

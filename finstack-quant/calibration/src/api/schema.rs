@@ -103,7 +103,7 @@ fn prefix_json_pointer(prefix: &str, child: Option<&str>) -> String {
     match child {
         None | Some("") => prefix.to_string(),
         Some(pointer) if pointer.starts_with('/') => format!("{prefix}{pointer}"),
-        Some(pointer) => format!("{prefix}/{}", pointer.replace('~', "~0").replace('/', "~1")),
+        Some(pointer) => format!("{prefix}/{}", super::validate::escape_json_pointer(pointer)),
     }
 }
 
@@ -370,34 +370,6 @@ pub struct CalibrationEnvelope {
     pub prior_market: Vec<PriorMarketObject>,
 }
 
-/// Serialized payloads of the market data collected so far, keyed by `(kind, id)`.
-type DatumPayloads = IndexMap<(&'static str, String), serde_json::Value>;
-
-/// Append `datum` unless an identical datum of the same kind and id is already collected.
-fn push_distinct_datum(
-    market_data: &mut Vec<MarketDatum>,
-    payloads: &mut DatumPayloads,
-    datum: MarketDatum,
-) -> Result<(), super::errors::EnvelopeError> {
-    use super::errors::EnvelopeError;
-    let payload = serde_json::to_value(&datum).map_err(|error| EnvelopeError::JsonSerialize {
-        target: "MarketDatum".to_string(),
-        message: error.to_string(),
-    })?;
-    let key = (datum.kind_name(), datum.id().to_string());
-    match payloads.get(&key) {
-        Some(existing) if existing != &payload => Err(EnvelopeError::ConflictingMarketDatum {
-            id: datum.id().to_string(),
-        }),
-        Some(_) => Ok(()),
-        None => {
-            payloads.insert(key, payload);
-            market_data.push(datum);
-            Ok(())
-        }
-    }
-}
-
 impl CalibrationEnvelope {
     /// Create a current-version calibration request envelope.
     ///
@@ -421,35 +393,6 @@ impl CalibrationEnvelope {
             market_data,
             prior_market,
         }
-    }
-
-    /// Append market data, collecting identical repeats once.
-    ///
-    /// Each datum is appended in order unless a datum of the same kind and id
-    /// with an identical payload is already present (in the envelope or
-    /// earlier in `market_data`), in which case it is collected once. Extra data can therefore repeat an existing input without duplication.
-    ///
-    /// # Arguments
-    ///
-    /// * `market_data` - Additional flat market-data inputs, in the order they
-    ///   should follow the envelope's existing `market_data`.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`super::errors::EnvelopeError::ConflictingMarketDatum`] when a
-    /// datum repeats the kind and id of one already present with a different
-    /// payload, and [`super::errors::EnvelopeError::JsonSerialize`] if a datum
-    /// cannot be serialized for the comparison.
-    pub fn with_market_data(
-        mut self,
-        market_data: Vec<MarketDatum>,
-    ) -> Result<Self, super::errors::EnvelopeError> {
-        let mut payloads = DatumPayloads::new();
-        let existing = std::mem::take(&mut self.market_data);
-        for datum in existing.into_iter().chain(market_data) {
-            push_distinct_datum(&mut self.market_data, &mut payloads, datum)?;
-        }
-        Ok(self)
     }
 
     /// Serialize this request envelope as canonical pretty-printed JSON.
@@ -490,8 +433,8 @@ impl CalibrationEnvelope {
     /// Returns [`ContractError`] for malformed JSON, resource-limit failures,
     /// a missing or malformed schema marker, an unsupported schema version, or
     /// an invalid calibration-envelope shape. Semantic findings are returned
-    /// in the bounded validation report so `dry_run` can report all findings;
-    /// execution rejects that report before constructing market state.
+    /// as contract diagnostics in the bounded validation report rather than as
+    /// an error. ([`super::validate::dry_run`] reports them as `EnvelopeError`s.)
     pub fn from_slice_strict(
         bytes: &[u8],
         limits: &LoadLimits,
@@ -810,7 +753,6 @@ pub struct DiscountCurveParams {
     /// Currency of the curve.
     pub currency: Currency,
     /// Base date for the curve.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -851,7 +793,6 @@ pub struct ForwardCurveParams {
     /// Currency of the curve.
     pub currency: Currency,
     /// Base date for the curve.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -863,10 +804,11 @@ pub struct ForwardCurveParams {
     pub discount_curve_id: CurveId,
     /// Calibration method to use.
     ///
-    /// Forward curves require [`CalibrationMethod::GlobalSolve`]. Sequential
-    /// bootstrap is rejected because contractual off-grid reset intervals
-    /// couple adjacent rates through projection discount factors.
-    #[serde(default)]
+    /// Forward curves require [`CalibrationMethod::GlobalSolve`], which is the
+    /// default (finite-difference Jacobian). Sequential bootstrap is rejected
+    /// because contractual off-grid reset intervals couple adjacent rates
+    /// through projection discount factors.
+    #[serde(default = "default_forward_method")]
     pub method: CalibrationMethod,
     /// Interpolation style for the constructed forward curve.
     ///
@@ -895,7 +837,6 @@ pub struct HazardCurveParams {
     /// Currency of the curve.
     pub currency: Currency,
     /// Base date for the curve.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -946,7 +887,6 @@ pub struct InflationCurveParams {
     pub currency: Currency,
     /// Valuation and calibration-instrument start date. The output curve's
     /// zero-time reference CPI date is this date minus `observation_lag`.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -992,7 +932,6 @@ pub struct VolSurfaceParams {
     /// Identifier for the volatility surface being built.
     pub vol_surface_id: String,
     /// Base date for the surface.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1041,7 +980,6 @@ pub struct SwaptionVolParams {
     /// Identifier for the volatility surface.
     pub vol_surface_id: String,
     /// Base date for the calibration.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1067,9 +1005,6 @@ pub struct SwaptionVolParams {
     /// Target tenor times (in years) for the surface grid.
     #[serde(default)]
     pub target_tenors: Vec<f64>,
-    /// SABR parameter interpolation method between expiries/tenors.
-    #[serde(default)]
-    pub sabr_interpolation: SabrInterpolationMethod,
     /// Optional calendar identifier for date adjustments.
     #[serde(default)]
     pub calendar_id: Option<String>,
@@ -1137,7 +1072,6 @@ pub struct BaseCorrelationParams {
     /// Quotes must resolve to the same CDS convention maturity as this tenor.
     pub maturity_years: f64,
     /// Base date for the calibration.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1165,7 +1099,9 @@ pub struct BaseCorrelationParams {
     /// Optional calendar identifier for schedule generation and date adjustments.
     #[serde(default)]
     pub calendar_id: Option<String>,
-    /// Detachment points (as percentages) for the tranches.
+    /// Expected tranche detachment points as decimals in `(0, 1]` (e.g. `0.03`
+    /// for 3%), the same unit as `CdsTrancheQuote.detachment`. When non-empty,
+    /// every quote must match one point and every point must be quoted.
     #[serde(default)]
     pub detachment_points: Vec<f64>,
     /// Coupon roll-date grid for the synthetic tranches: `cds_imm` for the
@@ -1249,7 +1185,6 @@ pub struct HullWhiteStepParams {
     /// Currency for conventions.
     pub currency: Currency,
     /// Base date for the calibration.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1292,7 +1227,6 @@ pub struct CapFloorHullWhiteStepParams {
     /// Currency for conventions.
     pub currency: Currency,
     /// Base date for the calibration.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1327,7 +1261,6 @@ pub struct SviSurfaceParams {
     /// Identifier for the volatility surface being built.
     pub vol_surface_id: String,
     /// Base date for the surface.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1382,14 +1315,10 @@ pub enum SwaptionVolConvention {
     },
 }
 
-/// Interpolation method for SABR parameters across the expiry–tenor grid.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum SabrInterpolationMethod {
-    /// Bilinear interpolation in (expiry, tenor) over SABR parameters.
-    #[default]
-    Bilinear,
+fn default_forward_method() -> CalibrationMethod {
+    CalibrationMethod::GlobalSolve {
+        use_analytical_jacobian: false,
+    }
 }
 
 fn default_interp_linear() -> InterpStyle {
@@ -1435,7 +1364,6 @@ pub struct XccyBasisParams {
     /// Foreign currency being calibrated.
     pub currency: Currency,
     /// Base date for the curve.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1485,7 +1413,6 @@ pub struct ParametricCurveParams {
     /// instruments use this curve for discounting and implied projection.
     pub curve_id: CurveId,
     /// Base date for the curve.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1553,10 +1480,7 @@ mod step_report_tests {
             .result
             .step_report("USD-OIS")
             .expect_err("no such step");
-        assert_eq!(
-            error.kind(),
-            finstack_quant_core::error::ErrorKind::NotFound
-        );
+        assert_eq!(error.kind(), finstack_quant_core::ErrorKind::NotFound);
         assert!(error
             .to_string()
             .contains("calibration step 'USD-OIS'; available steps: []"));

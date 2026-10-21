@@ -256,13 +256,6 @@ fn compute_contractual_flows(
                 Money::from((0_i64, schedule.get_notional().initial.currency()))
             };
 
-        // Toggle-driven PIK capitalization accumulated in state is excluded
-        // from the scale-clamp basis so PIK compounding is not frozen.
-        let toggled_pik = cs_state
-            .cumulative_toggled_pik
-            .get(instrument_id.as_str())
-            .copied()
-            .unwrap_or_else(|| Money::from((0_i64, opening_balance.currency())));
         if crate::capital_structure::period_flows::is_debt_kind(instrument.key())?
             && !cs_state.residual_schedules.contains_key(instrument_id)
         {
@@ -277,7 +270,6 @@ fn compute_contractual_flows(
                 instrument.as_ref(),
                 period,
                 opening_balance,
-                toggled_pik,
                 market_ctx,
                 as_of,
                 residual,
@@ -451,7 +443,7 @@ fn merge_updated_flows(
 mod opening_tests {
     use super::resolve_opening_balance;
     use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::cashflow::CashFlow;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};

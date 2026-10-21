@@ -56,7 +56,6 @@ pub struct ThreeFactorPathData {
     /// accrual boundaries plus every term-index reset date inside the facility
     /// life, sorted ascending. The name predates the separation of accrual,
     /// reset and adjusted payment dates.
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
@@ -755,7 +754,7 @@ impl<'a> CashflowEngine<'a> {
             ));
         }
 
-        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+        finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             self.facility.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
@@ -765,7 +764,7 @@ impl<'a> CashflowEngine<'a> {
                     ..self.schedule_meta()
                 },
             },
-        ))
+        )
     }
 
     /// The drawn balance at the anchor must fit the commitment in force there.
@@ -1253,14 +1252,14 @@ impl<'a> CashflowEngine<'a> {
             ));
         }
 
-        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+        finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             self.facility.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(Money::from((0_i64, self.facility.commitment.currency()))),
                 meta: self.schedule_meta(),
             },
-        ))
+        )
     }
 }
 

@@ -7,7 +7,7 @@
 //! publishes for its type (a root artifact or a `$defs` entry of one) and read
 //! back.
 
-use finstack_quant_core::dates::{Date, Month};
+use finstack_quant_core::dates::Date;
 use finstack_quant_models::credit::migration::{
     GeneratorMatrix, MigrationSimulator, RatingScale, TransitionMatrix,
 };
@@ -22,6 +22,7 @@ use finstack_quant_models::volatility::svi::SviParams;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Value};
+use time::Month;
 
 /// Schema for `type_name`: its root artifact, or a `$defs` entry of any
 /// registered artifact, wrapped so its local references still resolve.

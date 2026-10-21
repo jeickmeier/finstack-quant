@@ -109,14 +109,14 @@ pub(super) struct BuilderInternal {
 impl BuilderInternal {
     pub(super) fn generate(self) -> crate::Result<Vec<Date>> {
         if self.start >= self.end {
-            return Err(crate::error::InputError::InvalidDateRange.into());
+            return Err(crate::InputError::InvalidDateRange.into());
         }
         match self.stub {
             StubKind::ShortFront => self.gen_short_front(),
             StubKind::LongFront => self.gen_long_front(),
             StubKind::LongBack => self.gen_long_back(),
-            StubKind::None => self.gen_regular(),
-            StubKind::ShortBack => self.gen_short_back(),
+            StubKind::None => self.gen_forward(true),
+            StubKind::ShortBack => self.gen_forward(false),
         }
     }
 
@@ -136,14 +136,11 @@ impl BuilderInternal {
         if n == 0 {
             return Ok(Some(anchor));
         }
-        let count_i32 =
-            i32::try_from(tenor.count()).map_err(|_| crate::error::InputError::InvalidTenor {
-                tenor: tenor.to_string(),
-                reason: format!("count {} exceeds i32::MAX", tenor.count()),
-            })?;
+        // `Tenor::new` bounds the count (at most 73,200 days), so the cast is exact.
+        let count_i32 = tenor.count() as i32;
         let checked_mul_i32 = |lhs: i32, rhs: i32| -> crate::Result<i32> {
             lhs.checked_mul(rhs).ok_or_else(|| {
-                crate::Error::from(crate::error::InputError::InvalidTenor {
+                crate::Error::from(crate::InputError::InvalidTenor {
                     tenor: tenor.to_string(),
                     reason: "tenor multiplication overflowed while generating schedule".to_string(),
                 })
@@ -151,7 +148,7 @@ impl BuilderInternal {
         };
         let checked_mul_i64 = |lhs: i64, rhs: i64| -> crate::Result<i64> {
             lhs.checked_mul(rhs).ok_or_else(|| {
-                crate::Error::from(crate::error::InputError::InvalidTenor {
+                crate::Error::from(crate::InputError::InvalidTenor {
                     tenor: tenor.to_string(),
                     reason: "tenor multiplication overflowed while generating schedule".to_string(),
                 })
@@ -176,10 +173,7 @@ impl BuilderInternal {
         };
         match tenor.unit() {
             crate::dates::TenorUnit::Months => add_months(checked_mul_i32(n, count_i32)?),
-            crate::dates::TenorUnit::Years => {
-                let years = checked_mul_i32(n, count_i32)?;
-                add_months(checked_mul_i32(years, 12)?)
-            }
+            crate::dates::TenorUnit::Years => add_months(checked_mul_i32(n, count_i32 * 12)?),
             crate::dates::TenorUnit::Weeks => add_days(checked_mul_i64(
                 checked_mul_i64(i64::from(n), i64::from(tenor.count()))?,
                 7,
@@ -195,20 +189,10 @@ impl BuilderInternal {
     // contractual and are emitted verbatim (QuantLib-style); snapping them
     // (the previous behavior) silently moved the effective date and maturity.
 
-    /// Forward roll grid from `start` that must land exactly on `end`.
-    ///
-    /// Alignment is against the actual roll grid, including EOM; a
+    /// Forward roll grid from `start`, closed by `end`; with `aligned`
+    /// (`StubKind::None`), a grid that overshoots or runs out before `end` is
+    /// an error. Alignment is against the actual roll grid, including EOM; a
     /// contractual maturity between grid points needs an explicit stub.
-    pub(super) fn gen_regular(self) -> crate::Result<Vec<Date>> {
-        self.gen_forward(true)
-    }
-
-    pub(super) fn gen_short_back(self) -> crate::Result<Vec<Date>> {
-        self.gen_forward(false)
-    }
-
-    /// Forward roll grid from `start`, closed by `end`; with `aligned`, a
-    /// grid that overshoots or runs out before `end` is an error.
     fn gen_forward(self, aligned: bool) -> crate::Result<Vec<Date>> {
         let mut buf: Buffer = Buffer::new();
         buf.push(self.start);
@@ -221,7 +205,7 @@ impl BuilderInternal {
                 Some(dt) if dt < self.end => dt,
                 last => {
                     if aligned && last != Some(self.end) {
-                        return Err(crate::error::InputError::NonIntegerScheduleTenor.into());
+                        return Err(crate::InputError::NonIntegerScheduleTenor.into());
                     }
                     push_if_new(&mut buf, self.end);
                     check_anchor_count(buf.len())?;

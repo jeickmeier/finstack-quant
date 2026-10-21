@@ -28,13 +28,13 @@ pub struct EvaluationContext {
     pub period_id: PeriodId,
 
     /// Period frequency (quarterly, monthly, etc.)
-    pub period_kind: PeriodKind,
+    pub(crate) period_kind: PeriodKind,
 
     /// Map of node_id → column index for the current period
     pub node_to_column: Arc<IndexMap<NodeId, usize>>,
 
     /// Columnar historical node values sharing the context's column layout.
-    pub history: Arc<PeriodHistory>,
+    pub(crate) history: Arc<PeriodHistory>,
 
     /// Historical capital-structure snapshots: period_id → cashflows
     pub historical_capital_structure_cashflows:
@@ -42,7 +42,7 @@ pub struct EvaluationContext {
 
     /// Current period results being built.
     /// Uses `Option<f64>` to distinguish between "not yet evaluated" (`None`) and "evaluated to NaN" (`Some(NaN)`).
-    pub current_values: Vec<Option<f64>>,
+    pub(crate) current_values: Vec<Option<f64>>,
 
     /// Evaluation layer that produced each current-period value, in the same
     /// column layout as `current_values`. `None` for values set outside the
@@ -54,6 +54,15 @@ pub struct EvaluationContext {
 
     /// Warnings collected while evaluating this period
     pub warnings: Vec<EvalWarning>,
+
+    /// Set when a comparison, logical operator or `if` condition consumed a
+    /// non-finite operand during this period's evaluation.
+    ///
+    /// DSL comparisons read `NaN` as false, so a formula check fed a missing
+    /// lag (`lag(x, 1)` in the first period) or a non-finite input would
+    /// otherwise look like a failed test. Formula checks read this flag to
+    /// report insufficient data instead.
+    pub(crate) non_finite_operand: bool,
 
     /// Per-context memoization of sorted historical lookups.
     ///
@@ -134,6 +143,7 @@ impl EvaluationContext {
             current_sources: vec![None; num_nodes],
             capital_structure_cashflows: None,
             warnings: Vec::new(),
+            non_finite_operand: false,
             sorted_history_cache: RefCell::new(IndexMap::new()),
         }
     }
@@ -246,15 +256,6 @@ impl EvaluationContext {
         }
     }
 
-    /// Get historical value for a node at a specific period.
-    ///
-    /// # Arguments
-    /// * `node_id` - Identifier to query
-    /// * `period_id` - Historical period to look up
-    pub fn get_historical_value(&self, node_id: &str, period_id: &PeriodId) -> Option<f64> {
-        self.history.get_value(node_id, period_id)
-    }
-
     /// Get a capital-structure component from one completed period.
     ///
     /// `component` accepts `interest_expense`, `interest_expense_cash`,
@@ -354,7 +355,7 @@ impl EvaluationContext {
     ///
     /// Only includes nodes that have been evaluated (Some value).
     /// Nodes with None are skipped (should not happen in valid evaluation).
-    pub fn into_results(self) -> (IndexMap<String, f64>, Vec<EvalWarning>) {
+    pub(crate) fn into_results(self) -> (IndexMap<String, f64>, Vec<EvalWarning>) {
         let mut results = IndexMap::new();
         for (node_id, idx) in self.node_to_column.iter() {
             if let Some(value) = self.current_values[*idx] {
@@ -362,11 +363,6 @@ impl EvaluationContext {
             }
         }
         (results, self.warnings)
-    }
-
-    /// Record a warning for the current period.
-    pub fn push_warning(&mut self, warning: EvalWarning) {
-        self.warnings.push(warning);
     }
 }
 
@@ -425,7 +421,7 @@ mod tests {
             Arc::new(historical),
         );
 
-        let value = ctx.get_historical_value(
+        let value = ctx.history.get_value(
             "revenue",
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
         );
@@ -452,8 +448,8 @@ mod tests {
         );
 
         assert_eq!(ctx.current_values.len(), 2);
-        assert_eq!(ctx.get_historical_value("revenue", &q1), Some(100.0));
-        assert_eq!(ctx.get_historical_value("legacy_margin", &q1), Some(25.0));
+        assert_eq!(ctx.history.get_value("revenue", &q1), Some(100.0));
+        assert_eq!(ctx.history.get_value("legacy_margin", &q1), Some(25.0));
         assert!(Arc::ptr_eq(
             &ctx.node_to_column,
             &ctx.history.shared_node_to_column()

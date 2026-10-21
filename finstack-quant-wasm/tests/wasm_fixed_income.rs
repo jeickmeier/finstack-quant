@@ -33,7 +33,8 @@ fn fixed_bond() -> JsBond {
 fn market_context_json() -> String {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    let base = time::Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
+    let base = finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+        .unwrap();
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(base)
         .knots([(0.5, 0.99), (1.0, 0.98), (5.0, 0.90), (10.0, 0.80)])
@@ -48,7 +49,8 @@ fn credit_market_context_json() -> String {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 
-    let base = time::Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
+    let base = finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+        .unwrap();
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(base)
         .day_count(DayCount::Act365F)
@@ -155,8 +157,10 @@ fn bond_fixed_to_json_is_tagged_and_matches_rust() {
         )
         .expect("valid money fixture"),
         finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-        time::Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),
-        time::Date::from_calendar_date(2034, time::Month::January, 1).unwrap(),
+        finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+            .unwrap(),
+        finstack_quant_core::dates::Date::from_calendar_date(2034, time::Month::January, 1)
+            .unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,
         "USD-OIS",
     )

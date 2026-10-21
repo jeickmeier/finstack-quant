@@ -21,6 +21,7 @@
 
 use crate::xccy_swap::types::{initial_principal_sign, XccySwap};
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::money::Money;
@@ -134,10 +135,10 @@ fn project_mtm_cashflows(
     context: &finstack_quant_core::market_data::context::MarketContext,
     as_of: Date,
 ) -> Result<(
-    Vec<finstack_quant_cashflows::primitives::CashFlow>,
+    Vec<finstack_quant_core::cashflow::CashFlow>,
     finstack_quant_cashflows::builder::CashFlowMeta,
 )> {
-    use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
+    use finstack_quant_core::cashflow::{CFKind, CashFlow};
     use finstack_quant_core::money::fx::FxQuery;
     use finstack_quant_core::money::Money;
 
@@ -375,20 +376,20 @@ pub(crate) fn mtm_cashflow_schedule(
 ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
     let (flows, meta) = project_mtm_cashflows(swap, resetting_side, context, as_of)?;
     let (_, resetting_leg) = swap.partition_legs(resetting_side)?;
-    Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+    finstack_quant_cashflows::schedule_from_classified_flows(
         flows,
         resetting_leg.leg.day_count,
         finstack_quant_cashflows::ScheduleBuildOpts {
             notional_hint: Some(resetting_leg.notional),
             meta,
         },
-    ))
+    )
 }
 
 /// Per-period resetting-leg notional under CIP no-FX-vol: `N_C / X_t^FRA`.
 ///
 /// Uses *relative* discount factors from `as_of` via
-/// [`DiscountCurve::df_between_dates`] so the CIP forward FX
+/// [`Discounting::df_between_dates`](finstack_quant_core::market_data::traits::Discounting::df_between_dates) so the CIP forward FX
 /// `X_t^FRA = spot_x_at_as_of · P_R(as_of, t) / P_C(as_of, t)` is consistent
 /// with the spot rate observed at `as_of`. Using absolute DFs from each curve's
 /// base date would only agree when `as_of == curve.base_date` — i.e., the same

@@ -39,7 +39,7 @@
 //! # Quick Example
 //!
 //! ```
-//! use finstack_quant_core::math::norm_cdf;
+//! use finstack_quant_core::math::special_functions::norm_cdf;
 //! use finstack_quant_models::closed_form::d1_d2;
 //!
 //! let spot = 100.0;

@@ -8,10 +8,11 @@ use finstack_quant_analytics::schema::ARTIFACTS;
 use finstack_quant_analytics::{
     BetaResult, DatedSeries, GreeksResult, MultiFactorResult, Performance, PeriodStats,
 };
-use finstack_quant_core::dates::{Date, Month, PeriodKind};
+use finstack_quant_core::dates::{Date, PeriodKind};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Value};
+use time::Month;
 
 fn schema(type_name: &str) -> Value {
     ARTIFACTS

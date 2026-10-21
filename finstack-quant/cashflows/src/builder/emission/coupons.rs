@@ -1,12 +1,8 @@
 //! Coupon cashflow emission (fixed and floating).
-//!
-//! `emit_inflation_coupons` maps pre-indexed inflation coupon tuples into
-//! `CashFlow` values. Index projection and ratio logic belong in the instrument
-//! layer that supplies those tuples.
 
+use crate::builder::orchestrator::BuildState;
 use crate::builder::FloatingLegCompounding;
-use crate::primitives::{CFKind, CashFlow};
-use finstack_quant_core::cashflow::CashFlowAccrual;
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::fixings::{fixing_series_id, require_fixing_value_exact};
@@ -15,51 +11,62 @@ use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
-use tracing::{info, warn};
+use tracing::warn;
 
+use crate::builder::overnight::overnight_day_count_basis;
 use crate::builder::overnight::{OvernightObservationSchedule, OvernightRateConstraints};
-use crate::builder::rate_helpers::calculate_floating_rate;
+use crate::builder::rate_helpers::{
+    apply_bp_bounds, calculate_floating_rate, observed_term_fixing, project_index_rate,
+    project_overnight_rate,
+};
 use crate::builder::{
     CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod, FloatingRateFallback,
     FloatingRateObservation, SchedulePeriod,
 };
-use rust_decimal::prelude::ToPrimitive;
 
-use super::super::compiler::{FixedSchedule, FloatSchedule};
-use super::f64_to_decimal;
-use super::helpers::{add_pik_flow_if_nonzero, compute_reset_date};
+use crate::builder::compiler::{FixedSchedule, FloatSchedule};
+use crate::builder::periods::compute_reset_date;
+use finstack_quant_core::decimal::f64_to_decimal;
 
-/// Append pre-computed inflation-linked coupon cashflows.
+/// Add a PIK cashflow if the amount is strictly positive.
 ///
-/// This function does not project CPI/RPI/HICP fixings or calculate index
-/// ratios. It preserves caller-computed indexed coupon amounts and tags them as
-/// [`CFKind::InflationCoupon`] for downstream valuation/reporting.
+/// Returns the PIK amount for outstanding balance tracking (`0.0` when no
+/// flow was added).
 ///
-/// Each tuple is `(payment_date, indexed_coupon_amount, accrual_factor, real_coupon_rate)`.
+/// # Errors
 ///
-/// # Arguments
-///
-/// * `ccy` - Currency assigned to every emitted inflation-coupon cashflow.
-/// * `coupons` - Precomputed payment tuples of date, indexed amount, accrual
-///   factor in years, and annual real coupon rate as a decimal.
-/// * `out_flows` - Mutable schedule flow list to which one inflation-coupon
-///   row is appended for each supplied tuple.
-pub fn emit_inflation_coupons(
+/// Returns `Error::Validation` when `pik_amt` is negative. A negative PIK
+/// coupon (negative all-in rate on a PIK/split leg) would have to *reduce*
+/// the outstanding balance; that de-capitalization policy is not modeled, so
+/// it fails loudly instead of being silently dropped. Configure an
+/// `all_in_floor_bp` of zero (or pay cash) for negative-rate PIK structures.
+fn add_pik_flow_if_nonzero(
+    flows: &mut Vec<CashFlow>,
+    date: Date,
+    pik_amt: f64,
     ccy: Currency,
-    coupons: &[(Date, f64, f64, f64)],
-    out_flows: &mut Vec<CashFlow>,
-) -> finstack_quant_core::Result<()> {
-    for &(date, amount, accrual_factor, real_coupon_rate) in coupons {
-        out_flows.push(CashFlow::new(
+    rate: Option<f64>,
+    accrual_factor: f64,
+) -> finstack_quant_core::Result<f64> {
+    if pik_amt < 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "negative PIK coupon amount {pik_amt} on {date}: de-capitalizing PIK is not \
+             supported; floor the all-in rate at zero or use a cash coupon"
+        )));
+    }
+    if pik_amt > 0.0 {
+        flows.push(CashFlow::new(
             date,
             None,
-            Money::new(amount, ccy)?,
-            CFKind::InflationCoupon,
+            Money::new(pik_amt, ccy)?,
+            CFKind::Pik,
             accrual_factor,
-            Some(real_coupon_rate),
+            rate,
         ));
+        Ok(pik_amt)
+    } else {
+        Ok(0.0)
     }
-    Ok(())
 }
 
 /// Error for an overnight observation date strictly before the curve base
@@ -104,14 +111,12 @@ fn pre_base_observation_error(obs_date: Date, fwd: &ForwardCurve) -> finstack_qu
 ///   calendar observation interval, with both endpoints on the curve's clock.
 fn observed_overnight_rate(
     obs_date: Date,
-    rate_tenor_days: u32,
-    index_year_fraction: f64,
+    day_count_basis: f64,
     fwd: &ForwardCurve,
     fixings: Option<&ScalarTimeSeries>,
     forward_curve_id: &str,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
-    let fwd_base = fwd.base_date();
     if obs_date < as_of {
         return match fixings {
             Some(series) => {
@@ -125,49 +130,7 @@ fn observed_overnight_rate(
             return Ok(fixing);
         }
     }
-    let fwd_day_count = fwd.day_count();
-    let t = if obs_date == fwd_base {
-        0.0
-    } else {
-        fwd_day_count.year_fraction(
-            fwd_base,
-            obs_date,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?
-    };
-    let observation_end = obs_date
-        .checked_add(time::Duration::days(i64::from(rate_tenor_days)))
-        .ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "overnight projection endpoint exceeds the date range for {obs_date}"
-            ))
-        })?;
-    let t_end = fwd_day_count.year_fraction(
-        fwd_base,
-        observation_end,
-        finstack_quant_core::dates::DayCountContext::default(),
-    )?;
-    // Published fixings above already use the contractual index convention.
-    // Curve observations use the curve clock, so convert their annualization
-    // before applying observation-day carry weights or coupon constraints.
-    let curve_year_fraction = t_end - t;
-    if !index_year_fraction.is_finite()
-        || index_year_fraction <= 0.0
-        || !curve_year_fraction.is_finite()
-        || curve_year_fraction <= 0.0
-    {
-        return Err(finstack_quant_core::Error::Validation(
-            "overnight projection requires finite positive curve and index accrual fractions"
-                .into(),
-        ));
-    }
-    let rate = fwd.rate_period(t, t_end) * (curve_year_fraction / index_year_fraction);
-    if !rate.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(
-            "overnight projection produced a non-finite index rate".into(),
-        ));
-    }
-    Ok(rate)
+    project_overnight_rate(fwd, obs_date, day_count_basis)
 }
 
 /// Prevent a projection fallback from replacing incomplete supplied history.
@@ -212,35 +175,16 @@ fn resolve_floating_rate_fallback(
     spread_bp: f64,
     fallback: &FloatingRateFallback,
 ) -> finstack_quant_core::Result<f64> {
-    match fallback {
-        FloatingRateFallback::Error => Err(error),
-        FloatingRateFallback::SpreadOnly => {
-            warn!(
-                reset_date = %reset_date,
-                spread_bp = %spread_bp,
-                error = %error,
-                "Floating rate unavailable, using fallback (spread-only) rate"
-            );
-            Ok(0.0)
-        }
-        FloatingRateFallback::FixedRate(rate) => {
-            let index_rate = rate.to_f64().ok_or(finstack_quant_core::Error::Input(
-                InputError::ConversionOverflow,
-            ))?;
-            info!(
-                reset_date = %reset_date,
-                fixed_rate = %index_rate,
-                error = %error,
-                "Floating rate unavailable, using fixed index rate"
-            );
-            if !index_rate.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(
-                    "floating-rate fallback did not provide a finite index rate".into(),
-                ));
-            }
-            Ok(index_rate)
-        }
+    if !fallback.is_default() {
+        warn!(
+            reset_date = %reset_date,
+            spread_bp = %spread_bp,
+            ?fallback,
+            error = %error,
+            "Floating rate unavailable, using the configured fallback index rate"
+        );
     }
+    fallback.index_rate(error)
 }
 
 /// Emit fixed coupon cashflows on a specific date.
@@ -259,11 +203,16 @@ fn resolve_floating_rate_fallback(
 pub(crate) fn emit_fixed_coupons_on(
     d: Date,
     fixed_schedules: &[FixedSchedule],
-    outstanding_history: &[(Date, Decimal)],
-    outstanding_fallback: Decimal,
     ccy: Currency,
-    out_flows: &mut Vec<CashFlow>,
+    state: &mut BuildState,
 ) -> finstack_quant_core::Result<f64> {
+    let BuildState {
+        flows: out_flows,
+        outstanding_history,
+        outstanding: outstanding_fallback,
+        ..
+    } = state;
+    let outstanding_fallback = *outstanding_fallback;
     let mut pik_to_add = 0.0;
 
     for schedule in fixed_schedules {
@@ -381,30 +330,6 @@ pub(crate) struct ResolvedFloatMarket<'a> {
     pub(crate) fixings: &'a [Option<ScalarTimeSeries>],
 }
 
-/// Emit floating coupon cashflows on a specific date.
-///
-/// Processes all floating coupon schedules for the given date, looking up forward
-/// rates from the optional market context and computing coupon amounts based on
-/// `forward_rate * gearing + margin`. Splits into cash/PIK according to coupon type.
-/// Cash and PIK flows are appended directly into the provided `out_flows` buffer.
-///
-/// Seasoned coupons (observation dates before the curve base) resolve realized
-/// index fixings from `market.fixings` — the per-schedule `FIXING:{forward_curve_id}`
-/// series aligned with `market.curves` (exact-date observations for both
-/// overnight and term resets). Without a series, pre-base observations route
-/// through the spec's [`crate::builder::FloatingRateFallback`] policy.
-///
-/// # Returns
-///
-/// `pik_to_add` — the total PIK coupon amount (across every floating schedule
-/// processed on date `d`) that the caller must capitalize into the outstanding
-/// balance for subsequent periods. Cash flows are pushed into `out_flows` as a
-/// side effect; the return value is exclusively the PIK leg.
-pub(crate) struct FloatEmissionOutput<'a> {
-    pub flows: &'a mut Vec<CashFlow>,
-    pub projected_fixings: &'a mut Vec<crate::fixings::ProjectedFixing>,
-}
-
 #[derive(Clone, Copy)]
 struct FloatingAccrualSegment {
     start: Date,
@@ -470,12 +395,12 @@ fn project_segment_indices(
     let as_of = observation_date.unwrap_or(curve.base_date());
     match observation {
         FloatingRateObservation::Term { reset_date, .. } => {
-            let same_day_fixing_exists = *reset_date == as_of
-                && fixings.is_some_and(|series| series.value_on_exact(*reset_date).is_ok());
-            let index_rate = if *reset_date < as_of || same_day_fixing_exists {
-                require_fixing_value_exact(fixings, forward_curve_id, *reset_date, as_of)?
+            let index_rate = if let Some(fixing) =
+                observed_term_fixing(*reset_date, fixings, forward_curve_id, as_of)?
+            {
+                fixing
             } else {
-                super::super::rate_helpers::project_index_rate(
+                project_index_rate(
                     *reset_date,
                     curve,
                     period.accrual_start,
@@ -501,7 +426,7 @@ fn project_segment_indices(
             constraints,
         } => {
             let mut accumulator = observations.accumulator(*day_count_basis, *constraints)?;
-            let mut raw_fixings = finstack_quant_core::HashMap::default();
+            let mut raw_fixings = finstack_quant_core::FxHashMap::default();
             for slice in observations.observations() {
                 if raw_fixings.contains_key(&slice.observation_date) {
                     continue;
@@ -509,8 +434,7 @@ fn project_segment_indices(
                 // Carry weights do not change a published one-day index fixing.
                 let rate = observed_overnight_rate(
                     slice.observation_date,
-                    1,
-                    1.0 / *day_count_basis,
+                    *day_count_basis,
                     curve,
                     fixings,
                     forward_curve_id,
@@ -581,19 +505,40 @@ fn project_segment_indices(
     }
 }
 
+/// Emit floating coupon cashflows on a specific date.
+///
+/// Processes all floating coupon schedules for the given date, looking up forward
+/// rates from the optional market context and computing coupon amounts based on
+/// `forward_rate * gearing + margin`. Splits into cash/PIK according to coupon type.
+/// Cash and PIK flows are appended directly into the provided `out_flows` buffer.
+///
+/// Seasoned coupons (observation dates before the curve base) resolve realized
+/// index fixings from `market.fixings` — the per-schedule `FIXING:{forward_curve_id}`
+/// series aligned with `market.curves` (exact-date observations for both
+/// overnight and term resets). Without a series, pre-base observations route
+/// through the spec's [`crate::builder::FloatingRateFallback`] policy.
+///
+/// # Returns
+///
+/// `pik_to_add` — the total PIK coupon amount (across every floating schedule
+/// processed on date `d`) that the caller must capitalize into the outstanding
+/// balance for subsequent periods. Cash flows are pushed into `out_flows` as a
+/// side effect; the return value is exclusively the PIK leg.
 pub(crate) fn emit_float_coupons_on(
     d: Date,
     float_schedules: &[FloatSchedule],
-    outstanding_history: &[(Date, Decimal)],
-    outstanding_fallback: Decimal,
     ccy: Currency,
     market: ResolvedFloatMarket<'_>,
-    output: FloatEmissionOutput<'_>,
+    state: &mut BuildState,
 ) -> finstack_quant_core::Result<f64> {
-    let FloatEmissionOutput {
+    let BuildState {
         flows: out_flows,
         projected_fixings,
-    } = output;
+        outstanding_history,
+        outstanding: outstanding_fallback,
+        ..
+    } = state;
+    let outstanding_fallback = *outstanding_fallback;
     let mut pik_to_add = 0.0;
     for ((schedule, resolved_curve), resolved_fixing) in float_schedules
         .iter()
@@ -648,27 +593,13 @@ pub(crate) fn emit_float_coupons_on(
                     .rate_spec
                     .overnight_basis
                     .unwrap_or(spec.schedule.day_count);
-                let day_count_basis = match basis {
-                    finstack_quant_core::dates::DayCount::Act360 => 360.0,
-                    finstack_quant_core::dates::DayCount::Act365F => 365.0,
-                    other => {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "overnight compounding requires Act360 or Act365F; got {other:?}"
-                        )));
-                    }
-                };
+                let day_count_basis = overnight_day_count_basis(basis)?;
                 let observations = OvernightObservationSchedule::compile(
                     period.accrual_start,
                     period.accrual_end,
                     method,
                     schedule.fixing_calendar,
                 )?;
-                if observations.observations().is_empty() {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "overnight accrual period [{}, {}) for index '{}' contains no business-day fixings",
-                        period.accrual_start, period.accrual_end, spec.rate_spec.forward_curve_id,
-                    )));
-                }
                 let mut constraints = OvernightRateConstraints {
                     application: spec.rate_spec.overnight_index_constraints,
                     index_floor_bp: params.index_floor_bp,
@@ -752,14 +683,8 @@ pub(crate) fn emit_float_coupons_on(
                         params.spread_bp,
                         &spec.rate_spec.fallback,
                     )?;
-                    let constrained_index = calculate_floating_rate(
-                        index_rate,
-                        &crate::builder::rate_helpers::FloatingRateParams {
-                            index_floor_bp: params.index_floor_bp,
-                            index_cap_bp: params.index_cap_bp,
-                            ..Default::default()
-                        },
-                    );
+                    let constrained_index =
+                        apply_bp_bounds(index_rate, params.index_floor_bp, params.index_cap_bp);
                     vec![(constrained_index, index_rate); segments.len()]
                 }
             };
@@ -794,7 +719,7 @@ pub(crate) fn emit_float_coupons_on(
                 .iter()
                 .zip(indices)
                 .map(|(segment, (index_rate, projected_index_rate))| {
-                    compiled.settle_index_rate_for_accrual(
+                    compiled.settle_index_rate(
                         segment.notional.as_f64(),
                         index_rate,
                         projected_index_rate,
@@ -874,34 +799,6 @@ mod tests {
     use time::Month;
 
     #[test]
-    fn emit_inflation_coupons_preserves_non_positive_amounts() {
-        let mut flows = Vec::new();
-        emit_inflation_coupons(
-            Currency::USD,
-            &[
-                (
-                    Date::from_calendar_date(2025, Month::January, 1).expect("valid date"),
-                    0.0,
-                    0.5,
-                    0.02,
-                ),
-                (
-                    Date::from_calendar_date(2025, Month::July, 1).expect("valid date"),
-                    -12.5,
-                    0.5,
-                    0.02,
-                ),
-            ],
-            &mut flows,
-        )
-        .expect("valid inflation coupons fixture");
-
-        assert_eq!(flows.len(), 2);
-        assert_eq!(flows[0].kind, CFKind::InflationCoupon);
-        assert_eq!(flows[1].amount.amount(), -12.5);
-    }
-
-    #[test]
     fn overnight_projection_converts_curve_basis_but_preserves_observed_fixings() {
         let past = Date::from_calendar_date(2025, Month::January, 3).expect("past fixing");
         let base = Date::from_calendar_date(2025, Month::January, 6).expect("curve base");
@@ -918,8 +815,7 @@ mod tests {
         for (date, expected) in [(past, 0.041), (base, 0.042)] {
             let actual = observed_overnight_rate(
                 date,
-                1,
-                1.0 / 360.0,
+                360.0,
                 &curve,
                 Some(&fixings),
                 "TEST-ON",
@@ -930,8 +826,7 @@ mod tests {
         }
         let projected = observed_overnight_rate(
             future,
-            1,
-            1.0 / 360.0,
+            360.0,
             &curve,
             Some(&fixings),
             "TEST-ON",
@@ -964,8 +859,7 @@ mod tests {
             .replay(end, 360.0, OvernightRateConstraints::default(), |slice| {
                 observed_overnight_rate(
                     slice.observation_date,
-                    slice.rate_tenor_days,
-                    f64::from(slice.rate_tenor_days) / 360.0,
+                    360.0,
                     &curve,
                     None,
                     "TEST-ON",
@@ -1004,8 +898,7 @@ mod tests {
             .replay(end, 360.0, OvernightRateConstraints::default(), |slice| {
                 observed_overnight_rate(
                     slice.observation_date,
-                    slice.rate_tenor_days,
-                    f64::from(slice.rate_tenor_days) / 360.0,
+                    360.0,
                     &curve,
                     None,
                     "TEST-ON",

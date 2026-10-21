@@ -124,7 +124,6 @@ pub struct LookbackOption {
     /// Lookback type (fixed or floating strike)
     pub lookback_type: LookbackType,
     /// Option expiry date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

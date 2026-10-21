@@ -1,7 +1,9 @@
 //! CDS tranche market quote schema.
 
 use super::ids::QuoteId;
-use super::validate;
+use finstack_quant_core::validation::{
+    require_with, validate_f64_finite, validate_f64_positive, validate_f64_unit_interval,
+};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::market::conventions::ids::CdsConventionKey;
 use serde::{Deserialize, Serialize};
@@ -59,7 +61,6 @@ pub struct CdsTrancheQuote {
     /// Detachment point (decimal, e.g. 0.07).
     pub detachment: f64,
     /// Maturity date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -115,21 +116,21 @@ impl CdsTrancheQuote {
 
     /// Validate attachment/detachment, running spread, and decimal upfront bounds.
     pub fn validate(&self) -> Result<()> {
-        validate::unit_interval(self.attachment, "attachment")?;
-        validate::unit_interval(self.detachment, "detachment")?;
+        validate_f64_unit_interval(self.attachment, "attachment")?;
+        validate_f64_unit_interval(self.detachment, "detachment")?;
         if self.attachment >= self.detachment {
             return Err(Error::Validation(format!(
                 "attachment must be less than detachment; got attachment={}, detachment={}",
                 self.attachment, self.detachment
             )));
         }
-        validate::finite(self.upfront_pct, "upfront_pct")?;
-        if self.upfront_pct.abs() > 1.0 {
-            return Err(Error::Validation(format!(
-                "upfront_pct must satisfy abs(upfront_pct) <= 1; got {}",
+        validate_f64_finite(self.upfront_pct, "upfront_pct")?;
+        require_with(self.upfront_pct.abs() <= 1.0, || {
+            format!(
+                "Invalid upfront_pct: |value| exceeds 1 (got {})",
                 self.upfront_pct
-            )));
-        }
-        validate::positive(self.coupon_bp, "coupon_bp")
+            )
+        })?;
+        validate_f64_positive(self.coupon_bp, "coupon_bp")
     }
 }

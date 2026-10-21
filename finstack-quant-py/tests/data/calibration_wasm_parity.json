@@ -209,7 +209,11 @@
       "base_date": "2026-05-08",
       "tenor_years": 0.25,
       "discount_curve_id": "USD-OIS",
-      "method": "bootstrap",
+      "method": {
+        "global_solve": {
+          "use_analytical_jacobian": false
+        }
+      },
       "interpolation": "monotone_convex",
       "conventions": {
         "curve_day_count": null,
@@ -274,7 +278,6 @@
       "sabr_beta": 0.5,
       "target_expiries": [],
       "target_tenors": [],
-      "sabr_interpolation": "bilinear",
       "calendar_id": null,
       "fixed_day_count": null,
       "swap_index": null,

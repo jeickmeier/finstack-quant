@@ -8,6 +8,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies;
@@ -55,7 +56,6 @@ pub struct Equity {
     /// Optional discrete cash dividends `(ex_date, amount)` for single-name forwards.
     #[serde(default)]
     #[builder(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -223,39 +223,7 @@ impl Equity {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
-        if price.currency() == self.currency {
-            return Ok(price);
-        }
-
-        let matrix = market.fx_required()?;
-
-        struct MatrixProvider<'a> {
-            m: &'a finstack_quant_core::money::fx::FxMatrix,
-        }
-        impl finstack_quant_core::money::fx::FxProvider for MatrixProvider<'_> {
-            fn rate(
-                &self,
-                from: finstack_quant_core::currency::Currency,
-                to: finstack_quant_core::currency::Currency,
-                on: finstack_quant_core::dates::Date,
-                policy: finstack_quant_core::money::fx::FxConversionPolicy,
-            ) -> finstack_quant_core::Result<f64> {
-                let r = self
-                    .m
-                    .rate(finstack_quant_core::money::fx::FxQuery::with_policy(
-                        from, to, on, policy,
-                    ))?;
-                Ok(r.rate)
-            }
-        }
-
-        let provider = MatrixProvider { m: matrix.as_ref() };
-        price.convert(
-            self.currency,
-            as_of,
-            &provider,
-            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
-        )
+        Ok(market.convert_money(price, self.currency, as_of)?.amount)
     }
 
     /// Get the effective number of shares held (defaults to 1).
@@ -436,7 +404,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Equity {
         _curves: &MarketContext,
         _as_of: Date,
     ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+        finstack_quant_cashflows::schedule_from_classified_flows(
             Vec::new(),
             finstack_quant_core::dates::DayCount::Act365F, // Standard for equity spot
             finstack_quant_cashflows::ScheduleBuildOpts {
@@ -447,7 +415,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Equity {
                     ..Default::default()
                 },
             },
-        ))
+        )
     }
 }
 

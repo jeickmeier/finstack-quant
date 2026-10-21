@@ -5,10 +5,10 @@ use super::config::{
     PAR_SPREAD_TOLERANCE,
 };
 use crate::cds_tranche::CdsTranche;
-use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::{context::MarketContext, term_structures::CreditIndexData};
-use finstack_quant_core::math::binomial_pmf_all_into;
+use finstack_quant_core::math::distributions::binomial_pmf_all_into;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::{Error, Result};
 
@@ -366,7 +366,7 @@ impl CdsTranchePricer {
                 calendar_id: tranche
                     .calendar_id
                     .as_deref()
-                    .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
+                    .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID),
                 end_of_month: false,
                 day_count: tranche.day_count,
                 payment_lag_days: 0,
@@ -646,7 +646,7 @@ impl CdsTranchePricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::math::binomial_pmf_all;
+    use finstack_quant_core::math::distributions::binomial_pmf_all;
 
     /// W-20: `conditional_equity_tranche_loss` evaluates the conditional binomial
     /// PMF for every `k` in `0..=N` via [`binomial_pmf_all`]. With `N = 125` a

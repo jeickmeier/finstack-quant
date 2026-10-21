@@ -5,11 +5,12 @@
 //! evaluated on calendar dates, rather than applying one elapsed-time scalar to
 //! both curves. This module owns that conversion for every valuation caller.
 
-use finstack_quant_core::dates::{Date, Duration};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditCalibrationTargets;
+use time::Duration;
 
 /// Exact discounted default-probability weight for one constant-forward step.
 ///

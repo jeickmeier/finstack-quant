@@ -66,7 +66,7 @@ impl TableEnvelope {
         metadata: IndexMap<String, serde_json::Value>,
     ) -> Result<Self> {
         let row_count = columns.first().map(TableColumn::len).unwrap_or(0);
-        let mut seen = crate::HashSet::default();
+        let mut seen = crate::FxHashSet::default();
 
         for column in &columns {
             if column.len() != row_count {
@@ -229,59 +229,6 @@ impl TableColumnData {
     }
 }
 
-macro_rules! decl_typed_accessors {
-    (
-        $(
-            (
-                $variant:ident, $doc_fn:literal,
-                $nullable_variant:ident, $doc_nullable_fn:literal,
-                $ty:ty,
-                $as_fn:ident,
-                $as_nullable_fn:ident
-            )
-        ),* $(,)?
-    ) => {
-        impl TableColumn {
-            $(
-                #[doc = $doc_fn]
-                #[must_use]
-                pub fn $as_fn(&self) -> Option<&[$ty]> {
-                    match &self.data { TableColumnData::$variant(values) => Some(values), _ => None }
-                }
-
-                #[doc = $doc_nullable_fn]
-                #[must_use]
-                pub fn $as_nullable_fn(&self) -> Option<&[Option<$ty>]> {
-                    match &self.data { TableColumnData::$nullable_variant(values) => Some(values), _ => None }
-                }
-            )*
-        }
-    };
-}
-
-decl_typed_accessors! {
-    (
-        String,   "Return string values if this is a non-null string column.",
-        NullableString, "Return nullable string values if this is a nullable string column.",
-        String, as_strings, as_nullable_strings
-    ),
-    (
-        Float64,  "Return floating-point values if this is a non-null float column.",
-        NullableFloat64, "Return nullable floating-point values if this is a nullable float column.",
-        f64, as_f64, as_nullable_f64
-    ),
-    (
-        UInt32,   "Return unsigned integer values if this is a non-null `u32` column.",
-        NullableUInt32, "Return nullable unsigned integer values if this is a nullable `u32` column.",
-        u32, as_u32, as_nullable_u32
-    ),
-    (
-        Int64,    "Return signed integer values if this is a non-null `i64` column.",
-        NullableInt64, "Return nullable signed integer values if this is a nullable `i64` column.",
-        i64, as_i64, as_nullable_i64
-    ),
-}
-
 /// Optional semantic hint for a column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -356,38 +303,6 @@ mod tests {
         assert_eq!(restored.row_count, 2);
         assert_eq!(restored.metadata.get("orientation"), Some(&json!("long")));
         assert_eq!(restored.column("period_id").map(TableColumn::len), Some(2));
-    }
-
-    #[test]
-    fn typed_accessors_return_matching_columns_only() {
-        let strings = TableColumn::new(
-            "name",
-            TableColumnData::String(vec!["alpha".into(), "beta".into()]),
-        );
-        let nullable_floats = TableColumn::new(
-            "score",
-            TableColumnData::NullableFloat64(vec![Some(1.5), None]),
-        );
-        let uints = TableColumn::new("count", TableColumnData::UInt32(vec![1, 2]));
-        let nullable_ints = TableColumn::new(
-            "delta",
-            TableColumnData::NullableInt64(vec![Some(-1), None]),
-        );
-
-        assert_eq!(
-            strings.as_strings(),
-            Some(vec!["alpha".to_string(), "beta".to_string()].as_slice())
-        );
-        assert_eq!(strings.as_f64(), None);
-        assert_eq!(
-            nullable_floats.as_nullable_f64(),
-            Some([Some(1.5), None].as_slice())
-        );
-        assert_eq!(uints.as_u32(), Some([1, 2].as_slice()));
-        assert_eq!(
-            nullable_ints.as_nullable_i64(),
-            Some([Some(-1), None].as_slice())
-        );
     }
 
     #[test]

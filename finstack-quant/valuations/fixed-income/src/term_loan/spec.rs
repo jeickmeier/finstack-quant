@@ -16,7 +16,7 @@
 //!
 //! - [`DdtlSpec`]: Delayed-draw term loan features
 //! - [`TermLoanCovenantEvents`]: Covenant-driven events
-//! - [`AmortizationSpec`]: Principal repayment schedules (the shared cashflows
+//! - `AmortizationSpec`: Principal repayment schedules (the shared cashflows
 //!   type; term loans accept every variant except `LinearTo` and
 //!   `StepRemaining`)
 //! - [`LoanCallSchedule`]: Borrower prepayment options
@@ -47,7 +47,6 @@ use rust_decimal::Decimal;
 
 pub use super::super::bond::MakeWholeSpec;
 pub use super::super::loan_terms::{CommitmentStep, DrawEvent, MarginStep, OidEirSpec};
-pub use finstack_quant_cashflows::builder::AmortizationSpec;
 
 /// Original Issue Discount (OID) policy for term loan origination.
 ///
@@ -199,14 +198,12 @@ pub struct DdtlSpec {
     /// Total commitment available for draws, in the loan currency.
     pub commitment: Money,
     /// First date draws are permitted
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub availability_start: Date,
     /// Last date draws are permitted (commitment expiry)
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -267,7 +264,6 @@ impl DdtlSpec {
 #[serde(deny_unknown_fields)]
 pub struct PikToggle {
     /// Date PIK feature is toggled
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -286,7 +282,6 @@ pub struct PikToggle {
 #[serde(deny_unknown_fields)]
 pub struct CashSweepEvent {
     /// Date of cash sweep prepayment
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -313,7 +308,6 @@ pub struct TermLoanCovenantEvents {
     /// Cash sweep (mandatory prepayment) schedule
     pub cash_sweeps: Vec<CashSweepEvent>,
     /// Dates on which draws are prohibited (covenant breach or scheduled)
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
@@ -381,7 +375,6 @@ pub enum LoanCallType {
 #[serde(deny_unknown_fields)]
 pub struct LoanCall {
     /// Call date (earliest prepayment date for this call provision)
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

@@ -59,7 +59,8 @@ impl<'a> std::fmt::Debug for DayCountContext<'a> {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, try_from = "DayCountContextStateFields")]
+#[cfg_attr(feature = "json-schema", schemars(!try_from, deny_unknown_fields))]
 /// Serializable snapshot of [`DayCountContext`] state for persistence and interchange.
 ///
 /// This struct captures the optional context parameters (calendar, frequency, business-day basis)
@@ -79,7 +80,7 @@ pub struct DayCountContextState {
     ///
     /// Required for exact ICMA accrual on round-trip. `None` selects the
     /// frequency-only ICMA calculation path; ACT/365L requires these dates.
-    #[serde(default, with = "crate::wire::optional_date_pair")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<(crate::wire::DateWire, crate::wire::DateWire)>")
@@ -89,12 +90,39 @@ pub struct DayCountContextState {
     pub end_is_termination_date: bool,
 }
 
+/// Wire fields of [`DayCountContextState`]; deserialization validates them
+/// through [`DayCountContextState::try_new`].
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DayCountContextStateFields {
+    calendar_id: Option<String>,
+    frequency: Option<Tenor>,
+    bus_basis: Option<u16>,
+    #[serde(default)]
+    coupon_period: Option<(Date, Date)>,
+    end_is_termination_date: bool,
+}
+
+impl TryFrom<DayCountContextStateFields> for DayCountContextState {
+    type Error = crate::Error;
+
+    fn try_from(fields: DayCountContextStateFields) -> crate::Result<Self> {
+        Self::try_new(
+            fields.calendar_id,
+            fields.frequency,
+            fields.bus_basis,
+            fields.coupon_period,
+            fields.end_is_termination_date,
+        )
+    }
+}
+
 impl DayCountContextState {
     /// Build a validated state snapshot.
     ///
-    /// This is the single validation point shared by every host binding: an
-    /// inverted `coupon_period` is rejected here rather than at year-fraction
-    /// time. The calendar id is *not* resolved (that happens in
+    /// This is the single validation point shared by every host binding and
+    /// by deserialization: an inverted `coupon_period` is rejected here rather
+    /// than at year-fraction time. The calendar id is *not* resolved (that happens in
     /// [`Self::to_ctx`]) so a snapshot can be persisted before the registry
     /// is consulted.
     ///
@@ -126,7 +154,7 @@ impl DayCountContextState {
             validate_coupon_period(start, end)?;
         }
         if bus_basis == Some(0) {
-            return Err(crate::error::InputError::InvalidBusBasis { basis: 0 }.into());
+            return Err(crate::InputError::InvalidBusBasis { basis: 0 }.into());
         }
         Ok(Self {
             calendar_id,
@@ -141,12 +169,8 @@ impl DayCountContextState {
     ///
     /// # Errors
     ///
-    /// Returns an error when `calendar_id` names an unknown calendar or when
-    /// a deserialized `coupon_period` is inverted.
+    /// Returns an error when `calendar_id` names an unknown calendar.
     pub fn to_ctx(&self) -> crate::Result<DayCountContext<'static>> {
-        if let Some((start, end)) = self.coupon_period {
-            validate_coupon_period(start, end)?;
-        }
         let calendar = self
             .calendar_id
             .as_deref()
@@ -225,8 +249,7 @@ mod tests {
             }
 
             fn is_business_day(&self, date: Date) -> bool {
-                !crate::dates::WeekendRule::SaturdaySunday.is_weekend(date.weekday())
-                    && !self.is_holiday(date)
+                !crate::dates::DateExt::is_weekend(date) && !self.is_holiday(date)
             }
         }
 
@@ -273,14 +296,29 @@ mod tests {
     }
 
     #[test]
-    fn to_ctx_rejects_inverted_deserialized_coupon_period() {
-        let state = DayCountContextState {
-            calendar_id: None,
-            frequency: None,
-            bus_basis: None,
-            coupon_period: Some((date!(2025 - 07 - 01), date!(2025 - 01 - 01))),
-            end_is_termination_date: false,
-        };
-        assert!(state.to_ctx().is_err());
+    fn deserialization_validates_through_try_new() {
+        let valid = DayCountContextState::try_new(
+            None,
+            None,
+            None,
+            Some((date!(2025 - 01 - 01), date!(2025 - 07 - 01))),
+            false,
+        )
+        .expect("valid state");
+        let mut json = serde_json::to_value(&valid).expect("serializable");
+        assert_eq!(
+            serde_json::from_value::<DayCountContextState>(json.clone()).expect("round-trips"),
+            valid
+        );
+        let period = json["coupon_period"].as_array_mut().expect("two dates");
+        period.swap(0, 1);
+        let err = serde_json::from_value::<DayCountContextState>(json.clone())
+            .expect_err("inverted coupon period is rejected at load time");
+        assert!(err
+            .to_string()
+            .contains("coupon period start must be before end"));
+        json["coupon_period"] = serde_json::Value::Null;
+        json["bus_basis"] = serde_json::json!(0);
+        assert!(serde_json::from_value::<DayCountContextState>(json).is_err());
     }
 }

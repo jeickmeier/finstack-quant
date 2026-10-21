@@ -248,20 +248,22 @@ fn generated_schema_preserves_derived_assertions() {
 }
 
 const INDEX_PROBE_ARTIFACTS: &[SchemaArtifact] = &[
-    SchemaArtifact::new::<SuffixProbe>(
-        "schemas/probe/1/second.schema.json",
-        "https://finstack_quant.dev/schemas/probe/1/second.schema.json",
-        "Second",
+    crate::schema_artifact!(
+        SuffixProbe,
+        "probe",
+        "second",
+        Output,
         "Registered second but sorts first by path.",
-    )
-    .with_kind(SchemaKind::Output),
-    SchemaArtifact::new::<SuffixProbe>(
-        "schemas/probe/1/first.schema.json",
-        "https://finstack_quant.dev/schemas/probe/1/first.schema.json",
-        "First",
+        title = "Second"
+    ),
+    crate::schema_artifact!(
+        SuffixProbe,
+        "probe",
+        "first",
+        Input,
         "Falls back to this description because no summary is set.",
+        title = "First"
     )
-    .with_kind(SchemaKind::Input)
     .with_summary("An explicit one-line summary."),
 ];
 
@@ -753,11 +755,13 @@ fn projection_rejects_a_non_object_document() {
 
 #[test]
 fn schema_index_defaults_to_component() {
-    const COMPONENT: &[SchemaArtifact] = &[SchemaArtifact::new::<SuffixProbe>(
-        "schemas/probe/1/component.schema.json",
-        "https://finstack_quant.dev/schemas/probe/1/component.schema.json",
-        "Component",
+    const COMPONENT: &[SchemaArtifact] = &[crate::schema_artifact!(
+        SuffixProbe,
+        "probe",
+        "component",
+        Component,
         "Referenced by roots, never submitted alone.",
+        title = "Component"
     )];
     let index = build_schema_index(COMPONENT).expect("index builds");
     assert_eq!(index["artifacts"][0]["kind"], json!("component"));
@@ -765,11 +769,13 @@ fn schema_index_defaults_to_component() {
 
 #[test]
 fn registry_selection_and_index_use_the_published_contract() {
-    const REGISTRY: &[SchemaArtifact] = &[SchemaArtifact::new::<SuffixProbe>(
-        "schemas/probe/1/component.schema.json",
-        "https://finstack_quant.dev/schemas/probe/1/component.schema.json",
-        "Component",
+    const REGISTRY: &[SchemaArtifact] = &[crate::schema_artifact!(
+        SuffixProbe,
+        "probe",
+        "component",
+        Component,
         "A component schema.",
+        title = "Component"
     )];
     let artifact = &REGISTRY[0];
     for selector in [artifact.id, artifact.relative_path, "component.schema.json"] {

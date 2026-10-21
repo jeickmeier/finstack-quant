@@ -11,7 +11,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     execute_waterfall, run_simulation, AssetPool, CoverageTestSpec, DealType, FundingSource,
     PaymentType, PoolAsset, Recipient, StructuredCredit, Tranche, TrancheCashflows,
@@ -120,7 +120,7 @@ fn clo(pool_rate: f64, a_coupon: f64, covers: Option<bool>) -> (StructuredCredit
     (deal, close)
 }
 
-fn simulate(deal: &StructuredCredit, as_of: Date) -> HashMap<String, TrancheCashflows> {
+fn simulate(deal: &StructuredCredit, as_of: Date) -> FxHashMap<String, TrancheCashflows> {
     run_simulation(deal, &market(as_of), as_of).expect("simulation")
 }
 

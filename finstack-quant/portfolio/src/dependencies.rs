@@ -10,8 +10,8 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::HashMap;
-use finstack_quant_core::HashSet;
+use finstack_quant_core::FxHashMap;
+use finstack_quant_core::FxHashSet;
 use finstack_quant_valuations::instruments::MarketDependencies;
 use finstack_quant_valuations::instruments::RatesCurveKind;
 
@@ -129,8 +129,8 @@ impl MarketFactorKey {
 /// # Returns
 ///
 /// Deduplicated normalized key set.
-pub fn flatten_dependencies(deps: &MarketDependencies) -> HashSet<MarketFactorKey> {
-    let mut keys = HashSet::default();
+pub fn flatten_dependencies(deps: &MarketDependencies) -> FxHashSet<MarketFactorKey> {
+    let mut keys = FxHashSet::default();
 
     for (curve_id, kind) in deps.curves.all_with_kind() {
         keys.insert(MarketFactorKey::curve(curve_id, kind));
@@ -204,7 +204,7 @@ pub(crate) fn credit_index_keys(
 pub(crate) fn resolved_dependencies(
     deps: &MarketDependencies,
     market: &MarketContext,
-) -> finstack_quant_core::Result<HashSet<MarketFactorKey>> {
+) -> finstack_quant_core::Result<FxHashSet<MarketFactorKey>> {
     let mut keys = flatten_dependencies(deps);
     for index_id in &deps.credit_index_ids {
         keys.remove(&MarketFactorKey::CreditIndex(index_id.clone()));
@@ -215,7 +215,7 @@ pub(crate) fn resolved_dependencies(
 
 /// Inverted index mapping market factor keys to affected position indices.
 ///
-/// Stored alongside the `position_index` on [`Portfolio`](crate::portfolio::Portfolio)
+/// Stored alongside the `position_index` on [`Portfolio`](crate::Portfolio)
 /// as a derived, non-serialized cache.  The index maps each [`MarketFactorKey`]
 /// to the position indices whose instruments depend on that key.
 ///
@@ -226,7 +226,7 @@ pub(crate) fn resolved_dependencies(
 /// method, so empty means the instrument genuinely reads no market data.
 #[derive(Debug, Clone, Default)]
 pub struct DependencyIndex {
-    inner: HashMap<MarketFactorKey, Vec<usize>>,
+    inner: FxHashMap<MarketFactorKey, Vec<usize>>,
     /// Position indices whose instruments failed to report dependencies.
     /// These are always included in any affected-position query as a
     /// conservative fallback.
@@ -353,7 +353,7 @@ impl DependencyIndex {
         keys: &[MarketFactorKey],
         market: &MarketContext,
     ) -> finstack_quant_core::Result<Vec<usize>> {
-        let mut seen = HashSet::default();
+        let mut seen = FxHashSet::default();
         let mut result = Vec::new();
 
         for &idx in &self.unresolved {
@@ -436,15 +436,6 @@ impl DependencyIndex {
     /// `true` when the index contains no keys and no unresolved positions.
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty() && self.unresolved.is_empty()
-    }
-
-    /// Iterate over all tracked market factor keys and their position indices.
-    ///
-    /// # Returns
-    ///
-    /// Iterator over normalized factor keys and matching position-index slices.
-    pub fn iter(&self) -> impl Iterator<Item = (&MarketFactorKey, &[usize])> {
-        self.inner.iter().map(|(k, v)| (k, v.as_slice()))
     }
 }
 
@@ -529,7 +520,7 @@ pub(crate) mod tests {
             .expect("index")
             .to_builder()
             .num_constituents(1)
-            .issuer_curves(finstack_quant_core::HashMap::from_iter([(
+            .issuer_curves(finstack_quant_core::FxHashMap::from_iter([(
                 "issuer".to_string(),
                 Arc::new(issuer.clone()),
             )]))
@@ -622,7 +613,7 @@ pub(crate) mod tests {
     fn affected_positions_conservatively_includes_all_fx_dependencies() {
         let direct = MarketFactorKey::fx(Currency::EUR, Currency::USD);
         let triangulated_cross = MarketFactorKey::fx(Currency::EUR, Currency::JPY);
-        let inner = HashMap::from_iter([(direct, vec![7]), (triangulated_cross, vec![11])]);
+        let inner = FxHashMap::from_iter([(direct, vec![7]), (triangulated_cross, vec![11])]);
         let index = DependencyIndex {
             inner,
             unresolved: Vec::new(),

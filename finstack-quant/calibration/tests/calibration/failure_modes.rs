@@ -4,9 +4,8 @@ use crate::calibration::calibration_support as cal_utils;
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::{
     BaseCorrelationParams, CalibrationEnvelope, CalibrationPlan, CalibrationStep,
-    ForwardCurveParams, HazardCurveParams, InflationCurveParams, SabrInterpolationMethod,
-    StepParams, SurfaceExtrapolationPolicy, SwaptionVolConvention, SwaptionVolParams,
-    VolSurfaceParams,
+    ForwardCurveParams, HazardCurveParams, InflationCurveParams, StepParams,
+    SurfaceExtrapolationPolicy, SwaptionVolConvention, SwaptionVolParams, VolSurfaceParams,
 };
 use finstack_quant_calibration::quotes::cds::CdsQuote;
 use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
@@ -15,7 +14,7 @@ use finstack_quant_calibration::quotes::inflation::InflationQuote;
 use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
     InflationIndex, InflationLag, SeriesInterpolation,
 };
@@ -23,7 +22,7 @@ use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::{HazardCurve, ParInterp};
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use finstack_quant_valuations_test_support::fixtures;
 use std::sync::Arc;
@@ -39,20 +38,6 @@ fn usd_discount_curve(base_date: Date) -> DiscountCurve {
     fixtures::usd_discount_curve_minimal(base_date, "USD-OIS")
 }
 
-#[test]
-fn market_context_split_rejects_malformed_collateral_currency() {
-    let mut state =
-        MarketContextState::try_from(&MarketContext::new()).expect("coherent market snapshot");
-    state
-        .collateral
-        .insert("NOT_A_CURRENCY".to_string(), "USD".to_string());
-
-    let err =
-        cal_utils::split_market_context_state(state).expect_err("invalid currency should error");
-    assert!(err.to_string().contains("Invalid collateral currency"));
-    assert!(err.to_string().contains("NOT_A_CURRENCY"));
-}
-
 fn envelope_for_step(
     step: CalibrationStep,
     quotes: Vec<MarketQuote>,
@@ -60,7 +45,7 @@ fn envelope_for_step(
 ) -> CalibrationEnvelope {
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert(step.quote_set.clone(), cal_utils::quote_set_ids(&quotes));
     let plan = CalibrationPlan {
         id: "plan".to_string(),
@@ -162,7 +147,50 @@ fn inflation_preflight_rejects_invalid_observation_lag() {
     let err = engine::calibrate(&envelope).expect_err("invalid lag should fail");
     let msg = err.to_string();
     assert!(
-        msg.contains("Invalid observation_lag"),
+        msg.contains("Invalid inflation lag"),
+        "unexpected error: {msg}"
+    );
+}
+
+#[test]
+fn inflation_preflight_rejects_day_based_observation_lag() {
+    let base_date = base_date();
+    let discount = usd_discount_curve(base_date);
+    let source_market = MarketContext::new().insert(discount);
+
+    let quote = MarketQuote::Inflation(InflationQuote::InflationSwap {
+        id: QuoteId::new("USA-CPI-U-ZCIS-20300102"),
+        maturity: Date::from_calendar_date(2030, Month::January, 2).expect("maturity"),
+        rate: 0.02,
+        index: "USA-CPI-U".to_string(),
+        convention:
+            finstack_quant_valuations_core::market::conventions::ids::InflationSwapConventionId::new(
+                "USD",
+            ),
+    });
+
+    let step = CalibrationStep {
+        id: "infl".to_string(),
+        quote_set: "infl".to_string(),
+        params: StepParams::Inflation(InflationCurveParams {
+            curve_id: "USD-CPI".into(),
+            currency: Currency::USD,
+            base_date,
+            discount_curve_id: "USD-OIS".into(),
+            index: "USA-CPI-U".to_string(),
+            observation_lag: "90D".to_string(),
+            base_cpi: 100.0,
+            notional: 1.0,
+            method: Default::default(),
+            interpolation: Default::default(),
+        }),
+    };
+
+    let envelope = envelope_for_step(step, vec![quote], source_market);
+    let err = engine::calibrate(&envelope).expect_err("day-based lag should fail in preflight");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("day-based observation lags"),
         "unexpected error: {msg}"
     );
 }
@@ -215,7 +243,6 @@ fn swaption_vol_preflight_rejects_invalid_shift() {
             sabr_beta: 0.5,
             target_expiries: Vec::new(),
             target_tenors: Vec::new(),
-            sabr_interpolation: SabrInterpolationMethod::default(),
             calendar_id: None,
             fixed_day_count: None,
             swap_index: None,

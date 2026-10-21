@@ -210,7 +210,9 @@ fn market_context_roundtrip() {
     assert!(deserialized.get_discount("USD-OIS").is_ok());
     assert!(deserialized.get_forward("USD-SOFR").is_ok());
     assert!(deserialized.get_surface("VOL").is_ok());
-    assert!(deserialized.get_dividend_schedule("AAPL-DIVS").is_ok());
+    assert!(deserialized
+        .dividends_iter()
+        .any(|(id, _)| id.as_str() == "AAPL-DIVS"));
     assert!(deserialized.fx().is_some());
 }
 
@@ -239,9 +241,11 @@ fn market_context_roundtrip_preserves_hierarchy() {
     let hierarchy = deserialized
         .hierarchy()
         .expect("hierarchy should survive MarketContext serde round-trip");
-    assert!(hierarchy
-        .all_curve_ids()
-        .contains(&CurveId::from("EUR-ESTR")));
+    let path: Vec<String> = vec!["Rates".into(), "EUR".into(), "ESTR".into()];
+    assert_eq!(
+        hierarchy.get_node(&path).expect("EUR node").curve_ids(),
+        &[CurveId::from("EUR-ESTR")]
+    );
 }
 
 #[test]
@@ -339,10 +343,7 @@ fn market_context_missing_schema_version_is_rejected_by_all_loaders() {
 
 #[test]
 fn market_context_strict_loader_reports_zero_future_and_malformed_json() {
-    for version in [
-        0,
-        finstack_quant_core::market_data::context::MARKET_CONTEXT_STATE_VERSION + 1,
-    ] {
+    for version in [0, finstack_quant_core::wire::SchemaVersion::VALUE + 1] {
         let mut json = serde_json::to_value(
             MarketContextState::try_from(&MarketContext::new()).expect("coherent market snapshot"),
         )
@@ -370,10 +371,7 @@ fn market_context_strict_loader_reports_zero_future_and_malformed_json() {
 
 #[test]
 fn market_context_state_rejects_unsupported_versions() {
-    for version in [
-        0,
-        finstack_quant_core::market_data::context::MARKET_CONTEXT_STATE_VERSION + 1,
-    ] {
+    for version in [0, finstack_quant_core::wire::SchemaVersion::VALUE + 1] {
         let mut json = serde_json::to_value(
             MarketContextState::try_from(&MarketContext::new()).expect("coherent market snapshot"),
         )
@@ -453,7 +451,7 @@ fn semantic_restore_fixture() -> MarketContextState {
         "USD-SWAPTION",
         &[1.0],
         &[5.0],
-        &[SabrParameterData::new(0.035, 0.5, -0.2, 0.4).expect("SABR parameters")],
+        &[SabrParameterData::new(0.035, 0.5, 0.4, -0.2).expect("SABR parameters")],
         &[0.03],
     )
     .expect("vol cube");
@@ -483,7 +481,6 @@ fn semantic_restore_fixture() -> MarketContextState {
         }],
         fx_delta_vol_surfaces: vec![fx_delta_vol],
         vol_cubes: vec![vol_cube],
-        collateral: std::collections::BTreeMap::new(),
         hierarchy: None,
     }
 }
@@ -529,26 +526,6 @@ fn market_context_restore_detects_duplicates_in_every_vector_state_field() {
             "{field}"
         );
     }
-}
-
-#[test]
-fn market_context_restore_reports_missing_collateral_reference_without_truncation() {
-    let mut state = semantic_restore_fixture();
-    state
-        .collateral
-        .insert("USD/CSA".into(), "MISSING-DISCOUNT".into());
-
-    let report = restore_report(&state);
-    assert!(!report.truncated);
-    assert_eq!(report.diagnostics.len(), 1, "{report:?}");
-    assert_eq!(
-        report.diagnostics[0].code,
-        "market-context/missing-collateral-curve"
-    );
-    assert_eq!(
-        report.diagnostics[0].pointer.as_deref(),
-        Some("/collateral/USD~1CSA")
-    );
 }
 
 #[test]
@@ -652,7 +629,7 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
         .unwrap();
 
     // Add issuer curves/weights/recoveries to cover optional-map serde paths.
-    let mut issuer_curves = finstack_quant_core::HashMap::default();
+    let mut issuer_curves = finstack_quant_core::FxHashMap::default();
     issuer_curves.insert("ISSUER1".to_string(), std::sync::Arc::new(hazard.clone()));
     let issuer2_haz = HazardCurve::builder("ISSUER2-HAZ")
         .base_date(d)
@@ -664,9 +641,9 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
         "ISSUER2".to_string(),
         std::sync::Arc::new(issuer2_haz.clone()),
     );
-    let mut issuer_recovery = finstack_quant_core::HashMap::default();
+    let mut issuer_recovery = finstack_quant_core::FxHashMap::default();
     issuer_recovery.insert("ISSUER1".to_string(), 0.35);
-    let mut issuer_weights = finstack_quant_core::HashMap::default();
+    let mut issuer_weights = finstack_quant_core::FxHashMap::default();
     issuer_weights.insert("ISSUER1".to_string(), 0.6);
     issuer_weights.insert("ISSUER2".to_string(), 0.4);
 
@@ -706,8 +683,7 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
         .insert_price(
             "EQ-SPOT",
             MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
-        )
-        .map_collateral("USD-CSA", CurveId::from("A-DISC"));
+        );
 
     let state = MarketContextState::try_from(&ctx).expect("coherent market snapshot");
 
@@ -757,7 +733,6 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
     assert!(roundtripped.get_series("TS").is_ok());
     assert!(roundtripped.get_surface("VOL").is_ok());
     assert!(roundtripped.get_price("EQ-SPOT").is_ok());
-    assert!(roundtripped.get_collateral("USD-CSA").is_ok());
 }
 
 #[test]
@@ -811,7 +786,6 @@ fn curve_storage_roundtrip_and_market_context_state_error_branch() {
         ],
         fx_delta_vol_surfaces: vec![],
         vol_cubes: vec![],
-        collateral: std::collections::BTreeMap::new(),
         hierarchy: None,
     };
     assert!(MarketContext::try_from(bad_state).is_err());
@@ -920,7 +894,7 @@ fn market_context_state_roundtrip_hits_more_state_serde_lines() {
         .build()
         .unwrap();
 
-    let mut issuer_curves = finstack_quant_core::HashMap::default();
+    let mut issuer_curves = finstack_quant_core::FxHashMap::default();
     issuer_curves.insert("ISSUER".to_string(), Arc::new(issuer_haz.clone()));
 
     let credit_index = CreditIndexData::builder()
@@ -964,8 +938,7 @@ fn market_context_state_roundtrip_hits_more_state_serde_lines() {
         .insert_price(
             "EQ-SPOT",
             MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
-        )
-        .map_collateral("USD-CSA", CurveId::from("USD-OIS"));
+        );
 
     // Roundtrip via MarketContextState explicitly
     let state = MarketContextState::try_from(&ctx).expect("coherent market snapshot");
@@ -984,7 +957,6 @@ fn market_context_state_roundtrip_hits_more_state_serde_lines() {
     assert!(rebuilt.get_series("TS").is_ok());
     assert!(rebuilt.get_surface("VOL").is_ok());
     assert!(rebuilt.get_price("EQ-SPOT").is_ok());
-    assert!(rebuilt.get_collateral("USD-CSA").is_ok());
 }
 
 // Strict serde: unknown fields rejected on inbound curve/surface states

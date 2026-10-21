@@ -1,7 +1,8 @@
 //! Regime-switching prepayment model.
 
-use super::super::{clamped_cpr_to_smm, expected_shocked_smm};
+use super::super::expected_shocked_smm;
 use super::traits::{PrepaymentState, StochasticPrepayment};
+use finstack_quant_cashflows::builder::clamped_cpr_to_smm;
 
 /// Two-state Markov prepayment model with factor-shocked CPR.
 #[derive(Debug, Clone)]
@@ -141,7 +142,7 @@ mod tests {
 
     #[test]
     fn expected_smm_integrates_factor_shocks_within_each_regime() {
-        use finstack_quant_core::math::norm_cdf;
+        use finstack_quant_core::math::special_functions::norm_cdf;
 
         let model = RegimeSwitchingPrepay::new(0.04, 0.80, 0.3, 0.1, 0.8, 0.5);
         // Independent PDF integral, with z = cap_z - u^12 removing the

@@ -1,4 +1,5 @@
 //! JSON Schema generation helpers for scenario contracts.
+use crate::{ApplicationEnvelope, HorizonResult, HorizonSummary, TemplateMetadata};
 
 /// Canonical title of the published scenario envelope schema.
 pub const SCENARIO_SCHEMA_TITLE: &str = "Finstack Quant Scenario Specification";
@@ -137,36 +138,36 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
     .with_kind(finstack_quant_core::schema::SchemaKind::Input)
     .with_summary("Ordered shock and roll operations over market, statement and valuation targets.")
     .with_examples(scenario_examples),
-    finstack_quant_core::schema::SchemaArtifact::new::<crate::TemplateMetadata>(
-        "schemas/scenarios/1/template_metadata.schema.json",
-        "https://finstack_quant.dev/schemas/scenarios/1/template_metadata.schema.json",
-        "TemplateMetadata",
-        "Descriptive metadata of a built-in scenario template.",
+    finstack_quant_core::schema_artifact!(
+        TemplateMetadata,
+        "scenarios",
+        "template_metadata",
+        Output,
+        "Descriptive metadata of a built-in scenario template."
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Output)
     .with_examples(template_metadata_examples),
-    finstack_quant_core::schema::SchemaArtifact::new::<crate::ApplicationEnvelope>(
-        "schemas/scenarios/1/application_envelope.schema.json",
-        "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
-        "ApplicationEnvelope",
-        "Scenario application result: mutated market, model and instruments with the report.",
+    finstack_quant_core::schema_artifact!(
+        ApplicationEnvelope,
+        "scenarios",
+        "application_envelope",
+        Output,
+        "Scenario application result: mutated market, model and instruments with the report."
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Output)
     .with_examples(application_envelope_examples),
-    finstack_quant_core::schema::SchemaArtifact::new::<crate::HorizonResult>(
-        "schemas/scenarios/1/horizon_result.schema.json",
-        "https://finstack_quant.dev/schemas/scenarios/1/horizon_result.schema.json",
-        "HorizonResult",
-        "Horizon total return: factor-decomposed P&L with scenario context.",
+    finstack_quant_core::schema_artifact!(
+        HorizonResult,
+        "scenarios",
+        "horizon_result",
+        Output,
+        "Horizon total return: factor-decomposed P&L with scenario context."
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Output)
     .with_examples(horizon_result_examples),
-    finstack_quant_core::schema::SchemaArtifact::new::<crate::HorizonSummary>(
-        "schemas/scenarios/1/horizon_summary.schema.json",
-        "https://finstack_quant.dev/schemas/scenarios/1/horizon_summary.schema.json",
-        "HorizonSummary",
-        "Derived total, annualized and per-factor returns of a horizon result.",
+    finstack_quant_core::schema_artifact!(
+        HorizonSummary,
+        "scenarios",
+        "horizon_summary",
+        Output,
+        "Derived total, annualized and per-factor returns of a horizon result."
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Output)
     .with_examples(horizon_summary_examples),
 ];

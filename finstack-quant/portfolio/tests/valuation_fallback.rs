@@ -188,7 +188,7 @@ fn valuation_falls_back_when_metrics_fail() {
     assert_eq!(pv.value_native.currency(), Currency::USD);
     assert!((pv.value_native.amount() - 123.45).abs() < 1e-9);
     assert!(
-        valuation.has_degraded_risk(),
+        !valuation.degraded_positions.is_empty(),
         "fallback valuation should mark the portfolio as degraded"
     );
     assert_eq!(valuation.degraded_positions.len(), 1);
@@ -248,13 +248,8 @@ fn fallback_valuation_stamps_caller_config() {
         .expect("fallback result");
 
     assert_eq!(
-        result
-            .meta
-            .rounding
-            .get_output_scale_by_currency()
-            .get(&Currency::USD)
-            .copied(),
-        Some(4),
+        result.meta.rounding.output_scale(Currency::USD),
+        4,
         "PV-only fallback must stamp the caller's FinstackConfig",
     );
 }
@@ -308,7 +303,7 @@ fn empty_metric_request_uses_the_pv_only_path() {
         "PV-only fallback must record the canonical pricing failure, got {:?}",
         position.risk_error
     );
-    assert!(!valuation.has_degraded_risk());
+    assert!(valuation.degraded_positions.is_empty());
     assert!(position
         .valuation_result
         .as_ref()

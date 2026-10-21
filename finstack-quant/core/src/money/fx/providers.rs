@@ -7,8 +7,8 @@ use super::provider::directional_rate;
 use super::{FxConversionPolicy, FxProvider};
 use crate::currency::Currency;
 use crate::dates::Date;
-use crate::error::InputError;
-use crate::{recover_lock as recover, HashMap};
+use crate::InputError;
+use crate::{recover_lock as recover, FxHashMap};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 
@@ -41,8 +41,8 @@ use std::sync::{Arc, RwLock};
 /// ```
 #[derive(Default)]
 pub struct SimpleFxProvider {
-    quotes: RwLock<HashMap<(Currency, Currency), f64>>,
-    pinned_quotes: RwLock<HashMap<(Currency, Currency, Date, FxConversionPolicy), f64>>,
+    quotes: RwLock<FxHashMap<(Currency, Currency), f64>>,
+    pinned_quotes: RwLock<FxHashMap<(Currency, Currency, Date, FxConversionPolicy), f64>>,
     revision: AtomicU64,
 }
 
@@ -56,11 +56,7 @@ impl SimpleFxProvider {
     /// let provider = SimpleFxProvider::new();
     /// ```
     pub fn new() -> Self {
-        Self {
-            quotes: RwLock::new(HashMap::default()),
-            pinned_quotes: RwLock::new(HashMap::default()),
-            revision: AtomicU64::new(0),
-        }
+        Self::default()
     }
 
     /// Insert or update a single FX quote.
@@ -91,10 +87,7 @@ impl SimpleFxProvider {
     /// provider.set_quote(Currency::GBP, Currency::USD, 1.25);
     /// ```
     pub fn set_quote(&self, from: Currency, to: Currency, rate: f64) -> crate::Result<()> {
-        let rate = super::validate_fx_rate(from, to, rate)?;
-        recover(self.quotes.write()).insert((from, to), rate);
-        self.advance_revision();
-        Ok(())
+        self.set_quotes(&[(from, to, rate)])
     }
 
     /// Bulk insert or update FX quotes.
@@ -145,7 +138,7 @@ impl SimpleFxProvider {
         &self,
         quotes: &[(Currency, Currency, Date, FxConversionPolicy, f64)],
     ) -> crate::Result<()> {
-        let mut validated = HashMap::default();
+        let mut validated = FxHashMap::default();
         for &(from, to, on, policy, rate) in quotes {
             let rate = super::validate_fx_rate(from, to, rate)?;
             if validated.insert((from, to, on, policy), rate).is_some() {
@@ -196,11 +189,11 @@ impl FxProvider for SimpleFxProvider {
     /// # Errors
     ///
     /// Returns `Err` when:
-    /// - [`InputError::NotFound`](crate::error::InputError::NotFound): No direct quote
+    /// - [`InputError::NotFound`](crate::InputError::NotFound): No direct quote
     ///   exists for `from→to` and no reciprocal `to→from` is available
-    /// - [`InputError::NonFiniteValue`](crate::error::InputError::NonFiniteValue): The
+    /// - [`InputError::NonFiniteValue`](crate::InputError::NonFiniteValue): The
     ///   stored rate is non-finite
-    /// - [`InputError::InvalidFxRate`](crate::error::InputError::InvalidFxRate): The
+    /// - [`InputError::InvalidFxRate`](crate::InputError::InvalidFxRate): The
     ///   computed reciprocal is non-finite or non-positive (e.g. the stored
     ///   rate is subnormal, so `1/rate` overflows to infinity)
     ///
@@ -408,7 +401,7 @@ impl FxProvider for BumpedFxProvider {
         let mut quotes = self.original.snapshot_pinned_quotes();
         let from = self.override_from;
         let to = self.override_to;
-        let mut rates = HashMap::default();
+        let mut rates = FxHashMap::default();
         for &(base, quote, on, policy, rate) in &quotes {
             if base == from && quote == to {
                 rates.insert((on, policy), rate);

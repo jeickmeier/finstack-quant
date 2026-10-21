@@ -47,7 +47,7 @@
 //! - Hull, J. C., *Options, Futures, and Other Derivatives*. `docs/REFERENCES.md#hull-options-futures`
 //!
 
-use finstack_quant_core::math::{norm_cdf, norm_pdf};
+use finstack_quant_core::math::special_functions::{norm_cdf, norm_pdf};
 
 /// Calculate both d1 and d2 for Black–Scholes in a single pass.
 ///

@@ -9,9 +9,13 @@
 //!
 //! ## Where To Start
 //!
-//! - Use [`crate::evaluator::Evaluator::evaluate`] for standard model evaluation.
-//! - Use [`crate::evaluator::Evaluator::evaluate_with_market`] when the model
-//!   references capital structure (`cs.*`) and you need instrument pricing.
+//! - Use [`crate::evaluator::Evaluator::evaluate`] for standard model evaluation,
+//!   including fixed-rate capital structure.
+//! - Use [`crate::evaluator::Evaluator::evaluate_with_market`] when
+//!   capital-structure instruments need market data or explicit values need an
+//!   as-of cutoff.
+//! - Use [`crate::evaluator::StatementResult::rollup`] to roll results up to a
+//!   coarser frequency (quarterly to annual).
 //! - Use [`crate::evaluator::StatementResult`] as the canonical output envelope for downstream
 //!   analysis, reporting, and exports; call its `to_table_*` methods when you
 //!   need a serializable tabular representation.
@@ -32,7 +36,7 @@ mod dag;
 mod engine;
 pub(crate) mod export;
 mod forecast_eval;
-pub mod formula;
+pub(crate) mod formula;
 mod formula_aggregates;
 mod formula_dispatch;
 mod formula_ewm;
@@ -42,14 +46,17 @@ pub(crate) mod monte_carlo;
 mod period_history;
 mod precedence;
 mod results;
+mod rollup;
 
 pub use cashflow_export::{node_to_dated_schedule, PeriodDateConvention};
 pub use context::EvaluationContext;
-pub use dag::{evaluate_order, DependencyGraph};
+pub use dag::DependencyGraph;
 pub use engine::{Evaluator, PreparedEvaluation};
+pub use formula::evaluate_formula;
 pub use monte_carlo::{MonteCarloConfig, MonteCarloResults, PercentileSeries};
-pub use period_history::PeriodHistory;
+pub(crate) use period_history::PeriodHistory;
 pub use results::{
     CapitalStructureClaimCategory, CapitalStructureWarning, CellSource, EvalStats, EvalWarning,
     NumericMode, StatementResult,
 };
+pub use rollup::{RollupMethod, RollupSpec};

@@ -373,14 +373,7 @@ fn metrics_spec_restores_opening_conversion_and_rounding() {
     assert!((result.total_pnl.amount() - expected).abs() < 1e-8);
     assert!((result.model_params_pnl.amount() - expected).abs() < 1e-8);
     assert!(result.residual.amount().abs() < 1e-8);
-    assert_eq!(
-        result
-            .meta
-            .rounding
-            .get_output_scale_by_currency()
-            .get(&Currency::USD),
-        Some(&4)
-    );
+    assert_eq!(result.meta.rounding.output_scale(Currency::USD), 4);
 }
 
 #[test]

@@ -531,8 +531,7 @@ export type CouponType =
  * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
  *   frequency, take (actual days) / (actual days in coupon period) for each,
  *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
- *   first/last coupons use
- *   [`act_act_isma_year_fraction_with_reference_period`].
+ *   first/last coupons also supply the enclosing regular `coupon_period`.
  * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
  *   **backwards from `end`** until the candidate is before `start`; each
  *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -625,7 +624,7 @@ export type RollRule = "none" | "imm" | "cds_imm";
  *   ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide
  *   evenly by the frequency. Use a stub variant for misaligned schedules.
  *
- * [`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor
+ * [`InputError::NonIntegerScheduleTenor`]: crate::InputError::NonIntegerScheduleTenor
  * - **`ShortFront`**: Short stub period at the start. Schedule is built
  *   backward from the end date, creating a short first period.
  * - **`ShortBack`**: Short stub period at the end. Schedule is built forward
@@ -1846,19 +1845,6 @@ export type EvalWarning =
       };
     }
   | {
-      nan_propagated: {
-        /**
-         * Identifier of the node that produced the NaN value.
-         */
-        node_id: string;
-        /**
-         * Period in which the warning occurred.
-         */
-        period: string;
-        [k: string]: unknown;
-      };
-    }
-  | {
       non_finite_value: {
         /**
          * Identifier of the node that produced the non-finite value.
@@ -2014,6 +2000,29 @@ export type TableColumnData =
  * Optional semantic hint for a column.
  */
 export type TableColumnRole = "dimension" | "index" | "measure" | "attribute";
+/**
+ * Period frequency type.
+ *
+ * Defines the frequency of periodic schedules (cashflow rolls, return-series
+ * resampling, statement reporting). Each variant carries an implied
+ * "periods-per-year" used by [`PeriodKind::periods_per_year`] and by
+ * downstream annualization helpers in `finstack-quant-analytics`.
+ *
+ * `Daily` follows the trading-day convention (252 per year), not the
+ * calendar-day convention (365 per year). Use `Weekly` if you need
+ * calendar-week granularity.
+ *
+ * Parses the snake_case wire values via [`std::str::FromStr`]
+ * (for example, `"quarterly"` or `"semi_annual"`). The parser also accepts
+ * the `"semiannual"` spelling and the pandas offset aliases `D`/`B`
+ * (daily), `W` (weekly), `M`/`ME` (monthly), `Q`/`QE` (quarterly) and
+ * `A`/`Y`/`YE` (annual); serde (de)serialization stays strict snake_case.
+ */
+export type PeriodKind = "daily" | "quarterly" | "monthly" | "weekly" | "semi_annual" | "annual";
+/**
+ * How one node's values combine over the source periods of a target period.
+ */
+export type RollupMethod = "sum" | "period_end" | "formula";
 /**
  * Numeric mode used for evaluation.
  */
@@ -6738,6 +6747,14 @@ export interface CheckSuiteSpec {
  *
  * Full suite definitions (built-in + formula) can be stored as a single JSON
  * document and resolved directly with [`CheckSuiteSpec::resolve`].
+ *
+ * Each period ends in one of three verdicts: pass, fail (a finding with the
+ * configured `severity`), or insufficient data. A period has insufficient
+ * data when a same-period input is missing or non-finite, or when the
+ * formula consumes a non-finite value, such as a lag or rolling window that
+ * reaches before the first period. It is reported as a `warning` finding
+ * naming the inputs, records no comparison, and never fails the check. A
+ * division by zero over finite inputs is not missing data and still fails.
  */
 export interface FormulaCheckSpec {
   /**
@@ -7140,6 +7157,25 @@ export interface NormalizationResult {
    */
   value_type: NodeValueType;
   [k: string]: unknown;
+}
+/**
+ * Target frequency and per-node methods for rolling statement results up to coarser periods.
+ */
+export interface RollupSpec {
+  /**
+   * Target frequency: `quarterly`, `semi_annual` or `annual`. It must be
+   * coarser than the model's periods and hold a whole number of them
+   * (monthly into quarterly, semi-annual or annual; quarterly into
+   * semi-annual or annual; semi-annual into annual).
+   */
+  frequency: PeriodKind;
+  /**
+   * Rollup method per node id. Nodes not listed are summed, so list
+   * balances as `period_end` and ratios as `formula`.
+   */
+  methods?: {
+    [k: string]: RollupMethod;
+  };
 }
 /**
  * Execution statistics for a statement-model evaluation.

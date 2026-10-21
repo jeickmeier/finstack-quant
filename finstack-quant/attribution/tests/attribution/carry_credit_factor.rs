@@ -157,7 +157,7 @@ fn build_bond_with_issuer() -> Bond {
     bond
 }
 
-fn flat_discount(base: time::Date, r: f64) -> DiscountCurve {
+fn flat_discount(base: finstack_quant_core::dates::Date, r: f64) -> DiscountCurve {
     DiscountCurve::builder("USD-OIS")
         .base_date(base)
         .day_count(DayCount::Act365F)
@@ -183,7 +183,6 @@ fn make_market_state(disc: DiscountCurve, haz: HazardCurve) -> MarketContextStat
         inflation_indices: vec![],
         dividends: vec![],
         credit_indices: vec![],
-        collateral: BTreeMap::new(),
         fx_delta_vol_surfaces: vec![],
         hierarchy: None,
         vol_cubes: vec![],

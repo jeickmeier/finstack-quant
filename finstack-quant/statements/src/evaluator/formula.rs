@@ -438,6 +438,20 @@ pub fn evaluate_formula(
             // right side avoids triggering its side effects (division-by-zero
             // warnings, lookup errors, etc.) whenever the result is already
             // determined.
+            let is_boolean_op = matches!(
+                op,
+                BinOp::Eq
+                    | BinOp::Ne
+                    | BinOp::Lt
+                    | BinOp::Le
+                    | BinOp::Gt
+                    | BinOp::Ge
+                    | BinOp::And
+                    | BinOp::Or
+            );
+            if is_boolean_op && !left_val.is_finite() {
+                context.non_finite_operand = true;
+            }
             if matches!(op, BinOp::And) && !is_truthy(left_val) {
                 return Ok(bool_to_f64(false));
             }
@@ -446,6 +460,9 @@ pub fn evaluate_formula(
             }
 
             let right_val = evaluate_formula(right, context, node_id)?;
+            if is_boolean_op && !right_val.is_finite() {
+                context.non_finite_operand = true;
+            }
 
             let result = match op {
                 BinOp::Add => left_val + right_val,
@@ -466,7 +483,7 @@ pub fn evaluate_formula(
                             context.period_id
                         );
                         if let Some(id) = node_id {
-                            context.push_warning(EvalWarning::DivisionByZero {
+                            context.warnings.push(EvalWarning::DivisionByZero {
                                 node_id: id.to_string(),
                                 period: context.period_id,
                             });
@@ -483,7 +500,7 @@ pub fn evaluate_formula(
                             context.period_id
                         );
                         if let Some(id) = node_id {
-                            context.push_warning(EvalWarning::DivisionByZero {
+                            context.warnings.push(EvalWarning::DivisionByZero {
                                 node_id: id.to_string(),
                                 period: context.period_id,
                             });
@@ -512,7 +529,12 @@ pub fn evaluate_formula(
             let val = evaluate_formula(operand, context, node_id)?;
             let result = match op {
                 UnaryOp::Neg => -val,
-                UnaryOp::Not => bool_to_f64(!is_truthy(val)),
+                UnaryOp::Not => {
+                    if !val.is_finite() {
+                        context.non_finite_operand = true;
+                    }
+                    bool_to_f64(!is_truthy(val))
+                }
             };
             Ok(result)
         }
@@ -522,6 +544,9 @@ pub fn evaluate_formula(
             else_expr,
         } => {
             let cond_val = evaluate_formula(condition, context, node_id)?;
+            if !cond_val.is_finite() {
+                context.non_finite_operand = true;
+            }
             if is_truthy(cond_val) {
                 evaluate_formula(then_expr, context, node_id)
             } else {
@@ -545,7 +570,7 @@ mod tests {
     use crate::types::NodeId;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::expr::{Expr, Function};
-    use finstack_quant_core::math::kahan_sum;
+    use finstack_quant_core::math::summation::kahan_sum;
     use finstack_quant_core::money::Money;
     use indexmap::IndexMap;
 
@@ -634,7 +659,7 @@ mod tests {
         let mut values = vec![1e16];
         values.extend(std::iter::repeat_n(1.0, 256));
 
-        let precise = finstack_quant_core::math::mean_or_nan(&values);
+        let precise = finstack_quant_core::math::stats::mean_or_nan(&values);
         let reference = kahan_sum(values.iter().copied()) / values.len() as f64;
         let naive = values.iter().sum::<f64>() / values.len() as f64;
 

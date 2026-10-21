@@ -1,10 +1,11 @@
 //! Statement shock and rate binding adapters.
 
 use crate::error::{Error, Result};
-use crate::spec::{Compounding, RateBindingSpec};
+use crate::spec::RateBindingSpec;
 use crate::warning::Warning;
 use finstack_quant_core::dates::{BusinessDayConvention, HolidayCalendar, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::math::Compounding;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, NodeValueType};
 use finstack_quant_statements::FinancialModelSpec;
@@ -149,7 +150,10 @@ pub fn update_rate_from_binding(
             }
         }
 
-        let zero = curve.zero(tenor_years);
+        let zero = curve.zero_rate(
+            tenor_years,
+            finstack_quant_core::math::Compounding::Continuous,
+        );
         let output_years = tenor.to_years_with_context(
             curve.base_date(),
             calendar,

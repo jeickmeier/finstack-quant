@@ -41,7 +41,7 @@ use crate::swaption::BermudanSwaption;
 use crate::swaption::PreparedHullWhiteModel;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::HashSet;
+use finstack_quant_core::FxHashSet;
 use finstack_quant_core::Result;
 use finstack_quant_models::rates::clock::{model_time, ModelDiscountCurve};
 use finstack_quant_models::trees::tree_framework::TreeDiscounting;
@@ -56,8 +56,8 @@ pub struct BermudanSwaptionTreeValuator<'a> {
     /// Reference to the calibrated Hull-White model
     model: &'a PreparedHullWhiteModel,
     discount_curve: ModelDiscountCurve<'a>,
-    exercise_steps: HashSet<usize>,
-    exercise_cashflows: finstack_quant_core::HashMap<usize, HwSwaptionCashflows>,
+    exercise_steps: FxHashSet<usize>,
+    exercise_cashflows: finstack_quant_core::FxHashMap<usize, HwSwaptionCashflows>,
     /// Strike rate as f64, validated at construction
     strike: f64,
 }
@@ -104,11 +104,11 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
         model.validate_reuse(discount_curve, as_of, swaption.time_to_maturity(as_of)?)?;
         let tree = model.tree();
         let exercise_times = swaption.exercise_times(as_of)?;
-        let exercise_steps: HashSet<usize> = exercise_times
+        let exercise_steps: FxHashSet<usize> = exercise_times
             .iter()
             .map(|&t| tree.step_at_time(t))
             .collect::<Result<_>>()?;
-        let mut exercise_cashflows = finstack_quant_core::HashMap::default();
+        let mut exercise_cashflows = finstack_quant_core::FxHashMap::default();
         for &date in &swaption.exercise_schedule.exercise_dates {
             let time = model_time(as_of, date);
             if !exercise_times.iter().any(|&t| (t - time).abs() < 1e-10) {
@@ -222,8 +222,8 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
             .collect();
 
         // Store continuation values at exercise steps for forward pass comparison
-        let mut exercise_cont_values: finstack_quant_core::HashMap<usize, Vec<f64>> =
-            finstack_quant_core::HashMap::default();
+        let mut exercise_cont_values: finstack_quant_core::FxHashMap<usize, Vec<f64>> =
+            finstack_quant_core::FxHashMap::default();
 
         for step in (0..n).rev() {
             let num_curr = self.tree().num_nodes(step);

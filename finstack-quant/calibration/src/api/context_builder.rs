@@ -6,8 +6,7 @@
 //!   so credit-index reconstruction (which resolves hazard / base-correlation
 //!   curves out of the populated context) sees every curve it might need.
 //! - `market_data`: flat id-addressable inputs (FX spots, prices, fixings,
-//!   dividends, credit indices, vol surfaces / cubes, CSA collateral mappings,
-//!   and quote variants).
+//!   dividends, credit indices, vol surfaces / cubes, and quote variants).
 //!
 //! Quote variants (`*Quote`) are intentionally skipped here — they're consumed
 //! per-step by the engine (`resolve_step_quotes`), not stored on the context.
@@ -138,9 +137,6 @@ pub(crate) fn build_initial_context(
             }
             MarketDatum::VolCube(c) => {
                 ctx.insert_vol_cube_mut(c.clone());
-            }
-            MarketDatum::Collateral(c) => {
-                ctx.map_collateral_mut(c.id.to_string(), CurveId::from(c.csa_currency.to_string()));
             }
             // Quote variants are consumed per-step by the engine, not stored
             // on the market context.

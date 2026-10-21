@@ -9,11 +9,11 @@
 //! position DataFrame, which is more flexible than any fixed Rust helper.
 
 use crate::book::{Book, BookId};
-use crate::error::Result;
 use crate::valuation::PortfolioValuation;
+use crate::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::{HashMap, HashSet};
+use finstack_quant_core::{FxHashMap, FxHashSet};
 use indexmap::IndexMap;
 
 const MAX_BOOK_GROUPING_RECURSION_DEPTH: usize = crate::book::MAX_BOOK_DEPTH;
@@ -75,7 +75,7 @@ pub fn aggregate_by_book(
 ) -> Result<IndexMap<BookId, Money>> {
     let mut book_totals: IndexMap<BookId, Money> = IndexMap::new();
 
-    let position_values: HashMap<&crate::types::PositionId, &Money> = valuation
+    let position_values: FxHashMap<&crate::types::PositionId, &Money> = valuation
         .position_values
         .iter()
         .map(|(id, val)| (id, &val.value_base))
@@ -84,35 +84,35 @@ pub fn aggregate_by_book(
     fn compute_book_total(
         book_id: &BookId,
         books: &IndexMap<BookId, Book>,
-        position_values: &HashMap<&crate::types::PositionId, &Money>,
+        position_values: &FxHashMap<&crate::types::PositionId, &Money>,
         base_currency: Currency,
-        memo: &mut HashMap<BookId, Money>,
-        visiting: &mut HashSet<BookId>,
+        memo: &mut FxHashMap<BookId, Money>,
+        visiting: &mut FxHashSet<BookId>,
         depth: usize,
     ) -> Result<Money> {
         if let Some(cached) = memo.get(book_id) {
             return Ok(*cached);
         }
         if depth >= MAX_BOOK_GROUPING_RECURSION_DEPTH {
-            return Err(crate::error::Error::invalid_input(format!(
+            return Err(crate::Error::invalid_input(format!(
                 "Book aggregation exceeded maximum recursion depth of {MAX_BOOK_GROUPING_RECURSION_DEPTH}"
             )));
         }
         if !visiting.insert(book_id.clone()) {
-            return Err(crate::error::Error::invalid_input(format!(
+            return Err(crate::Error::invalid_input(format!(
                 "Book hierarchy contains a cycle at '{book_id}'"
             )));
         }
 
-        let book = books.get(book_id).ok_or_else(|| {
-            crate::error::Error::InvalidInput(format!("Book not found: {}", book_id))
-        })?;
+        let book = books
+            .get(book_id)
+            .ok_or_else(|| crate::Error::InvalidInput(format!("Book not found: {}", book_id)))?;
 
         let mut total = Money::from((0_i64, base_currency));
 
         for pos_id in &book.position_ids {
             let &&value = position_values.get(pos_id).ok_or_else(|| {
-                crate::error::Error::invalid_input(format!(
+                crate::Error::invalid_input(format!(
                     "MO-3: valuation is missing book position '{pos_id}'"
                 ))
             })?;
@@ -138,9 +138,9 @@ pub fn aggregate_by_book(
         Ok(total)
     }
 
-    let mut memo: HashMap<BookId, Money> = HashMap::default();
+    let mut memo: FxHashMap<BookId, Money> = FxHashMap::default();
     for book_id in books.keys() {
-        let mut visiting = HashSet::default();
+        let mut visiting = FxHashSet::default();
         let total = compute_book_total(
             book_id,
             books,

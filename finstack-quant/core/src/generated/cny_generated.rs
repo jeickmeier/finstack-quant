@@ -185,8 +185,14 @@ static CNY_DATES_MAP: phf::Map<i32, (u8, u8)> = phf::phf_map! {
     2150i32 => (1, 28),
 };
 
-/// Get Chinese New Year date for a supported year.
+/// Gregorian date of the `(month, day)` tabulated for `year` in `table`.
+fn tabulated_date(year: i32, table: &phf::Map<i32, (u8, u8)>) -> Option<Date> {
+    let &(month, day) = table.get(&year)?;
+    Date::from_calendar_date(year, Month::try_from(month).ok()?, day).ok()
+}
+
+/// Chinese New Year (Spring Festival) date in `year`, or `None` outside 1970-2150.
 #[inline]
-pub(crate) fn cny_date_for_year(year: i32) -> Option<(u8, u8)> {
-    CNY_DATES_MAP.get(&year).copied()
+pub(crate) fn cny_date(year: i32) -> Option<Date> {
+    tabulated_date(year, &CNY_DATES_MAP)
 }

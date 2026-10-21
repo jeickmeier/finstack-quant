@@ -1,5 +1,5 @@
 //! Independent payoff and Gaussian-moment regressions for lookbacks and commodities.
-use finstack_quant_core::math::norm_cdf;
+use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_models::closed_form::{
     fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_put,
 };

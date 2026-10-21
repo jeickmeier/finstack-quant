@@ -1,9 +1,9 @@
 //! Interest rate market quote schema.
 
 use super::ids::{Pillar, QuoteId};
-use super::validate;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::types::IndexId;
+use finstack_quant_core::validation::validate_f64_finite;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::market::conventions::ids::IrFutureContractId;
 use serde::{Deserialize, Serialize};
@@ -91,7 +91,6 @@ pub enum RateQuote {
         /// this date. For in-arrears IMM contracts such as `CME:SR3`, pass the
         /// business day before the ending IMM Wednesday, not the named contract
         /// month's starting IMM date.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -241,15 +240,17 @@ impl RateQuote {
     /// Validate that every quoted rate or futures price field is finite.
     pub fn validate(&self) -> Result<()> {
         match self {
-            Self::Deposit { rate, .. } | Self::Fra { rate, .. } => validate::finite(*rate, "rate"),
+            Self::Deposit { rate, .. } | Self::Fra { rate, .. } => {
+                validate_f64_finite(*rate, "rate")
+            }
             Self::Swap {
                 rate,
                 spread_decimal,
                 ..
             } => {
-                validate::finite(*rate, "rate")?;
+                validate_f64_finite(*rate, "rate")?;
                 if let Some(spread) = spread_decimal {
-                    validate::finite(*spread, "spread_decimal")?;
+                    validate_f64_finite(*spread, "spread_decimal")?;
                 }
                 Ok(())
             }
@@ -258,8 +259,8 @@ impl RateQuote {
                 convexity_adjustment,
                 ..
             } => {
-                validate::finite(*price, "price")?;
-                validate::finite(*convexity_adjustment, "convexity_adjustment")
+                validate_f64_finite(*price, "price")?;
+                validate_f64_finite(*convexity_adjustment, "convexity_adjustment")
             }
         }
     }
@@ -496,8 +497,7 @@ mod tests {
         let quote = RateQuote::Futures {
             id: QuoteId::new("TEST-SR3-M6"),
             contract: IrFutureContractId::new("CME:SR3"),
-            expiry: Date::from_calendar_date(2026, finstack_quant_core::dates::Month::June, 17)
-                .expect("valid date"),
+            expiry: Date::from_calendar_date(2026, time::Month::June, 17).expect("valid date"),
             price: 96.00,
             convexity_adjustment: 0.0,
         };
