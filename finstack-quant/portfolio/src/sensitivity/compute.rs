@@ -238,9 +238,9 @@ mod tests {
     use finstack_quant_core::market_data::bumps::BumpUnits;
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::types::CurveId;
+    use finstack_quant_factor::MatchingConfig;
     use finstack_quant_factor::{
-        FactorCovarianceMatrix, FactorId, FactorModelConfig, MatchingConfig, RiskMeasure,
-        UnmatchedPolicy,
+        FactorCovarianceMatrix, FactorId, FactorModelConfig, RiskMeasure, UnmatchedPolicy,
     };
     use finstack_quant_valuations::instruments::equity::spot::Equity;
     use std::sync::Arc;

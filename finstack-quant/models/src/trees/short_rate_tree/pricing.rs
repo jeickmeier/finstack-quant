@@ -2,11 +2,12 @@ use finstack_quant_core::math::Compounding;
 use finstack_quant_core::{Error, Result};
 
 use crate::trees::tree_framework::{
-    price_recombining_tree, NodeState, RecombiningInputs, RecombiningLattice, TreeValuator,
+    price_recombining_tree, NodeState, RecombiningInputs, RecombiningLattice, TreeDiscounting,
+    TreeValuator,
 };
 
 use super::black_karasinski::{transition_index, transition_offsets, BkTrinomialLattice};
-use super::{ShortRateModel, ShortRateTree, TreeDiscounting};
+use super::{ShortRateModel, ShortRateTree};
 
 impl ShortRateTree {
     /// Backward induction over the Black-Karasinski trinomial lattice.

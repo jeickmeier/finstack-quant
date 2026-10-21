@@ -4,7 +4,7 @@ title: "Monte Carlo II: Path Dependence and Early Exercise"
 description: "Define exact payoff observations, separate approximation from benchmark, and evaluate learned exercise policies on independent paths."
 desk_question: "Which parts of this exotic price come from the contract, the monitoring grid, and the exercise policy?"
 references: ["#glasserman-2004-monte-carlo", "#kemna-vorst-1990", "#turnbull-wakeman-1991", "#conze-viswanathan-1991", "#goldman-sosin-gatto-1979", "#broadie-glasserman-kou-1997", "#reiner-rubinstein-1991", "#hull-white-1994-numerical-procedures", "#broadie-detemple-1996", "#brigo-mercurio-2006-interest-rate-models", "#hull-white-1990-pricing-ird"]
-api: ["finstack_quant.models.asian_option_price", "finstack_quant.models.barrier_call", "finstack_quant.models.quanto_option_price", "finstack_quant.models.monte_carlo.PathDependentPricer", "finstack_quant.models.monte_carlo.LsmcPricer", "finstack_quant.valuations.instruments.Swaption", "finstack_quant.valuations.instruments.price_instrument"]
+api: ["finstack_quant.models.asian_option_price", "finstack_quant.models.barrier_option_price", "finstack_quant.models.quanto_option_price", "finstack_quant.models.monte_carlo.PathDependentPricer", "finstack_quant.models.monte_carlo.LsmcPricer", "finstack_quant.valuations.instruments.Swaption", "finstack_quant.valuations.instruments.price_instrument"]
 status: "published"
 ---
 
@@ -30,7 +30,7 @@ A geometric Asian can be a control variate for an arithmetic Asian: subtract a f
 
 An up-and-out call survives only if no monitored price reaches its upper barrier. Adding observations can only remove surviving paths when payoff, rebate and path are held fixed. Thus a coarse discrete knock-out is at least as valuable pathwise as a finer nested one. Continuously monitored survival is more restrictive still.
 
-The [Reiner–Rubinstein](/references.html#reiner-rubinstein-1991) `barrier_call` formula here is continuously monitored and has no monitoring-frequency argument. The discrete sweep must therefore use captured paths. Independently generated coarse and fine simulations obscure the pathwise comparison with sampling noise.
+The [Reiner–Rubinstein](/references.html#reiner-rubinstein-1991) `barrier_option_price` formula here is continuously monitored and has no monitoring-frequency argument. The discrete sweep must therefore use captured paths. Independently generated coarse and fine simulations obscure the pathwise comparison with sampling noise.
 
 The [Broadie–Glasserman–Kou correction](/references.html#broadie-glasserman-kou-1997) approximates discrete monitoring by shifting a continuous barrier outward by a factor involving $\exp(\beta\sigma\sqrt{\Delta t})$, with $\beta$ about 0.5826: an upper barrier moves up and a lower barrier moves down. It is an approximation under its assumptions, especially delicate near a barrier, with irregular monitoring or additional contractual features. We do not substitute it for the explicit observation experiment.
 
@@ -84,7 +84,7 @@ def gbm_spot_paths(num_steps, num_paths, seed):
 args = (100.0, 100.0, 0.05, 0.0, 0.20, 1.0)
 vanilla = bs_price(*args, True)
 one_fixing = asian_option_price(*args, 1, "arithmetic", True)
-eu_one = EuropeanPricer(4096, 17, False).price_call(*args, num_steps=1)
+eu_one = EuropeanPricer(4096, 17, False).price_gbm(*args, is_call=True, num_steps=1)
 asian_one = PathDependentPricer(4096, 17, False, False).price_asian(*args, num_steps=1, is_call=True)
 print(f"One-fixing analytical Asian={one_fixing:.8f}; BS={vanilla:.8f}")
 print(f"One-fixing MC Asian={asian_one.mean.amount:.8f}; European MC={eu_one.mean.amount:.8f}")
@@ -114,11 +114,11 @@ The experiment captures 252-step GBM paths once and selects nested quarterly, mo
 
 {/* notebook-block notebook="07_advanced_quant/monte_carlo/exotic_payoffs_and_pricers.ipynb" cell="nested-barrier-monitoring" role="build" */}
 ```python exec id=nested-barrier-monitoring role=build
-from finstack_quant.models import barrier_call
+from finstack_quant.models import barrier_option_price
 
 fine_paths = gbm_spot_paths(252, 4096, seed=17)
 terminal_payoffs = math.exp(-0.05) * np.maximum(fine_paths[:, -1] - 100, 0)
-continuous = barrier_call(100, 100, 120, 0.05, 0, 0.20, 1, "up", "out")
+continuous = barrier_option_price(100, 100, 120, 0.05, 0, 0.20, 1, "up", "out")
 previous_payoffs = terminal_payoffs
 print("observations | sampled up-and-out value | SE | gap to continuous")
 for observations in (4, 12, 252):

@@ -78,8 +78,7 @@ fn simulate_paths(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyPathSum
 ///
 /// This is the Monte Carlo engine's own predicate
 /// (`finstack_quant_models::monte_carlo::process::heston::heston_satisfies_feller`), so the
-/// answer at the boundary matches :func:`price_heston_call` /
-/// :func:`price_heston_put`. Inputs are not validated: non-finite values
+/// answer at the boundary matches :func:`price_heston`. Inputs are not validated: non-finite values
 /// typically yield ``False``.
 ///
 /// Parameters
@@ -106,28 +105,72 @@ fn heston_satisfies_feller(kappa: f64, theta: f64, vol_of_vol: f64) -> bool {
     )
 }
 
-/// Resolve an optional currency argument, defaulting to the registry default.
-pub(super) fn resolve_currency(
-    currency: Option<&Bound<'_, PyAny>>,
-) -> PyResult<finstack_quant_core::currency::Currency> {
-    finstack_quant_models::monte_carlo::convenience::resolve_currency(extract_optional_currency(
-        currency,
-    )?)
-    .map_err(core_to_py)
-}
-
 /// Extract an optional currency argument without applying any default.
 ///
 /// Canonical entry points in the Monte Carlo crate own the registry default;
 /// the binding only marshals an explicitly supplied currency.
-fn extract_optional_currency(currency: Option<&Bound<'_, PyAny>>) -> PyResult<Option<Currency>> {
+pub(super) fn extract_optional_currency(
+    currency: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Option<Currency>> {
     currency.map(extract_currency).transpose()
 }
 
+/// Price a European option under the Heston stochastic-volatility model by Monte Carlo.
+///
+/// Paths are generated with the Quadratic-Exponential (QE) discretization of
+/// Andersen (2008), which stays stable when the Feller condition
+/// (``2 * kappa * theta >= vol_of_vol**2``) is violated — the common case for
+/// equity calibrations. Check it with
+/// :func:`~finstack_quant.models.monte_carlo.heston_satisfies_feller`.
+///
+/// Parameters
+/// ----------
+/// spot : float
+///     Current underlying price.
+/// strike : float
+///     Option strike.
+/// rate : float
+///     Continuously compounded risk-free rate.
+/// div_yield : float
+///     Continuous dividend yield.
+/// kappa : float
+///     Mean-reversion speed of the variance process.
+/// theta : float
+///     Long-run variance level.
+/// vol_of_vol : float
+///     Volatility of variance.
+/// rho : float
+///     Correlation between the spot and variance Brownian drivers, in ``[-1, 1]``.
+/// v0 : float
+///     Initial instantaneous variance (variance, not volatility).
+/// expiry : float
+///     Time to expiry in years.
+/// is_call : bool
+///     ``True`` for a call payoff, ``False`` for a put.
+/// num_paths : int, optional
+///     Independent path estimators in ``[2, 10_000_000]``; each antithetic
+///     pair counts once. Defaults to the configured European-pricer default.
+/// seed : int, optional
+///     RNG seed. The same seed reproduces the same price on any thread count.
+/// num_steps : int, optional
+///     Time steps per path.
+/// currency : Currency or str, optional
+///     Currency stamped on the result. Defaults to the configured default.
+///
+/// Returns
+/// -------
+/// MoneyEstimate
+///     Price with its Monte Carlo standard error.
+///
+/// References
+/// ----------
+/// - Andersen QE (2008): see docs/REFERENCES.md#andersen-2008-heston-qe
+/// - Heston (1993): see docs/REFERENCES.md#heston-1993
+#[pyfunction]
 #[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, is_call, num_paths=None, seed=None, num_steps=None, currency=None))]
 fn price_heston(
     py: Python<'_>,
-    is_call: bool,
     spot: f64,
     strike: f64,
     rate: f64,
@@ -138,6 +181,7 @@ fn price_heston(
     rho: f64,
     v0: f64,
     expiry: f64,
+    is_call: bool,
     num_paths: Option<usize>,
     seed: Option<u64>,
     num_steps: Option<usize>,
@@ -170,156 +214,9 @@ fn price_heston(
     .map_err(core_to_py)
 }
 
-/// Price a European call under the Heston stochastic-volatility model by Monte Carlo.
-///
-/// Paths are generated with the Quadratic-Exponential (QE) discretization of
-/// Andersen (2008), which stays stable when the Feller condition
-/// (``2 * kappa * theta >= vol_of_vol**2``) is violated — the common case for
-/// equity calibrations. Check it with
-/// :func:`~finstack_quant.models.monte_carlo.heston_satisfies_feller`.
-///
-/// Parameters
-/// ----------
-/// spot : float
-///     Current underlying price.
-/// strike : float
-///     Option strike.
-/// rate : float
-///     Continuously compounded risk-free rate.
-/// div_yield : float
-///     Continuous dividend yield.
-/// kappa : float
-///     Mean-reversion speed of the variance process.
-/// theta : float
-///     Long-run variance level.
-/// vol_of_vol : float
-///     Volatility of variance.
-/// rho : float
-///     Correlation between the spot and variance Brownian drivers, in ``[-1, 1]``.
-/// v0 : float
-///     Initial instantaneous variance (variance, not volatility).
-/// expiry : float
-///     Time to expiry in years.
-/// num_paths : int, optional
-///     Independent path estimators in ``[2, 10_000_000]``; each antithetic
-///     pair counts once. Defaults to the configured European-pricer default.
-/// seed : int, optional
-///     RNG seed. The same seed reproduces the same price on any thread count.
-/// num_steps : int, optional
-///     Time steps per path.
-/// currency : Currency or str, optional
-///     Currency stamped on the result. Defaults to the configured default.
-///
-/// Returns
-/// -------
-/// MoneyEstimate
-///     Price with its Monte Carlo standard error.
-///
-/// References
-/// ----------
-/// - Andersen QE (2008): see docs/REFERENCES.md#andersen-2008-heston-qe
-/// - Heston (1993): see docs/REFERENCES.md#heston-1993
-#[pyfunction]
-#[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, num_paths=None, seed=None, num_steps=None, currency=None))]
-fn price_heston_call(
-    py: Python<'_>,
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    kappa: f64,
-    theta: f64,
-    vol_of_vol: f64,
-    rho: f64,
-    v0: f64,
-    expiry: f64,
-    num_paths: Option<usize>,
-    seed: Option<u64>,
-    num_steps: Option<usize>,
-    currency: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyMoneyEstimate> {
-    price_heston(
-        py, true, spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry,
-        num_paths, seed, num_steps, currency,
-    )
-}
-
-/// Price a European put under the Heston stochastic-volatility model by Monte Carlo.
-///
-/// Identical machinery to :func:`price_heston_call` — QE discretization,
-/// same parameters, same determinism guarantee — with a put payoff.
-///
-/// Parameters
-/// ----------
-/// spot : float
-///     Current underlying price.
-/// strike : float
-///     Option strike.
-/// rate : float
-///     Continuously compounded risk-free rate.
-/// div_yield : float
-///     Continuous dividend yield.
-/// kappa : float
-///     Mean-reversion speed of the variance process.
-/// theta : float
-///     Long-run variance level.
-/// vol_of_vol : float
-///     Volatility of variance.
-/// rho : float
-///     Correlation between the spot and variance Brownian drivers, in ``[-1, 1]``.
-/// v0 : float
-///     Initial instantaneous variance (variance, not volatility).
-/// expiry : float
-///     Time to expiry in years.
-/// num_paths : int, optional
-///     Independent path estimators in ``[2, 10_000_000]``; each antithetic
-///     pair counts once. Defaults to the configured European-pricer default.
-/// seed : int, optional
-///     RNG seed. The same seed reproduces the same price on any thread count.
-/// num_steps : int, optional
-///     Time steps per path.
-/// currency : Currency or str, optional
-///     Currency stamped on the result. Defaults to the configured default.
-///
-/// Returns
-/// -------
-/// MoneyEstimate
-///     Price with its Monte Carlo standard error.
-///
-/// See Also
-/// --------
-/// price_heston_call : Call counterpart, with full model references.
-#[pyfunction]
-#[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, num_paths=None, seed=None, num_steps=None, currency=None))]
-fn price_heston_put(
-    py: Python<'_>,
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    kappa: f64,
-    theta: f64,
-    vol_of_vol: f64,
-    rho: f64,
-    v0: f64,
-    expiry: f64,
-    num_paths: Option<usize>,
-    seed: Option<u64>,
-    num_steps: Option<usize>,
-    currency: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyMoneyEstimate> {
-    price_heston(
-        py, false, spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry,
-        num_paths, seed, num_steps, currency,
-    )
-}
-
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(simulate_paths, m)?)?;
     m.add_function(wrap_pyfunction!(heston_satisfies_feller, m)?)?;
-    m.add_function(wrap_pyfunction!(price_heston_call, m)?)?;
-    m.add_function(wrap_pyfunction!(price_heston_put, m)?)?;
+    m.add_function(wrap_pyfunction!(price_heston, m)?)?;
     Ok(())
 }

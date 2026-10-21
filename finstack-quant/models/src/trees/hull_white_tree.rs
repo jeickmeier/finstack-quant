@@ -37,7 +37,7 @@
 //! - Hull, J. (2018). *Options, Futures, and Other Derivatives*, 10th ed.
 //!   Chapter 31: Interest Rate Derivatives: Models of the Short Rate `docs/REFERENCES.md#hull-options-futures`
 
-use super::short_rate_tree::TreeDiscounting;
+use super::tree_framework::TreeDiscounting;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
 use finstack_quant_core::math::Compounding;

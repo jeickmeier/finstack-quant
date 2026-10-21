@@ -39,7 +39,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_models::monte_carlo::discretization::credit_line::{
     ou_exact_step, spread_linked_target,
 };
-use finstack_quant_models::monte_carlo::discretization::QeCir;
+use finstack_quant_models::monte_carlo::discretization::qe_cir::QeCir;
 use finstack_quant_models::monte_carlo::traits::Discretization;
 use finstack_quant_valuations_fixed_income::revolving_credit::MC_CLOCK_DAY_COUNT;
 

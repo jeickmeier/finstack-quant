@@ -2,7 +2,8 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::{Error, Result};
 
-use super::{ShortRateTree, TreeCalibrationResult, TreeDiscounting};
+use super::{ShortRateTree, TreeCalibrationResult};
+use crate::trees::tree_framework::TreeDiscounting;
 use finstack_quant_core::math::Compounding;
 
 impl ShortRateTree {
@@ -10,7 +11,7 @@ impl ShortRateTree {
     ///
     /// Ho-Lee does **not** support mean reversion because the rate-dependent
     /// drift `κ·r` breaks lattice recombination. Use
-    /// [`HullWhiteTree`](crate::trees::HullWhiteTree) for mean-reverting
+    /// [`HullWhiteTree`](crate::trees::hull_white_tree::HullWhiteTree) for mean-reverting
     /// normal short-rate models.
     ///
     /// Negative short rates are a correct and expected feature of Ho-Lee and

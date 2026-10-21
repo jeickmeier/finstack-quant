@@ -1,4 +1,10 @@
 import * as wasm from '../../pkg/finstack_quant_wasm.js';
+import { lgd } from './credit/lgd.js';
+import { liabilityManagement } from './credit/liabilityManagement.js';
+import { migration } from './credit/migration.js';
+import { pd } from './credit/pd.js';
+import { recoveryWaterfall } from './credit/recoveryWaterfall.js';
+import { scoring } from './credit/scoring.js';
 
 export const credit = {
   // Structural (Merton-family) models and PIK specifications
@@ -11,43 +17,12 @@ export const credit = {
   ToggleExerciseModel: wasm.ToggleExerciseModel,
   RatingFactorTable: wasm.RatingFactorTable,
   moodysWarfFactor: wasm.moodysWarfFactor,
-  // Liability management
-  analyzeExchangeOffer: wasm.analyzeExchangeOffer,
-  analyzeLme: wasm.analyzeLme,
-  tenderRecommendationHurdle: wasm.tenderRecommendationHurdle,
-  // Loss given default and exposure at default
-  BetaRecovery: wasm.BetaRecovery,
-  WorkoutCosts: wasm.WorkoutCosts,
-  WorkoutLgd: wasm.WorkoutLgd,
-  WorkoutLgdBuilder: wasm.WorkoutLgdBuilder,
-  DownturnLgd: wasm.DownturnLgd,
-  EadCalculator: wasm.EadCalculator,
-  seniorityRecoveryStats: wasm.seniorityRecoveryStats,
-  workoutLgd: wasm.workoutLgd,
-  collateralPieceLiquidationValue: wasm.collateralPieceLiquidationValue,
-  // PD calibration
-  MasterScale: wasm.MasterScale,
-  baselIrbPdFloor: wasm.baselIrbPdFloor,
-  applyBaselIrbPdFloor: wasm.applyBaselIrbPdFloor,
-  pitToTtc: wasm.pitToTtc,
-  ttcToPit: wasm.ttcToPit,
-  centralTendency: wasm.centralTendency,
-  // Credit migration
-  RatingScale: wasm.RatingScale,
-  TransitionMatrix: wasm.TransitionMatrix,
-  GeneratorMatrix: wasm.GeneratorMatrix,
-  RatingPath: wasm.RatingPath,
-  RatingPaths: wasm.RatingPaths,
-  MigrationSimulator: wasm.MigrationSimulator,
-  project: wasm.project,
-  // Accounting-based scoring
-  altmanZScore: wasm.altmanZScore,
-  altmanZPrime: wasm.altmanZPrime,
-  altmanZDoublePrime: wasm.altmanZDoublePrime,
-  altmanEmScore: wasm.altmanEmScore,
-  ohlsonOScore: wasm.ohlsonOScore,
-  zmijewskiScore: wasm.zmijewskiScore,
-  // Recovery waterfall
-  allocateRecovery: wasm.allocateRecovery,
-  recoveryClaimTotalClaim: wasm.recoveryClaimTotalClaim,
+  // Submodules (Rust `credit::{lgd, liability_management, migration, pd,
+  // recovery_waterfall, scoring}`)
+  lgd,
+  liabilityManagement,
+  migration,
+  pd,
+  recoveryWaterfall,
+  scoring,
 };

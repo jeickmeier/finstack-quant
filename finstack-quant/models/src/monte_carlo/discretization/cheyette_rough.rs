@@ -61,7 +61,7 @@
 //! `work[0]` stores the running accumulated Riemann-Liouville Volterra
 //! process `Ỹ(t) = √(2H)·∫₀ᵗ(t−s)^{H−½}dW̃_s` with `Var(Ỹ(t)) = t^{2H}`.
 //! The engine must zero the work buffer before each new path (see
-//! [`simulate_path_fractional`](crate::monte_carlo::engine_fractional::simulate_path_fractional)).
+//! [`simulate_path_fractional`](crate::monte_carlo::engine::simulate_path_fractional)).
 //!
 //! # References
 //!

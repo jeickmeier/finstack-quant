@@ -1,4 +1,4 @@
-//! Correlation structure specification.
+//! Correlation structures for structured credit.
 //!
 //! This module provides correlation specifications that capture:
 //! - Asset correlation (intra-pool default correlation)

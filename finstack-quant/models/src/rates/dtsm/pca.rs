@@ -648,12 +648,6 @@ mod tests {
         vec![0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 20.0, 30.0]
     }
 
-    fn matrix_rows(matrix: &DMatrix<f64>) -> Vec<Vec<f64>> {
-        (0..matrix.nrows())
-            .map(|i| (0..matrix.ncols()).map(|j| matrix[(i, j)]).collect())
-            .collect()
-    }
-
     #[test]
     fn pca_fit_basic() {
         let tenors = standard_tenors();
@@ -819,12 +813,18 @@ mod tests {
         for (actual, expected) in pca.mean_change().iter().zip(mean_change) {
             assert_close(*actual, expected);
         }
-        for (actual_row, expected_row) in matrix_rows(pca.loadings()).iter().zip(&loadings) {
+        for (actual_row, expected_row) in finstack_quant_core::math::linalg::rows_of(pca.loadings())
+            .iter()
+            .zip(&loadings)
+        {
             for (actual, expected) in actual_row.iter().zip(expected_row) {
                 assert_close(*actual, *expected);
             }
         }
-        for (actual_row, expected_row) in matrix_rows(pca.scores()).iter().zip(&scores) {
+        for (actual_row, expected_row) in finstack_quant_core::math::linalg::rows_of(pca.scores())
+            .iter()
+            .zip(&scores)
+        {
             for (actual, expected) in actual_row.iter().zip(expected_row) {
                 assert_close(*actual, *expected);
             }
@@ -846,7 +846,7 @@ mod tests {
     fn fit_yield_changes_matches_panel_fit() {
         let tenors = standard_tenors();
         let panel = make_synthetic_panel(52, &tenors, &[0.01, 0.005, 0.002]);
-        let rows = matrix_rows(&panel.yield_changes());
+        let rows = finstack_quant_core::math::linalg::rows_of(&panel.yield_changes());
 
         let from_panel = YieldPca::fit(&panel).unwrap();
         let from_changes = YieldPca::fit_yield_changes(rows).unwrap();

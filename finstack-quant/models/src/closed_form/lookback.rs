@@ -753,8 +753,7 @@ mod tests {
         // underestimates the continuous extremum by ≈ exp(±β·σ·√dt) in level
         // (β = −ζ(1/2)/√(2π) ≈ 0.5826). Applying it lets the discrete-path MC
         // match the continuous-monitoring closed form tightly.
-        let corr =
-            (crate::monte_carlo::barriers::corrections::GOBET_MIRI_BETA * vol * dt.sqrt()).exp();
+        let corr = (crate::monte_carlo::payoff::barrier::GOBET_MIRI_BETA * vol * dt.sqrt()).exp();
         let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
         // Deterministic GBM MC from `spot`, returning discounted E[payoff(run_max, run_min)].
         let mut mc = |spot: f64, payoff: &dyn Fn(f64, f64) -> f64| -> f64 {

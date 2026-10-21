@@ -65,9 +65,9 @@ test('hestonPrice dispatches the put through Rust', () => {
   assert.ok(Math.abs(parity) < 1e-8, `parity residual ${parity}`);
 });
 
-test('priceHestonCall defaults numPaths and seed from the Rust registry and returns MoneyEstimate', () => {
+test('priceHeston defaults numPaths and seed from the Rust registry and returns MoneyEstimate', () => {
   const heston = [100, 100, 0.05, 0, 2, 0.04, 0.3, -0.7, 0.04, 1];
-  const est = models.monteCarlo.priceHestonCall(...heston, undefined, undefined, 1);
+  const est = models.monteCarlo.priceHeston(...heston, true, undefined, undefined, 1);
   assert.equal(est.num_paths, 100000);
   assert.equal(typeof est.mean.amount, 'string');
   assert.equal(est.mean.currency, 'USD');
@@ -76,9 +76,9 @@ test('priceHestonCall defaults numPaths and seed from the Rust registry and retu
     assert.equal(key in est, false, `${key} is not a MoneyEstimate field`);
   }
   // The registry seed is fixed, so the default run is reproducible.
-  const again = models.monteCarlo.priceHestonCall(...heston, null, null, 1);
+  const again = models.monteCarlo.priceHeston(...heston, true, null, null, 1);
   assert.deepEqual(again, est);
-  const explicit = models.monteCarlo.priceHestonPut(...heston, 500, 7n, 4);
+  const explicit = models.monteCarlo.priceHeston(...heston, false, 500, 7n, 4);
   assert.equal(explicit.num_paths, 500);
 });
 
@@ -103,7 +103,15 @@ test('SabrSmile single-strike vol and arbitrage verdict come from Rust', () => {
 test('SabrCalibrator.withShift parses "auto" in Rust and rejects booleans', () => {
   const { SabrCalibrator } = models.volatility;
   new SabrCalibrator().withShift('auto').free();
-  assert.throws(() => new SabrCalibrator().withShift(true), kind('invalid_type', /^shift:/));
+  // The host union is the Rust `SabrShift` serde form: null, a number or "auto".
+  assert.throws(
+    () => new SabrCalibrator().withShift(true),
+    kind('validation', /shift: .*got bool/)
+  );
+  assert.throws(() => new SabrCalibrator().withShift(Number.NaN), kind('invalid_type', /^shift:/));
+  const fixed = new SabrCalibrator().withShift(0.02);
+  assert.equal(fixed.shift, 0.02);
+  assert.equal(fixed.withShift(undefined).shift, null);
   assert.throws(
     () => new SabrCalibrator().withShift('AUTO'),
     kind('validation', /SABR shift must be null\/None, a number, or "auto"/)

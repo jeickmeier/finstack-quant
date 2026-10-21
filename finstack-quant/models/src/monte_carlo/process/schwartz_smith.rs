@@ -28,7 +28,7 @@
 
 use super::super::paths::ProcessParams;
 use super::super::traits::{StateKey, StochasticProcess};
-use super::metadata::ProcessMetadata;
+use crate::monte_carlo::traits::ProcessMetadata;
 
 /// Schwartz-Smith process parameters.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

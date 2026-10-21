@@ -43,7 +43,7 @@
 //! let panel = YieldPanel::new(yields, tenors, None).unwrap();
 //!
 //! // Diebold-Li: extract factors, fit VAR, forecast
-//! let model = DieboldLi::new(lambda)
+//! let model = DieboldLi::new(Some(lambda))
 //!     .unwrap()
 //!     .extract_factors(&panel)
 //!     .unwrap()
@@ -65,11 +65,11 @@
 //!   Bond Returns." *Journal of Fixed Income*, 1(1), 54-61. `docs/REFERENCES.md#litterman-scheinkman-1991`
 
 /// Diebold-Li dynamic Nelson-Siegel model. `docs/REFERENCES.md#diebold-li-2006` `docs/REFERENCES.md#nelson-siegel-1987`
-pub(crate) mod diebold_li;
+mod diebold_li;
 /// PCA-based yield curve analysis.
-pub(crate) mod pca;
+mod pca;
 /// Shared types: YieldPanel, FactorTimeSeries, YieldForecast.
-pub(crate) mod types;
+mod types;
 
 pub use diebold_li::{nelson_siegel_yields, DieboldLi};
 pub use pca::{YieldPca, YieldPcaView};

@@ -339,7 +339,7 @@ impl JsFxDeltaVolSurface {
 ///   [90, 100, 110],
 ///   [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
 /// );
-/// models.volatility.getSurfaceVol(surface.toJson(), 0.75, 100); // 0.205
+/// models.volatility.getSurfaceVol(surface, 0.75, 100); // 0.205
 /// surface.gridShape; // [2, 3]
 /// ```
 #[wasm_bindgen(js_name = VolSurface)]
@@ -543,7 +543,7 @@ impl JsVolSurface {
 /// Volatility grid at one fixed option expiry, indexed by underlying tenor and strike.
 ///
 /// The fixed-expiry slice of a SABR cube: `models.volatility.materializeCubeExpirySlice`
-/// returns its wire object, and `fromJson` turns that object into a handle.
+/// returns this handle, and `fromJson` loads one from its canonical JSON.
 /// Shifted-Black quotes carry one displacement per tenor, in strike units.
 ///
 /// @example
@@ -624,8 +624,8 @@ impl JsVolCubeExpirySlice {
     /// # Arguments
     ///
     /// * `json` - Canonical VolCubeExpirySlice JSON text or plain object, such
-    ///   as a `materializeCubeExpirySlice` result; unknown fields are rejected
-    ///   and the grid is re-validated.
+    ///   as `toJson()` output; unknown fields are rejected and the grid is
+    ///   re-validated.
     ///
     /// @returns The validated `VolCubeExpirySlice`.
     /// @throws `TypeError` if `json` is not a JSON string or plain object;

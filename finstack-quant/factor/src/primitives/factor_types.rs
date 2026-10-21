@@ -1,5 +1,5 @@
-//! Core identifiers and definitions used by the factor model.
-//!
+//! Factor identifiers and asset-class type tags.
+
 use finstack_quant_core::market_data::bumps::BumpUnits;
 use serde::{Deserialize, Serialize};
 use std::fmt;

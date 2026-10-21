@@ -9,7 +9,7 @@ use finstack_quant_models::rates::clock::model_time;
 use finstack_quant_models::rates::hull_white::{
     hw1f_delayed_coupon_adjustment, HullWhiteCalibrationParams,
 };
-use finstack_quant_models::trees::HullWhiteTree;
+use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::SettlementType;
 use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec};

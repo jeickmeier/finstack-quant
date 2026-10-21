@@ -125,12 +125,10 @@ pub fn seniority_recovery_stats(
     rating_agency: Option<JsValue>,
 ) -> Result<JsBetaRecovery, JsValue> {
     let seniority = js_string(&seniority, "seniority")?;
-    match js_opt_string(rating_agency.as_ref(), "ratingAgency")? {
-        Some(agency) => lgd::seniority_recovery_stats(&seniority, &agency),
-        None => lgd::seniority_recovery_stats_default(&seniority),
-    }
-    .map(|inner| JsBetaRecovery { inner })
-    .map_err(to_js_err)
+    let rating_agency = js_opt_string(rating_agency.as_ref(), "ratingAgency")?;
+    lgd::seniority_recovery_stats(&seniority, rating_agency.as_deref())
+        .map(|inner| JsBetaRecovery { inner })
+        .map_err(to_js_err)
 }
 
 /// Direct and indirect workout cost rates, each a fraction of exposure at default.
@@ -382,7 +380,7 @@ impl JsWorkoutLgdBuilder {
 /// import init, { models } from "finstack-quant-wasm";
 /// await init();
 /// const piece = { collateral_type: "real_estate" as const, book_value: 800_000, haircut: 0.25 };
-/// console.log(models.credit.collateralPieceLiquidationValue(piece)); // 600000
+/// console.log(models.credit.lgd.collateralPieceLiquidationValue(piece)); // 600000
 /// ```
 ///
 /// # Errors
@@ -436,6 +434,8 @@ pub fn workout_lgd(
 pub struct JsDownturnLgd {
     pub(crate) inner: DownturnLgd,
 }
+
+json_round_trip!(JsDownturnLgd, DownturnLgd, validate);
 
 #[wasm_bindgen(js_class = DownturnLgd)]
 impl JsDownturnLgd {
@@ -542,32 +542,6 @@ impl JsDownturnLgd {
     #[wasm_bindgen(getter)]
     pub fn params(&self) -> Result<JsValue, JsValue> {
         to_js_value(self.inner.method())
-    }
-
-    /// Load a downturn adjustment from canonical JSON and validate its parameters.
-    /// @param json - `DownturnLgd` JSON text or plain object; unknown fields are rejected.
-    /// @returns The validated handle.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `validation` error if the payload is malformed or its
-    /// parameters are out of range.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsDownturnLgd, JsValue> {
-        let inner: DownturnLgd = from_js_json(&json, "json")?;
-        inner.validate().map_err(to_js_err)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
-    /// @returns Compact canonical JSON text.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `validation` error if serialization fails.
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
     }
 }
 

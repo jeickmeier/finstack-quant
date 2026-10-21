@@ -146,9 +146,8 @@ where
 /// rule, which is enough to show how factors, their market mapping and the
 /// dependency matcher fit together.
 fn factor_model_config_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
-    use crate::{
-        FactorDefinition, FactorId, FactorType, MappingRule, MarketMapping, MatchingConfig,
-    };
+    use crate::matching::{MappingRule, MatchingConfig};
+    use crate::{FactorDefinition, FactorId, FactorType, MarketMapping};
     use finstack_quant_core::market_data::bumps::BumpUnits;
 
     let factor_id = FactorId::new("rates::usd::parallel");

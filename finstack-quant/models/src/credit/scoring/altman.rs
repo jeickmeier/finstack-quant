@@ -325,11 +325,11 @@ pub fn altman_z_double_prime(
 ///
 /// Altman, Hartzell & Peck (1995) add +3.25 so that a defaulted (D-rated)
 /// issuer maps to an EM-Score near zero.
-pub const EM_SCORE_CONSTANT: f64 = 3.25;
+const EM_SCORE_CONSTANT: f64 = 3.25;
 /// EM-Score above this value is Safe (US bond-rating equivalent ~BBB and above).
-pub const EM_SCORE_SAFE_THRESHOLD: f64 = 5.85;
+const EM_SCORE_SAFE_THRESHOLD: f64 = 5.85;
 /// EM-Score below this value is Distress (US bond-rating equivalent ~BB- and below).
-pub const EM_SCORE_DISTRESS_THRESHOLD: f64 = 4.35;
+const EM_SCORE_DISTRESS_THRESHOLD: f64 = 4.35;
 
 /// Compute the Altman EM-Score for emerging-market corporates.
 ///

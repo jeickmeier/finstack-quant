@@ -9,7 +9,7 @@ use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithParams;
-use finstack_quant_models::trees::BinomialTree;
+use finstack_quant_models::trees::binomial_tree::BinomialTree;
 use finstack_quant_models::types::OptionMarketParams;
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
 use finstack_quant_valuations_core::impl_instrument_base;
@@ -528,9 +528,9 @@ impl CommoditySpotOption {
         Option<finstack_quant_valuations_core::results::MonteCarloValuationDetails>,
     )> {
         use finstack_quant_core::math::time_grid::TimeGrid;
-        use finstack_quant_models::monte_carlo::discretization::ExactSchwartzSmith;
+        use finstack_quant_models::monte_carlo::discretization::schwartz_smith::ExactSchwartzSmith;
         use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
-        use finstack_quant_models::monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
+        use finstack_quant_models::monte_carlo::payoff::vanilla::European;
         use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithProcess;
         use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 
@@ -598,34 +598,16 @@ impl CommoditySpotOption {
         let initial_state = process.initial_state().to_vec();
         let maturity_step = mc_params.num_steps;
 
-        // Dispatch on option type (EuropeanCall / EuropeanPut are
-        // distinct concrete types, so we branch here).
-        let estimate = match self.option_type {
-            OptionType::Call => {
-                let payoff = EuropeanCall::new(self.strike, 1.0, maturity_step);
-                engine.price(
-                    &rng,
-                    &process,
-                    &disc_scheme,
-                    &initial_state,
-                    &payoff,
-                    self.underlying.currency,
-                    df,
-                )?
-            }
-            OptionType::Put => {
-                let payoff = EuropeanPut::new(self.strike, 1.0, maturity_step);
-                engine.price(
-                    &rng,
-                    &process,
-                    &disc_scheme,
-                    &initial_state,
-                    &payoff,
-                    self.underlying.currency,
-                    df,
-                )?
-            }
-        };
+        let payoff = European::new(self.option_type, self.strike, 1.0, maturity_step);
+        let estimate = engine.price(
+            &rng,
+            &process,
+            &disc_scheme,
+            &initial_state,
+            &payoff,
+            self.underlying.currency,
+            df,
+        )?;
 
         let scale = self.quantity * self.multiplier;
         Ok((
@@ -785,7 +767,7 @@ impl Instrument for CommoditySpotOption {
                     option_type: self.option_type,
                 };
                 params.validate()?;
-                tree.price_american(&params)?
+                tree.price_american(&params, &[])?
             }
             ExerciseStyle::Bermudan => {
                 let schedule = self.exercise_dates.as_ref().ok_or_else(|| {
@@ -829,7 +811,7 @@ impl Instrument for CommoditySpotOption {
                             .to_string(),
                     ));
                 }
-                tree.price_bermudan(&params, &exercise_times)?
+                tree.price_bermudan(&params, &exercise_times, &[])?
             }
         };
 
@@ -994,7 +976,8 @@ impl CommoditySpotOption {
             return Ok(Some(intrinsic_delta * df * self.quantity * self.multiplier));
         }
 
-        let d1 = finstack_quant_models::volatility::d1_d2_black76(forward, self.strike, sigma, t).0;
+        let d1 =
+            finstack_quant_models::closed_form::d1_d2_black76(forward, self.strike, sigma, t).0;
         let nd1 = norm_cdf(d1);
 
         let delta_unit = match self.option_type {
@@ -1147,7 +1130,8 @@ impl CommoditySpotOption {
         let forward = self.forward_price(market, as_of)?;
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let df = disc.df_between_dates(as_of, self.expiry)?;
-        let d1 = finstack_quant_models::volatility::d1_d2_black76(forward, self.strike, sigma, t).0;
+        let d1 =
+            finstack_quant_models::closed_form::d1_d2_black76(forward, self.strike, sigma, t).0;
         let vega_abs = df * forward * norm_pdf(d1) * t.sqrt();
         Ok(Some(vega_abs * 0.01 * self.quantity * self.multiplier))
     }

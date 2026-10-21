@@ -19,7 +19,6 @@ from finstack_quant.models.factor.risk import (
     build_stress_attribution,
     evaluate_risk_budget,
     historical_var_decomposition,
-    parametric_es_decomposition,
     parametric_var_decomposition,
 )
 
@@ -67,13 +66,6 @@ def test_parametric_var_decomposition_wire_shape_matches_wasm() -> None:
     explicit = parametric_var_decomposition(VAR_IDS, VAR_WEIGHTS, VAR_COVARIANCE, 0.99, True)
     assert explicit.confidence == 0.99
     assert explicit.var_contributions[0].incremental_var is not None
-
-
-def test_parametric_es_decomposition_returns_position_risk_decomposition() -> None:
-    result = parametric_es_decomposition(VAR_IDS, VAR_WEIGHTS, VAR_COVARIANCE)
-    doc = json.loads(result.to_json())
-    assert sorted(doc) == DECOMPOSITION_KEYS
-    assert doc["confidence"] == 0.95
 
 
 def test_decompositions_no_longer_take_a_config_keyword() -> None:

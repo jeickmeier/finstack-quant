@@ -23,16 +23,13 @@ use crate::bindings::pandas_utils::{
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::core_to_py;
 use finstack_quant_core::wire::serde_parse;
-use finstack_quant_models::closed_form::heston::{heston_price, HestonPricingParams};
-use finstack_quant_models::closed_form::vanilla::{
-    bs_greeks, bs_price, vanilla_expiry_payoff, BsGreeks, DEFAULT_THETA_DAYS_PER_YEAR,
-};
 use finstack_quant_models::closed_form::{
-    asian_option_price, bachelier_greeks, bachelier_price, barrier_call, barrier_put,
-    black76_greeks, black76_price, black_shifted_price, black_shifted_vega, lookback_option_price,
-    quanto_option_price, ForwardGreeks, DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE,
+    asian_option_price, bachelier_greeks, bachelier_price, barrier_option_price, black76_greeks,
+    black76_implied_vol, black76_price, black_shifted_price, black_shifted_vega, bs_greeks,
+    bs_implied_vol, bs_price, heston_price, lookback_option_price, quanto_option_price,
+    vanilla_expiry_payoff, BsGreeks, ForwardGreeks, HestonPricingParams, DEFAULT_ASIAN_AVERAGING,
+    DEFAULT_LOOKBACK_STRIKE_TYPE, DEFAULT_THETA_DAYS_PER_YEAR,
 };
-use finstack_quant_models::closed_form::{black76_implied_vol, bs_implied_vol};
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_models::types::OptionType;
 use pyo3::prelude::*;
@@ -896,9 +893,9 @@ fn black_shifted_vega_wrapper(
     black_shifted_vega(forward, strike, vol, expiry, shift).map_err(core_to_py)
 }
 
-// barrier_call / barrier_put
+// barrier_option_price
 
-/// Reiner-Rubinstein continuous-monitoring barrier call price.
+/// Reiner-Rubinstein continuous-monitoring barrier option price.
 ///
 /// Parameters
 /// ----------
@@ -920,6 +917,8 @@ fn black_shifted_vega_wrapper(
 ///     ``"up"`` or ``"down"`` (relative to spot / barrier).
 /// knock : str
 ///     ``"in"`` (knock-in) or ``"out"`` (knock-out).
+/// is_call : bool, optional
+///     ``True`` for call (default), ``False`` for put.
 ///
 /// Returns
 /// -------
@@ -933,79 +932,19 @@ fn black_shifted_vega_wrapper(
 ///
 /// Examples
 /// --------
-/// >>> from finstack_quant.models import barrier_call
-/// >>> round(barrier_call(100.0, 100.0, 120.0, 0.05, 0.0, 0.2, 1.0, "up", "out"), 4)
+/// >>> from finstack_quant.models import barrier_option_price
+/// >>> round(barrier_option_price(100.0, 100.0, 120.0, 0.05, 0.0, 0.2, 1.0, "up", "out"), 4)
 /// 1.1761
-///
-/// Sources
-/// -------
-/// - Reiner-Rubinstein (1991): see docs/REFERENCES.md#reiner-rubinstein-1991
-#[pyfunction(name = "barrier_call")]
-#[pyo3(signature = (spot, strike, barrier, rate, div_yield, vol, expiry, direction, knock))]
-#[allow(clippy::too_many_arguments)]
-fn barrier_call_wrapper(
-    spot: f64,
-    strike: f64,
-    barrier: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
-    direction: &str,
-    knock: &str,
-) -> PyResult<f64> {
-    barrier_call(
-        spot, strike, barrier, rate, div_yield, vol, expiry, direction, knock,
-    )
-    .map_err(core_to_py)
-}
-
-/// Reiner-Rubinstein continuous-monitoring barrier put price.
-///
-/// Parameters
-/// ----------
-/// spot : float
-///     Current spot price ``S``.
-/// strike : float
-///     Strike price ``K``.
-/// barrier : float
-///     Barrier level.
-/// rate : float
-///     Domestic / risk-free rate (continuously compounded, decimal).
-/// div_yield : float
-///     Dividend yield or foreign rate (continuously compounded, decimal).
-/// vol : float
-///     Annualized volatility (decimal, e.g. ``0.20`` for 20%).
-/// expiry : float
-///     Time to expiry in years.
-/// direction : str
-///     ``"up"`` or ``"down"`` (relative to spot / barrier).
-/// knock : str
-///     ``"in"`` (knock-in) or ``"out"`` (knock-out).
-///
-/// Returns
-/// -------
-/// float
-///     Per-unit option price.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``direction`` / ``knock`` is unsupported or the price is non-finite.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.models import barrier_put
-/// >>> barrier_put(100.0, 100.0, 80.0, 0.05, 0.0, 0.2, 1.0, "down", "out") > 0
+/// >>> barrier_option_price(100.0, 100.0, 80.0, 0.05, 0.0, 0.2, 1.0, "down", "out", is_call=False) > 0
 /// True
 ///
 /// Sources
 /// -------
 /// - Reiner-Rubinstein (1991): see docs/REFERENCES.md#reiner-rubinstein-1991
-#[pyfunction(name = "barrier_put")]
-#[pyo3(signature = (spot, strike, barrier, rate, div_yield, vol, expiry, direction, knock))]
+#[pyfunction(name = "barrier_option_price")]
+#[pyo3(signature = (spot, strike, barrier, rate, div_yield, vol, expiry, direction, knock, is_call=true))]
 #[allow(clippy::too_many_arguments)]
-fn barrier_put_wrapper(
+fn barrier_option_price_wrapper(
     spot: f64,
     strike: f64,
     barrier: f64,
@@ -1015,9 +954,19 @@ fn barrier_put_wrapper(
     expiry: f64,
     direction: &str,
     knock: &str,
+    is_call: bool,
 ) -> PyResult<f64> {
-    barrier_put(
-        spot, strike, barrier, rate, div_yield, vol, expiry, direction, knock,
+    barrier_option_price(
+        spot,
+        strike,
+        barrier,
+        rate,
+        div_yield,
+        vol,
+        expiry,
+        direction,
+        knock,
+        OptionType::from(is_call),
     )
     .map_err(core_to_py)
 }
@@ -1338,8 +1287,7 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(bachelier_greeks_wrapper, m)?)?;
     m.add_function(wrap_pyfunction!(black_shifted_price_wrapper, m)?)?;
     m.add_function(wrap_pyfunction!(black_shifted_vega_wrapper, m)?)?;
-    m.add_function(wrap_pyfunction!(barrier_call_wrapper, m)?)?;
-    m.add_function(wrap_pyfunction!(barrier_put_wrapper, m)?)?;
+    m.add_function(wrap_pyfunction!(barrier_option_price_wrapper, m)?)?;
     m.add_function(wrap_pyfunction!(asian_option_wrapper, m)?)?;
     m.add_function(wrap_pyfunction!(lookback_option_wrapper, m)?)?;
     m.add_function(wrap_pyfunction!(quanto_option_wrapper, m)?)?;

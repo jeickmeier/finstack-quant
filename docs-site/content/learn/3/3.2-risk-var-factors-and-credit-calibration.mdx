@@ -4,7 +4,7 @@ title: "Risk: VaR, Factors, and Credit Calibration"
 description: "Audit tail estimators and horizon scaling, fit aligned return factors, and turn a calibrated credit covariance into explicitly dimensioned risk."
 desk_question: "How much can this book lose, over which horizon, and which exposures explain that estimate?"
 references: ["#jpmorgan1996RiskMetrics", "#artzner1999CoherentRisk", "#cornishFisher1937", "#mcneil-frey-embrechts-qrm", "#fama-french-1993", "#ben-dor-2007-dts", "#ledoitwolf2004", "#joanesGill1998"]
-api: ["finstack_quant.analytics.Performance", "finstack_quant.core.math.linalg.ledoit_wolf_shrinkage", "finstack_quant.features.neutralize_and_zscore", "finstack_quant.models.factor.risk.parametric_var_decomposition", "finstack_quant.models.factor.risk.parametric_es_decomposition"]
+api: ["finstack_quant.analytics.Performance", "finstack_quant.core.math.linalg.ledoit_wolf_shrinkage", "finstack_quant.features.neutralize_and_zscore", "finstack_quant.models.factor.risk.parametric_var_decomposition"]
 status: "published"
 ---
 
@@ -503,14 +503,14 @@ With $z_c=\Phi^{-1}(c)$ and standard-normal density $\phi$, return ES is $-\sigm
 
 {/* notebook-block notebook="03_analytics/risk_and_factor_analytics.ipynb" cell="normal-es-reference" role="exercise" */}
 ```python exec id=normal-es-reference role=exercise
-from finstack_quant.models.factor.risk import parametric_es_decomposition
+from finstack_quant.models.factor.risk import parametric_var_decomposition
 from statistics import NormalDist
 
 alpha, daily_sigma = 0.95, 0.01
 z = NormalDist().inv_cdf(alpha)
 phi = math.exp(-0.5*z*z)/math.sqrt(2*math.pi)
 expected_normal_es = -daily_sigma * phi/(1-alpha)
-es_reference = parametric_es_decomposition(["unit_exposure"],[1.0],[[daily_sigma**2]],alpha)
+es_reference = parametric_var_decomposition(["unit_exposure"],[1.0],[[daily_sigma**2]],alpha)
 print(f"Zero-mean normal VaR={es_reference.portfolio_var:.6%}; ES={es_reference.portfolio_es:.6%}")
 print(f"ES/VaR magnitude ratio={phi/((1-alpha)*z):.6f}; this ratio depends on confidence and distribution.")
 ```

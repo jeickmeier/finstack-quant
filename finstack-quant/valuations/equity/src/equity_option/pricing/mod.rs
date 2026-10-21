@@ -20,7 +20,7 @@ use crate::equity_option::types::EquityOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_models::closed_form::heston::heston_price;
+use finstack_quant_models::closed_form::heston_price;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::expect_inst;
@@ -192,7 +192,7 @@ mod tests {
     use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-    use finstack_quant_models::closed_form::vanilla::bs_greeks_unchecked;
+    use finstack_quant_models::closed_form::bs_greeks_unchecked;
     use finstack_quant_models::types::ExerciseStyle;
     use finstack_quant_valuations_core::instruments::pricing_overrides::ThetaDayBasis;
     use finstack_quant_valuations_core::instruments::SettlementType;
@@ -616,10 +616,11 @@ mod tests {
             t,
         );
         params.dividend_yield = q;
-        let tree_european = finstack_quant_models::trees::BinomialTree::leisen_reimer(51)
-            .price_european(&params)
-            .expect("European lattice")
-            * european.quantity;
+        let tree_european =
+            finstack_quant_models::trees::binomial_tree::BinomialTree::leisen_reimer(51)
+                .price_european(&params)
+                .expect("European lattice")
+                * european.quantity;
         assert!(american_pv.amount() >= tree_european);
         assert!((tree_european - european_pv.amount()).abs() < 0.01 * european.quantity);
     }

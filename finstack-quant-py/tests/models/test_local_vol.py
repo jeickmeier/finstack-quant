@@ -9,7 +9,7 @@ import pytest
 from finstack_quant.core.market_data import VolSurface
 from finstack_quant.models import bs_price
 from finstack_quant.models.monte_carlo import simulate_paths
-from finstack_quant.models.volatility import LocalVolSurface, surface_to_dataframe
+from finstack_quant.models.volatility import LocalVolSurface
 
 EXPIRIES = [0.25, 0.5, 1.0, 2.0]
 STRIKES = [80.0, 90.0, 100.0, 110.0, 120.0]
@@ -71,7 +71,7 @@ def test_explicit_grid_round_trips_and_tabulates() -> None:
     assert frame.loc[2.0, 100.0] == 0.3
     assert "<table" in local._repr_html_()
     # Same layout as the implied surface it came from.
-    implied = surface_to_dataframe(_skew())
+    implied = _skew().to_dataframe().pivot(index="expiry", columns="strike", values="vol")
     extracted = LocalVolSurface.from_implied_vol(_skew(), FORWARDS).to_dataframe()
     assert list(extracted.index) == list(implied.index)
     assert list(extracted.columns) == list(implied.columns)

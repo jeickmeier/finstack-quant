@@ -110,6 +110,10 @@ impl TryFrom<GeneratorMatrixWire> for GeneratorMatrix {
     }
 }
 
+/// Default round-trip tolerance of [`GeneratorMatrix::from_transition_matrix`]:
+/// the largest accepted ‖exp(Q·h) − P(h)‖∞ for a 4-digit published table.
+const DEFAULT_ROUND_TRIP_TOL: f64 = 1e-2;
+
 impl GeneratorMatrix {
     /// Construct a generator matrix directly from row-major data.
     ///
@@ -159,32 +163,15 @@ impl GeneratorMatrix {
     /// The default round-trip tolerance is `1e-2`. For a matrix with 4-digit
     /// precision such as a published annual transition table, K-S regularization
     /// introduces errors on the order of 1e-3 to 1e-2 (the matrix itself only
-    /// has 4-digit accuracy). Use [`from_transition_matrix_with_tol`](Self::from_transition_matrix_with_tol)
-    /// to tighten or loosen this threshold.
+    /// has 4-digit accuracy). Pass `round_trip_tol` to tighten or loosen this
+    /// threshold.
     ///
     /// # Errors
     ///
     /// - [`MigrationError::ComplexEigenvalues`] if P has complex eigenvalues.
     /// - [`MigrationError::NoValidGenerator`] if any eigenvalue is ≤ 0.
-    /// - [`MigrationError::RoundTripError`] if ‖exp(Q) − P‖∞ exceeds the default
-    ///   tolerance of `1e-2`.
-    ///
-    /// # Arguments
-    ///
-    /// * `p` - Row-stochastic transition probabilities over `p.horizon()` years;
-    ///   the extracted generator is annualized by that horizon.
-    pub fn from_transition_matrix(p: &TransitionMatrix) -> Result<Self, MigrationError> {
-        Self::from_transition_matrix_with_tol(p, 1e-2)
-    }
-
-    /// Like [`from_transition_matrix`](Self::from_transition_matrix) but with a
-    /// configurable round-trip tolerance.
-    ///
-    /// # Errors
-    ///
-    /// - [`MigrationError::ComplexEigenvalues`] if P has complex eigenvalues.
-    /// - [`MigrationError::NoValidGenerator`] if any eigenvalue is ≤ 0.
-    /// - [`MigrationError::RoundTripError`] if ‖exp(Q) − P‖∞ exceeds `round_trip_tol`.
+    /// - [`MigrationError::RoundTripError`] if ‖exp(Q) − P‖∞ exceeds the
+    ///   round-trip tolerance.
     /// - [`MigrationError::InvalidTolerance`] if `round_trip_tol` is negative or non-finite.
     ///
     /// # Arguments
@@ -193,10 +180,12 @@ impl GeneratorMatrix {
     ///   the extracted generator is annualized by that horizon.
     /// * `round_trip_tol` - Finite, non-negative upper bound on the maximum
     ///   absolute row-sum difference between `exp(Q * p.horizon())` and `p`.
-    pub fn from_transition_matrix_with_tol(
+    ///   `None` uses the default `1e-2`.
+    pub fn from_transition_matrix(
         p: &TransitionMatrix,
-        round_trip_tol: f64,
+        round_trip_tol: Option<f64>,
     ) -> Result<Self, MigrationError> {
+        let round_trip_tol = round_trip_tol.unwrap_or(DEFAULT_ROUND_TRIP_TOL);
         if !round_trip_tol.is_finite() || round_trip_tol < 0.0 {
             return Err(MigrationError::InvalidTolerance(round_trip_tol));
         }
@@ -257,10 +246,7 @@ impl GeneratorMatrix {
     /// Transition intensities as one row per starting state, in scale order.
     #[must_use]
     pub fn to_rows(&self) -> Vec<Vec<f64>> {
-        self.as_matrix()
-            .row_iter()
-            .map(|row| row.iter().copied().collect())
-            .collect()
+        finstack_quant_core::math::linalg::rows_of(self.as_matrix())
     }
 
     /// The underlying `nalgebra` matrix.

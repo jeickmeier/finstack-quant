@@ -1,7 +1,7 @@
 //! Parametric factor risk decomposition using covariance-based Euler allocation.
 
-use super::math::{tail_multipliers, VARIANCE_TOLERANCE};
 use super::types::{FactorContribution, PositionFactorContribution, RiskDecomposition};
+use super::{tail_multipliers, VARIANCE_TOLERANCE};
 use crate::{FactorCovarianceMatrix, RiskMeasure, SensitivityMatrix};
 
 /// Reject sensitivity matrices that contain non-finite deltas.

@@ -112,7 +112,7 @@ pub(crate) fn known_knock_out_value(
 /// [`BarrierOptionPayoff::with_rebate_at_hit`] so the rebate compounds
 /// forward from the hit time τ at the flat rate and the engine's maturity
 /// discount factor nets to `DF(τ)` — exact at-hit discounting, matching the
-/// analytical [`finstack_quant_models::closed_form::barrier::barrier_rebate`] with
+/// analytical [`finstack_quant_models::closed_form::barrier_rebate`] with
 /// [`PayoutTiming::AtHit`](finstack_quant_core::types::PayoutTiming::AtHit).
 pub(crate) fn wants_at_hit_rebate(inst: &BarrierOption) -> bool {
     use finstack_quant_core::types::PayoutTiming;
@@ -159,7 +159,7 @@ impl BarrierOptionMcPricer {
         let r = inputs.r_eff();
 
         if inst.observed_barrier_breached == Some(true) {
-            let unit = finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
+            let unit = finstack_quant_models::closed_form::bs_price_unchecked(
                 spot,
                 inst.strike,
                 r,
@@ -168,7 +168,7 @@ impl BarrierOptionMcPricer {
                 t_vol,
                 inst.option_type,
             );
-            let unit = finstack_quant_models::closed_form::vanilla::checked_closed_form_value(
+            let unit = finstack_quant_models::closed_form::checked_closed_form_value(
                 unit,
                 "barrier knocked-in vanilla price",
             )?;
@@ -330,7 +330,7 @@ pub(crate) fn price_expired_barrier(
     Money::new(pv, ccy)
 }
 
-use finstack_quant_models::closed_form::barrier::{barrier_price, barrier_rebate, BarrierParams};
+use finstack_quant_models::closed_form::{barrier_price, barrier_rebate, BarrierParams};
 /// Reiner-Rubinstein pricer for continuous contractual monitoring.
 /// Discrete observation dates require the Monte Carlo or PDE engine.
 pub(crate) struct BarrierOptionAnalyticalPricer;
@@ -399,7 +399,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
         );
 
         if barrier_opt.observed_barrier_breached == Some(true) {
-            let unit = finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
+            let unit = finstack_quant_models::closed_form::bs_price_unchecked(
                 spot,
                 barrier_opt.strike,
                 bs_inputs.r_eff(),
@@ -408,7 +408,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
                 t,
                 barrier_opt.option_type,
             );
-            let unit = finstack_quant_models::closed_form::vanilla::checked_closed_form_value(
+            let unit = finstack_quant_models::closed_form::checked_closed_form_value(
                 unit,
                 "barrier observed-breach vanilla price",
             )?;
@@ -442,7 +442,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
         };
         // The closed-form leaves return NaN sentinels for out-of-domain input;
         // convert that to an error before `Money::new` panics on non-finite.
-        let price = finstack_quant_models::closed_form::vanilla::checked_closed_form_value(
+        let price = finstack_quant_models::closed_form::checked_closed_form_value(
             price * barrier_opt.quantity + rebate_val,
             "barrier closed-form price",
         )?;
@@ -504,9 +504,7 @@ mod tests {
     use finstack_quant_core::types::BarrierType as AnalyticalBarrierType;
     use finstack_quant_core::types::InstrumentId;
     use finstack_quant_core::types::{BarrierType, PayoutTiming};
-    use finstack_quant_models::closed_form::barrier::{
-        barrier_price, barrier_rebate, BarrierParams,
-    };
+    use finstack_quant_models::closed_form::{barrier_price, barrier_rebate, BarrierParams};
     use finstack_quant_models::types::OptionType;
     use time::Month;
 
@@ -685,7 +683,7 @@ mod tests {
         let p = BarrierParams::new(spot, barrier, barrier, t, rate, div_yield, vol);
 
         // Default timing is at-hit (market standard).
-        let expected_at_hit = finstack_quant_models::closed_form::barrier::barrier_rebate(
+        let expected_at_hit = finstack_quant_models::closed_form::barrier_rebate(
             &p,
             rebate,
             AnalyticalBarrierType::UpAndOut,

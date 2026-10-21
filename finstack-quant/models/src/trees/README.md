@@ -13,8 +13,8 @@ instrument payoff logic is decoupled from lattice evolution through the
 
 Depends on `finstack_quant_core` for `MarketContext`, the `Discounting` trait,
 `HazardCurve`, `PiecewiseConstantCurve`, and `math::time_grid`, and on
-[`models::volatility::black`](../volatility/) — `binomial_tree.rs` uses
-`d1_d2` to feed the Leisen-Reimer Peizer-Pratt inversion. Consumed by the
+[`models::closed_form`](../closed_form/) — `binomial_tree.rs` uses
+`closed_form::d1_d2` to feed the Leisen-Reimer Peizer-Pratt inversion. Consumed by the
 instrument pricers listed under
 [Usage in the codebase](#usage-in-the-codebase).
 
@@ -25,7 +25,7 @@ only through the instrument pricers.
 
 | Path | Contents |
 |------|----------|
-| [`tree_framework/`](tree_framework/) | Traits, `NodeState`, evolution parameters, the generic recombining engine |
+| [`tree_framework.rs`](tree_framework.rs) | `TreeValuator`, `NodeState`, `TreeDiscounting`, evolution parameters, the crate-internal recombining engine |
 | [`binomial_tree.rs`](binomial_tree.rs) | `BinomialTree` (CRR, Leisen-Reimer) plus American/European/Bermudan entry points |
 | [`short_rate_tree/`](short_rate_tree/) | `ShortRateTree`: Ho-Lee, Black-Derman-Toy, Black-Karasinski |
 | [`hull_white_tree.rs`](hull_white_tree.rs) | `HullWhiteTree`: 1-factor trinomial in auxiliary x-space |
@@ -86,8 +86,8 @@ Two variants share the `price_recombining_tree` engine:
 | Leisen-Reimer | `LeisenReimer` | O(1/N²) | Peizer-Pratt inversion; use odd step counts |
 
 ```rust
-use finstack_quant_models::types::{OptionMarketParams, OptionType};
-use finstack_quant_models::trees::BinomialTree;
+use finstack_quant_valuations::instruments::{OptionMarketParams, OptionType};
+use finstack_quant_models::trees::binomial_tree::BinomialTree;
 
 let params = OptionMarketParams::new(
     100.0, // spot
@@ -103,15 +103,16 @@ let params = OptionMarketParams::new(
 let tree = BinomialTree::leisen_reimer(200);
 assert_eq!(tree.steps, 201);
 
-let american = tree.price_american(&params)?;
+let american = tree.price_american(&params, &[])?;
 let european = tree.price_european(&params)?;
 assert!(american >= european - 1e-9); // early exercise never destroys value
 # Ok::<(), finstack_quant_core::Error>(())
 ```
 
 `BinomialTree::leisen_reimer(steps)` rounds positive even requests up to the next odd step count. Additional entry points:
-`price_bermudan(&params, &exercise_times)`,
-`price_american_with_discrete_dividends` and `price_bermudan_with_discrete_dividends`.
+`price_bermudan(&params, &exercise_times, &dividends)`; both `price_american`
+and `price_bermudan` take a cash-dividend schedule `&[(time_in_years, amount)]`
+(empty for none).
 Greeks are finite differences owned by
 the instrument pricers, not the lattice.
 
@@ -194,7 +195,7 @@ node's central child plus one node either side): mean reversion pulls the
 central child inward, so the lattice limits its own width.
 
 ```rust
-use finstack_quant_models::trees::{HullWhiteTree, HullWhiteTreeConfig};
+use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
 
 let config = HullWhiteTreeConfig {
     kappa: 0.03,
@@ -356,8 +357,9 @@ mise run rust-bench
 
 ## Adding a tree model
 
-1. Add the file (or directory) and declare it in [`mod.rs`](mod.rs) with the
-   public re-exports.
+1. Add the file (or directory) and declare it as a `pub mod` in
+   [`mod.rs`](mod.rs); its items are reached at their child path
+   (`trees::<child>::Item`), with no flat re-export.
 2. Give the tree an inherent pricing method. The shortest path is to build a `RecombiningInputs`
    and call `price_recombining_tree(inputs)` — note it takes the struct **by
    value**. Fields: `steps`, `time_to_maturity`, `valuator`, `prob_up`,

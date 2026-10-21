@@ -44,8 +44,6 @@
 //! valuations crate depends on this one, so the edge would make a factor edit
 //! rebuild the pricing stack.
 
-extern crate self as finstack_quant_models;
-
 pub mod closed_form;
 pub mod correlation;
 pub mod credit;

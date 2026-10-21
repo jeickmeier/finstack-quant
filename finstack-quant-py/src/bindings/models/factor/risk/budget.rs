@@ -5,7 +5,7 @@ use pyo3::types::PyDict;
 
 use finstack_quant_factor::risk::{self as model_risk, PositionBudgetEntry, RiskBudgetResult};
 
-use crate::bindings::json_bridge::{deserialize_json, serialize_json};
+use crate::bindings::macros::wire_methods;
 
 /// Per-position budget comparison entry.
 #[pyclass(
@@ -25,32 +25,14 @@ impl PyPositionBudgetEntry {
     }
 }
 
+wire_methods!(
+    PyPositionBudgetEntry,
+    PositionBudgetEntry,
+    "PositionBudgetEntry"
+);
+
 #[pymethods]
 impl PyPositionBudgetEntry {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: PositionBudgetEntry = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Portfolio position identifier.
     #[getter]
     fn position_id(&self) -> String {
@@ -147,32 +129,10 @@ impl PyRiskBudgetResult {
     }
 }
 
+wire_methods!(PyRiskBudgetResult, RiskBudgetResult, "RiskBudgetResult");
+
 #[pymethods]
 impl PyRiskBudgetResult {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: RiskBudgetResult = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Total absolute over-budget amount summed across exceeding positions.
     #[getter]
     fn total_overbudget(&self) -> f64 {

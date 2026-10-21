@@ -24,7 +24,7 @@
 //! # Implementation Notes
 //!
 //! - The formula and its finite differences are the ones the arbitrage check
-//!   [`LocalVolDensityCheck`](crate::volatility::arbitrage::checks::LocalVolDensityCheck)
+//!   [`LocalVolDensityCheck`](crate::volatility::arbitrage::LocalVolDensityCheck)
 //!   evaluates: central differences inside the grid, one-sided at its edges.
 //! - The local volatility is stored on the grid of the implied surface and
 //!   interpolated bilinearly, with flat extrapolation outside it.

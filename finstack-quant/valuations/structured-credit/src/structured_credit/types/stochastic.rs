@@ -11,7 +11,7 @@ use crate::structured_credit::pricing::stochastic::calibrations::{
 use finstack_quant_cashflows::builder::DefaultModelSpec;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_core::Result;
-use finstack_quant_models::credit::pool::prepayment::StochasticPrepaySpec;
+use finstack_quant_models::credit::pool::StochasticPrepaySpec;
 use finstack_quant_models::credit::pool::{CorrelationStructure, StochasticDefaultSpec};
 
 impl StructuredCredit {
@@ -34,7 +34,7 @@ impl StructuredCredit {
     /// # Example
     /// ```text
     /// use finstack_quant_valuations_structured_credit::structured_credit::StructuredCredit;
-    /// use finstack_quant_models::credit::pool::prepayment::StochasticPrepaySpec;
+    /// use finstack_quant_models::credit::pool::StochasticPrepaySpec;
     ///
     /// let mut clo = StructuredCredit::example().expect("example");
     /// clo.with_stochastic_prepay(StochasticPrepaySpec::factor_correlated(

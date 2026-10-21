@@ -196,6 +196,81 @@ impl HullWhiteParams {
         Self::new(kappa, PiecewiseConstantCurve::constant(sigma)?)
     }
 
+    /// Construct a model with a piecewise-constant volatility schedule.
+    ///
+    /// # Arguments
+    ///
+    /// * `kappa` - Mean-reversion speed κ in inverse years; must be positive
+    ///   and finite.
+    /// * `times` - Segment start times in years: the first must be `0.0` and
+    ///   the rest strictly increasing; the last segment extends to infinity.
+    /// * `values` - Short-rate volatility on each segment in absolute rate
+    ///   units per square-root year; same length as `times`, non-negative.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] when the schedule is empty, ragged, does
+    /// not start at `0.0`, is not strictly increasing or holds an invalid
+    /// value, or when `kappa` is invalid.
+    pub fn piecewise(kappa: f64, times: Vec<f64>, values: Vec<f64>) -> Result<Self> {
+        Self::new(kappa, PiecewiseConstantCurve::new(times, values)?)
+    }
+
+    /// Short-rate volatility σ(t) in force at model time `t`.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Model time in years; the left-continuous schedule segment
+    ///   containing `t` supplies the value (flat after the last knot).
+    #[must_use]
+    pub fn sigma(&self, t: f64) -> f64 {
+        self.volatility.value_at(t)
+    }
+
+    /// Segment start times of the volatility schedule, in years.
+    #[must_use]
+    pub fn times(&self) -> &[f64] {
+        self.volatility.times()
+    }
+
+    /// Volatility on each schedule segment, in absolute rate units per
+    /// square-root year.
+    #[must_use]
+    pub fn values(&self) -> &[f64] {
+        self.volatility.values()
+    }
+
+    /// Compute zero-coupon bond-option volatility under scheduled σ(t).
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Current model time in years.
+    /// * `expiry` - Bond-option expiry time in years.
+    /// * `maturity` - Underlying bond maturity time in years.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] for non-finite, negative, or incorrectly
+    /// ordered times, or when schedule integration fails.
+    pub fn bond_vol(&self, t: f64, expiry: f64, maturity: f64) -> Result<f64> {
+        if !t.is_finite()
+            || !expiry.is_finite()
+            || !maturity.is_finite()
+            || t < 0.0
+            || expiry < t
+            || maturity < expiry
+        {
+            return Err(Error::Validation(format!(
+                "invalid HW bond option times t={t}, T={expiry}, S={maturity}"
+            )));
+        }
+        let b = hw_b(self.kappa, expiry, maturity);
+        let variance = self
+            .volatility
+            .integrate_squared_exp_weight(self.kappa, expiry, t, expiry)?;
+        Ok(b * variance.max(0.0).sqrt())
+    }
+
     /// Compute centered short-rate state variance `Var[x(t)]`.
     ///
     /// # Arguments
@@ -333,44 +408,6 @@ pub fn hw_bond_vol(kappa: f64, sigma: f64, t: f64, expiry: f64, maturity: f64) -
         (1.0 - (-2.0 * kappa * (expiry - t)).exp()) / (2.0 * kappa)
     };
     b * sigma * var_factor.max(0.0).sqrt()
-}
-
-/// Compute zero-coupon bond-option volatility under scheduled σ(t).
-///
-/// # Arguments
-///
-/// * `params` - Validated mean reversion and piecewise volatility schedule.
-/// * `t` - Current model time in years.
-/// * `expiry` - Bond-option expiry time in years.
-/// * `maturity` - Underlying bond maturity time in years.
-///
-/// # Errors
-///
-/// Returns [`Error::Validation`] for non-finite, negative, or incorrectly
-/// ordered times, or when schedule integration fails.
-pub fn hw_bond_vol_with_model(
-    params: &HullWhiteParams,
-    t: f64,
-    expiry: f64,
-    maturity: f64,
-) -> Result<f64> {
-    if !t.is_finite()
-        || !expiry.is_finite()
-        || !maturity.is_finite()
-        || t < 0.0
-        || expiry < t
-        || maturity < expiry
-    {
-        return Err(Error::Validation(format!(
-            "invalid HW bond option times t={t}, T={expiry}, S={maturity}"
-        )));
-    }
-    let b = hw_b(params.kappa, expiry, maturity);
-    let variance =
-        params
-            .volatility
-            .integrate_squared_exp_weight(params.kappa, expiry, t, expiry)?;
-    Ok(b * variance.max(0.0).sqrt())
 }
 
 /// Compute `ln A(t,T)` for the affine Hull-White zero-coupon bond price.
@@ -624,9 +661,8 @@ pub fn hw1f_term_caplet_price_from_dfs_with_model(
             Ok(0.0)
         };
     }
-    let ratio_vol = (hw_bond_vol_with_model(params, 0.0, t_fix, t_end)?
-        - hw_bond_vol_with_model(params, 0.0, t_fix, t_start)?)
-    .abs();
+    let ratio_vol =
+        (params.bond_vol(0.0, t_fix, t_end)? - params.bond_vol(0.0, t_fix, t_start)?).abs();
     if ratio_vol < 1.0e-15 {
         let intrinsic = if is_cap {
             (ratio_forward - ratio_strike).max(0.0)
@@ -808,7 +844,7 @@ mod tests {
         let scalar = HullWhiteCalibrationParams::new(0.05, 0.01).expect("scalar parameters");
         let model = HullWhiteParams::try_from(scalar).expect("constant model");
         let expected = hw_bond_vol(scalar.kappa, scalar.sigma, 0.0, 1.0, 2.0);
-        let actual = hw_bond_vol_with_model(&model, 0.0, 1.0, 2.0).expect("model vol");
+        let actual = model.bond_vol(0.0, 1.0, 2.0).expect("model vol");
         assert!((actual - expected).abs() < 1.0e-14);
     }
 

@@ -17,11 +17,11 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::fractional::HurstExponent;
+use finstack_quant_models::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
 use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
 use finstack_quant_models::monte_carlo::discretization::rough_heston::RoughHestonHybrid;
-use finstack_quant_models::monte_carlo::discretization::ExactHullWhite1F;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
-use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+use finstack_quant_models::monte_carlo::payoff::vanilla::European;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
 use finstack_quant_models::monte_carlo::pricer::lsmc::{AmericanExercise, LsmcConfig, LsmcPricer};
@@ -43,7 +43,7 @@ use std::hint::black_box;
 fn bench_european_pricer(c: &mut Criterion) {
     let mut group = c.benchmark_group("european_pricer");
     let process = GbmProcess::with_params(0.05, 0.02, 0.20).unwrap();
-    let payoff = EuropeanCall::new(100.0, 1.0, 252);
+    let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
     let df = (-0.05_f64).exp();
 
     {
@@ -135,7 +135,7 @@ fn bench_heston_qe_pricer(c: &mut Criterion) {
     let process =
         HestonProcess::with_params(0.03, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid Heston");
     let disc = QeHeston::new();
-    let payoff = EuropeanCall::new(100.0, 1.0, 252);
+    let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
     let rng = PhiloxRng::new(42);
     let df = (-0.03_f64).exp();
 
@@ -220,7 +220,7 @@ fn bench_hw1f_pricer(c: &mut Criterion) {
         HullWhite1FParams::new(0.1, 0.01, 0.03).expect("valid Hull-White parameters"),
     );
     let disc = ExactHullWhite1F::new();
-    let payoff = EuropeanCall::new(0.03, 1.0, 252);
+    let payoff = European::new(OptionType::Call, 0.03, 1.0, 252);
     let rng = PhiloxRng::new(42);
     let df = (-0.03_f64).exp();
 

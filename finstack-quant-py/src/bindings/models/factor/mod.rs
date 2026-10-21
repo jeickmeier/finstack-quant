@@ -73,7 +73,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "decompose_factors",
             "evaluate_risk_budget",
             "historical_var_decomposition",
-            "parametric_es_decomposition",
             "parametric_var_decomposition",
             "position_component_var",
         ],

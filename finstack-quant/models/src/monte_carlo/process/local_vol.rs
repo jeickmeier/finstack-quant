@@ -43,7 +43,7 @@
 
 use super::super::paths::ProcessParams;
 use super::super::traits::StochasticProcess;
-use super::metadata::ProcessMetadata;
+use crate::monte_carlo::traits::ProcessMetadata;
 use crate::volatility::local_vol::LocalVolSurface;
 use std::sync::Arc;
 

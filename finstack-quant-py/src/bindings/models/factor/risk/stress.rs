@@ -11,7 +11,7 @@ use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, value_error};
 
 use super::functions::extract_pnl_input;
-use crate::bindings::json_bridge::{deserialize_json, serialize_json};
+use crate::bindings::macros::wire_methods;
 
 /// Single position's contribution to tail stress.
 #[pyclass(
@@ -31,32 +31,14 @@ impl PyStressPositionEntry {
     }
 }
 
+wire_methods!(
+    PyStressPositionEntry,
+    StressPositionEntry,
+    "StressPositionEntry"
+);
+
 #[pymethods]
 impl PyStressPositionEntry {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: StressPositionEntry = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Portfolio position identifier.
     #[getter]
     fn position_id(&self) -> String {
@@ -127,30 +109,60 @@ impl PyTailScenarioBreakdown {
     }
 }
 
+// Hand-written rather than `wire_methods!`: the wrapper carries the parent's
+// `position_ids` beside `inner`, which a breakdown loaded on its own lacks.
 #[pymethods]
 impl PyTailScenarioBreakdown {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
+    /// Serialize this TailScenarioBreakdown to its canonical JSON wire form.
     ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
+    /// Returns
+    /// -------
+    /// str
+    ///     Compact JSON that ``from_json`` accepts.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the value cannot be serialized.
+    #[pyo3(text_signature = "($self)")]
+    fn to_json(&self) -> PyResult<String> {
+        crate::bindings::json_bridge::serialize_json_with_context(
+            &self.inner,
+            "failed to serialize TailScenarioBreakdown",
+        )
+    }
+
+    /// Deserialize a TailScenarioBreakdown from its canonical JSON wire form.
+    ///
+    /// Parameters
+    /// ----------
+    /// json : str
+    ///     JSON produced by ``to_json`` (strict field names).
+    ///
+    /// Returns
+    /// -------
+    /// TailScenarioBreakdown
+    ///     The reconstructed value, without the parent's position ordering.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the JSON is malformed or carries unknown fields.
+    #[staticmethod]
+    #[pyo3(text_signature = "(json)")]
+    fn from_json(json: &str) -> PyResult<Self> {
+        crate::bindings::json_bridge::deserialize_json_with_context(
+            json,
+            "invalid TailScenarioBreakdown JSON",
+        )
+        .map(Self::from_inner)
+    }
+
+    /// Support ``pickle`` through the same strict serde round-trip as
+    /// ``to_json`` / ``from_json``.
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: TailScenarioBreakdown = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
     }
 
     /// Zero-based index of this scenario in the original P&L history.
@@ -252,32 +264,10 @@ impl PyStressAttribution {
     }
 }
 
+wire_methods!(PyStressAttribution, StressAttribution, "StressAttribution");
+
 #[pymethods]
 impl PyStressAttribution {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: StressAttribution = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Portfolio VaR threshold separating tail scenarios from the rest.
     ///
     /// Returns

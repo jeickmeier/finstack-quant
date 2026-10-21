@@ -870,7 +870,7 @@ def bootstrap_hull_white_sigma_schedule_to_cap_floors(
     Returns
     -------
     tuple[HullWhiteParams, CalibrationReport]
-        Piecewise parameters (``finstack_quant.models.rates.hull_white.HullWhiteParams``)
+        Piecewise :class:`finstack_quant.models.rates.hull_white.HullWhiteParams`
         and the fit report.
 
     Raises

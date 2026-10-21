@@ -15,7 +15,7 @@ use crate::bindings::pandas_utils::{
 };
 use crate::bindings::repr_support::repr_from_serde;
 
-use crate::bindings::json_bridge::{deserialize_json, serialize_json};
+use crate::bindings::macros::wire_methods;
 
 /// Python-style rendering of an optional float (`None` or the number).
 fn py_opt(value: Option<f64>) -> String {
@@ -50,32 +50,14 @@ impl PyFactorContribution {
     }
 }
 
+wire_methods!(
+    PyFactorContribution,
+    FactorContribution,
+    "FactorContribution"
+);
+
 #[pymethods]
 impl PyFactorContribution {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: FactorContribution = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Identifier of the factor being reported.
     #[getter]
     fn factor_id(&self) -> String {
@@ -135,32 +117,14 @@ impl PyPositionFactorContribution {
     }
 }
 
+wire_methods!(
+    PyPositionFactorContribution,
+    PositionFactorContribution,
+    "PositionFactorContribution"
+);
+
 #[pymethods]
 impl PyPositionFactorContribution {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: PositionFactorContribution = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Portfolio position identifier.
     #[getter]
     fn position_id(&self) -> String {
@@ -211,32 +175,14 @@ impl PyPositionResidualContribution {
     }
 }
 
+wire_methods!(
+    PyPositionResidualContribution,
+    PositionResidualContribution,
+    "PositionResidualContribution"
+);
+
 #[pymethods]
 impl PyPositionResidualContribution {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: PositionResidualContribution = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Portfolio position identifier.
     #[getter]
     fn position_id(&self) -> String {
@@ -310,32 +256,10 @@ impl PyRiskDecomposition {
     }
 }
 
+wire_methods!(PyRiskDecomposition, RiskDecomposition, "RiskDecomposition");
+
 #[pymethods]
 impl PyRiskDecomposition {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: RiskDecomposition = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Total portfolio risk under the selected measure.
     ///
     /// Returns
@@ -506,32 +430,14 @@ impl PyPositionVarContribution {
     }
 }
 
+wire_methods!(
+    PyPositionVarContribution,
+    PositionVarContribution,
+    "PositionVarContribution"
+);
+
 #[pymethods]
 impl PyPositionVarContribution {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: PositionVarContribution = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Portfolio position identifier.
     #[getter]
     fn position_id(&self) -> String {
@@ -626,32 +532,14 @@ impl PyPositionEsContribution {
     }
 }
 
+wire_methods!(
+    PyPositionEsContribution,
+    PositionEsContribution,
+    "PositionEsContribution"
+);
+
 #[pymethods]
 impl PyPositionEsContribution {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: PositionEsContribution = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Portfolio position identifier.
     #[getter]
     fn position_id(&self) -> String {
@@ -716,32 +604,14 @@ impl PyPositionRiskDecomposition {
     }
 }
 
+wire_methods!(
+    PyPositionRiskDecomposition,
+    PositionRiskDecomposition,
+    "PositionRiskDecomposition"
+);
+
 #[pymethods]
 impl PyPositionRiskDecomposition {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from a JSON string.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json_str)")]
-    fn from_json(json_str: &str) -> PyResult<Self> {
-        let inner: PositionRiskDecomposition = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
     /// Total portfolio Value-at-Risk.
     ///
     /// Returns

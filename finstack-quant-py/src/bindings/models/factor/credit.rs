@@ -31,7 +31,7 @@ use crate::bindings::pandas_utils::{
     ColumnSchema,
 };
 use crate::bindings::pickle_support::reduce_via_json;
-use crate::errors::{core_to_py, decomposition_error_to_py, serde_json_to_py, value_error};
+use crate::errors::{core_to_py, kinded_to_py, serde_json_to_py, value_error};
 
 /// Column schema of `PyLevelsAtDate::to_dataframe`, kept so a level-free
 /// snapshot still exports the documented columns.
@@ -134,35 +134,15 @@ impl PyCreditFactorModel {
     }
 }
 
+wire_methods!(
+    PyCreditFactorModel,
+    CreditFactorModel,
+    "CreditFactorModel",
+    rust_json
+);
+
 #[pymethods]
 impl PyCreditFactorModel {
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a ``CreditFactorModel`` from JSON.
-    ///
-    /// Validates the required ``schema`` marker and all structural constraints.
-    ///
-    /// Args:
-    ///     json: JSON string produced by ``to_json`` or the offline calibrator.
-    ///
-    /// Raises:
-    ///     ValueError: If the JSON is malformed or fails validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        CreditFactorModel::from_json(json)
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
-    }
-
-    /// Serialize this model to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        self.inner.to_json().map_err(core_to_py)
-    }
-
     /// Namespaced schema marker (``"finstack_quant.credit_factor_model/1"``).
     #[getter]
     fn schema(&self) -> &'static str {
@@ -587,30 +567,15 @@ impl PyLevelsAtDate {
     }
 }
 
+wire_methods!(
+    PyLevelsAtDate,
+    finstack_quant_factor::credit::decomposition::LevelsAtDate,
+    "LevelsAtDate",
+    rust_json
+);
+
 #[pymethods]
 impl PyLevelsAtDate {
-    /// Deserialize a factor-level snapshot from canonical JSON.
-    ///
-    /// Raises:
-    ///     ValueError: If the JSON is malformed or fails validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        finstack_quant_factor::credit::decomposition::LevelsAtDate::from_json(json)
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
-    }
-
-    /// Serialize the snapshot to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        self.inner.to_json().map_err(core_to_py)
-    }
-
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Observation date (ISO 8601 string).
     #[getter]
     fn date(&self) -> String {
@@ -753,30 +718,15 @@ impl PyPeriodDecomposition {
     }
 }
 
+wire_methods!(
+    PyPeriodDecomposition,
+    finstack_quant_factor::credit::decomposition::PeriodDecomposition,
+    "PeriodDecomposition",
+    rust_json
+);
+
 #[pymethods]
 impl PyPeriodDecomposition {
-    /// Deserialize a period decomposition from canonical JSON.
-    ///
-    /// Raises:
-    ///     ValueError: If the JSON is malformed or fails validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        finstack_quant_factor::credit::decomposition::PeriodDecomposition::from_json(json)
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
-    }
-
-    /// Serialize the decomposition to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        self.inner.to_json().map_err(core_to_py)
-    }
-
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Earlier snapshot date (ISO 8601).
     #[getter(from_date)]
     fn get_from_date(&self) -> String {
@@ -977,7 +927,7 @@ fn decompose_levels(
         date,
         runtime_tags.as_ref(),
     )
-    .map_err(decomposition_error_to_py)?;
+    .map_err(kinded_to_py)?;
 
     Ok(PyLevelsAtDate::from_inner(result))
 }
@@ -1024,7 +974,7 @@ fn decompose_period(
         &from_levels.inner,
         &to_levels.inner,
     )
-    .map_err(decomposition_error_to_py)?;
+    .map_err(kinded_to_py)?;
     Ok(PyPeriodDecomposition::from_inner(result))
 }
 

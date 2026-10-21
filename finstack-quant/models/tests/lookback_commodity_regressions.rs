@@ -4,7 +4,7 @@ use finstack_quant_models::closed_form::{
     fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_put,
 };
 use finstack_quant_models::monte_carlo::{
-    discretization::ExactSchwartzSmith,
+    discretization::schwartz_smith::ExactSchwartzSmith,
     process::schwartz_smith::{SchwartzSmithParams, SchwartzSmithProcess},
     traits::Discretization,
 };

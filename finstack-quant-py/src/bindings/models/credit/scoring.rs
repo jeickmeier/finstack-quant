@@ -1,20 +1,18 @@
 //! Python bindings for `finstack_quant_models::credit::scoring`.
 
 use crate::bindings::macros::wire_methods;
-use finstack_quant_models::credit::scoring::ohlson::{
-    ohlson_o_score as core_ohlson_o_score, OhlsonOScoreInput,
-};
 use finstack_quant_models::credit::scoring::{
     altman_em_score as core_altman_em_score, altman_z_double_prime as core_altman_z_double_prime,
     altman_z_prime as core_altman_z_prime, altman_z_score as core_altman_z_score,
-    zmijewski_score as core_zmijewski_score, AltmanZDoublePrimeInput, AltmanZPrimeInput,
-    AltmanZScoreInput, ScoringResult, ZmijewskiInput,
+    ohlson_o_score as core_ohlson_o_score, zmijewski_score as core_zmijewski_score,
+    AltmanZDoublePrimeInput, AltmanZPrimeInput, AltmanZScoreInput, OhlsonOScoreInput,
+    ScoringResult, ZmijewskiInput,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
 use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema;
-use crate::errors::{core_to_py, scoring_to_py};
+use crate::errors::{core_to_py, kinded_to_py};
 
 /// Outcome of one academic credit-scoring model.
 ///
@@ -135,7 +133,7 @@ fn altman_z_score(
     };
     core_altman_z_score(&input)
         .map(PyScoringResult::from_inner)
-        .map_err(scoring_to_py)
+        .map_err(kinded_to_py)
 }
 
 /// Compute the Altman Z'-Score for private firms.
@@ -183,7 +181,7 @@ fn altman_z_prime(
     };
     core_altman_z_prime(&input)
         .map(PyScoringResult::from_inner)
-        .map_err(scoring_to_py)
+        .map_err(kinded_to_py)
 }
 
 /// Compute the Altman Z''-Score for non-manufacturing firms.
@@ -229,7 +227,7 @@ fn altman_z_double_prime(
     };
     core_altman_z_double_prime(&input)
         .map(PyScoringResult::from_inner)
-        .map_err(scoring_to_py)
+        .map_err(kinded_to_py)
 }
 
 /// Compute the Altman EM-Score for emerging-market corporates.
@@ -274,7 +272,7 @@ fn altman_em_score(
     };
     core_altman_em_score(&input)
         .map(PyScoringResult::from_inner)
-        .map_err(scoring_to_py)
+        .map_err(kinded_to_py)
 }
 
 /// Compute the Ohlson O-Score (1980) nine-predictor logistic bankruptcy model.
@@ -343,7 +341,7 @@ fn ohlson_o_score(
     };
     core_ohlson_o_score(&input)
         .map(PyScoringResult::from_inner)
-        .map_err(scoring_to_py)
+        .map_err(kinded_to_py)
 }
 
 /// Compute the Zmijewski (1984) probit bankruptcy score.
@@ -384,7 +382,7 @@ fn zmijewski_score(
     };
     core_zmijewski_score(&input)
         .map(PyScoringResult::from_inner)
-        .map_err(scoring_to_py)
+        .map_err(kinded_to_py)
 }
 
 /// Build the `finstack_quant.models.credit.scoring` submodule.

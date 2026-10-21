@@ -667,7 +667,7 @@ class TestMonteCarloBenchmarks:
         pricer = EuropeanPricer(num_paths=10_000, seed=42)
 
         def _price():
-            return pricer.price_call(
+            return pricer.price_gbm(
                 spot=100.0,
                 strike=100.0,
                 rate=0.05,
@@ -675,6 +675,7 @@ class TestMonteCarloBenchmarks:
                 vol=0.2,
                 expiry=1.0,
                 num_steps=252,
+                is_call=True,
             )
 
         benchmark.pedantic(_price, rounds=5, warmup_rounds=1)

@@ -1306,9 +1306,7 @@ mod tests {
 
         let mut quotes = Vec::new();
         for &k in &strikes {
-            let vol_dec = sabr_true
-                .implied_volatility(fwd, k, t_exp)
-                .expect("true vol");
+            let vol_dec = sabr_true.implied_vol(fwd, k, t_exp).expect("true vol");
             quotes.push(MarketQuote::Vol(VolQuote::SwaptionVol {
                 id: QuoteId::new(format!("USD-SWPTN-VOL-1Yx5Y-{k}")),
                 expiry: expiry_date,
@@ -1405,9 +1403,7 @@ mod tests {
 
         let mut quotes = Vec::new();
         for &k in &strikes {
-            let vol_dec = sabr_true
-                .implied_volatility(fwd, k, t_exp)
-                .expect("true vol");
+            let vol_dec = sabr_true.implied_vol(fwd, k, t_exp).expect("true vol");
             quotes.push(MarketQuote::Vol(VolQuote::SwaptionVol {
                 id: QuoteId::new(format!("USD-SWPTN-VOL-LN-1Yx5Y-{k}")),
                 expiry: expiry_date,
@@ -1431,9 +1427,7 @@ mod tests {
 
         let fitted_atm = finstack_quant_models::volatility::get_cube_vol(&cube, t_exp, t_ten, fwd)
             .expect("cube vol");
-        let true_atm = sabr_true
-            .implied_volatility(fwd, fwd, t_exp)
-            .expect("true atm");
+        let true_atm = sabr_true.implied_vol(fwd, fwd, t_exp).expect("true atm");
 
         assert!(
             (fitted_atm - true_atm).abs() <= 0.0005,
@@ -1521,7 +1515,7 @@ mod tests {
             good_fwd + 0.010,
         ] {
             let vol_dec = sabr_true
-                .implied_volatility(good_fwd, k, good_t_exp)
+                .implied_vol(good_fwd, k, good_t_exp)
                 .expect("true vol");
             quotes.push(MarketQuote::Vol(VolQuote::SwaptionVol {
                 id: QuoteId::new(format!("GOOD-1Yx5Y-{k}")),

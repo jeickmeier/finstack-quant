@@ -1,12 +1,10 @@
 //! Pricer bindings — European, Path-Dependent, LSMC.
 
-use super::engine::resolve_currency;
+use super::engine::extract_optional_currency;
 use super::results::{PyLrmGreeks, PyMoneyEstimate};
 use crate::errors::core_to_py;
 use finstack_quant_models::monte_carlo::convenience::{self, LsmcConvenience};
-use finstack_quant_models::monte_carlo::pricer::basis::BasisKind;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
-use finstack_quant_models::monte_carlo::pricer::lsmc::LsmcPricer;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
 use finstack_quant_models::types::OptionType;
 use pyo3::prelude::*;
@@ -76,13 +74,26 @@ impl PyEuropeanPricer {
         self.inner.use_parallel()
     }
 
-    /// Price a European call option under GBM.
+    /// Price a European option under GBM.
     ///
     /// Releases the GIL during the Monte Carlo run so other Python threads
     /// can make progress.
+    ///
+    /// Parameters
+    /// ----------
+    /// spot, strike, rate, div_yield, vol, expiry : float
+    ///     GBM market inputs; ``rate`` / ``div_yield`` are continuously
+    ///     compounded decimals, ``vol`` is a positive decimal, ``expiry`` is in
+    ///     years.
+    /// is_call : bool
+    ///     ``True`` for a call payoff, ``False`` for a put.
+    /// num_steps : int, optional
+    ///     Uniform time steps to expiry; defaults to the registry value.
+    /// currency : Currency or str, optional
+    ///     Currency stamped on the estimate; defaults to the registry value.
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, num_steps=None, currency=None))]
-    fn price_call(
+    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, num_steps=None, currency=None))]
+    fn price_gbm(
         &self,
         py: Python<'_>,
         spot: f64,
@@ -91,53 +102,15 @@ impl PyEuropeanPricer {
         div_yield: f64,
         vol: f64,
         expiry: f64,
+        is_call: bool,
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMoneyEstimate> {
-        let ccy = resolve_currency(currency)?;
-        let num_steps = convenience::european_num_steps(num_steps).map_err(core_to_py)?;
+        let ccy = extract_optional_currency(currency)?;
         let pricer = &self.inner;
         py.detach(|| {
             pricer.price_gbm(
-                OptionType::Call,
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
-                num_steps,
-                ccy,
-            )
-        })
-        .map(PyMoneyEstimate::from_inner)
-        .map_err(core_to_py)
-    }
-
-    /// Price a European put option under GBM.
-    ///
-    /// Releases the GIL during the Monte Carlo run so other Python threads
-    /// can make progress.
-    #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, num_steps=None, currency=None))]
-    fn price_put(
-        &self,
-        py: Python<'_>,
-        spot: f64,
-        strike: f64,
-        rate: f64,
-        div_yield: f64,
-        vol: f64,
-        expiry: f64,
-        num_steps: Option<usize>,
-        currency: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyMoneyEstimate> {
-        let ccy = resolve_currency(currency)?;
-        let num_steps = convenience::european_num_steps(num_steps).map_err(core_to_py)?;
-        let pricer = &self.inner;
-        py.detach(|| {
-            pricer.price_gbm(
-                OptionType::Put,
+                OptionType::from(is_call),
                 spot,
                 strike,
                 rate,
@@ -261,11 +234,10 @@ impl PyPathDependentPricer {
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMoneyEstimate> {
-        let ccy = resolve_currency(currency)?;
-        let num_steps = convenience::path_dependent_num_steps(num_steps).map_err(core_to_py)?;
+        let ccy = extract_optional_currency(currency)?;
         let pricer = &self.inner;
         py.detach(|| {
-            pricer.price_gbm_asian(
+            pricer.price_asian(
                 OptionType::from(is_call),
                 spot,
                 strike,
@@ -332,11 +304,10 @@ impl PyPathDependentPricer {
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyLrmGreeks> {
-        let ccy = resolve_currency(currency)?;
-        let num_steps = convenience::lrm_num_steps(num_steps).map_err(core_to_py)?;
+        let ccy = extract_optional_currency(currency)?;
         let pricer = &self.inner;
         py.detach(|| {
-            pricer.price_gbm_asian_with_lrm_greeks(
+            pricer.price_with_lrm_greeks(
                 OptionType::from(is_call),
                 spot,
                 strike,
@@ -556,11 +527,13 @@ impl PyLsmcPricer {
         basis: Option<&str>,
         basis_degree: Option<usize>,
     ) -> PyResult<PyMoneyEstimate> {
-        let currency = resolve_currency(currency)?;
-        let (pricer, num_steps, basis, basis_degree) =
-            self.call_config(num_steps, basis, basis_degree)?;
+        let currency = extract_optional_currency(currency)?;
+        let (pricer, num_steps, basis, basis_degree) = self
+            .inner
+            .call_config(num_steps, basis, basis_degree)
+            .map_err(core_to_py)?;
         py.detach(|| {
-            pricer.price_gbm_american(
+            pricer.price_american(
                 OptionType::from(is_call),
                 spot,
                 strike,
@@ -615,11 +588,13 @@ impl PyLsmcPricer {
         basis: Option<&str>,
         basis_degree: Option<usize>,
     ) -> PyResult<PyMoneyEstimate> {
-        let currency = resolve_currency(currency)?;
-        let (pricer, num_steps, basis, basis_degree) =
-            self.call_config(num_steps, basis, basis_degree)?;
+        let currency = extract_optional_currency(currency)?;
+        let (pricer, num_steps, basis, basis_degree) = self
+            .inner
+            .call_config(num_steps, basis, basis_degree)
+            .map_err(core_to_py)?;
         py.detach(|| {
-            pricer.price_gbm_american_unbiased(
+            pricer.price_american_unbiased(
                 OptionType::from(is_call),
                 spot,
                 strike,
@@ -649,23 +624,6 @@ impl PyLsmcPricer {
             self.inner.basis().as_str(),
             self.inner.basis_degree(),
         )
-    }
-}
-
-impl PyLsmcPricer {
-    /// Resolve per-call overrides against the instance configuration.
-    ///
-    /// A `num_steps` override rebuilds the LSMC configuration (the exercise
-    /// grid is part of it); every other setting is carried over unchanged.
-    fn call_config(
-        &self,
-        num_steps: Option<usize>,
-        basis: Option<&str>,
-        basis_degree: Option<usize>,
-    ) -> PyResult<(LsmcPricer, usize, BasisKind, usize)> {
-        self.inner
-            .call_config(num_steps, basis, basis_degree)
-            .map_err(core_to_py)
     }
 }
 

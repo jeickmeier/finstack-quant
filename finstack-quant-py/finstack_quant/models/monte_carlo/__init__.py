@@ -36,8 +36,7 @@ EuropeanPricer = _mc.EuropeanPricer
 PathDependentPricer = _mc.PathDependentPricer
 LsmcPricer = _mc.LsmcPricer
 
-price_heston_call = _mc.price_heston_call
-price_heston_put = _mc.price_heston_put
+price_heston = _mc.price_heston
 
 # Finite-difference Greeks. The reported stderr is the paired
 # common-random-number standard error of the per-path differences.
@@ -56,7 +55,6 @@ __all__: list[str] = [
     "finite_diff_delta",
     "finite_diff_gamma",
     "heston_satisfies_feller",
-    "price_heston_call",
-    "price_heston_put",
+    "price_heston",
     "simulate_paths",
 ]

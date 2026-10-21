@@ -14,7 +14,6 @@ const credit = {
 
 const risk = {
   parametricVarDecomposition: wasm.parametricVarDecomposition,
-  parametricEsDecomposition: wasm.parametricEsDecomposition,
   historicalVarDecomposition: wasm.historicalVarDecomposition,
   evaluateRiskBudget: wasm.evaluateRiskBudget,
   buildStressAttribution: wasm.buildStressAttribution,

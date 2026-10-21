@@ -15,7 +15,7 @@
 //!
 //! - **Geometric average**: Exact closed-form (Kemna & Vorst 1990)
 //! - **Arithmetic average**: Turnbull-Wakeman approximation or Monte Carlo
-//! - See [`models::closed_form::asian`](finstack_quant_models::closed_form::asian) for formulas
+//! - See [`models::closed_form::geometric_asian_price`](finstack_quant_models::closed_form::geometric_asian_price) for formulas
 //!
 //! # References
 //!
@@ -26,8 +26,8 @@
 //! # See Also
 //!
 //! - [`AsianOption`](crate::exotics::asian_option::AsianOption) for instrument struct
-//! - [`AveragingMethod`](finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod) for geometric vs arithmetic
-//! - [`models::closed_form::asian`](finstack_quant_models::closed_form::asian) for pricing formulas
+//! - `AveragingMethod` for geometric vs arithmetic
+//! - [`models::closed_form::geometric_asian_price`](finstack_quant_models::closed_form::geometric_asian_price) for pricing formulas
 
 pub(crate) mod metrics;
 pub(crate) mod pricer;

@@ -72,13 +72,14 @@ def main() -> None:
             seed=42,
             use_parallel=False,
         )
-        .price_call(
+        .price_gbm(
             spot,
             strike,
             rate,
             dividend_yield,
             volatility,
             expiry,
+            True,
             num_steps=1,
         )
     )
@@ -86,7 +87,7 @@ def main() -> None:
 
     for label, price in (
         ("models.bs_price", closed_form_price),
-        ("models.monte_carlo.EuropeanPricer.price_call", monte_carlo_price),
+        ("models.monte_carlo.EuropeanPricer.price_gbm", monte_carlo_price),
     ):
         _require(math.isfinite(price), f"{label} returned a non-finite price: {price}")
         _require(price > 0.0, f"{label} returned a non-positive price: {price}")

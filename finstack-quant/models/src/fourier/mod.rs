@@ -1,11 +1,7 @@
 //! Fourier pricing engines.
 
 pub mod characteristic_function;
-pub(crate) mod cos;
-
-pub use cos::{
-    bs_cos_price, merton_jump_cos_price, vg_cos_price, CosConfig, CosMarketParams, CosPricer,
-};
+pub mod cos;
 
 /// Inputs rejected before pricing (volatility, term count, truncation
 /// multiplier): a validation error.

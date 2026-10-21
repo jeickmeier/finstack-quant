@@ -1,9 +1,7 @@
 //! Scenario configuration for stochastic structured-credit pricing.
 
-use finstack_quant_models::correlation::LatentFactorSpec;
-use finstack_quant_models::correlation::RecoverySpec;
-use finstack_quant_models::credit::pool::prepayment::StochasticPrepaySpec;
-use finstack_quant_models::credit::pool::StochasticDefaultSpec;
+use finstack_quant_models::correlation::{LatentFactorSpec, RecoverySpec};
+use finstack_quant_models::credit::pool::{StochasticDefaultSpec, StochasticPrepaySpec};
 
 /// Internal inputs shared by structured-credit setup and stochastic pricing.
 pub(crate) struct ScenarioTreeConfig {

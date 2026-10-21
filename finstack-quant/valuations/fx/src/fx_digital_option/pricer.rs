@@ -6,8 +6,8 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
+use finstack_quant_models::closed_form::d1_d2;
 use finstack_quant_models::types::OptionType;
-use finstack_quant_models::volatility::d1_d2;
 
 /// FX digital option calculator.
 #[derive(Debug, Clone, Default)]
@@ -728,7 +728,7 @@ mod tests {
     /// relative to the analytic result.
     #[test]
     fn w46_cash_or_nothing_theta_is_analytic_not_finite_difference() {
-        use finstack_quant_models::volatility::d1_d2;
+        use finstack_quant_models::closed_form::d1_d2;
 
         // Near-ATM inputs where non-linearity in t is highest.
         let spot = 1.20_f64;

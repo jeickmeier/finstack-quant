@@ -112,7 +112,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1255904
+            "bytes": 1255895
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
@@ -1985,7 +1985,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1150141
+            "bytes": 1150132
           },
           {
             "path": "schemas/scenarios/1/horizon_result.schema.json",
@@ -2107,7 +2107,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 382288
+            "bytes": 382279
           },
           {
             "path": "schemas/statements/1/metric_registry.schema.json",
@@ -2681,7 +2681,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
             "type_name": "MetricPricingOverrides",
             "kind": "component",
-            "bytes": 33762
+            "bytes": 33753
           },
           {
             "path": "schemas/common/1/money.schema.json",
@@ -3318,7 +3318,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
             "type_name": "EnhancedMonteCarloResult",
             "kind": "output",
-            "bytes": 52469
+            "bytes": 52468
           },
           {
             "path": "schemas/results/1/equity_metrics.schema.json",
@@ -3564,7 +3564,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1255904
+            "bytes": 1255895
           },
           {
             "domain": "attribution",
@@ -4444,7 +4444,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1150141
+            "bytes": 1150132
           },
           {
             "domain": "scenarios",
@@ -4492,7 +4492,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 382288
+            "bytes": 382279
           },
           {
             "domain": "statements",
@@ -4684,7 +4684,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
             "type_name": "MetricPricingOverrides",
             "kind": "component",
-            "bytes": 33762
+            "bytes": 33753
           },
           {
             "domain": "valuations",
@@ -5412,7 +5412,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
             "type_name": "EnhancedMonteCarloResult",
             "kind": "output",
-            "bytes": 52469
+            "bytes": 52468
           },
           {
             "domain": "valuations",

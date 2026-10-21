@@ -7,7 +7,8 @@
 
 use crate::utils::input::{from_js_json, js_f64, js_f64_seq, js_opt_f64, js_opt_uint, js_uint};
 use crate::utils::to_js_err;
-use finstack_quant_core::math::probability::CorrelatedBernoulli;
+use finstack_quant_core::math::linalg;
+use finstack_quant_core::math::probability::{self, CorrelatedBernoulli};
 use finstack_quant_models::correlation::{
     self as corr, Copula, CopulaSpec, CreditExposure, LatentFactorKind, LatentFactorSpec,
     LatentMultiFactor, LatentSingleFactor, LatentTwoFactor, PortfolioLossConfig, RecoveryModel,
@@ -334,8 +335,7 @@ impl JsRecoveryModel {
 pub fn correlation_bounds(p1: JsValue, p2: JsValue) -> Result<Box<[f64]>, JsValue> {
     let p1 = js_f64(&p1, "p1")?;
     let p2 = js_f64(&p2, "p2")?;
-    let (lo, hi) =
-        finstack_quant_core::math::probability::correlation_bounds(p1, p2).map_err(to_js_err)?;
+    let (lo, hi) = probability::correlation_bounds(p1, p2).map_err(to_js_err)?;
     Ok(Box::new([lo, hi]))
 }
 
@@ -360,8 +360,7 @@ pub fn joint_probabilities(
     let p2 = js_f64(&p2, "p2")?;
     let correlation = js_f64(&correlation, "correlation")?;
     let (p11, p10, p01, p00) =
-        finstack_quant_core::math::probability::joint_probabilities(p1, p2, correlation)
-            .map_err(to_js_err)?;
+        probability::joint_probabilities(p1, p2, correlation).map_err(to_js_err)?;
     Ok(Box::new([p11, p10, p01, p00]))
 }
 
@@ -391,7 +390,7 @@ pub fn joint_probabilities(
 pub fn validate_correlation_matrix(matrix: JsValue, n: JsValue) -> Result<(), JsValue> {
     let matrix: &[f64] = &js_f64_seq(&matrix, "matrix")?;
     let n: usize = js_uint(&n, "n")?;
-    finstack_quant_core::math::linalg::validate_correlation_matrix(matrix, n).map_err(to_js_err)
+    linalg::validate_correlation_matrix(matrix, n).map_err(to_js_err)
 }
 
 /// Nearest correlation matrix (Higham 2002).
@@ -432,12 +431,12 @@ pub fn nearest_correlation(
     let max_iter: Option<usize> = js_opt_uint(max_iter.as_ref(), "maxIter")?;
     // Single source of truth for the defaults: the Rust
     // `NearestCorrelationOpts::default()` (max_iter = 200, tol = 1e-10).
-    let defaults = finstack_quant_core::math::linalg::NearestCorrelationOpts::default();
-    let opts = finstack_quant_core::math::linalg::NearestCorrelationOpts {
+    let defaults = linalg::NearestCorrelationOpts::default();
+    let opts = linalg::NearestCorrelationOpts {
         max_iter: max_iter.unwrap_or(defaults.max_iter),
         tol: tol.unwrap_or(defaults.tol),
     };
-    finstack_quant_core::math::linalg::nearest_correlation(&matrix, n, opts)
+    linalg::nearest_correlation(&matrix, n, opts)
         .map(Vec::into_boxed_slice)
         .map_err(to_js_err)
 }
@@ -1084,14 +1083,11 @@ pub fn simulate_portfolio_loss(
 ) -> Result<JsPortfolioLossResult, JsValue> {
     let exposures: Vec<CreditExposure> = from_js_json(&exposures, "exposures")?;
     let config: PortfolioLossConfig = from_js_json(&config, "config")?;
-    let result = match recovery.filter(|value| !value.is_null() && !value.is_undefined()) {
-        Some(recovery) => {
-            let recovery: corr::RecoverySpec = from_js_json(&recovery, "recovery")?;
-            corr::simulate_portfolio_loss_with_recovery(&exposures, &config, &recovery)
-        }
-        None => corr::simulate_portfolio_loss(&exposures, &config),
-    };
-    result
+    let recovery: Option<corr::RecoverySpec> = recovery
+        .filter(|value| !value.is_null() && !value.is_undefined())
+        .map(|value| from_js_json(&value, "recovery"))
+        .transpose()?;
+    corr::simulate_portfolio_loss(&exposures, &config, recovery.as_ref())
         .map(|inner| JsPortfolioLossResult { inner })
         .map_err(to_js_err)
 }

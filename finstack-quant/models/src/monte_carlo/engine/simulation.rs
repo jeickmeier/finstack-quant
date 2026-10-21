@@ -96,7 +96,7 @@ pub(crate) fn fill_shocks<R: RandomStream>(
 }
 
 /// Shared per-path simulation loop used by [`McEngine::simulate_path`] and the
-/// fractional-noise wrapper in [`crate::monte_carlo::engine_fractional`].
+/// fractional-noise wrapper [`super::simulate_path_fractional`].
 ///
 /// Drives a single path through `time_grid`, generating shocks via `hook`,
 /// stepping the discretization, and dispatching payoff events. Returns the

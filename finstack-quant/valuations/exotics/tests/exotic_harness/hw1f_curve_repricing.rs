@@ -34,7 +34,7 @@
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::time_grid::TimeGrid;
-use finstack_quant_models::monte_carlo::discretization::ExactHullWhite1F;
+use finstack_quant_models::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
 use finstack_quant_models::monte_carlo::process::ou::{
     calibrate_theta_from_curve, HullWhite1FParams, HullWhite1FProcess,
 };

@@ -57,7 +57,7 @@
 //!   *Applied Mathematical Finance*, 12(4), 371-385. `docs/REFERENCES.md#hagan-2002-sabr`
 //! - QuantLib SABR implementation: `ql/termstructures/volatility/sabr.cpp` `docs/REFERENCES.md#hagan-2002-sabr`
 use super::parameters::SabrParameters;
-use crate::volatility::conventions::VolatilityConvention;
+use crate::volatility::VolatilityConvention;
 use finstack_quant_core::{Error, Result};
 
 /// Snap β to the exact endpoints 0 or 1 when it is within this tolerance.
@@ -68,7 +68,7 @@ use finstack_quant_core::{Error, Result};
 pub(crate) const BETA_SNAP_TOL: f64 = 1e-4;
 
 impl SabrParameters {
-    /// Quoting convention of the vols [`Self::implied_volatility`] produces.
+    /// Quoting convention of the vols [`Self::implied_vol`] produces.
     ///
     /// The β≈0 (normal-SABR) branch outputs a **normal (Bachelier)** vol in
     /// absolute rate units, displaced or not; every other β outputs a
@@ -103,12 +103,7 @@ impl SabrParameters {
     /// * `time_to_expiry` - Time to expiry in years; must be strictly positive.
     #[must_use = "computed volatility should be used"]
     #[inline]
-    pub fn implied_volatility(
-        &self,
-        forward: f64,
-        strike: f64,
-        time_to_expiry: f64,
-    ) -> Result<f64> {
+    pub fn implied_vol(&self, forward: f64, strike: f64, time_to_expiry: f64) -> Result<f64> {
         self.validate_inputs(forward, strike, time_to_expiry)?;
 
         if self.beta < BETA_SNAP_TOL {
@@ -164,7 +159,7 @@ impl SabrParameters {
         let rho = self.rho;
 
         // Snap β to 0 or 1 with the same `BETA_SNAP_TOL` used by
-        // `implied_volatility` / `quote_convention`, so smile and ATM paths take
+        // `implied_vol` / `quote_convention`, so smile and ATM paths take
         // the same branch for a given raw β.
         let raw_beta = self.beta;
         let beta_is_zero = raw_beta < BETA_SNAP_TOL;
@@ -494,7 +489,7 @@ impl SabrParameters {
     /// expiry, a χ(z) breakdown, or cross-zero inputs (`f·k ≤ 0` after any
     /// configured shift) with `beta > 0` — the CEV backbone is not
     /// shift-invariant, so such quotes require an explicit
-    /// [`with_shift`](Self::with_shift). β = 0 (normal SABR) is shift-invariant
+    /// [`new_with_shift`](Self::new_with_shift). β = 0 (normal SABR) is shift-invariant
     /// and prices cross-zero quotes directly. Guard with `is_finite()` or use
     /// the checked [`implied_vol_normal`](Self::implied_vol_normal)
     /// on pricing paths.

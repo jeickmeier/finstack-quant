@@ -25,9 +25,9 @@ const { dtsm, hullWhite } = models.rates;
 
 const kind = (expected) => (e) => e instanceof Error && e.kind === expected;
 const invalidType = (e) => e instanceof TypeError && e.kind === 'invalid_type';
-const scale = () => credit.RatingScale.custom(['A', 'B', 'D']);
+const scale = () => credit.migration.RatingScale.custom(['A', 'B', 'D']);
 const generator = () =>
-  new credit.GeneratorMatrix(scale(), [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
+  new credit.migration.GeneratorMatrix(scale(), [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
 
 test('every serde handle round-trips its canonical JSON', () => {
   const handles = [
@@ -38,15 +38,15 @@ test('every serde handle round-trips its canonical JSON', () => {
     [credit.EndogenousHazardSpec, credit.EndogenousHazardSpec.exponential(0.1, 1.5, 2)],
     [credit.ToggleExerciseModel, credit.ToggleExerciseModel.stochastic('leverage', -2, 4)],
     [credit.RatingFactorTable, credit.RatingFactorTable.moodysStandard()],
-    [credit.BetaRecovery, new credit.BetaRecovery(0.4, 0.2)],
-    [credit.WorkoutCosts, new credit.WorkoutCosts(0.05, 0.03)],
-    [credit.DownturnLgd, credit.DownturnLgd.stressed(0.15, 0.3, 0.999)],
-    [credit.EadCalculator, new credit.EadCalculator(600, 400, 0.75)],
-    [credit.MasterScale, credit.MasterScale.spAssumptions()],
-    [credit.RatingScale, scale()],
-    [credit.TransitionMatrix, credit.project(generator(), 1)],
-    [credit.GeneratorMatrix, generator()],
-    [credit.MigrationSimulator, new credit.MigrationSimulator(generator(), 5)],
+    [credit.lgd.BetaRecovery, new credit.lgd.BetaRecovery(0.4, 0.2)],
+    [credit.lgd.WorkoutCosts, new credit.lgd.WorkoutCosts(0.05, 0.03)],
+    [credit.lgd.DownturnLgd, credit.lgd.DownturnLgd.stressed(0.15, 0.3, 0.999)],
+    [credit.lgd.EadCalculator, new credit.lgd.EadCalculator(600, 400, 0.75)],
+    [credit.pd.MasterScale, credit.pd.MasterScale.spAssumptions()],
+    [credit.migration.RatingScale, scale()],
+    [credit.migration.TransitionMatrix, credit.migration.project(generator(), 1)],
+    [credit.migration.GeneratorMatrix, generator()],
+    [credit.migration.MigrationSimulator, new credit.migration.MigrationSimulator(generator(), 5)],
     [correlation.CopulaSpec, correlation.CopulaSpec.studentT(5)],
     [correlation.RecoverySpec, correlation.RecoverySpec.constant(0.4)],
     [liquidity.AlmgrenChrissModel, new liquidity.AlmgrenChrissModel(1e-7, 1e-6, 1)],
@@ -74,13 +74,13 @@ test('every serde handle round-trips its canonical JSON', () => {
 });
 
 test('simulation batches round-trip and expose their paths', () => {
-  const simulator = new credit.MigrationSimulator(generator(), 5);
+  const simulator = new credit.migration.MigrationSimulator(generator(), 5);
   const batch = simulator.simulate(0, 20, 7n);
   assert.equal(batch.length, 20);
   assert.equal(batch.paths.length, 20);
-  const copy = credit.RatingPaths.fromJson(batch.toJson());
+  const copy = credit.migration.RatingPaths.fromJson(batch.toJson());
   assert.equal(copy.defaultRate, batch.defaultRate);
-  const path = credit.RatingPath.fromJson(batch.paths[0].toJson());
+  const path = credit.migration.RatingPath.fromJson(batch.paths[0].toJson());
   assert.equal(path.stateAt(0), 0);
   assert.equal(path.labelAt(0), 'A');
   assert.equal(path.horizon, 5);
@@ -94,7 +94,7 @@ test('simulation batches round-trip and expose their paths', () => {
 });
 
 test('migration lookups report the Rust error kind', () => {
-  const matrix = credit.project(generator(), 1);
+  const matrix = credit.migration.project(generator(), 1);
   assert.throws(() => matrix.probability('A', 'ZZ'), kind('not_found'));
   assert.throws(() => matrix.probabilityByIndex(0, 3), kind('validation'));
   assert.throws(() => matrix.probabilityByIndex(-1, 0), invalidType);
@@ -103,20 +103,24 @@ test('migration lookups report the Rust error kind', () => {
   assert.equal(scale().indexOf('ZZ'), undefined);
   assert.equal(scale().labelOf(9), undefined);
   assert.equal(scale().labelOf(1), 'B');
-  assert.throws(() => credit.RatingScale.custom(['A']), kind('validation'));
-  assert.throws(() => credit.RatingScale.custom('A,B'), invalidType);
-  assert.throws(() => new credit.MigrationSimulator(generator(), 0), kind('validation'));
+  assert.throws(() => credit.migration.RatingScale.custom(['A']), kind('validation'));
+  assert.throws(() => credit.migration.RatingScale.custom('A,B'), invalidType);
+  assert.throws(() => new credit.migration.MigrationSimulator(generator(), 0), kind('validation'));
   assert.throws(
-    () => new credit.MigrationSimulator(generator(), 5).empiricalMatrix(0, 7),
+    () => new credit.migration.MigrationSimulator(generator(), 5).empiricalMatrix(0, 7),
     kind('validation')
   );
   // A transition matrix accepts flat row-major data or an array of rows.
-  const flat = new credit.TransitionMatrix(scale(), [0.9, 0.08, 0.02, 0.1, 0.8, 0.1, 0, 0, 1], 1);
-  const rows = new credit.TransitionMatrix(scale(), flat.toMatrix(), 1);
+  const flat = new credit.migration.TransitionMatrix(
+    scale(),
+    [0.9, 0.08, 0.02, 0.1, 0.8, 0.1, 0, 0, 1],
+    1
+  );
+  const rows = new credit.migration.TransitionMatrix(scale(), flat.toMatrix(), 1);
   assert.equal(rows.toJson(), flat.toJson());
   assert.throws(
     () =>
-      new credit.TransitionMatrix(
+      new credit.migration.TransitionMatrix(
         scale(),
         [
           [0.9, 0.1],
@@ -130,14 +134,14 @@ test('migration lookups report the Rust error kind', () => {
   assert.equal(matrix.horizon, 1);
   assert.equal(matrix.nStates, 3);
   assert.equal(matrix.scale.labels().join(), 'A,B,D');
-  const fitted = credit.GeneratorMatrix.fromTransitionMatrixWithTol(matrix, 1e-6);
+  const fitted = credit.migration.GeneratorMatrix.fromTransitionMatrix(matrix, 1e-6);
   assert.ok(fitted.roundTripError < 1e-6);
   assert.ok(fitted.regularizationL1 >= 0);
   assert.equal(fitted.scale.nStates, 3);
 });
 
 test('the workout builder is consumed by each call and validates collateral', () => {
-  const builder = credit.WorkoutLgd.builder();
+  const builder = credit.lgd.WorkoutLgd.builder();
   const next = builder.workoutYears(2);
   assert.throws(() => builder.discountRate(0.05), /null pointer|moved|freed|destroyed/i);
   const workout = next
@@ -150,7 +154,7 @@ test('the workout builder is consumed by each call and validates collateral', ()
   assert.ok(workout.costs.totalRate >= 0);
   assert.throws(
     () =>
-      credit.WorkoutLgd.builder().collateral({
+      credit.lgd.WorkoutLgd.builder().collateral({
         collateral_type: 'cash',
         book_value: 10,
         haircut: 1.5,
@@ -159,70 +163,80 @@ test('the workout builder is consumed by each call and validates collateral', ()
   );
   assert.throws(
     () =>
-      credit.WorkoutLgd.builder().collateral({
+      credit.lgd.WorkoutLgd.builder().collateral({
         collateral_type: 'gold',
         book_value: 10,
         haircut: 0,
       }),
     kind('validation')
   );
-  assert.throws(() => credit.WorkoutLgd.builder().collateralPieces('not json'), kind('validation'));
+  assert.throws(
+    () => credit.lgd.WorkoutLgd.builder().collateralPieces('not json'),
+    kind('validation')
+  );
   assert.throws(() => workout.evaluate(-1), kind('validation'));
 });
 
 test('LGD, EAD and PD handles expose their accessors and reject bad input', () => {
-  const beta = new credit.BetaRecovery(0.4, 0.2);
+  const beta = new credit.lgd.BetaRecovery(0.4, 0.2);
   assert.equal(beta.mean, 0.4);
   assert.equal(beta.stdDev, 0.2);
   assert.ok(beta.mode === undefined || typeof beta.mode === 'number');
-  assert.throws(() => new credit.BetaRecovery(0.4, 2), kind('validation'));
+  assert.throws(() => new credit.lgd.BetaRecovery(0.4, 2), kind('validation'));
   assert.throws(() => beta.quantile(2), kind('validation'));
   assert.throws(() => beta.sampleSeeded(1.5, 7), invalidType);
-  assert.throws(() => credit.seniorityRecoveryStats('nope'), kind('validation'));
-  assert.throws(() => credit.seniorityRecoveryStats('senior_secured', 'nope'), kind('validation'));
-
-  const costs = new credit.WorkoutCosts(0.05, 0.03);
-  assert.equal(costs.directCostRate, 0.05);
-  assert.equal(costs.indirectCostRate, 0.03);
-  assert.ok(Math.abs(costs.totalRate - 0.08) < 1e-15);
-  assert.equal(credit.WorkoutCosts.zero().totalRate, 0);
-  assert.throws(() => new credit.WorkoutCosts(-1, 0), kind('validation'));
-
-  const downturn = credit.DownturnLgd.regulatoryFloor(0.08, 0.1);
-  assert.equal(downturn.method, 'regulatory_floor');
-  assert.deepEqual(downturn.params, { regulatory_floor: { add_on: 0.08, floor: 0.1 } });
-  assert.equal(credit.DownturnLgd.stressed(0.15, 0.3, 0.999).method, 'stressed_approximation');
-  assert.throws(() => credit.DownturnLgd.fromRegistryId('nope'), kind('not_found'));
+  assert.throws(() => credit.lgd.seniorityRecoveryStats('nope'), kind('validation'));
   assert.throws(
-    () => credit.DownturnLgd.fromJson({ method: { regulatory_floor: { add_on: -1, floor: 0.1 } } }),
+    () => credit.lgd.seniorityRecoveryStats('senior_secured', 'nope'),
     kind('validation')
   );
 
-  assert.equal(new credit.EadCalculator(600, 0, 0.75).leqFromObservedEad(600), undefined);
-  assert.throws(() => new credit.EadCalculator(600, 400, 1.5), kind('validation'));
-  assert.throws(() => new credit.EadCalculator(-1, 0, 0.5), kind('validation'));
+  const costs = new credit.lgd.WorkoutCosts(0.05, 0.03);
+  assert.equal(costs.directCostRate, 0.05);
+  assert.equal(costs.indirectCostRate, 0.03);
+  assert.ok(Math.abs(costs.totalRate - 0.08) < 1e-15);
+  assert.equal(credit.lgd.WorkoutCosts.zero().totalRate, 0);
+  assert.throws(() => new credit.lgd.WorkoutCosts(-1, 0), kind('validation'));
 
-  const scaleHandle = credit.MasterScale.moodysAssumptions();
+  const downturn = credit.lgd.DownturnLgd.regulatoryFloor(0.08, 0.1);
+  assert.equal(downturn.method, 'regulatory_floor');
+  assert.deepEqual(downturn.params, { regulatory_floor: { add_on: 0.08, floor: 0.1 } });
+  assert.equal(credit.lgd.DownturnLgd.stressed(0.15, 0.3, 0.999).method, 'stressed_approximation');
+  assert.throws(() => credit.lgd.DownturnLgd.fromRegistryId('nope'), kind('not_found'));
+  assert.throws(
+    () =>
+      credit.lgd.DownturnLgd.fromJson({ method: { regulatory_floor: { add_on: -1, floor: 0.1 } } }),
+    kind('validation')
+  );
+
+  assert.equal(new credit.lgd.EadCalculator(600, 0, 0.75).leqFromObservedEad(600), undefined);
+  assert.throws(() => new credit.lgd.EadCalculator(600, 400, 1.5), kind('validation'));
+  assert.throws(() => new credit.lgd.EadCalculator(-1, 0, 0.5), kind('validation'));
+
+  const scaleHandle = credit.pd.MasterScale.moodysAssumptions();
   assert.equal(scaleHandle.grades.length, scaleHandle.nGrades);
   assert.equal(typeof scaleHandle.grades[0].label, 'string');
   assert.throws(() => scaleHandle.mapPd(5), kind('validation'));
   assert.throws(() => scaleHandle.mapPds([0.01, -1]), kind('validation'));
-  assert.throws(() => new credit.MasterScale([]), kind('validation'));
-  assert.throws(() => credit.MasterScale.fromRegistryId('nope'), kind('not_found'));
+  assert.throws(() => new credit.pd.MasterScale([]), kind('validation'));
+  assert.throws(() => credit.pd.MasterScale.fromRegistryId('nope'), kind('not_found'));
   // Altman scores carry no implied PD, so they cannot be mapped to a grade.
   assert.throws(
-    () => scaleHandle.mapScore(credit.altmanZScore(0.1, 0.2, 0.15, 1.5, 1.1)),
+    () => scaleHandle.mapScore(credit.scoring.altmanZScore(0.1, 0.2, 0.15, 1.5, 1.1)),
     kind('validation')
   );
-  assert.throws(() => credit.pitToTtc(1.5, 0.15, 0), kind('validation'));
-  assert.throws(() => credit.centralTendency([]), kind('validation'));
-  assert.throws(() => credit.altmanZScore(NaN, 0.2, 0.15, 1.5, 1.1), kind('validation'));
+  assert.throws(() => credit.pd.pitToTtc(1.5, 0.15, 0), kind('validation'));
+  assert.throws(() => credit.pd.centralTendency([]), kind('validation'));
+  assert.throws(() => credit.scoring.altmanZScore(NaN, 0.2, 0.15, 1.5, 1.1), kind('validation'));
   assert.throws(
-    () => credit.ohlsonOScore(5, 0.6, 0.1, 0.8, 0.5, 0.05, 0.2, 0, 0.1),
+    () => credit.scoring.ohlsonOScore(5, 0.6, 0.1, 0.8, 0.5, 0.05, 0.2, 0, 0.1),
     kind('validation')
   );
-  assert.throws(() => credit.allocateRecovery(-1, []), kind('validation'));
-  assert.throws(() => credit.allocateRecovery(100, [{ id: 'x' }]), kind('validation'));
+  assert.throws(() => credit.recoveryWaterfall.allocateRecovery(-1, []), kind('validation'));
+  assert.throws(
+    () => credit.recoveryWaterfall.allocateRecovery(100, [{ id: 'x' }]),
+    kind('validation')
+  );
 });
 
 // Twins of the Python properties `RecoveryClaim.total_claim` and
@@ -238,18 +252,21 @@ test('recovery-claim and collateral-piece derived values are computed in Rust', 
     collateral_value: null,
     collateral_haircut: 0,
   };
-  assert.equal(credit.recoveryClaimTotalClaim(claim), 106);
-  assert.equal(credit.recoveryClaimTotalClaim(JSON.stringify(claim)), 106);
-  assert.throws(() => credit.recoveryClaimTotalClaim({ id: 'x' }), kind('validation'));
-  assert.throws(() => credit.recoveryClaimTotalClaim(1), invalidType);
-
-  const piece = { collateral_type: 'real_estate', book_value: 800_000, haircut: 0.25 };
-  assert.equal(credit.collateralPieceLiquidationValue(piece), 600_000);
+  assert.equal(credit.recoveryWaterfall.recoveryClaimTotalClaim(claim), 106);
+  assert.equal(credit.recoveryWaterfall.recoveryClaimTotalClaim(JSON.stringify(claim)), 106);
   assert.throws(
-    () => credit.collateralPieceLiquidationValue({ ...piece, haircut: 1.5 }),
+    () => credit.recoveryWaterfall.recoveryClaimTotalClaim({ id: 'x' }),
     kind('validation')
   );
-  assert.throws(() => credit.collateralPieceLiquidationValue(null), invalidType);
+  assert.throws(() => credit.recoveryWaterfall.recoveryClaimTotalClaim(1), invalidType);
+
+  const piece = { collateral_type: 'real_estate', book_value: 800_000, haircut: 0.25 };
+  assert.equal(credit.lgd.collateralPieceLiquidationValue(piece), 600_000);
+  assert.throws(
+    () => credit.lgd.collateralPieceLiquidationValue({ ...piece, haircut: 1.5 }),
+    kind('validation')
+  );
+  assert.throws(() => credit.lgd.collateralPieceLiquidationValue(null), invalidType);
 });
 
 test('correlation handles expose their accessors and reject bad input', () => {
@@ -330,6 +347,15 @@ test('factor handles and helpers follow the Rust accessors', () => {
   const forecast = new factorCredit.FactorCovarianceForecast(model);
   const covariance = forecast.covarianceAt(factorCredit.VolHorizon.oneStep().toString());
   assert.deepEqual(covariance.factor_ids, model.factorIds());
+  // A horizon handle is read through its public `toString()` and stays
+  // usable; the descriptor's JSON object form is accepted as well.
+  const twoSteps = factorCredit.VolHorizon.nSteps(2);
+  const viaHandle = forecast.covarianceAt(twoSteps);
+  assert.deepEqual(forecast.covarianceAt(twoSteps), viaHandle);
+  assert.equal(twoSteps.n, 2);
+  assert.deepEqual(forecast.covarianceAt('{"n_steps": 2}'), viaHandle);
+  assert.deepEqual(forecast.covarianceAt({ n_steps: 2 }), viaHandle);
+  assert.throws(() => forecast.covarianceAt({ n_steps: 'two' }), kind('validation'));
   // A unit `RiskMeasure` variant is its bare wire label; the quoted JSON text
   // of the same label is equivalent.
   const oneStep = factorCredit.VolHorizon.oneStep().toString();
@@ -390,16 +416,19 @@ test('Monte Carlo pricers take their defaults from the Rust registry', () => {
   assert.equal(explicit.numPaths, 500);
   assert.equal(explicit.seed, 7n);
   // The default currency and step count come from the registry too.
-  const call = explicit.priceCall(100, 100, 0.05, 0, 0.2, 1);
+  const call = explicit.priceGbm(100, 100, 0.05, 0, 0.2, 1, true);
   assert.equal(typeof call.mean.currency, 'string');
   assert.equal(call.num_paths, 500);
   assert.equal(
-    explicit.priceCall(100, 100, 0.05, 0, 0.2, 1, undefined, 'EUR').mean.currency,
+    explicit.priceGbm(100, 100, 0.05, 0, 0.2, 1, true, undefined, 'EUR').mean.currency,
     'EUR'
   );
   assert.throws(() => new monteCarlo.EuropeanPricer(0), kind('validation'));
   assert.throws(() => new monteCarlo.EuropeanPricer('100'), invalidType);
-  assert.throws(() => explicit.priceCall(100, 100, 0.05, 0, 0.2, 1, 4, 'ZZZZ'), kind('validation'));
+  assert.throws(
+    () => explicit.priceGbm(100, 100, 0.05, 0, 0.2, 1, true, 4, 'ZZZZ'),
+    kind('validation')
+  );
 
   const asian = new monteCarlo.PathDependentPricer(500, 7, false, true);
   assert.equal(asian.antithetic, true);
@@ -561,21 +590,24 @@ test('volatility helpers take a VolSurface in its canonical wire form', () => {
     ],
     [0.03, 0.035]
   );
+  // Materialized surfaces are `core.VolSurface` handles, the type the
+  // surface evaluators take.
   const surface = volatility.materializeCubeTenorSlice(cube, 5, [0.02, 0.03, 0.04]);
-  assert.deepEqual(surface.expiries, [1, 2]);
-  assert.deepEqual(surface.strikes, [0.02, 0.03, 0.04]);
-  assert.equal(surface.vols_row_major.length, 6);
+  assert.ok(surface instanceof core.VolSurface);
+  assert.deepEqual(Array.from(surface.expiries), [1, 2]);
+  assert.deepEqual(Array.from(surface.strikes), [0.02, 0.03, 0.04]);
+  assert.equal(surface.vols.length, 6);
   assert.equal(
     volatility.getSurfaceVol(surface, 1, 0.03),
-    volatility.getSurfaceVol(JSON.stringify(surface), 1, 0.03)
+    volatility.getSurfaceVol(core.VolSurface.fromJson(surface.toJson()), 1, 0.03)
   );
-  assert.equal(volatility.getSurfaceVol(surface, 1, 0.03), surface.vols_row_major[1]);
+  assert.equal(volatility.getSurfaceVol(surface, 1, 0.03), surface.vols[1]);
   assert.throws(() => volatility.getSurfaceVol(surface, 9, 0.03), kind('validation'));
   assert.equal(
     volatility.getSurfaceVolClamped(surface, 9, 0.03),
     volatility.getSurfaceVol(surface, 2, 0.03)
   );
-  assert.throws(() => volatility.getSurfaceVol({ id: 'x' }, 1, 0.03), kind('validation'));
+  assert.throws(() => volatility.getSurfaceVol({ id: 'x' }, 1, 0.03));
   assert.throws(
     () => volatility.materializeCubeTenorSlice(cube, 5, [0.04, 0.03]),
     kind('validation')
@@ -609,12 +641,12 @@ test('volatility helpers take a VolSurface in its canonical wire form', () => {
 
 test('LGD replay and uncorrelated factors use checked Rust construction', () => {
   assert.throws(() =>
-    credit.WorkoutCosts.fromJson({ direct_cost_rate: -1, indirect_cost_rate: 0 })
+    credit.lgd.WorkoutCosts.fromJson({ direct_cost_rate: -1, indirect_cost_rate: 0 })
   );
-  const model = credit.WorkoutLgd.builder().build();
+  const model = credit.lgd.WorkoutLgd.builder().build();
   const wire = JSON.parse(model.toJson());
   wire.costs.direct_cost_rate = -1;
-  assert.throws(() => credit.WorkoutLgd.fromJson(wire));
+  assert.throws(() => credit.lgd.WorkoutLgd.fromJson(wire));
   for (const vols of [[0.2], [0.2, -0.1], [0.2, NaN]]) {
     assert.throws(() => correlation.LatentMultiFactor.uncorrelated(2, vols));
   }
@@ -622,7 +654,7 @@ test('LGD replay and uncorrelated factors use checked Rust construction', () => 
 
 test('local volatility is a plain object with free-function twins', () => {
   const smile = [0.24, 0.22, 0.2, 0.19, 0.185];
-  const implied = (rows) => ({
+  const impliedWire = (rows) => ({
     id: 'IMPLIED',
     expiries: [0.25, 0.5, 1.0, 2.0],
     strikes: [80, 90, 100, 110, 120],
@@ -631,6 +663,7 @@ test('local volatility is a plain object with free-function twins', () => {
     interpolation_mode: 'vol',
     quote_type: 'black_lognormal',
   });
+  const implied = (rows) => core.VolSurface.fromJson(impliedWire(rows));
   const forwards = [100.5, 101.0, 102.0, 104.0];
 
   // A flat implied volatility is its own local volatility, under any forwards.
@@ -649,7 +682,10 @@ test('local volatility is a plain object with free-function twins', () => {
   const value = (surface, strike) => volatility.localVolValue(surface, 1.0, strike);
   assert.ok(value(local, 90) - value(local, 110) > 0.22 - 0.19);
   assert.equal(value(local, 100), local.local_vols[2 * 5 + 2]);
-  assert.deepEqual(volatility.localVolFromImpliedVol(JSON.stringify(skew), forwards), local);
+  assert.deepEqual(
+    volatility.localVolFromImpliedVol(core.VolSurface.fromJson(skew.toJson()), forwards),
+    local
+  );
   assert.equal(volatility.localVolValue(JSON.stringify(local), 1.0, 100), value(local, 100));
   const smoothed = volatility.localVolFromImpliedVolSmoothed(skew, forwards, 10.0);
   assert.ok(value(smoothed, 80) - value(smoothed, 120) < value(local, 80) - value(local, 120));
@@ -673,23 +709,25 @@ test('local volatility is a plain object with free-function twins', () => {
     () => volatility.localVolFromImpliedVolSmoothed(skew, forwards, -1),
     message(/sigma_strikes/)
   );
-  const calendar = {
-    ...implied([Array(5).fill(0.25), Array(5).fill(0.25), Array(5).fill(0.15)]),
+  const calendar = core.VolSurface.fromJson({
+    ...impliedWire([Array(5).fill(0.25), Array(5).fill(0.25), Array(5).fill(0.15)]),
     expiries: [0.5, 1.0, 2.0],
-  };
+  });
   assert.throws(
     () => volatility.localVolFromImpliedVol(calendar, [100, 100, 100]),
     message(/calendar arbitrage/)
   );
+  const normalWire = { ...impliedWire(Array(4).fill(smile)), quote_type: 'normal' };
   assert.throws(
-    () => volatility.localVolFromImpliedVol({ ...skew, quote_type: 'normal' }, forwards),
+    () => volatility.localVolFromImpliedVol(core.VolSurface.fromJson(normalWire), forwards),
     kind('validation')
   );
-  assert.throws(
-    () => volatility.localVolFromImpliedVol({ ...skew, extra: 1 }, forwards),
-    kind('validation')
+  // The surface argument is a `core.VolSurface` handle; wire objects are
+  // loaded with `core.VolSurface.fromJson` first.
+  assert.throws(() =>
+    volatility.localVolFromImpliedVol(impliedWire(Array(4).fill(smile)), forwards)
   );
-  assert.throws(() => volatility.localVolFromImpliedVol(42, forwards), invalidType);
+  assert.throws(() => volatility.localVolFromImpliedVol(42, forwards));
   assert.throws(() => volatility.localVolFromImpliedVol(skew, 'forwards'), invalidType);
   assert.throws(() => volatility.localVolFromImpliedVolSmoothed(skew, forwards, '5'), invalidType);
   assert.throws(() => volatility.localVolValue(grid, '1', 100), invalidType);

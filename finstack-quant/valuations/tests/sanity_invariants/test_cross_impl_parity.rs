@@ -274,7 +274,7 @@ mod gbm_barrier {
 ///
 /// # The code paths being cross-checked
 ///
-/// [`SabrModel::implied_volatility`] has three structurally distinct branches
+/// [`SabrModel::implied_vol`] has three structurally distinct branches
 /// selected by the CEV exponent β:
 ///
 /// * **β = 0** — the *normal* (Bachelier) branch: `f_mid^(1-β)` is forced to
@@ -319,7 +319,7 @@ mod sabr_beta {
 
         for &forward in &[0.02_f64, 1.0, 100.0, 4_000.0] {
             let vol = params
-                .implied_volatility(forward, forward, 1.0)
+                .implied_vol(forward, forward, 1.0)
                 .expect("β=1 ATM vol should compute");
             assert!(
                 (vol - alpha).abs() < 1e-10,
@@ -333,7 +333,7 @@ mod sabr_beta {
     /// **The off-ATM branch limits to the ATM branch across all three β
     /// branches.**
     ///
-    /// `SabrParameters::implied_volatility` contains *two* internal code paths: an
+    /// `SabrParameters::implied_vol` contains *two* internal code paths: an
     /// ATM short-circuit (taken when forward and strike are within a relative
     /// `1e-8`) and the full off-ATM `z/χ(z)` expansion. Pricing exactly ATM
     /// (`K = F`) takes the short-circuit; pricing a hair away (`K = F·(1±ε)`
@@ -358,14 +358,14 @@ mod sabr_beta {
 
             // Exactly ATM: routed through the ATM short-circuit path.
             let atm = params
-                .implied_volatility(forward, forward, expiry)
+                .implied_vol(forward, forward, expiry)
                 .expect("ATM vol should compute");
             // Strikes a hair away from the forward, from both sides: each is
             // routed through the off-ATM z/χ(z) branch, but close enough that
             // it must collapse to the ATM value.
             for &eps in &[1e-6_f64, -1e-6_f64] {
                 let near_atm = params
-                    .implied_volatility(forward, forward * (1.0 + eps), expiry)
+                    .implied_vol(forward, forward * (1.0 + eps), expiry)
                     .expect("near-ATM vol should compute");
                 let rel = (near_atm - atm).abs() / atm;
                 assert!(
@@ -404,7 +404,7 @@ mod sabr_beta {
             let params =
                 SabrParameters::new(alpha, beta, nu, rho).expect("SABR params should be valid");
             params
-                .implied_volatility(forward, strike, expiry)
+                .implied_vol(forward, strike, expiry)
                 .expect("vol should compute")
         };
 
@@ -452,7 +452,7 @@ mod sabr_beta {
 
         for &forward in &[50.0_f64, 100.0, 250.0] {
             let vol = params
-                .implied_volatility(forward, forward, 2.0)
+                .implied_vol(forward, forward, 2.0)
                 .expect("β=0 ATM vol should compute");
             assert!(
                 (vol - alpha).abs() < 1e-10,

@@ -9,27 +9,12 @@
 
 use crate::bindings::macros::wire_methods;
 use finstack_quant_core::wire::serde_label;
-use finstack_quant_models::volatility::arbitrage::{
-    self as model_arbitrage, ArbitrageReport, ArbitrageViolation,
-};
+use finstack_quant_models::volatility::arbitrage::{self as model_arbitrage, ArbitrageReport};
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe, serde_to_py};
 use crate::errors::core_to_py;
-
-/// Convert a slice of violations into a Python list of serde dicts.
-///
-/// Each entry is the wire form of the Rust ``ArbitrageViolation``:
-/// ``violation_type``, ``severity``, ``location`` (``strike``, ``expiry``,
-/// ``adjacent_expiry``), ``magnitude``, ``description``,
-/// ``suggested_fix``.
-fn violations_to_pylist<'py>(
-    py: Python<'py>,
-    violations: &[ArbitrageViolation],
-) -> PyResult<Bound<'py, PyAny>> {
-    serde_to_py(py, &violations)
-}
 
 /// Flatten one violation into a long-format row for ``to_dataframe``.
 #[derive(serde::Serialize)]
@@ -94,7 +79,7 @@ impl PyArbitrageReport {
     /// ``severity``, ``magnitude``, ``description``, ``suggested_fix``).
     #[getter]
     fn violations<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        violations_to_pylist(py, &self.inner.violations)
+        serde_to_py(py, &self.inner.violations)
     }
 
     /// Violation counts keyed by severity name; only severities that occur.
@@ -191,7 +176,7 @@ fn check_butterfly_grid<'py>(
         tolerance,
     )
     .map_err(core_to_py)?;
-    violations_to_pylist(py, &violations)
+    serde_to_py(py, &violations)
 }
 
 /// Check calendar spread arbitrage (total variance monotonicity in log-moneyness).
@@ -237,7 +222,7 @@ fn check_calendar_spread_grid<'py>(
         tolerance,
     )
     .map_err(core_to_py)?;
-    violations_to_pylist(py, &violations)
+    serde_to_py(py, &violations)
 }
 
 /// Check Dupire local-vol density positivity.
@@ -281,7 +266,7 @@ fn check_local_vol_density_grid<'py>(
     let violations =
         model_arbitrage::check_local_vol_density_grid(&strikes, &expiries, &vols, forward_prices)
             .map_err(core_to_py)?;
-    violations_to_pylist(py, &violations)
+    serde_to_py(py, &violations)
 }
 
 /// Run butterfly, calendar-spread, and local-vol density checks together.

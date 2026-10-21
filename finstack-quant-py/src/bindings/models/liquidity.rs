@@ -13,21 +13,13 @@ use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, labeled_values_to_series, serde_object_to_single_row_dataframe_with_schema,
 };
-use crate::errors::{core_to_py, value_error};
+use crate::errors::core_to_py;
 use finstack_quant_models::liquidity::{
     self, AlmgrenChrissModel, ExecutionTrajectory, ImpactEstimate, KyleLambdaModel,
     LiquidityProfile, LvarBangiaScalar, SpreadVolatilityKind, TradeParams,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
-
-fn parse_spread_volatility_kind(kind: &str) -> PyResult<SpreadVolatilityKind> {
-    serde_json::from_value(serde_json::Value::String(kind.to_string())).map_err(|_| {
-        value_error(format!(
-            "unknown spread_volatility_kind {kind:?}; expected \"relative\" or \"absolute\""
-        ))
-    })
-}
 
 /// Market microstructure snapshot for one instrument.
 ///
@@ -126,7 +118,10 @@ impl PyLiquidityProfile {
         )
         .map_err(core_to_py)?;
         if let Some(kind) = spread_volatility_kind {
-            inner = inner.with_spread_volatility_kind(parse_spread_volatility_kind(kind)?);
+            inner = inner.with_spread_volatility_kind(
+                finstack_quant_core::wire::serde_parse::<SpreadVolatilityKind>(kind)
+                    .map_err(core_to_py)?,
+            );
         }
         if let Some(days) = observation_days {
             inner = inner.with_observation_days(days).map_err(core_to_py)?;

@@ -89,9 +89,10 @@
 //!
 //! ```
 //! use finstack_quant_core::currency::Currency;
-//! use finstack_quant_models::monte_carlo::discretization::ExactGbm;
+//! use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
 //! use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
-//! use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+//! use finstack_quant_models::monte_carlo::payoff::vanilla::European;
+//! use finstack_quant_models::types::OptionType;
 //! use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 //! use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 //!
@@ -108,7 +109,7 @@
 //!     0.20,  // sigma = 20% volatility
 //! ).unwrap();
 //! let disc = ExactGbm::new();
-//! let payoff = EuropeanCall::new(100.0, 1.0, 252);
+//! let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 //! let result = engine
 //!     .price(
 //!         &rng,
@@ -126,7 +127,7 @@
 
 use super::super::paths::ProcessParams;
 use super::super::traits::{PathState, ProportionalDiffusion, StateKey, StochasticProcess};
-use super::metadata::ProcessMetadata;
+use crate::monte_carlo::traits::ProcessMetadata;
 use finstack_quant_core::math::linalg::validate_correlation_matrix;
 use std::sync::Arc;
 
@@ -186,7 +187,7 @@ impl GbmParams {
 /// constant-drift GBM is the special case `M(t) = (r − q)·t`.
 ///
 /// Attaching a schedule to a [`GbmProcess`] lets
-/// [`ExactGbm`](crate::monte_carlo::discretization::ExactGbm) price path-dependent
+/// [`ExactGbm`](crate::monte_carlo::discretization::exact::ExactGbm) price path-dependent
 /// payoffs (Asian, lookback) on a non-flat rate curve without the per-fixing
 /// forward bias a single maturity-averaged drift introduces.
 #[derive(Debug, Clone)]
@@ -307,7 +308,7 @@ impl GbmProcess {
 
     /// Attach a deterministic time-varying drift schedule.
     ///
-    /// When present, [`ExactGbm`](crate::monte_carlo::discretization::ExactGbm) uses
+    /// When present, [`ExactGbm`](crate::monte_carlo::discretization::exact::ExactGbm) uses
     /// the schedule's per-step log-drift increment instead of the constant
     /// `(r − q)·Δt`, removing the per-fixing forward bias on a non-flat rate
     /// curve. The instantaneous [`StochasticProcess::drift`] (used by generic

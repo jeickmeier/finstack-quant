@@ -80,13 +80,14 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
         () => models.mertonJumpCosPrice(100, 100, 0.05, 0, 0.2, -0.1, 0.1, 0.1, 1, true, count),
         invalidCount('nTerms')
       );
-      for (const price of [models.monteCarlo.priceHestonCall, models.monteCarlo.priceHestonPut]) {
+      for (const isCall of [true, false]) {
+        const price = models.monteCarlo.priceHeston;
         assert.throws(
-          () => price(100, 100, 0.05, 0, 2, 0.04, 0.3, -0.7, 0.04, 1, count, 42n, 1),
+          () => price(100, 100, 0.05, 0, 2, 0.04, 0.3, -0.7, 0.04, 1, isCall, count, 42n, 1),
           invalidCount('numPaths')
         );
         assert.throws(
-          () => price(100, 100, 0.05, 0, 2, 0.04, 0.3, -0.7, 0.04, 1, 2, 42n, count),
+          () => price(100, 100, 0.05, 0, 2, 0.04, 0.3, -0.7, 0.04, 1, isCall, 2, 42n, count),
           invalidCount('numSteps')
         );
       }
@@ -98,7 +99,7 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
       );
       assert.throws(() => calibrator.withMaxIterations(count), invalidCount('maxIterations'));
     }
-    const estimate = models.monteCarlo.priceHestonCall(
+    const estimate = models.monteCarlo.priceHeston(
       100,
       100,
       0.05,
@@ -109,6 +110,7 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
       -0.7,
       0.04,
       1,
+      true,
       2,
       42n,
       1
