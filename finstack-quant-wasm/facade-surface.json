@@ -3768,33 +3768,10 @@
       "listBuiltinTemplateMetadata",
       "listBuiltinTemplates",
       "listTemplateComponents",
-      "operationSpecAssetCorrelationPts",
-      "operationSpecBaseCorrBucketPts",
-      "operationSpecBaseCorrParallelPts",
-      "operationSpecCurveNodeBp",
-      "operationSpecCurveParallelBp",
-      "operationSpecEquityPricePct",
-      "operationSpecHierarchyBaseCorrParallelPts",
-      "operationSpecHierarchyCurveParallelBp",
-      "operationSpecHierarchyEquityPricePct",
-      "operationSpecHierarchyVolSurfaceParallelPct",
-      "operationSpecInstrumentPricePctByAttr",
-      "operationSpecInstrumentPricePctByType",
-      "operationSpecInstrumentSpreadBpByAttr",
-      "operationSpecInstrumentSpreadBpByType",
-      "operationSpecMarketFxPct",
       "operationSpecMutatesInstruments",
-      "operationSpecPrepayDefaultCorrelationPts",
-      "operationSpecRateBinding",
       "operationSpecRequiresInstruments",
-      "operationSpecStmtForecastAssign",
-      "operationSpecStmtForecastPercent",
       "operationSpecTimeRollForward",
       "operationSpecValidate",
-      "operationSpecVolIndexNodePts",
-      "operationSpecVolIndexParallelPts",
-      "operationSpecVolSurfaceBucketPct",
-      "operationSpecVolSurfaceParallelPct",
       "parallelBpMany",
       "parseScenarioSpec",
       "rateBindingSpecValidate",
@@ -3834,76 +3811,7 @@
   "scenarios.computeHorizonReturn": {
     "kind": "function"
   },
-  "scenarios.operationSpecMarketFxPct": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecEquityPricePct": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecInstrumentPricePctByAttr": {
-    "kind": "function"
-  },
   "scenarios.parallelBpMany": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecCurveParallelBp": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecCurveNodeBp": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecVolIndexParallelPts": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecVolIndexNodePts": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecBaseCorrParallelPts": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecBaseCorrBucketPts": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecVolSurfaceParallelPct": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecVolSurfaceBucketPct": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecStmtForecastPercent": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecStmtForecastAssign": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecRateBinding": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecInstrumentSpreadBpByAttr": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecInstrumentPricePctByType": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecInstrumentSpreadBpByType": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecAssetCorrelationPts": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecPrepayDefaultCorrelationPts": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecHierarchyCurveParallelBp": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecHierarchyVolSurfaceParallelPct": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecHierarchyEquityPricePct": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecHierarchyBaseCorrParallelPts": {
     "kind": "function"
   },
   "scenarios.operationSpecTimeRollForward": {

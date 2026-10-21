@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::ScenarioSpec;
 
 /// Persistence contract for [`ScenarioEnvelope`].
-pub const SCENARIO_CONTRACT: ContractDescriptor =
+pub(crate) const SCENARIO_CONTRACT: ContractDescriptor =
     ContractDescriptor::new("finstack_quant.scenario");
 
 /// Exact schema marker accepted by [`ScenarioEnvelope`].
