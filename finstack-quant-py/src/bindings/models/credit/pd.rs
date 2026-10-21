@@ -15,7 +15,7 @@ use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
     ColumnSchema,
 };
-use crate::errors::{core_to_py, pd_calibration_to_py};
+use crate::errors::{core_to_py, kinded_to_py};
 
 /// Column schema shared by `MasterScaleResult.to_dataframe` and
 /// `MasterScale.map_pds`.
@@ -52,7 +52,7 @@ fn pit_to_ttc(pd_pit: f64, asset_correlation: f64, cycle_index: f64) -> PyResult
         asset_correlation,
         cycle_index,
     };
-    core_pit_to_ttc(pd_pit, &params).map_err(pd_calibration_to_py)
+    core_pit_to_ttc(pd_pit, &params).map_err(kinded_to_py)
 }
 
 /// Convert a Through-the-Cycle PD to a Point-in-Time PD.
@@ -81,7 +81,7 @@ fn ttc_to_pit(pd_ttc: f64, asset_correlation: f64, cycle_index: f64) -> PyResult
         asset_correlation,
         cycle_index,
     };
-    core_ttc_to_pit(pd_ttc, &params).map_err(pd_calibration_to_py)
+    core_ttc_to_pit(pd_ttc, &params).map_err(kinded_to_py)
 }
 
 /// Calibrate a central tendency (long-run average PD) from annual default rates
@@ -102,7 +102,7 @@ fn ttc_to_pit(pd_ttc: f64, asset_correlation: f64, cycle_index: f64) -> PyResult
 #[pyfunction]
 #[pyo3(text_signature = "(annual_default_rates)")]
 fn central_tendency(annual_default_rates: Vec<f64>) -> PyResult<f64> {
-    core_central_tendency(&annual_default_rates).map_err(pd_calibration_to_py)
+    core_central_tendency(&annual_default_rates).map_err(kinded_to_py)
 }
 
 /// Apply the Basel IRB corporate PD floor: ``max(pd, BASEL_IRB_PD_FLOOR)``.
@@ -278,7 +278,7 @@ impl PyMasterScale {
         let grades = grades.into_iter().map(|g| g.inner).collect();
         MasterScale::new(grades)
             .map(|inner| Self { inner })
-            .map_err(pd_calibration_to_py)
+            .map_err(kinded_to_py)
     }
 
     /// Library PD-band assumptions using S&P-style labels.
@@ -337,7 +337,7 @@ impl PyMasterScale {
     /// Raises ``ValueError`` when ``pd`` is non-finite or outside [0, 1].
     #[pyo3(text_signature = "($self, pd)")]
     fn map_pd(&self, pd: f64) -> PyResult<PyMasterScaleResult> {
-        let result = self.inner.map_pd(pd).map_err(pd_calibration_to_py)?;
+        let result = self.inner.map_pd(pd).map_err(kinded_to_py)?;
         Ok(PyMasterScaleResult { inner: result })
     }
 
@@ -355,7 +355,7 @@ impl PyMasterScale {
     /// Raises ``ValueError`` when any PD is non-finite or outside [0, 1].
     #[pyo3(text_signature = "($self, pds)")]
     fn map_pds<'py>(&self, py: Python<'py>, pds: Vec<f64>) -> PyResult<Bound<'py, PyAny>> {
-        let rows = self.inner.map_pds(&pds).map_err(pd_calibration_to_py)?;
+        let rows = self.inner.map_pds(&pds).map_err(kinded_to_py)?;
         serde_rows_to_dataframe_with_schema(py, &rows, RESULT_COLUMNS)
     }
 
@@ -374,7 +374,7 @@ impl PyMasterScale {
         self.inner
             .map_score(&result.inner)
             .map(|inner| PyMasterScaleResult { inner })
-            .map_err(pd_calibration_to_py)
+            .map_err(kinded_to_py)
     }
 
     /// Number of grades in the scale.

@@ -435,6 +435,8 @@ pub struct JsDownturnLgd {
     pub(crate) inner: DownturnLgd,
 }
 
+json_round_trip!(JsDownturnLgd, DownturnLgd, validate);
+
 #[wasm_bindgen(js_class = DownturnLgd)]
 impl JsDownturnLgd {
     /// Stressed-factor downturn adjustment.
@@ -540,32 +542,6 @@ impl JsDownturnLgd {
     #[wasm_bindgen(getter)]
     pub fn params(&self) -> Result<JsValue, JsValue> {
         to_js_value(self.inner.method())
-    }
-
-    /// Load a downturn adjustment from canonical JSON and validate its parameters.
-    /// @param json - `DownturnLgd` JSON text or plain object; unknown fields are rejected.
-    /// @returns The validated handle.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `validation` error if the payload is malformed or its
-    /// parameters are out of range.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsDownturnLgd, JsValue> {
-        let inner: DownturnLgd = from_js_json(&json, "json")?;
-        inner.validate().map_err(to_js_err)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
-    /// @returns Compact canonical JSON text.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `validation` error if serialization fails.
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
     }
 }
 

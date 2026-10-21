@@ -773,7 +773,7 @@ mod tests {
         let factors = fitted.factors().unwrap();
         assert_eq!(factors.dates.as_deref(), panel.dates.as_deref());
         assert_eq!(factors.num_dates(), 12);
-        assert_eq!(factors.residual_rows().len(), 12);
+        assert_eq!(factors.residuals.nrows(), 12);
     }
 
     #[test]

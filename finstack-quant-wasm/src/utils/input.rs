@@ -444,6 +444,27 @@ pub fn from_js_json<T: DeserializeOwned>(value: &JsValue, label: &str) -> Result
     })
 }
 
+/// An optional structured argument: `undefined`/`null`/absent → `None`,
+/// otherwise as [`from_js_json`].
+///
+/// # Arguments
+///
+/// * `value` - The optional JavaScript argument.
+/// * `label` - The camelCase argument name, used in the error message.
+///
+/// # Errors
+///
+/// As [`from_js_json`], for a present value.
+pub fn opt_from_js_json<T: DeserializeOwned>(
+    value: Option<&JsValue>,
+    label: &str,
+) -> Result<Option<T>, JsValue> {
+    match value {
+        Some(v) if !(v.is_null() || v.is_undefined()) => from_js_json(v, label).map(Some),
+        _ => Ok(None),
+    }
+}
+
 /// A sequence of numbers: an array of `number`s or a numeric typed array.
 ///
 /// A plain array's items are type-checked, not `ToNumber`-coerced. A

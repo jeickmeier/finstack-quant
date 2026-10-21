@@ -16,7 +16,7 @@
 //! - JSON string `'{"n_steps": N, "periods_per_year": P}'` — the same as
 //!   `'{"years": N / P}'`.
 
-use crate::utils::input::{from_js_json, js_f64, js_string, js_uint, json_text, opt_json_text};
+use crate::utils::input::{from_js_json, js_f64, js_string, js_uint, json_text, opt_from_js_json};
 use crate::utils::{to_js_err, to_js_value};
 
 use finstack_quant_factor::credit::VolHorizon;
@@ -33,34 +33,10 @@ pub struct JsCreditFactorModel {
     pub(crate) inner: finstack_quant_factor::credit::hierarchy::CreditFactorModel,
 }
 
+json_round_trip!(JsCreditFactorModel, CreditFactorModel, rust_json finstack_quant_factor::credit::hierarchy::CreditFactorModel);
+
 #[wasm_bindgen(js_class = CreditFactorModel)]
 impl JsCreditFactorModel {
-    /// Deserialize a `CreditFactorModel` from JSON.
-    ///
-    /// Validates the required `schema` marker and all structural constraints.
-    ///
-    /// # Errors
-    /// Throws a `validation` error if the JSON is malformed or fails
-    /// validation.
-    /// @param json - JSON-serialized CreditFactorModel to deserialize.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsCreditFactorModel, JsValue> {
-        let json: &str = &json_text(&json, "json")?;
-        let inner = finstack_quant_factor::credit::hierarchy::CreditFactorModel::from_json(json)
-            .map_err(to_js_err)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this model to compact wire JSON.
-    ///
-    /// # Errors
-    ///
-    /// Throws a JavaScript exception if the model cannot be serialized to JSON.
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        self.inner.to_json().map_err(to_js_err)
-    }
-
     /// Return the exact namespaced contract marker.
     ///
     /// @returns The string `"finstack_quant.credit_factor_model/1"`.
@@ -87,12 +63,8 @@ impl JsCreditCalibrator {
     /// @param config_json - Optional credit-factor calibration configuration JSON; omitted or `null` uses the Rust `CreditCalibrationConfig::default()`.
     #[wasm_bindgen(constructor)]
     pub fn new(config_json: Option<JsValue>) -> Result<JsCreditCalibrator, JsValue> {
-        let config_json = opt_json_text(config_json.as_ref(), "configJson")?;
         let config: finstack_quant_factor::credit::calibration::CreditCalibrationConfig =
-            match config_json.as_deref() {
-                Some(json) => serde_json::from_str(json).map_err(to_js_err)?,
-                None => Default::default(),
-            };
+            opt_from_js_json(config_json.as_ref(), "configJson")?.unwrap_or_default();
         Ok(Self {
             inner: finstack_quant_factor::credit::calibration::CreditCalibrator::new(config),
         })
@@ -106,9 +78,8 @@ impl JsCreditCalibrator {
     /// Throws if inputs are structurally invalid or calibration fails.
     /// @param inputs_json - Credit-factor calibration input JSON containing issuers, spreads, and observations.
     pub fn calibrate(&self, inputs_json: JsValue) -> Result<JsCreditFactorModel, JsValue> {
-        let inputs_json: &str = &json_text(&inputs_json, "inputsJson")?;
         let inputs: finstack_quant_factor::credit::calibration::CreditCalibrationInputs =
-            serde_json::from_str(inputs_json).map_err(to_js_err)?;
+            from_js_json(&inputs_json, "inputsJson")?;
         let model = self.inner.calibrate(inputs).map_err(to_js_err)?;
         Ok(JsCreditFactorModel { inner: model })
     }
@@ -126,37 +97,10 @@ pub struct JsLevelsAtDate {
     pub(crate) inner: finstack_quant_factor::credit::decomposition::LevelsAtDate,
 }
 
+json_round_trip!(JsLevelsAtDate, LevelsAtDate, rust_json finstack_quant_factor::credit::decomposition::LevelsAtDate);
+
 #[wasm_bindgen(js_class = LevelsAtDate)]
 impl JsLevelsAtDate {
-    /// Deserialize a factor-level snapshot from canonical JSON.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical `LevelsAtDate` JSON containing `date`, `generic`,
-    ///   `by_level`, and `adder` fields.
-    ///
-    /// # Errors
-    ///
-    /// Throws when the JSON is malformed or a numeric field is non-finite.
-    /// @returns A validated `LevelsAtDate` handle.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsLevelsAtDate, JsValue> {
-        let json: &str = &json_text(&json, "json")?;
-        let inner = finstack_quant_factor::credit::decomposition::LevelsAtDate::from_json(json)
-            .map_err(to_js_err)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize the snapshot to JSON.
-    ///
-    /// # Errors
-    /// Throws if any numeric output field is non-finite (NaN/Inf), naming
-    /// the offending field instead of silently serializing `null`.
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        self.inner.to_json().map_err(to_js_err)
-    }
-
     /// Observation date as an ISO-8601 string.
     #[wasm_bindgen(getter)]
     pub fn date(&self) -> String {
@@ -216,38 +160,10 @@ pub struct JsPeriodDecomposition {
     pub(crate) inner: finstack_quant_factor::credit::decomposition::PeriodDecomposition,
 }
 
+json_round_trip!(JsPeriodDecomposition, PeriodDecomposition, rust_json finstack_quant_factor::credit::decomposition::PeriodDecomposition);
+
 #[wasm_bindgen(js_class = PeriodDecomposition)]
 impl JsPeriodDecomposition {
-    /// Deserialize a period decomposition from canonical JSON.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical `PeriodDecomposition` JSON containing `from`,
-    ///   `to`, `d_generic`, `by_level`, and `d_adder` fields.
-    ///
-    /// # Errors
-    ///
-    /// Throws when the JSON is malformed or a numeric field is non-finite.
-    /// @returns A validated `PeriodDecomposition` handle.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsPeriodDecomposition, JsValue> {
-        let json: &str = &json_text(&json, "json")?;
-        let inner =
-            finstack_quant_factor::credit::decomposition::PeriodDecomposition::from_json(json)
-                .map_err(to_js_err)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize the decomposition to JSON.
-    ///
-    /// # Errors
-    /// Throws if any numeric output field is non-finite (NaN/Inf), naming
-    /// the offending field instead of silently serializing `null`.
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        self.inner.to_json().map_err(to_js_err)
-    }
-
     /// Earlier snapshot date as an ISO-8601 string.
     #[wasm_bindgen(getter, js_name = fromDate)]
     pub fn from_date(&self) -> String {
@@ -337,11 +253,9 @@ pub fn decompose_levels(
     runtime_tags_json: Option<JsValue>,
 ) -> Result<JsLevelsAtDate, JsValue> {
     let observed_generic = js_f64(&observed_generic, "observedGeneric")?;
-    let observed_spreads_json: &str = &json_text(&observed_spreads_json, "observedSpreadsJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
-    let runtime_tags_json = opt_json_text(runtime_tags_json.as_ref(), "runtimeTagsJson")?;
     let observed_spreads: std::collections::BTreeMap<finstack_quant_core::types::IssuerId, f64> =
-        serde_json::from_str(observed_spreads_json).map_err(to_js_err)?;
+        from_js_json(&observed_spreads_json, "observedSpreadsJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
 
     let date = finstack_quant_core::dates::parse_iso_date(as_of).map_err(to_js_err)?;
 
@@ -350,10 +264,7 @@ pub fn decompose_levels(
             finstack_quant_core::types::IssuerId,
             finstack_quant_factor::credit::hierarchy::IssuerTags,
         >,
-    > = match runtime_tags_json.as_deref() {
-        Some(json) => Some(serde_json::from_str(json).map_err(to_js_err)?),
-        None => None,
-    };
+    > = opt_from_js_json(runtime_tags_json.as_ref(), "runtimeTagsJson")?;
 
     let inner = finstack_quant_factor::credit::decomposition::decompose_levels(
         &model.inner,

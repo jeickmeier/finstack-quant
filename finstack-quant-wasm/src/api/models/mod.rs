@@ -16,9 +16,41 @@
 /// type in `inner`.
 ///
 /// Both exits use the canonical Rust serde form, so the JSON is the same text
-/// Python `to_json` / `from_json` exchange.
+/// Python `to_json` / `from_json` exchange. The arms mirror Python's
+/// `wire_methods!`: append `validate` when the Rust type checks its invariants
+/// in an inherent `validate()` rather than in `Deserialize`, and `rust_json`
+/// when it owns its wire form through inherent `from_json(&str)` /
+/// `to_json()` methods.
 macro_rules! json_round_trip {
     ($js:ident, $class:ident) => {
+        json_round_trip!(
+            @impl $js, $class,
+            |json| $crate::utils::input::from_js_json(&json, "json")?,
+            |inner| serde_json::to_string(inner).map_err($crate::utils::to_js_err)
+        );
+    };
+    ($js:ident, $class:ident, validate) => {
+        json_round_trip!(
+            @impl $js, $class,
+            |json| {
+                let loaded = Self {
+                    inner: $crate::utils::input::from_js_json(&json, "json")?,
+                };
+                loaded.inner.validate().map_err($crate::utils::to_js_err)?;
+                loaded.inner
+            },
+            |inner| serde_json::to_string(inner).map_err($crate::utils::to_js_err)
+        );
+    };
+    ($js:ident, $class:ident, rust_json $rust:ty) => {
+        json_round_trip!(
+            @impl $js, $class,
+            |json| <$rust>::from_json(&$crate::utils::input::json_text(&json, "json")?)
+                .map_err($crate::utils::to_js_err)?,
+            |inner| inner.to_json().map_err($crate::utils::to_js_err)
+        );
+    };
+    (@impl $js:ident, $class:ident, |$json:ident| $load:expr, |$inner:ident| $dump:expr) => {
         #[wasm_bindgen::prelude::wasm_bindgen(js_class = $class)]
         impl $js {
             /// Load a handle from its canonical JSON wire form, the same form
@@ -36,7 +68,8 @@ macro_rules! json_round_trip {
             /// malformed or fails the type's validation.
             #[wasm_bindgen(js_name = fromJson)]
             pub fn from_json(json: wasm_bindgen::JsValue) -> Result<$js, wasm_bindgen::JsValue> {
-                $crate::utils::input::from_js_json(&json, "json").map(|inner| Self { inner })
+                let $json = json;
+                Ok(Self { inner: $load })
             }
 
             /// Serialize to the canonical JSON wire form accepted by `fromJson`
@@ -45,11 +78,12 @@ macro_rules! json_round_trip {
             ///
             /// # Errors
             ///
-            /// Throws a `validation` error if serialization fails (not expected
-            /// for a valid handle).
+            /// Throws a `validation` error if serialization fails, for example
+            /// on a non-finite value the type's wire form rejects.
             #[wasm_bindgen(js_name = toJson)]
             pub fn to_json(&self) -> Result<String, wasm_bindgen::JsValue> {
-                serde_json::to_string(&self.inner).map_err($crate::utils::to_js_err)
+                let $inner = &self.inner;
+                $dump
             }
         }
     };

@@ -146,17 +146,36 @@ pub fn core_to_py(e: finstack_quant_core::Error) -> PyErr {
     kind_to_py(e.kind(), format_chain(&e))
 }
 
-/// Convert a `PdCalibrationError` into a Python exception.
-///
-/// Every variant is a validation failure, so all map to `ValueError`.
-pub fn pd_calibration_to_py(e: finstack_quant_models::credit::pd::PdCalibrationError) -> PyErr {
-    kind_to_py(e.kind(), format_chain(&e))
+/// A typed domain error that reports its own Rust-owned
+/// [`ErrorKind`](finstack_quant_core::error::ErrorKind).
+pub trait KindedError: std::error::Error + 'static {
+    /// The error's classification (`NotFound`, `Validation`, `Computation`).
+    fn error_kind(&self) -> finstack_quant_core::error::ErrorKind;
 }
 
-/// Convert a `MigrationError` into a Python exception by its Rust-owned
-/// [`MigrationError::kind`](finstack_quant_models::credit::migration::MigrationError::kind).
-pub fn migration_to_py(e: finstack_quant_models::credit::migration::MigrationError) -> PyErr {
-    kind_to_py(e.kind(), format_chain(&e))
+macro_rules! kinded_error {
+    ($($ty:ty),* $(,)?) => {$(
+        impl KindedError for $ty {
+            fn error_kind(&self) -> finstack_quant_core::error::ErrorKind {
+                self.kind()
+            }
+        }
+    )*};
+}
+
+kinded_error!(
+    finstack_quant_models::credit::pd::PdCalibrationError,
+    finstack_quant_models::credit::migration::MigrationError,
+    finstack_quant_models::credit::scoring::CreditScoringError,
+    finstack_quant_factor::credit::decomposition::DecompositionError,
+);
+
+/// Convert a typed domain error with a Rust-owned kind (PD calibration,
+/// migration, credit scoring, factor decomposition) into a Python exception:
+/// `NotFound` → `KeyError`, `Validation` → `ValueError`, `Computation` →
+/// `RuntimeError`, with the full source chain as the message.
+pub fn kinded_to_py<E: KindedError>(e: E) -> PyErr {
+    kind_to_py(e.error_kind(), format_chain(&e))
 }
 
 /// Convert an analytics-domain core error into a Python `AnalyticsError`.
@@ -184,15 +203,6 @@ pub fn scenarios_to_py(e: finstack_quant_scenarios::Error) -> PyErr {
         SErr::Valuations(inner) => core_to_py(inner.into()),
         err => kind_to_py(err.kind(), format_chain(&err)),
     }
-}
-
-/// Convert a factor-model `DecompositionError` into a Python exception by its
-/// Rust-owned kind (unknown issuer → `KeyError`, inconsistent model →
-/// `RuntimeError`, otherwise `ValueError`).
-pub fn decomposition_error_to_py(
-    e: finstack_quant_factor::credit::decomposition::DecompositionError,
-) -> PyErr {
-    kind_to_py(e.kind(), format_chain(&e))
 }
 
 /// Convert a `finstack_quant_portfolio::Error` into a Python exception by its
@@ -339,14 +349,6 @@ pub fn value_error(message: impl Into<String>) -> PyErr {
 /// ```
 pub fn serde_json_to_py(err: serde_json::Error, context: &str) -> PyErr {
     PyValueError::new_err(format!("{context}: {err}"))
-}
-
-/// Convert a `CreditScoringError` into a Python exception.
-///
-/// Every variant (non-finite ratio, non-binary indicator) is a validation
-/// failure of the caller's inputs, so all map to `ValueError`.
-pub fn scoring_to_py(e: finstack_quant_models::credit::scoring::CreditScoringError) -> PyErr {
-    kind_to_py(e.kind(), format_chain(&e))
 }
 
 /// Convert a `finstack_quant_models::correlation::Error` into a Python

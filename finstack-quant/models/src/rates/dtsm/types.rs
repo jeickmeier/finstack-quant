@@ -290,35 +290,10 @@ impl FactorTimeSeries {
         Ok(())
     }
 
-    /// The factor matrix as one `Vec` per factor column (`level`, `slope`,
-    /// `curvature` for Diebold–Li), each with one entry per observation date.
-    #[must_use]
-    pub fn columns(&self) -> Vec<Vec<f64>> {
-        (0..self.factors.ncols())
-            .map(|k| {
-                (0..self.factors.nrows())
-                    .map(|i| self.factors[(i, k)])
-                    .collect()
-            })
-            .collect()
-    }
-
     /// Number of observation dates (rows of the factor matrix).
     #[must_use]
     pub fn num_dates(&self) -> usize {
         self.factors.nrows()
-    }
-
-    /// The residual matrix as row-major nested vectors (`residuals[t][tenor]`).
-    #[must_use]
-    pub fn residual_rows(&self) -> Vec<Vec<f64>> {
-        (0..self.residuals.nrows())
-            .map(|i| {
-                (0..self.residuals.ncols())
-                    .map(|j| self.residuals[(i, j)])
-                    .collect()
-            })
-            .collect()
     }
 }
 

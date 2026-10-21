@@ -9,18 +9,54 @@
 /// `wire_methods!(PyType, RustType, "Name")` deserializes straight into the
 /// wrapper. Append `validate` when the Rust type's invariants are checked by
 /// an inherent `validate()` returning a `finstack_quant_core` error rather
-/// than by its `Deserialize` impl.
+/// than by its `Deserialize` impl. Append `rust_json` when the Rust type owns
+/// its wire form through inherent `from_json(&str)` / `to_json()` methods
+/// (both returning `finstack_quant_core::Result`), so both directions run the
+/// Rust checks.
 macro_rules! wire_methods {
     ($py_type:ident, $rust_type:ty, $name:literal) => {
-        $crate::bindings::macros::wire_methods!(@impl $py_type, $rust_type, $name, |inner| inner);
+        $crate::bindings::macros::wire_methods!(
+            @impl $py_type, $name,
+            |json| {
+                let inner: $rust_type =
+                    $crate::bindings::json_bridge::deserialize_json_with_context(
+                        json,
+                        concat!("invalid ", $name, " JSON"),
+                    )?;
+                inner
+            },
+            |value| $crate::bindings::json_bridge::serialize_json_with_context(
+                value,
+                concat!("failed to serialize ", $name),
+            )
+        );
     };
     ($py_type:ident, $rust_type:ty, $name:literal, validate) => {
-        $crate::bindings::macros::wire_methods!(@impl $py_type, $rust_type, $name, |inner| {
-            inner.validate().map_err($crate::errors::core_to_py)?;
-            inner
-        });
+        $crate::bindings::macros::wire_methods!(
+            @impl $py_type, $name,
+            |json| {
+                let inner: $rust_type =
+                    $crate::bindings::json_bridge::deserialize_json_with_context(
+                        json,
+                        concat!("invalid ", $name, " JSON"),
+                    )?;
+                inner.validate().map_err($crate::errors::core_to_py)?;
+                inner
+            },
+            |value| $crate::bindings::json_bridge::serialize_json_with_context(
+                value,
+                concat!("failed to serialize ", $name),
+            )
+        );
     };
-    (@impl $py_type:ident, $rust_type:ty, $name:literal, |$inner:ident| $checked:expr) => {
+    ($py_type:ident, $rust_type:ty, $name:literal, rust_json) => {
+        $crate::bindings::macros::wire_methods!(
+            @impl $py_type, $name,
+            |json| <$rust_type>::from_json(json).map_err($crate::errors::core_to_py)?,
+            |value| value.to_json().map_err($crate::errors::core_to_py)
+        );
+    };
+    (@impl $py_type:ident, $name:literal, |$json:ident| $load:expr, |$value:ident| $dump:expr) => {
         #[::pyo3::pymethods]
         impl $py_type {
             #[doc = concat!(
@@ -31,10 +67,8 @@ macro_rules! wire_methods {
             #[allow(clippy::wrong_self_convention)]
             #[pyo3(text_signature = "($self)")]
             fn to_json(&self) -> ::pyo3::PyResult<String> {
-                $crate::bindings::json_bridge::serialize_json_with_context(
-                    &self.inner,
-                    concat!("failed to serialize ", $name),
-                )
+                let $value = &self.inner;
+                $dump
             }
 
             #[doc = concat!(
@@ -46,12 +80,8 @@ macro_rules! wire_methods {
             #[staticmethod]
             #[pyo3(text_signature = "(json)")]
             fn from_json(json: &str) -> ::pyo3::PyResult<Self> {
-                let $inner: $rust_type =
-                    $crate::bindings::json_bridge::deserialize_json_with_context(
-                        json,
-                        concat!("invalid ", $name, " JSON"),
-                    )?;
-                Ok(Self { inner: $checked })
+                let $json = json;
+                Ok(Self { inner: $load })
             }
 
             /// Support ``pickle`` (and therefore ``multiprocessing``, ``joblib``, ``dask``)

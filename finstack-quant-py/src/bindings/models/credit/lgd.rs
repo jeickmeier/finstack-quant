@@ -24,10 +24,6 @@ use crate::errors::{core_to_py, value_error};
 const COLLATERAL_TYPES: &str =
     "cash, securities, receivables, inventory, equipment, real_estate, intellectual_property, other";
 
-fn parse_collateral_type(value: &str) -> PyResult<WorkoutCollateralType> {
-    finstack_quant_core::wire::serde_parse::<WorkoutCollateralType>(value).map_err(core_to_py)
-}
-
 /// Beta-distributed recovery rate parameterised by mean and standard deviation.
 ///
 /// ``alpha`` / ``beta_param`` are the moment-matched Beta shape parameters.
@@ -212,7 +208,9 @@ impl PyCollateralPiece {
     #[new]
     #[pyo3(text_signature = "(collateral_type, book_value, haircut)")]
     fn new(collateral_type: &str, book_value: f64, haircut: f64) -> PyResult<Self> {
-        let collateral_type = parse_collateral_type(collateral_type)?;
+        let collateral_type =
+            finstack_quant_core::wire::serde_parse::<WorkoutCollateralType>(collateral_type)
+                .map_err(core_to_py)?;
         CollateralPiece::new(collateral_type, book_value, haircut)
             .map(|inner| Self { inner })
             .map_err(core_to_py)

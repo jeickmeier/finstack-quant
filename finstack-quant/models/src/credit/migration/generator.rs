@@ -246,10 +246,7 @@ impl GeneratorMatrix {
     /// Transition intensities as one row per starting state, in scale order.
     #[must_use]
     pub fn to_rows(&self) -> Vec<Vec<f64>> {
-        self.as_matrix()
-            .row_iter()
-            .map(|row| row.iter().copied().collect())
-            .collect()
+        finstack_quant_core::math::linalg::rows_of(self.as_matrix())
     }
 
     /// The underlying `nalgebra` matrix.

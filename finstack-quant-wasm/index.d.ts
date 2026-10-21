@@ -9531,9 +9531,9 @@ declare class CreditFactorModel {
   private constructor();
   /**
    * Deserialize and validate a `CreditFactorModel` from JSON.
-   * @returns A calibrated `CreditFactorModel` handle.
-   * @param json - JSON-serialized CreditFactorModel to deserialize.
-   * @throws Error - Throws a `validation` error if the JSON is malformed or fails validation.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
    */
   static fromJson(json: JsonInput): CreditFactorModel;
   /**
@@ -9543,8 +9543,8 @@ declare class CreditFactorModel {
   readonly schema: string;
   /**
    * Serialize to compact canonical JSON.
-   * @returns Canonical JSON string.
-   * @throws Error - Throws a JavaScript exception if the model cannot be serialized to JSON.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -9657,9 +9657,9 @@ declare class LevelsAtDate {
   private constructor();
   /**
    * Deserialize a hierarchy-level snapshot from canonical JSON.
-   * @param json - Canonical `LevelsAtDate` JSON containing `date`, `generic`, `by_level`, and `adder` fields.
-   * @returns A validated `LevelsAtDate` handle.
-   * @throws Error - Throws when the JSON is malformed or a numeric field is non-finite.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
    */
   static fromJson(json: JsonInput): LevelsAtDate;
   /**
@@ -9689,8 +9689,8 @@ declare class LevelsAtDate {
   adder(): Record<string, number>;
   /**
    * Serialize the snapshot to compact canonical JSON.
-   * @returns Canonical JSON string.
-   * @throws Error - Throws if any numeric output field is non-finite (NaN/Inf), naming the offending field instead of silently serializing `null`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -9708,9 +9708,9 @@ declare class PeriodDecomposition {
   private constructor();
   /**
    * Deserialize a period decomposition from canonical JSON.
-   * @param json - Canonical `PeriodDecomposition` JSON containing `from`, `to`, `d_generic`, `by_level`, and `d_adder` fields.
-   * @returns A validated `PeriodDecomposition` handle.
-   * @throws Error - Throws when the JSON is malformed or a numeric field is non-finite.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
    */
   static fromJson(json: JsonInput): PeriodDecomposition;
   /**
@@ -9744,8 +9744,8 @@ declare class PeriodDecomposition {
   dAdder(): Record<string, number>;
   /**
    * Serialize the decomposition to compact canonical JSON.
-   * @returns Canonical JSON string.
-   * @throws Error - Throws if any numeric output field is non-finite (NaN/Inf), naming the offending field instead of silently serializing `null`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -10501,7 +10501,7 @@ export interface CopulaSpec extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
 }
@@ -10619,7 +10619,7 @@ export interface RecoverySpec extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
 }
@@ -10747,7 +10747,7 @@ export interface PortfolioLossResult extends WasmOwned {
   /**
    * Serialize to the canonical JSON wire format.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
 }
@@ -24985,7 +24985,7 @@ export interface SabrParameters extends WasmOwned {
   /**
    * Serialize to the Rust `SabrParameters` JSON wire form.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
 }
@@ -25295,7 +25295,7 @@ export interface AssetDynamics extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
 }
@@ -25375,7 +25375,7 @@ export interface BetaRecovery extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -25459,7 +25459,7 @@ export interface DownturnLgd extends WasmOwned {
   /**
    * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails.
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -25502,9 +25502,9 @@ export interface DownturnLgdConstructor {
   baselUnsecured(): DownturnLgd;
   /**
    * Load a downturn adjustment from canonical JSON and validate its parameters.
-   * @param json - `DownturnLgd` JSON text or plain object; unknown fields are rejected.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
    * @returns The validated handle.
-   * @throws Error - Throws a `validation` error if the payload is malformed or its parameters are out of range.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
    */
   fromJson(json: JsonInput): DownturnLgd;
   /**
@@ -25548,7 +25548,7 @@ export interface DynamicRecoverySpec extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -25664,7 +25664,7 @@ export interface EadCalculator extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -25757,7 +25757,7 @@ export interface EndogenousHazardSpec extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -25858,7 +25858,7 @@ export interface GeneratorMatrix extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -25964,7 +25964,7 @@ export interface MasterScale extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26045,7 +26045,7 @@ export interface MertonBarrierType extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
 }
@@ -26203,7 +26203,7 @@ export interface MertonModel extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26427,7 +26427,7 @@ export interface MigrationSimulator extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26494,7 +26494,7 @@ export interface RatingFactorTable extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26590,7 +26590,7 @@ export interface RatingPath extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26648,7 +26648,7 @@ export interface RatingPaths extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26742,7 +26742,7 @@ export interface RatingScale extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26844,7 +26844,7 @@ export interface SimulatedPaths extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26927,7 +26927,7 @@ export interface ToggleExerciseModel extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -27049,7 +27049,7 @@ export interface TransitionMatrix extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -27122,7 +27122,7 @@ export interface WorkoutCosts extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -27209,7 +27209,7 @@ export interface WorkoutLgd extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -28155,7 +28155,7 @@ export interface DieboldLi extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -28228,7 +28228,7 @@ export interface YieldPanel extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -28345,7 +28345,7 @@ export interface YieldPca extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -28521,7 +28521,7 @@ export interface HullWhiteParams extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -29210,7 +29210,7 @@ export interface AlmgrenChrissModel extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -29307,7 +29307,7 @@ export interface KyleLambdaModel extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**

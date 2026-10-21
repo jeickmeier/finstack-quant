@@ -140,10 +140,7 @@ impl TransitionMatrix {
     /// Transition probabilities as one row per starting state, in scale order.
     #[must_use]
     pub fn to_rows(&self) -> Vec<Vec<f64>> {
-        self.data
-            .row_iter()
-            .map(|row| row.iter().copied().collect())
-            .collect()
+        finstack_quant_core::math::linalg::rows_of(&self.data)
     }
 
     /// Row of transition probabilities from a given state.

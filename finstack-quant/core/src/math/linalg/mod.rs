@@ -779,6 +779,31 @@ pub fn unflatten_square(
     Ok(flat.chunks_exact(n).map(<[f64]>::to_vec).collect())
 }
 
+/// Copy a dense matrix into nested rows (`rows[i][j] == matrix[(i, j)]`).
+///
+/// The row-major nested form is the shape the host bindings exchange and the
+/// shape `to_rows` accessors on matrix-backed model types return.
+///
+/// # Arguments
+///
+/// * `matrix` - Dense matrix of any shape; a matrix with zero rows yields an
+///   empty vector, one with zero columns yields that many empty rows.
+///
+/// # Examples
+///
+/// ```
+/// use finstack_quant_core::math::linalg::rows_of;
+/// let m = nalgebra::DMatrix::from_row_slice(2, 3, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+/// assert_eq!(rows_of(&m), vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]]);
+/// ```
+#[must_use]
+pub fn rows_of(matrix: &nalgebra::DMatrix<f64>) -> Vec<Vec<f64>> {
+    matrix
+        .row_iter()
+        .map(|row| row.iter().copied().collect())
+        .collect()
+}
+
 /// Cholesky decomposition of a correlation/covariance matrix.
 ///
 /// Computes L such that Σ = L L^T, where Σ is the correlation matrix.

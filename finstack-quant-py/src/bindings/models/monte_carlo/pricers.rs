@@ -4,9 +4,7 @@ use super::engine::extract_optional_currency;
 use super::results::{PyLrmGreeks, PyMoneyEstimate};
 use crate::errors::core_to_py;
 use finstack_quant_models::monte_carlo::convenience::{self, LsmcConvenience};
-use finstack_quant_models::monte_carlo::pricer::basis::BasisKind;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
-use finstack_quant_models::monte_carlo::pricer::lsmc::LsmcPricer;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
 use finstack_quant_models::types::OptionType;
 use pyo3::prelude::*;
@@ -530,8 +528,10 @@ impl PyLsmcPricer {
         basis_degree: Option<usize>,
     ) -> PyResult<PyMoneyEstimate> {
         let currency = extract_optional_currency(currency)?;
-        let (pricer, num_steps, basis, basis_degree) =
-            self.call_config(num_steps, basis, basis_degree)?;
+        let (pricer, num_steps, basis, basis_degree) = self
+            .inner
+            .call_config(num_steps, basis, basis_degree)
+            .map_err(core_to_py)?;
         py.detach(|| {
             pricer.price_american(
                 OptionType::from(is_call),
@@ -589,8 +589,10 @@ impl PyLsmcPricer {
         basis_degree: Option<usize>,
     ) -> PyResult<PyMoneyEstimate> {
         let currency = extract_optional_currency(currency)?;
-        let (pricer, num_steps, basis, basis_degree) =
-            self.call_config(num_steps, basis, basis_degree)?;
+        let (pricer, num_steps, basis, basis_degree) = self
+            .inner
+            .call_config(num_steps, basis, basis_degree)
+            .map_err(core_to_py)?;
         py.detach(|| {
             pricer.price_american_unbiased(
                 OptionType::from(is_call),
@@ -622,23 +624,6 @@ impl PyLsmcPricer {
             self.inner.basis().as_str(),
             self.inner.basis_degree(),
         )
-    }
-}
-
-impl PyLsmcPricer {
-    /// Resolve per-call overrides against the instance configuration.
-    ///
-    /// A `num_steps` override rebuilds the LSMC configuration (the exercise
-    /// grid is part of it); every other setting is carried over unchanged.
-    fn call_config(
-        &self,
-        num_steps: Option<usize>,
-        basis: Option<&str>,
-        basis_degree: Option<usize>,
-    ) -> PyResult<(LsmcPricer, usize, BasisKind, usize)> {
-        self.inner
-            .call_config(num_steps, basis, basis_degree)
-            .map_err(core_to_py)
     }
 }
 
