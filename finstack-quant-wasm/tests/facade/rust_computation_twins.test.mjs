@@ -482,14 +482,19 @@ test('portfolio cashflow readers net and collapse the Rust ladder', () => {
   ]);
   const collapsed = portfolio.collapseToBaseByDateKind(
     ladder,
-    FLAT_USD_MARKET,
+    core.MarketContext.fromJson(FLAT_USD_MARKET),
     'USD',
     '2024-01-15',
     { USD: 'USD-OIS' }
   );
   assert.deepEqual(collapsed['2027-01-15'].notional, { amount: '500000', currency: 'USD' });
   assert.deepEqual(
-    portfolio.collapseToBaseByDateKind(ladder, FLAT_USD_MARKET, 'USD', '2024-01-15'),
+    portfolio.collapseToBaseByDateKind(
+      ladder,
+      core.MarketContext.fromJson(FLAT_USD_MARKET),
+      'USD',
+      '2024-01-15'
+    ),
     collapsed
   );
   assert.throws(
@@ -507,9 +512,7 @@ test('portfolioMetricsSeries decodes bucketed metrics', () => {
   );
   const metrics = portfolio.aggregateMetrics(
     JSON.stringify(valuation, (_, v) => (typeof v === 'bigint' ? Number(v) : v)),
-    'USD',
-    FLAT_USD_MARKET,
-    '2024-01-15'
+    core.MarketContext.fromJson(FLAT_USD_MARKET)
   );
   const series = portfolio.portfolioMetricsSeries(metrics, 'bucketed_dv01');
   assert.equal(series.length, 11);

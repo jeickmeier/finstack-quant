@@ -29,7 +29,7 @@ cargo run -p finstack-quant-valuations --bin gen_schemas -- --write
 
 # Run the other owning generators directly when needed
 cargo run -p finstack-quant-cashflows --bin gen_cashflow_schemas -- --write
-cargo run -p finstack-quant-portfolio --bin gen_materialization_schemas -- --write
+cargo run -p finstack-quant-portfolio --bin gen_portfolio_schemas -- --write
 
 # Validate schema parity and the checked-in schema audit
 mise run rust-check-schemas

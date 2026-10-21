@@ -1,4 +1,5 @@
-//! Portfolio-level factor assignment, decomposition, and what-if analysis.
+//! Factor assignment report: which factors each position maps to and which
+//! dependencies matched no factor.
 //!
 use crate::types::PositionId;
 use finstack_quant_core::types::Attributes;
@@ -56,13 +57,13 @@ pub(crate) fn assign_position_factors(
     dependencies: &[MarketDependency],
     attributes: &Attributes,
     matcher: &dyn FactorMatcher,
-) -> crate::error::Result<(PositionAssignment, Vec<UnmatchedEntry>)> {
+) -> crate::Result<(PositionAssignment, Vec<UnmatchedEntry>)> {
     let mut mappings = Vec::new();
     let mut unmatched = Vec::new();
 
     for dependency in dependencies {
         let entries = matcher.match_factor(dependency, attributes).map_err(|e| {
-            crate::error::Error::invalid_input(format!(
+            crate::Error::invalid_input(format!(
                 "factor assignment failed for position '{position_id}': {e}"
             ))
         })?;

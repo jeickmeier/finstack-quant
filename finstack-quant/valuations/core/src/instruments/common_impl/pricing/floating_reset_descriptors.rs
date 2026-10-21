@@ -24,36 +24,11 @@
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_cashflows::builder::FloatingRateParams;
-use finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::trees::two_factor_rates_credit::NodeCoupon;
-use rust_decimal::prelude::ToPrimitive;
-
-/// Convert a [`FloatingRateSpec`] into the f64 composition parameters the
-/// increment shares with the emission (same mapping the term-loan
-/// discounting pricer applies for realized fixings).
-pub fn params_from_spec(spec: &FloatingRateSpec) -> FloatingRateParams {
-    FloatingRateParams {
-        spread_bp: spec.spread_bp.to_f64().unwrap_or_default(),
-        gearing: spec.gearing.to_f64().unwrap_or(1.0),
-        gearing_includes_spread: spec.gearing_includes_spread,
-        index_floor_bp: spec.index_floor_bp.and_then(|value| value.to_f64()),
-        index_cap_bp: spec.index_cap_bp.and_then(|value| value.to_f64()),
-        all_in_floor_bp: spec.all_in_floor_bp.and_then(|value| value.to_f64()),
-        all_in_cap_bp: spec.all_in_cap_bp.and_then(|value| value.to_f64()),
-    }
-}
-
-/// Whether period-level composition must drop index-level floor/cap
-/// because the leg applies them daily inside an overnight-compounded
-/// window (mirrors the emission's `period_rate_params_for_overnight`).
-pub fn strips_index_constraints(spec: &FloatingRateSpec) -> bool {
-    spec.compounding.is_some()
-        && spec.overnight_index_constraints == OvernightIndexConstraintApplication::Daily
-}
 
 fn ceil_step(time_steps: &[f64], t: f64) -> usize {
     let last = time_steps.len() - 1;

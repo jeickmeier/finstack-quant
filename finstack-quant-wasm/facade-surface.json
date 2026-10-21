@@ -404,17 +404,10 @@
       "buildCashflowSchedule",
       "buildCashflowScheduleJson",
       "calendarYearLadder",
-      "cashFlowGetBalanceDate",
-      "cashFlowValidate",
       "cdrToMdr",
-      "cfKindIsCashSettlement",
-      "cfKindIsInterestLike",
-      "cfKindIsPrincipalLike",
-      "cfKindParse",
       "cprToSmm",
       "datedFlows",
       "datedFlowsJson",
-      "defaultModelSpecCdr2pct",
       "defaultModelSpecCumulativeDefaultFraction",
       "defaultModelSpecMdr",
       "defaultModelSpecMdrWithSurvival",
@@ -489,7 +482,7 @@
   },
   "cashflows.CashFlowSchedule": {
     "kind": "class",
-    "statics": ["builder", "fromFlows", "fromJson", "fromParts"],
+    "statics": ["builder", "fromFlows", "fromJson"],
     "methods": [
       "calendarYearLadder",
       "coupons",
@@ -531,25 +524,7 @@
   "cashflows.calendarYearLadder": {
     "kind": "function"
   },
-  "cashflows.cashFlowGetBalanceDate": {
-    "kind": "function"
-  },
-  "cashflows.cashFlowValidate": {
-    "kind": "function"
-  },
   "cashflows.cdrToMdr": {
-    "kind": "function"
-  },
-  "cashflows.cfKindIsCashSettlement": {
-    "kind": "function"
-  },
-  "cashflows.cfKindIsInterestLike": {
-    "kind": "function"
-  },
-  "cashflows.cfKindIsPrincipalLike": {
-    "kind": "function"
-  },
-  "cashflows.cfKindParse": {
     "kind": "function"
   },
   "cashflows.cprToSmm": {
@@ -559,9 +534,6 @@
     "kind": "function"
   },
   "cashflows.datedFlowsJson": {
-    "kind": "function"
-  },
-  "cashflows.defaultModelSpecCdr2pct": {
     "kind": "function"
   },
   "cashflows.defaultModelSpecCumulativeDefaultFraction": {
@@ -749,6 +721,12 @@
       "availableCalendars",
       "buildFiscalPeriods",
       "buildPeriods",
+      "cashFlowGetBalanceDate",
+      "cashFlowValidate",
+      "cfKindIsCashSettlement",
+      "cfKindIsInterestLike",
+      "cfKindIsPrincipalLike",
+      "cfKindParse",
       "choleskyDecomposition",
       "choleskySolve",
       "correlation",
@@ -1714,6 +1692,24 @@
     "kind": "function"
   },
   "core.longestPositiveRun": {
+    "kind": "function"
+  },
+  "core.cashFlowGetBalanceDate": {
+    "kind": "function"
+  },
+  "core.cashFlowValidate": {
+    "kind": "function"
+  },
+  "core.cfKindIsCashSettlement": {
+    "kind": "function"
+  },
+  "core.cfKindIsInterestLike": {
+    "kind": "function"
+  },
+  "core.cfKindIsPrincipalLike": {
+    "kind": "function"
+  },
+  "core.cfKindParse": {
     "kind": "function"
   },
   "core.schema": {
@@ -2942,6 +2938,7 @@
     "kind": "namespace",
     "keys": [
       "buildStressAttribution",
+      "decomposeFactors",
       "defaultUtilizationThreshold",
       "evaluateRiskBudget",
       "historicalVarDecomposition",
@@ -2966,6 +2963,9 @@
     "kind": "function"
   },
   "models.factor.risk.positionComponentVar": {
+    "kind": "function"
+  },
+  "models.factor.risk.decomposeFactors": {
     "kind": "function"
   },
   "models.factor.risk.defaultUtilizationThreshold": {
@@ -3429,34 +3429,26 @@
       "InstrumentArtifactCache",
       "Portfolio",
       "PortfolioBuilder",
-      "PortfolioMarginAggregator",
       "aggregateFullCashflows",
       "aggregateMetrics",
       "allocateWeights",
-      "allocateWeightsJson",
       "applyScenarioAndRevalue",
       "attributePortfolioPnl",
       "brinsonFachler",
       "buildCreditVolReport",
       "campisiAttribution",
       "campisiCarinoLink",
-      "campisiCarinoLinkFromSnapshots",
-      "campisiReconciliationCheck",
       "carinoLink",
-      "carinoLinkFromSectorPeriods",
       "cellReturnsFromCurves",
       "cellReturnsFromReference",
       "collapseToBaseByDateKind",
       "computeFactorSensitivities",
       "computePnlProfiles",
-      "constraintBudget",
       "constraintExposureLimit",
       "constraintExposureMinimum",
-      "constraintMaxTurnover",
-      "constraintWeightBounds",
-      "decomposeFactorRisk",
       "excessReturns",
       "factorBrinsonAttribution",
+      "fiAttributionResultReconciliationCheck",
       "gridAttribution",
       "gridCarinoLink",
       "mwrXirr",
@@ -3465,12 +3457,14 @@
       "parsePortfolioSpecJson",
       "portfolioAttributionExplainText",
       "portfolioAttributionReconciliationCheck",
+      "portfolioMargin",
       "portfolioMetricsGetMetric",
       "portfolioMetricsGetPositionMetrics",
       "portfolioMetricsGetTotal",
       "portfolioMetricsRequireTotal",
       "portfolioMetricsSeries",
       "portfolioOptimizationResultBindingConstraints",
+      "portfolioOptimizationResultIsFeasible",
       "portfolioOptimizationResultNewPositionTrades",
       "portfolioOptimizationResultToTradeList",
       "portfolioValuationGetEntityValue",
@@ -3486,7 +3480,6 @@
       "sensitivityMatrixPositionDeltas",
       "twrrLinked",
       "twrrModifiedDietz",
-      "validateAllocationJson",
       "valuePortfolio"
     ]
   },
@@ -3516,11 +3509,8 @@
     ],
     "getters": []
   },
-  "portfolio.PortfolioMarginAggregator": {
-    "kind": "class",
-    "statics": ["fromPortfolio"],
-    "methods": ["calculate", "free"],
-    "getters": []
+  "portfolio.portfolioMargin": {
+    "kind": "function"
   },
   "portfolio.parsePortfolioSpecJson": {
     "kind": "function"
@@ -3531,19 +3521,13 @@
   "portfolio.carinoLink": {
     "kind": "function"
   },
-  "portfolio.carinoLinkFromSectorPeriods": {
-    "kind": "function"
-  },
   "portfolio.campisiAttribution": {
     "kind": "function"
   },
   "portfolio.campisiCarinoLink": {
     "kind": "function"
   },
-  "portfolio.campisiCarinoLinkFromSnapshots": {
-    "kind": "function"
-  },
-  "portfolio.campisiReconciliationCheck": {
+  "portfolio.fiAttributionResultReconciliationCheck": {
     "kind": "function"
   },
   "portfolio.cellReturnsFromReference": {
@@ -3612,9 +3596,6 @@
   "portfolio.computePnlProfiles": {
     "kind": "function"
   },
-  "portfolio.decomposeFactorRisk": {
-    "kind": "function"
-  },
   "portfolio.PortfolioBuilder": {
     "kind": "class",
     "statics": [],
@@ -3622,12 +3603,6 @@
     "getters": []
   },
   "portfolio.allocateWeights": {
-    "kind": "function"
-  },
-  "portfolio.allocateWeightsJson": {
-    "kind": "function"
-  },
-  "portfolio.validateAllocationJson": {
     "kind": "function"
   },
   "portfolio.buildCreditVolReport": {
@@ -3672,6 +3647,9 @@
   "portfolio.portfolioOptimizationResultToTradeList": {
     "kind": "function"
   },
+  "portfolio.portfolioOptimizationResultIsFeasible": {
+    "kind": "function"
+  },
   "portfolio.portfolioMetricsRequireTotal": {
     "kind": "function"
   },
@@ -3682,15 +3660,6 @@
     "kind": "function"
   },
   "portfolio.sensitivityMatrixFactorDeltas": {
-    "kind": "function"
-  },
-  "portfolio.constraintBudget": {
-    "kind": "function"
-  },
-  "portfolio.constraintWeightBounds": {
-    "kind": "function"
-  },
-  "portfolio.constraintMaxTurnover": {
     "kind": "function"
   },
   "portfolio.constraintExposureLimit": {
@@ -3725,33 +3694,10 @@
       "listBuiltinTemplateMetadata",
       "listBuiltinTemplates",
       "listTemplateComponents",
-      "operationSpecAssetCorrelationPts",
-      "operationSpecBaseCorrBucketPts",
-      "operationSpecBaseCorrParallelPts",
-      "operationSpecCurveNodeBp",
-      "operationSpecCurveParallelBp",
-      "operationSpecEquityPricePct",
-      "operationSpecHierarchyBaseCorrParallelPts",
-      "operationSpecHierarchyCurveParallelBp",
-      "operationSpecHierarchyEquityPricePct",
-      "operationSpecHierarchyVolSurfaceParallelPct",
-      "operationSpecInstrumentPricePctByAttr",
-      "operationSpecInstrumentPricePctByType",
-      "operationSpecInstrumentSpreadBpByAttr",
-      "operationSpecInstrumentSpreadBpByType",
-      "operationSpecMarketFxPct",
       "operationSpecMutatesInstruments",
-      "operationSpecPrepayDefaultCorrelationPts",
-      "operationSpecRateBinding",
       "operationSpecRequiresInstruments",
-      "operationSpecStmtForecastAssign",
-      "operationSpecStmtForecastPercent",
       "operationSpecTimeRollForward",
       "operationSpecValidate",
-      "operationSpecVolIndexNodePts",
-      "operationSpecVolIndexParallelPts",
-      "operationSpecVolSurfaceBucketPct",
-      "operationSpecVolSurfaceParallelPct",
       "parallelBpMany",
       "parseScenarioSpec",
       "rateBindingSpecValidate",
@@ -3791,76 +3737,7 @@
   "scenarios.computeHorizonReturn": {
     "kind": "function"
   },
-  "scenarios.operationSpecMarketFxPct": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecEquityPricePct": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecInstrumentPricePctByAttr": {
-    "kind": "function"
-  },
   "scenarios.parallelBpMany": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecCurveParallelBp": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecCurveNodeBp": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecVolIndexParallelPts": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecVolIndexNodePts": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecBaseCorrParallelPts": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecBaseCorrBucketPts": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecVolSurfaceParallelPct": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecVolSurfaceBucketPct": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecStmtForecastPercent": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecStmtForecastAssign": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecRateBinding": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecInstrumentSpreadBpByAttr": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecInstrumentPricePctByType": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecInstrumentSpreadBpByType": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecAssetCorrelationPts": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecPrepayDefaultCorrelationPts": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecHierarchyCurveParallelBp": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecHierarchyVolSurfaceParallelPct": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecHierarchyEquityPricePct": {
-    "kind": "function"
-  },
-  "scenarios.operationSpecHierarchyBaseCorrParallelPts": {
     "kind": "function"
   },
   "scenarios.operationSpecTimeRollForward": {

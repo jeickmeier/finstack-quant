@@ -5,10 +5,11 @@
 //! floating-rate conventions stay consistent across instruments.
 
 use crate::term_loan::types::TermLoan;
+use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_cashflows::builder::{merge_cashflow_schedules, CashFlowSchedule};
-use finstack_quant_cashflows::builder::{CashFlowBuilder, ScheduleParams};
 use finstack_quant_cashflows::builder::{
-    CouponType, FeeBase, FeeSpec, FloatingCouponSpec, FloatingRateSpec, StepUpCouponSpec,
+    CouponType, FeeBase, FeeSpec, FloatingCouponSpec, FloatingRateSpec, PrincipalEventSpec,
+    StepUpCouponSpec,
 };
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
@@ -16,14 +17,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 use std::collections::BTreeMap;
-
-struct PrincipalEvent {
-    date: Date,
-    payment_date: Date,
-    delta: Money,
-    cash: Money,
-    kind: CFKind,
-}
 
 fn loan_schedule_params(loan: &TermLoan) -> ScheduleParams {
     ScheduleParams {
@@ -33,7 +26,7 @@ fn loan_schedule_params(loan: &TermLoan) -> ScheduleParams {
         calendar_id: loan
             .calendar_id
             .clone()
-            .unwrap_or_else(|| finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID.into()),
+            .unwrap_or_else(|| finstack_quant_core::dates::WEEKENDS_ONLY_ID.into()),
         stub: loan.stub,
         end_of_month: false,
         payment_lag_days: 0,
@@ -47,7 +40,7 @@ pub(crate) fn generate_cashflows(
     loan: &TermLoan,
     market: &MarketContext,
 ) -> finstack_quant_core::Result<CashFlowSchedule> {
-    let mut principal_events: Vec<PrincipalEvent> = Vec::new();
+    let mut principal_events: Vec<PrincipalEventSpec> = Vec::new();
     let mut fees: Vec<FeeSpec> = Vec::new();
 
     // Draw stop date (if any)
@@ -112,20 +105,20 @@ pub(crate) fn generate_cashflows(
                 }
             }
 
-            principal_events.push(PrincipalEvent {
+            principal_events.push(PrincipalEventSpec {
                 date: ev.date,
                 payment_date: ev.date,
                 delta: ev.amount,
-                cash: cash_inflow,
+                cash: Some(cash_inflow),
                 kind: CFKind::Notional,
             });
         }
     } else if loan.notional_limit.amount() != 0.0 {
-        principal_events.push(PrincipalEvent {
+        principal_events.push(PrincipalEventSpec {
             date: loan.issue_date,
             payment_date: loan.issue_date,
             delta: loan.notional_limit,
-            cash: loan.notional_limit,
+            cash: Some(loan.notional_limit),
             kind: CFKind::Notional,
         });
     }
@@ -149,11 +142,11 @@ pub(crate) fn generate_cashflows(
     if let Some(cov) = &loan.covenants {
         for sweep in &cov.cash_sweeps {
             if sweep.amount.amount() > 0.0 {
-                principal_events.push(PrincipalEvent {
+                principal_events.push(PrincipalEventSpec {
                     date: sweep.date,
                     payment_date: sweep.date,
                     delta: Money::new(-sweep.amount.amount(), sweep.amount.currency())?,
-                    cash: sweep.amount,
+                    cash: Some(sweep.amount),
                     kind: CFKind::Amortization,
                 });
             }
@@ -186,30 +179,32 @@ pub(crate) fn generate_cashflows(
 
     // Amortization → principal events
     match &loan.amortization {
-        super::spec::AmortizationSpec::LinearTo { .. }
-        | super::spec::AmortizationSpec::StepRemaining { .. } => {
+        finstack_quant_cashflows::builder::AmortizationSpec::LinearTo { .. }
+        | finstack_quant_cashflows::builder::AmortizationSpec::StepRemaining { .. } => {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Term loan '{}' amortization does not support linear_to or step_remaining",
                 loan.id.as_str()
             )));
         }
-        super::spec::AmortizationSpec::CustomPrincipal { items } => {
+        finstack_quant_cashflows::builder::AmortizationSpec::CustomPrincipal { items } => {
             for (dt, amt) in items {
-                principal_events.push(PrincipalEvent {
+                principal_events.push(PrincipalEventSpec {
                     date: *dt,
                     payment_date: *dt,
                     delta: Money::new(-amt.amount(), amt.currency())?,
-                    cash: *amt,
+                    cash: Some(*amt),
                     kind: CFKind::Amortization,
                 });
             }
         }
         // Balance-dependent rules are executed by the canonical builder after
         // coupon PIK capitalization, never precomputed from funded draws alone.
-        super::spec::AmortizationSpec::None
-        | super::spec::AmortizationSpec::PercentOfRemainingPerPeriod { .. }
-        | super::spec::AmortizationSpec::LinearBetween { .. } => {}
-        super::spec::AmortizationSpec::PercentOfOriginalPerPeriod { pct } => {
+        finstack_quant_cashflows::builder::AmortizationSpec::None
+        | finstack_quant_cashflows::builder::AmortizationSpec::PercentOfRemainingPerPeriod {
+            ..
+        }
+        | finstack_quant_cashflows::builder::AmortizationSpec::LinearBetween { .. } => {}
+        finstack_quant_cashflows::builder::AmortizationSpec::PercentOfOriginalPerPeriod { pct } => {
             let funding: Vec<_> = principal_events
                 .iter()
                 .filter(|event| event.kind == CFKind::Notional && event.delta.amount() > 0.0)
@@ -224,11 +219,11 @@ pub(crate) fn generate_cashflows(
                     .sum();
                 let flat_payment = funded * pct;
                 let pay = Money::new(flat_payment, loan.currency)?;
-                principal_events.push(PrincipalEvent {
+                principal_events.push(PrincipalEventSpec {
                     date: d,
                     payment_date,
                     delta: Money::new(-pay.amount(), pay.currency())?,
-                    cash: pay,
+                    cash: Some(pay),
                     kind: CFKind::Amortization,
                 });
             }
@@ -254,7 +249,7 @@ pub(crate) fn generate_cashflows(
                     let capped = requested.min(running.max(0.0));
                     if (capped - requested).abs() > 1e-10 {
                         event.delta = Money::new(-capped, event.delta.currency())?;
-                        event.cash = Money::new(capped, event.cash.currency())?;
+                        event.cash = Some(Money::new(capped, event.delta.currency())?);
                     }
                     running -= capped;
                 }
@@ -263,7 +258,7 @@ pub(crate) fn generate_cashflows(
         }
     }
 
-    let mut builder = CashFlowBuilder::default();
+    let mut builder = CashFlowSchedule::builder();
     let _ = builder
         .principal(
             Money::from((0_i64, loan.currency)),
@@ -271,12 +266,12 @@ pub(crate) fn generate_cashflows(
             loan.maturity,
         )
         .amortization(match &loan.amortization {
-            super::spec::AmortizationSpec::PercentOfRemainingPerPeriod { pct } => {
-                finstack_quant_cashflows::builder::AmortizationSpec::PercentOfRemainingPerPeriod {
-                    pct: *pct,
-                }
-            }
-            super::spec::AmortizationSpec::LinearBetween { start, end } => {
+            finstack_quant_cashflows::builder::AmortizationSpec::PercentOfRemainingPerPeriod {
+                pct,
+            } => finstack_quant_cashflows::builder::AmortizationSpec::PercentOfRemainingPerPeriod {
+                pct: *pct,
+            },
+            finstack_quant_cashflows::builder::AmortizationSpec::LinearBetween { start, end } => {
                 finstack_quant_cashflows::builder::AmortizationSpec::LinearBetween {
                     start: *start,
                     end: *end,
@@ -289,13 +284,13 @@ pub(crate) fn generate_cashflows(
             event.date,
             event.payment_date,
             event.delta,
-            Some(event.cash),
+            event.cash,
             event.kind,
         );
     }
 
     match &loan.rate {
-        super::types::RateSpec::Fixed { rate } => {
+        finstack_quant_cashflows::builder::RateSpec::Fixed { rate } => {
             let initial_rate = finstack_quant_core::decimal::f64_to_decimal(*rate)?;
             let margin_steps = loan
                 .covenants
@@ -316,7 +311,7 @@ pub(crate) fn generate_cashflows(
             };
             let _ = builder.step_up_cf(spec);
         }
-        super::types::RateSpec::Floating(spec) => {
+        finstack_quant_cashflows::builder::RateSpec::Floating(spec) => {
             // LSTA convention: a margin change takes effect from the start of
             // the NEXT interest period on or after its effective date, never
             // mid-period. Snap each covenant step date to the accrual-period
@@ -424,7 +419,7 @@ pub(crate) fn generate_cashflows(
                 calendar_id: loan
                     .calendar_id
                     .as_deref()
-                    .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID)
+                    .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID)
                     .to_string(),
                 stub: loan.stub,
                 accrual_basis:
@@ -449,7 +444,7 @@ pub(crate) fn generate_cashflows(
                         notional_hint: Some(notional.initial),
                         meta: schedule.get_meta().clone(),
                     },
-                )
+                )?
                 .with_notional(notional.clone());
                 schedule = merge_cashflow_schedules([schedule, fee_schedule], notional, day_count);
             }
@@ -630,7 +625,8 @@ pub(crate) fn build_oid_eir_schedule(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::term_loan::spec::{AmortizationSpec, CommitmentFeeBase, DdtlSpec, DrawEvent};
+    use crate::term_loan::spec::{CommitmentFeeBase, DdtlSpec, DrawEvent};
+    use finstack_quant_cashflows::builder::AmortizationSpec;
     use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};

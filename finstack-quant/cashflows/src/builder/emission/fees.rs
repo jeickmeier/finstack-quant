@@ -1,15 +1,14 @@
 //! Fee cashflow emission (periodic and fixed fees on the builder pipeline).
 
-use finstack_quant_core::cashflow::CashFlowAccrual;
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 
-use super::super::compiler::PeriodicFee;
-use super::super::specs::{FeeAccrualBasis, FeeBase};
-use super::f64_to_decimal;
+use crate::builder::compiler::PeriodicFee;
+use crate::builder::specs::{FeeAccrualBasis, FeeBase};
+use finstack_quant_core::decimal::f64_to_decimal;
 
 /// Conversion factor from basis points to rate (1 bp = 0.0001).
 const BP_TO_RATE: Decimal = Decimal::from_parts(1, 0, 0, false, 4);

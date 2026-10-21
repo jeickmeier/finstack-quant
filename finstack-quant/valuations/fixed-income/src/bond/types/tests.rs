@@ -2,7 +2,7 @@
 
 use super::*;
 use finstack_quant_cashflows::builder::{
-    CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,
+    AmortizationSpec, CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,
 };
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;

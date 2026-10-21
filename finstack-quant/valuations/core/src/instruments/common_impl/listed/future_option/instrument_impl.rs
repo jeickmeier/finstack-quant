@@ -202,7 +202,7 @@ macro_rules! impl_future_option_instrument {
                 _market: &finstack_quant_core::market_data::context::MarketContext,
                 _as_of: finstack_quant_core::dates::Date,
             ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-                Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+                finstack_quant_cashflows::schedule_from_classified_flows(
                     Vec::new(),
                     self.terms.day_count,
                     finstack_quant_cashflows::ScheduleBuildOpts {
@@ -216,7 +216,7 @@ macro_rules! impl_future_option_instrument {
                             ..Default::default()
                         },
                     },
-                ))
+                )
             }
         }
     };

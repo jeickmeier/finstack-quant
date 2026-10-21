@@ -1966,11 +1966,11 @@ mod tests {
                 .iter()
                 .map(|(date, amount)| CashFlow::new(*date, None, *amount, CFKind::Fixed, 0.0, None))
                 .collect();
-            Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+            finstack_quant_cashflows::schedule_from_classified_flows(
                 flows,
                 DayCount::Act365F,
                 finstack_quant_cashflows::ScheduleBuildOpts::default(),
-            ))
+            )
         }
     }
 

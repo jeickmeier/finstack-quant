@@ -14,7 +14,7 @@ pub use default::{
 };
 pub use prepayment::{StochasticPrepaySpec, StochasticPrepayment};
 
-use finstack_quant_cashflows::builder::{clamped_cdr_to_mdr, clamped_cpr_to_smm};
+use finstack_quant_cashflows::builder::clamped_cpr_to_smm;
 
 /// Mean monthly prepayment after a lognormal CPR shock and the annual-rate cap.
 ///

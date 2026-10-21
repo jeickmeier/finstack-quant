@@ -297,8 +297,12 @@ export default [
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/1/properties/method",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/1/properties/method",
-    "default": "bootstrap",
-    "description": "Calibration method to use.\n\nForward curves require [`CalibrationMethod::GlobalSolve`]. Sequential\nbootstrap is rejected because contractual off-grid reset intervals\ncouple adjacent rates through projection discount factors.",
+    "default": {
+      "global_solve": {
+        "use_analytical_jacobian": false
+      }
+    },
+    "description": "Calibration method to use.\n\nForward curves require [`CalibrationMethod::GlobalSolve`], which is the\ndefault (finite-difference Jacobian). Sequential bootstrap is rejected\nbecause contractual off-grid reset intervals couple adjacent rates\nthrough projection discount factors.",
     "ref": "#/$defs/CalibrationMethod",
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationMethod"
   },
@@ -998,7 +1002,7 @@ export default [
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/6/properties/detachment_points",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/6/properties/detachment_points",
     "default": [],
-    "description": "Detachment points (as percentages) for the tranches."
+    "description": "Expected tranche detachment points as decimals in `(0, 1]` (e.g. `0.03`\nfor 3%), the same unit as `CdsTrancheQuote.detachment`. When non-empty,\nevery quote must match one point and every point must be quoted."
   },
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/6/properties/detachment_points/items",
@@ -1916,13 +1920,19 @@ export default [
   {
     "path": "#/$defs/d_49947b4265557428e6de",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketFreshnessPolicy",
-    "description": "Audit metadata and freshness policy for calibration inputs."
+    "description": "Audit metadata and freshness policy for calibration inputs.\n\nThe snapshot age is `as_of_timestamp - snapshot_timestamp`. Both instants\nare caller inputs, so validation never reads the wall clock and the same\nenvelope always validates the same way."
+  },
+  {
+    "path": "#/$defs/d_49947b4265557428e6de/properties/as_of_timestamp",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketFreshnessPolicy/properties/as_of_timestamp",
+    "default": null,
+    "description": "RFC3339 instant at which freshness is assessed (normally the caller's\nclock when it submits the envelope). Required with `snapshot_timestamp`\nand `max_age_seconds`."
   },
   {
     "path": "#/$defs/d_49947b4265557428e6de/properties/max_age_seconds",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketFreshnessPolicy/properties/max_age_seconds",
     "default": null,
-    "description": "Maximum permitted snapshot age in seconds.",
+    "description": "Maximum permitted snapshot age in seconds, measured at `as_of_timestamp`.",
     "format": "uint64",
     "minimum": 0
   },

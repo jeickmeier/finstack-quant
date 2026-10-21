@@ -1,7 +1,8 @@
 //! Python bindings for `finstack_quant_cashflows::aggregation`.
 
 use finstack_quant_cashflows::aggregation::{
-    aggregate_by_period, aggregate_cashflows_checked, PeriodAggregation,
+    aggregate_by_period, aggregate_cashflows_checked as rust_aggregate_cashflows_checked,
+    calendar_year_ladder as rust_calendar_year_ladder, PeriodAggregation,
 };
 use finstack_quant_cashflows::DatedFlow;
 use pyo3::prelude::*;
@@ -265,16 +266,16 @@ fn py_aggregate_by_period<'py>(
 /// >>> flows = [(datetime.date(2025, 1, 15), Money(50_000.0, "USD"))]
 /// >>> aggregate_cashflows_checked(flows, "USD").amount
 /// 50000.0
-#[pyfunction(name = "aggregate_cashflows_checked")]
+#[pyfunction]
 #[pyo3(text_signature = "(flows, target)")]
-fn py_aggregate_cashflows_checked(
+fn aggregate_cashflows_checked(
     py: Python<'_>,
     flows: Vec<(Bound<'_, PyAny>, PyMoney)>,
     target: &Bound<'_, PyAny>,
 ) -> PyResult<PyMoney> {
     let flows = extract_dated_flows(flows)?;
     let target = extract_currency(target)?;
-    py.detach(move || aggregate_cashflows_checked(&flows, target))
+    py.detach(move || rust_aggregate_cashflows_checked(&flows, target))
         .map(PyMoney::from_inner)
         .map_err(core_to_py)
 }
@@ -321,9 +322,9 @@ fn py_aggregate_cashflows_checked(
 /// ...     [90.0, 700.0],
 /// ... )
 /// [(2027, 100.0, 0.0, 90.0), (2034, 0.0, 1000.0, 700.0)]
-#[pyfunction(name = "calendar_year_ladder")]
+#[pyfunction]
 #[pyo3(text_signature = "(dates, kinds, amounts, pvs)")]
-fn py_calendar_year_ladder(
+fn calendar_year_ladder(
     py: Python<'_>,
     dates: Vec<Bound<'_, PyAny>>,
     kinds: Vec<String>,
@@ -334,10 +335,7 @@ fn py_calendar_year_ladder(
         dates.iter().map(py_to_date).collect::<PyResult<_>>()?;
     py.detach(move || {
         let kind_refs: Vec<&str> = kinds.iter().map(String::as_str).collect();
-        finstack_quant_cashflows::aggregation::calendar_year_ladder(
-            &dates, &kind_refs, &amounts, &pvs,
-        )
-        .map(|rows| {
+        rust_calendar_year_ladder(&dates, &kind_refs, &amounts, &pvs).map(|rows| {
             rows.into_iter()
                 .map(|row| (row.year, row.non_principal, row.principal, row.pv))
                 .collect()
@@ -355,8 +353,8 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     )?;
     module.add_class::<PyPeriodAggregation>()?;
     module.add_function(wrap_pyfunction!(py_aggregate_by_period, &module)?)?;
-    module.add_function(wrap_pyfunction!(py_aggregate_cashflows_checked, &module)?)?;
-    module.add_function(wrap_pyfunction!(py_calendar_year_ladder, &module)?)?;
+    module.add_function(wrap_pyfunction!(aggregate_cashflows_checked, &module)?)?;
+    module.add_function(wrap_pyfunction!(calendar_year_ladder, &module)?)?;
 
     let all = PyList::new(
         py,

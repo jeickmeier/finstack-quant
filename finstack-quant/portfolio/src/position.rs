@@ -67,8 +67,28 @@ pub enum PositionUnit {
     Percentage,
 }
 
+impl PositionUnit {
+    /// Instrument-value multiplier for `quantity` held in this unit: a
+    /// `Percentage` holding of `50.0` scales by `0.5`; every other unit scales
+    /// by the quantity itself.
+    pub(crate) fn scale_of(self, quantity: f64) -> f64 {
+        match self {
+            Self::Units | Self::Notional(_) | Self::FaceValue => quantity,
+            Self::Percentage => quantity / 100.0,
+        }
+    }
+
+    /// Inverse of [`Self::scale_of`]: the quantity in this unit that gives `scale`.
+    pub(crate) fn quantity_of(self, scale: f64) -> f64 {
+        match self {
+            Self::Units | Self::Notional(_) | Self::FaceValue => scale,
+            Self::Percentage => scale * 100.0,
+        }
+    }
+}
+
 impl std::str::FromStr for PositionUnit {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
 
     /// Parse a unit-only position unit from its serde name.
     ///
@@ -90,7 +110,7 @@ impl std::str::FromStr for PositionUnit {
             "units" => Ok(Self::Units),
             "face_value" => Ok(Self::FaceValue),
             "percentage" => Ok(Self::Percentage),
-            other => Err(crate::error::Error::invalid_input(format!(
+            other => Err(crate::Error::invalid_input(format!(
                 "unknown position unit {other:?}; expected one of units, face_value, \
                  percentage, or the mapping {{\"notional\": <currency or null>}}"
             ))),
@@ -142,6 +162,7 @@ pub struct Position {
 /// the instrument definition as JSON rather than a trait object.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PositionSpec {
     /// Position identifier
     pub position_id: PositionId,
@@ -285,40 +306,6 @@ impl Position {
         self
     }
 
-    /// Add a text attribute to the position.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - Attribute key.
-    /// * `value` - Text attribute value.
-    ///
-    /// # Returns
-    ///
-    /// The updated position for fluent chaining.
-    #[must_use]
-    pub fn with_text_attribute(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
-        self.attributes
-            .insert(key.into(), AttributeValue::Text(value.into()));
-        self
-    }
-
-    /// Add a numeric attribute to the position.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - Attribute key.
-    /// * `value` - Numeric attribute value.
-    ///
-    /// # Returns
-    ///
-    /// The updated position for fluent chaining.
-    #[must_use]
-    pub fn with_numeric_attribute(mut self, key: impl Into<String>, value: f64) -> Self {
-        self.attributes
-            .insert(key.into(), AttributeValue::Number(value));
-        self
-    }
-
     /// Add an attribute to the position.
     ///
     /// # Arguments
@@ -338,67 +325,6 @@ impl Position {
         self
     }
 
-    /// Add multiple text attributes at once.
-    ///
-    /// # Arguments
-    ///
-    /// * `attrs` - Iterator of (key, value) string pairs.
-    ///
-    /// # Returns
-    ///
-    /// The updated position for fluent chaining.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use finstack_quant_portfolio::position::{Position, PositionUnit};
-    /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_core::money::Money;
-    /// use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-    /// use std::sync::Arc;
-    /// use time::macros::date;
-    ///
-    /// # fn main() -> finstack_quant_portfolio::Result<()> {
-    /// let as_of = date!(2024-01-01);
-    ///
-    /// // Create an instrument to attach to the position (example: a simple deposit)
-    /// let deposit = Deposit::builder()
-    ///     .id("DEP_1M".into())
-    ///     .notional(Money::from((1_000_000_i64, Currency::USD)))
-    ///     .start_date(as_of)
-    ///     .maturity(date!(2024-02-01))
-    ///     .day_count(finstack_quant_core::dates::DayCount::Act360)
-    ///     .discount_curve_id("USD".into())
-    ///     .build()
-    ///     .expect("deposit builder should succeed");
-    ///
-    /// let position = Position::new(
-    ///     "POS_001",
-    ///     "ACME_CORP",
-    ///     "DEP_1M",
-    ///     Arc::new(deposit),
-    ///     1.0,
-    ///     PositionUnit::Units,
-    /// )?
-    /// .with_text_attributes([("sector", "Technology"), ("region", "US")]);
-    ///
-    /// assert_eq!(position.attributes.get("sector"), Some(&finstack_quant_portfolio::AttributeValue::Text("Technology".to_string())));
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn with_text_attributes<K, V, I>(mut self, attrs: I) -> Self
-    where
-        K: Into<String>,
-        V: Into<String>,
-        I: IntoIterator<Item = (K, V)>,
-    {
-        for (k, v) in attrs {
-            self.attributes
-                .insert(k.into(), AttributeValue::Text(v.into()));
-        }
-        self
-    }
-
     /// Add metadata.
     ///
     /// # Arguments
@@ -413,16 +339,6 @@ impl Position {
     pub fn with_meta(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
         self.meta.insert(key.into(), value);
         self
-    }
-
-    /// `true` when quantity is strictly positive.
-    pub fn is_long(&self) -> bool {
-        self.quantity > 0.0
-    }
-
-    /// `true` when quantity is strictly negative.
-    pub fn is_short(&self) -> bool {
-        self.quantity < 0.0
     }
 
     /// Scale a monetary value by [`Self::scale_factor`].
@@ -491,12 +407,7 @@ impl Position {
     /// return currency-less P&L deltas).
     #[inline]
     pub fn scale_factor(&self) -> f64 {
-        match self.unit {
-            PositionUnit::Units | PositionUnit::Notional(_) | PositionUnit::FaceValue => {
-                self.quantity
-            }
-            PositionUnit::Percentage => self.quantity / 100.0,
-        }
+        self.unit.scale_of(self.quantity)
     }
 
     /// Convert this position to a serializable specification.
@@ -645,14 +556,13 @@ mod tests {
             PositionUnit::Units,
         )
         .expect("test should succeed")
-        .with_text_attribute("type", "cash")
-        .with_text_attribute("rating", "AAA");
+        .with_attribute("type", "cash")
+        .with_attribute("rating", "AAA");
 
         assert_eq!(position.position_id, "POS_001");
         assert_eq!(position.entity_id, "FUND_A");
         assert_eq!(position.instrument_id, "DEP_1M");
-        assert!(position.is_long());
-        assert!(!position.is_short());
+        assert!(position.quantity > 0.0);
         assert_eq!(
             position.attributes.get("type"),
             Some(&AttributeValue::Text("cash".to_string()))

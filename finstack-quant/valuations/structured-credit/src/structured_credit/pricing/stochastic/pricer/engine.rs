@@ -12,7 +12,7 @@ use crate::structured_credit::pricing::simulation_engine::{
 use crate::structured_credit::types::{
     StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority,
 };
-use finstack_quant_cashflows::builder::weighted_average_life_from_principal;
+use finstack_quant_cashflows::aggregation::weighted_average_life_from_principal;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::OnlineStats;
@@ -1419,10 +1419,11 @@ mod tests {
     use super::*;
     use crate::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
     use crate::structured_credit::{
-        AssetPool, DealType, DefaultModelSpec, PoolAsset, RecoveryModelSpec, Tranche,
-        TrancheCashflows, TrancheSeniority, TrancheStructure,
+        AssetPool, DealType, PoolAsset, Tranche, TrancheCashflows, TrancheSeniority,
+        TrancheStructure,
     };
     use finstack_quant_cashflows::builder::RateSpec;
+    use finstack_quant_cashflows::builder::{DefaultModelSpec, RecoveryModelSpec};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DateExt};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -1979,10 +1980,10 @@ mod per_name_copula_tests {
     use super::*;
     use crate::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
     use crate::structured_credit::{
-        AssetPool, DealType, DefaultModelSpec, PoolAsset, RecoveryModelSpec, Tranche,
-        TrancheSeniority, TrancheStructure,
+        AssetPool, DealType, PoolAsset, Tranche, TrancheSeniority, TrancheStructure,
     };
     use finstack_quant_cashflows::builder::RateSpec;
+    use finstack_quant_cashflows::builder::{DefaultModelSpec, RecoveryModelSpec};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::context::MarketContext;

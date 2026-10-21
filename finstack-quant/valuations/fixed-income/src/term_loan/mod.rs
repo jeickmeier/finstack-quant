@@ -68,10 +68,10 @@ pub(crate) mod types;
 
 pub use super::loan_terms::{CommitmentStep, MarginStep, OidEirSpec};
 pub use spec::{
-    AmortizationSpec, CashSweepEvent, CommitmentFeeBase, DdtlSpec, DrawEvent, LoanCall,
-    LoanCallSchedule, LoanCallType, MakeWholeSpec, OidPolicy, PikToggle, TermLoanCovenantEvents,
+    CashSweepEvent, CommitmentFeeBase, DdtlSpec, DrawEvent, LoanCall, LoanCallSchedule,
+    LoanCallType, MakeWholeSpec, OidPolicy, PikToggle, TermLoanCovenantEvents,
 };
-pub use types::{RateSpec, TermLoan, TermLoanBuilder};
+pub use types::{TermLoan, TermLoanBuilder};
 
 pub use pricing::TermLoanDiscountingPricer;
 pub use pricing::TermLoanTreePricer;

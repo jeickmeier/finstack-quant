@@ -811,7 +811,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
                     ..Default::default()
                 },
             },
-        );
+        )?;
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
         ))

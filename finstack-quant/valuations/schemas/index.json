@@ -1046,7 +1046,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
-      "bytes": 2449,
+      "bytes": 2491,
       "kind": "output",
       "path": "schemas/results/1/pool_stats.schema.json",
       "summary": "Collateral-pool statistics: WAC, spread, maturity, diversity and concentration.",

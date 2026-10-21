@@ -22,9 +22,9 @@ umbrella crate as `finstack_quant::cashflows`.
 |--------|----------|
 | [`builder`](src/builder/mod.rs) | `CashFlowSchedule`, `CashFlowBuilder`, and every spec type (`ScheduleParams`, coupon/fee/amortization/credit specs) |
 | [`accrual`](src/accrual.rs) | `accrued_interest_amount`, `AccrualIndex`, `AccrualConfig`, `AccrualMethod`, `ExCouponRule` |
-| [`aggregation`](src/aggregation.rs) | Period bucketing, currency-checked totals, credit-adjusted PV, calendar-year ladders |
+| [`aggregation`](src/aggregation.rs) | Period bucketing, currency-checked totals, credit-adjusted PV, calendar-year ladders, the Act/365F WAL kernel |
 | [`fixings`](src/fixings.rs) | `ProjectedFixing` raw index observations retained for realized-forward scenario rolls |
-| [`schema`](src/schema.rs) | Published JSON Schema artifacts and `jsonschema` resources |
+| [`schema`](src/schema.rs) | The JSON Schema registry (`ARTIFACTS`) and the `jsonschema` resources rendered from it |
 
 The flow types themselves (`CashFlow`, `CFKind`, `CashFlowAccrual`) live in
 `finstack_quant_core::cashflow`.
@@ -195,16 +195,19 @@ assert!(!flows_json.is_empty());
 ```
 
 `validate_cashflow_schedule_json` parses, validates, and re-serializes a
-schedule payload; `validate_cashflow_schedule` is the in-memory twin and
-delegates to `CashFlowSchedule::validate`.
+schedule payload; for an in-memory schedule call `CashFlowSchedule::validate`.
 
-Seven component schemas are checked in under
-[`schemas/cashflow/1/`](schemas/cashflow/1) — `amortization_spec`,
-`coupon_specs`, `default_model_spec`, `fee_specs`, `prepayment_model_spec`,
-`recovery_model_spec`, `schedule_params` — indexed by
+Fourteen schemas, one per entry of `schema::ARTIFACTS`, are checked in under
+[`schemas/cashflow/1/`](schemas/cashflow/1): the inputs `accrual_config`,
+`cashflow_schedule_build_spec` and `schedule_build_opts`; the outputs
+`cashflow_schedule` and `period_aggregation`; and the components
+`amortization_spec`, `coupon_specs`, `default_model_spec`, `fee_specs`,
+`floating_coupon_spec`, `prepayment_model_spec`, `recovery_model_spec`,
+`schedule_params` and `step_up_coupon_spec`. They are indexed by
 [`schemas/index.json`](schemas/index.json). Regenerate with
-`mise run rust-gen-schemas`; verify with `mise run rust-check-schemas`. The
-Rust serde types remain authoritative for semantic validation.
+`mise run rust-gen-schemas`; verify with `mise run rust-check-schemas`.
+Validation renders the same registry, and the Rust serde types remain
+authoritative for semantic validation.
 
 See [`docs/SERDE_STABILITY.md`](../../docs/SERDE_STABILITY.md) for the wire
 stability rules.
@@ -212,15 +215,18 @@ stability rules.
 ## Bindings
 
 - **Python** — typed submodules under `finstack_quant.cashflows`:
-  `primitives` (binding `finstack_quant_core::cashflow`), `builder`, `accrual`,
-  `aggregation`, `schema`, plus the JSON
+  `builder`, `accrual`, `aggregation`, `fixings`, `schema`, plus the JSON
   bridge (`build_cashflow_schedule_json`, `validate_cashflow_schedule_json`,
   `dated_flows_json`) on the package root; the rate conversions live on
-  `builder`.
-- **WASM** — JSON-only surface in
+  `builder`. The `CashFlow`, `CFKind` and `CashFlowAccrual` row types are
+  `finstack_quant.core.cashflow`.
+- **WASM** — the `cashflows` namespace in
   [`exports/cashflows.js`](../../finstack-quant-wasm/exports/cashflows.js):
-  `buildCashflowScheduleJson`, `validateCashflowScheduleJson`,
-  `datedFlowsJson`, and `cprToSmm` / `smmToCpr` / `cdrToMdr` / `mdrToCdr`.
+  `CashFlowSchedule`, `CashFlowBuilder` and `AccrualIndex` handles; spec,
+  aggregation, fixing and rate-conversion functions over plain wire objects;
+  and the JSON bridge (`buildCashflowScheduleJson`,
+  `validateCashflowScheduleJson`, `datedFlowsJson`). The `CFKind` and
+  `CashFlow` helpers (`cfKindParse`, `cashFlowValidate`, …) are in `core`.
 
 The authoritative contract, including the deliberately Rust-only surface, is
 [`parity_contract.toml`](../../finstack-quant-py/parity_contract.toml)
@@ -247,12 +253,11 @@ Entries live in [`docs/REFERENCES.md`](../../docs/REFERENCES.md):
 ## Verification
 
 ```bash
-cargo clippy -p finstack-quant-cashflows --lib --bins --tests --examples --all-features -- -D warnings
-cargo nextest run -p finstack-quant-cashflows --lib --test '*'
-cargo bench -p finstack-quant-cashflows --bench cashflow_hot_paths
+mise run rust-lint-crate -- finstack-quant-cashflows
+mise run rust-test-crate -- finstack-quant-cashflows
+mise run rust-bench-crate -- finstack-quant-cashflows cashflow_hot_paths
 ```
 
 Workspace gates (`mise run rust-lint`, `mise run rust-test`, `mise run rust-doc`
-— the last one runs doctests) are what CI enforces. Use `cargo nextest`, not
-`cargo test`, for crate-scoped runs; see
+— the last one runs doctests) are what CI enforces; see
 [`CONTRIBUTING.md`](../../CONTRIBUTING.md).

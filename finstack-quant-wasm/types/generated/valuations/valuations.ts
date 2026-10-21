@@ -19897,8 +19897,8 @@ export interface PoolStats {
   /**
    * Weighted average maturity (WAM) in years.
    *
-   * For weighted average life use
-   * [`AssetPool::wal_from_cashflows`].
+   * For weighted average life, which weights principal cashflows rather
+   * than maturities, use the `wal` metric.
    */
   weighted_avg_maturity: number;
   /**

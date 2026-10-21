@@ -247,7 +247,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for PrivateMarketsFund {
             finstack_quant_core::cashflow::CFKind::Fixed,
             finstack_quant_core::dates::DayCount::Act365F,
             finstack_quant_cashflows::ScheduleBuildOpts::default(),
-        );
+        )?;
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Contractual,
         ))

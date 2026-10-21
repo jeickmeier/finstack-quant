@@ -2,7 +2,7 @@
   "$defs": {
     "ApplicationReport": {
       "additionalProperties": false,
-      "description": "Report describing what happened during [`super::ScenarioEngine::apply`].\n\n# Examples\n```rust\nuse finstack_quant_scenarios::engine::ApplicationReport;\n\nlet report = ApplicationReport {\n    operations_applied: 3,\n    user_operations: 1,\n    expanded_operations: 3,\n    changes: Default::default(),\n    applied_shocks: vec![],\n    warnings: vec![],\n    meta: None,\n    time_roll: None,\n};\n\nassert_eq!(report.operations_applied, 3);\nassert_eq!(report.user_operations, 1);\nassert_eq!(report.expanded_operations, 3);\n```",
+      "description": "Report describing what happened during [`super::ScenarioEngine::apply`].\n\n# Examples\n```rust\nuse finstack_quant_scenarios::ApplicationReport;\n\nlet report = ApplicationReport {\n    operations_applied: 3,\n    user_operations: 1,\n    expanded_operations: 3,\n    changes: Default::default(),\n    applied_shocks: vec![],\n    warnings: vec![],\n    meta: None,\n    time_roll: None,\n};\n\nassert_eq!(report.operations_applied, 3);\nassert_eq!(report.user_operations, 1);\nassert_eq!(report.expanded_operations, 3);\n```",
       "properties": {
         "applied_shocks": {
           "description": "Size of every market and instrument shock applied, in application\norder: one entry per accepted effect, so the entries reconcile with\n[`changes`](Self::changes) (every market target named there appears\nhere at least once, and the instrument indices here union to\n`changes.changed_instrument_indices`).\n\nStatement-forecast operations, rate bindings and the time roll are not\nlisted. Empty when the scenario applied no market or instrument shock,\nand on reports deserialized from JSON written before this field\nexisted.",
@@ -2498,7 +2498,7 @@
               "type": "string"
             },
             "op_kind": {
-              "description": "Operation kind name (e.g., `\"HierarchyCurveParallelBp\"`).",
+              "description": "Operation `kind` tag (e.g., `\"hierarchy_curve_parallel_bp\"`).",
               "type": "string"
             },
             "target_path": {
@@ -2525,7 +2525,7 @@
               "type": "string"
             },
             "op_kind": {
-              "description": "Operation kind name (e.g., `\"HierarchyCurveParallelBp\"`).",
+              "description": "Operation `kind` tag (e.g., `\"hierarchy_curve_parallel_bp\"`).",
               "type": "string"
             }
           },
@@ -2564,7 +2564,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "One ordered result from `scenario_pnl_batch`.",
+  "description": "One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`.",
   "examples": [
     {
       "pnl": {

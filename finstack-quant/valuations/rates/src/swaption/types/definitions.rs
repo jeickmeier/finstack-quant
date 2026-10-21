@@ -146,7 +146,7 @@ impl BermudanSchedule {
                 frequency: fixed_frequency,
                 stub: StubKind::None,
                 business_day_convention: BusinessDayConvention::ModifiedFollowing,
-                calendar_id: finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID,
+                calendar_id: finstack_quant_core::dates::WEEKENDS_ONLY_ID,
                 end_of_month: false,
                 day_count: finstack_quant_core::dates::DayCount::Act365F,
                 payment_lag_days: 0,

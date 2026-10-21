@@ -19,14 +19,9 @@ pub enum PortfolioMaterializationSchema {
     Materialization,
 }
 
-impl PortfolioMaterializationSchema {
-    /// The exact marker required by every persisted materialization envelope.
-    pub const CURRENT: Self = Self::Materialization;
-}
-
 /// Strict, versioned portfolio materialization bundle.
 ///
-/// Unlike [`crate::portfolio::PortfolioSpec`], this database-oriented format
+/// Unlike [`crate::PortfolioSpec`], this database-oriented format
 /// stores each instrument artifact once and lets ordered lightweight positions
 /// reference the artifact by ID.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -288,6 +283,26 @@ impl TryFrom<&MaterializedPosition> for MaterializedPositionWire {
             )
         };
 
+        let non_percentage = |unit: NonPercentagePositionUnitWire| -> Result<Self, Self::Error> {
+            if !position.quantity.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "materialized position quantity must be finite, got {}",
+                    position.quantity
+                )));
+            }
+            let (id, entity_id, instrument_id, artifact_id, attributes, meta) = common();
+            Ok(Self::NonPercentage(NonPercentageMaterializedPositionWire {
+                id,
+                entity_id,
+                instrument_id,
+                artifact_id,
+                quantity: position.quantity,
+                unit,
+                attributes,
+                meta,
+            }))
+        };
+
         match position.unit {
             PositionUnit::Percentage => {
                 let (id, entity_id, instrument_id, artifact_id, attributes, meta) = common();
@@ -302,41 +317,16 @@ impl TryFrom<&MaterializedPosition> for MaterializedPositionWire {
                     meta,
                 }))
             }
-            unit => {
-                if !position.quantity.is_finite() {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "materialized position quantity must be finite, got {}",
-                        position.quantity
-                    )));
-                }
-                let unit = match unit {
-                    PositionUnit::Units => {
-                        NonPercentagePositionUnitWire::Named(NonPercentagePositionUnitName::Units)
-                    }
-                    PositionUnit::FaceValue => NonPercentagePositionUnitWire::Named(
-                        NonPercentagePositionUnitName::FaceValue,
-                    ),
-                    PositionUnit::Notional(notional) => NonPercentagePositionUnitWire::Notional {
-                        notional: notional.into(),
-                    },
-                    PositionUnit::Percentage => {
-                        return Err(finstack_quant_core::Error::Internal(
-                            "percentage position reached non-percentage serialization branch"
-                                .to_string(),
-                        ));
-                    }
-                };
-                let (id, entity_id, instrument_id, artifact_id, attributes, meta) = common();
-                Ok(Self::NonPercentage(NonPercentageMaterializedPositionWire {
-                    id,
-                    entity_id,
-                    instrument_id,
-                    artifact_id,
-                    quantity: position.quantity,
-                    unit,
-                    attributes,
-                    meta,
-                }))
+            PositionUnit::Units => non_percentage(NonPercentagePositionUnitWire::Named(
+                NonPercentagePositionUnitName::Units,
+            )),
+            PositionUnit::FaceValue => non_percentage(NonPercentagePositionUnitWire::Named(
+                NonPercentagePositionUnitName::FaceValue,
+            )),
+            PositionUnit::Notional(notional) => {
+                non_percentage(NonPercentagePositionUnitWire::Notional {
+                    notional: notional.into(),
+                })
             }
         }
     }

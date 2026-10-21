@@ -1,4 +1,4 @@
-//! Embedded JSON Schema resources owned by the cashflows crate.
+//! JSON Schema registry and validation resources owned by the cashflows crate.
 
 use crate::accrual::AccrualConfig;
 use crate::aggregation::PeriodAggregation;
@@ -12,10 +12,6 @@ use crate::traits::ScheduleBuildOpts;
 use finstack_quant_core::Error;
 use finstack_quant_core::Result;
 use serde_json::Value;
-
-/// Stable base URI for cashflow component schemas.
-#[cfg(feature = "jsonschema-validate")]
-pub const CASHFLOW_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/cashflow/1/";
 
 /// Typed cashflow definitions eligible for assertion-checked externalization.
 pub const CASHFLOW_SCHEMA_DEFINITIONS: &[finstack_quant_core::schema::ExternalSchemaDefinition] = &[
@@ -54,78 +50,19 @@ pub const CASHFLOW_SCHEMA_DEFINITIONS: &[finstack_quant_core::schema::ExternalSc
 /// # Arguments
 ///
 /// * `schema` - Complete schema generated from a cashflow serde type.
-#[doc(hidden)]
-pub fn package_cashflow_schema(schema: &mut Value) -> Result<()> {
+fn package_cashflow_schema(schema: &mut Value) -> Result<()> {
     finstack_quant_core::schema::externalize_schema_definitions(
         schema,
         finstack_quant_core::schema::COMMON_SCHEMA_DEFINITIONS,
     )
 }
 
-#[cfg(feature = "jsonschema-validate")]
-const SCHEMAS: [(&str, &str); 14] = [
-    (
-        "accrual_config.schema.json",
-        include_str!("../schemas/cashflow/1/accrual_config.schema.json"),
-    ),
-    (
-        "amortization_spec.schema.json",
-        include_str!("../schemas/cashflow/1/amortization_spec.schema.json"),
-    ),
-    (
-        "cashflow_schedule.schema.json",
-        include_str!("../schemas/cashflow/1/cashflow_schedule.schema.json"),
-    ),
-    (
-        "cashflow_schedule_build_spec.schema.json",
-        include_str!("../schemas/cashflow/1/cashflow_schedule_build_spec.schema.json"),
-    ),
-    (
-        "coupon_specs.schema.json",
-        include_str!("../schemas/cashflow/1/coupon_specs.schema.json"),
-    ),
-    (
-        "default_model_spec.schema.json",
-        include_str!("../schemas/cashflow/1/default_model_spec.schema.json"),
-    ),
-    (
-        "fee_specs.schema.json",
-        include_str!("../schemas/cashflow/1/fee_specs.schema.json"),
-    ),
-    (
-        "floating_coupon_spec.schema.json",
-        include_str!("../schemas/cashflow/1/floating_coupon_spec.schema.json"),
-    ),
-    (
-        "period_aggregation.schema.json",
-        include_str!("../schemas/cashflow/1/period_aggregation.schema.json"),
-    ),
-    (
-        "prepayment_model_spec.schema.json",
-        include_str!("../schemas/cashflow/1/prepayment_model_spec.schema.json"),
-    ),
-    (
-        "recovery_model_spec.schema.json",
-        include_str!("../schemas/cashflow/1/recovery_model_spec.schema.json"),
-    ),
-    (
-        "schedule_build_opts.schema.json",
-        include_str!("../schemas/cashflow/1/schedule_build_opts.schema.json"),
-    ),
-    (
-        "schedule_params.schema.json",
-        include_str!("../schemas/cashflow/1/schedule_params.schema.json"),
-    ),
-    (
-        "step_up_coupon_spec.schema.json",
-        include_str!("../schemas/cashflow/1/step_up_coupon_spec.schema.json"),
-    ),
-];
-
-/// Parse the embedded schemas once per process.
+/// Render every registered schema once per process.
 ///
-/// Errors are cached as `String` because `finstack_quant_core::Error` is not
-/// `Clone`.
+/// The published files under `schemas/cashflow/1/` are exactly these renders
+/// (the schema gen-check enforces it), so validation reads the registry
+/// rather than a second, hand-kept list of embedded files. Errors are cached
+/// as `String` because `finstack_quant_core::Error` is not `Clone`.
 #[cfg(feature = "jsonschema-validate")]
 fn parsed_schemas() -> &'static std::result::Result<Vec<(String, jsonschema::Resource)>, String> {
     static CACHE: std::sync::OnceLock<
@@ -133,15 +70,16 @@ fn parsed_schemas() -> &'static std::result::Result<Vec<(String, jsonschema::Res
     > = std::sync::OnceLock::new();
 
     CACHE.get_or_init(|| {
-        SCHEMAS
-            .into_iter()
-            .map(|(filename, raw)| {
-                let schema = serde_json::from_str::<Value>(raw)
-                    .map_err(|err| format!("invalid cashflow schema JSON at {filename}: {err}"))?;
+        ARTIFACTS
+            .iter()
+            .map(|artifact| {
+                let schema = artifact
+                    .generate()
+                    .map_err(|err| format!("render cashflow schema {}: {err}", artifact.id))?;
                 let resource = jsonschema::Resource::from_contents(schema).map_err(|err| {
-                    format!("invalid cashflow schema resource at {filename}: {err}")
+                    format!("invalid cashflow schema resource {}: {err}", artifact.id)
                 })?;
-                Ok((format!("{CASHFLOW_SCHEMA_BASE}{filename}"), resource))
+                Ok((artifact.id.to_string(), resource))
             })
             .collect()
     })

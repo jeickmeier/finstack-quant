@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use crate::adjustments::types::{NormalizationConfig, NormalizationResult};
 use crate::checks::CheckSuiteSpec;
-use crate::evaluator::{MonteCarloConfig, MonteCarloResults, StatementResult};
+use crate::evaluator::{MonteCarloConfig, MonteCarloResults, RollupSpec, StatementResult};
 use crate::registry::MetricRegistry;
 use crate::FinancialModelSpec;
 use crate::{Error, Result};
@@ -352,12 +352,12 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "Per-period normalization outcome: base value, applied adjustments and final value."
     )
     .with_examples(normalization_result_examples),
-    finstack_quant_core::schema::SchemaArtifact::new::<crate::evaluator::RollupSpec>(
-        "schemas/statements/1/rollup_spec.schema.json",
-        "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
-        "RollupSpec",
-        "Target frequency and per-node methods for rolling statement results up to coarser periods.",
+    finstack_quant_core::schema_artifact!(
+        RollupSpec,
+        "statements",
+        "rollup_spec",
+        Input,
+        "Target frequency and per-node methods for rolling statement results up to coarser periods."
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
     .with_examples(rollup_spec_examples),
 ];

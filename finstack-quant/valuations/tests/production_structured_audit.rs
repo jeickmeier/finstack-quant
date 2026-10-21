@@ -1,11 +1,12 @@
 //! Independent input-contract regressions for the structured-credit audit.
 
+use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    DealType, DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec, RepLine, StructuredCredit,
+    DealType, RepLine, StructuredCredit,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use time::macros::date;

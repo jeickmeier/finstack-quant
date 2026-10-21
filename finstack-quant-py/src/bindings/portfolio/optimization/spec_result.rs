@@ -1,10 +1,11 @@
 use indexmap::{IndexMap, IndexSet};
 use pyo3::prelude::*;
+
+use crate::errors::core_to_py;
 use pyo3::types::{PyDict, PyList, PyType};
 
 use finstack_quant_portfolio::optimization::{
-    CandidatePosition, OptimizationStatus, PortfolioOptimizationResult,
-    PortfolioOptimizationResultWire, PortfolioOptimizationSpec, TradeUniverse,
+    CandidatePosition, PortfolioOptimizationResult, PortfolioOptimizationSpec, TradeUniverse,
 };
 use finstack_quant_portfolio::types::PositionId;
 
@@ -79,8 +80,8 @@ impl PyCandidatePosition {
         min_weight: f64,
         attributes: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
-        let boxed = crate::bindings::portfolio::types::extract_position_instrument(instrument)?;
-        let unit = crate::bindings::portfolio::types::extract_position_unit(py, unit)?;
+        let boxed = crate::bindings::portfolio::container::extract_position_instrument(instrument)?;
+        let unit = crate::bindings::portfolio::container::extract_position_unit(py, unit)?;
         let mut inner = CandidatePosition::new(id, entity_id, std::sync::Arc::from(boxed), unit)
             .with_max_weight(max_weight)
             .with_min_weight(min_weight);
@@ -185,7 +186,7 @@ impl PyTradeUniverse {
     /// Universe where all existing positions are tradeable and no candidates exist.
     #[classmethod]
     fn all_positions(_cls: &Bound<'_, PyType>) -> Self {
-        Self::from_inner(TradeUniverse::all_positions())
+        Self::from_inner(TradeUniverse::default())
     }
 
     /// Universe where only positions matching ``filter`` may trade.
@@ -314,17 +315,18 @@ impl PyPortfolioOptimizationSpec {
         portfolio: &Bound<'_, PyAny>,
         objective: PyObjective,
     ) -> PyResult<Self> {
-        let portfolio: finstack_quant_portfolio::portfolio::PortfolioSpec =
-            if let Ok(built) = portfolio.cast::<crate::bindings::portfolio::types::PyPortfolio>() {
-                built.borrow().inner.to_spec()
-            } else {
-                let json: String = portfolio.extract().map_err(|_| {
-                    pyo3::exceptions::PyTypeError::new_err(
-                        "expected a Portfolio or a canonical PortfolioSpec JSON string",
-                    )
-                })?;
-                deserialize_json(&json)?
-            };
+        let portfolio: finstack_quant_portfolio::PortfolioSpec = if let Ok(built) =
+            portfolio.cast::<crate::bindings::portfolio::container::PyPortfolio>()
+        {
+            built.borrow().inner.to_spec()
+        } else {
+            let json: String = portfolio.extract().map_err(|_| {
+                pyo3::exceptions::PyTypeError::new_err(
+                    "expected a Portfolio or a canonical PortfolioSpec JSON string",
+                )
+            })?;
+            deserialize_json(&json)?
+        };
         Ok(Self::from_inner(PortfolioOptimizationSpec::new(
             portfolio,
             objective.inner,
@@ -476,27 +478,19 @@ const TRADE_COLUMNS: [ColumnSchema<'static>; 9] = [
     ("target_weight", "float64"),
 ];
 
-/// Result of an optimization run.
-///
-/// The wrapper holds the canonical `PortfolioOptimizationResultWire` rather
-/// than `PortfolioOptimizationResult` itself: the latter echoes the original
-/// problem, whose `Arc<dyn Instrument>` values do not round-trip through
-/// serde. The wire type carries every field this class exposes, so storing it
-/// is what lets the wrapper satisfy the result-return contract — typed
-/// getters, `to_json`, `from_json`, and pickle — like its 154 siblings.
+/// Result of an optimization run (wraps Rust `PortfolioOptimizationResult`,
+/// which is also the canonical JSON wire contract).
 #[pyclass(
     name = "PortfolioOptimizationResult",
     module = "finstack_quant.portfolio"
 )]
 pub(super) struct PyPortfolioOptimizationResult {
-    pub(crate) inner: PortfolioOptimizationResultWire,
+    pub(crate) inner: PortfolioOptimizationResult,
 }
 
 impl PyPortfolioOptimizationResult {
     pub(crate) fn from_inner(inner: PortfolioOptimizationResult) -> Self {
-        Self {
-            inner: PortfolioOptimizationResultWire::from(&inner),
-        }
+        Self { inner }
     }
 }
 
@@ -542,16 +536,17 @@ impl PyPortfolioOptimizationResult {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Solver outcome (optimal, feasible-but-suboptimal, infeasible, ...).
+    /// Solver outcome (optimal, infeasible, unbounded or error).
     #[getter]
     fn status(&self) -> PyOptimizationStatus {
         PyOptimizationStatus::from_inner(self.inner.status.clone())
     }
 
-    /// Whether :attr:`status` represents a solution that may be consumed.
+    /// Whether :attr:`status` represents a solution that may be consumed;
+    /// derived from :attr:`status`, never stored.
     #[getter]
     fn is_feasible(&self) -> bool {
-        self.inner.is_feasible
+        self.inner.is_feasible()
     }
 
     /// Value of the objective function at the solution, in the objective's own
@@ -617,16 +612,6 @@ impl PyPortfolioOptimizationResult {
             .implied_quantities
             .iter()
             .map(|(k, v)| (k.as_str().to_owned(), *v))
-            .collect()
-    }
-
-    /// Evaluated portfolio-level metric values at the solution, keyed by metric id.
-    #[getter]
-    fn metric_values(&self) -> IndexMap<String, f64> {
-        self.inner
-            .metric_values
-            .iter()
-            .map(|(k, v)| (k.clone(), *v))
             .collect()
     }
 
@@ -741,19 +726,13 @@ impl PyPortfolioOptimizationResult {
             .collect()
     }
 
-    fn __repr__(&self) -> String {
-        format!(
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
             "PortfolioOptimizationResult(status={:?}, objective_value={}, turnover={})",
-            match &self.inner.status {
-                OptimizationStatus::Optimal => "optimal",
-                OptimizationStatus::FeasibleButSuboptimal => "feasible_but_suboptimal",
-                OptimizationStatus::Infeasible { .. } => "infeasible",
-                OptimizationStatus::Unbounded => "unbounded",
-                OptimizationStatus::Error { .. } => "error",
-            },
+            finstack_quant_core::wire::serde_tag(&self.inner.status).map_err(core_to_py)?,
             self.inner.objective_value,
             self.inner.turnover,
-        )
+        ))
     }
 
     /// Render as an HTML table in Jupyter notebooks.

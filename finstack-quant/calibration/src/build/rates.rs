@@ -43,67 +43,6 @@ use rust_decimal::Decimal;
 /// - Date calculations fail (invalid tenor, business day adjustment)
 /// - Instrument construction fails (invalid parameters)
 ///
-/// # Examples
-///
-/// Building a deposit:
-/// ```rust,ignore
-/// use finstack_quant_calibration::build::BuildCtx;
-/// use finstack_quant_calibration::build::build_rate_instrument;
-/// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-/// use finstack_quant_calibration::quotes::rates::RateQuote;
-/// use finstack_quant_core::types::IndexId;
-/// use finstack_quant_core::dates::Date;
-/// use finstack_quant_core::FxHashMap;
-///
-/// # fn example() -> finstack_quant_core::Result<()> {
-/// let ctx = BuildCtx::new(
-///     Date::from_calendar_date(2024, time::Month::January, 2).unwrap(),
-///     1_000_000.0,
-///     FxHashMap::default(),
-/// );
-///
-/// let quote = RateQuote::Deposit {
-///     id: QuoteId::new("USD-SOFR-DEP-1M"),
-///     index: IndexId::new("USD-SOFR-1M"),
-///     pillar: Pillar::Tenor("1M".parse().unwrap()),
-///     rate: 0.0525,
-/// };
-///
-/// let instrument = build_rate_instrument(&quote, &ctx)?;
-/// # Ok(())
-/// # }
-/// ```
-///
-/// Building a swap:
-/// ```rust,ignore
-/// use finstack_quant_calibration::build::BuildCtx;
-/// use finstack_quant_calibration::build::build_rate_instrument;
-/// use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-/// use finstack_quant_calibration::quotes::rates::RateQuote;
-/// use finstack_quant_core::types::IndexId;
-/// use finstack_quant_core::dates::Date;
-/// use finstack_quant_core::FxHashMap;
-///
-/// # fn example() -> finstack_quant_core::Result<()> {
-/// let ctx = BuildCtx::new(
-///     Date::from_calendar_date(2024, time::Month::January, 2).unwrap(),
-///     1_000_000.0,
-///     FxHashMap::default(),
-/// );
-///
-/// let quote = RateQuote::Swap {
-///     id: QuoteId::new("USD-OIS-SWAP-5Y"),
-///     index: IndexId::new("USD-SOFR-OIS"),
-///     pillar: Pillar::Tenor("5Y".parse().unwrap()),
-///     rate: 0.0450,
-///     spread_decimal: None,
-/// };
-///
-/// let instrument = build_rate_instrument(&quote, &ctx)?;
-/// # Ok(())
-/// # }
-/// ```
-///
 /// # See Also
 ///
 /// - [`RateQuote`] for supported quote types

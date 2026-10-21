@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
-      "bytes": 78256,
+      "bytes": 78379,
       "kind": "input",
       "path": "schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
       "summary": "Notional, dates, coupon program, fees and principal events that build a schedule.",
@@ -56,7 +56,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/fee_specs.schema.json",
-      "bytes": 8073,
+      "bytes": 8196,
       "kind": "component",
       "path": "schemas/cashflow/1/fee_specs.schema.json",
       "summary": "Recurring or one-off fees attached to a schedule.",

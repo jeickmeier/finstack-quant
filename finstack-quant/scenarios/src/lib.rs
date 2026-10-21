@@ -34,7 +34,7 @@
 //! - [`ScenarioSpec`] and [`OperationSpec`] to describe shocks and time rolls
 //! - [`ScenarioEngine`] to apply a spec deterministically
 //! - [`ExecutionContext`] to supply market data, statements, instruments, and calendars
-//! - [`templates`] for reusable historical stress scenarios
+//! - [`TemplateRegistry`] for reusable historical stress scenarios
 //!
 //! # Quick Start
 //!
@@ -95,38 +95,43 @@
 //! - Day-count and business-day conventions: `docs/REFERENCES.md#isda-2006-definitions`
 //! - Period notation: `docs/REFERENCES.md#iso-8601`
 
+// Every public item is exported once, at the crate root; the modules below
+// only organize the source. `schema` stays a public module because every
+// crate publishes its registry as `<crate>::schema::ARTIFACTS`.
+
 /// Adaptations for scenario execution across domains.
-pub(crate) mod adapters;
+mod adapters;
 /// Scenario execution engine and context.
-pub mod engine;
+mod engine;
 /// Versioned persistence envelope for scenario specifications.
-pub mod envelope;
+mod envelope;
 /// Error types for scenario evaluation.
-pub mod error;
+mod error;
 /// Horizon total return analysis.
-pub mod horizon;
+mod horizon;
 /// JSON Schema generation helpers for scenario contracts.
 #[cfg(feature = "json-schema")]
 pub mod schema;
 /// Scenario specification types and enums.
-pub mod spec;
+mod spec;
 /// Historical stress test template types and builders.
-pub mod templates;
+mod templates;
 /// Utility helpers for scenario operations.
-pub(crate) mod utils;
+mod utils;
 /// Structured warning enum surfaced via `ApplicationReport.warnings`.
-pub mod warning;
+mod warning;
 
 pub use engine::{
-    ApplicationEnvelope, ApplicationReport, AppliedShock, AppliedShockTarget, ExecutionContext,
-    LevelChange, RollForwardReport, ScenarioEngine, ShockMagnitude, ShockNode, ShockUnit,
+    instrument_envelopes, ApplicationEnvelope, ApplicationReport, AppliedShock, AppliedShockTarget,
+    ExecutionContext, LevelChange, RollForwardReport, ScenarioChangeManifest, ScenarioEngine,
+    ScenarioMarketTarget, ShockMagnitude, ShockNode, ShockUnit,
 };
-pub use envelope::ScenarioEnvelope;
+pub use envelope::{ScenarioEnvelope, ScenarioSchema};
 pub use error::{Error, Result};
 pub use horizon::{HorizonAnalysis, HorizonReport, HorizonResult, HorizonSummary};
 pub use spec::{
-    CurveKind, HazardBumpMode, HierarchyTarget, InstrumentType, NodeId, OperationSpec,
-    RateBindingSpec, ScenarioSpec, TenorMatchMode, TimeRollMode,
+    CurveKind, HazardBumpMode, OperationSpec, RateBindingSpec, ScenarioSpec, TenorMatchMode,
+    TimeRollMode,
 };
 pub use templates::{AssetClass, TemplateMetadata, TemplateRegistry, TemplateSeverity};
 pub use warning::Warning;

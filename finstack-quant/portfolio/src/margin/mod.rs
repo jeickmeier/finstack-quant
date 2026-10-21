@@ -30,20 +30,23 @@
 //! # Usage
 //!
 //! ```no_run
-//! use finstack_quant_portfolio::PortfolioMarginAggregator;
+//! use finstack_quant_portfolio::margin::portfolio_margin;
 //! use finstack_quant_core::market_data::context::MarketContext;
 //! use finstack_quant_portfolio::Portfolio;
 //! use time::macros::date;
 //!
-//! // Create margin aggregator from portfolio
 //! # fn main() -> finstack_quant_portfolio::Result<()> {
 //! # let portfolio: Portfolio = unimplemented!("Provide your portfolio");
 //! # let market: MarketContext = unimplemented!("Provide market context");
 //! let as_of = date!(2025-11-21);
-//! let mut aggregator = PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
 //!
-//! // Calculate margin requirements
-//! let margin_results = aggregator.calculate(&portfolio, &market, as_of, &finstack_quant_core::FxHashMap::default())?;
+//! // One call groups positions into netting sets and calculates margin.
+//! let margin_results = portfolio_margin(
+//!     &portfolio,
+//!     &market,
+//!     as_of,
+//!     &finstack_quant_core::FxHashMap::default(),
+//! )?;
 //!
 //! // Get margin by netting set
 //! for (netting_set, margin) in &margin_results.by_netting_set {
@@ -61,5 +64,5 @@ mod netting_set;
 mod results;
 mod wire;
 
-pub use aggregator::PortfolioMarginAggregator;
+pub use aggregator::portfolio_margin;
 pub use results::{NettingSetMargin, PortfolioMarginResult};

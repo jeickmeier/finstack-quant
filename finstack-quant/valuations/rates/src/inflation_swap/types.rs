@@ -315,7 +315,7 @@ impl InflationSwap {
                 frequency: Tenor::annual(),
                 stub: StubKind::ShortFront,
                 business_day_convention: BusinessDayConvention::Unadjusted,
-                calendar_id: finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID,
+                calendar_id: finstack_quant_core::dates::WEEKENDS_ONLY_ID,
                 end_of_month: false,
                 day_count: DayCount::OneOne,
                 payment_lag_days: 0,
@@ -588,7 +588,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
                     ..Default::default()
                 },
             },
-        );
+        )?;
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
         ))
@@ -791,7 +791,7 @@ impl YoYInflationSwap {
                 calendar_id: self
                     .calendar_id
                     .as_deref()
-                    .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
+                    .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID),
                 end_of_month: false,
                 day_count: self.day_count,
                 payment_lag_days: 0,
@@ -1081,7 +1081,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for YoYInflationSwap {
                     ..Default::default()
                 },
             },
-        );
+        )?;
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
         ))

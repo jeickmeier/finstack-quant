@@ -302,10 +302,10 @@ fn test_pik_cashflows() {
     assert_eq!(settlements[0].1.amount(), -1000.0);
     assert!(settlements[1].1.amount() > 1000.0);
     assert!(
-        finstack_quant_cashflows::accrued_interest_amount(
+        finstack_quant_cashflows::accrual::accrued_interest_amount(
             &schedule,
             date!(2025 - 04 - 01),
-            &finstack_quant_cashflows::AccrualConfig::default(),
+            &finstack_quant_cashflows::accrual::AccrualConfig::default(),
         )
         .unwrap()
             > 0.0

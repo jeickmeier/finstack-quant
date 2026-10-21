@@ -616,7 +616,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for RealEstateAsset {
         if let Some((date, amount)) = self.terminal_sale_proceeds(as_of)? {
             flows.push((date, Money::new(amount, self.currency)?));
         }
-        Ok(finstack_quant_cashflows::schedule_from_dated_flows(
+        finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
             finstack_quant_core::cashflow::CFKind::Fixed,
             self.day_count,
@@ -628,7 +628,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for RealEstateAsset {
                 },
                 ..Default::default()
             },
-        ))
+        )
     }
 }
 

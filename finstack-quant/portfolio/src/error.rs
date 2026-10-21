@@ -8,8 +8,7 @@ use thiserror::Error;
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Errors that can occur during portfolio operations.
-#[derive(Debug, Clone, PartialEq, Error, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
 pub enum Error {
     /// Position references an unknown entity
@@ -20,10 +19,6 @@ pub enum Error {
         /// Entity identifier that was not found.
         entity_id: EntityId,
     },
-
-    /// Portfolio validation failed
-    #[error("Portfolio validation failed: {0}")]
-    ValidationFailed(String),
 
     /// FX conversion failed
     #[error("FX conversion failed: {from} to {to}")]
@@ -47,8 +42,14 @@ pub enum Error {
     },
 
     /// Scenario application error
-    #[error("Scenario application failed: {0}")]
-    ScenarioError(String),
+    #[error("Scenario application failed: {message}")]
+    ScenarioError {
+        /// Error message describing the scenario failure.
+        message: String,
+        /// Classification of the failure: the scenario engine error's kind,
+        /// or the kind of the consistency check that failed.
+        kind: finstack_quant_core::ErrorKind,
+    },
 
     /// Missing market data
     #[error("Missing market data: {0}")]
@@ -58,7 +59,7 @@ pub enum Error {
     #[error(transparent)]
     Core(#[from] finstack_quant_core::Error),
 
-    /// Invalid input data
+    /// Invalid caller input or a failed portfolio validation check.
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
@@ -79,15 +80,6 @@ pub enum Error {
 }
 
 impl Error {
-    /// Create a validation error with context.
-    ///
-    /// # Arguments
-    ///
-    /// * `msg` - Human-readable description of the validation failure.
-    pub fn validation(msg: impl Into<String>) -> Self {
-        Self::ValidationFailed(msg.into())
-    }
-
     /// Create a valuation error with context.
     ///
     /// # Arguments
@@ -108,15 +100,29 @@ impl Error {
         }
     }
 
+    /// Create a scenario application error with context.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` - Classification of the failure (see [`Error::kind`]): the
+    ///   scenario engine error's kind, or the kind of the failed check.
+    /// * `msg` - Human-readable error detail.
+    pub fn scenario(kind: finstack_quant_core::ErrorKind, msg: impl Into<String>) -> Self {
+        Self::ScenarioError {
+            message: msg.into(),
+            kind,
+        }
+    }
+
     /// Classify this error for host-language exception mapping.
     ///
     /// | Kind | Variants |
     /// |------|----------|
     /// | [`ErrorKind::NotFound`] | `UnknownEntity`, `MissingMarketData`, `FxConversionFailed` (no rate for the pair) |
-    /// | [`ErrorKind::Validation`] | `ValidationFailed`, `ScenarioError`, `InvalidInput`, `ContractLimitExceeded`, `MaterializationFailed` |
+    /// | [`ErrorKind::Validation`] | `InvalidInput`, `ContractLimitExceeded`, `MaterializationFailed` |
     ///
-    /// `Core` keeps its own kind and `ValuationError` carries the kind of the
-    /// failure it wraps.
+    /// `Core` keeps its own kind; `ValuationError` and `ScenarioError` carry
+    /// the kind of the failure they wrap.
     ///
     /// [`ErrorKind::NotFound`]: finstack_quant_core::ErrorKind::NotFound
     /// [`ErrorKind::Validation`]: finstack_quant_core::ErrorKind::Validation
@@ -125,13 +131,11 @@ impl Error {
         use finstack_quant_core::ErrorKind;
         match self {
             Error::Core(core) => core.kind(),
-            Error::ValuationError { kind, .. } => *kind,
+            Error::ValuationError { kind, .. } | Error::ScenarioError { kind, .. } => *kind,
             Error::UnknownEntity { .. }
             | Error::MissingMarketData(_)
             | Error::FxConversionFailed { .. } => ErrorKind::NotFound,
-            Error::ValidationFailed(_)
-            | Error::ScenarioError(_)
-            | Error::InvalidInput(_)
+            Error::InvalidInput(_)
             | Error::ContractLimitExceeded { .. }
             | Error::MaterializationFailed(_) => ErrorKind::Validation,
         }
@@ -150,11 +154,12 @@ impl Error {
         }
     }
 
-    /// Create an invalid input error.
+    /// Create an invalid-input error, the one validation category for bad
+    /// caller input and failed portfolio checks.
     ///
     /// # Arguments
     ///
-    /// * `msg` - Description of the bad caller input.
+    /// * `msg` - Description of the bad input or the violated invariant.
     pub fn invalid_input(msg: impl Into<String>) -> Self {
         Self::InvalidInput(msg.into())
     }
@@ -231,8 +236,14 @@ mod tests {
                 Error::valuation("P", ErrorKind::Computation, "solver"),
                 ErrorKind::Computation,
             ),
-            (Error::validation("bad"), ErrorKind::Validation),
-            (Error::ScenarioError("bad".into()), ErrorKind::Validation),
+            (
+                Error::scenario(ErrorKind::Validation, "bad"),
+                ErrorKind::Validation,
+            ),
+            (
+                Error::scenario(ErrorKind::NotFound, "missing curve"),
+                ErrorKind::NotFound,
+            ),
             (Error::invalid_input("bad"), ErrorKind::Validation),
             (
                 Error::contract_limit_exceeded("bytes", 2, 1),

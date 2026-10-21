@@ -215,7 +215,7 @@ pub(crate) fn resolved_dependencies(
 
 /// Inverted index mapping market factor keys to affected position indices.
 ///
-/// Stored alongside the `position_index` on [`Portfolio`](crate::portfolio::Portfolio)
+/// Stored alongside the `position_index` on [`Portfolio`](crate::Portfolio)
 /// as a derived, non-serialized cache.  The index maps each [`MarketFactorKey`]
 /// to the position indices whose instruments depend on that key.
 ///
@@ -436,15 +436,6 @@ impl DependencyIndex {
     /// `true` when the index contains no keys and no unresolved positions.
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty() && self.unresolved.is_empty()
-    }
-
-    /// Iterate over all tracked market factor keys and their position indices.
-    ///
-    /// # Returns
-    ///
-    /// Iterator over normalized factor keys and matching position-index slices.
-    pub fn iter(&self) -> impl Iterator<Item = (&MarketFactorKey, &[usize])> {
-        self.inner.iter().map(|(k, v)| (k, v.as_slice()))
     }
 }
 

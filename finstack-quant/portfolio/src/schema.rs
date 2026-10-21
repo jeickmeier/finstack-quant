@@ -5,23 +5,24 @@
 //! definition. Render an entry with
 //! [`SchemaArtifact::generate`](finstack_quant_core::schema::SchemaArtifact::generate).
 
-use crate::materialization::MaterializationReport;
-use crate::optimization::PortfolioOptimizationResultWire;
-use crate::PortfolioMaterializationEnvelope;
 use crate::{
-    attribution::ReconciliationReport, cashflows::CashflowAggregationOptions,
-    cashflows::PortfolioCashflows, factor_model::CreditVolReport,
+    allocation::WeightAllocationResult, allocation::WeightAllocationSpec,
+    attribution::ReconciliationReport, brinson::CarinoLinkedAttribution, brinson::SectorPeriod,
+    cashflows::CashflowAggregationOptions, cashflows::PortfolioCashflows,
+    dependencies::MarketFactorKey, excess_return::CellConfig, excess_return::DurationCellTable,
+    excess_return::ExcessReturnPosition, excess_return::ExcessReturnResult,
+    excess_return::ReferenceReturn, factor_brinson::FactorBrinsonInput,
+    factor_brinson::FactorBrinsonResult, factor_model::CreditVolReport,
     factor_model::FactorAssignmentReport, factor_model::PositionChange, factor_model::StressPnl,
-    factor_model::StressResult, factor_model::WhatIfResult,
-    optimization::PortfolioOptimizationSpec, primitive::PortfolioPrimitiveExposureReport,
-    replay::ReplayConfig, replay::ReplayResult, scenarios::ScenarioPnlBatchItem,
-    scenarios::ScenarioPnlView, scenarios::ScenarioRevalueView, sensitivity::FactorPnlProfile,
-    sensitivity::SensitivityMatrixJson, CarinoLinkedAttribution, CellConfig, DatedCashflow,
-    DurationCellTable, ExcessReturnPosition, ExcessReturnResult, FactorBrinsonInput,
-    FactorBrinsonResult, FiAttributionConfig, FiCarinoLinkedResult, FiPeriodInput,
-    FiReconciliationReport, GridCarinoLinkedResult, GridPosition, LinkedReturn, MarketFactorKey,
-    PortfolioMarginResult, PortfolioResult, ReferenceReturn, SectorPeriod, TwrrPeriod,
-    WeightAllocationResult, WeightAllocationSpec,
+    factor_model::StressResult, factor_model::WhatIfResult, fi_attribution::FiAttributionConfig,
+    fi_attribution::FiCarinoLinkedResult, grid_attribution::GridCarinoLinkedResult,
+    grid_attribution::GridPosition, margin::PortfolioMarginResult,
+    materialization::MaterializationReport, materialization::PortfolioMaterializationEnvelope,
+    optimization::PortfolioOptimizationResult, optimization::PortfolioOptimizationSpec,
+    performance::DatedCashflow, performance::LinkedReturn,
+    performance::TwrrPeriod, primitive::PortfolioPrimitiveExposureReport, replay::ReplayConfig,
+    replay::ReplayResult, scenarios::ScenarioPnlBatchItem, scenarios::ScenarioRevalueView,
+    sensitivity::FactorPnlProfile, sensitivity::SensitivityMatrixJson, PortfolioResult,
 };
 use finstack_quant_core::schema::{
     externalize_schema_definitions, ExternalSchemaDefinition, SchemaArtifact, SchemaKind,
@@ -100,13 +101,13 @@ fn example_portfolio() -> Result<crate::Portfolio> {
             finstack_quant_core::Error::Internal(format!("build example deposit: {error}"))
         })?;
 
-    let position = crate::Position::new(
+    let position = crate::position::Position::new(
         "POS_001",
         "ACME_CORP",
         "DEP_1M",
         Arc::new(deposit),
         1.0,
-        crate::PositionUnit::Units,
+        crate::position::PositionUnit::Units,
     )
     .map_err(|error| {
         finstack_quant_core::Error::Internal(format!("build example position: {error}"))
@@ -115,7 +116,7 @@ fn example_portfolio() -> Result<crate::Portfolio> {
     crate::Portfolio::builder("EXAMPLE_FUND")
         .base_currency(Currency::USD)
         .as_of(as_of)
-        .entity(crate::Entity::new("ACME_CORP"))
+        .entity(crate::types::Entity::new("ACME_CORP"))
         .position(position)
         .build()
         .map_err(|error| {
@@ -144,7 +145,7 @@ fn materialization_examples() -> Result<Vec<Value>> {
 fn optimization_result_examples() -> Result<Vec<Value>> {
     use indexmap::IndexMap;
 
-    let position: crate::PositionId = "POS_001".into();
+    let position: crate::types::PositionId = "POS_001".into();
     let mut optimal = IndexMap::new();
     optimal.insert(position.clone(), 0.60);
     let mut current = IndexMap::new();
@@ -153,25 +154,20 @@ fn optimization_result_examples() -> Result<Vec<Value>> {
     deltas.insert(position.clone(), 0.05);
     let mut quantities = IndexMap::new();
     quantities.insert(position.clone(), 600_000.0);
-    let mut metrics = IndexMap::new();
-    metrics.insert("expected_return".to_string(), 0.0425);
     let mut slacks = IndexMap::new();
     slacks.insert("max_weight".to_string(), 0.40);
 
-    let result = crate::optimization::PortfolioOptimizationResultWire {
+    let result = crate::optimization::PortfolioOptimizationResult {
         meta: finstack_quant_core::config::ResultsMeta::default(),
         schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
         status: crate::optimization::OptimizationStatus::Optimal,
-        status_label: "optimal".to_string(),
         label: None,
-        is_feasible: true,
         objective_value: 0.0425,
         turnover: 0.05,
         optimal_weights: optimal,
         current_weights: current,
         weight_deltas: deltas,
         implied_quantities: quantities,
-        metric_values: metrics,
         trades: vec![crate::optimization::TradeSpec {
             position_id: position,
             instrument_id: "DEP_1M".to_string(),
@@ -197,35 +193,35 @@ fn optimization_result_examples() -> Result<Vec<Value>> {
 /// The crate's complete schema registry, sorted by artifact path.
 pub const ARTIFACTS: &[SchemaArtifact] = &[
     finstack_quant_core::schema_artifact!(
-    MaterializationReport,
-    "portfolio",
-    "materialization_report",
-    Output,
-    "Outcome metadata for one successful portfolio materialization.",
-    title = "Materialization Report"
-)
+        MaterializationReport,
+        "portfolio",
+        "materialization_report",
+        Output,
+        "Outcome metadata for one successful portfolio materialization.",
+        title = "Materialization Report"
+    )
     .with_summary("Retained diagnostics, bundle counts and phase timings from a portfolio load.")
     .with_examples(examples::materialization_report),
     finstack_quant_core::schema_artifact!(
-    PortfolioMaterializationEnvelope,
-    "portfolio",
-    "portfolio_materialization",
-    Component,
-    "Strict, versioned, content-addressed portfolio materialization bundle.",
-    title = "Portfolio Materialization Envelope"
-)
+        PortfolioMaterializationEnvelope,
+        "portfolio",
+        "portfolio_materialization",
+        Component,
+        "Strict, versioned, content-addressed portfolio materialization bundle.",
+        title = "Portfolio Materialization Envelope"
+    )
     .with_packager(package_materialization_schema)
     .with_kind(SchemaKind::Input)
     .with_summary("Positions, books and their instruments as one content-addressed bundle.")
     .with_examples(materialization_examples),
     finstack_quant_core::schema_artifact!(
-    PortfolioOptimizationResultWire,
-    "portfolio",
-    "portfolio_optimization_result",
-    Output,
-    "Canonical typed v1 output from portfolio optimization.",
-    title = "Portfolio Optimization Result"
-)
+        PortfolioOptimizationResult,
+        "portfolio",
+        "portfolio_optimization_result",
+        Output,
+        "Canonical typed v1 output from portfolio optimization.",
+        title = "Portfolio Optimization Result"
+    )
     .with_summary("Optimizer weights and diagnostics.")
     .with_examples(optimization_result_examples),
     finstack_quant_core::schema_artifact!(
@@ -355,24 +351,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     .with_packager(package_materialization_schema)
     .with_examples(examples::fi_carino_linked_result),
     finstack_quant_core::schema_artifact!(
-        FiPeriodInput,
-        "portfolio",
-        "fi_period_input",
-        Input,
-        "One attribution period's raw inputs for multi-period linking."
-    )
-    .with_packager(package_materialization_schema)
-    .with_examples(examples::fi_period_input),
-    finstack_quant_core::schema_artifact!(
-        FiReconciliationReport,
-        "portfolio",
-        "fi_reconciliation_report",
-        Output,
-        "Report from reconciling the five effect totals against the active return, mirroring `crate::attribution` reconciliation conventions."
-    )
-    .with_packager(package_materialization_schema)
-    .with_examples(examples::fi_reconciliation_report),
-    finstack_quant_core::schema_artifact!(
         GridCarinoLinkedResult,
         "portfolio",
         "grid_carino_linked_result",
@@ -467,7 +445,7 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "portfolio",
         "reconciliation_report",
         Output,
-        "Report from reconciling position-level P&L attribution against portfolio totals."
+        "Report from reconciling an attribution's effect buckets against its total."
     )
     .with_packager(package_materialization_schema)
     .with_examples(examples::reconciliation_report),
@@ -503,19 +481,10 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "portfolio",
         "scenario_pnl_batch_item",
         Output,
-        "One ordered result from `scenario_pnl_batch`."
+        "One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`."
     )
     .with_packager(package_materialization_schema)
     .with_examples(examples::scenario_pnl_batch_item),
-    finstack_quant_core::schema_artifact!(
-        ScenarioPnlView,
-        "portfolio",
-        "scenario_pnl_view",
-        Output,
-        "Scenario-P&L view returned by binding surfaces."
-    )
-    .with_packager(package_materialization_schema)
-    .with_examples(examples::scenario_pnl_view_example),
     finstack_quant_core::schema_artifact!(
         ScenarioRevalueView,
         "portfolio",

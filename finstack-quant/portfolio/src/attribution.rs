@@ -4,14 +4,13 @@
 //! with currency conversion to portfolio base currency.
 
 use crate::error::{Error, Result};
-#[cfg(not(target_arch = "wasm32"))]
-use crate::evaluation::POSITION_PARALLEL_MIN_POSITIONS;
+use crate::evaluation::try_map_positions;
 use crate::evaluation::{EvaluationProfile, PortfolioEvaluationPlan, PositionExecution};
-use crate::portfolio::Portfolio;
 use crate::types::PositionId;
 use crate::valuation::{
     PortfolioValuation, PortfolioValuationOptions, PositionValue, RequestedMetrics,
 };
+use crate::Portfolio;
 use finstack_quant_attribution::{
     attribute_pnl_metrics_based, default_attribution_metrics, translate_to_target_currency,
     AttributionMethod, AttributionRequest, PnlAttribution,
@@ -159,13 +158,18 @@ pub struct PortfolioAttribution {
     pub result_invalid: bool,
 }
 
-/// Report from reconciling position-level P&L attribution against portfolio totals.
+/// Report from reconciling an attribution's effect buckets against its total.
 ///
-/// Verifies that the sum of all factor P&L buckets plus FX translation equals `total_pnl`.
+/// Returned by [`PortfolioAttribution::reconciliation_check`] (factor P&L
+/// buckets plus FX translation against `total_pnl`) and by
+/// [`crate::fi_attribution::FiAttributionResult::reconciliation_check`] (the
+/// five Campisi effect totals against the active return).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ReconciliationReport {
-    /// Total residual: `total_pnl - (sum of factor buckets + fx_translation_pnl)`.
+    /// Total minus the sum of its effect buckets: `total_pnl - (factor buckets
+    /// + fx_translation_pnl)` for P&L attribution, `active_return - (allocation
+    /// + carry + treasury + spread + selection)` for Campisi attribution.
     pub total_residual: f64,
     /// Whether the reconciliation passes within tolerance.
     pub is_reconciled: bool,
@@ -271,6 +275,11 @@ fn attribute_composite_primitives(
             as_of_t0,
             as_of_t1,
         )?;
+        // `accumulate` sums amounts only; the composite records the FX
+        // policy its translated legs applied.
+        if aggregate.meta.fx_policy.is_none() {
+            aggregate.meta.fx_policy = primitive.meta.fx_policy.clone();
+        }
         aggregate.accumulate(primitive)?;
     }
 
@@ -519,24 +528,7 @@ pub(crate) fn reduce_prepared(
             })
         };
 
-    #[cfg(not(target_arch = "wasm32"))]
-    let position_results: Vec<Result<PositionAttributionData>> =
-        if portfolio.positions.len() >= POSITION_PARALLEL_MIN_POSITIONS {
-            use rayon::prelude::*;
-            portfolio
-                .positions
-                .par_iter()
-                .map(reduce_position)
-                .collect()
-        } else {
-            portfolio.positions.iter().map(reduce_position).collect()
-        };
-
-    #[cfg(target_arch = "wasm32")]
-    let position_results: Vec<Result<PositionAttributionData>> =
-        portfolio.positions.iter().map(reduce_position).collect();
-
-    let position_data = position_results.into_iter().collect::<Result<Vec<_>>>()?;
+    let position_data = try_map_positions(&portfolio.positions, reduce_position)?;
 
     aggregate_position_attributions(
         portfolio,
@@ -899,16 +891,16 @@ mod tests {
         let position = attribution
             .by_position
             .get("P-COMPOSITE")
-            .ok_or_else(|| Error::validation("missing composite attribution"))?;
+            .ok_or_else(|| Error::invalid_input("missing composite attribution"))?;
         assert_eq!(position.total_pnl.amount(), 10.0);
         // Endpoint values are the scaled sum of the primitive paths:
         // 2 × (100 − 90) at T0 and 2 × (110 − 95) at T1.
         let pv_t0 = position
             .pv_t0
-            .ok_or_else(|| Error::validation("missing composite pv_t0"))?;
+            .ok_or_else(|| Error::invalid_input("missing composite pv_t0"))?;
         let pv_t1 = position
             .pv_t1
-            .ok_or_else(|| Error::validation("missing composite pv_t1"))?;
+            .ok_or_else(|| Error::invalid_input("missing composite pv_t1"))?;
         assert!((pv_t0.amount() - 20.0).abs() < 1.0e-9);
         assert!((pv_t1.amount() - 30.0).abs() < 1.0e-9);
         assert!(position.waterfall_steps.is_empty() && position.sensitivity_steps.is_empty());
@@ -918,6 +910,96 @@ mod tests {
             .notes
             .iter()
             .any(|note| note.contains("frozen primitive")));
+        Ok(())
+    }
+
+    /// A foreign-currency primitive is translated into the composite's
+    /// reporting currency with factors at T1 FX plus the opening-value FX move,
+    /// and the composite records the FX policy it applied.
+    #[test]
+    fn composite_attribution_translates_foreign_primitives() -> Result<()> {
+        use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
+
+        let spec = CompositeSpec::new(
+            "EUR-BASKET",
+            Currency::USD,
+            Money::from((100_i64, Currency::USD)),
+            vec![
+                CompositeLegSpec::new(
+                    "E",
+                    finstack_quant_valuations::instruments::InstrumentJson::Equity(
+                        finstack_quant_valuations::instruments::Equity::new(
+                            "E",
+                            "E",
+                            Currency::EUR,
+                        )
+                        .with_spot_id("E"),
+                    ),
+                    1.0,
+                ),
+                // A flat-price USD leg: no P&L, no translation.
+                CompositeLegSpec::new(
+                    "U",
+                    finstack_quant_valuations::instruments::InstrumentJson::Equity(
+                        finstack_quant_valuations::instruments::Equity::new(
+                            "U",
+                            "U",
+                            Currency::USD,
+                        )
+                        .with_spot_id("U"),
+                    ),
+                    1.0,
+                ),
+            ],
+            WeightingMethod::FixedQuantity,
+            RebalanceRule::Manual,
+        );
+        let composite = spec.initialize_fixed(date!(2025 - 01 - 01))?.instrument;
+        let portfolio = Portfolio::builder("PORTFOLIO")
+            .base_currency(Currency::USD)
+            .as_of(date!(2025 - 01 - 01))
+            .entity(Entity::new("ENTITY"))
+            .position(Position::new(
+                "P-EUR",
+                "ENTITY",
+                "EUR-BASKET",
+                Arc::new(composite),
+                2.0,
+                PositionUnit::Units,
+            )?)
+            .build()?;
+        let market = |spot: f64, eur_usd: f64| -> Result<MarketContext> {
+            let provider = Arc::new(SimpleFxProvider::new());
+            provider.set_quote(Currency::EUR, Currency::USD, eur_usd)?;
+            Ok(MarketContext::new()
+                .insert_price("E", MarketScalar::Unitless(spot))
+                .insert_price("U", MarketScalar::Unitless(50.0))
+                .insert_fx(FxMatrix::new(provider)))
+        };
+
+        let attribution = attribute_portfolio_pnl(
+            &portfolio,
+            &market(100.0, 1.1)?,
+            &market(110.0, 1.2)?,
+            date!(2025 - 01 - 01),
+            date!(2025 - 01 - 02),
+            &FinstackConfig::default(),
+            AttributionMethod::Parallel,
+        )?;
+        let position = attribution
+            .by_position
+            .get("P-EUR")
+            .ok_or_else(|| Error::invalid_input("missing composite attribution"))?;
+        // Per unit: 10 EUR × 1.2 + 100 EUR × (1.2 − 1.1) = 22 USD; two units held.
+        assert_eq!(position.total_pnl.currency(), Currency::USD);
+        assert!((position.total_pnl.amount() - 44.0).abs() < 1.0e-9);
+        assert!((position.fx_translation_pnl.amount() - 20.0).abs() < 1.0e-9);
+        let fx_policy = position
+            .meta
+            .fx_policy
+            .as_ref()
+            .ok_or_else(|| Error::invalid_input("composite FX policy not stamped"))?;
+        assert_eq!(fx_policy.target_currency, Some(Currency::USD));
         Ok(())
     }
 

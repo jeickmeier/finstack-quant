@@ -306,7 +306,7 @@ impl MetricCalculator for AllInRateCalculator {
                     ))),
                     meta: with_opening.get_meta().clone(),
                 },
-            );
+            )?;
         }
         all_in_rate_from_schedule(
             &with_opening,

@@ -1745,9 +1745,10 @@ export type D_08Aea844Abd10Cb00E40 =
       /**
        * Calibration method to use.
        *
-       * Forward curves require [`CalibrationMethod::GlobalSolve`]. Sequential
-       * bootstrap is rejected because contractual off-grid reset intervals
-       * couple adjacent rates through projection discount factors.
+       * Forward curves require [`CalibrationMethod::GlobalSolve`], which is the
+       * default (finite-difference Jacobian). Sequential bootstrap is rejected
+       * because contractual off-grid reset intervals couple adjacent rates
+       * through projection discount factors.
        */
       method?:
         | "bootstrap"
@@ -2066,7 +2067,9 @@ export type D_08Aea844Abd10Cb00E40 =
        */
       day_count?: DayCount | null;
       /**
-       * Detachment points (as percentages) for the tranches.
+       * Expected tranche detachment points as decimals in `(0, 1]` (e.g. `0.03`
+       * for 3%), the same unit as `CdsTrancheQuote.detachment`. When non-empty,
+       * every quote must match one point and every point must be quoted.
        */
       detachment_points?: number[];
       discount_curve_id: Id15;
@@ -5636,7 +5639,13 @@ export interface DCebddb4A91C1C968Bece {
  */
 export interface D_49947B4265557428E6De {
   /**
-   * Maximum permitted snapshot age in seconds.
+   * RFC3339 instant at which freshness is assessed (normally the caller's
+   * clock when it submits the envelope). Required with `snapshot_timestamp`
+   * and `max_age_seconds`.
+   */
+  as_of_timestamp?: string | null;
+  /**
+   * Maximum permitted snapshot age in seconds, measured at `as_of_timestamp`.
    */
   max_age_seconds?: number | null;
   /**

@@ -40,7 +40,7 @@ impl PositionFilter {
     ///
     /// The caller provides the item's entity ID, position ID, and attributes.
     /// This avoids duplicating the recursive filter logic for every position-like type.
-    pub fn matches(
+    pub(crate) fn matches(
         &self,
         entity_id: &EntityId,
         position_id: &PositionId,
@@ -201,13 +201,11 @@ struct CandidatePositionSpec {
 }
 
 impl TryFrom<CandidatePositionSpec> for CandidatePosition {
-    type Error = crate::error::Error;
+    type Error = crate::Error;
 
     fn try_from(spec: CandidatePositionSpec) -> Result<Self, Self::Error> {
         let instrument = spec.instrument_spec.into_boxed().map_err(|e| {
-            crate::error::Error::invalid_input(format!(
-                "Failed to convert candidate instrument JSON: {e}"
-            ))
+            crate::Error::invalid_input(format!("Failed to convert candidate instrument JSON: {e}"))
         })?;
         Ok(Self {
             id: spec.id,
@@ -285,15 +283,6 @@ pub struct TradeUniverse {
 }
 
 impl TradeUniverse {
-    /// Create a universe where all existing positions are tradeable.
-    ///
-    /// # Returns
-    ///
-    /// Default trade universe with all held positions tradeable and no candidates.
-    pub fn all_positions() -> Self {
-        Self::default()
-    }
-
     /// Create a universe with only specific positions tradeable.
     ///
     /// # Arguments

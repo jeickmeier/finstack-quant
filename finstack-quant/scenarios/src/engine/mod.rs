@@ -21,7 +21,7 @@ pub use types::{
 };
 
 use crate::error::Result;
-use crate::spec::{NodeId, OperationSpec, RateBindingSpec, ScenarioSpec};
+use crate::spec::{OperationSpec, RateBindingSpec, ScenarioSpec};
 use crate::warning::Warning;
 use effects::{
     apply_generated_effects, flush_pending_bumps, generate_replace_curve_effects_parallel,
@@ -32,6 +32,7 @@ use finstack_quant_core::dates::HolidayCalendar;
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
+use finstack_quant_statements::types::NodeId;
 use finstack_quant_statements::FinancialModelSpec;
 use finstack_quant_valuations::recalibration::RecalibrationProvider;
 use hierarchy::{expand_hierarchy_operations, ExpansionOutcome};

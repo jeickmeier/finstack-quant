@@ -23,3 +23,18 @@ pub(super) mod calendars_generated {
 }
 
 pub use calendars_generated::*;
+
+/// Identifier of the holiday-free [`WEEKENDS_ONLY`] calendar.
+///
+/// Use it wherever a calendar id is required but only Saturday/Sunday
+/// adjustment applies; [`calendar_by_id_strict`](business_days::calendar_by_id_strict)
+/// resolves it to [`WEEKENDS_ONLY`].
+pub const WEEKENDS_ONLY_ID: &str = "weekends_only";
+
+#[cfg(test)]
+mod weekends_only_id_tests {
+    #[test]
+    fn id_matches_the_generated_calendar() {
+        assert_eq!(super::WEEKENDS_ONLY.id, super::WEEKENDS_ONLY_ID);
+    }
+}

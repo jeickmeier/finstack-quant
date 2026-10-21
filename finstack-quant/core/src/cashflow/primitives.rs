@@ -296,6 +296,24 @@ impl CFKind {
         )
     }
 
+    /// Returns `true` for kinds that repay principal to the lender: amortization,
+    /// prepayment, revolver repayment, and notional (redemption when positive).
+    ///
+    /// Narrower than [`Self::is_principal_like`], which also counts PIK
+    /// capitalization, revolver draws and defaulted notional. Callers that
+    /// weigh repayments (weighted average life, principal-repaid totals) also
+    /// require a positive amount, since a negative notional row is a funding.
+    #[must_use]
+    pub fn is_principal_repayment(self) -> bool {
+        matches!(
+            self,
+            CFKind::Amortization
+                | CFKind::Notional
+                | CFKind::PrePayment
+                | CFKind::RevolvingRepayment
+        )
+    }
+
     /// Returns `true` when this classified flow represents a cash settlement.
     ///
     /// [`CFKind::Pik`] is a capitalization event and

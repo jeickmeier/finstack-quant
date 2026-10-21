@@ -28,36 +28,6 @@ use finstack_quant_valuations_credit::cds::CdsValuationConvention;
 /// | **CDS** | `"discount"`, `"credit"` | *(none -- errors if missing)* |
 /// | **XCCY** | `"domestic_discount"`, `"foreign_discount"` | *(none -- forward curves are the convention index ids)* |
 /// | **CDS Tranche** | `"discount"`, `"credit"` | *(none -- errors if missing)* |
-///
-/// # Examples
-///
-/// Basic usage:
-/// ```rust,ignore
-/// use finstack_quant_calibration::build::BuildCtx;
-/// use finstack_quant_core::dates::Date;
-/// use finstack_quant_core::FxHashMap;
-///
-/// let as_of = Date::from_calendar_date(2024, time::Month::January, 2).unwrap();
-/// let mut curve_ids = FxHashMap::default();
-/// curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
-/// curve_ids.insert("forward".to_string(), "USD-SOFR".to_string());
-///
-/// let ctx = BuildCtx::new(as_of, 1_000_000.0, curve_ids);
-/// assert_eq!(ctx.curve_id("discount"), Some("USD-OIS"));
-/// ```
-///
-/// Minimal context with no curve roles:
-/// ```rust,ignore
-/// use finstack_quant_calibration::build::BuildCtx;
-/// use finstack_quant_core::dates::Date;
-/// use finstack_quant_core::FxHashMap;
-///
-/// let ctx = BuildCtx::new(
-///     Date::from_calendar_date(2024, time::Month::January, 2).unwrap(),
-///     1_000_000.0,
-///     FxHashMap::default(), // Builders that require roles will fail closed.
-/// );
-/// ```
 #[derive(Debug, Clone)]
 pub(crate) struct BuildCtx {
     /// The valuation date for which the instrument is being built.

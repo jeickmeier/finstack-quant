@@ -32,34 +32,26 @@ const EXPORTED_KEYS = [
   'InstrumentArtifactCache',
   'Portfolio',
   'PortfolioBuilder',
-  'PortfolioMarginAggregator',
   'aggregateFullCashflows',
   'aggregateMetrics',
   'allocateWeights',
-  'allocateWeightsJson',
   'applyScenarioAndRevalue',
   'attributePortfolioPnl',
   'brinsonFachler',
   'buildCreditVolReport',
   'campisiAttribution',
   'campisiCarinoLink',
-  'campisiCarinoLinkFromSnapshots',
-  'campisiReconciliationCheck',
   'carinoLink',
-  'carinoLinkFromSectorPeriods',
   'cellReturnsFromCurves',
   'cellReturnsFromReference',
   'collapseToBaseByDateKind',
   'computeFactorSensitivities',
   'computePnlProfiles',
-  'constraintBudget',
   'constraintExposureLimit',
   'constraintExposureMinimum',
-  'constraintMaxTurnover',
-  'constraintWeightBounds',
-  'decomposeFactorRisk',
   'excessReturns',
   'factorBrinsonAttribution',
+  'fiAttributionResultReconciliationCheck',
   'gridAttribution',
   'gridCarinoLink',
   'mwrXirr',
@@ -68,12 +60,14 @@ const EXPORTED_KEYS = [
   'parsePortfolioSpecJson',
   'portfolioAttributionExplainText',
   'portfolioAttributionReconciliationCheck',
+  'portfolioMargin',
   'portfolioMetricsGetMetric',
   'portfolioMetricsGetPositionMetrics',
   'portfolioMetricsGetTotal',
   'portfolioMetricsRequireTotal',
   'portfolioMetricsSeries',
   'portfolioOptimizationResultBindingConstraints',
+  'portfolioOptimizationResultIsFeasible',
   'portfolioOptimizationResultNewPositionTrades',
   'portfolioOptimizationResultToTradeList',
   'portfolioValuationGetEntityValue',
@@ -89,7 +83,6 @@ const EXPORTED_KEYS = [
   'sensitivityMatrixPositionDeltas',
   'twrrLinked',
   'twrrModifiedDietz',
-  'validateAllocationJson',
   'valuePortfolio',
 ];
 
@@ -122,7 +115,7 @@ test('portfolio namespace exposes exactly the pinned contract surface', () => {
   }
 });
 
-test('portfolio.decomposeFactorRisk consumes the canonical Python monetary matrix wire', () => {
+test('models.factor.risk.decomposeFactors consumes the canonical Python monetary matrix wire', () => {
   const sensitivities = {
     base_currency: 'EUR',
     position_ids: ['A', 'B'],
@@ -131,7 +124,7 @@ test('portfolio.decomposeFactorRisk consumes the canonical Python monetary matri
   };
   const covariance = JSON.stringify({ factor_ids: ['F'], n: 1, data: [0.04] });
   const result = assertStructured(
-    portfolio.decomposeFactorRisk(JSON.stringify(sensitivities), covariance),
+    models.factor.risk.decomposeFactors(JSON.stringify(sensitivities), covariance),
     'factor decomposition'
   );
   assert.ok(Math.abs(result.total_risk - 1.0) < 1e-12);
@@ -151,7 +144,7 @@ test('portfolio.decomposeFactorRisk consumes the canonical Python monetary matri
     { var: { confidence: 0.99 } },
     { expected_shortfall: { confidence: 0.975 } },
   ]) {
-    const measured = portfolio.decomposeFactorRisk(
+    const measured = models.factor.risk.decomposeFactors(
       JSON.stringify(sensitivities),
       covariance,
       JSON.stringify(measure)
@@ -161,21 +154,23 @@ test('portfolio.decomposeFactorRisk consumes the canonical Python monetary matri
   }
 });
 
-test('portfolio.decomposeFactorRisk rejects malformed matrices and missing reporting currency', () => {
+test('models.factor.risk.decomposeFactors rejects malformed matrices and missing reporting currency', () => {
   const valid = { base_currency: 'USD', position_ids: ['P'], factor_ids: ['F'], data: [[2.0]] };
   const covariance = JSON.stringify({ factor_ids: ['F'], n: 1, data: [0.04] });
   for (const data of [[], [[], []], [[]], [[2.0, 3.0]], [2.0], [[null]]]) {
     assert.throws(() =>
-      portfolio.decomposeFactorRisk(JSON.stringify({ ...valid, data }), covariance)
+      models.factor.risk.decomposeFactors(JSON.stringify({ ...valid, data }), covariance)
     );
   }
   for (const extra of [{ n_factors: 1 }, { unexpected: true }, { base_currency: 'BAD' }]) {
     assert.throws(() =>
-      portfolio.decomposeFactorRisk(JSON.stringify({ ...valid, ...extra }), covariance)
+      models.factor.risk.decomposeFactors(JSON.stringify({ ...valid, ...extra }), covariance)
     );
   }
   const missingCurrency = { position_ids: ['P'], factor_ids: ['F'], data: [[2.0]] };
-  assert.throws(() => portfolio.decomposeFactorRisk(JSON.stringify(missingCurrency), covariance));
+  assert.throws(() =>
+    models.factor.risk.decomposeFactors(JSON.stringify(missingCurrency), covariance)
+  );
 });
 
 // Runtime arity gate. `index.d.ts` is hand-maintained, so a declaration with
@@ -186,8 +181,7 @@ test('portfolio.decomposeFactorRisk rejects malformed matrices and missing repor
 test('portfolio Campisi exports keep their declared arity', () => {
   assert.equal(portfolio.campisiAttribution.length, 3);
   assert.equal(portfolio.campisiCarinoLink.length, 1);
-  assert.equal(portfolio.campisiCarinoLinkFromSnapshots.length, 2);
-  assert.equal(portfolio.campisiReconciliationCheck.length, 2);
+  assert.equal(portfolio.fiAttributionResultReconciliationCheck.length, 2);
 });
 
 // Same lesson as the Campisi arity gate above, applied to the credit
@@ -358,14 +352,15 @@ test('portfolio.campisiCarinoLink accepts huge finite cancelling effects', () =>
   assert.equal(linked.linked_active_carry, -1e308);
 });
 
-test('portfolio.campisiCarinoLinkFromSnapshots links raw snapshot periods', () => {
-  const period = {
-    portfolio: JSON.parse(CAMPISI_PORTFOLIO),
-    benchmark: JSON.parse(CAMPISI_BENCHMARK),
-  };
+test('portfolio.campisiCarinoLink links per-period campisiAttribution results', () => {
+  const result = portfolio.campisiAttribution(
+    CAMPISI_PORTFOLIO,
+    CAMPISI_BENCHMARK,
+    campisiConfig(0.25)
+  );
   const linked = assertStructured(
-    portfolio.campisiCarinoLinkFromSnapshots(JSON.stringify([period, period]), campisiConfig(0.25)),
-    'campisiCarinoLinkFromSnapshots result'
+    portfolio.campisiCarinoLink([result, result]),
+    'campisiCarinoLink result'
   );
   const geometric = linked.portfolio_return_compounded - linked.benchmark_return_compounded;
   const reconstructed =
@@ -376,16 +371,12 @@ test('portfolio.campisiCarinoLinkFromSnapshots links raw snapshot periods', () =
     linked.linked_selection;
   assert.ok(Math.abs(reconstructed - geometric) < 1e-10);
 
-  // The two link entry points take different payloads and are not aliases.
+  // Raw snapshot periods are not `FiAttributionResult`s.
+  const period = {
+    portfolio: JSON.parse(CAMPISI_PORTFOLIO),
+    benchmark: JSON.parse(CAMPISI_BENCHMARK),
+  };
   assert.throws(() => portfolio.campisiCarinoLink(JSON.stringify([period])));
-  assert.throws(() =>
-    portfolio.campisiCarinoLinkFromSnapshots(
-      JSON.stringify([
-        portfolio.campisiAttribution(CAMPISI_PORTFOLIO, CAMPISI_BENCHMARK, campisiConfig(0.25)),
-      ]),
-      campisiConfig(0.25)
-    )
-  );
 });
 
 test('portfolio.campisiAttribution fails closed on a zero-net-weight sector', () => {
@@ -438,16 +429,15 @@ test('portfolio.campisiAttribution fails closed on a zero-net-weight sector', ()
   assert.ok(Math.abs(reconstructed - result.active_return) < 1e-12);
 });
 
-test('portfolio.campisiReconciliationCheck reports the residual and fails closed', () => {
+test('portfolio.fiAttributionResultReconciliationCheck reports the residual and fails closed', () => {
   const result = portfolio.campisiAttribution(
     CAMPISI_PORTFOLIO,
     CAMPISI_BENCHMARK,
     campisiConfig(0.25)
   );
-  const resultJson = JSON.stringify(result);
   const report = assertStructured(
-    portfolio.campisiReconciliationCheck(resultJson, 1e-10),
-    'campisiReconciliationCheck result'
+    portfolio.fiAttributionResultReconciliationCheck(result, 1e-10),
+    'fiAttributionResultReconciliationCheck result'
   );
   assert.equal(report.is_reconciled, true);
   assert.equal(report.tolerance, 1e-10);
@@ -457,13 +447,16 @@ test('portfolio.campisiReconciliationCheck reports the residual and fails closed
   // active_return has been tampered with breaks the identity at 1e-10 and
   // passes only under an absurdly loose tolerance.
   const tampered = JSON.stringify({ ...result, active_return: result.active_return + 0.01 });
-  assert.equal(portfolio.campisiReconciliationCheck(tampered, 1e-10).is_reconciled, false);
-  assert.equal(portfolio.campisiReconciliationCheck(tampered, 1.0).is_reconciled, true);
+  assert.equal(
+    portfolio.fiAttributionResultReconciliationCheck(tampered, 1e-10).is_reconciled,
+    false
+  );
+  assert.equal(portfolio.fiAttributionResultReconciliationCheck(tampered, 1.0).is_reconciled, true);
 
   // `FiAttributionResult` denies unknown fields, so a stale key fails closed
   // instead of being silently dropped into a report that still "reconciles".
   const withBogus = JSON.stringify({ ...result, bogus_field: 1.0 });
-  assert.throws(() => portfolio.campisiReconciliationCheck(withBogus, 1e-10));
+  assert.throws(() => portfolio.fiAttributionResultReconciliationCheck(withBogus, 1e-10));
   assert.throws(() => portfolio.campisiCarinoLink(`[${withBogus}]`));
 });
 
@@ -951,7 +944,10 @@ test('portfolio.aggregateMetrics returns a structured metrics object', () => {
     false
   );
   const metrics = assertStructured(
-    portfolio.aggregateMetrics(JSON.stringify(valuation), 'USD', EMPTY_MARKET, '2024-01-15'),
+    portfolio.aggregateMetrics(
+      JSON.stringify(valuation),
+      portfolioCore.MarketContext.fromJson(EMPTY_MARKET)
+    ),
     'aggregateMetrics result'
   );
   assert.equal(typeof metrics, 'object');
@@ -965,7 +961,7 @@ test('portfolio.replayPortfolio returns a structured replay result', () => {
   ]);
   const config = JSON.stringify({ mode: 'pv_only', attribution_method: 'parallel' });
   const replay = assertStructured(
-    portfolio.replayPortfolio(EMPTY_SPEC, snapshots, config),
+    portfolio.replayPortfolio(portfolio.Portfolio.fromSpec(EMPTY_SPEC), snapshots, config),
     'replayPortfolio result'
   );
   assert.equal(replay.steps.length, 2);
@@ -992,23 +988,15 @@ test('portfolio.brinsonFachler and carinoLink return structured attributions', (
   const reconstructed = single.total_allocation + single.total_selection + single.total_interaction;
   assert.ok(Math.abs(reconstructed - single.total_excess_return) < 1e-12);
 
+  // carinoLink binds Rust `carino_link`: it links precomputed period results
+  // (the brinsonFachler output), like campisiCarinoLink and gridCarinoLink.
   const linked = assertStructured(
-    portfolio.carinoLinkFromSectorPeriods(
-      JSON.stringify([JSON.parse(sectors), JSON.parse(sectors)])
-    ),
-    'carinoLinkFromSectorPeriods result'
+    portfolio.carinoLink(JSON.stringify([single, single])),
+    'carinoLink result'
   );
   const geometric = linked.portfolio_return_compounded - linked.benchmark_return_compounded;
   const sum = linked.linked_allocation + linked.linked_selection + linked.linked_interaction;
   assert.ok(Math.abs(sum - geometric) < 1e-10);
-
-  // carinoLink binds Rust `carino_link`: it links precomputed period results
-  // (the brinsonFachler output), like campisiCarinoLink and gridCarinoLink.
-  const precomputed = assertStructured(
-    portfolio.carinoLink(JSON.stringify([single, single])),
-    'carinoLink result'
-  );
-  assert.deepEqual(precomputed, linked);
   assert.throws(
     () => portfolio.carinoLink(JSON.stringify([JSON.parse(sectors), JSON.parse(sectors)])),
     (error) => error instanceof Error && error.kind === 'validation'
@@ -1193,10 +1181,10 @@ const SENSITIVITY_COVARIANCE = JSON.stringify({
   data: [0.04, 0.01, 0.01, 0.09],
 });
 
-test('portfolio.decomposeFactorRisk reads the canonical wire and returns the Rust result', () => {
+test('models.factor.risk.decomposeFactors reads the canonical wire and returns the Rust result', () => {
   const variance = assertStructured(
-    portfolio.decomposeFactorRisk(JSON.stringify(SENSITIVITY_WIRE), SENSITIVITY_COVARIANCE),
-    'decomposeFactorRisk result'
+    models.factor.risk.decomposeFactors(JSON.stringify(SENSITIVITY_WIRE), SENSITIVITY_COVARIANCE),
+    'decomposeFactors result'
   );
   // exposures e = [4, 1]; e' S e = 16*0.04 + 2*4*0.01 + 0.09 = 0.81
   assert.ok(Math.abs(variance.total_risk - 0.81) < 1e-12);
@@ -1210,7 +1198,7 @@ test('portfolio.decomposeFactorRisk reads the canonical wire and returns the Rus
     [{ expected_shortfall: { confidence: 0.975 } }, { expected_shortfall: { confidence: 0.975 } }],
     ['volatility', 'volatility'],
   ]) {
-    const decomposition = portfolio.decomposeFactorRisk(
+    const decomposition = models.factor.risk.decomposeFactors(
       SENSITIVITY_WIRE,
       SENSITIVITY_COVARIANCE,
       JSON.stringify(measure)
@@ -1220,16 +1208,17 @@ test('portfolio.decomposeFactorRisk reads the canonical wire and returns the Rus
 
   // A unit variant is its bare wire label, as the declared type says.
   assert.equal(
-    portfolio.decomposeFactorRisk(SENSITIVITY_WIRE, SENSITIVITY_COVARIANCE, 'volatility').measure,
+    models.factor.risk.decomposeFactors(SENSITIVITY_WIRE, SENSITIVITY_COVARIANCE, 'volatility')
+      .measure,
     'volatility'
   );
   assert.throws(
-    () => portfolio.decomposeFactorRisk(SENSITIVITY_WIRE, SENSITIVITY_COVARIANCE, 'nope'),
+    () => models.factor.risk.decomposeFactors(SENSITIVITY_WIRE, SENSITIVITY_COVARIANCE, 'nope'),
     (error) => error.kind === 'validation' && /riskMeasureJson/.test(error.message)
   );
 });
 
-test('portfolio.decomposeFactorRisk rejects malformed sensitivity wire with a validation error', () => {
+test('models.factor.risk.decomposeFactors rejects malformed sensitivity wire with a validation error', () => {
   const isValidation = (pattern) => (error) =>
     error instanceof Error && error.kind === 'validation' && pattern.test(error.message);
   for (const [wire, pattern] of [
@@ -1240,50 +1229,46 @@ test('portfolio.decomposeFactorRisk rejects malformed sensitivity wire with a va
     [{ ...SENSITIVITY_WIRE, data: [1.0, 2.0, 3.0, -1.0] }, /invalid type/],
   ]) {
     assert.throws(
-      () => portfolio.decomposeFactorRisk(JSON.stringify(wire), SENSITIVITY_COVARIANCE),
+      () => models.factor.risk.decomposeFactors(JSON.stringify(wire), SENSITIVITY_COVARIANCE),
       isValidation(pattern)
     );
   }
 });
 
-test('standalone sensitivity outputs require and retain the reporting currency', () => {
-  const result = portfolio.computeFactorSensitivities(
-    '[]',
-    '[]',
-    portfolioCore.MarketContext.fromJson(EMPTY_MARKET),
-    '2025-01-15',
-    'EUR'
+test('portfolio sensitivity outputs report in the portfolio base currency', () => {
+  const book = portfolio.Portfolio.fromSpec(
+    JSON.stringify({ ...JSON.parse(EMPTY_SPEC), base_currency: 'EUR' })
   );
+  const market = portfolioCore.MarketContext.fromJson(EMPTY_MARKET);
+  const result = portfolio.computeFactorSensitivities(book, [], market, '2024-01-15');
   assert.equal(result.base_currency, 'EUR');
   assert.deepEqual(result.position_ids, []);
   assert.deepEqual(result.data, []);
-  assert.deepEqual(
-    portfolio.computePnlProfiles(
-      '[]',
-      '[]',
-      portfolioCore.MarketContext.fromJson(EMPTY_MARKET),
-      '2025-01-15',
-      'EUR'
-    ),
-    []
-  );
-  assert.throws(() =>
-    portfolio.computeFactorSensitivities(
-      '[]',
-      '[]',
-      portfolioCore.MarketContext.fromJson(EMPTY_MARKET),
-      '2025-01-15',
-      'INVALID'
-    )
+  assert.deepEqual(portfolio.computePnlProfiles(book, '[]', market, '2024-01-15'), []);
+  const creditHierarchy = [
+    {
+      id: 'credit::generic',
+      factor_type: 'credit',
+      market_mapping: { curve_parallel: { curve_ids: [], units: 'rate_bp' } },
+    },
+  ];
+  for (const call of [portfolio.computeFactorSensitivities, portfolio.computePnlProfiles]) {
+    assert.throws(
+      () => call(book, creditHierarchy, market, '2024-01-15'),
+      (error) => error.kind === 'validation' && /credit::generic/.test(error.message)
+    );
+  }
+  assert.throws(
+    () => portfolio.computePnlProfiles(book, [], market, '2024-01-15', undefined, 1.5),
+    (error) => error.kind === 'invalid_type' && /nPoints/.test(error.message)
   );
 });
 
-test('portfolio.PortfolioMarginAggregator returns a plain PortfolioMarginResult', () => {
+test('portfolio.portfolioMargin returns a plain PortfolioMarginResult', () => {
   const book = portfolio.Portfolio.fromSpec(EMPTY_SPEC);
   const market = portfolioCore.MarketContext.fromJson(EMPTY_MARKET);
-  const aggregator = portfolio.PortfolioMarginAggregator.fromPortfolio(book);
   try {
-    const result = aggregator.calculate(book, market, '2025-01-15');
+    const result = portfolio.portfolioMargin(book, market, '2025-01-15');
     assert.equal(result.as_of, '2025-01-15');
     assert.equal(result.base_currency, 'USD');
     assert.deepEqual(result.netting_sets, []);
@@ -1291,24 +1276,23 @@ test('portfolio.PortfolioMarginAggregator returns a plain PortfolioMarginResult'
     assert.equal(result.total_positions, 0);
     assert.equal(result.total_initial_margin.currency, 'USD');
     assert.equal(Number(result.total_initial_margin.amount), 0);
-    // The handle is reusable; an explicit empty balance map is the same as none.
-    assert.deepEqual(aggregator.calculate(book, market, '2025-01-15', {}), result);
-    assert.deepEqual(aggregator.calculate(book, market, '2025-01-15', null), result);
+    // A repeated run is identical; an explicit empty balance map is the same as none.
+    assert.deepEqual(portfolio.portfolioMargin(book, market, '2025-01-15', {}), result);
+    assert.deepEqual(portfolio.portfolioMargin(book, market, '2025-01-15', null), result);
     // Collateral for a CSA the portfolio does not have is rejected, and the
     // date is type-checked rather than coerced.
     assert.throws(
       () =>
-        aggregator.calculate(book, market, '2025-01-15', {
+        portfolio.portfolioMargin(book, market, '2025-01-15', {
           'NO-SUCH-CSA': { amount: '1', currency: 'USD' },
         }),
       (error) => error.name === 'FinstackError' && error.kind === 'validation'
     );
     assert.throws(
-      () => aggregator.calculate(book, market, 20250115),
+      () => portfolio.portfolioMargin(book, market, 20250115),
       (error) => error instanceof TypeError && error.kind === 'invalid_type'
     );
   } finally {
-    aggregator.free();
     market.free();
     book.free();
   }

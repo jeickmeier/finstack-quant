@@ -6,7 +6,7 @@
 //! the PAC.
 
 use crate::cmo::types::PacCollar;
-use finstack_quant_cashflows::builder::{clamped_cpr_to_smm, psa_to_cpr};
+use finstack_quant_cashflows::builder::{clamped_cpr_to_smm, psa_cpr};
 use finstack_quant_valuations_fixed_income::mbs_passthrough::pricer::pool_month_step;
 
 /// Dated contractual PAC principal target, in the tranche currency's major units.
@@ -213,11 +213,11 @@ fn project_principal_stream(
 /// Convert PSA speed to SMM for a given month.
 ///
 /// Delegates to the registry-backed canonical PSA curve
-/// (`finstack_quant_cashflows::builder::psa_to_cpr`) and the canonical CPR→SMM conversion,
+/// (`finstack_quant_cashflows::builder::psa_cpr`) and the canonical CPR→SMM conversion,
 /// keeping PAC/Support projection consistent with the rest of the workspace.
 #[inline]
 fn psa_to_smm(speed_multiplier: f64, month: u32) -> f64 {
-    clamped_cpr_to_smm(psa_to_cpr(speed_multiplier, month))
+    clamped_cpr_to_smm(psa_cpr(speed_multiplier, month))
 }
 
 #[cfg(test)]
@@ -393,7 +393,7 @@ mod tests {
         // helper across a PSA grid, including high-speed clamping behavior.
         for &psa in &[0.0, 0.5, 1.0, 2.0, 3.0, 18.0] {
             for &month in &[1u32, 15, 30, 60, 360] {
-                let canonical = clamped_cpr_to_smm(psa_to_cpr(psa, month));
+                let canonical = clamped_cpr_to_smm(psa_cpr(psa, month));
                 let got = psa_to_smm(psa, month);
                 assert!(
                     (got - canonical).abs() < 1e-12,

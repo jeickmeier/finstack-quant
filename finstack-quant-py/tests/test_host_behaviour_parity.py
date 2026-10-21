@@ -81,7 +81,7 @@ def test_sensitivity_matrix_accessors_reject_out_of_range_indices() -> None:
         matrix.factor_deltas(3)
 
 
-def test_constraint_constructors_validate_in_rust_and_serialize_to_the_wire_object() -> None:
+def test_constraint_constructors_serialize_to_the_wire_object() -> None:
     assert json.loads(Constraint.budget(1.0).to_json()) == {"budget": {"rhs": 1.0}}
     assert json.loads(Constraint.max_turnover(0.25, label="turnover").to_json()) == {
         "max_turnover": {"label": "turnover", "max_turnover": 0.25}
@@ -96,12 +96,8 @@ def test_constraint_constructors_validate_in_rust_and_serialize_to_the_wire_obje
     assert limit["metric_bound"]["label"] == "ccc cap"
     assert {**minimum["metric_bound"], "op": "le"} == limit["metric_bound"]
 
-    with pytest.raises(ValueError, match="budget rhs"):
-        Constraint.budget(-1.0)
-    with pytest.raises(ValueError, match="max_turnover"):
-        Constraint.max_turnover(-0.1)
-    with pytest.raises(ValueError, match="min"):
-        Constraint.weight_bounds(PositionFilter.all(), 0.2, 0.1)
+    # Plain variants are literals; their inputs are validated when optimized.
+    assert json.loads(Constraint.budget(-1.0).to_json()) == {"budget": {"rhs": -1.0}}
     with pytest.raises(ValueError, match="max_share must be in"):
         Constraint.exposure_limit("rating", "CCC", 1.5)
     with pytest.raises(ValueError, match="min_share must be in"):

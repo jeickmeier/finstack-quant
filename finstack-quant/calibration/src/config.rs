@@ -382,51 +382,69 @@ pub enum MarketQuoteSide {
 }
 
 /// Audit metadata and freshness policy for calibration inputs.
+///
+/// The snapshot age is `as_of_timestamp - snapshot_timestamp`. Both instants
+/// are caller inputs, so validation never reads the wall clock and the same
+/// envelope always validates the same way.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct MarketFreshnessPolicy {
     /// RFC3339 timestamp at which the quote snapshot was captured.
     pub snapshot_timestamp: Option<String>,
-    /// Maximum permitted snapshot age in seconds.
+    /// Maximum permitted snapshot age in seconds, measured at `as_of_timestamp`.
     pub max_age_seconds: Option<u64>,
+    /// RFC3339 instant at which freshness is assessed (normally the caller's
+    /// clock when it submits the envelope). Required with `snapshot_timestamp`
+    /// and `max_age_seconds`.
+    pub as_of_timestamp: Option<String>,
     /// Market side represented by quote values in the envelope.
     pub quote_side: MarketQuoteSide,
 }
 
+fn parse_rfc3339(
+    timestamp: &str,
+    field: &str,
+) -> finstack_quant_core::Result<time::OffsetDateTime> {
+    time::OffsetDateTime::parse(timestamp, &time::format_description::well_known::Rfc3339).map_err(
+        |error| {
+            finstack_quant_core::Error::Validation(format!(
+                "market freshness {field} must be RFC3339: {error}"
+            ))
+        },
+    )
+}
+
 impl MarketFreshnessPolicy {
     fn validate(&self) -> finstack_quant_core::Result<()> {
-        match (&self.snapshot_timestamp, self.max_age_seconds) {
-            (None, None) => Ok(()),
-            (Some(timestamp), Some(max_age_seconds)) if max_age_seconds > 0 => {
-                let captured = time::OffsetDateTime::parse(
-                    timestamp,
-                    &time::format_description::well_known::Rfc3339,
-                )
-                .map_err(|error| {
-                    finstack_quant_core::Error::Validation(format!(
-                        "market snapshot timestamp must be RFC3339: {error}"
-                    ))
-                })?;
-                let now = time::OffsetDateTime::now_utc();
-                if captured > now {
+        match (
+            &self.snapshot_timestamp,
+            self.max_age_seconds,
+            &self.as_of_timestamp,
+        ) {
+            (None, None, None) => Ok(()),
+            (Some(_), Some(0), Some(_)) => Err(finstack_quant_core::Error::Validation(
+                "market freshness max_age_seconds must be positive".to_string(),
+            )),
+            (Some(snapshot), Some(max_age_seconds), Some(as_of)) => {
+                let captured = parse_rfc3339(snapshot, "snapshot_timestamp")?;
+                let assessed = parse_rfc3339(as_of, "as_of_timestamp")?;
+                if captured > assessed {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "market snapshot timestamp {timestamp} is in the future"
+                        "market snapshot timestamp {snapshot} is after as_of_timestamp {as_of}"
                     )));
                 }
-                let age_seconds = (now - captured).whole_seconds();
+                let age_seconds = (assessed - captured).whole_seconds();
                 if age_seconds > max_age_seconds as i64 {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "market snapshot is {age_seconds} seconds old, exceeding max_age_seconds={max_age_seconds}"
+                        "market snapshot is {age_seconds} seconds old at {as_of}, exceeding max_age_seconds={max_age_seconds}"
                     )));
                 }
                 Ok(())
             }
-            (Some(_), Some(0)) => Err(finstack_quant_core::Error::Validation(
-                "market freshness max_age_seconds must be positive".to_string(),
-            )),
             _ => Err(finstack_quant_core::Error::Validation(
-                "market freshness requires snapshot_timestamp and max_age_seconds together"
+                "market freshness requires snapshot_timestamp, max_age_seconds and \
+                 as_of_timestamp together"
                     .to_string(),
             )),
         }
@@ -435,13 +453,16 @@ impl MarketFreshnessPolicy {
     /// Whether the snapshot carries a complete, validated freshness assertion.
     #[must_use]
     pub fn is_verifiable(&self) -> bool {
-        self.snapshot_timestamp.is_some() && self.max_age_seconds.is_some()
+        self.snapshot_timestamp.is_some()
+            && self.max_age_seconds.is_some()
+            && self.as_of_timestamp.is_some()
     }
 }
 
 fn market_freshness_is_default(policy: &MarketFreshnessPolicy) -> bool {
     policy.snapshot_timestamp.is_none()
         && policy.max_age_seconds.is_none()
+        && policy.as_of_timestamp.is_none()
         && policy.quote_side == MarketQuoteSide::Mid
 }
 
@@ -937,6 +958,44 @@ mod tests {
         }
     }
 
+    /// The freshness age is measured against the caller's explicit as-of
+    /// timestamp, never the wall clock, so validation is deterministic.
+    #[test]
+    fn market_freshness_age_is_measured_against_explicit_as_of() {
+        let policy = |as_of: Option<&str>| MarketFreshnessPolicy {
+            snapshot_timestamp: Some("2020-01-01T00:00:00Z".to_string()),
+            max_age_seconds: Some(3600),
+            as_of_timestamp: as_of.map(str::to_string),
+            quote_side: MarketQuoteSide::Mid,
+        };
+
+        let fresh = policy(Some("2020-01-01T01:00:00Z"));
+        fresh.validate().expect("exactly max_age_seconds old");
+        assert!(fresh.is_verifiable());
+
+        let stale = policy(Some("2020-01-01T01:00:01Z"));
+        assert!(stale
+            .validate()
+            .expect_err("one second past max age")
+            .to_string()
+            .contains("3601 seconds old"));
+
+        let future = policy(Some("2019-12-31T23:59:59Z"));
+        assert!(future
+            .validate()
+            .expect_err("snapshot after as-of")
+            .to_string()
+            .contains("after as_of_timestamp"));
+
+        let missing = policy(None);
+        assert!(missing
+            .validate()
+            .expect_err("age needs an as-of")
+            .to_string()
+            .contains("together"));
+        assert!(!missing.is_verifiable());
+    }
+
     #[test]
     fn freshness_age_is_a_plain_json_number() {
         let policy: MarketFreshnessPolicy =
@@ -1050,6 +1109,7 @@ mod fx_and_hierarchy_settings_tests {
         let mut malformed = CalibrationConfig::default();
         malformed.market_freshness.snapshot_timestamp = Some("not-a-timestamp".to_string());
         malformed.market_freshness.max_age_seconds = Some(60);
+        malformed.market_freshness.as_of_timestamp = Some("2026-01-01T00:00:00Z".to_string());
         assert!(malformed
             .validate()
             .expect_err("malformed timestamp")

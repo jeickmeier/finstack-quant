@@ -166,7 +166,7 @@ fn financing_period_projection(
                         currency,
                         "TRS financing",
                     )?
-                } else if calendar_id == finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID {
+                } else if calendar_id == finstack_quant_core::dates::WEEKENDS_ONLY_ID {
                     &finstack_quant_core::dates::WEEKENDS_ONLY
                 } else {
                     super::overnight::resolve_overnight_fixing_calendar(
@@ -1366,7 +1366,7 @@ mod tests {
             year_fraction,
             Tenor::quarterly(),
             as_of,
-            finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID,
+            finstack_quant_core::dates::WEEKENDS_ONLY_ID,
             Currency::USD,
         )
         .expect_err("started term period without fixing must fail");
@@ -1384,7 +1384,7 @@ mod tests {
             year_fraction,
             Tenor::quarterly(),
             as_of,
-            finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID,
+            finstack_quant_core::dates::WEEKENDS_ONLY_ID,
             Currency::USD,
         )
         .expect("exact reset fixing");
@@ -1399,7 +1399,7 @@ mod tests {
             year_fraction,
             Tenor::quarterly(),
             as_of,
-            finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID,
+            finstack_quant_core::dates::WEEKENDS_ONLY_ID,
             Currency::USD,
         )
         .expect("future term period projects");

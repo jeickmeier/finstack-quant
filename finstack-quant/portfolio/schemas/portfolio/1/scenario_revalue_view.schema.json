@@ -2,7 +2,7 @@
   "$defs": {
     "ApplicationReport": {
       "additionalProperties": false,
-      "description": "Report describing what happened during [`super::ScenarioEngine::apply`].\n\n# Examples\n```rust\nuse finstack_quant_scenarios::engine::ApplicationReport;\n\nlet report = ApplicationReport {\n    operations_applied: 3,\n    user_operations: 1,\n    expanded_operations: 3,\n    changes: Default::default(),\n    applied_shocks: vec![],\n    warnings: vec![],\n    meta: None,\n    time_roll: None,\n};\n\nassert_eq!(report.operations_applied, 3);\nassert_eq!(report.user_operations, 1);\nassert_eq!(report.expanded_operations, 3);\n```",
+      "description": "Report describing what happened during [`super::ScenarioEngine::apply`].\n\n# Examples\n```rust\nuse finstack_quant_scenarios::ApplicationReport;\n\nlet report = ApplicationReport {\n    operations_applied: 3,\n    user_operations: 1,\n    expanded_operations: 3,\n    changes: Default::default(),\n    applied_shocks: vec![],\n    warnings: vec![],\n    meta: None,\n    time_roll: None,\n};\n\nassert_eq!(report.operations_applied, 3);\nassert_eq!(report.user_operations, 1);\nassert_eq!(report.expanded_operations, 3);\n```",
       "properties": {
         "applied_shocks": {
           "description": "Size of every market and instrument shock applied, in application\norder: one entry per accepted effect, so the entries reconcile with\n[`changes`](Self::changes) (every market target named there appears\nhere at least once, and the instrument indices here union to\n`changes.changed_instrument_indices`).\n\nStatement-forecast operations, rate bindings and the time roll are not\nlisted. Empty when the scenario applied no market or instrument shock,\nand on reports deserialized from JSON written before this field\nexisted.",
@@ -990,10 +990,6 @@
       "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
       "type": "string"
     },
-    "EntityId": {
-      "description": "Entity identifier (company, fund, etc.)",
-      "type": "string"
-    },
     "FxConversionPolicy": {
       "description": "Standard FX conversion strategies used to hint FX providers.\n\nThe policy tells a provider *how* the rate will be applied so it can decide\nbetween spot, forward, or averaged sources.",
       "oneOf": [
@@ -1474,13 +1470,12 @@
         "degraded_positions": {
           "description": "Positions whose valuation fell back to PV-only because requested risk\nmetrics could not be computed.",
           "items": {
-            "$ref": "#/$defs/PositionId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
         "fx_collapse_policy": {
           "$ref": "#/$defs/FxConversionPolicy",
-          "default": "cashflow_date",
           "description": "FX policy applied when collapsing position values to the base currency.\n\nBase-currency rollups use an explicit spot-equivalent conversion at\n[`as_of`](Self::as_of) through the market FX matrix; this records the\napplied [`FxConversionPolicy`] so the result envelope satisfies the\npolicy-visibility invariant (the FX strategy is stamped, not implied)."
         },
         "position_values": {
@@ -1499,23 +1494,20 @@
         "as_of",
         "position_values",
         "total_base_currency",
-        "by_entity"
+        "by_entity",
+        "fx_collapse_policy"
       ],
       "type": "object"
-    },
-    "PositionId": {
-      "description": "Position identifier.",
-      "type": "string"
     },
     "PositionValue": {
       "description": "Result of valuing a single position.\n\nHolds both native-currency and base-currency valuations along with\nthe underlying [`ValuationResult`].",
       "properties": {
         "entity_id": {
-          "$ref": "#/$defs/EntityId",
+          "$ref": "#/$defs/Id",
           "description": "Entity that owns this position"
         },
         "fx_rate": {
-          "description": "Spot FX rate applied to collapse [`value_native`](Self::value_native)\ninto [`value_base`](Self::value_base): units of the portfolio base\ncurrency per one unit of the native currency, observed at the\nvaluation date, so `value_native × fx_rate = value_base` (up to the\nbase currency's `Money` rounding).\n\nAbsent when the native currency is the base currency (no FX lookup is\nmade), and on values deserialized from JSON written before this field\nexisted.",
+          "description": "Spot FX rate applied to collapse [`value_native`](Self::value_native)\ninto [`value_base`](Self::value_base): units of the portfolio base\ncurrency per one unit of the native currency, observed at the\nvaluation date, so `value_native × fx_rate = value_base` (up to the\nbase currency's `Money` rounding).\n\nAbsent when the native currency is the base currency (no FX lookup is\nmade).",
           "format": "double",
           "type": [
             "number",
@@ -1542,7 +1534,7 @@
           "type": "number"
         },
         "position_id": {
-          "$ref": "#/$defs/PositionId",
+          "$ref": "#/$defs/Id",
           "description": "Position identifier"
         },
         "risk_error": {
@@ -2634,7 +2626,7 @@
               "type": "string"
             },
             "op_kind": {
-              "description": "Operation kind name (e.g., `\"HierarchyCurveParallelBp\"`).",
+              "description": "Operation `kind` tag (e.g., `\"hierarchy_curve_parallel_bp\"`).",
               "type": "string"
             },
             "target_path": {
@@ -2661,7 +2653,7 @@
               "type": "string"
             },
             "op_kind": {
-              "description": "Operation kind name (e.g., `\"HierarchyCurveParallelBp\"`).",
+              "description": "Operation `kind` tag (e.g., `\"hierarchy_curve_parallel_bp\"`).",
               "type": "string"
             }
           },

@@ -175,7 +175,7 @@ impl OvernightRateSource {
 
 #[derive(Clone)]
 pub(super) struct OvernightCoupon {
-    pub(super) sources: BTreeMap<(Date, u32), OvernightRateSource>,
+    pub(super) sources: BTreeMap<Date, OvernightRateSource>,
     pub(super) max_history_steps: usize,
 }
 
@@ -299,12 +299,10 @@ pub(super) struct FloatingBuild {
     pub(super) base_index_rate: Option<f64>,
 }
 
-pub(super) type FloatingRuntimeState = FloatingCouponReplayState;
-
 #[derive(Clone)]
 pub(super) struct LiveFloatingCheckpoint {
     pub(super) coupon_id: usize,
-    pub(super) state: FloatingRuntimeState,
+    pub(super) state: FloatingCouponReplayState,
 }
 
 #[derive(Clone)]
@@ -332,7 +330,7 @@ pub(super) struct ReplayCursor {
     pub(super) outstanding: f64,
     pub(super) cumulative_distribution_cash: f64,
     pub(super) cumulative_distribution_target_pv: f64,
-    pub(super) floating: Vec<FloatingRuntimeState>,
+    pub(super) floating: Vec<FloatingCouponReplayState>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -350,7 +348,7 @@ pub(super) struct ExerciseInputs<'a> {
     pub(super) path: &'a [RatesCreditPathState],
     pub(super) outstanding: f64,
     pub(super) locked_coupon: f64,
-    pub(super) coupon_states: &'a [FloatingRuntimeState],
+    pub(super) coupon_states: &'a [FloatingCouponReplayState],
     pub(super) cumulative_distribution_cash: f64,
     pub(super) cumulative_distribution_target_pv: f64,
     pub(super) make_whole_policies: Option<&'a [RegressionPolicy]>,

@@ -136,7 +136,7 @@ pub use calendar::business_days::{
     adjust, available_calendars, calendar_by_id_strict, resolve_calendar, resolve_joint_calendar,
     BusinessDayConvention, CalendarMetadata, HolidayCalendar,
 };
-pub use calendar::WEEKENDS_ONLY;
+pub use calendar::{WEEKENDS_ONLY, WEEKENDS_ONLY_ID};
 
 mod schedule;
 

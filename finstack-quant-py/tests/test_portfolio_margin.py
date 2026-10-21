@@ -1,7 +1,7 @@
 """Portfolio margin aggregation binding.
 
-Covers the typed surface over the Rust ``PortfolioMarginAggregator``:
-``from_portfolio`` / ``calculate``, the ``PortfolioMarginResult`` and
+Covers the typed surface over the Rust ``margin::portfolio_margin``:
+the ``portfolio_margin`` function, the ``PortfolioMarginResult`` and
 ``NettingSetMargin`` getters, and their JSON, pickle and DataFrame exits.
 """
 
@@ -20,8 +20,8 @@ from finstack_quant.margin import ImMethodology, NettingSetId
 from finstack_quant.portfolio import (
     NettingSetMargin,
     Portfolio,
-    PortfolioMarginAggregator,
     PortfolioMarginResult,
+    portfolio_margin,
 )
 
 AS_OF = "2025-01-15"
@@ -143,8 +143,7 @@ def _market() -> MarketContext:
 
 def test_calculate_on_an_unmargined_portfolio_reports_no_netting_sets() -> None:
     portfolio = _unmargined_portfolio()
-    aggregator = PortfolioMarginAggregator.from_portfolio(portfolio)
-    result = aggregator.calculate(portfolio, _market(), AS_OF)
+    result = portfolio_margin(portfolio, _market(), AS_OF)
 
     assert isinstance(result, PortfolioMarginResult)
     assert result.as_of == date.fromisoformat(AS_OF)
@@ -170,18 +169,17 @@ def test_calculate_on_an_unmargined_portfolio_reports_no_netting_sets() -> None:
     assert list(frame.columns) == NETTING_SET_COLUMNS
     assert len(frame) == 0
 
-    # The aggregator is reusable, and accepts a date object and JSON inputs.
-    again = aggregator.calculate(portfolio, _market().to_json(), date.fromisoformat(AS_OF), current_im_collateral={})
+    # A repeated run is identical, and accepts a date object and JSON inputs.
+    again = portfolio_margin(portfolio, _market().to_json(), date.fromisoformat(AS_OF), current_im_collateral={})
     assert again.to_json() == result.to_json()
 
 
 def test_calculate_rejects_collateral_for_an_unknown_csa() -> None:
     portfolio = _unmargined_portfolio()
-    aggregator = PortfolioMarginAggregator.from_portfolio(portfolio)
     with pytest.raises(ValueError, match="Unknown IM collateral CSA"):
-        aggregator.calculate(portfolio, _market(), AS_OF, current_im_collateral={"NO-SUCH-CSA": Money(1.0, "USD")})
+        portfolio_margin(portfolio, _market(), AS_OF, current_im_collateral={"NO-SUCH-CSA": Money(1.0, "USD")})
     with pytest.raises(TypeError):
-        aggregator.calculate(portfolio, _market(), 20250115)
+        portfolio_margin(portfolio, _market(), 20250115)
 
 
 def test_result_getters_reconcile_with_netting_set_rows() -> None:

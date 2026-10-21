@@ -1447,7 +1447,7 @@ impl PyBondBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let method: finstack_quant_valuations::instruments::fixed_income::bond::AccrualMethod =
+        let method: finstack_quant_cashflows::accrual::AccrualMethod =
             enum_from_str(value, "accrual_method")?;
         builder_set!(
             slf,
@@ -1988,13 +1988,13 @@ impl PyTermLoanBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let (spec, shown) = if value.extract::<&str>().is_ok() || value.cast::<PyDict>().is_ok() {
-            let spec: finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec =
+            let spec: finstack_quant_cashflows::builder::RateSpec =
                 spec_from_py(py, value, "rate")?;
             (spec, "{...}".to_string())
         } else {
             let rate = rate_from_py(value, "rate")?;
             (
-                finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec::fixed_rate(rate),
+                finstack_quant_cashflows::builder::RateSpec::fixed_rate(rate),
                 rate.as_decimal().to_string(),
             )
         };
@@ -2221,7 +2221,7 @@ impl PyTermLoanBuilder {
         py: Python<'py>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spec: finstack_quant_valuations::instruments::fixed_income::term_loan::AmortizationSpec =
+        let spec: finstack_quant_cashflows::builder::AmortizationSpec =
             if let Ok(name) = value.extract::<&str>() {
                 if name.trim_start().starts_with('{') || name.trim_start().starts_with('"') {
                     json_field(name, "amortization")?

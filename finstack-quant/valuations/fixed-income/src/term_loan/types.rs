@@ -45,13 +45,12 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::Decimal;
 
-use super::spec::{
-    AmortizationSpec, DdtlSpec, LoanCallSchedule, OidEirSpec, TermLoanCovenantEvents,
-};
+use super::spec::{DdtlSpec, LoanCallSchedule, OidEirSpec, TermLoanCovenantEvents};
 use crate::loan_terms::UpfrontFee;
+use finstack_quant_cashflows::builder::AmortizationSpec;
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::FloatingRateSpec;
-pub use finstack_quant_cashflows::builder::RateSpec;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
@@ -336,7 +335,7 @@ impl TermLoan {
         let calendar_id = self
             .calendar_id
             .as_deref()
-            .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID);
+            .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID);
         let periods = finstack_quant_cashflows::builder::build_periods(
             finstack_quant_cashflows::builder::BuildPeriodsParams {
                 start: self.issue_date,

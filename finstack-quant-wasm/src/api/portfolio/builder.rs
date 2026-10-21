@@ -5,7 +5,7 @@ use crate::utils::date::parse_iso_date;
 use crate::utils::input::{from_js_json, js_string};
 use crate::utils::to_js_err;
 use finstack_quant_portfolio::types::Entity;
-use finstack_quant_portfolio::{PortfolioBuilder, Position};
+use finstack_quant_portfolio::{position::Position, PortfolioBuilder};
 use wasm_bindgen::prelude::*;
 
 /// Fluent builder returned by `Portfolio.builder(id, baseCurrency, asOf)`.

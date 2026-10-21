@@ -248,7 +248,7 @@ mod tests {
             _market: &MarketContext,
             _as_of: Date,
         ) -> finstack_quant_core::Result<CashFlowSchedule> {
-            Ok(schedule_from_classified_flows(
+            schedule_from_classified_flows(
                 Vec::new(),
                 DayCount::Act365F,
                 ScheduleBuildOpts {
@@ -258,7 +258,7 @@ mod tests {
                         ..Default::default()
                     },
                 },
-            ))
+            )
         }
     }
 

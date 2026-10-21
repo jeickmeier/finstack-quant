@@ -524,7 +524,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommodityForward {
                     ..Default::default()
                 },
             },
-        );
+        )?;
         Ok(schedule)
     }
 }

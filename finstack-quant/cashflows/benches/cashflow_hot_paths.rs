@@ -23,6 +23,9 @@
 mod fixtures;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use finstack_quant_cashflows::accrual::{
+    accrued_interest_amount, AccrualConfig, AccrualMethod, ExCouponRule,
+};
 use finstack_quant_cashflows::aggregation::{
     aggregate_by_period, aggregate_cashflows_checked, calendar_year_ladder,
 };
@@ -32,8 +35,7 @@ use finstack_quant_cashflows::builder::{
 };
 use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_cashflows::{
-    accrued_interest_amount, build_cashflow_schedule_json, dated_flows_json,
-    validate_cashflow_schedule_json, AccrualConfig, AccrualMethod, ExCouponRule,
+    build_cashflow_schedule_json, dated_flows_json, validate_cashflow_schedule_json,
 };
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
@@ -191,6 +193,7 @@ fn make_amortizing_schedule(base: Date, n_periods: usize) -> CashFlowSchedule {
             },
         },
     )
+    .expect("valid schedule")
 }
 
 // Benchmark: pv_by_period (plain, no credit)
@@ -217,7 +220,6 @@ fn bench_pv_by_period(c: &mut Criterion) {
                         black_box(&disc_id),
                         None,
                         black_box(base),
-                        Some(DayCount::Act365F),
                     )
                     .unwrap()
             });
@@ -261,7 +263,6 @@ fn bench_pv_by_period_credit(c: &mut Criterion) {
                         black_box(&disc_id),
                         Some(black_box(&credit_zero_id)),
                         black_box(base),
-                        Some(DayCount::Act365F),
                     )
                     .unwrap()
             });
@@ -276,7 +277,6 @@ fn bench_pv_by_period_credit(c: &mut Criterion) {
                         black_box(&disc_id),
                         Some(black_box(&credit_id)),
                         black_box(base),
-                        Some(DayCount::Act365F),
                     )
                     .unwrap()
             });
@@ -389,10 +389,14 @@ fn bench_npv(c: &mut Criterion) {
         group.throughput(Throughput::Elements(schedule.get_flows().len() as u64));
         group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
             b.iter(|| {
-                black_box(&schedule)
-                    .npv(black_box(disc.as_ref()), black_box(base))
-                    .unwrap()
-                    .amount()
+                let flows = black_box(&schedule).dated_flows().unwrap();
+                finstack_quant_core::cashflow::npv(
+                    black_box(disc.as_ref()),
+                    black_box(base),
+                    &flows,
+                )
+                .unwrap()
+                .amount()
             });
         });
     }

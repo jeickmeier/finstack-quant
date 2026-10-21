@@ -377,7 +377,7 @@ fn base_correlation_params_reject_use_imm_dates() {
         day_count: None,
         business_day_convention: None,
         calendar_id: None,
-        detachment_points: vec![3.0, 7.0],
+        detachment_points: vec![0.03, 0.07],
         roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
     };
     let mut json = serde_json::to_value(&params).expect("serialize");

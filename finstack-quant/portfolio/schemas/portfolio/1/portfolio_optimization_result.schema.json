@@ -1,5 +1,9 @@
 {
   "$defs": {
+    "Id": {
+      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
+      "type": "string"
+    },
     "NonFiniteF64Wire": {
       "anyOf": [
         {
@@ -43,34 +47,9 @@
           "type": "string"
         },
         {
-          "const": "feasible_but_suboptimal",
-          "description": "Found feasible solution but solver stopped early.",
+          "const": "infeasible",
+          "description": "No feasible solution exists. The LP backend does not expose an\nirreducible infeasible subset, so no conflicting constraints are named.",
           "type": "string"
-        },
-        {
-          "additionalProperties": false,
-          "description": "No feasible solution exists.",
-          "properties": {
-            "infeasible": {
-              "properties": {
-                "conflicting_constraints": {
-                  "description": "Constraints that appear to conflict (if determinable).",
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                }
-              },
-              "required": [
-                "conflicting_constraints"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "infeasible"
-          ],
-          "type": "object"
         },
         {
           "const": "unbounded",
@@ -100,10 +79,6 @@
           "type": "object"
         }
       ]
-    },
-    "PositionId": {
-      "description": "Position identifier.",
-      "type": "string"
     },
     "PositiveF64Wire": {
       "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
@@ -299,7 +274,7 @@
           "type": "string"
         },
         "position_id": {
-          "$ref": "#/$defs/PositionId",
+          "$ref": "#/$defs/Id",
           "description": "Position identifier in the optimized portfolio."
         },
         "target_quantity": {
@@ -367,7 +342,6 @@
       "implied_quantities": {
         "POS_001": 600000.0
       },
-      "is_feasible": true,
       "meta": {
         "fx_policy_applied": null,
         "numeric_mode": "f64",
@@ -382,16 +356,12 @@
         },
         "version": "0.11.0"
       },
-      "metric_values": {
-        "expected_return": 0.0425
-      },
       "objective_value": 0.0425,
       "optimal_weights": {
         "POS_001": 0.6
       },
       "schema_version": 1,
       "status": "optimal",
-      "status_label": "optimal",
       "trades": [
         {
           "current_quantity": 550000.0,
@@ -413,7 +383,7 @@
   ],
   "properties": {
     "binding_constraints": {
-      "description": "Approximately binding constraint names.",
+      "description": "Names of the approximately binding constraints (slack ≈ 0), in slack\norder; empty for an infeasible solve.",
       "items": {
         "type": "string"
       },
@@ -423,7 +393,7 @@
       "additionalProperties": {
         "$ref": "#/$defs/NonFiniteF64Wire"
       },
-      "description": "Constraint slack values; undefined averages use the `\"nan\"` sentinel.",
+      "description": "Constraint slack values (positive = slack, zero ≈ binding); undefined\naverages use the `\"nan\"` sentinel.",
       "type": "object"
     },
     "current_weights": {
@@ -431,7 +401,7 @@
         "format": "double",
         "type": "number"
       },
-      "description": "Current weights keyed by position.",
+      "description": "Pre‑trade weights (current portfolio state).",
       "type": "object"
     },
     "implied_quantities": {
@@ -439,12 +409,8 @@
         "format": "double",
         "type": "number"
       },
-      "description": "Implied target quantities keyed by position.",
+      "description": "Implied target quantities for each position (units / face / notional).\n\nReconstruction depends on the weighting scheme and is always written\nin `Position::quantity` units (lots, shares, face multiplier, or\npercentage points):\n- `ValueWeight`: convert the target PV share through `pv_per_unit`\n  (base PV per 1.0 of `scale_factor()`) and map scale back to quantity\n- `NotionalWeight`: convert the target notional share through\n  `|instrument.notional().amount()|` and map scale back to quantity\n- `UnitScaling`: treat the optimized weight as a quantity multiplier for\n  existing positions, or as the direct target quantity for new candidates\n\nHeld existing positions retain their exact current quantity under every\nscheme, including positions with zero or negligible present value.",
       "type": "object"
-    },
-    "is_feasible": {
-      "description": "Whether the solution can be consumed.",
-      "type": "boolean"
     },
     "label": {
       "description": "Optional user-supplied problem label.",
@@ -457,14 +423,6 @@
       "$ref": "#/$defs/ResultsMeta",
       "description": "Configuration and numerical provenance from the solve."
     },
-    "metric_values": {
-      "additionalProperties": {
-        "format": "double",
-        "type": "number"
-      },
-      "description": "Evaluated metrics.",
-      "type": "object"
-    },
     "objective_value": {
       "$ref": "#/$defs/NonFiniteF64Wire",
       "description": "Objective value at the solution.\n\n`NaN` when the solve is not feasible; non-finite values travel as the\nstring sentinels `\"nan\"`, `\"inf\"` and `\"-inf\"` so the result round-trips."
@@ -474,7 +432,7 @@
         "format": "double",
         "type": "number"
       },
-      "description": "Optimal weights keyed by position.",
+      "description": "Optimal weights per position (for positions in the universe).\nNon‑universe positions implicitly keep weight = current_weight.",
       "type": "object"
     },
     "schema_version": {
@@ -483,14 +441,10 @@
     },
     "status": {
       "$ref": "#/$defs/OptimizationStatus",
-      "description": "Solver outcome."
-    },
-    "status_label": {
-      "description": "Stable snake-case status label.",
-      "type": "string"
+      "description": "Solver outcome; see [`OptimizationStatus::is_feasible`]."
     },
     "trades": {
-      "description": "Executable trade list.",
+      "description": "Executable trade list, largest absolute quantity change first.\n\nCovers existing positions and candidate additions whose weight change\nis materially non-zero. Empty for an infeasible solve, which is not the\nsame as \"nothing to trade\"; check [`Self::is_feasible`] first.",
       "items": {
         "$ref": "#/$defs/TradeSpec"
       },
@@ -498,14 +452,14 @@
     },
     "turnover": {
       "$ref": "#/$defs/NonFiniteF64Wire",
-      "description": "Gross turnover.\n\n`NaN` when the solve is not feasible; encoded like `objective_value`."
+      "description": "Gross turnover (sum of absolute weight changes).\n\n`NaN` when the solve is not feasible — there is no solution, so \"no\nturnover\" would be indistinguishable from \"already optimal\"; encoded\nlike `objective_value`."
     },
     "weight_deltas": {
       "additionalProperties": {
         "format": "double",
         "type": "number"
       },
-      "description": "Weight changes keyed by position.",
+      "description": "Weight changes (`optimal - current`).",
       "type": "object"
     }
   },
@@ -513,15 +467,12 @@
     "meta",
     "schema_version",
     "status",
-    "status_label",
-    "is_feasible",
     "objective_value",
     "turnover",
     "optimal_weights",
     "current_weights",
     "weight_deltas",
     "implied_quantities",
-    "metric_values",
     "trades",
     "constraint_slacks",
     "binding_constraints"

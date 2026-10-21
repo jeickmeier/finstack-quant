@@ -959,7 +959,7 @@ class TestPortfolioCompoundWorkflow:
 
         def _run():
             val = value_portfolio(_BENCH_SPEC_JSON_500, _BENCH_MARKET_JSON)
-            agg = aggregate_metrics(val, "USD", _BENCH_MARKET_JSON, "2025-01-15")
+            agg = aggregate_metrics(val, _BENCH_MARKET_JSON)
             cf = aggregate_full_cashflows(_BENCH_SPEC_JSON_500, _BENCH_MARKET_JSON)
             return val, agg, cf
 
@@ -971,7 +971,7 @@ class TestPortfolioCompoundWorkflow:
 
         def _run():
             val = value_portfolio(portfolio, _BENCH_MARKET)
-            agg = aggregate_metrics(val, "USD", _BENCH_MARKET, "2025-01-15")
+            agg = aggregate_metrics(val, _BENCH_MARKET)
             cf = aggregate_full_cashflows(portfolio, _BENCH_MARKET)
             return val, agg, cf
 

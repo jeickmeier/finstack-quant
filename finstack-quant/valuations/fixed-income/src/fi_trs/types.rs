@@ -387,7 +387,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FiIndexTotalReturnSwap
                     ..Default::default()
                 },
             },
-        );
+        )?;
         Ok(schedule)
     }
 }

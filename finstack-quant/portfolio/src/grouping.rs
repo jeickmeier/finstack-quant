@@ -9,8 +9,8 @@
 //! position DataFrame, which is more flexible than any fixed Rust helper.
 
 use crate::book::{Book, BookId};
-use crate::error::Result;
 use crate::valuation::PortfolioValuation;
+use crate::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{FxHashMap, FxHashSet};
@@ -94,25 +94,25 @@ pub fn aggregate_by_book(
             return Ok(*cached);
         }
         if depth >= MAX_BOOK_GROUPING_RECURSION_DEPTH {
-            return Err(crate::error::Error::invalid_input(format!(
+            return Err(crate::Error::invalid_input(format!(
                 "Book aggregation exceeded maximum recursion depth of {MAX_BOOK_GROUPING_RECURSION_DEPTH}"
             )));
         }
         if !visiting.insert(book_id.clone()) {
-            return Err(crate::error::Error::invalid_input(format!(
+            return Err(crate::Error::invalid_input(format!(
                 "Book hierarchy contains a cycle at '{book_id}'"
             )));
         }
 
-        let book = books.get(book_id).ok_or_else(|| {
-            crate::error::Error::InvalidInput(format!("Book not found: {}", book_id))
-        })?;
+        let book = books
+            .get(book_id)
+            .ok_or_else(|| crate::Error::InvalidInput(format!("Book not found: {}", book_id)))?;
 
         let mut total = Money::from((0_i64, base_currency));
 
         for pos_id in &book.position_ids {
             let &&value = position_values.get(pos_id).ok_or_else(|| {
-                crate::error::Error::invalid_input(format!(
+                crate::Error::invalid_input(format!(
                     "MO-3: valuation is missing book position '{pos_id}'"
                 ))
             })?;

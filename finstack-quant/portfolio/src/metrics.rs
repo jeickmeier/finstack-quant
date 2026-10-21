@@ -16,16 +16,15 @@
 //! rate implied by `value_base / value_native`. Positions with near-zero
 //! native PV and no matrix quote fail closed.
 
-use crate::error::{Error, Result};
-#[cfg(not(target_arch = "wasm32"))]
-use crate::evaluation::POSITION_PARALLEL_MIN_POSITIONS;
+use crate::error::Result;
+use crate::evaluation::try_map_positions;
 use crate::types::{EntityId, PositionId};
 use crate::valuation::PortfolioValuation;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::FxHashSet;
-use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::metrics::{is_additive_metric, MetricId};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -87,7 +86,7 @@ pub struct AggregatedMetric {
 /// instrument type no such exposure, so the total is complete without it. Such
 /// narrowing is reported per position on
 /// [`PositionValue::inapplicable_metrics`](crate::valuation::PositionValue::inapplicable_metrics).
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PortfolioMetrics {
     /// Aggregated metrics (summable only)
@@ -135,23 +134,6 @@ pub struct PositionMetrics {
     pub currency: Currency,
     /// Raw metric values for the position.
     pub metrics: IndexMap<MetricId, f64>,
-}
-
-impl std::ops::Deref for PositionMetrics {
-    type Target = IndexMap<MetricId, f64>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.metrics
-    }
-}
-
-impl<'a> IntoIterator for &'a PositionMetrics {
-    type Item = (&'a MetricId, &'a f64);
-    type IntoIter = indexmap::map::Iter<'a, MetricId, f64>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.metrics.iter()
-    }
 }
 
 impl PortfolioMetrics {
@@ -212,15 +194,40 @@ impl PortfolioMetrics {
     ///
     /// * `base` - Composite metric identifier whose decoded series components
     ///   should be collected from [`Self::aggregated`].
-    pub fn metric_series(&self, base: &MetricId) -> Vec<(Vec<String>, &AggregatedMetric)> {
+    ///
+    /// # Returns
+    ///
+    /// One [`MetricSeriesEntry`] per aggregated key that encodes a component of
+    /// `base`; empty when `base` has no series entries.
+    pub fn metric_series(&self, base: &MetricId) -> Vec<MetricSeriesEntry<'_>> {
         self.aggregated
             .iter()
             .filter_map(|(key, aggregate)| {
                 key.decode_components(base)
-                    .map(|components| (components, aggregate))
+                    .map(|components| MetricSeriesEntry {
+                        components,
+                        total: aggregate.total,
+                        by_entity: &aggregate.by_entity,
+                    })
             })
             .collect()
     }
+}
+
+/// One decoded entry of [`PortfolioMetrics::metric_series`].
+///
+/// Serializes as `{components, total, by_entity}`, the object WASM
+/// `portfolioMetricsSeries` returns.
+#[derive(Clone, Debug, Serialize)]
+pub struct MetricSeriesEntry<'a> {
+    /// Decoded key components after the base metric, e.g. `["USD-OIS", "10y"]`
+    /// for `bucketed_dv01::USD-OIS::10y`.
+    pub components: Vec<String>,
+    /// Portfolio total of this series point, in the portfolio base currency.
+    pub total: f64,
+    /// Per-entity totals of this series point in aggregation order, in the
+    /// portfolio base currency.
+    pub by_entity: &'a IndexMap<EntityId, f64>,
 }
 
 /// A metric value that was excluded from portfolio aggregation because it was
@@ -234,57 +241,6 @@ pub struct SkippedMetric {
     pub metric_id: String,
     /// The non-finite value that was encountered.
     pub value: f64,
-}
-
-impl Default for PortfolioMetrics {
-    fn default() -> Self {
-        Self {
-            aggregated: IndexMap::new(),
-            by_position: IndexMap::new(),
-            skipped_metrics: Vec::new(),
-            degraded_positions: Vec::new(),
-            unaggregated_metrics: Vec::new(),
-        }
-    }
-}
-
-/// Metrics that can be meaningfully summed across positions.
-///
-/// These metrics scale linearly with position size and can be aggregated.
-///
-/// Bucketed metrics (e.g. key-rate DV01) are stored in `ValuationResult::measures`
-/// using composite keys of the form:
-///
-/// - `bucketed_dv01::2y`
-/// - `bucketed_cs01::5y`
-///
-/// To support portfolio-level aggregation of these series, `is_summable` performs
-/// a prefix match on the base metric ID rather than requiring an exact key match.
-///
-/// Membership is an explicit allowlist rather than a registry-driven property:
-/// a metric is listed only when it is currency-denominated and linear in
-/// position size, so that FX conversion plus summation yields a number with a
-/// portfolio-level meaning. Metrics that appear per position but are absent
-/// here are reported on
-/// [`PortfolioMetrics::unaggregated_metrics`] so the omission is visible.
-/// Check if a metric can be summed across positions.
-///
-/// This treats both base IDs (e.g. `bucketed_dv01`) and structured
-/// composite keys (e.g. `bucketed_dv01::2y`) as summable so that
-/// key-rate / bucketed series aggregate correctly.
-///
-/// # Arguments
-///
-/// * `metric_id` - Metric identifier to test.
-///
-/// # Returns
-///
-/// `true` when the metric is safe to sum across positions after any required
-/// FX conversion.
-pub(crate) fn is_summable(metric_id: &str) -> bool {
-    metric_id
-        .parse::<MetricId>()
-        .is_ok_and(|id| finstack_quant_valuations::metrics::is_additive_metric(&id))
 }
 
 /// Aggregate metrics from portfolio valuation results.
@@ -322,10 +278,10 @@ pub(crate) fn is_summable(metric_id: &str) -> bool {
 ///
 /// # Arguments
 ///
-/// * `valuation` - Portfolio valuation containing per-position valuation results.
-/// * `base_currency` - Portfolio base currency for aggregation.
-/// * `market` - Market context providing FX rates for zero-PV positions.
-/// * `as_of` - Valuation date used for FX rate lookups.
+/// * `valuation` - Portfolio valuation containing per-position valuation
+///   results. Its base currency (`total_base_currency`) is the aggregation
+///   currency and its `as_of` is the date of the FX spot lookups.
+/// * `market` - Market context providing FX rates for out-of-base positions.
 ///
 /// # Returns
 ///
@@ -346,28 +302,15 @@ pub(crate) fn is_summable(metric_id: &str) -> bool {
 ///
 /// # Errors
 ///
-/// Returns an error when `base_currency` or `as_of` differs from the valuation,
-/// or when an out-of-base position with near-zero native PV cannot obtain an
+/// Returns an error when an out-of-base position with near-zero native PV cannot obtain an
 /// FX conversion rate from `market`. Non-finite summable metric values are
 /// recorded as skipped in the result rather than failing aggregation.
 pub fn aggregate_metrics(
     valuation: &PortfolioValuation,
-    base_currency: Currency,
     market: &MarketContext,
-    as_of: finstack_quant_core::dates::Date,
 ) -> Result<PortfolioMetrics> {
-    let valuation_base_currency = valuation.total_base_currency.currency();
-    if base_currency != valuation_base_currency {
-        return Err(Error::invalid_input(format!(
-            "M-17: aggregate_metrics base_currency {base_currency} does not match valuation base currency {valuation_base_currency}"
-        )));
-    }
-    if as_of != valuation.as_of {
-        return Err(Error::invalid_input(format!(
-            "M-17: aggregate_metrics as_of {as_of} does not match valuation as_of {}",
-            valuation.as_of
-        )));
-    }
+    let base_currency = valuation.total_base_currency.currency();
+    let as_of = valuation.as_of;
 
     let position_entries: Vec<_> = valuation.position_values.iter().collect();
 
@@ -378,8 +321,7 @@ pub fn aggregate_metrics(
                     .measures
                     .iter()
                     .map(|(id, v)| {
-                        let scaled =
-                            scale_position_metric(id.as_str(), *v, position_value.metric_scale);
+                        let scaled = scale_position_metric(id, *v, position_value.metric_scale);
                         (id.clone(), scaled)
                     })
                     .collect();
@@ -394,34 +336,13 @@ pub fn aggregate_metrics(
             })
         };
 
-    #[cfg(not(target_arch = "wasm32"))]
-    let collected_results: Vec<Result<PositionMetricData>> =
-        if position_entries.len() >= POSITION_PARALLEL_MIN_POSITIONS {
-            use rayon::prelude::*;
-            position_entries
-                .par_iter()
-                .filter_map(|(position_id, position_value)| {
-                    collect_position((position_id, position_value))
-                })
-                .collect()
-        } else {
-            position_entries
-                .iter()
-                .filter_map(|(position_id, position_value)| {
-                    collect_position((position_id, position_value))
-                })
-                .collect()
-        };
-
-    #[cfg(target_arch = "wasm32")]
-    let collected_results: Vec<Result<PositionMetricData>> = position_entries
-        .iter()
-        .filter_map(|(position_id, position_value)| collect_position((position_id, position_value)))
-        .collect();
-
-    let collected = collected_results
+    let collected: Vec<PositionMetricData> =
+        try_map_positions(&position_entries, |&(position_id, position_value)| {
+            collect_position((position_id, position_value)).transpose()
+        })?
         .into_iter()
-        .collect::<Result<Vec<PositionMetricData>>>()?;
+        .flatten()
+        .collect();
 
     let mut metrics = aggregate_collected_metrics(collected);
     metrics
@@ -464,14 +385,19 @@ fn fx_rate_for_position(
         return Ok(base_amount / native_amount);
     }
 
-    Err(crate::error::Error::FxConversionFailed {
+    Err(crate::Error::FxConversionFailed {
         from: native_currency,
         to: base_currency,
     })
 }
 
-fn scale_position_metric(metric_id: &str, value: f64, metric_scale: f64) -> f64 {
-    if is_summable(metric_id) {
+/// Scale a position metric by the position size when it is additive.
+///
+/// Only metrics on the `is_additive_metric` allowlist (currency-denominated and
+/// linear in position size, including bucketed composite keys) scale; ratios such
+/// as `ytm` or `duration` are size-independent and pass through unchanged.
+fn scale_position_metric(metric_id: &MetricId, value: f64, metric_scale: f64) -> f64 {
+    if is_additive_metric(metric_id) {
         value * metric_scale
     } else {
         value
@@ -506,7 +432,7 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
 
         for (metric_id, value) in &data.metrics {
             let metric_name = metric_id.as_str();
-            if !is_summable(metric_name) {
+            if !is_additive_metric(metric_id) {
                 unaggregated.insert(metric_name.to_string());
             } else {
                 if !value.is_finite() {
@@ -620,25 +546,29 @@ mod tests {
         assert!(serde_json::from_value::<PortfolioMetrics>(position).is_err());
     }
 
+    fn is_additive(metric: &str) -> bool {
+        is_additive_metric(&metric.parse::<MetricId>().expect("metric id"))
+    }
+
     #[test]
     fn test_is_summable() {
-        assert!(is_summable("dv01"));
-        assert!(is_summable("cs01"));
-        assert!(is_summable("fx_delta"));
-        assert!(is_summable("index_delta"));
-        assert!(!is_summable("delta"));
-        assert!(!is_summable("gamma"));
-        assert!(!is_summable("vega"));
-        assert!(is_summable("delta::AAPL"));
-        assert!(is_summable("gamma::SPX"));
-        assert!(is_summable("vega::SPX_VOL"));
-        assert!(!is_summable("ytm"));
-        assert!(!is_summable("duration"));
+        assert!(is_additive("dv01"));
+        assert!(is_additive("cs01"));
+        assert!(is_additive("fx_delta"));
+        assert!(is_additive("index_delta"));
+        assert!(!is_additive("delta"));
+        assert!(!is_additive("gamma"));
+        assert!(!is_additive("vega"));
+        assert!(is_additive("delta::AAPL"));
+        assert!(is_additive("gamma::SPX"));
+        assert!(is_additive("vega::SPX_VOL"));
+        assert!(!is_additive("ytm"));
+        assert!(!is_additive("duration"));
 
-        assert!(is_summable("bucketed_dv01::2y"));
-        assert!(is_summable("bucketed_cs01::AAA::5y"));
-        assert!(is_summable("bucketed_vega::SURFACE::1y"));
-        assert!(!is_summable("unknown::2y"));
+        assert!(is_additive("bucketed_dv01::2y"));
+        assert!(is_additive("bucketed_cs01::AAA::5y"));
+        assert!(is_additive("bucketed_vega::SURFACE::1y"));
+        assert!(!is_additive("unknown::2y"));
     }
 
     #[test]
@@ -666,10 +596,10 @@ mod tests {
 
         let series = metrics.metric_series(&MetricId::BucketedDv01);
         assert_eq!(series.len(), 2);
-        assert_eq!(series[0].0, vec!["USD-OIS", "10y"]);
-        assert_eq!(series[0].1.total, -1.0);
-        assert_eq!(series[1].0, vec!["EUR/USD", ""]);
-        assert_eq!(series[1].1.total, -2.0);
+        assert_eq!(series[0].components, vec!["USD-OIS", "10y"]);
+        assert_eq!(series[0].total, -1.0);
+        assert_eq!(series[1].components, vec!["EUR/USD", ""]);
+        assert_eq!(series[1].total, -2.0);
     }
 
     #[test]
@@ -698,7 +628,7 @@ mod tests {
             metrics
                 .metric_series(&MetricId::BucketedDv01)
                 .into_iter()
-                .map(|(components, metric)| (components, metric.total))
+                .map(|entry| (entry.components, entry.total))
                 .collect::<Vec<_>>(),
             vec![
                 (vec!["curve-ray".to_string()], -1.0),
@@ -748,8 +678,7 @@ mod tests {
 
         let valuation = value_portfolio(&portfolio, &market, &config, &Default::default())
             .expect("test should succeed");
-        let metrics = aggregate_metrics(&valuation, Currency::USD, &market, as_of)
-            .expect("test should succeed");
+        let metrics = aggregate_metrics(&valuation, &market).expect("test should succeed");
 
         assert_eq!(valuation.position_values.len(), 1);
         assert!(
@@ -868,7 +797,7 @@ mod tests {
         let market =
             MarketContext::new().insert_fx(FxMatrix::new(Arc::new(SimpleFxProvider::new())));
 
-        let error = aggregate_metrics(&valuation, Currency::USD, &market, as_of)
+        let error = aggregate_metrics(&valuation, &market)
             .expect_err("both positions have missing FX quotes");
         let message = error.to_string();
         assert!(

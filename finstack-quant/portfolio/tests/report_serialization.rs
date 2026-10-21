@@ -6,11 +6,11 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::cashflows::{
-    CashflowExtractionIssue, CashflowExtractionIssueKind, CashflowFxPolicy, PortfolioCashflowEvent,
+    CashflowExtractionIssue, CashflowFxPolicy, PortfolioCashflowEvent,
     PortfolioCashflowPositionSummary, PortfolioCashflows,
 };
+use finstack_quant_portfolio::dependencies::MarketFactorKey;
 use finstack_quant_portfolio::types::PositionId;
-use finstack_quant_portfolio::MarketFactorKey;
 use finstack_quant_valuations::instruments::RatesCurveKind;
 use finstack_quant_valuations::pricer::InstrumentType;
 use indexmap::IndexMap;
@@ -48,7 +48,6 @@ fn test_cashflow_report_types_roundtrip() {
         position_id: position_id.clone(),
         instrument_id: "LOAN_B".to_string(),
         instrument_type: InstrumentType::TermLoan,
-        kind: CashflowExtractionIssueKind::BuildFailed,
         message: "missing forward curve".to_string(),
     });
 
@@ -103,7 +102,6 @@ fn test_cashflow_report_types_roundtrip() {
             position_id: PositionId::new("POS_2"),
             instrument_id: "SWAP_C".to_string(),
             instrument_type: InstrumentType::Irs,
-            kind: CashflowExtractionIssueKind::BuildFailed,
             message: "cashflow provider unavailable".to_string(),
         }],
         fx_collapse_policy: CashflowFxPolicy::CipForward,

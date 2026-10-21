@@ -350,14 +350,17 @@ fn replay_once(
                     || bump_for_pillar(input.pillar_time, spread_bump),
                     |(_, bump_bp)| bump_bp,
                 );
-            MarketQuote::Cds(
-                input
-                    .quote
-                    .with_recovery_rate(request.recovery_rate)
-                    .bump_spread_bp(bump_bp),
-            )
+            let quote = input.quote.with_recovery_rate(request.recovery_rate);
+            // The identity replay feeds the original (possibly upfront)
+            // calibration inputs unbumped; bumped replays use par-spread
+            // `spread_risk_inputs`, the only quotes with a spread to shift.
+            if bump_bp == 0.0 {
+                Ok(MarketQuote::Cds(quote))
+            } else {
+                Ok(MarketQuote::Cds(quote.bump_spread_bp(bump_bp)?))
+            }
         })
-        .collect::<Vec<_>>();
+        .collect::<finstack_quant_core::Result<Vec<_>>>()?;
     let step = StepParams::Hazard(params.clone());
     let (context, report) =
         step_runtime::execute_params_and_apply(&step, &market_quotes, request.context, config)?;

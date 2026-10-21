@@ -18,8 +18,8 @@
 use crate::capital_structure::cashflows::CashflowBreakdown;
 use crate::error::Result;
 use crate::evaluator::{CapitalStructureWarning, EvalWarning};
+use finstack_quant_cashflows::accrual::{accrued_interest_amount, AccrualConfig};
 use finstack_quant_cashflows::builder::{CashFlowSchedule, CashflowRepresentation};
-use finstack_quant_cashflows::{accrued_interest_amount, AccrualConfig};
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::dates::{Date, Period};
@@ -88,10 +88,8 @@ pub(crate) fn period_snapshot_date(period: &Period) -> Date {
 /// Whether a flow returns principal to the lender: amortization, prepayment,
 /// revolver repayment, or a positive notional (redemption) row.
 fn is_principal_repayment(flow: &CashFlow) -> bool {
-    matches!(
-        flow.kind,
-        CFKind::Amortization | CFKind::PrePayment | CFKind::RevolvingRepayment
-    ) || (flow.kind == CFKind::Notional && flow.amount.amount() > 0.0)
+    flow.kind.is_principal_repayment()
+        && (flow.kind != CFKind::Notional || flow.amount.amount() > 0.0)
 }
 
 /// Preserve the cash and economic dates of this period's principal claims.

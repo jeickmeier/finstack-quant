@@ -37,7 +37,8 @@
 //! floating PIK is rejected in that mode rather than misstating
 //! path-dependent principal.
 
-use crate::term_loan::{RateSpec, TermLoan};
+use crate::term_loan::TermLoan;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
@@ -465,6 +466,11 @@ impl TermLoanValuator {
             // Each call entry is an effective-dated provision. It remains active
             // at every subsequent exercise step until the next entry replaces it.
             // Make-whole entries replace prior hard/soft provisions identically.
+            let claims = if call_boundaries.is_empty() {
+                None
+            } else {
+                Some(super::call::ExerciseClaims::new(&loan, &schedule)?)
+            };
             let mut boundary_index = 0usize;
             let mut active_call = None;
             for step in 0..num_steps {
@@ -474,7 +480,7 @@ impl TermLoanValuator {
                     active_call = Some(call_boundaries[boundary_index].1);
                     boundary_index += 1;
                 }
-                let Some(call) = active_call else {
+                let (Some(call), Some(claims)) = (active_call, &claims) else {
                     continue;
                 };
                 let step_date = step_dates[step];
@@ -484,7 +490,7 @@ impl TermLoanValuator {
                 if step_date >= loan.maturity {
                     continue;
                 }
-                let (out, accrued) = super::call::exercise_claim(&loan, &schedule, step_date)?;
+                let (out, accrued) = claims.at(step_date)?;
                 let clean = super::call::clean_call_price(
                     call, &schedule, market, step_date, out, accrued,
                 )?;
@@ -528,7 +534,7 @@ impl TermLoanValuator {
     /// Build node-coupon descriptors for stochastic future floating resets.
     fn stochastic_node_coupons(&self, market: &MarketContext) -> Result<Vec<NodeCoupon>> {
         use finstack_quant_valuations_core::instruments::common_impl::pricing::floating_reset_descriptors::{
-            build_node_coupons, has_future_pik, params_from_spec, strips_index_constraints,
+            build_node_coupons, has_future_pik,
             NodeCouponBuildInputs,
         };
 
@@ -557,12 +563,14 @@ impl TermLoanValuator {
         build_node_coupons(
             &NodeCouponBuildInputs {
                 schedule,
-                params: params_from_spec(float_spec),
+                params: finstack_quant_cashflows::builder::FloatingRateParams::try_from(
+                    float_spec,
+                )?,
                 grid_origin: self.origin,
                 time_steps: &self.time_steps,
                 day_count: disc.day_count(),
                 discount: disc.as_ref(),
-                strip_index_constraints: strips_index_constraints(float_spec),
+                strip_index_constraints: float_spec.applies_daily_index_bounds(),
             },
             |step| self.outstanding_at(step),
         )

@@ -92,14 +92,7 @@ test('sensitivityMatrix accessors read the wire matrix and reject out-of-range i
   );
 });
 
-test('constraint constructors validate in Rust and return the wire object', () => {
-  assert.deepEqual(portfolio.constraintBudget(1.0), { budget: { rhs: 1.0 } });
-  assert.deepEqual(portfolio.constraintMaxTurnover(0.25, 'turnover'), {
-    max_turnover: { label: 'turnover', max_turnover: 0.25 },
-  });
-  assert.deepEqual(portfolio.constraintWeightBounds('all', 0.0, 0.1), {
-    weight_bounds: { label: null, filter: 'all', min: 0.0, max: 0.1 },
-  });
+test('exposure constraint shorthands validate in Rust and return the wire object', () => {
   const limit = portfolio.constraintExposureLimit('rating', 'CCC', 0.1, 'ccc cap');
   const minimum = portfolio.constraintExposureMinimum('rating', 'CCC', 0.1, 'ccc cap');
   assert.equal(limit.metric_bound.op, 'le');
@@ -107,11 +100,6 @@ test('constraint constructors validate in Rust and return the wire object', () =
   assert.equal(limit.metric_bound.label, 'ccc cap');
   assert.deepEqual({ ...minimum.metric_bound, op: 'le' }, limit.metric_bound);
 
-  throwsKind(() => portfolio.constraintBudget(-1.0), 'validation', /budget rhs/);
-  throwsKind(() => portfolio.constraintBudget('1'), 'invalid_type');
-  throwsKind(() => portfolio.constraintMaxTurnover(-0.1), 'validation', /max_turnover/);
-  throwsKind(() => portfolio.constraintWeightBounds('all', 0.2, 0.1), 'validation', /min/);
-  throwsKind(() => portfolio.constraintWeightBounds({ nope: 1 }, 0.0, 0.1), 'validation');
   throwsKind(() => portfolio.constraintExposureLimit('rating', 'CCC', 1.5), 'validation');
   throwsKind(() => portfolio.constraintExposureMinimum('rating', 'CCC', -0.5), 'validation');
 });

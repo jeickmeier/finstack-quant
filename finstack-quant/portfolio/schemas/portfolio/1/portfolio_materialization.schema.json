@@ -16,17 +16,17 @@
     },
     "Book": {
       "additionalProperties": false,
-      "description": "A book represents a folder-like organizational unit within a portfolio.\n\nBooks can contain positions and/or child books, forming a hierarchical tree.\nThis allows multi-level aggregation (e.g., Americas > Credit > Investment Grade).\n\n# Design\n\n- Flat position list is default; books are optional\n- Parent-child relationships tracked via `parent_id` field\n- Positions reference books via optional `book_id` field\n- Positions without `book_id` are not in any book\n- Book hierarchies are expected to be acyclic trees or forests; aggregation\n  helpers reject cycles and excessively deep nesting instead of recursing\n  indefinitely. A portfolio supports at most 100,000 books and 512 levels\n  of ancestry, including the root.\n- [`Book::child_book_ids`] drives rollup in [`crate::grouping::aggregate_by_book`];\n  [`crate::portfolio::Portfolio::validate`] checks parent/child consistency\n  between child lists and [`Book::parent_id`]",
+      "description": "A book represents a folder-like organizational unit within a portfolio.\n\nBooks can contain positions and/or child books, forming a hierarchical tree.\nThis allows multi-level aggregation (e.g., Americas > Credit > Investment Grade).\n\n# Design\n\n- Flat position list is default; books are optional\n- Parent-child relationships tracked via `parent_id` field\n- Positions reference books via optional `book_id` field\n- Positions without `book_id` are not in any book\n- Book hierarchies are expected to be acyclic trees or forests; aggregation\n  helpers reject cycles and excessively deep nesting instead of recursing\n  indefinitely. A portfolio supports at most 100,000 books and 512 levels\n  of ancestry, including the root.\n- [`Book::child_book_ids`] drives rollup in [`crate::grouping::aggregate_by_book`];\n  [`crate::Portfolio::validate`] checks parent/child consistency\n  between child lists and [`Book::parent_id`]",
       "properties": {
         "child_book_ids": {
           "description": "Child book IDs (for hierarchical organization)",
           "items": {
-            "$ref": "#/$defs/BookId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
         "id": {
-          "$ref": "#/$defs/BookId",
+          "$ref": "#/$defs/Id",
           "description": "Unique identifier for this book"
         },
         "meta": {
@@ -44,7 +44,7 @@
         "parent_id": {
           "anyOf": [
             {
-              "$ref": "#/$defs/BookId"
+              "$ref": "#/$defs/Id"
             },
             {
               "type": "null"
@@ -55,7 +55,7 @@
         "position_ids": {
           "description": "Position IDs directly assigned to this book (non-recursive)",
           "items": {
-            "$ref": "#/$defs/PositionId"
+            "$ref": "#/$defs/Id"
           },
           "type": "array"
         },
@@ -73,10 +73,6 @@
         "child_book_ids"
       ],
       "type": "object"
-    },
-    "BookId": {
-      "description": "Book identifier.",
-      "type": "string"
     },
     "Currency": {
       "description": "ISO 4217 currency enumeration",
@@ -888,7 +884,7 @@
       "description": "An entity that can hold positions.\n\nEntities represent companies, funds, or other legal entities that\nown instruments. For standalone instruments (derivatives, FX), use\nthe dummy entity.",
       "properties": {
         "id": {
-          "$ref": "#/$defs/EntityId",
+          "$ref": "#/$defs/Id",
           "description": "Unique identifier for the entity"
         },
         "meta": {
@@ -915,10 +911,6 @@
         "id"
       ],
       "type": "object"
-    },
-    "EntityId": {
-      "description": "Entity identifier (company, fund, etc.)",
-      "type": "string"
     },
     "FxPair": {
       "additionalProperties": false,
@@ -1324,10 +1316,6 @@
     "PortfolioMaterializationSchema": {
       "const": "finstack_quant.portfolio_materialization/1",
       "description": "Sole supported portfolio-materialization contract marker.",
-      "type": "string"
-    },
-    "PositionId": {
-      "description": "Position identifier.",
       "type": "string"
     },
     "VolatilityDependency": {

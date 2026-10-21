@@ -148,12 +148,8 @@ pub(super) struct PortfolioMarginResultWire {
 
 impl From<&PortfolioMarginResult> for PortfolioMarginResultWire {
     fn from(r: &PortfolioMarginResult) -> Self {
-        let mut netting_sets: Vec<NettingSetMargin> = r.by_netting_set.values().cloned().collect();
-        netting_sets.sort_by(|a, b| {
-            a.netting_set_id
-                .to_string()
-                .cmp(&b.netting_set_id.to_string())
-        });
+        let netting_sets: Vec<NettingSetMargin> =
+            r.netting_sets_sorted().into_iter().cloned().collect();
         let degraded_positions = r
             .degraded_positions
             .iter()

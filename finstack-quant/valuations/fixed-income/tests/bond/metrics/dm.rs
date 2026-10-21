@@ -476,8 +476,9 @@ fn test_dm_monotone_residual_does_not_break_valid_solve() {
 /// `CashflowSpec::Floating`.
 #[test]
 fn test_dm_amortizing_frn_is_supported() {
+    use finstack_quant_cashflows::builder::AmortizationSpec;
     use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
-    use finstack_quant_valuations_fixed_income::bond::{AmortizationSpec, CashflowSpec};
+    use finstack_quant_valuations_fixed_income::bond::CashflowSpec;
 
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::floating(

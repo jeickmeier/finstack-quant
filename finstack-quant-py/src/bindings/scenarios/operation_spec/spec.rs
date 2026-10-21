@@ -2,7 +2,7 @@
 
 use crate::errors::{display_to_py, scenarios_to_py};
 use finstack_quant_core::types::CurveId;
-use finstack_quant_scenarios::spec::OperationSpec;
+use finstack_quant_scenarios::OperationSpec;
 use finstack_quant_statements::types::NodeId;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
@@ -147,7 +147,7 @@ impl PyOperationSpec {
     /// Node-level basis-point shifts on a curve.
     ///
     /// ``nodes`` is a list of ``(tenor, bp)`` pairs; ``match_mode``
-    /// (``TenorMatchMode | str``) defaults to ``"exact"``.
+    /// (``TenorMatchMode | str``) defaults to ``"interpolate"``.
     #[classmethod]
     #[pyo3(signature = (curve_kind, curve_id, nodes, match_mode=None, discount_curve_id=None))]
     fn curve_node_bp(
@@ -184,7 +184,7 @@ impl PyOperationSpec {
     /// Node-level shocks to a volatility-index curve in absolute index points.
     ///
     /// ``nodes`` is a list of ``(tenor, points)`` pairs; ``match_mode``
-    /// (``TenorMatchMode | str``) defaults to ``"exact"``.
+    /// (``TenorMatchMode | str``) defaults to ``"interpolate"``.
     #[classmethod]
     #[pyo3(signature = (curve_id, nodes, match_mode=None))]
     fn vol_index_node_pts(
@@ -497,13 +497,8 @@ impl PyOperationSpec {
     /// The variant discriminator (the serde ``kind`` tag value), e.g.
     /// ``"curve_parallel_bp"``.
     #[getter]
-    fn kind(&self) -> PyResult<String> {
-        let value = serde_json::to_value(&self.inner).map_err(display_to_py)?;
-        value
-            .get("kind")
-            .and_then(|v| v.as_str())
-            .map(str::to_string)
-            .ok_or_else(|| crate::errors::value_error("OperationSpec JSON missing 'kind' tag"))
+    fn kind(&self) -> &'static str {
+        self.inner.kind()
     }
 
     /// Python-style repr rendered from the wire fields, e.g.

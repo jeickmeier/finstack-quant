@@ -354,14 +354,14 @@ impl CdsIndexPricer {
     ) -> Result<CashFlowSchedule> {
         let projected = self.project_resolved_flows(index, curves, as_of)?;
         match projected.single_curve {
-            Some(flows) => Ok(schedule_from_classified_flows(
+            Some(flows) => schedule_from_classified_flows(
                 flows,
                 index.premium_leg.day_count,
                 ScheduleBuildOpts {
                     notional_hint: Some(index.notional),
                     ..Default::default()
                 },
-            )),
+            ),
             None => {
                 let schedules = projected
                     .constituents
@@ -376,7 +376,7 @@ impl CdsIndexPricer {
                             },
                         )
                     })
-                    .collect::<Vec<_>>();
+                    .collect::<finstack_quant_core::Result<Vec<_>>>()?;
                 Ok(merge_cashflow_schedules(
                     schedules,
                     Notional::par(index.notional.amount(), index.notional.currency())?,

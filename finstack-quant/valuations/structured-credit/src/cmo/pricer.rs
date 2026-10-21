@@ -181,7 +181,7 @@ pub(crate) fn build_reference_tranche_schedule(
         }
     }
 
-    Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+    finstack_quant_cashflows::schedule_from_classified_flows(
         flows,
         DayCount::Thirty360,
         finstack_quant_cashflows::ScheduleBuildOpts {
@@ -196,7 +196,7 @@ pub(crate) fn build_reference_tranche_schedule(
                 maturity: None,
             },
         },
-    ))
+    )
 }
 
 /// Create assumed collateral for CMO valuation.

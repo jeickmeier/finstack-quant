@@ -8,7 +8,7 @@ payment record used throughout schedule construction and accrual.
 Example::
 
     >>> import datetime
-    >>> from finstack_quant.cashflows.primitives import CashFlow, CFKind
+    >>> from finstack_quant.core.cashflow import CashFlow, CFKind
     >>> from finstack_quant.core.money import Money
     >>> cf = CashFlow(
     ...     date=datetime.date(2025, 6, 15),
@@ -22,7 +22,7 @@ Example::
 
 Examples
 --------
->>> from finstack_quant.cashflows.primitives import CFKind
+>>> from finstack_quant.core.cashflow import CFKind
 >>> CFKind.parse("fixed") == CFKind.FIXED
 True
 
@@ -49,7 +49,7 @@ class CFKind:
 
     Examples
     --------
-    >>> from finstack_quant.cashflows.primitives import CFKind
+    >>> from finstack_quant.core.cashflow import CFKind
     >>> CFKind.FIXED.name
     'fixed'
     >>> CFKind.parse("amortization") == CFKind.AMORTIZATION
@@ -108,7 +108,7 @@ class CFKind:
 
         Examples
         --------
-        >>> from finstack_quant.cashflows.primitives import CFKind
+        >>> from finstack_quant.core.cashflow import CFKind
         >>> CFKind.parse("fixed") == CFKind.FIXED
         True
         """
@@ -194,7 +194,7 @@ class CashFlowAccrual:
 
     Examples
     --------
-    >>> from finstack_quant.cashflows.primitives import CashFlowAccrual
+    >>> from finstack_quant.core.cashflow import CashFlowAccrual
     >>> from finstack_quant.core.dates import DayCount
     >>> a = CashFlowAccrual("2025-01-01", "2025-04-01", DayCount.BUS_252, calendar_id="weekends_only")
     >>> a.calendar_id
@@ -329,7 +329,7 @@ class CashFlow:
     Examples
     --------
     >>> import datetime
-    >>> from finstack_quant.cashflows.primitives import CashFlow, CFKind
+    >>> from finstack_quant.core.cashflow import CashFlow, CFKind
     >>> from finstack_quant.core.money import Money
     >>> cf = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED, 0.0)
     >>> cf.kind == CFKind.FIXED
@@ -606,7 +606,7 @@ class CashFlow:
         Examples
         --------
         >>> import datetime
-        >>> from finstack_quant.cashflows.primitives import CashFlow
+        >>> from finstack_quant.core.cashflow import CashFlow
         >>> from finstack_quant.core.money import Money
         >>> isinstance(CashFlow(datetime.date(2025, 6, 15), Money(1.0, "USD"), "fixed", 0.0).to_json(), str)
         True
@@ -636,7 +636,7 @@ class CashFlow:
         Examples
         --------
         >>> import datetime
-        >>> from finstack_quant.cashflows.primitives import CashFlow
+        >>> from finstack_quant.core.cashflow import CashFlow
         >>> from finstack_quant.core.money import Money
         >>> value = CashFlow(datetime.date(2025, 6, 15), Money(1.0, "USD"), "fixed", 0.0)
         >>> CashFlow.from_json(value.to_json()).to_json() == value.to_json()

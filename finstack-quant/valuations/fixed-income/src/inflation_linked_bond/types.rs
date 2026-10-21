@@ -368,7 +368,7 @@ impl InflationLinkedBond {
     fn schedule_calendar_id(&self) -> &str {
         self.calendar_id
             .as_deref()
-            .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID)
+            .unwrap_or(finstack_quant_core::dates::WEEKENDS_ONLY_ID)
     }
 
     /// Coupon periods from issue to maturity under the bond's schedule
@@ -465,7 +465,7 @@ impl InflationLinkedBond {
                 None,
             ));
         }
-        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+        finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             self.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
@@ -475,7 +475,7 @@ impl InflationLinkedBond {
                     ..Default::default()
                 },
             },
-        ))
+        )
     }
 
     /// Real accrued interest at `as_of` on the real schedule, from the shared
@@ -843,20 +843,19 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
         as_of: Date,
     ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         if self.issue_date >= self.maturity {
-            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+            return finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 self.day_count,
                 finstack_quant_cashflows::ScheduleBuildOpts {
                     notional_hint: Some(self.notional),
                     ..Default::default()
                 },
-            ));
+            );
         }
         let periods = self.periods()?;
         let coupon_rate = self.real_coupon_rate()?;
 
         let mut detailed_flows = Vec::with_capacity(periods.len() + 1);
-        let mut coupon_rows = Vec::with_capacity(periods.len());
         for period in periods.iter().filter(|period| period.payment_date > as_of) {
             let accrual_factor = period.accrual_year_fraction.max(0.0);
             let base_amount = self.notional.amount() * coupon_rate * accrual_factor;
@@ -866,18 +865,15 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
                 as_of,
                 self.deflation_protection == DeflationProtection::AllPayments,
             )?;
-            coupon_rows.push((
+            detailed_flows.push(finstack_quant_core::cashflow::CashFlow::new(
                 period.payment_date,
-                base_amount * ratio,
+                None,
+                Money::new(base_amount * ratio, self.notional.currency())?,
+                finstack_quant_core::cashflow::CFKind::InflationCoupon,
                 accrual_factor,
-                coupon_rate,
+                Some(coupon_rate),
             ));
         }
-        finstack_quant_cashflows::builder::emit_inflation_coupons(
-            self.notional.currency(),
-            &coupon_rows,
-            &mut detailed_flows,
-        )?;
 
         let principal_date = self.principal_payment_date()?;
         if principal_date > as_of {
@@ -904,7 +900,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
                 notional_hint: Some(self.notional),
                 ..Default::default()
             },
-        );
+        )?;
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
         ))

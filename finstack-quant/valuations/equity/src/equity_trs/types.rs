@@ -640,7 +640,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap 
     ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let (flows, projected_fixings) =
             crate::equity_trs::pricer::net_cashflows(self, context, as_of)?;
-        Ok(finstack_quant_cashflows::schedule_from_dated_flows(
+        finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
             finstack_quant_core::cashflow::CFKind::Fixed,
             self.financing_leg.day_count,
@@ -653,7 +653,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap 
                     ..Default::default()
                 },
             },
-        ))
+        )
     }
 }
 

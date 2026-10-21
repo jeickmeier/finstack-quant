@@ -180,7 +180,7 @@ mod tests {
             fixed_day_count: DayCount::Act365F,
             float_frequency: "1Y".parse().expect("tenor"),
             float_day_count: DayCount::Act365F,
-            calendar_id: finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID,
+            calendar_id: finstack_quant_core::dates::WEEKENDS_ONLY_ID,
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
             stub: StubKind::None,
             end_of_month: false,
@@ -206,7 +206,7 @@ mod tests {
             .expect("curve");
         let market = MarketContext::new().insert(curve);
         let disc = market.get_discount("USD-OIS").expect("curve");
-        let calendar_id = finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID;
+        let calendar_id = finstack_quant_core::dates::WEEKENDS_ONLY_ID;
         let calendar = calendar_by_id_strict(calendar_id).expect("calendar");
         for business_day_convention in [
             BusinessDayConvention::Unadjusted,

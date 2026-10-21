@@ -36,7 +36,7 @@
 //! engine does not yet expose a stable per-tranche balance hook for this path.
 //! Consumers should not treat `null` as missing data for non-CMO instruments.
 
-use finstack_quant_cashflows::aggregation::{credit_adjusted_cashflow_pvs, DateContext};
+use finstack_quant_cashflows::aggregation::credit_adjusted_cashflow_pvs;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCountContext};
@@ -477,7 +477,7 @@ fn envelope_for_priced(
         &discount_factors,
         hazard_arc.as_deref(),
         recovery_rate,
-        DateContext::new(as_of_date, primary_discount.day_count(), dc_ctx),
+        as_of_date,
     )?;
 
     let accrual_notionals = accrual_start_balances(&schedule);

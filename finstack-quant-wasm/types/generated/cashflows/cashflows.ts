@@ -432,9 +432,11 @@ export type FeeSpec =
          */
         bp: valuations.DecimalWire;
         /**
-         * Business-day convention applied to generated fee dates.
+         * Business-day convention applied to generated fee dates
+         * (`ModifiedFollowing` when omitted from the wire form, as for
+         * [`ScheduleParams`](crate::builder::ScheduleParams)).
          */
-        business_day_convention: valuations.BusinessDayConvention;
+        business_day_convention?: valuations.BusinessDayConvention;
         /**
          * Holiday calendar identifier used with `business_day_convention`.
          *

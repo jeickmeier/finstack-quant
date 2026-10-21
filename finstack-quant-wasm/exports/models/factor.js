@@ -19,6 +19,7 @@ const risk = {
   evaluateRiskBudget: wasm.evaluateRiskBudget,
   buildStressAttribution: wasm.buildStressAttribution,
   positionComponentVar: wasm.positionComponentVar,
+  decomposeFactors: wasm.decomposeFactors,
   defaultUtilizationThreshold: wasm.defaultUtilizationThreshold,
 };
 

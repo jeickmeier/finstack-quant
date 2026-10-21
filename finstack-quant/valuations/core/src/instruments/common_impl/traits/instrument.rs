@@ -52,12 +52,12 @@ use super::pricing_options::PricingOptions;
 ///
 /// impl CashflowScheduleSource for ZeroNote {
 ///     fn raw_cashflow_schedule(&self, _: &MarketContext, _: Date) -> Result<CashFlowSchedule> {
-///         Ok(schedule_from_dated_flows(
+///         schedule_from_dated_flows(
 ///             vec![(self.maturity, self.notional)],
 ///             CFKind::Notional,
 ///             DayCount::Act365F,
 ///             ScheduleBuildOpts { notional_hint: Some(self.notional), ..Default::default() },
-///         ))
+///         )
 ///     }
 /// }
 ///
