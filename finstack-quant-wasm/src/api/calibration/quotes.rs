@@ -17,7 +17,7 @@ use finstack_quant_calibration::quotes::ids::Pillar;
 use finstack_quant_calibration::quotes::inflation::InflationQuote;
 use finstack_quant_calibration::quotes::rates::RateQuote;
 use finstack_quant_calibration::quotes::vol::VolQuote;
-use finstack_quant_calibration::RateBounds;
+use finstack_quant_calibration::validation::RateBounds;
 use finstack_quant_core::currency::Currency;
 use wasm_bindgen::prelude::*;
 
