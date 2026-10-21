@@ -1,6 +1,6 @@
 //! FX forward instrument module.
 //!
-//! This module provides the [`FxForward`] instrument for modeling outright
+//! This module provides the [`FxForward`](crate::fx_forward::FxForward) instrument for modeling outright
 //! forward contracts on currency pairs. An FX forward is a single exchange
 //! of currencies at a future date at a predetermined rate.
 //!

@@ -38,7 +38,7 @@
 //!
 //! # See Also
 //!
-//! - [`FxSpot`] for instrument struct
+//! - [`FxSpot`](crate::fx_spot::FxSpot) for instrument struct
 //! - [`crate::fx_option`] for FX option pricing
 //! - [`crate::fx_swap`] for FX forwards
 

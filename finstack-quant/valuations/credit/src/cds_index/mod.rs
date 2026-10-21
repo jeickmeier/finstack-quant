@@ -80,7 +80,7 @@
 //!
 //! # Examples
 //!
-//! See [`CdsIndex`] for construction and usage examples.
+//! See [`CdsIndex`](crate::cds_index::CdsIndex) for construction and usage examples.
 //!
 //! # See Also
 //!

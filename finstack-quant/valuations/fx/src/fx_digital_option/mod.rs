@@ -51,7 +51,7 @@
 //!
 //! # See Also
 //!
-//! - [`FxDigitalOption`] for the instrument struct
+//! - [`FxDigitalOption`](crate::fx_digital_option::FxDigitalOption) for the instrument struct
 //! - `pricer::FxDigitalOptionCalculator` for pricing calculations
 
 /// FX digital option risk metrics

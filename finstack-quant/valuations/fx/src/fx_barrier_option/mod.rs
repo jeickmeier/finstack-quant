@@ -30,7 +30,7 @@
 //!
 //! # See Also
 //!
-//! - [`FxBarrierOption`] for instrument struct
+//! - [`FxBarrierOption`](crate::fx_barrier_option::FxBarrierOption) for instrument struct
 //! - [`crate::fx_option`] for vanilla FX options
 
 pub(crate) mod metrics;

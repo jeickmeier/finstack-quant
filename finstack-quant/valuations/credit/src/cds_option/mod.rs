@@ -10,7 +10,7 @@
 //! - **Payer option** (`Call`): right to buy protection (pay spread, receive on default)
 //! - **Receiver option** (`Put`): right to sell protection (receive spread, pay on default)
 //! - **Underlying**: single-name CDS or CDS index
-//! - **Strike** ([`CdsOptionStrike`]): a CDS spread level (decimal rate,
+//! - **Strike** ([`CdsOptionStrike`](crate::cds_option::CdsOptionStrike)): a CDS spread level (decimal rate,
 //!   e.g. `0.01` = 100 bp) or a clean index price in percentage points
 //!   (e.g. `107.0`, the CDX HY convention)
 //!
@@ -55,7 +55,7 @@
 //!
 //! # See also
 //!
-//! - [`CdsOption`] for the instrument struct
+//! - [`CdsOption`](crate::cds_option::CdsOption) for the instrument struct
 //! - [`crate::cds`] for underlying CDS pricing
 
 #[doc(hidden)]

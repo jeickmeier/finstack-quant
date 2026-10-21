@@ -4398,7 +4398,7 @@
     },
     "RateBounds": {
       "additionalProperties": false,
-      "description": "Configurable bounds for forward/zero rates during calibration.\n\nDifferent market regimes require different rate bounds:\n- Developed markets (USD, EUR, GBP): typically [-2%, 50%]\n- Negative rate environments (EUR, JPY, CHF): [-5%, 20%]\n- Emerging markets (TRY, ARS, BRL): [-5%, 200%]\n\n# Examples\n\n```\nuse finstack_quant_calibration::RateBounds;\nuse finstack_quant_core::currency::Currency;\n\n// Use currency-specific defaults\nlet usd_bounds = RateBounds::for_currency(Currency::USD);\nassert!(usd_bounds.min_rate < 0.0);\n\n// Or customize for specific scenarios\nlet em_bounds = RateBounds::emerging_markets();\nassert!(em_bounds.max_rate > 1.0);\n```",
+      "description": "Configurable bounds for forward/zero rates during calibration.\n\nDifferent market regimes require different rate bounds:\n- Developed markets (USD, EUR, GBP): typically [-2%, 50%]\n- Negative rate environments (EUR, JPY, CHF): [-5%, 20%]\n- Emerging markets (TRY, ARS, BRL): [-5%, 200%]\n\n# Examples\n\n```\nuse finstack_quant_calibration::validation::RateBounds;\nuse finstack_quant_core::currency::Currency;\n\n// Use currency-specific defaults\nlet usd_bounds = RateBounds::for_currency(Currency::USD);\nassert!(usd_bounds.min_rate < 0.0);\n\n// Or customize for specific scenarios\nlet em_bounds = RateBounds::emerging_markets();\nassert!(em_bounds.max_rate > 1.0);\n```",
       "properties": {
         "max_rate": {
           "description": "Maximum allowed rate (decimal, e.g., 0.50 for 50%)",

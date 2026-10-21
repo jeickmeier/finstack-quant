@@ -11,7 +11,7 @@
 //! Generic configuration, covariance, envelope, factor, dependency, and
 //! sensitivity types are exported at the module root. Public submodules are:
 //!
-//! - [`matching`] for dependency-to-factor matching.
+//! - [`MatchingConfig`] and [`FactorMatcher`] for dependency-to-factor matching.
 //! - [`credit`] for credit hierarchy artifacts, calibration, and decomposition.
 //! - [`schema`] for versioned JSON Schema contracts.
 //!
