@@ -118,7 +118,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1255668
+            "bytes": 1255766
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
@@ -829,7 +829,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 215892
+            "bytes": 215904
           },
           {
             "path": "schemas/calibration/1/calibration_result.schema.json",
@@ -2011,7 +2011,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1149905
+            "bytes": 1150003
           },
           {
             "path": "schemas/scenarios/1/horizon_result.schema.json",
@@ -2679,7 +2679,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
             "type_name": "InstrumentJson",
             "kind": "component",
-            "bytes": 1002986
+            "bytes": 1003084
           },
           {
             "path": "schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -2819,7 +2819,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1010899
+            "bytes": 1010997
           },
           {
             "path": "schemas/instruments/1/credit_derivatives/cds_index.schema.json",
@@ -2973,7 +2973,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1009876
+            "bytes": 1009974
           },
           {
             "path": "schemas/instruments/1/exotics/callable_range_accrual.schema.json",
@@ -3176,7 +3176,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 14247
+            "bytes": 14345
           },
           {
             "path": "schemas/instruments/1/fx/quanto_option.schema.json",
@@ -3190,7 +3190,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
             "type_name": "InstrumentEnvelope",
             "kind": "input",
-            "bytes": 1100990
+            "bytes": 1101088
           },
           {
             "path": "schemas/instruments/1/rates/basis_swap.schema.json",
@@ -3330,7 +3330,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
             "type_name": "CompositeRebalanceResult",
             "kind": "output",
-            "bytes": 1012507
+            "bytes": 1012605
           },
           {
             "path": "schemas/results/1/convertible_greeks.schema.json",
@@ -3590,7 +3590,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1255668
+            "bytes": 1255766
           },
           {
             "domain": "attribution",
@@ -3614,7 +3614,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 215892
+            "bytes": 215904
           },
           {
             "domain": "calibration",
@@ -4470,7 +4470,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1149905
+            "bytes": 1150003
           },
           {
             "domain": "scenarios",
@@ -4678,7 +4678,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
             "type_name": "InstrumentJson",
             "kind": "component",
-            "bytes": 1002986
+            "bytes": 1003084
           },
           {
             "domain": "valuations",
@@ -4838,7 +4838,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1010899
+            "bytes": 1010997
           },
           {
             "domain": "valuations",
@@ -5014,7 +5014,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1009876
+            "bytes": 1009974
           },
           {
             "domain": "valuations",
@@ -5246,7 +5246,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 14247
+            "bytes": 14345
           },
           {
             "domain": "valuations",
@@ -5262,7 +5262,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
             "type_name": "InstrumentEnvelope",
             "kind": "input",
-            "bytes": 1100990
+            "bytes": 1101088
           },
           {
             "domain": "valuations",
@@ -5422,7 +5422,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
             "type_name": "CompositeRebalanceResult",
             "kind": "output",
-            "bytes": 1012507
+            "bytes": 1012605
           },
           {
             "domain": "valuations",
