@@ -208,13 +208,19 @@ pub use equity::{
     VolatilityIndexFuture, VolatilityIndexFutureOption,
 };
 
-pub use fx::FxVarianceSwap;
 pub use fx::{
-    BarrierDirection, DigitalPayoutType, FxDigitalOption, FxTouchOption, PayoutTiming, TouchType,
-};
-pub use fx::{
-    FxBarrierOption, FxForward, FxFuture, FxFutureOption, FxOption, FxSpot, FxSwap, Ndf,
-    QuantoOption,
+    fx_barrier_option::FxBarrierOption,
+    fx_digital_option::{DigitalPayoutType, FxDigitalOption},
+    fx_forward::FxForward,
+    fx_future::FxFuture,
+    fx_future_option::FxFutureOption,
+    fx_option::FxOption,
+    fx_spot::FxSpot,
+    fx_swap::FxSwap,
+    fx_touch_option::{FxTouchOption, TouchType},
+    fx_variance_swap::FxVarianceSwap,
+    ndf::Ndf,
+    quanto_option::QuantoOption,
 };
 
 pub use commodity::{

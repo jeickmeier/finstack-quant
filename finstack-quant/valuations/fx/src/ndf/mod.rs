@@ -20,7 +20,7 @@
 //!
 //! # Quote Conventions
 //!
-//! NDFs support two quote conventions via [`crate::ndf::NdfQuoteConvention`]:
+//! NDFs support two quote conventions via [`finstack_quant_valuations_core::instruments::NdfQuoteConvention`]:
 //!
 //! ## BasePerSettlement (default)
 //!
@@ -76,7 +76,8 @@
 //! # Examples
 //!
 //! ```rust
-//! use finstack_quant_valuations_fx::ndf::{Ndf, NdfQuoteConvention};
+//! use finstack_quant_valuations_fx::ndf::Ndf;
+//! use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
 //! use finstack_quant_core::currency::Currency;
 //!
 //! // Create a USD/CNY NDF with BasePerSettlement convention
@@ -93,7 +94,6 @@
 
 mod types;
 
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::NdfQuoteConvention;
 pub use types::{Ndf, NdfFixingSource};
 
 /// Metrics submodule for NDF risk measures.

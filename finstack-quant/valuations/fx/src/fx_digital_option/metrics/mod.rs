@@ -14,11 +14,11 @@ pub(crate) fn register_fx_digital_option_metrics(
         registry: registry,
         instrument: InstrumentType::FxDigitalOption,
         metrics: [
-            (Delta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxDigitalOption>::delta()),
-            (Gamma, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxDigitalOption>::gamma()),
-            (Vega, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxDigitalOption>::vega()),
-            (Theta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxDigitalOption>::theta()),
-            (Rho, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::FxDigitalOption>::rho()),
+            (Delta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::fx_digital_option::FxDigitalOption>::delta()),
+            (Gamma, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::fx_digital_option::FxDigitalOption>::gamma()),
+            (Vega, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::fx_digital_option::FxDigitalOption>::vega()),
+            (Theta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::fx_digital_option::FxDigitalOption>::theta()),
+            (Rho, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::fx_digital_option::FxDigitalOption>::rho()),
             (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]

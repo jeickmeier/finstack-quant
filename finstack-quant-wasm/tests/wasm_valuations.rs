@@ -138,7 +138,7 @@ fn invalid_structured_credit_instrument_json() -> String {
 }
 
 fn fx_option_instrument_json() -> String {
-    use finstack_quant_valuations::instruments::fx::FxOption;
+    use finstack_quant_valuations::instruments::fx::fx_option::FxOption;
     use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
 
     let option = FxOption::example().expect("fx option example");
