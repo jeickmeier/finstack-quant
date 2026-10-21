@@ -25,7 +25,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional dividend-yield scalar ID.\n\n`Some(id)`: lookup MUST succeed (a missing or non-unitless scalar\nreturns an error). `None`: no implicit default; treated as zero\ncontinuous dividend yield. Set explicitly for index underlyings."
         },
         "expiry": {
@@ -57,7 +56,6 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "local_cap": {
@@ -72,9 +70,6 @@
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
@@ -102,7 +97,7 @@
         },
         "path_model": {
           "$ref": "#/$defs/EquityPathModel",
-          "description": "Explicit path model selection; required to acknowledge model risk."
+          "description": "Explicit path model selection.\n\n`AtmTermGbm` is an ATM-term-structure approximation and does not model\nequity strike skew; callers must opt into that limitation."
         },
         "payoff_type": {
           "$ref": "#/$defs/CliquetPayoffType",
@@ -118,7 +113,6 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {

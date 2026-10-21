@@ -329,62 +329,69 @@ export default [
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/attributes",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/attributes",
-    "description": "Attributes for scenario selection and tagging.",
+    "description": "Attributes for scenario selection and tagging",
     "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/base_calendar_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/base_calendar_id",
-    "default": null,
     "description": "Optional base currency calendar for spot/settlement adjustment metadata."
+  },
+  {
+    "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/base_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/base_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/base_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/base_calendar_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/base_currency",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/base_currency",
-    "description": "Base currency (foreign).",
+    "description": "Base currency (foreign)",
     "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
   },
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/domestic_discount_curve_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/domestic_discount_curve_id",
-    "description": "Domestic discount curve id (quote currency).",
+    "description": "Domestic discount curve id (quote currency)",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/far_date",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/far_date",
-    "description": "Far leg settlement date (forward leg).",
+    "description": "Far leg settlement date (forward leg)",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/far_rate",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/far_rate",
-    "default": null,
     "description": "Optional far leg FX rate (quote per base). If absent, use the market\noutright forward from the valuation date to far settlement.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/foreign_discount_curve_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/foreign_discount_curve_id",
-    "description": "Foreign discount curve id (base currency).",
+    "description": "Foreign discount curve id (base currency)",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/id",
-    "description": "Unique instrument identifier.",
+    "description": "Unique instrument identifier",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -392,9 +399,6 @@ export default [
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -402,41 +406,48 @@ export default [
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/near_date",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/near_date",
-    "description": "Near leg settlement date (spot leg).",
+    "description": "Near leg settlement date (spot leg)",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/near_rate",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/near_rate",
-    "default": null,
     "description": "Optional near leg FX rate (quote per base). If absent, use the market\noutright forward from the valuation date to near settlement.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/notional",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/notional",
-    "description": "Notional amount in base currency (exchanged on near, reversed on far).",
+    "description": "Notional amount in base currency (exchanged on near, reversed on far)",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/quote_calendar_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/quote_calendar_id",
-    "default": null,
     "description": "Optional quote currency calendar for spot/settlement adjustment metadata."
+  },
+  {
+    "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/quote_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/quote_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/quote_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/quote_calendar_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/quote_currency",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/quote_currency",
-    "description": "Quote currency (domestic).",
+    "description": "Quote currency (domestic)",
     "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
   },
   {
     "path": "#/$defs/d_17ebaf6bae7cbde5673d/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json#/$defs/FxSwap/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"

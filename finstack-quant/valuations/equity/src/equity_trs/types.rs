@@ -83,7 +83,7 @@ pub enum TrsDividendSettlement {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields, try_from = "EquityTotalReturnSwapUnchecked")]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct EquityTotalReturnSwap {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -187,120 +187,7 @@ pub struct EquityTotalReturnSwap {
     pub attributes: Attributes,
 }
 
-/// Mirror of `EquityTotalReturnSwap` used by serde to apply `validate()`
-/// after deserialization. Not part of the public API.
-#[derive(Debug, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-struct EquityTotalReturnSwapUnchecked {
-    /// Unique instrument identifier.
-    id: InstrumentId,
-    /// Notional amount for the swap.
-    notional: Money,
-    /// Underlying equity parameters (spot ID, dividend yield, contract size).
-    underlying: EquityUnderlyingParams,
-    /// Financing leg specification (curves, spread, day count).
-    financing_leg: FinancingLegSpec,
-    /// Schedule specification (payment dates and frequency).
-    schedule: TrsScheduleSpec,
-    /// Trade side (receive/pay total return).
-    side: PayReceive,
-    /// Optional first-period start level.
-    ///
-    /// Pricing uses this only when the first period is in progress and no
-    /// matching entry exists in `past_fixings`. Future periods use live spot.
-    initial_level: Option<f64>,
-    /// Observed underlying levels at past reset (period-start) dates.
-    ///
-    /// For a seasoned TRS valued inside a return period, the total-return leg
-    /// must anchor the current period to the level *observed* at the period
-    /// start so the realized spot move enters the PV (equity delta). Provide
-    /// `(reset_date, level)` pairs for every period-start date on or before
-    /// the valuation date; the first period may use `initial_level` instead.
-    /// Pricing errors when the current period's start level is unavailable.
-    #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
-    )]
-    past_fixings: Vec<(Date, f64)>,
-    /// Optional OTC margin specification for VM/IM.
-    ///
-    /// Equity TRS use SIMM equity bucket for margin calculation.
-    #[serde(default)]
-    margin_spec: Option<OtcMarginSpec>,
-    /// Dividend withholding tax rate for net return calculation.
-    ///
-    /// Specifies the fraction of dividends withheld for tax (e.g., 0.15 for 15% withholding).
-    /// When set to 0.0 (default), the TRS passes through 100% of dividends (gross return).
-    /// When set to a positive value, the dividend return component is reduced:
-    /// ```text
-    /// net_dividend_return = gross_dividend_return × (1 - dividend_tax_rate)
-    /// ```
-    ///
-    /// # Market Context
-    ///
-    /// Withholding tax varies by jurisdiction and investor domicile:
-    /// - US qualified dividends: typically 0% for domestic investors
-    /// - US non-qualified: up to 30% for foreign investors (varies by treaty)
-    /// - European: varies by country (15-30% typical)
-    #[serde(default)]
-    dividend_tax_rate: f64,
-    /// Settlement timing for explicit manufactured dividends.
-    dividend_settlement: TrsDividendSettlement,
-    /// Optional discrete cash dividends `(ex_date, amount)` for the underlying.
-    ///
-    /// When non-empty, pricing uses explicit period dividend pass-through and does
-    /// not add continuous-yield dividend return to avoid double counting.
-    #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
-    )]
-    discrete_dividends: Vec<(Date, f64)>,
-    /// Instrument-owned pricing inputs.
-    #[serde(default)]
-    instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[serde(default)]
-    metric_pricing_overrides: finstack_quant_valuations_core::instruments::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[serde(default)]
-    scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
-    /// Attributes for scenario selection and tagging
-    attributes: Attributes,
-}
-
-impl TryFrom<EquityTotalReturnSwapUnchecked> for EquityTotalReturnSwap {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(value: EquityTotalReturnSwapUnchecked) -> std::result::Result<Self, Self::Error> {
-        let inst = Self {
-            id: value.id,
-            notional: value.notional,
-            underlying: value.underlying,
-            financing_leg: value.financing_leg,
-            schedule: value.schedule,
-            side: value.side,
-            initial_level: value.initial_level,
-            past_fixings: value.past_fixings,
-            margin_spec: value.margin_spec,
-            dividend_tax_rate: value.dividend_tax_rate,
-            dividend_settlement: value.dividend_settlement,
-            discrete_dividends: value.discrete_dividends,
-            instrument_pricing_overrides: value.instrument_pricing_overrides,
-            metric_pricing_overrides: value.metric_pricing_overrides,
-            scenario_pricing_overrides: value.scenario_pricing_overrides,
-            attributes: value.attributes,
-        };
-        inst.validate()?;
-        Ok(inst)
-    }
-}
+finstack_quant_valuations_core::validate_on_deserialize!(EquityTotalReturnSwap);
 
 impl EquityTotalReturnSwap {
     /// Create a canonical example equity TRS for testing and documentation.

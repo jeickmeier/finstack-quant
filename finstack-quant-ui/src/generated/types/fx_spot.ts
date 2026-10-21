@@ -2,6 +2,10 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
+ * Opaque string identifier.
+ */
+export type Id = string;
+/**
  * Base currency (the currency being priced)
  */
 export type Currency =
@@ -172,10 +176,6 @@ export type Currency =
  */
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
-/**
- * Opaque string identifier.
- */
-export type Id = string;
 /**
  * Opaque string identifier.
  */
@@ -663,7 +663,7 @@ export interface D_81828A2Fc42Ad3C4Ad70 {
    * Per market convention, FX settlement uses the joint calendar of both currencies.
    * A date is a good business day only if it's valid in both calendars.
    */
-  base_calendar_id?: string | null;
+  base_calendar_id?: Id | null;
   base_currency: Currency;
   business_day_convention?: BusinessDayConvention;
   /**
@@ -682,7 +682,7 @@ export interface D_81828A2Fc42Ad3C4Ad70 {
    * Per market convention, FX settlement uses the joint calendar of both currencies.
    * A date is a good business day only if it's valid in both calendars.
    */
-  quote_calendar_id?: string | null;
+  quote_calendar_id?: Id | null;
   quote_currency: Currency1;
   /**
    * Optional quoted FX spot rate (quote per base); `None` reads the FxMatrix.
@@ -690,13 +690,18 @@ export interface D_81828A2Fc42Ad3C4Ad70 {
   quoted_spot?: number | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
-   * Optional explicit settlement (value) date
+   * Optional explicit settlement (value) date. When set it is only
+   * business-day adjusted and `settlement_days` is ignored.
    */
   settlement_date?: Date | null;
   /**
-   * Optional T+N settlement lag in business days when `settlement_date` is not provided.
+   * Optional contractual T+N settlement lag in business days when
+   * `settlement_date` is not provided.
    *
-   * `None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.
+   * `None` uses the pair-aware default from
+   * [`finstack_quant_core::dates::fx::fx_standard_settlement_days`]: T+1 for
+   * USD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB, T+2 otherwise. An explicit value
+   * overrides that default.
    */
   settlement_days?: number | null;
 }

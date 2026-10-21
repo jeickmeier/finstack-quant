@@ -232,7 +232,7 @@ pub struct DilutionSecurity {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields, try_from = "DiscountedCashFlowUnchecked")]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct DiscountedCashFlow {
     /// Unique identifier for the DCF.
     pub id: InstrumentId,
@@ -322,117 +322,7 @@ pub struct DiscountedCashFlow {
     pub attributes: Attributes,
 }
 
-/// Mirror of `DiscountedCashFlow` used by serde to apply `validate()` after
-/// deserialization. Not part of the public API.
-#[derive(Debug, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-struct DiscountedCashFlowUnchecked {
-    /// Unique identifier for the DCF.
-    id: InstrumentId,
-    /// Currency for all cashflows.
-    currency: Currency,
-    /// Explicit period free cash flows (date, amount pairs).
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
-    )]
-    flows: Vec<(Date, f64)>,
-    /// Weighted Average Cost of Capital (discount rate).
-    wacc: f64,
-    /// Terminal value specification.
-    terminal_value: TerminalValueSpec,
-    /// Valuation date (as-of date for the DCF).
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    valuation_date: Date,
-    /// Discount curve identifier, used for risk attribution only.
-    ///
-    /// Discounting always uses [`wacc`](Self::wacc) via `(1 + wacc)^{-t}`
-    /// regardless of whether this curve is loaded (the
-    /// previous behavior silently switched risky flows to risk-free curve
-    /// discounting). WACC sensitivity is exposed separately as `dcf::wacc01`.
-    /// Mid-year discounting convention (default: `false` = end-of-period).
-    ///
-    /// When `true`, each flow is discounted at `t` minus half the average
-    /// flow spacing instead of `t` (the classic `t - 0.5` for annual
-    /// grids; half a period for sub-annual grids), reflecting the
-    /// assumption that cash flows arrive mid-period. This is the standard
-    /// convention in IB/PE practice (Koller et al.). Exit-multiple
-    /// terminal values are not shifted (point-in-time sale at the horizon).
-    #[serde(default)]
-    mid_year_convention: bool,
-    /// Annualized terminal flow used by growth-perpetuity terminal values.
-    ///
-    /// Gordon Growth and H-Model capitalize an *annual* flow with annual
-    /// WACC and growth rates. When the explicit `flows` grid is sub-annual
-    /// (e.g. quarterly), the last flow is a period flow, not an annual one;
-    /// set this to the trailing-twelve-month aggregate of the final
-    /// explicit year so the terminal value is computed on a consistent
-    /// annual basis (Koller et al., Damodaran). When `None`, the last
-    /// explicit flow is used directly (correct for annual grids).
-    ///
-    /// Ignored by `ExitMultiple` terminal values.
-    #[serde(default)]
-    terminal_flow_override: Option<f64>,
-    /// Equity bridge from enterprise value to equity value (debt, cash,
-    /// preferred equity, minority interest, non-operating assets and other
-    /// adjustments), in instrument currency.
-    equity_bridge: EquityBridge,
-    /// Basic shares outstanding for per-share value calculation.
-    #[serde(default)]
-    shares_outstanding: Option<f64>,
-    /// Dilutive securities (options, warrants, RSUs, convertibles) for treasury stock method.
-    #[serde(default)]
-    dilution_securities: Vec<DilutionSecurity>,
-    /// Private company valuation discounts (DLOM, DLOC).
-    #[serde(default)]
-    valuation_discounts: Option<ValuationDiscounts>,
-    /// Instrument-owned pricing inputs.
-    #[serde(default)]
-    instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[serde(default)]
-    metric_pricing_overrides: finstack_quant_valuations_core::instruments::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[serde(default)]
-    scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
-    /// Attributes for scenario selection and tagging
-    attributes: Attributes,
-}
-
-impl TryFrom<DiscountedCashFlowUnchecked> for DiscountedCashFlow {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(value: DiscountedCashFlowUnchecked) -> std::result::Result<Self, Self::Error> {
-        let inst = Self {
-            id: value.id,
-            currency: value.currency,
-            flows: value.flows,
-            wacc: value.wacc,
-            terminal_value: value.terminal_value,
-            valuation_date: value.valuation_date,
-            mid_year_convention: value.mid_year_convention,
-            terminal_flow_override: value.terminal_flow_override,
-            equity_bridge: value.equity_bridge,
-            shares_outstanding: value.shares_outstanding,
-            dilution_securities: value.dilution_securities,
-            valuation_discounts: value.valuation_discounts,
-            instrument_pricing_overrides: value.instrument_pricing_overrides,
-            metric_pricing_overrides: value.metric_pricing_overrides,
-            scenario_pricing_overrides: value.scenario_pricing_overrides,
-            attributes: value.attributes,
-        };
-        inst.validate()?;
-        Ok(inst)
-    }
-}
+finstack_quant_valuations_core::validate_on_deserialize!(DiscountedCashFlow);
 
 impl DiscountedCashFlow {
     /// Validate structural invariants required by the DCF pricer.

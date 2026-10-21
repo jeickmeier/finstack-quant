@@ -4321,14 +4321,14 @@
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
-          "description": "Attributes for scenario selection and grouping."
+          "description": "Attributes for scenario selection and grouping"
         },
         "base_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
-          "description": "Base currency (equity denomination)."
+          "description": "Base currency (equity denomination)"
         },
         "correlation": {
-          "description": "Correlation between equity price and FX rate.",
+          "description": "Correlation between equity price and FX rate",
           "format": "double",
           "type": "number"
         },
@@ -4346,20 +4346,19 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Optional dividend-yield scalar ID."
+          "description": "Optional dividend-yield scalar ID"
         },
         "domestic_discount_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Discount curve ID (domestic currency)."
+          "description": "Discount curve ID (domestic currency)"
         },
         "expiry": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Option expiry date."
+          "description": "Option expiry date"
         },
         "foreign_discount_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Discount curve ID (foreign currency)."
+          "description": "Discount curve ID (foreign currency)"
         },
         "fx_spot_id": {
           "anyOf": [
@@ -4370,8 +4369,7 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Optional FX rate identifier."
+          "description": "Optional FX rate identifier.\n\nThe referenced scalar must be quoted as **quote currency per unit of\nbase currency** (e.g. for base JPY / quote USD, USD-per-JPY ≈ 0.0071,\nconventionally named `JPYUSD`). The pricer compounds it with\n`exp((r_quote − r_base)·t)` to obtain the ATM forward for the FX vol\nlookup, so an inverted quote (JPY-per-USD) silently mislocates the\nsmile. `validate()` rejects ids whose embedded pair name contradicts\nthis direction."
         },
         "fx_vol_surface_id": {
           "anyOf": [
@@ -4382,36 +4380,30 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Optional FX volatility surface ID."
+          "description": "Optional FX volatility surface ID.\n\nMust be calibrated in the same **quote-per-base** direction as\n`fx_spot_id` so absolute-strike lookups at the CIRP forward land on\nthe correct smile. `validate()` rejects ids whose embedded pair name\ncontradicts this direction."
         },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Unique instrument identifier."
+          "description": "Unique instrument identifier"
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Strike-equivalent domestic reference notional."
+          "description": "Strike-equivalent domestic reference notional.\n\nWhen `quantity` and `payoff_fx_rate` are supplied, this must\nequal `quantity * payoff_fx_rate * strike`."
         },
         "option_type": {
           "$ref": "#/$defs/d_2399758d0de780758df4",
-          "description": "Option type (call or put)."
+          "description": "Option type (call or put)"
         },
         "payoff_fx_rate": {
-          "default": null,
-          "description": "Fixed payoff FX conversion rate from base-currency payoff into quote currency.",
+          "description": "Fixed payoff FX conversion rate from base-currency payoff into quote currency.\n\nExample: for a JPY-underlying option settled in USD at a fixed 140 JPY/USD\nconversion, `payoff_fx_rate` is `1.0 / 140.0` USD per JPY.",
           "format": "double",
           "type": [
             "number",
@@ -4419,8 +4411,7 @@
           ]
         },
         "quantity": {
-          "default": null,
-          "description": "Number of underlying units covered by the option payoff.",
+          "description": "Number of underlying units covered by the option payoff.\n\nQuanto pricing is performed per unit of the underlying in the base currency.\nThis quantity converts the per-unit price into contract-level exposure.",
           "format": "double",
           "type": [
             "number",
@@ -4429,16 +4420,15 @@
         },
         "quote_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
-          "description": "Quote currency (payment/settlement currency)."
+          "description": "Quote currency (payment/settlement currency)"
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Equity spot price identifier."
+          "description": "Equity spot price identifier"
         },
         "strike": {
           "description": "Per-unit strike of the equity underlying, in `base_currency` price units.",
@@ -4446,12 +4436,12 @@
           "type": "number"
         },
         "underlying_ticker": {
-          "description": "Underlying equity ticker symbol.",
+          "description": "Underlying equity ticker symbol",
           "type": "string"
         },
         "vol_surface_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Equity volatility surface ID."
+          "description": "Equity volatility surface ID"
         }
       },
       "required": [

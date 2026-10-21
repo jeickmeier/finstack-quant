@@ -2,7 +2,7 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
- * Base currency (equity denomination).
+ * Base currency (equity denomination)
  */
 export type Currency =
   | "AED"
@@ -190,7 +190,7 @@ export type Id = string;
  */
 export type Id1 = string;
 /**
- * Option expiry date.
+ * Option expiry date
  */
 export type Date = string;
 /**
@@ -469,7 +469,7 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
- * Quote currency (payment/settlement currency).
+ * Quote currency (payment/settlement currency)
  */
 export type Currency1 =
   | "AED"
@@ -665,12 +665,12 @@ export interface DE896827D9Ebec6B04130 {
   attributes: Attributes;
   base_currency: Currency;
   /**
-   * Correlation between equity price and FX rate.
+   * Correlation between equity price and FX rate
    */
   correlation: number;
   day_count?: DayCount;
   /**
-   * Optional dividend-yield scalar ID.
+   * Optional dividend-yield scalar ID
    */
   div_yield_id?: Id | null;
   domestic_discount_curve_id: Id1;
@@ -678,10 +678,23 @@ export interface DE896827D9Ebec6B04130 {
   foreign_discount_curve_id: Id2;
   /**
    * Optional FX rate identifier.
+   *
+   * The referenced scalar must be quoted as **quote currency per unit of
+   * base currency** (e.g. for base JPY / quote USD, USD-per-JPY ≈ 0.0071,
+   * conventionally named `JPYUSD`). The pricer compounds it with
+   * `exp((r_quote − r_base)·t)` to obtain the ATM forward for the FX vol
+   * lookup, so an inverted quote (JPY-per-USD) silently mislocates the
+   * smile. `validate()` rejects ids whose embedded pair name contradicts
+   * this direction.
    */
   fx_spot_id?: Id | null;
   /**
    * Optional FX volatility surface ID.
+   *
+   * Must be calibrated in the same **quote-per-base** direction as
+   * `fx_spot_id` so absolute-strike lookups at the CIRP forward land on
+   * the correct smile. `validate()` rejects ids whose embedded pair name
+   * contradicts this direction.
    */
   fx_vol_surface_id?: Id | null;
   id: Id3;
@@ -689,15 +702,21 @@ export interface DE896827D9Ebec6B04130 {
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money;
   /**
-   * Option type (call or put).
+   * Option type (call or put)
    */
   option_type: "call" | "put";
   /**
    * Fixed payoff FX conversion rate from base-currency payoff into quote currency.
+   *
+   * Example: for a JPY-underlying option settled in USD at a fixed 140 JPY/USD
+   * conversion, `payoff_fx_rate` is `1.0 / 140.0` USD per JPY.
    */
   payoff_fx_rate?: number | null;
   /**
    * Number of underlying units covered by the option payoff.
+   *
+   * Quanto pricing is performed per unit of the underlying in the base currency.
+   * This quantity converts the per-unit price into contract-level exposure.
    */
   quantity?: number | null;
   quote_currency: Currency1;
@@ -708,13 +727,13 @@ export interface DE896827D9Ebec6B04130 {
    */
   strike: number;
   /**
-   * Underlying equity ticker symbol.
+   * Underlying equity ticker symbol
    */
   underlying_ticker: string;
   vol_surface_id: Id5;
 }
 /**
- * Attributes for scenario selection and grouping.
+ * Attributes for scenario selection and grouping
  */
 export interface Attributes {
   /**
@@ -1658,6 +1677,9 @@ export interface DE49387F97C0F9D510642 {
 }
 /**
  * Strike-equivalent domestic reference notional.
+ *
+ * When `quantity` and `payoff_fx_rate` are supplied, this must
+ * equal `quantity * payoff_fx_rate * strike`.
  */
 export interface Money {
   /**

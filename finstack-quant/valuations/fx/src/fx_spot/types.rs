@@ -98,7 +98,7 @@ use finstack_quant_valuations_core::instruments::Attributes;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields, try_from = "FxSpotUnchecked")]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct FxSpot {
     /// Unique identifier for the FX pair
     pub id: InstrumentId,
@@ -176,92 +176,7 @@ pub struct FxSpot {
     pub attributes: Attributes,
 }
 
-#[derive(Debug, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-struct FxSpotUnchecked {
-    /// Unique identifier for the FX pair
-    id: InstrumentId,
-    /// Base currency (the currency being priced)
-    base_currency: Currency,
-    /// Quote currency (the currency used for pricing)
-    quote_currency: Currency,
-    /// Optional explicit settlement (value) date
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
-    )]
-    settlement_date: Option<Date>,
-    /// Optional T+N settlement lag in business days when `settlement_date` is not provided.
-    ///
-    /// `None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.
-    settlement_days: Option<u32>,
-    /// Optional quoted FX spot rate (quote per base); `None` reads the FxMatrix.
-    quoted_spot: Option<f64>,
-    /// Optional quote-currency discount curve for PV-ing the settlement
-    /// cashflow. When absent the settlement amount is reported undiscounted
-    /// (a 1–2 day effect for standard spot lags).
-    #[serde(default)]
-    domestic_discount_curve_id: Option<CurveId>,
-    /// Notional amount in base currency.
-    notional: Money,
-    /// Business day convention to apply when adjusting settlement (default: ModifiedFollowing)
-    ///
-    /// Note: Default changed from `Following` to `ModifiedFollowing` in v0.8.0 to align
-    /// with ISDA standard FX settlement conventions.
-    #[serde(default = "finstack_quant_valuations_core::serde_defaults::bdc_modified_following")]
-    business_day_convention: BusinessDayConvention,
-    /// Optional base currency calendar for joint calendar settlement adjustment.
-    ///
-    /// Per market convention, FX settlement uses the joint calendar of both currencies.
-    /// A date is a good business day only if it's valid in both calendars.
-    base_calendar_id: Option<String>,
-    /// Optional quote currency calendar for joint calendar settlement adjustment.
-    ///
-    /// Per market convention, FX settlement uses the joint calendar of both currencies.
-    /// A date is a good business day only if it's valid in both calendars.
-    quote_calendar_id: Option<String>,
-    /// Instrument-owned pricing inputs.
-    #[serde(default)]
-    instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[serde(default)]
-    metric_pricing_overrides: finstack_quant_valuations_core::instruments::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[serde(default)]
-    scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
-    /// Attributes for scenario selection and tagging
-    attributes: Attributes,
-}
-
-impl TryFrom<FxSpotUnchecked> for FxSpot {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(value: FxSpotUnchecked) -> std::result::Result<Self, Self::Error> {
-        let spot = Self {
-            id: value.id,
-            base_currency: value.base_currency,
-            quote_currency: value.quote_currency,
-            settlement_date: value.settlement_date,
-            settlement_days: value.settlement_days,
-            quoted_spot: value.quoted_spot,
-            domestic_discount_curve_id: value.domestic_discount_curve_id,
-            notional: value.notional,
-            instrument_pricing_overrides: value.instrument_pricing_overrides,
-            metric_pricing_overrides: value.metric_pricing_overrides,
-            scenario_pricing_overrides: value.scenario_pricing_overrides,
-            business_day_convention: value.business_day_convention,
-            base_calendar_id: value.base_calendar_id.map(Into::into),
-            quote_calendar_id: value.quote_calendar_id.map(Into::into),
-            attributes: value.attributes,
-        };
-        spot.validate_economics()?;
-        Ok(spot)
-    }
-}
+finstack_quant_valuations_core::validate_on_deserialize!(FxSpot);
 
 impl FxSpot {
     /// Compute the effective settlement date for this FX spot.

@@ -26,7 +26,7 @@ use finstack_quant_valuations_core::impl_instrument_base;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields, try_from = "FxSwapUnchecked")]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct FxSwap {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -96,91 +96,7 @@ pub struct FxSwap {
     pub attributes: Attributes,
 }
 
-#[derive(Debug, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-struct FxSwapUnchecked {
-    /// Unique instrument identifier.
-    id: InstrumentId,
-    /// Base currency (foreign).
-    base_currency: Currency,
-    /// Quote currency (domestic).
-    quote_currency: Currency,
-    /// Near leg settlement date (spot leg).
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    near_date: Date,
-    /// Far leg settlement date (forward leg).
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    far_date: Date,
-    /// Notional amount in base currency (exchanged on near, reversed on far).
-    notional: Money,
-    /// Domestic discount curve id (quote currency).
-    domestic_discount_curve_id: CurveId,
-    /// Foreign discount curve id (base currency).
-    foreign_discount_curve_id: CurveId,
-    /// Optional near leg FX rate (quote per base). If absent, use the market
-    /// outright forward from the valuation date to near settlement.
-    #[serde(default)]
-    near_rate: Option<f64>,
-    /// Optional far leg FX rate (quote per base). If absent, use the market
-    /// outright forward from the valuation date to far settlement.
-    #[serde(default)]
-    far_rate: Option<f64>,
-    /// Optional base currency calendar for spot/settlement adjustment metadata.
-    #[serde(default)]
-    base_calendar_id: Option<String>,
-    /// Optional quote currency calendar for spot/settlement adjustment metadata.
-    #[serde(default)]
-    quote_calendar_id: Option<String>,
-    /// Instrument-owned pricing inputs.
-    #[serde(default)]
-    instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[serde(default)]
-    metric_pricing_overrides: finstack_quant_valuations_core::instruments::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[serde(default)]
-    scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
-    /// Attributes for scenario selection and tagging.
-    attributes: Attributes,
-}
-
-impl TryFrom<FxSwapUnchecked> for FxSwap {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(value: FxSwapUnchecked) -> std::result::Result<Self, Self::Error> {
-        let swap = Self {
-            id: value.id,
-            base_currency: value.base_currency,
-            quote_currency: value.quote_currency,
-            near_date: value.near_date,
-            far_date: value.far_date,
-            notional: value.notional,
-            domestic_discount_curve_id: value.domestic_discount_curve_id,
-            foreign_discount_curve_id: value.foreign_discount_curve_id,
-            near_rate: value.near_rate,
-            far_rate: value.far_rate,
-            base_calendar_id: value.base_calendar_id.map(Into::into),
-            quote_calendar_id: value.quote_calendar_id.map(Into::into),
-            instrument_pricing_overrides: value.instrument_pricing_overrides,
-            metric_pricing_overrides: value.metric_pricing_overrides,
-            scenario_pricing_overrides: value.scenario_pricing_overrides,
-            attributes: value.attributes,
-        };
-        swap.validate()?;
-        Ok(swap)
-    }
-}
+finstack_quant_valuations_core::validate_on_deserialize!(FxSwap);
 
 impl FxSwap {
     /// Validate FX swap economics at construction boundaries.

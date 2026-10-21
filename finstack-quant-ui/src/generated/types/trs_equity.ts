@@ -797,6 +797,9 @@ export interface D_785F04C4Ffd82F89F1Ab {
   discrete_dividends?: [Date, number][];
   /**
    * Settlement timing for explicit manufactured dividends.
+   *
+   * This field is mandatory because dividend-date and period-end settlement
+   * differ by the funding carry between the two dates.
    */
   dividend_settlement: "on_dividend_date" | "at_period_end";
   /**
@@ -836,20 +839,21 @@ export interface D_785F04C4Ffd82F89F1Ab {
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money6;
   /**
-   * Observed underlying levels at past reset (period-start) dates.
+   * Observed underlying levels at contractual reset boundaries.
    *
-   * For a seasoned TRS valued inside a return period, the total-return leg
-   * must anchor the current period to the level *observed* at the period
-   * start so the realized spot move enters the PV (equity delta). Provide
-   * `(reset_date, level)` pairs for every period-start date on or before
-   * the valuation date; the first period may use `initial_level` instead.
-   * Pricing errors when the current period's start level is unavailable.
+   * Provide `(reset_date, level)` for each boundary on or before the
+   * valuation date that is needed by an unpaid return period. This includes
+   * the final period end when payment lag leaves its cashflow outstanding.
+   * The first boundary may use `initial_level`; a boundary equal to `as_of`
+   * may use live spot. Pricing errors when any other required fixing is
+   * unavailable.
    */
   past_fixings?: [Date, number][];
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   schedule: D_14A97E9C761228D7D7Fa;
   /**
-   * Trade side (receive/pay total return).
+   * Trade side: `receive` receives the total-return leg and pays financing;
+   * `pay` pays the total return and receives financing.
    */
   side: "pay" | "receive";
   underlying: D_3907A55Cf33393B0F707;

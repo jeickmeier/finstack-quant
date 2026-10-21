@@ -21,7 +21,7 @@ use finstack_quant_valuations_core::instruments::OptionType;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields, try_from = "QuantoOptionUnchecked")]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct QuantoOption {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -122,107 +122,7 @@ pub struct QuantoOption {
     pub attributes: Attributes,
 }
 
-#[derive(Debug, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-struct QuantoOptionUnchecked {
-    /// Unique instrument identifier.
-    id: InstrumentId,
-    /// Underlying equity ticker symbol.
-    underlying_ticker: String,
-    /// Per-unit strike of the equity underlying, in `base_currency` price units.
-    strike: f64,
-    /// Option type (call or put).
-    option_type: OptionType,
-    /// Option expiry date.
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    expiry: Date,
-    /// Strike-equivalent domestic reference notional.
-    notional: Money,
-    /// Number of underlying units covered by the option payoff.
-    #[serde(default)]
-    quantity: Option<f64>,
-    /// Fixed payoff FX conversion rate from base-currency payoff into quote currency.
-    #[serde(default)]
-    payoff_fx_rate: Option<f64>,
-    /// Base currency (equity denomination).
-    base_currency: Currency,
-    /// Quote currency (payment/settlement currency).
-    quote_currency: Currency,
-    /// Correlation between equity price and FX rate.
-    correlation: f64,
-    /// Day count convention (defaults to ACT/365F).
-    #[serde(default = "finstack_quant_valuations_core::serde_defaults::day_count_act365f")]
-    day_count: finstack_quant_core::dates::DayCount,
-    /// Discount curve ID (domestic currency).
-    domestic_discount_curve_id: CurveId,
-    /// Discount curve ID (foreign currency).
-    foreign_discount_curve_id: CurveId,
-    /// Equity spot price identifier.
-    spot_id: PriceId,
-    /// Equity volatility surface ID.
-    vol_surface_id: CurveId,
-    /// Optional dividend-yield scalar ID.
-    #[serde(default)]
-    div_yield_id: Option<PriceId>,
-    /// Optional FX rate identifier.
-    #[serde(default)]
-    fx_spot_id: Option<PriceId>,
-    /// Optional FX volatility surface ID.
-    #[serde(default)]
-    fx_vol_surface_id: Option<CurveId>,
-    /// Instrument-owned pricing inputs.
-    #[serde(default)]
-    instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[serde(default)]
-    metric_pricing_overrides: finstack_quant_valuations_core::instruments::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[serde(default)]
-    scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
-    /// Attributes for scenario selection and grouping.
-    attributes: Attributes,
-}
-
-impl TryFrom<QuantoOptionUnchecked> for QuantoOption {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(value: QuantoOptionUnchecked) -> std::result::Result<Self, Self::Error> {
-        let quanto = Self {
-            id: value.id,
-            underlying_ticker: value.underlying_ticker,
-            strike: value.strike,
-            option_type: value.option_type,
-            expiry: value.expiry,
-            notional: value.notional,
-            quantity: value.quantity,
-            payoff_fx_rate: value.payoff_fx_rate,
-            base_currency: value.base_currency,
-            quote_currency: value.quote_currency,
-            correlation: value.correlation,
-            day_count: value.day_count,
-            domestic_discount_curve_id: value.domestic_discount_curve_id,
-            foreign_discount_curve_id: value.foreign_discount_curve_id,
-            spot_id: value.spot_id,
-            vol_surface_id: value.vol_surface_id,
-            div_yield_id: value.div_yield_id,
-            fx_spot_id: value.fx_spot_id,
-            fx_vol_surface_id: value.fx_vol_surface_id,
-            instrument_pricing_overrides: value.instrument_pricing_overrides,
-            metric_pricing_overrides: value.metric_pricing_overrides,
-            scenario_pricing_overrides: value.scenario_pricing_overrides,
-            attributes: value.attributes,
-        };
-        quanto.validate()?;
-        Ok(quanto)
-    }
-}
+finstack_quant_valuations_core::validate_on_deserialize!(QuantoOption);
 
 impl QuantoOption {
     /// Create a canonical example quanto equity option (Nikkei in USD)

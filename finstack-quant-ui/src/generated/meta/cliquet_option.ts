@@ -3706,7 +3706,6 @@ export default [
   {
     "path": "#/$defs/d_e106c3fc700775eb2266/properties/div_yield_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/cliquet_option.schema.json#/$defs/CliquetOption/properties/div_yield_id",
-    "default": null,
     "description": "Optional dividend-yield scalar ID.\n\n`Some(id)`: lookup MUST succeed (a missing or non-unitless scalar\nreturns an error). `None`: no implicit default; treated as zero\ncontinuous dividend yield. Set explicitly for index underlyings."
   },
   {
@@ -3755,7 +3754,6 @@ export default [
   {
     "path": "#/$defs/d_e106c3fc700775eb2266/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/cliquet_option.schema.json#/$defs/CliquetOption/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -3775,9 +3773,6 @@ export default [
   {
     "path": "#/$defs/d_e106c3fc700775eb2266/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/cliquet_option.schema.json#/$defs/CliquetOption/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -3813,7 +3808,7 @@ export default [
   {
     "path": "#/$defs/d_e106c3fc700775eb2266/properties/path_model",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/cliquet_option.schema.json#/$defs/CliquetOption/properties/path_model",
-    "description": "Explicit path model selection; required to acknowledge model risk.",
+    "description": "Explicit path model selection.\n\n`AtmTermGbm` is an ATM-term-structure approximation and does not model\nequity strike skew; callers must opt into that limitation.",
     "ref": "#/$defs/EquityPathModel",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/cliquet_option.schema.json#/$defs/EquityPathModel"
   },
@@ -3839,7 +3834,6 @@ export default [
   {
     "path": "#/$defs/d_e106c3fc700775eb2266/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/cliquet_option.schema.json#/$defs/CliquetOption/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"

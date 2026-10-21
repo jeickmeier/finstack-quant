@@ -5575,14 +5575,6 @@
           "#/$defs/VarianceSwap/properties/high_series_id",
           "#/$defs/VarianceSwap/properties/low_series_id",
           "#/$defs/VarianceSwap/properties/open_series_id",
-          "#/$defs/FxSpot/properties/base_calendar_id",
-          "#/$defs/FxSpot/properties/quote_calendar_id",
-          "#/$defs/FxSwap/properties/base_calendar_id",
-          "#/$defs/FxSwap/properties/quote_calendar_id",
-          "#/$defs/FxForward/properties/base_calendar_id",
-          "#/$defs/FxForward/properties/quote_calendar_id",
-          "#/$defs/Ndf/properties/base_calendar_id",
-          "#/$defs/Ndf/properties/settlement_calendar_id",
           "#/$defs/FxVarianceSwap/properties/close_series_id",
           "#/$defs/FxVarianceSwap/properties/high_series_id",
           "#/$defs/FxVarianceSwap/properties/low_series_id",
@@ -6159,11 +6151,39 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/FxSpot/properties/base_calendar_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/FxSpot/properties/domestic_discount_curve_id",
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/FxSpot/properties/quote_calendar_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/FxSpot/properties/settlement_date",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FxSwap/properties/base_calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FxSwap/properties/quote_calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FxForward/properties/base_calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FxForward/properties/quote_calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/Ndf/properties/base_calendar_id",
             "keyword": "anyOf"
           },
           {
@@ -6172,6 +6192,10 @@
           },
           {
             "pointer": "#/$defs/Ndf/properties/foreign_discount_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/Ndf/properties/settlement_calendar_id",
             "keyword": "anyOf"
           },
           {
@@ -17204,14 +17228,6 @@
           "#/$defs/VarianceSwap/properties/high_series_id",
           "#/$defs/VarianceSwap/properties/low_series_id",
           "#/$defs/VarianceSwap/properties/open_series_id",
-          "#/$defs/FxSpot/properties/base_calendar_id",
-          "#/$defs/FxSpot/properties/quote_calendar_id",
-          "#/$defs/FxSwap/properties/base_calendar_id",
-          "#/$defs/FxSwap/properties/quote_calendar_id",
-          "#/$defs/FxForward/properties/base_calendar_id",
-          "#/$defs/FxForward/properties/quote_calendar_id",
-          "#/$defs/Ndf/properties/base_calendar_id",
-          "#/$defs/Ndf/properties/settlement_calendar_id",
           "#/$defs/FxVarianceSwap/properties/close_series_id",
           "#/$defs/FxVarianceSwap/properties/high_series_id",
           "#/$defs/FxVarianceSwap/properties/low_series_id",
@@ -17788,11 +17804,39 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/FxSpot/properties/base_calendar_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/FxSpot/properties/domestic_discount_curve_id",
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/FxSpot/properties/quote_calendar_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/FxSpot/properties/settlement_date",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FxSwap/properties/base_calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FxSwap/properties/quote_calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FxForward/properties/base_calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FxForward/properties/quote_calendar_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/Ndf/properties/base_calendar_id",
             "keyword": "anyOf"
           },
           {
@@ -17801,6 +17845,10 @@
           },
           {
             "pointer": "#/$defs/Ndf/properties/foreign_discount_curve_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/Ndf/properties/settlement_calendar_id",
             "keyword": "anyOf"
           },
           {
@@ -24819,11 +24867,13 @@
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
         "nullable-string": [
-          "#/$defs/d_5f15f4bd684bc813ff88/properties/base_calendar_id",
-          "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario",
-          "#/$defs/d_5f15f4bd684bc813ff88/properties/quote_calendar_id"
+          "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario"
         ],
         "nullable-union": [
+          {
+            "pointer": "#/$defs/d_5f15f4bd684bc813ff88/properties/base_calendar_id",
+            "keyword": "anyOf"
+          },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
             "keyword": "anyOf"
@@ -24870,6 +24920,10 @@
           },
           {
             "pointer": "#/$defs/d_e49387f97c0f9d510642/properties/reporting_currency",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_5f15f4bd684bc813ff88/properties/quote_calendar_id",
             "keyword": "anyOf"
           }
         ],
@@ -26615,11 +26669,13 @@
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
         "nullable-string": [
-          "#/$defs/d_81828a2fc42ad3c4ad70/properties/base_calendar_id",
-          "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario",
-          "#/$defs/d_81828a2fc42ad3c4ad70/properties/quote_calendar_id"
+          "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario"
         ],
         "nullable-union": [
+          {
+            "pointer": "#/$defs/d_81828a2fc42ad3c4ad70/properties/base_calendar_id",
+            "keyword": "anyOf"
+          },
           {
             "pointer": "#/$defs/d_81828a2fc42ad3c4ad70/properties/domestic_discount_curve_id",
             "keyword": "anyOf"
@@ -26670,6 +26726,10 @@
           },
           {
             "pointer": "#/$defs/d_e49387f97c0f9d510642/properties/reporting_currency",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_81828a2fc42ad3c4ad70/properties/quote_calendar_id",
             "keyword": "anyOf"
           },
           {
@@ -27142,11 +27202,13 @@
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
         "nullable-string": [
-          "#/$defs/d_17ebaf6bae7cbde5673d/properties/base_calendar_id",
-          "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario",
-          "#/$defs/d_17ebaf6bae7cbde5673d/properties/quote_calendar_id"
+          "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario"
         ],
         "nullable-union": [
+          {
+            "pointer": "#/$defs/d_17ebaf6bae7cbde5673d/properties/base_calendar_id",
+            "keyword": "anyOf"
+          },
           {
             "pointer": "#/$defs/d_572ad1befb7d94914652/properties/asw_forward_curve_id",
             "keyword": "anyOf"
@@ -27193,6 +27255,10 @@
           },
           {
             "pointer": "#/$defs/d_e49387f97c0f9d510642/properties/reporting_currency",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_17ebaf6bae7cbde5673d/properties/quote_calendar_id",
             "keyword": "anyOf"
           }
         ],
@@ -32706,11 +32772,13 @@
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
         "nullable-string": [
-          "#/$defs/d_6737e7813812de86cf9b/properties/base_calendar_id",
-          "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario",
-          "#/$defs/d_6737e7813812de86cf9b/properties/settlement_calendar_id"
+          "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario"
         ],
         "nullable-union": [
+          {
+            "pointer": "#/$defs/d_6737e7813812de86cf9b/properties/base_calendar_id",
+            "keyword": "anyOf"
+          },
           {
             "pointer": "#/$defs/d_6737e7813812de86cf9b/properties/fixing_source",
             "keyword": "anyOf"
@@ -32765,6 +32833,10 @@
           },
           {
             "pointer": "#/$defs/d_e49387f97c0f9d510642/properties/reporting_currency",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_6737e7813812de86cf9b/properties/settlement_calendar_id",
             "keyword": "anyOf"
           }
         ],
