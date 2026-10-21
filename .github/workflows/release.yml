@@ -118,7 +118,7 @@ jobs:
 
       - name: Set up Python environment
         run: |
-          uv venv --python 3.12
+          uv venv --python 3.14
           echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
           uv sync --locked --no-build --no-install-project
 
@@ -207,7 +207,7 @@ jobs:
 
       - name: Set up Python environment
         run: |
-          uv venv --python 3.12
+          uv venv --python 3.14
           echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
           uv sync --locked --no-build --no-install-project
 

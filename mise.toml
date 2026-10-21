@@ -33,7 +33,7 @@ rust = [
   { version = "nightly", profile = "minimal" },
 ]
 node = "24"
-python = "3.12.15"
+python = "3.14.8"
 # Its postinstall puts headless Chromium in the per-user Playwright cache. The
 # browser build is tied to this version: keep it equal to `playwright` in
 # finstack-quant-ui/package.json.
@@ -55,15 +55,15 @@ RUSTUP_HOME = '{% if env.RUSTUP_HOME is defined %}{{ env.RUSTUP_HOME }}{% elif o
 # Builds use the pinned stable toolchain, not the nightly installed above.
 RUSTUP_TOOLCHAIN = "1.97.1"
 # uv and PyO3 use the mise-installed Python above (same version). uv takes the
-# first 3.12.15 on PATH, where mise puts its own, never a uv-managed one, and
+# first 3.14.8 on PATH, where mise puts its own, never a uv-managed one, and
 # never downloads its own; outside mise it finds none and says so.
 # UV_PYTHON is a version, not a path: a path acts like `--python` and overrides
 # the active venv, so `uv pip` (which `maturin develop` runs) would install
 # into the mise interpreter instead of .venv.
-UV_PYTHON = "{{ env.UV_PYTHON | default(value='3.12.15') }}"
+UV_PYTHON = "{{ env.UV_PYTHON | default(value='3.14.8') }}"
 UV_PYTHON_PREFERENCE = "{{ env.UV_PYTHON_PREFERENCE | default(value='only-system') }}"
 UV_PYTHON_DOWNLOADS = "{{ env.UV_PYTHON_DOWNLOADS | default(value='never') }}"
-PYO3_PYTHON = '{% if env.PYO3_PYTHON is defined %}{{ env.PYO3_PYTHON }}{% elif os() == "windows" %}{{ xdg_data_home }}\mise\installs\python\3.12.15\python.exe{% else %}{{ xdg_data_home }}/mise/installs/python/3.12.15/bin/python{% endif %}'
+PYO3_PYTHON = '{% if env.PYO3_PYTHON is defined %}{{ env.PYO3_PYTHON }}{% elif os() == "windows" %}{{ xdg_data_home }}\mise\installs\python\3.14.8\python.exe{% else %}{{ xdg_data_home }}/mise/installs/python/3.14.8/bin/python{% endif %}'
 
 # ─────────────────────────────────────────────────────────────────
 # Aggregates
