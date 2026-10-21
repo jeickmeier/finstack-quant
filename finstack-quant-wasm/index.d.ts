@@ -30885,7 +30885,7 @@ export interface CalibrationNamespace {
    * @param quotes - Array (or JSON) of `CapFloorQuote` objects with distinct maturities in years; each maturity adds one constant-sigma interval.
    * @param config - `PiecewiseSigmaCalibrationConfig` object: `fixed_kappa`, `sigma_min`, `sigma_max` (absolute rate volatility), `fit_tolerance` and optional `frequency` (default `"semi_annual"`).
    * @param forward - Curve projecting the caplet forwards; the published function defaults it to `discount`.
-   * @returns `[params, report]`: the piecewise `HullWhiteParams` and the `CalibrationReport`.
+   * @returns `[params, report]`: the piecewise `HullWhiteParams` handle (`models.rates.hullWhite.HullWhiteParams`) and the `CalibrationReport` object.
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` if no quotes are supplied, maturities repeat, the configuration bounds are invalid (`kind: "validation"`), or an interval's sigma cannot be bracketed or solved.
    */
   bootstrapHullWhiteSigmaScheduleToCapFloors(
@@ -30893,18 +30893,7 @@ export interface CalibrationNamespace {
     quotes: readonly generated.calibration.CapFloorQuote[] | string,
     config: generated.calibration.PiecewiseSigmaCalibrationConfig | string,
     forward?: DiscountCurve | null
-  ): [generated.models.HullWhiteParams, generated.calibration.CalibrationReport];
-  /**
-   * Short-rate volatility of a piecewise Hull-White parameter set at a model time.
-   *
-   * Free-function twin of Python `HullWhiteParams.sigma_at` (Rust
-   * `HullWhiteParams::volatility` read with `PiecewiseConstantCurve::value_at`).
-   * @param params - `HullWhiteParams` object (or JSON): `kappa` and the piecewise `volatility` schedule (`times`, `values`).
-   * @param time - Year fraction at which the left-continuous piecewise sigma is read.
-   * @returns Sigma applying at `time`, in absolute rate units per square-root year.
-   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `params` is not a valid `HullWhiteParams` object.
-   */
-  hullWhiteParamsSigmaAt(params: generated.models.HullWhiteParams | string, time: number): number;
+  ): [HullWhiteParams, generated.calibration.CalibrationReport];
   /**
    * Build a zero-coupon inflation swap quote.
    *

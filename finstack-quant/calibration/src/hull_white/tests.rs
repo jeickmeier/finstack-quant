@@ -7,7 +7,6 @@ use super::targets::{
 use super::*;
 use finstack_quant_models::rates::hull_white::{
     hw1f_caplet_forward_rate_normal_vol, hw1f_convexity_adjustment, hw_b, hw_bond_vol,
-    hw_bond_vol_with_model,
 };
 
 #[test]
@@ -87,7 +86,7 @@ fn constant_model_bond_vol_matches_scalar_formula() {
     let scalar = HullWhiteCalibrationParams::new(0.05, 0.01).expect("scalar parameters");
     let model = HullWhiteParams::try_from(scalar).expect("constant model");
 
-    let model_vol = hw_bond_vol_with_model(&model, 0.0, 1.0, 2.0).expect("model vol");
+    let model_vol = model.bond_vol(0.0, 1.0, 2.0).expect("model vol");
     let scalar_vol = hw_bond_vol(0.05, 0.01, 0.0, 1.0, 2.0);
 
     assert!((model_vol - scalar_vol).abs() < 1.0e-15);

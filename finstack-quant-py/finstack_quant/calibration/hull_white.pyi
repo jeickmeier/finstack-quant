@@ -14,12 +14,12 @@ from typing import Any
 
 from finstack_quant.calibration import CalibrationReport
 from finstack_quant.core.market_data import DiscountCurve
+from finstack_quant.models.rates.hull_white import HullWhiteParams
 
 __all__ = [
     "CapFloorCalibrationConfig",
     "CapFloorQuote",
     "HullWhiteCalibrationParams",
-    "HullWhiteParams",
     "PiecewiseSigmaCalibrationConfig",
     "SwaptionQuote",
     "bootstrap_hull_white_sigma_schedule_to_cap_floors",
@@ -421,123 +421,6 @@ class HullWhiteCalibrationParams:
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
 
-class HullWhiteParams:
-    """Hull-White parameters with a piecewise-constant volatility schedule.
-
-    Examples:
-    --------
-    >>> from finstack_quant.calibration.hull_white import HullWhiteParams
-    >>> p = HullWhiteParams.from_json('{"kappa":0.03,"volatility":{"times":[0.0],"values":[0.01]}}')
-    >>> p.sigma_at(0.5)
-    0.01
-
-    """
-
-    @property
-    def kappa(self) -> float:
-        """
-        Mean-reversion speed per annum.
-
-        This property does not raise.
-
-        Returns
-        -------
-        float
-            Mean-reversion speed per annum.
-        """
-
-    @property
-    def times(self) -> list[float]:
-        """
-        Increasing volatility segment start times in model years, beginning at zero.
-
-        This property does not raise.
-
-        Returns
-        -------
-        list[float]
-            Start times with ``values[i]`` applying on ``[times[i], times[i+1])``;
-            the final value extrapolates flat beyond the last start time.
-        """
-
-    @property
-    def values(self) -> list[float]:
-        """
-        Volatility on each interval, decimal per annum.
-
-        This property does not raise.
-
-        Returns
-        -------
-        list[float]
-            Volatility on each interval, decimal per annum.
-        """
-
-    def sigma_at(self, time: float) -> float:
-        """Volatility in force at a given time.
-
-        Parameters
-        ----------
-        time : float
-            Time in years from the curve base date. Values outside the
-            calibrated grid clamp to the first or last interval.
-
-        This lookup is a piecewise-constant read and does not raise.
-
-        Returns
-        -------
-        float
-            Piecewise-constant volatility at ``time``, decimal per annum; the
-            last interval's value applies beyond the final knot.
-
-        """
-
-    def to_json(self) -> str:
-        """
-        Serialize to compact JSON.
-
-        Returns
-        -------
-        str
-            Compact JSON encoding of these parameters.
-
-        Raises
-        ------
-        ValueError
-            If the value cannot be serialized to JSON.
-        """
-
-    @staticmethod
-    def from_json(json: str) -> HullWhiteParams:
-        """
-        Rebuild parameters from JSON.
-
-        Parameters
-        ----------
-        json : str
-            JSON produced by :meth:`to_json`.
-
-        Returns
-        -------
-        HullWhiteParams
-            The decoded parameters.
-
-        Raises
-        ------
-        ValueError
-            If ``json`` is malformed or carries unknown fields.
-
-        Examples
-        --------
-        >>> from finstack_quant.calibration.hull_white import HullWhiteParams
-        >>> HullWhiteParams.from_json("{")
-        Traceback (most recent call last):
-        ValueError: ...
-        """
-
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
-    def __repr__(self) -> str: ...
-
 class CapFloorCalibrationConfig:
     """Settings for the scalar Hull-White fit to cap/floor quotes.
 
@@ -901,7 +784,8 @@ def bootstrap_hull_white_sigma_schedule_to_cap_floors(
     Returns
     -------
     tuple[HullWhiteParams, CalibrationReport]
-        Piecewise parameters and the fit report.
+        Piecewise :class:`finstack_quant.models.rates.hull_white.HullWhiteParams`
+        and the fit report.
 
     Raises
     ------

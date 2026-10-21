@@ -8,7 +8,6 @@
 use crate::bindings::core::market_data::curves::PyDiscountCurve;
 use crate::bindings::macros::wire_methods;
 use crate::errors::core_to_py;
-use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
 use finstack_quant_models::rates::hull_white::{self, HullWhiteCalibrationParams, HullWhiteParams};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
@@ -76,8 +75,7 @@ impl PyHullWhiteParams {
         times: Vec<f64>,
         values: Vec<f64>,
     ) -> PyResult<Self> {
-        let schedule = PiecewiseConstantCurve::new(times, values).map_err(core_to_py)?;
-        HullWhiteParams::new(kappa, schedule)
+        HullWhiteParams::piecewise(kappa, times, values)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
@@ -91,19 +89,19 @@ impl PyHullWhiteParams {
     /// Volatility knot times in years.
     #[getter]
     fn times(&self) -> Vec<f64> {
-        self.inner.volatility.times().to_vec()
+        self.inner.times().to_vec()
     }
 
     /// Volatility values per knot (absolute rate units per square-root year).
     #[getter]
     fn values(&self) -> Vec<f64> {
-        self.inner.volatility.values().to_vec()
+        self.inner.values().to_vec()
     }
 
     /// Short-rate volatility applying at model time ``t`` (years).
     #[pyo3(text_signature = "(self, t)")]
     fn sigma(&self, t: f64) -> f64 {
-        self.inner.volatility.value_at(t)
+        self.inner.sigma(t)
     }
 
     /// Variance of the centered short-rate state at time ``t`` (years).
@@ -131,15 +129,15 @@ impl PyHullWhiteParams {
     /// time is negative/non-finite.
     #[pyo3(text_signature = "(self, t, expiry, maturity)")]
     fn bond_vol(&self, t: f64, expiry: f64, maturity: f64) -> PyResult<f64> {
-        hull_white::hw_bond_vol_with_model(&self.inner, t, expiry, maturity).map_err(core_to_py)
+        self.inner.bond_vol(t, expiry, maturity).map_err(core_to_py)
     }
 
     fn __repr__(&self) -> String {
         format!(
             "HullWhiteParams(kappa={:?}, times={:?}, values={:?})",
             self.inner.kappa,
-            self.inner.volatility.times(),
-            self.inner.volatility.values()
+            self.inner.times(),
+            self.inner.values()
         )
     }
 }

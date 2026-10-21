@@ -14,7 +14,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import init, { calibration, core } from '../../index.js';
+import init, { calibration, core, models } from '../../index.js';
 
 await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
@@ -325,17 +325,21 @@ test('bootstrapHullWhiteSigmaScheduleToCapFloors matches the Python bootstrap', 
   const expected = HW.piecewise;
   assert.equal(report.success, expected.success);
   assert.equal(params.kappa, expected.params.kappa);
-  assert.deepEqual(Array.from(params.volatility.times), expected.params.volatility.times);
-  params.volatility.values.forEach((value, index) =>
+  assert.deepEqual(Array.from(params.times), expected.params.volatility.times);
+  params.values.forEach((value, index) =>
     close(value, expected.params.volatility.values[index], 1e-8, `sigma[${index}]`)
   );
+  close(params.sigma(1.5), expected.sigma_at_1_5, 1e-8, 'sigma(1.5)');
+  close(params.sigma(0.5), expected.sigma_at_0_5, 1e-8, 'sigma(0.5)');
+  const exact = models.rates.hullWhite.HullWhiteParams.fromJson(expected.params);
+  assert.equal(exact.sigma(1.5), expected.sigma_at_1_5);
   const [explicit] = calibration.bootstrapHullWhiteSigmaScheduleToCapFloors(
     curve,
     JSON.stringify(HW.cap_floor_quotes),
     JSON.stringify(HW.piecewise_config),
     curve
   );
-  assert.deepEqual(plain(explicit), plain(params));
+  assert.deepEqual(JSON.parse(explicit.toJson()), JSON.parse(params.toJson()));
   assert.throws(
     () =>
       calibration.bootstrapHullWhiteSigmaScheduleToCapFloors(curve, HW.cap_floor_quotes, {
@@ -344,16 +348,6 @@ test('bootstrapHullWhiteSigmaScheduleToCapFloors matches the Python bootstrap', 
       }),
     validation
   );
-});
-
-test('hullWhiteParamsSigmaAt reads the piecewise sigma like Python sigma_at', () => {
-  const expected = HW.piecewise;
-  assert.equal(calibration.hullWhiteParamsSigmaAt(expected.params, 1.5), expected.sigma_at_1_5);
-  assert.equal(
-    calibration.hullWhiteParamsSigmaAt(JSON.stringify(expected.params), 0.5),
-    expected.sigma_at_0_5
-  );
-  assert.throws(() => calibration.hullWhiteParamsSigmaAt({ kappa: 0.03 }, 1.0), validation);
 });
 
 test('calibrateHullWhiteToCapFloors matches the Python fixed-kappa fit', () => {

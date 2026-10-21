@@ -36,7 +36,6 @@ from finstack_quant.calibration import (
 from finstack_quant.calibration.hull_white import (
     CapFloorCalibrationConfig,
     CapFloorQuote,
-    HullWhiteParams,
     PiecewiseSigmaCalibrationConfig,
     SwaptionQuote,
     bootstrap_hull_white_sigma_schedule_to_cap_floors,
@@ -44,6 +43,7 @@ from finstack_quant.calibration.hull_white import (
     calibrate_hull_white_to_swaptions,
 )
 from finstack_quant.core.market_data import DiscountCurve
+from finstack_quant.models.rates.hull_white import HullWhiteParams
 
 GOLDEN: dict[str, Any] = json.loads((Path(__file__).parent / "data" / "calibration_wasm_parity.json").read_text())
 HW: dict[str, Any] = GOLDEN["hull_white"]
@@ -186,10 +186,10 @@ def test_hull_white_piecewise_bootstrap_matches_the_shared_golden() -> None:
     assert params.kappa == expected["params"]["kappa"]
     assert params.times == expected["params"]["volatility"]["times"]
     assert params.values == pytest.approx(expected["params"]["volatility"]["values"], rel=1e-8)
-    assert params.sigma_at(1.5) == pytest.approx(expected["sigma_at_1_5"], rel=1e-8)
-    assert params.sigma_at(0.5) == pytest.approx(expected["sigma_at_0_5"], rel=1e-8)
+    assert params.sigma(1.5) == pytest.approx(expected["sigma_at_1_5"], rel=1e-8)
+    assert params.sigma(0.5) == pytest.approx(expected["sigma_at_0_5"], rel=1e-8)
     exact = HullWhiteParams.from_json(json.dumps(expected["params"]))
-    assert exact.sigma_at(1.5) == expected["sigma_at_1_5"]
+    assert exact.sigma(1.5) == expected["sigma_at_1_5"]
 
 
 def test_hull_white_cap_floor_fit_matches_the_shared_golden() -> None:
