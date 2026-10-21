@@ -7,7 +7,7 @@
 //! rebuild interval `k`, scheduled rebuilds cost `O(n + n * window / k)`;
 //! numerical recovery can trigger additional rebuilds.
 
-use crate::dates::Date;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 
@@ -25,11 +25,19 @@ use super::{annualized_ratio_or_sign_infinity, ratio_or_sign_infinity};
 /// rebuild, because removing an outlier can expose accumulated roundoff.
 pub(crate) const ROLLING_KERNEL_RECOMPUTE_INTERVAL: usize = 1024;
 
-/// Welford mean and sum of squared deviations (`M2`) of a full window.
 #[inline]
 fn recompute_mean_m2(window: &[f64]) -> (f64, f64) {
-    let (mean, variance) = finstack_quant_core::math::stats::mean_var(window);
-    (mean, variance * window.len().saturating_sub(1) as f64)
+    let mut mean = 0.0_f64;
+    let mut m2 = 0.0_f64;
+    let mut count = 0.0_f64;
+    for &value in window {
+        count += 1.0;
+        let delta = value - mean;
+        mean += delta / count;
+        let delta2 = value - mean;
+        m2 += delta * delta2;
+    }
+    (mean, m2)
 }
 
 #[inline]
@@ -118,13 +126,6 @@ pub struct DatedSeries {
 }
 
 impl DatedSeries {
-    /// An empty series of `metric` (no complete window).
-    #[inline]
-    #[must_use]
-    pub(crate) fn empty(metric: RollingMetric) -> Self {
-        Self::with_capacity(metric, 0)
-    }
-
     /// Allocate an empty series of `metric` with capacity for `cap` points.
     #[inline]
     #[must_use]
@@ -174,7 +175,7 @@ pub(crate) fn rolling_sharpe(
 ) -> DatedSeries {
     let n = returns.len().min(dates.len());
     if n < window || window == 0 {
-        return DatedSeries::empty(RollingMetric::Sharpe);
+        return DatedSeries::with_capacity(RollingMetric::Sharpe, 0);
     }
     if window < 2 || invalid_annualization_factor(true, ann_factor) {
         return nan_series(RollingMetric::Sharpe, dates, window - 1, n - window + 1);
@@ -218,7 +219,7 @@ pub(crate) fn rolling_volatility(
 ) -> DatedSeries {
     let n = returns.len().min(dates.len());
     if n < window || window == 0 {
-        return DatedSeries::empty(RollingMetric::Volatility);
+        return DatedSeries::with_capacity(RollingMetric::Volatility, 0);
     }
     if window < 2 || invalid_annualization_factor(true, ann_factor) {
         return nan_series(RollingMetric::Volatility, dates, window - 1, n - window + 1);
@@ -262,7 +263,7 @@ pub(crate) fn rolling_sortino(
 ) -> DatedSeries {
     let n = returns.len().min(dates.len());
     if n < window || window == 0 {
-        return DatedSeries::empty(RollingMetric::Sortino);
+        return DatedSeries::with_capacity(RollingMetric::Sortino, 0);
     }
     if window < 2 || invalid_annualization_factor(true, ann_factor) || !mar.is_finite() {
         return nan_series(RollingMetric::Sortino, dates, window - 1, n - window + 1);
@@ -296,7 +297,7 @@ fn recompute_log_sum(window: &[f64]) -> NeumaierAccumulator {
 pub(crate) fn rolling_returns(returns: &[f64], dates: &[Date], window: usize) -> DatedSeries {
     let n = returns.len().min(dates.len());
     if n < window || window == 0 {
-        return DatedSeries::empty(RollingMetric::Return);
+        return DatedSeries::with_capacity(RollingMetric::Return, 0);
     }
     let count = n - window + 1;
     let mut values = Vec::with_capacity(count);

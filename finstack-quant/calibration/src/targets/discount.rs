@@ -1,23 +1,22 @@
 //! Calibration target construction and shared input validation.
 //!
-use crate::CalibrationReport;
 use crate::api::schema::DiscountCurveParams;
 use crate::build::prepared::PreparedQuote;
 use crate::config::{CalibrationConfig, CalibrationMethod};
 use crate::constants::*;
+use crate::quotes::rates::RateQuote;
 use crate::quotes::ExtractQuotes;
 use crate::quotes::MarketQuote;
-use crate::quotes::rates::RateQuote;
 use crate::solver::bootstrap::SequentialBootstrapper;
 use crate::solver::global::GlobalFitOptimizer;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
 use crate::targets::rate_recipe::rate_calibration_recipe;
 use crate::targets::util::{
-    ContextScratch, discount_and_forward_curve_ids, prepare_rate_calibration_quotes,
-    pv01_residual_weight, sorted_knot_grid, validate_global_knot_grid,
+    discount_and_forward_curve_ids, prepare_rate_calibration_quotes, pv01_residual_weight,
+    sorted_knot_grid, validate_global_knot_grid, ContextScratch,
 };
 use crate::validation::RateBoundsPolicy;
-use finstack_quant_core::Result;
+use crate::CalibrationReport;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -27,6 +26,7 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
+use finstack_quant_core::Result;
 
 /// Parameters for constructing a [`DiscountCurveTarget`].
 ///

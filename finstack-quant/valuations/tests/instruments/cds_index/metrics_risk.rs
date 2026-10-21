@@ -427,16 +427,12 @@ fn bucketed_cs01_quote_constituents_use_each_off_grid_replay_quote_once() {
 
     assert_eq!(hz1_buckets.len(), expected_per_curve);
     assert_eq!(hz2_buckets.len(), expected_per_curve);
-    assert!(
-        hz1_buckets
-            .iter()
-            .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ1::4y")
-    );
-    assert!(
-        hz2_buckets
-            .iter()
-            .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ2::4y")
-    );
+    assert!(hz1_buckets
+        .iter()
+        .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ1::4y"));
+    assert!(hz2_buckets
+        .iter()
+        .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ2::4y"));
     relative_eq(
         bucket_sum,
         result.measures[MetricId::Cs01.as_str()],

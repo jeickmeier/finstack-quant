@@ -5,7 +5,7 @@
 //! resolves to one of these constants, so both hosts share a single source for
 //! every default.
 
-use crate::dates::PeriodKind;
+use finstack_quant_core::dates::PeriodKind;
 
 /// Observations per year assumed by the scalar [`crate::sharpe`],
 /// [`crate::sortino`] and [`crate::volatility`] when the caller omits it.

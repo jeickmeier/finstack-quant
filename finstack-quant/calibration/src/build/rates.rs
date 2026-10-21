@@ -1,13 +1,13 @@
 //! Builders for interest rate instruments from market quotes.
 
-use crate::build::BuildCtx;
 use crate::build::helpers::resolve_spot_date;
+use crate::build::BuildCtx;
 use crate::quotes::ids::Pillar;
 use crate::quotes::rates::RateQuote;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DateExt, TenorUnit, adjust, third_wednesday,
+    adjust, third_wednesday, BusinessDayConvention, Date, DateExt, TenorUnit,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -652,8 +652,8 @@ fn resolve_fixing_date(start: Date, conv: &RateIndexConventions) -> Result<Date>
 mod tests {
     use super::*;
     use crate::quotes::ids::{Pillar, QuoteId};
-    use finstack_quant_core::FxHashMap;
     use finstack_quant_core::types::IndexId;
+    use finstack_quant_core::FxHashMap;
 
     fn usd_build_ctx() -> BuildCtx {
         let as_of = Date::from_calendar_date(2024, time::Month::January, 2)

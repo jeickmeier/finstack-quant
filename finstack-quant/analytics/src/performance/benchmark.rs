@@ -133,7 +133,7 @@ impl Performance {
         ticker_idx: usize,
         window: usize,
         risk_free_rate: f64,
-    ) -> crate::Result<RollingGreeks> {
+    ) -> finstack_quant_core::Result<RollingGreeks> {
         self.ensure_ticker_idx(ticker_idx)?;
         Self::ensure_window(window)?;
         let (r, bench) = self.active_pair_returns(ticker_idx);
@@ -200,7 +200,7 @@ impl Performance {
         ticker_idx: usize,
         factor_returns: &[&[f64]],
         return_kind: ReturnKind,
-    ) -> crate::Result<MultiFactorResult> {
+    ) -> finstack_quant_core::Result<MultiFactorResult> {
         self.ensure_ticker_idx(ticker_idx)?;
         multi_factor_greeks(
             self.active_returns(ticker_idx),

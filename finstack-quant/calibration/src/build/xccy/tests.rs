@@ -1,7 +1,7 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
-use crate::build::BuildCtx;
 use crate::build::xccy::build_xccy_instrument;
+use crate::build::BuildCtx;
 use crate::quotes::ids::{Pillar, QuoteId};
 use crate::quotes::xccy::XccyQuote;
 use finstack_quant_core::currency::Currency;

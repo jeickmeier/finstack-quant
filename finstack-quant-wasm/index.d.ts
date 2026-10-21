@@ -9166,12 +9166,12 @@ export interface AnalyticsNamespace {
    * Sharpe ratio of one return series (annualized excess mean over
    * annualized sample volatility; the same kernel as `Performance.sharpe`).
    * @param returns - Per-period simple decimal returns in date order.
-   * @param rf - Annualized risk-free rate as a decimal (`0.02` for 2%); defaults to `0`.
+   * @param riskFreeRate - Annualized risk-free rate as a decimal (`0.02` for 2%); defaults to `0`.
    * @param periodsPerYear - Observations per year used to annualize; defaults to `252`.
    * @returns The Sharpe ratio; `±Infinity` when volatility is zero with a non-zero excess return, `NaN` for fewer than two observations, non-finite inputs, or an invalid `periodsPerYear`.
    * @throws Error - Rejects a `returns` value that is not a numeric array.
    */
-  sharpe(returns: NumericArray, rf?: number, periodsPerYear?: number): number;
+  sharpe(returns: NumericArray, riskFreeRate?: number, periodsPerYear?: number): number;
   /**
    * Annualized Sortino ratio of one return series.
    * @param returns - Per-period simple decimal returns in date order.

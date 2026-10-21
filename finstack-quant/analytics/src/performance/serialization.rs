@@ -1,7 +1,7 @@
 //! Serde wire type for [`super::Performance`]; caches are rebuilt on load.
 
 use super::{invalid_return_series, Performance, TickerSpan};
-use crate::dates::{Date, PeriodKind};
+use finstack_quant_core::dates::{Date, PeriodKind};
 
 #[derive(serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]

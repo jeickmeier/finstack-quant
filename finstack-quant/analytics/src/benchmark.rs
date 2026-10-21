@@ -2,16 +2,15 @@
 //!
 //! [`beta`] and the result types ([`BetaResult`], [`GreeksResult`],
 //! [`RollingGreeks`], [`MultiFactorResult`]) are re-exported at the crate
-//! root. Everything else is crate-internal; `///` doc examples target crate
-//! developers and are marked `ignore`.
+//! root. Everything else is crate-internal.
 //!
 //! Delegates to `math::stats` for core statistics (correlation, covariance,
 //! variance, OnlineCovariance).
 
-use crate::dates::Date;
-use crate::math::stats::{OnlineCovariance, OnlineStats};
 use crate::regression::normalized_svd_least_squares;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::special_functions::student_t_inv_cdf;
+use finstack_quant_core::math::stats::{OnlineCovariance, OnlineStats};
 use finstack_quant_core::math::summation::{neumaier_sum, NeumaierAccumulator};
 use finstack_quant_core::wire::NonFiniteFields;
 use nalgebra::DMatrix;
@@ -90,6 +89,41 @@ fn regression_covariance(returns: &[f64], benchmark: &[f64]) -> (usize, OnlineCo
     (n, covariance)
 }
 
+/// OLS slope of the portfolio on the benchmark from accumulated statistics.
+///
+/// `NaN` when the benchmark has zero variance: the slope is unidentified, and
+/// the raw estimator's plausible-looking `0.0` would hide that.
+#[inline]
+fn slope(covariance: &OnlineCovariance) -> f64 {
+    if covariance.variance_y() == 0.0 {
+        f64::NAN
+    } else {
+        covariance.optimal_beta()
+    }
+}
+
+/// Squared correlation from accumulated statistics; `NaN` when either series
+/// has zero variance.
+#[inline]
+fn squared_correlation(covariance: &OnlineCovariance) -> f64 {
+    if covariance.variance_x() == 0.0 || covariance.variance_y() == 0.0 {
+        return f64::NAN;
+    }
+    let correlation = covariance.correlation();
+    correlation * correlation
+}
+
+/// Online statistics of the active returns `returns[i] - benchmark[i]` over
+/// the overlapping prefix of the two series.
+#[inline]
+fn active_return_stats(returns: &[f64], benchmark: &[f64]) -> OnlineStats {
+    let mut stats = OnlineStats::new();
+    for (&portfolio_return, &benchmark_return) in returns.iter().zip(benchmark) {
+        stats.update(portfolio_return - benchmark_return);
+    }
+    stats
+}
+
 /// Tracking error: annualized volatility of active (excess) returns.
 ///
 /// Measures how consistently a portfolio follows its benchmark:
@@ -124,12 +158,7 @@ pub(crate) fn tracking_error(returns: &[f64], benchmark: &[f64], ann_factor: f64
     if crate::risk_metrics::invalid_annualization_factor(true, ann_factor) {
         return f64::NAN;
     }
-    let mut os = OnlineStats::new();
-    for i in 0..n {
-        os.update(returns[i] - benchmark[i]);
-    }
-    let te = os.std_dev();
-    te * ann_factor.sqrt()
+    active_return_stats(returns, benchmark).std_dev() * ann_factor.sqrt()
 }
 
 /// Information ratio: annualized active return divided by tracking error.
@@ -172,13 +201,12 @@ pub(crate) fn information_ratio(returns: &[f64], benchmark: &[f64], ann_factor: 
     if crate::risk_metrics::invalid_annualization_factor(true, ann_factor) {
         return f64::NAN;
     }
-    let mut os = OnlineStats::new();
-    for i in 0..n {
-        os.update(returns[i] - benchmark[i]);
-    }
-    let er = os.mean();
-    let te = os.std_dev();
-    crate::risk_metrics::annualized_ratio_or_sign_infinity(er, te, ann_factor)
+    let active = active_return_stats(returns, benchmark);
+    crate::risk_metrics::annualized_ratio_or_sign_infinity(
+        active.mean(),
+        active.std_dev(),
+        ann_factor,
+    )
 }
 
 /// R-squared: proportion of portfolio variance explained by the benchmark.
@@ -208,11 +236,10 @@ pub(crate) fn information_ratio(returns: &[f64], benchmark: &[f64], ann_factor: 
 #[must_use]
 pub(crate) fn r_squared(returns: &[f64], benchmark: &[f64]) -> f64 {
     let (n, covariance) = regression_covariance(returns, benchmark);
-    if n < 2 || covariance.variance_x() == 0.0 || covariance.variance_y() == 0.0 {
+    if n < 2 {
         return f64::NAN;
     }
-    let c = covariance.correlation();
-    c * c
+    squared_correlation(&covariance)
 }
 
 /// OLS beta result with standard error and 95% confidence interval.
@@ -334,14 +361,7 @@ pub fn beta(portfolio: &[f64], benchmark: &[f64]) -> BetaResult {
             confidence_level: BETA_CONFIDENCE_LEVEL,
         };
     }
-    // A zero-variance benchmark cannot identify a slope: surface NaN
-    // (matching `beta_only` / `greeks` / `rolling_greeks`) rather than the
-    // plausible-looking 0.0 the raw estimator would report.
-    let beta = if oc.variance_y() == 0.0 {
-        f64::NAN
-    } else {
-        oc.optimal_beta()
-    };
+    let beta = slope(&oc);
 
     // oc.mean_x() = mean(portfolio), oc.mean_y() = mean(benchmark)
     let mean_port = oc.mean_x();
@@ -392,20 +412,22 @@ pub fn beta(portfolio: &[f64], benchmark: &[f64]) -> BetaResult {
 #[must_use]
 pub(crate) fn beta_only(returns: &[f64], benchmark: &[f64]) -> f64 {
     let (n, covariance) = regression_covariance(returns, benchmark);
-    if n < 2 || covariance.variance_y() == 0.0 {
+    if n < 2 {
         return f64::NAN;
     }
-    covariance.optimal_beta()
+    slope(&covariance)
 }
 
+/// Annualized Jensen alpha from per-period means, the slope and the
+/// per-period risk-free rate `rf_period`.
+#[inline]
 fn jensen_alpha(
     mean_port: f64,
     mean_bench: f64,
     beta: f64,
     ann_factor: f64,
-    risk_free_rate: f64,
+    rf_period: f64,
 ) -> f64 {
-    let rf_period = crate::returns::periodic_risk_free_rate(risk_free_rate, ann_factor);
     (mean_port - rf_period - beta * (mean_bench - rf_period)) * ann_factor
 }
 
@@ -505,24 +527,16 @@ pub(crate) fn greeks(
             n_obs: n,
         };
     }
-    let beta = if covariance.variance_y() == 0.0 {
-        f64::NAN
-    } else {
-        covariance.optimal_beta()
-    };
+    let beta = slope(&covariance);
+    let rf_period = crate::returns::periodic_risk_free_rate(risk_free_rate, ann_factor);
     let alpha = jensen_alpha(
         covariance.mean_x(),
         covariance.mean_y(),
         beta,
         ann_factor,
-        risk_free_rate,
+        rf_period,
     );
-    let r_squared = if covariance.variance_x() == 0.0 || covariance.variance_y() == 0.0 {
-        f64::NAN
-    } else {
-        let correlation = covariance.correlation();
-        correlation * correlation
-    };
+    let r_squared = squared_correlation(&covariance);
     let adjusted_r_squared = if n > 2 && r_squared.is_finite() {
         1.0 - (1.0 - r_squared) * (n as f64 - 1.0) / (n as f64 - 2.0)
     } else {
@@ -692,7 +706,7 @@ pub(crate) fn rolling_greeks(
             // cancellation of its own.
             let mean_r = sr / w + shift_r;
             let mean_b = sb / w + shift_b;
-            let alpha = (mean_r - rf_period - beta * (mean_b - rf_period)) * ann_factor;
+            let alpha = jensen_alpha(mean_r, mean_b, beta, ann_factor, rf_period);
             (alpha, beta)
         };
         out_dates.push(dates[i - 1]);
@@ -877,7 +891,10 @@ impl ReturnKind {
     ///
     /// Returns [`finstack_quant_core::Error::Validation`] for an unknown label, or
     /// for a non-zero `risk_free_rate` with [`ReturnKind::Excess`].
-    pub fn from_label(label: Option<&str>, risk_free_rate: f64) -> crate::Result<Self> {
+    pub fn from_label(
+        label: Option<&str>,
+        risk_free_rate: f64,
+    ) -> finstack_quant_core::Result<Self> {
         match label {
             None | Some("excess") if risk_free_rate == 0.0 => Ok(Self::Excess),
             None | Some("excess") => Err(finstack_quant_core::Error::Validation(format!(
@@ -1045,7 +1062,7 @@ pub(crate) fn multi_factor_greeks(
     factors: &[&[f64]],
     ann_factor: f64,
     return_kind: ReturnKind,
-) -> crate::Result<MultiFactorResult> {
+) -> finstack_quant_core::Result<MultiFactorResult> {
     if !ann_factor.is_finite() || ann_factor <= 0.0 {
         tracing::debug!(
             ann_factor,
@@ -2096,7 +2113,7 @@ mod tests {
         let rf_annual = 0.02;
         let rf_period = crate::returns::periodic_risk_free_rate(rf_annual, ann_factor);
         let expected = (mu - rf_period) * ann_factor;
-        let alpha = jensen_alpha(mu, 0.001, 0.0, ann_factor, rf_annual);
+        let alpha = jensen_alpha(mu, 0.001, 0.0, ann_factor, rf_period);
         let sharpe_excess =
             crate::returns::annualized_excess_return(mu * ann_factor, rf_annual, ann_factor);
         assert!((alpha - expected).abs() < 1e-12);
@@ -2117,8 +2134,8 @@ mod tests {
 
     #[test]
     fn performance_multi_factor_greeks_errors_on_invalid_factor_input() {
-        use crate::dates::PeriodKind;
         use crate::performance::Performance;
+        use finstack_quant_core::dates::PeriodKind;
         use time::Month;
 
         let jan =

@@ -2,13 +2,13 @@
 
 use super::cache::KeyedOnceCache;
 use super::ensure_replay_fit_accepted;
-use crate::CalibrationConfig;
 use crate::api::schema::{HazardCurveParams, StepParams};
-use crate::quotes::MarketQuote;
 use crate::quotes::cds::CdsQuote;
 use crate::quotes::ids::Pillar;
+use crate::quotes::MarketQuote;
 use crate::step_runtime;
 use crate::targets::hazard::ReplayQuote;
+use crate::CalibrationConfig;
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{HazardCalibrationRecipe, HazardCurve};
@@ -816,8 +816,8 @@ pub(super) fn recalibrate_hazard_with_recovery(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::CalibrationReport;
     use crate::quotes::ids::{Pillar, QuoteId};
+    use crate::CalibrationReport;
     use finstack_quant_core::market_data::term_structures::{
         HazardCalibrationInput, HazardCalibrationRecipe,
     };

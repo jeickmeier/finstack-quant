@@ -23,7 +23,11 @@ impl Performance {
     ///
     /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
     /// `ticker_idx` is outside the loaded ticker columns.
-    pub fn rolling_returns(&self, ticker_idx: usize, window: usize) -> crate::Result<DatedSeries> {
+    pub fn rolling_returns(
+        &self,
+        ticker_idx: usize,
+        window: usize,
+    ) -> finstack_quant_core::Result<DatedSeries> {
         self.ensure_ticker_idx(ticker_idx)?;
         Self::ensure_window(window)?;
         Ok(rolling_returns(
@@ -48,7 +52,7 @@ impl Performance {
         &self,
         ticker_idx: usize,
         window: usize,
-    ) -> crate::Result<DatedSeries> {
+    ) -> finstack_quant_core::Result<DatedSeries> {
         self.ensure_ticker_idx(ticker_idx)?;
         Self::ensure_window(window)?;
         Ok(rolling_volatility(
@@ -78,7 +82,7 @@ impl Performance {
         ticker_idx: usize,
         window: usize,
         mar: f64,
-    ) -> crate::Result<DatedSeries> {
+    ) -> finstack_quant_core::Result<DatedSeries> {
         self.ensure_ticker_idx(ticker_idx)?;
         Self::ensure_window(window)?;
         Ok(rolling_sortino(
@@ -112,7 +116,7 @@ impl Performance {
         ticker_idx: usize,
         window: usize,
         risk_free_rate: f64,
-    ) -> crate::Result<DatedSeries> {
+    ) -> finstack_quant_core::Result<DatedSeries> {
         self.ensure_ticker_idx(ticker_idx)?;
         Self::ensure_window(window)?;
         Ok(rolling_sharpe(
