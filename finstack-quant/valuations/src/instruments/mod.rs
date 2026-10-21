@@ -224,9 +224,14 @@ pub use fx::{
 };
 
 pub use commodity::{
-    CommodityAsianOption, CommodityForward, CommodityFuture, CommodityFutureFixing,
-    CommodityFutureOption, CommoditySpotOption, CommoditySpotOptionExercise, CommoditySpreadOption,
-    CommoditySwap, CommoditySwaption,
+    commodity_asian_option::CommodityAsianOption,
+    commodity_forward::CommodityForward,
+    commodity_future::{CommodityFuture, CommodityFutureFixing},
+    commodity_future_option::CommodityFutureOption,
+    commodity_spot_option::{CommoditySpotOption, CommoditySpotOptionExercise},
+    commodity_spread_option::CommoditySpreadOption,
+    commodity_swap::CommoditySwap,
+    commodity_swaption::CommoditySwaption,
 };
 
 pub use rates::InterestRateFutureOption;
@@ -239,8 +244,14 @@ pub use composite::{
 };
 
 pub use exotics::{
-    AsianOption, AveragingMethod, BarrierOption, Basket, CallableRangeAccrual, LookbackOption,
-    LookbackType, RangeAccrual, Snowball, SnowballVariant, Tarn,
+    asian_option::AsianOption,
+    barrier_option::BarrierOption,
+    callable_range_accrual::CallableRangeAccrual,
+    lookback_option::{LookbackOption, LookbackType},
+    range_accrual::RangeAccrual,
+    snowball::{Snowball, SnowballVariant},
+    tarn::Tarn,
+    Basket,
 };
 
 pub mod json_loader;

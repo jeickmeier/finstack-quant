@@ -7,10 +7,10 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_valuations::instruments::commodity::commodity_asian_option::CommodityAsianOption;
 use finstack_quant_valuations::instruments::{
-    Attributes, AveragingMethod, CommodityUnderlyingParams, Instrument, InstrumentPricingOverrides,
-    OptionType,
+    Attributes, CommodityUnderlyingParams, Instrument, InstrumentPricingOverrides, OptionType,
 };
 use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
 use finstack_quant_valuations_test_support::commodity_curves::flat_price_curve;

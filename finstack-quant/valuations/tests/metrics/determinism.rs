@@ -33,13 +33,13 @@ mod tests {
     use finstack_quant_core::money::Money;
     #[allow(unused_imports)]
     use finstack_quant_core::types::BarrierType;
+    use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
     #[allow(unused_imports)]
     use finstack_quant_valuations::instruments::Instrument;
     #[allow(unused_imports)]
     use finstack_quant_valuations::instruments::OptionType;
     use finstack_quant_valuations::instruments::{
-        AsianOption, Autocallable, AveragingMethod, BarrierOption, FinalPayoffType, LookbackOption,
-        LookbackType,
+        AsianOption, Autocallable, BarrierOption, FinalPayoffType, LookbackOption, LookbackType,
     };
     #[allow(unused_imports)]
     use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};

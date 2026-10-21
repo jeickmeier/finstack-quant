@@ -20,15 +20,15 @@ pub(crate) fn register_barrier_option_metrics(
             registry: registry,
             instrument: InstrumentType::BarrierOption,
             metrics: [
-                (Vega, finstack_quant_valuations_core::metrics::GenericFdVega::<crate::BarrierOption>::default()),
+                (Vega, finstack_quant_valuations_core::metrics::GenericFdVega::<crate::exotics::barrier_option::BarrierOption>::default()),
                 (Rho, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
                 (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
                 (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
                 // Theta is now registered universally in crate::exotics::EXOTICS.metrics(),
-                (Delta, GenericFdDelta::<crate::BarrierOption>::default()),
-                (Gamma, GenericFdGamma::<crate::BarrierOption>::default()),
-                (Vanna, GenericFdVanna::<crate::BarrierOption>::default()),
-                (Volga, GenericFdVolga::<crate::BarrierOption>::default()),
+                (Delta, GenericFdDelta::<crate::exotics::barrier_option::BarrierOption>::default()),
+                (Gamma, GenericFdGamma::<crate::exotics::barrier_option::BarrierOption>::default()),
+                (Vanna, GenericFdVanna::<crate::exotics::barrier_option::BarrierOption>::default()),
+                (Volga, GenericFdVolga::<crate::exotics::barrier_option::BarrierOption>::default()),
             ]
         }
     }

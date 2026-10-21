@@ -14,9 +14,9 @@ pub(crate) fn register_commodity_swaption_metrics(
         registry: registry,
         instrument: InstrumentType::CommoditySwaption,
         metrics: [
-            (Delta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::CommoditySwaption>::delta()),
-            (Gamma, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::CommoditySwaption>::gamma()),
-            (Vega, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::CommoditySwaption>::vega()),
+            (Delta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::commodity::commodity_swaption::CommoditySwaption>::delta()),
+            (Gamma, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::commodity::commodity_swaption::CommoditySwaption>::gamma()),
+            (Vega, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::commodity::commodity_swaption::CommoditySwaption>::vega()),
             (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]

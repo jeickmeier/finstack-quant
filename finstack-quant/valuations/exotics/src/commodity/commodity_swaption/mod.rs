@@ -1,6 +1,6 @@
 //! Commodity swaption instrument module.
 //!
-//! This module provides the [`CommoditySwaption`] instrument for modeling
+//! This module provides the [`CommoditySwaption`](crate::commodity::commodity_swaption::CommoditySwaption) instrument for modeling
 //! options on fixed-for-floating commodity price swap contracts.
 //!
 //! # Overview

@@ -123,7 +123,9 @@ fn create_asian_option() -> AsianOption {
         .underlying_ticker("SPX".to_string())
         .strike(100.0)
         .option_type(OptionType::Call)
-        .averaging_method(finstack_quant_valuations::instruments::AveragingMethod::Arithmetic)
+        .averaging_method(
+            finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic,
+        )
         .expiry(as_of() + time::Duration::days(365))
         .fixing_dates(fixing_dates)
         .quantity(100.0)

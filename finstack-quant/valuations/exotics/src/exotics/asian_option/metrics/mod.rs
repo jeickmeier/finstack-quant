@@ -19,15 +19,15 @@ pub(crate) fn register_asian_option_metrics(
             registry: registry,
             instrument: InstrumentType::AsianOption,
             metrics: [
-                (Vega, finstack_quant_valuations_core::metrics::GenericFdVega::<crate::AsianOption>::default()),
+                (Vega, finstack_quant_valuations_core::metrics::GenericFdVega::<crate::exotics::asian_option::AsianOption>::default()),
                 (Rho, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
                 (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
                 (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
                 // Theta is now registered universally in crate::exotics::EXOTICS.metrics(),
-                (Delta, GenericFdDelta::<crate::AsianOption>::default()),
-                (Gamma, GenericFdGamma::<crate::AsianOption>::default()),
-                (Vanna, GenericFdVanna::<crate::AsianOption>::default()),
-                (Volga, GenericFdVolga::<crate::AsianOption>::default()),
+                (Delta, GenericFdDelta::<crate::exotics::asian_option::AsianOption>::default()),
+                (Gamma, GenericFdGamma::<crate::exotics::asian_option::AsianOption>::default()),
+                (Vanna, GenericFdVanna::<crate::exotics::asian_option::AsianOption>::default()),
+                (Volga, GenericFdVolga::<crate::exotics::asian_option::AsianOption>::default()),
             ]
         }
     }
