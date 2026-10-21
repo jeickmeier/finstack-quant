@@ -208,12 +208,21 @@ pub use credit_derivatives::{
     cds::CreditDefaultSwap, cds_index::CdsIndex, cds_option::CdsOption, cds_tranche::CdsTranche,
 };
 
+pub use equity::autocallable::Autocallable;
+pub use equity::cliquet_option::CliquetOption;
+pub use equity::dcf_equity::{DiscountedCashFlow, TerminalValueSpec};
+pub use equity::equity_future::EquityFuture;
+pub use equity::equity_future_option::EquityFutureOption;
+pub use equity::equity_option::EquityOption;
+pub use equity::equity_total_return_future::EquityTotalReturnFuture;
+pub use equity::equity_trs::EquityTotalReturnSwap;
+pub use equity::pe_fund::PrivateMarketsFund;
+pub use equity::spot::Equity;
+pub use equity::variance_swap::{EquityPriceSeriesPolicy, VarianceSwap};
+pub use equity::vol_index_future::VolatilityIndexFuture;
+pub use equity::vol_index_future_option::VolatilityIndexFutureOption;
 pub use equity::{
-    Autocallable, CliquetOption, DiscountedCashFlow, Equity, EquityFuture, EquityFutureOption,
-    EquityOption, EquityPriceSeriesPolicy, EquityTotalReturnFuture, EquityTotalReturnSwap,
-    FinalPayoffType, LeveredRealEstateEquity, PrivateMarketsFund, RealEstateAsset,
-    RealEstateFinancing, RealEstateValuationMethod, TerminalValueSpec, VarianceSwap,
-    VolatilityIndexFuture, VolatilityIndexFutureOption,
+    LeveredRealEstateEquity, RealEstateAsset, RealEstateFinancing, RealEstateValuationMethod,
 };
 
 pub use fx::{

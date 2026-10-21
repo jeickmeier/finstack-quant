@@ -17,7 +17,7 @@
 //! stated `unrealized_nav` (the residual mark that dominates holder-view PV
 //! for an unrealized fund). Contributions are unchanged.
 
-use crate::pe_fund::waterfall::FundEventKind;
+use crate::pe_fund::FundEventKind;
 use crate::pe_fund::PrivateMarketsFund;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;

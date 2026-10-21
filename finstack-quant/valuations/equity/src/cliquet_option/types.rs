@@ -4,7 +4,7 @@ use crate::EquityPathModel;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-pub use finstack_quant_models::monte_carlo::payoff::cliquet::CliquetPayoffType;
+pub(crate) use finstack_quant_models::monte_carlo::payoff::cliquet::CliquetPayoffType;
 use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 use time::macros::date;

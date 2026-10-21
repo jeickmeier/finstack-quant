@@ -131,7 +131,7 @@ fn early_autocall_is_discounted_to_contractual_payment_date() {
 
 #[test]
 fn terminal_principal_and_last_coupon_use_their_own_payment_dates() {
-    use finstack_quant_valuations_equity::autocallable::FinalPayoffType;
+    use finstack_quant_models::monte_carlo::payoff::autocallable::FinalPayoffType;
 
     let as_of = date!(2025 - 01 - 01);
     let observations = vec![date!(2025 - 07 - 01), date!(2026 - 01 - 01)];

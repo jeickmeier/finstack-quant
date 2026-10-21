@@ -3,7 +3,7 @@
 //! Computes price per share, share exposure, dividend yield, forward price,
 //! and delta using the shared metrics framework.
 
-use crate::Equity;
+use crate::spot::Equity;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{
     MetricCalculator, MetricContext, MetricId, MetricRegistry,

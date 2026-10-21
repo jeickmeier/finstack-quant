@@ -1,7 +1,7 @@
 //! Private markets fund investment instrument type and implementations.
 
 use super::pricer;
-use crate::pe_fund::waterfall::{AllocationLedger, FundEvent, PeFundWaterfallSpec};
+use crate::pe_fund::{AllocationLedger, FundEvent, PeFundWaterfallSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
