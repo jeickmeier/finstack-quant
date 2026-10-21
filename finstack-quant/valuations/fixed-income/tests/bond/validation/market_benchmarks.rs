@@ -22,7 +22,7 @@ use finstack_quant_valuations_fixed_income::bond::Bond;
 use finstack_quant_valuations_fixed_income::bond::CashflowSpec;
 use time::macros::date;
 
-use finstack_quant_valuations_test_support::test_helpers::tolerances;
+use finstack_quant_valuations_test_support::tolerances;
 
 /// Helper to build a standard flat yield curve for testing
 fn build_flat_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve {

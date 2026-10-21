@@ -15,7 +15,7 @@ use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_fixed_income::bond::{Bond, CashflowSpec};
 use time::macros::date;
 
-use finstack_quant_valuations_test_support::test_helpers::tolerances;
+use finstack_quant_valuations_test_support::tolerances;
 
 /// Expected deviation from par for bonds with semi-annual coupon priced on
 /// continuous compounding curve.

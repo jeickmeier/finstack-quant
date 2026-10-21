@@ -82,7 +82,7 @@ Internal, despite living next to the public surface:
 |------|-----------|------|
 | `register_generic!` | `#[macro_export]` | Registration boilerplate for `GenericInstrumentPricer`; the umbrella re-exports it at its root |
 | `PricerRegistry::price_raw` | hidden `pub` | Unrounded `f64` path for finite-difference risk |
-| `standard_pricer_registry()`, `shared_standard_registry()`, `FAMILIES`, `STANDARD`, `pricer::json` | umbrella crate | The closed-world assembly lives in `finstack-quant-valuations`, not here |
+| `standard_pricer_registry()`, `FAMILIES`, `STANDARD`, the JSON pricing entry points | umbrella crate | The closed-world assembly lives in `finstack-quant-valuations`, not here |
 | `registry::attach_metric_measures` | `pub(super)` | |
 | `enrichment::*` | `pub(super)` | |
 
@@ -318,8 +318,7 @@ as-of date and model key, dispatch through the standard registry.
 | `price_instrument` | `ValuationResult` from a `ParsedInstrument` |
 | `metric_value` | `f64` from a `ParsedInstrument` |
 | `present_standard_option_greeks` | `Vec<(&'static str, f64)>` from a `ParsedInstrument` |
-| `instrument_cashflows_json` | `String` from an instrument envelope |
-| `instrument_cashflows` | `String` from a `ParsedInstrument` |
+| `instrument_cashflows` | `InstrumentCashflowEnvelope` from a parsed instrument |
 
 **The `_json` suffix here means JSON *in*, not JSON *out*.** `parse_boxed_instrument_from_json`
 returns a typed `ParsedInstrument` that `price_instrument` prices to a typed `ValuationResult`. Only `validate_*` and `pretty_*`

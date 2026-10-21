@@ -60,7 +60,7 @@ fn test_expired_option_returns_zero_theta() {
 
     // Expired options should have zero or very small theta
     assert!(
-        theta.abs() < tolerances::STANDARD,
+        theta.abs() < tolerances::ANALYTICAL,
         "Expired option theta should be near zero, got {}",
         theta
     );

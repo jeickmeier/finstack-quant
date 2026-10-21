@@ -171,16 +171,12 @@ impl CompositeSpec {
                 )));
             }
             let hash = InstrumentEnvelope::new((*leg.instrument).clone()).content_hash()?;
-            if let Some(existing) = seen.get(leg.instrument_id.as_str()) {
-                if existing != &hash {
-                    return Err(Error::Validation(format!(
-                        "instrument id '{}' is reused with conflicting definitions",
-                        leg.instrument_id
-                    )));
-                }
-            } else {
-                seen.insert(leg.instrument_id.to_string(), hash);
-            }
+            super::reporting::register_definition(seen, leg.instrument_id.as_str(), hash, || {
+                format!(
+                    "instrument id '{}' is reused with conflicting definitions",
+                    leg.instrument_id
+                )
+            })?;
             let boxed = leg.instrument.as_ref().clone().into_boxed()?;
             if boxed.id() != leg.instrument_id.as_str() {
                 return Err(Error::Validation(format!(

@@ -9,23 +9,10 @@ pub(crate) fn compute_pv(
     asset: &RealEstateAsset,
     as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
-    if let Some(appraisal) = &asset.appraisal_value {
-        if appraisal.currency() != asset.currency {
-            return Err(Error::Validation(format!(
-                "Appraisal currency {} does not match instrument currency {}",
-                appraisal.currency(),
-                asset.currency
-            )));
-        }
-        return Ok(*appraisal);
+    if let Some(appraisal) = checked_appraisal(asset)? {
+        return Ok(appraisal);
     }
-
-    let value = match asset.valuation_method {
-        super::RealEstateValuationMethod::Dcf => pv_with_rf_bump_dcf(asset, as_of, &|_| 0.0)?,
-        super::RealEstateValuationMethod::DirectCap => compute_npv_direct_cap(asset, as_of)?,
-    };
-
-    Money::new(value, asset.currency)
+    Money::new(unappraised_pv(asset, as_of, &|_| 0.0)?, asset.currency)
 }
 
 /// Asset value with the risk-free component of the discount rate bumped per
@@ -38,16 +25,34 @@ pub(crate) fn pv_with_rf_bump(
     as_of: Date,
     bump_at: &dyn Fn(f64) -> f64,
 ) -> finstack_quant_core::Result<f64> {
-    if let Some(appraisal) = &asset.appraisal_value {
-        if appraisal.currency() != asset.currency {
-            return Err(Error::Validation(format!(
-                "Appraisal currency {} does not match instrument currency {}",
-                appraisal.currency(),
-                asset.currency
-            )));
-        }
+    if let Some(appraisal) = checked_appraisal(asset)? {
         return Ok(appraisal.amount());
     }
+    unappraised_pv(asset, as_of, bump_at)
+}
+
+/// The appraisal value, when set, after checking its currency.
+fn checked_appraisal(asset: &RealEstateAsset) -> finstack_quant_core::Result<Option<Money>> {
+    let Some(appraisal) = asset.appraisal_value else {
+        return Ok(None);
+    };
+    if appraisal.currency() != asset.currency {
+        return Err(Error::Validation(format!(
+            "Appraisal currency {} does not match instrument currency {}",
+            appraisal.currency(),
+            asset.currency
+        )));
+    }
+    Ok(Some(appraisal))
+}
+
+/// Value under the configured method (DCF or direct cap), ignoring any
+/// appraisal; only DCF reads `bump_at`.
+fn unappraised_pv(
+    asset: &RealEstateAsset,
+    as_of: Date,
+    bump_at: &dyn Fn(f64) -> f64,
+) -> finstack_quant_core::Result<f64> {
     match asset.valuation_method {
         super::RealEstateValuationMethod::Dcf => pv_with_rf_bump_dcf(asset, as_of, bump_at),
         super::RealEstateValuationMethod::DirectCap => compute_npv_direct_cap(asset, as_of),
@@ -122,10 +127,7 @@ pub(crate) fn compute_npv_direct_cap(
     let noi = if let Some(noi) = asset.stabilized_noi {
         noi
     } else {
-        future_noi_flows(asset, as_of)?
-            .first()
-            .map(|(_, amount)| *amount)
-            .ok_or_else(|| Error::Validation("NOI schedule is empty".into()))?
+        first_noi(asset, as_of)?
     };
 
     Ok(noi / cap_rate)
@@ -207,29 +209,47 @@ pub(crate) fn unlevered_flows(
 }
 
 pub(crate) fn acquisition_cost_total(asset: &RealEstateAsset) -> finstack_quant_core::Result<f64> {
+    cost_total(asset, &asset.acquisition_costs, "acquisition_costs")
+}
+
+fn disposition_cost_total(asset: &RealEstateAsset) -> finstack_quant_core::Result<f64> {
+    cost_total(asset, &asset.disposition_costs, "disposition_costs")
+}
+
+/// Sum of cost line items, each required to be in the asset currency.
+fn cost_total(
+    asset: &RealEstateAsset,
+    costs: &[Money],
+    label: &str,
+) -> finstack_quant_core::Result<f64> {
     let mut total = 0.0;
-    for money in &asset.acquisition_costs {
+    for money in costs {
         if money.currency() != asset.currency {
-            return Err(Error::Validation(
-                "acquisition_costs currency must match instrument currency".into(),
-            ));
+            return Err(Error::Validation(format!(
+                "{label} currency must match instrument currency"
+            )));
         }
         total += money.amount();
     }
     Ok(total)
 }
 
-pub(crate) fn disposition_cost_total(asset: &RealEstateAsset) -> finstack_quant_core::Result<f64> {
-    let mut total = 0.0;
-    for money in &asset.disposition_costs {
-        if money.currency() != asset.currency {
-            return Err(Error::Validation(
-                "disposition_costs currency must match instrument currency".into(),
-            ));
-        }
-        total += money.amount();
+/// Purchase price amount after checking its currency; `None` when unset.
+pub(crate) fn purchase_price(asset: &RealEstateAsset) -> finstack_quant_core::Result<Option<f64>> {
+    let Some(price) = asset.purchase_price else {
+        return Ok(None);
+    };
+    if price.currency() != asset.currency {
+        return Err(Error::Validation(
+            "purchase_price currency must match instrument currency".into(),
+        ));
     }
-    Ok(total)
+    Ok(Some(price.amount()))
+}
+
+/// Purchase price amount, required by return and leverage metrics.
+pub(crate) fn required_purchase_price(asset: &RealEstateAsset) -> finstack_quant_core::Result<f64> {
+    purchase_price(asset)?.ok_or_else(|| Error::Validation("purchase_price is required".into()))
 }
 
 pub(crate) fn sale_proceeds_at(

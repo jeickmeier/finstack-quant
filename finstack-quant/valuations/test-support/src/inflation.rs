@@ -1,70 +1,14 @@
 //! Shared test fixtures and helpers for inflation swap tests.
 
+use crate::test_helpers::flat_discount_curve_with_day_count;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
     InflationIndex, InflationLag, SeriesInterpolation,
 };
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
+use finstack_quant_core::market_data::term_structures::InflationCurve;
 use finstack_quant_core::money::Money;
-
-/// Build a flat discount curve with given rate
-///
-/// # Arguments
-///
-/// * `id` - Curve identifier the market context is keyed by.
-/// * `base` - Curve base date; knot times (1, 5, 10, 30 years) are measured from it.
-/// * `rate` - Continuously compounded zero rate, as a decimal, applied at every knot.
-///
-/// # Errors
-///
-/// Returns the curve builder's validation error when the knots are rejected.
-pub fn flat_discount(
-    id: &str,
-    base: Date,
-    rate: f64,
-) -> finstack_quant_core::Result<DiscountCurve> {
-    let knots = vec![
-        (0.0, 1.0),
-        (1.0, (-rate).exp()),
-        (5.0, (-rate * 5.0).exp()),
-        (10.0, (-rate * 10.0).exp()),
-        (30.0, (-rate * 30.0).exp()),
-    ];
-
-    // Ensure all discount factors are positive (handle floating point precision issues)
-    let knots: Vec<(f64, f64)> = knots
-        .into_iter()
-        .map(|(t, df): (f64, f64)| {
-            if t.abs() < 1e-15 {
-                (t, 1.0) // First DF must be exactly 1.0
-            } else {
-                (t, df.max(1e-10)) // Ensure minimum positive value for others
-            }
-        })
-        .collect();
-
-    let mut builder = DiscountCurve::builder(id)
-        .base_date(base)
-        .day_count(DayCount::Act365F)
-        .knots(knots);
-
-    // For zero or negative rates, DFs may be flat or increasing
-    // Use Linear interpolation since MonotoneConvex expects decreasing values
-    if rate.abs() < 1e-10 || rate < 0.0 {
-        builder = builder
-            .validation(
-                finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                    allow_non_monotonic: true,
-                    forward_floor: None,
-                },
-            )
-            .interp(finstack_quant_core::math::interp::InterpStyle::Linear);
-    }
-
-    builder.build()
-}
 
 /// Build a flat inflation curve with constant CPI growth rate
 ///
@@ -173,8 +117,8 @@ pub fn simple_index(
 /// * `inflation_rate` - Annually compounded CPI growth, as a decimal, of the flat `US-CPI-U` curve.
 /// * `discount_rate` - Continuously compounded zero rate, as a decimal, of the flat `USD-OIS` curve.
 pub fn standard_market(as_of: Date, inflation_rate: f64, discount_rate: f64) -> MarketContext {
-    let disc = flat_discount("USD-OIS", as_of, discount_rate)
-        .unwrap_or_else(|_| panic!("Failed to build discount curve with rate {}", discount_rate));
+    let disc =
+        flat_discount_curve_with_day_count(discount_rate, as_of, "USD-OIS", DayCount::Act365F);
     let infl_curve =
         flat_inflation_curve("US-CPI-U", as_of, 300.0, inflation_rate).unwrap_or_else(|_| {
             panic!(
@@ -202,7 +146,7 @@ pub fn standard_market(as_of: Date, inflation_rate: f64, discount_rate: f64) -> 
 ///
 /// * `as_of` - Valuation date and base date of every curve in the context.
 pub fn realistic_market(as_of: Date) -> MarketContext {
-    let disc = flat_discount("USD-OIS", as_of, 0.045).unwrap(); // 4.5% nominal rate
+    let disc = flat_discount_curve_with_day_count(0.045, as_of, "USD-OIS", DayCount::Act365F); // 4.5% nominal rate
     let infl_curve = realistic_inflation_curve("US-CPI-U", as_of, 300.0);
     let index = simple_index(
         "US-CPI-U",
@@ -235,15 +179,4 @@ pub fn large_notional() -> Money {
 /// * `notional` - Trade notional the tolerance scales with.
 pub fn pv_tolerance(notional: Money) -> f64 {
     notional.amount() * 1e-6
-}
-
-/// Tolerance for rate checks (0.01 bp)
-pub fn rate_tolerance() -> f64 {
-    1e-6
-}
-
-/// Tolerance for greek checks (relative)
-/// Market standard: 2% for analytical vs finite difference comparison
-pub fn greek_tolerance() -> f64 {
-    0.02 // 2% relative tolerance for analytic vs FD approximations
 }

@@ -89,10 +89,7 @@ fn instrument_envelope_schema() -> PyResult<String> {
 ///     ``"interest_rate_swap"``. Every entry resolves through
 ///     :func:`instrument_schema`.
 ///
-/// Raises
-/// ------
-/// ValueError
-///     If the compiled-in instrument registry cannot be read.
+///     This function does not raise; the registry is compiled in.
 ///
 /// Examples
 /// --------
@@ -101,8 +98,8 @@ fn instrument_envelope_schema() -> PyResult<String> {
 /// True
 #[pyfunction]
 #[pyo3(text_signature = "()")]
-fn instrument_types() -> PyResult<Vec<String>> {
-    canonical::instrument_types().map_err(core_to_py)
+fn instrument_types() -> Vec<&'static str> {
+    canonical::instrument_types().to_vec()
 }
 
 /// Return the dedicated JSON Schema for one instrument type.

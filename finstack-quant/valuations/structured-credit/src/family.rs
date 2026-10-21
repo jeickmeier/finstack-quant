@@ -2,6 +2,7 @@
 //! tranche views.
 
 use indexmap::IndexMap;
+use std::sync::Arc;
 
 use crate::structured_credit::{StochasticPricingResult, StructuredCredit};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -21,7 +22,7 @@ pub static STRUCTURED_CREDIT: Family =
     Family::new("structured_credit", register_pricers, register_metrics);
 
 fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
-    register_generic!(registry, InstrumentType::StructuredCredit, StructuredCredit);
+    registry.register(StructuredCreditDiscountingPricer)?;
     registry.register(StructuredCreditStochasticPricer)?;
     register_generic!(registry, InstrumentType::AgencyCmo, crate::cmo::AgencyCmo);
     register_generic!(
@@ -50,6 +51,59 @@ fn register_metrics(registry: &mut MetricRegistry) -> Result<(), MetricRegistryE
         ]
     }
     Ok(())
+}
+
+/// Deterministic waterfall pricer that hands its simulation run to metric
+/// evaluation, so `price_with_metrics` runs the waterfall once.
+struct StructuredCreditDiscountingPricer;
+
+impl Pricer for StructuredCreditDiscountingPricer {
+    fn key(&self) -> PricerKey {
+        PricerKey::new(InstrumentType::StructuredCredit, ModelKey::Discounting)
+    }
+
+    fn price_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> std::result::Result<ValuationResult, PricingError> {
+        let structured_credit =
+            expect_inst::<StructuredCredit>(instrument, InstrumentType::StructuredCredit)?;
+        let (value, seed) = structured_credit
+            .price_with_seed(market, as_of)
+            .map_err(|e| {
+                PricingError::from_core(
+                    e,
+                    PricingErrorContext::from_instrument(structured_credit)
+                        .model(ModelKey::Discounting),
+                )
+            })?;
+        let mut result = ValuationResult::stamped(structured_credit.id(), as_of, value);
+        if let Some(details) = structured_credit.valuation_details(market, as_of) {
+            result = result.with_details(details);
+        }
+        Ok(result.with_metric_seed(Arc::new(seed)))
+    }
+
+    fn price_raw_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> std::result::Result<f64, PricingError> {
+        let structured_credit =
+            expect_inst::<StructuredCredit>(instrument, InstrumentType::StructuredCredit)?;
+        structured_credit
+            .base_value_raw(market, as_of)
+            .map_err(|e| {
+                PricingError::from_core(
+                    e,
+                    PricingErrorContext::from_instrument(structured_credit)
+                        .model(ModelKey::Discounting),
+                )
+            })
+    }
 }
 
 /// Registry adapter for the deal Monte Carlo engine.

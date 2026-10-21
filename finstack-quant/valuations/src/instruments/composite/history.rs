@@ -8,7 +8,7 @@
 //!
 //! Period return is `pnl / capital` for one composite unit. The chained
 //! `return_index` starts at `100` on the first output row.
-use super::types::{cashflows_between, validate_history};
+use super::{cashflows_between, validate_history};
 use super::{
     CompositeExposureReport, CompositeInstrument, CompositeMarketObservation, CompositeSpec,
     CompositeTrade,

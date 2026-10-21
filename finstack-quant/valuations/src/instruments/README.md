@@ -41,7 +41,6 @@ Files at this level:
 |------|------|
 | `mod.rs` | `pub use finstack_quant_valuations_core::instruments::*`, the asset-class module declarations and the flat public re-export list |
 | `json_loader.rs` | `InstrumentEnvelope`, `InstrumentJson`, and the registry macro (the closed world) |
-| `cashflow_export.rs` | `instrument_cashflows_json` and `instrument_cashflows(&ParsedInstrument, …)` over the core exporter (`export_cashflows`); re-exports the envelope and row types |
 | `composite/` | `CompositeInstrument` and its legs; it holds `InstrumentJson`, so it belongs to the closed world |
 | `<family>/family.rs` | The family's `Family` static: its pricer table and metric table |
 
@@ -63,14 +62,14 @@ metrics; `STANDARD` merges every family for the closed-world entry points.
 
 Instruments load through `InstrumentEnvelope` in
 [`json_loader.rs`](json_loader.rs) under schema `finstack_quant.instrument/1`
-(`InstrumentEnvelope::CURRENT_SCHEMA`). Unknown fields are rejected at
+(`InstrumentSchema::CURRENT`). Unknown fields are rejected at
 deserialize time. `InstrumentJson::into_boxed()` produces a
 `Box<dyn Instrument>`.
 
 The `with_instrument_json_registry!` macro is the single source of truth for the
 registry: the `InstrumentJson` enum definition, the deserialize tag map,
-`into_boxed`, `registry_tags`, and the schema-parity check are all generated
-from it.
+`into_boxed`, the tag list behind `schema::instrument_types()`, each tag's
+schema-index summary, and the schema-parity check are all generated from it.
 
 ## Adding an instrument
 
@@ -79,8 +78,10 @@ from it.
 2. Implement `Instrument` (`impl_instrument_base!` supplies `id`, `key`,
    `attributes` and `family`).
 3. Add an `InstrumentType` variant in `core/src/pricer/keys.rs`.
-4. Add one line to `with_instrument_json_registry!` in `json_loader.rs`. No
-   per-site hand edits are needed — everything else is generated.
+4. Add one row to `with_instrument_json_registry!` in `json_loader.rs`: kind
+   (`plain`, or `boxed` for a large payload), variant, type, tag, category,
+   example and a distinct one-sentence schema-index summary. No per-site hand
+   edits are needed — everything else is generated.
 5. Add a `metrics/` module with a `register_<name>_metrics(&mut MetricRegistry)`
    function and call it from `register_metrics` in the family's `family.rs`;
    register the pricer in that file's `register_pricers` and name the family

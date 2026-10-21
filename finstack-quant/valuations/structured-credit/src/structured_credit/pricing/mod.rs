@@ -24,6 +24,13 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
 
+#[cfg(test)]
+thread_local! {
+    /// Deterministic simulations started on this thread; tests read it to
+    /// count waterfall runs per pricing request.
+    pub(crate) static SIMULATION_RUNS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// Run full deterministic cashflow simulation for a structured credit instrument.
 ///
 /// # Arguments
@@ -64,6 +71,8 @@ pub fn run_simulation_with_diagnostics(
     market: &MarketContext,
     as_of: Date,
 ) -> Result<simulation_engine::SimulationRun> {
+    #[cfg(test)]
+    SIMULATION_RUNS.with(|runs| runs.set(runs.get() + 1));
     let lifecycle =
         finstack_quant_valuations_core::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(instrument)?;
     let effective_as_of = lifecycle.effective_as_of(market, as_of);

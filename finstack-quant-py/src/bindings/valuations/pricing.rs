@@ -1047,7 +1047,7 @@ fn instrument_cashflows(
     let model = model.to_owned();
     py.detach(move || {
         finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
-            &instrument,
+            instrument.as_instrument(),
             &market,
             &as_of,
             &model,

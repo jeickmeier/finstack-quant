@@ -117,14 +117,31 @@ pub(super) fn register_execution_definition(
             Error::Internal("primitive exposure lost its runtime instrument".to_string())
         })?;
     let hash = InstrumentEnvelope::new(definition).content_hash()?;
-    match definitions.get(exposure.instrument_id.as_str()) {
-        Some(existing) if existing != &hash => Err(Error::Validation(format!(
+    register_definition(definitions, exposure.instrument_id.as_str(), hash, || {
+        format!(
             "primitive instrument id '{}' has conflicting definitions across composite states",
             exposure.instrument_id
-        ))),
+        )
+    })
+}
+
+/// Record `hash` as the definition of instrument `id`.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` with the `conflict` message when `id` is
+/// already recorded with a different definition hash.
+pub(super) fn register_definition(
+    definitions: &mut BTreeMap<String, String>,
+    id: &str,
+    hash: String,
+    conflict: impl FnOnce() -> String,
+) -> Result<()> {
+    match definitions.get(id) {
+        Some(existing) if existing != &hash => Err(Error::Validation(conflict())),
         Some(_) => Ok(()),
         None => {
-            definitions.insert(exposure.instrument_id.to_string(), hash);
+            definitions.insert(id.to_string(), hash);
             Ok(())
         }
     }

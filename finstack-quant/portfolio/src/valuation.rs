@@ -545,7 +545,7 @@ mod tests {
     /// does: every id the standard registry lists is accepted, a typo is not.
     #[test]
     fn metric_names_resolve_against_the_standard_registry() {
-        let listed = finstack_quant_valuations::pricer::json::list_standard_metrics();
+        let listed = finstack_quant_valuations::pricer::list_standard_metrics();
         assert!(listed
             .iter()
             .any(|name| MetricId::parse_strict(name).is_err()));

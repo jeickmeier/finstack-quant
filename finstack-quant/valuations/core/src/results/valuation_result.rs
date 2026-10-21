@@ -347,6 +347,11 @@ pub struct ValuationResult {
     /// Stamped by the pricer registry. Absent on results constructed directly.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provenance: Option<super::ValuationProvenance>,
+
+    /// Pricer state handed to metric evaluation of the same request; never
+    /// serialized. See [`MetricSeed`](crate::metrics::MetricSeed).
+    #[serde(skip)]
+    pub(crate) metric_seed: Option<std::sync::Arc<dyn crate::metrics::MetricSeed>>,
 }
 
 impl ValuationResult {
@@ -452,7 +457,32 @@ impl ValuationResult {
             covenants: None,
             explanation: None,
             provenance: None,
+            metric_seed: None,
         }
+    }
+
+    /// Hand state computed while pricing to the metric evaluation of this
+    /// request.
+    ///
+    /// The registry installs the seed into the metric context before the
+    /// instrument seeds it, so metrics reuse the pricer's work. The seed is not
+    /// serialized and does not change any reported value.
+    ///
+    /// # Arguments
+    ///
+    /// * `seed` - State produced by the pricer for this instrument, market and
+    ///   valuation date.
+    ///
+    /// # Returns
+    ///
+    /// `Self` for method chaining
+    #[must_use]
+    pub fn with_metric_seed(
+        mut self,
+        seed: std::sync::Arc<dyn crate::metrics::MetricSeed>,
+    ) -> Self {
+        self.metric_seed = Some(seed);
+        self
     }
 
     /// Attach an explanation trace for debugging and auditability.

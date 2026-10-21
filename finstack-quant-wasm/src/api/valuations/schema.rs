@@ -26,10 +26,12 @@ pub fn instrument_envelope_schema() -> Result<JsValue, JsValue> {
 
 /// Canonical instrument type discriminators, in registry order.
 /// @returns Every `type` tag accepted by the instrument envelope, e.g. `"bond"`, `"interest_rate_swap"`.
-/// @throws Error - Throws if the instrument registry cannot be read (does not occur for a released build).
 #[wasm_bindgen(js_name = instrumentTypes)]
-pub fn instrument_types() -> Result<Vec<String>, JsValue> {
-    schema::instrument_types().map_err(to_js_err)
+pub fn instrument_types() -> Vec<String> {
+    schema::instrument_types()
+        .iter()
+        .map(|tag| (*tag).to_string())
+        .collect()
 }
 
 /// JSON Schema of one instrument type.

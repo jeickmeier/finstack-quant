@@ -496,6 +496,9 @@ pub struct MetricBuildOptions {
     /// verbatim from its `ValuationResult`. Standard identifiers among them
     /// seed the metric context; see [`compute_metrics_dyn`].
     pub pricer_measures: IndexMap<MetricId, f64>,
+    /// State the model pricer attached to its `ValuationResult`; installed into
+    /// the metric context before the instrument seeds it.
+    pub pricer_seed: Option<Arc<dyn crate::metrics::MetricSeed>>,
 }
 
 /// Compute requested metric measures for an already-priced instrument.
@@ -538,6 +541,7 @@ pub fn compute_metrics_dyn(
         pricing,
         pricing_dispatch,
         pricer_measures,
+        pricer_seed,
     } = options;
     let finstack_config = pricing.config.unwrap_or_else(MetricContext::default_config);
     let mut context = MetricContext::new(
@@ -560,6 +564,9 @@ pub fn compute_metrics_dyn(
 
     // Allow instruments to pre-seed the metric context with cached data (e.g., pre-computed
     // cashflows) to avoid redundant computation during metric calculation.
+    if let Some(seed) = pricer_seed {
+        seed.seed(&mut context);
+    }
     let market_ref: Arc<MarketContext> = Arc::clone(&context.curves);
     instrument.seed_metric_context(&mut context, market_ref.as_ref(), as_of);
 

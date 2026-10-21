@@ -15,12 +15,12 @@ valuations into every `core` test build.
 
 | Module | What it provides |
 |---|---|
-| `assertions` | `assert_positive`, `assert_negative`, `assert_non_negative`, `assert_finite` |
-| `builders` | `TestMarketBuilder` / `test_market`, `simple_option_market`, `option_market_with_divs` |
-| `fixtures` | `base_date`, `imm_base_date`, USD discount curves, `STANDARD_NOTIONAL` |
-| `tolerances` | `TIGHT`, `STANDARD`, `LOOSE`, `PERCENT_*`, `NEAR_ZERO` |
+| `assertions` | `assert_positive`, `assert_non_negative`, `assert_finite` |
+| `builders` | `TestMarketBuilder`, `simple_option_market` |
+| `fixtures` | `base_date`, USD discount curves |
+| `tolerances` | `TIGHT`, `ANALYTICAL`, `NUMERICAL`, `CURVE_PRICING`, `RELATIVE`, `BUMP_VS_ANALYTICAL`, `STATISTICAL` |
 | `parity` | `ParityConfig`, `compare_values`, `assert_parity!` |
-| `test_helpers` | flat / sloped discount, forward and hazard curves; `usd_swap_market`; `usd`, `eur`, `gbp`; Black-Scholes reference prices |
+| `test_helpers` | standard dates; flat discount, forward and hazard curves; `usd_swap_market`, `credit_market`; `usd`, `eur` |
 | `date`, `discount_forward_curves`, `volatility`, `commodity_curves` | one-line `date`, `flat_discount`, `flat_vol_surface`, `flat_price_curve` constructors |
 
 ## Example

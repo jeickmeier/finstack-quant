@@ -180,7 +180,7 @@ fn extract_instruments(
     json: Option<String>,
 ) -> Result<Option<Vec<Box<dyn finstack_quant_valuations::instruments::Instrument>>>, JsValue> {
     json.as_deref()
-        .map(finstack_quant_valuations::pricer::json::parse_boxed_instruments_from_json)
+        .map(finstack_quant_valuations::pricer::parse_boxed_instruments_from_json)
         .transpose()
         .map_err(to_js_err)
 }
@@ -325,11 +325,9 @@ pub fn compute_horizon_return(
     let calendar_id = js_opt_string(calendar_id.as_ref(), "calendarId")?;
     use std::sync::Arc;
 
-    let boxed = finstack_quant_valuations::pricer::json::parse_boxed_instrument_from_json(
-        instrument_json,
-        None,
-    )
-    .map_err(to_js_err)?;
+    let boxed =
+        finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(instrument_json, None)
+            .map_err(to_js_err)?;
     let instrument: Arc<dyn finstack_quant_valuations::instruments::Instrument> =
         Arc::from(boxed.into_boxed());
 

@@ -79,10 +79,7 @@ def instrument_types() -> list[str]:
         ``"interest_rate_swap"``. Every entry resolves through
         :func:`instrument_schema`.
 
-    Raises
-    ------
-    ValueError
-        If the compiled-in instrument registry cannot be read.
+        This function does not raise; the registry is compiled in.
 
     Examples
     --------

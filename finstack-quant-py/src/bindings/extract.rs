@@ -85,7 +85,7 @@ impl InstrumentArg {
                 Ok(*instrument)
             }
             Self::Envelope(json) => {
-                finstack_quant_valuations::pricer::json::parse_instrument_from_json(&json)
+                finstack_quant_valuations::pricer::parse_instrument_from_json(&json)
             }
         }
     }

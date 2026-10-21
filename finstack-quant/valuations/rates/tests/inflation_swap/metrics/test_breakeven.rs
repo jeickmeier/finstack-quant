@@ -44,7 +44,8 @@ fn test_breakeven_equals_par_rate() {
     let par_rate = *result.measures.get("par_rate").unwrap();
 
     assert!(
-        (breakeven - par_rate).abs() < rate_tolerance(),
+        (breakeven - par_rate).abs()
+            < finstack_quant_valuations_test_support::tolerances::ANALYTICAL,
         "Breakeven should equal par rate: {} vs {}",
         breakeven,
         par_rate

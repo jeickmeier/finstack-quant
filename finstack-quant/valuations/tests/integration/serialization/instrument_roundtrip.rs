@@ -13,7 +13,7 @@ use finstack_quant_valuations::instruments::*;
 //
 fn assert_roundtrip(expected_id: &str, json: json_loader::InstrumentJson) {
     let original = json_loader::InstrumentEnvelope {
-        schema: finstack_quant_valuations::instruments::json_loader::InstrumentSchema::CURRENT,
+        schema: finstack_quant_valuations::instruments::envelope::InstrumentSchema::CURRENT,
         instrument: json,
     };
     let s = serde_json::to_string_pretty(&original).unwrap();

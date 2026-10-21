@@ -72,7 +72,7 @@ fn test_ir01_finite_difference_validation() {
     // Check magnitude within tolerance
     let rel_diff = (dv01_analytic - dv01_fd).abs() / dv01_fd.abs().max(1.0);
     assert!(
-        rel_diff < greek_tolerance(),
+        rel_diff < finstack_quant_valuations_test_support::tolerances::STATISTICAL,
         "DV01 relative difference too large: {}",
         rel_diff
     );

@@ -16,7 +16,7 @@ documentation implements it for a one-payment note.
 |------|------|
 | `mod.rs` | Module declarations and the flat re-export list of the framework surface |
 | [`common_impl/`](common_impl/README.md) | The `Instrument` trait and provider traits, `PricingOptions`, parameter types (legs, conventions, convertible vocabulary, Merton MC config, bond quotes), the generic pricer, shared pricing kernels, listed-contract mechanics, the `Marginable` helpers. Public but hidden from the rendered docs; the families reach it by path |
-| `cashflow_export.rs` | `export_cashflows`, `InstrumentCashflowEnvelope`, `CashflowRow`, `CashflowExportTerms` — the per-flow DF / survival / PV exporter behind the umbrella's JSON entry points and the explain trace; it decomposes an instrument through `Instrument::cashflow_export_terms` and `Instrument::validate_cashflow_export` |
+| `cashflow_export.rs` | `instrument_cashflows`, `InstrumentCashflowEnvelope`, `CashflowRow`, `CashflowExportTerms` — the per-flow DF / survival / PV exporter behind the Python/WASM `instrument_cashflows` bindings and the explain trace; it decomposes an instrument through `Instrument::cashflow_export_terms` and `Instrument::validate_cashflow_export` |
 | `pricing_overrides.rs` | `InstrumentPricingOverrides`, `MetricPricingOverrides`, `ScenarioPricingOverrides`, `ModelConfig`, `BumpConfig` |
 | `model_params.rs` | `ModelParamsSnapshot` used by attribution |
 | `position.rs` | `Position` (long/short direction) |

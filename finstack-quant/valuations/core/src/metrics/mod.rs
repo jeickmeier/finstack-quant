@@ -77,7 +77,7 @@ pub use sensitivities::config::{
 };
 pub use sensitivities::cross_factor::CrossFactorPair;
 pub use sensitivities::theta::{collect_period_cash, PeriodCash};
-pub use traits::{MetricCalculator, MetricContext};
+pub use traits::{MetricCalculator, MetricContext, MetricSeed};
 #[doc(hidden)]
 pub use universal::{register_universal_metrics, PricerPublishedMetric};
 

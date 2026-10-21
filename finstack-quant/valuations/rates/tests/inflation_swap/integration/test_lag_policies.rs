@@ -8,6 +8,7 @@ use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
 use finstack_quant_valuations_test_support::inflation::*;
+use finstack_quant_valuations_test_support::test_helpers::flat_discount_curve_with_day_count;
 use rust_decimal::Decimal;
 use time::Month;
 
@@ -17,7 +18,7 @@ fn test_lag_override_vs_index_lag() {
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
     // Index with 3M lag
-    let disc = flat_discount("USD-OIS", as_of, 0.04).unwrap();
+    let disc = flat_discount_curve_with_day_count(0.04, as_of, "USD-OIS", DayCount::Act365F);
     let infl_curve = flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.02).unwrap();
     let index = simple_index(
         "US-CPI-U",
@@ -82,7 +83,7 @@ fn test_different_lag_durations() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
-    let disc = flat_discount("USD-OIS", as_of, 0.04).unwrap();
+    let disc = flat_discount_curve_with_day_count(0.04, as_of, "USD-OIS", DayCount::Act365F);
     let infl_curve = flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.03).unwrap();
     let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD, InflationLag::None);
 
@@ -130,7 +131,7 @@ fn test_lag_in_days_vs_months() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
-    let disc = flat_discount("USD-OIS", as_of, 0.04).unwrap();
+    let disc = flat_discount_curve_with_day_count(0.04, as_of, "USD-OIS", DayCount::Act365F);
     let infl_curve = flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.02).unwrap();
     let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD, InflationLag::None);
 
@@ -188,7 +189,7 @@ fn test_historical_observation_requires_fixing_or_explicit_contract_base() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
-    let disc = flat_discount("USD-OIS", as_of, 0.04).unwrap();
+    let disc = flat_discount_curve_with_day_count(0.04, as_of, "USD-OIS", DayCount::Act365F);
     let infl_curve = flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.02).unwrap();
 
     // Context without inflation index

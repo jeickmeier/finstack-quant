@@ -6,8 +6,9 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use finstack_quant_valuations::instruments::instrument_json_of;
-use finstack_quant_valuations::instruments::json_loader::{instrument_registry, registry_tags};
+use finstack_quant_valuations::instruments::json_loader::instrument_registry;
 use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::schema::instrument_types;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -445,7 +446,7 @@ fn generator_freshness_check_rejects_non_registry_fixtures() {
 
 #[test]
 fn public_registry_lists_only_canonical_tags() {
-    let registry = registry_tags();
+    let registry = instrument_types();
     assert_eq!(registry.len(), 78, "canonical registry tag count drifted");
     assert!(registry.contains(&"snowball"));
     assert!(!registry.contains(&"inverse_floater"));
@@ -479,10 +480,10 @@ fn registry_manifest_and_fixtures_are_consistent() {
     let manifest = load_manifest();
     assert_eq!(manifest.schema_version, 1);
 
-    let registry: BTreeSet<&str> = registry_tags().iter().copied().collect();
+    let registry: BTreeSet<&str> = instrument_types().iter().copied().collect();
     assert_eq!(
         registry.len(),
-        registry_tags().len(),
+        instrument_types().len(),
         "canonical registry tags must be unique"
     );
 
@@ -635,7 +636,7 @@ fn every_registered_instrument_satisfies_persistence_contract() {
     let limits = finstack_quant_core::contract::LoadLimits::default();
     let mut failures = Vec::new();
 
-    for tag in registry_tags() {
+    for tag in instrument_types() {
         let entry = entries
             .get(tag)
             .unwrap_or_else(|| panic!("{tag}: canonical registry tag is absent from manifest"));
@@ -785,7 +786,7 @@ fn every_registered_instrument_satisfies_persistence_contract() {
         failures.is_empty(),
         "{} of {} canonical instrument fixtures failed persistence coverage:\n{}",
         failures.len(),
-        registry_tags().len(),
+        instrument_types().len(),
         failures.join("\n")
     );
 }

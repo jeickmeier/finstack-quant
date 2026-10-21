@@ -212,7 +212,8 @@ fn test_par_rate_independent_of_side() {
     let par_receive = *result_receive.measures.get("par_rate").unwrap();
 
     assert!(
-        (par_pay - par_receive).abs() < rate_tolerance(),
+        (par_pay - par_receive).abs()
+            < finstack_quant_valuations_test_support::tolerances::ANALYTICAL,
         "Par rate should be independent of side: {} vs {}",
         par_pay,
         par_receive
