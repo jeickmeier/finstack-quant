@@ -23,28 +23,6 @@
 
 use pyo3::prelude::*;
 
-/// `to_json` / `from_json` / pickle (via `wire_methods!`) plus `to_dict` for a
-/// serde-backed wrapper whose Rust type carries strict field names.
-macro_rules! sc_wire_methods {
-    ($py_type:ident, $rust_type:ty, $name:literal) => {
-        $crate::bindings::macros::wire_methods!($py_type, $rust_type, $name);
-
-        #[pymethods]
-        impl $py_type {
-            /// Return every field as a plain ``dict`` (canonical serde shape).
-            ///
-            /// Raises
-            /// ------
-            /// ValueError
-            ///     If the value cannot be serialized.
-            #[pyo3(text_signature = "($self)")]
-            fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-                crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
-            }
-        }
-    };
-}
-
 mod asset_pool;
 mod borrowing_base;
 mod call_assumption;

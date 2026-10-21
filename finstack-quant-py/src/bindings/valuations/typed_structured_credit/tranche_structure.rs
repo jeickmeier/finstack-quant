@@ -182,15 +182,6 @@ impl PyTrancheStructure {
             .collect()
     }
 
-    /// Total original size of the capital structure.
-    #[getter]
-    fn total_size(&self) -> PyResult<PyMoney> {
-        self.inner
-            .total_size()
-            .map(money_to_py)
-            .map_err(crate::errors::core_to_py)
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
@@ -200,3 +191,9 @@ impl PyTrancheStructure {
         ))
     }
 }
+
+crate::bindings::macros::py_getters!(PyTrancheStructure |s| {
+    /// Total original size of the capital structure.
+    total_size -> PyResult<PyMoney> =
+        s.inner.total_size().map(money_to_py).map_err(crate::errors::core_to_py);
+});

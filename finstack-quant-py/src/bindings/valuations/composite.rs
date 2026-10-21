@@ -189,55 +189,6 @@ impl PyCompositeLegSpec {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Return the declared embedded-instrument identifier.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     Stable identifier that matches the embedded instrument.
-    ///
-    /// Notes
-    /// -----
-    /// This accessor does not raise; it returns the stored identifier.
-    #[getter]
-    fn instrument_id(&self) -> String {
-        self.inner.instrument_id.to_string()
-    }
-
-    /// Return the signed fixed quantity or dynamic weighting score.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Finite non-zero signed leg input.
-    ///
-    /// Notes
-    /// -----
-    /// This accessor does not raise; it returns the validated stored value.
-    #[getter]
-    fn score(&self) -> f64 {
-        self.inner.score
-    }
-
-    /// Return the embedded instrument as a canonical v1 envelope.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     ``finstack_quant.instrument/1`` JSON for the embedded instrument.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If canonical JSON serialization fails.
-    #[getter]
-    fn instrument_json(&self) -> PyResult<String> {
-        to_json(
-            &InstrumentEnvelope::new(self.inner.instrument.as_ref().clone()),
-            "embedded instrument envelope",
-        )
-    }
-
     /// Return the embedded instrument as a plain ``dict`` (canonical serde shape).
     ///
     /// Returns
@@ -266,6 +217,48 @@ impl PyCompositeLegSpec {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyCompositeLegSpec |s| {
+    /// Return the declared embedded-instrument identifier.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     Stable identifier that matches the embedded instrument.
+    ///
+    /// Notes
+    /// -----
+    /// This accessor does not raise; it returns the stored identifier.
+    instrument_id -> String = s.inner.instrument_id.to_string();
+
+    /// Return the signed fixed quantity or dynamic weighting score.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     Finite non-zero signed leg input.
+    ///
+    /// Notes
+    /// -----
+    /// This accessor does not raise; it returns the validated stored value.
+    score -> f64 = s.inner.score;
+
+    /// Return the embedded instrument as a canonical v1 envelope.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     ``finstack_quant.instrument/1`` JSON for the embedded instrument.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If canonical JSON serialization fails.
+    instrument_json -> PyResult<String> = to_json(
+        &InstrumentEnvelope::new(s.inner.instrument.as_ref().clone()),
+        "embedded instrument envelope",
+    );
+});
 
 /// Serializable policy for resolving signed composite quantities.
 #[pyclass(
@@ -794,44 +787,6 @@ impl PyCompositeSpec {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Return the stable composite identifier.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     Identifier stored on the unresolved specification.
-    ///
-    /// Notes
-    /// -----
-    /// This accessor does not raise; it returns the stored identifier.
-    #[getter]
-    fn id(&self) -> String {
-        self.inner.id.to_string()
-    }
-
-    /// Return the currency used for values, risk, P&L, and returns.
-    ///
-    /// Returns
-    /// -------
-    /// Currency
-    ///     Reporting currency of the composite.
-    ///
-    /// Notes
-    /// -----
-    /// This accessor does not raise; it returns the validated stored currency.
-    #[getter]
-    fn reporting_currency(&self) -> PyCurrency {
-        PyCurrency::from_inner(self.inner.reporting_currency)
-    }
-
-    /// Return the capital denominator (``Money`` in the reporting currency).
-    #[getter]
-    fn capital(&self) -> PyMoney {
-        PyMoney {
-            inner: self.inner.capital,
-        }
-    }
-
     /// Return the signed leg definitions in specification order.
     #[getter]
     fn legs(&self) -> Vec<PyCompositeLegSpec> {
@@ -840,22 +795,6 @@ impl PyCompositeSpec {
             .iter()
             .map(|leg| PyCompositeLegSpec { inner: leg.clone() })
             .collect()
-    }
-
-    /// Return the weighting policy.
-    #[getter]
-    fn weighting_method(&self) -> PyWeightingMethod {
-        PyWeightingMethod {
-            inner: self.inner.weighting_method.clone(),
-        }
-    }
-
-    /// Return the rebalance rule.
-    #[getter]
-    fn rebalance_rule(&self) -> PyRebalanceRule {
-        PyRebalanceRule {
-            inner: self.inner.rebalance_rule.clone(),
-        }
     }
 
     /// Return ``repr(self)``.
@@ -926,6 +865,42 @@ impl PyCompositeSpec {
     }
 }
 
+crate::bindings::macros::py_getters!(PyCompositeSpec |s| {
+    /// Return the stable composite identifier.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     Identifier stored on the unresolved specification.
+    ///
+    /// Notes
+    /// -----
+    /// This accessor does not raise; it returns the stored identifier.
+    id -> String = s.inner.id.to_string();
+
+    /// Return the currency used for values, risk, P&L, and returns.
+    ///
+    /// Returns
+    /// -------
+    /// Currency
+    ///     Reporting currency of the composite.
+    ///
+    /// Notes
+    /// -----
+    /// This accessor does not raise; it returns the validated stored currency.
+    reporting_currency -> PyCurrency = PyCurrency::from_inner(s.inner.reporting_currency);
+
+    /// Return the capital denominator (``Money`` in the reporting currency).
+    capital -> PyMoney = PyMoney { inner: s.inner.capital };
+
+    /// Return the weighting policy.
+    weighting_method -> PyWeightingMethod =
+        PyWeightingMethod { inner: s.inner.weighting_method.clone() };
+
+    /// Return the rebalance rule.
+    rebalance_rule -> PyRebalanceRule = PyRebalanceRule { inner: s.inner.rebalance_rule.clone() };
+});
+
 /// Frozen resolved quantities and their effective date.
 #[pyclass(
     name = "CompositeState",
@@ -982,21 +957,6 @@ impl PyCompositeState {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Return the ISO date from which these quantities are held.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     Effective date formatted as ``YYYY-MM-DD``.
-    ///
-    /// Notes
-    /// -----
-    /// This accessor does not raise; it returns the stored state date.
-    #[getter]
-    fn effective_date(&self) -> String {
-        self.inner.effective_date.to_string()
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -1025,6 +985,20 @@ impl PyCompositeState {
             .collect()
     }
 }
+
+crate::bindings::macros::py_getters!(PyCompositeState |s| {
+    /// Return the ISO date from which these quantities are held.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     Effective date formatted as ``YYYY-MM-DD``.
+    ///
+    /// Notes
+    /// -----
+    /// This accessor does not raise; it returns the stored state date.
+    effective_date -> String = s.inner.effective_date.to_string();
+});
 
 /// Priceable composite with an immutable resolved state.
 #[pyclass(
@@ -1083,55 +1057,6 @@ impl PyCompositeInstrument {
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Return the stable composite identifier.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     Identifier stored on the composite specification.
-    ///
-    /// Notes
-    /// -----
-    /// This accessor does not raise; it returns the stored identifier.
-    #[getter]
-    fn id(&self) -> String {
-        self.inner.spec.id.to_string()
-    }
-
-    /// Return a clone of the unresolved economic definition.
-    ///
-    /// Returns
-    /// -------
-    /// CompositeSpec
-    ///     Independent wrapper around a cloned specification.
-    ///
-    /// Notes
-    /// -----
-    /// This accessor does not raise; cloning preserves the immutable definition.
-    #[getter]
-    fn spec(&self) -> PyCompositeSpec {
-        PyCompositeSpec {
-            inner: self.inner.spec.clone(),
-        }
-    }
-
-    /// Return a clone of the immutable resolved holdings state.
-    ///
-    /// Returns
-    /// -------
-    /// CompositeState
-    ///     Independent wrapper around the frozen effective-date state.
-    ///
-    /// Notes
-    /// -----
-    /// This accessor does not raise; cloning cannot rebalance the instrument.
-    #[getter]
-    fn state(&self) -> PyCompositeState {
-        PyCompositeState {
-            inner: self.inner.state.clone(),
-        }
     }
 
     /// Explicitly return a distinct resolved state and primitive trade deltas.
@@ -1319,6 +1244,44 @@ impl PyCompositeInstrument {
     }
 }
 
+crate::bindings::macros::py_getters!(PyCompositeInstrument |s| {
+    /// Return the stable composite identifier.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     Identifier stored on the composite specification.
+    ///
+    /// Notes
+    /// -----
+    /// This accessor does not raise; it returns the stored identifier.
+    id -> String = s.inner.spec.id.to_string();
+
+    /// Return a clone of the unresolved economic definition.
+    ///
+    /// Returns
+    /// -------
+    /// CompositeSpec
+    ///     Independent wrapper around a cloned specification.
+    ///
+    /// Notes
+    /// -----
+    /// This accessor does not raise; cloning preserves the immutable definition.
+    spec -> PyCompositeSpec = PyCompositeSpec { inner: s.inner.spec.clone() };
+
+    /// Return a clone of the immutable resolved holdings state.
+    ///
+    /// Returns
+    /// -------
+    /// CompositeState
+    ///     Independent wrapper around the frozen effective-date state.
+    ///
+    /// Notes
+    /// -----
+    /// This accessor does not raise; cloning cannot rebalance the instrument.
+    state -> PyCompositeState = PyCompositeState { inner: s.inner.state.clone() };
+});
+
 /// New resolved instrument plus flattened primitive trades.
 #[pyclass(
     name = "CompositeRebalanceResult",
@@ -1361,39 +1324,6 @@ impl PyCompositeRebalanceResult {
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         parse_json(json, "CompositeRebalanceResult").map(|inner| Self { inner })
-    }
-
-    /// Return the newly resolved priceable composite instrument.
-    ///
-    /// Returns
-    /// -------
-    /// CompositeInstrument
-    ///     Independent wrapper around the new immutable resolved state.
-    ///
-    /// Notes
-    /// -----
-    /// This accessor does not raise; it clones the stored result instrument.
-    #[getter]
-    fn instrument(&self) -> PyCompositeInstrument {
-        PyCompositeInstrument {
-            inner: self.inner.instrument.clone(),
-        }
-    }
-
-    /// Return net primitive quantity deltas as a JSON array.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     Primitive IDs, type tags, and signed quantity deltas.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If canonical JSON serialization fails.
-    #[getter]
-    fn trades_json(&self) -> PyResult<String> {
-        to_json(&self.inner.trades, "composite rebalance trades")
     }
 
     /// Return net primitive quantity deltas as a list of dicts.
@@ -1448,6 +1378,34 @@ impl PyCompositeRebalanceResult {
     }
 }
 
+crate::bindings::macros::py_getters!(PyCompositeRebalanceResult |s| {
+    /// Return the newly resolved priceable composite instrument.
+    ///
+    /// Returns
+    /// -------
+    /// CompositeInstrument
+    ///     Independent wrapper around the new immutable resolved state.
+    ///
+    /// Notes
+    /// -----
+    /// This accessor does not raise; it clones the stored result instrument.
+    instrument -> PyCompositeInstrument =
+        PyCompositeInstrument { inner: s.inner.instrument.clone() };
+
+    /// Return net primitive quantity deltas as a JSON array.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     Primitive IDs, type tags, and signed quantity deltas.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If canonical JSON serialization fails.
+    trades_json -> PyResult<String> = to_json(&s.inner.trades, "composite rebalance trades");
+});
+
 /// Primitive path, net, and gross exposure report.
 #[pyclass(
     name = "CompositeExposureReport",
@@ -1487,24 +1445,6 @@ impl PyCompositeExposureReport {
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         parse_json(json, "CompositeExposureReport").map(|inner| Self { inner })
-    }
-
-    /// Reporting currency shared by all aggregate values.
-    #[getter]
-    fn reporting_currency(&self) -> PyCurrency {
-        PyCurrency::from_inner(self.inner.reporting_currency)
-    }
-
-    /// Number of primitive paths before overlap netting.
-    #[getter]
-    fn path_count(&self) -> usize {
-        self.inner.paths.len()
-    }
-
-    /// Number of net/gross primitive aggregates.
-    #[getter]
-    fn aggregate_count(&self) -> usize {
-        self.inner.aggregates.len()
     }
 
     /// Export net and gross primitive aggregates as a pandas ``DataFrame``.
@@ -1559,6 +1499,17 @@ impl PyCompositeExposureReport {
     }
 }
 
+crate::bindings::macros::py_getters!(PyCompositeExposureReport |s| {
+    /// Reporting currency shared by all aggregate values.
+    reporting_currency -> PyCurrency = PyCurrency::from_inner(s.inner.reporting_currency);
+
+    /// Number of primitive paths before overlap netting.
+    path_count -> usize = s.inner.paths.len();
+
+    /// Number of net/gross primitive aggregates.
+    aggregate_count -> usize = s.inner.aggregates.len();
+});
+
 /// Chronological composite history rows.
 #[pyclass(
     name = "CompositeHistoryResult",
@@ -1606,12 +1557,6 @@ impl PyCompositeHistoryResult {
     /// This accessor does not raise; an empty result has length ``0``.
     fn __len__(&self) -> usize {
         self.inner.len()
-    }
-
-    /// Observation dates in chronological order.
-    #[getter]
-    fn dates(&self) -> Vec<String> {
-        self.inner.iter().map(|row| row.date.to_string()).collect()
     }
 
     /// Export chronological value, cashflow, P&L, return, and state metadata.
@@ -1689,6 +1634,11 @@ impl PyCompositeHistoryResult {
         format!("CompositeHistoryResult(rows={})", self.inner.len())
     }
 }
+
+crate::bindings::macros::py_getters!(PyCompositeHistoryResult |s| {
+    /// Observation dates in chronological order.
+    dates -> Vec<String> = s.inner.iter().map(|row| row.date.to_string()).collect();
+});
 
 /// Initialize at the first observation and calculate chronological rows.
 ///

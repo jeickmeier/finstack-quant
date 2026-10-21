@@ -36,7 +36,7 @@ pub struct PyHedgeSwap {
     pub(crate) inner: HedgeSwap,
 }
 
-sc_wire_methods!(PyHedgeSwap, HedgeSwap, "HedgeSwap");
+crate::bindings::macros::wire_methods!(PyHedgeSwap, HedgeSwap, "HedgeSwap", to_dict);
 
 #[pymethods]
 impl PyHedgeSwap {
@@ -86,25 +86,11 @@ impl PyHedgeSwap {
         })
     }
 
-    /// The hedged swap as a typed ``InterestRateSwap``.
-    #[getter]
-    fn swap(&self) -> PyInterestRateSwap {
-        PyInterestRateSwap {
-            inner: self.inner.swap.clone(),
-        }
-    }
-
     /// ``SwapNotional`` serde value (``"contractual"``, ``"pool_par"`` or
     /// ``{"tranche_par": id}``).
     #[getter]
     fn notional<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.notional)
-    }
-
-    /// ``"senior_fee"`` or ``"junior_fee"``.
-    #[getter]
-    fn priority(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.priority)
     }
 
     /// Return ``repr(self)``.
@@ -117,6 +103,14 @@ impl PyHedgeSwap {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyHedgeSwap |s| {
+    /// The hedged swap as a typed ``InterestRateSwap``.
+    swap -> PyInterestRateSwap = PyInterestRateSwap { inner: s.inner.swap.clone() };
+
+    /// ``"senior_fee"`` or ``"junior_fee"``.
+    priority -> PyResult<String> = enum_to_py_string(&s.inner.priority);
+});
 
 /// Coerce ``list[HedgeSwap | dict] | str`` into Rust hedges.
 pub(crate) fn hedge_swaps_from_py(

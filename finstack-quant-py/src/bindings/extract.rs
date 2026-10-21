@@ -97,8 +97,8 @@ impl InstrumentArg {
 /// # Extending this function
 ///
 /// Every typed instrument class is wired in here by adding exactly **one**
-/// cast arm that clones its `inner` into the matching [`InstrumentJson`]
-/// variant, ordered before the final envelope fallback. Update the fallback
+/// cast arm (its `inner` converts through `InstrumentJson::from`), ordered
+/// before the final envelope fallback. Update the fallback
 /// error message below to name each newly landed class.
 ///
 /// Currently wired: `Bond`, `TermLoan`, `InterestRateSwap`, `Swaption`,
@@ -107,33 +107,33 @@ impl InstrumentArg {
 /// `RevolvingCredit`, `AssetBackedFacility`, `CompositeInstrument`.
 pub fn extract_instrument(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentArg> {
     macro_rules! typed {
-        ($($py:ty => $wrap:expr),+ $(,)?) => {
+        ($($py:ty),+ $(,)?) => {
             $(
                 if let Ok(typed) = obj.cast::<$py>() {
                     let inner = typed.borrow().inner.clone();
-                    return Ok(InstrumentArg::Typed(Box::new($wrap(inner))));
+                    return Ok(InstrumentArg::Typed(Box::new(InstrumentJson::from(inner))));
                 }
             )+
         };
     }
     typed!(
-        PyCompositeInstrument => InstrumentJson::from,
-        PyBond => InstrumentJson::Bond,
-        PyTermLoan => InstrumentJson::TermLoan,
-        PyRevolvingCredit => InstrumentJson::RevolvingCredit,
-        PyAssetBackedFacility => |inner| InstrumentJson::AssetBackedFacility(Box::new(inner)),
-        PyInterestRateSwap => InstrumentJson::InterestRateSwap,
-        PySwaption => InstrumentJson::Swaption,
-        PyCapFloor => InstrumentJson::CapFloor,
-        PyCreditDefaultSwap => InstrumentJson::CreditDefaultSwap,
-        PyCdsIndex => InstrumentJson::CdsIndex,
-        PyFxForward => InstrumentJson::FxForward,
-        PyFxOption => InstrumentJson::FxOption,
-        PyCdsOption => InstrumentJson::CdsOption,
-        PyCdsTranche => InstrumentJson::CdsTranche,
-        PyConvertibleBond => InstrumentJson::ConvertibleBond,
-        PyEquityOption => InstrumentJson::EquityOption,
-        PyStructuredCredit => |inner| InstrumentJson::StructuredCredit(Box::new(inner)),
+        PyCompositeInstrument,
+        PyBond,
+        PyTermLoan,
+        PyRevolvingCredit,
+        PyAssetBackedFacility,
+        PyInterestRateSwap,
+        PySwaption,
+        PyCapFloor,
+        PyCreditDefaultSwap,
+        PyCdsIndex,
+        PyFxForward,
+        PyFxOption,
+        PyCdsOption,
+        PyCdsTranche,
+        PyConvertibleBond,
+        PyEquityOption,
+        PyStructuredCredit,
     );
     envelope_json_text(obj).map(InstrumentArg::Envelope).map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(

@@ -417,37 +417,6 @@ impl PyOasResult {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Option-adjusted spread, as an annual decimal (``0.01`` = 100 bp).
-    #[getter]
-    fn oas(&self) -> f64 {
-        self.inner.oas
-    }
-
-    /// Model price at the solved OAS, as a percentage of current balance.
-    #[getter]
-    fn model_price(&self) -> f64 {
-        self.inner.model_price
-    }
-
-    /// Target market price, as a percentage of current balance.
-    #[getter]
-    fn market_price(&self) -> f64 {
-        self.inner.market_price
-    }
-
-    /// Number of Monte-Carlo scenarios used.
-    #[getter]
-    fn num_paths(&self) -> usize {
-        self.inner.num_paths
-    }
-
-    /// Monte-Carlo standard error of the mean price, as a percentage of
-    /// current balance.
-    #[getter]
-    fn price_std_error(&self) -> f64 {
-        self.inner.price_std_error
-    }
-
     /// Export as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``oas`` (annual decimal), ``model_price`` and ``market_price``
@@ -479,6 +448,24 @@ impl PyOasResult {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyOasResult |s| {
+    /// Option-adjusted spread, as an annual decimal (``0.01`` = 100 bp).
+    oas -> f64 = s.inner.oas;
+
+    /// Model price at the solved OAS, as a percentage of current balance.
+    model_price -> f64 = s.inner.model_price;
+
+    /// Target market price, as a percentage of current balance.
+    market_price -> f64 = s.inner.market_price;
+
+    /// Number of Monte-Carlo scenarios used.
+    num_paths -> usize = s.inner.num_paths;
+
+    /// Monte-Carlo standard error of the mean price, as a percentage of
+    /// current balance.
+    price_std_error -> f64 = s.inner.price_std_error;
+});
 
 /// Summary risk/pricing metrics for a structured-credit tranche
 /// ([`structured_credit_tranche_metrics`]'s return value).
@@ -560,142 +547,6 @@ impl PyTrancheMetrics {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Identifier of the tranche.
-    #[getter]
-    fn tranche_id(&self) -> &str {
-        &self.inner.tranche_id
-    }
-
-    /// ISO-4217 code of the currency ``pv``, ``accrued`` and ``cs01`` are
-    /// denominated in.
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
-    }
-
-    /// Present value of the tranche, in ``currency`` units.
-    #[getter]
-    fn pv(&self) -> f64 {
-        self.inner.pv
-    }
-
-    /// Model clean settlement price, as a percentage of the tranche's current
-    /// balance (the factor-adjusted secondary-market quote basis).
-    #[getter]
-    fn clean_price_pct(&self) -> f64 {
-        self.inner.clean_price_pct
-    }
-
-    /// Model dirty settlement price (clean plus accrued), as a percentage of
-    /// the tranche's current balance.
-    #[getter]
-    fn dirty_price_pct(&self) -> f64 {
-        self.inner.dirty_price_pct
-    }
-
-    /// Accrued coupon at buyer settlement, in ``currency`` units.
-    #[getter]
-    fn accrued(&self) -> f64 {
-        self.inner.accrued
-    }
-
-    /// Pool factor of the note: current balance over original balance, so a
-    /// price on original face is ``clean_price_pct * factor``.
-    #[getter]
-    fn factor(&self) -> f64 {
-        self.inner.factor
-    }
-
-    /// Weighted-average life, in years.
-    #[getter]
-    fn wal(&self) -> f64 {
-        self.inner.wal
-    }
-
-    /// Decimal yield reproducing the ``target_price_pct`` dirty value,
-    /// compounded at the note's coupon frequency in its own day count;
-    /// ``None`` for an impaired note.
-    #[getter]
-    fn ytm(&self) -> Option<f64> {
-        self.inner.ytm
-    }
-
-    /// Z-spread to ``target_price_pct``, in basis points.
-    #[getter]
-    fn z_spread_bp(&self) -> f64 {
-        self.inner.z_spread_bp
-    }
-
-    /// Credit-spread DV01 — currency change for a +1 bp z-spread shock,
-    /// in ``currency`` units. Negative for a long tranche.
-    #[getter]
-    fn cs01(&self) -> f64 {
-        self.inner.cs01
-    }
-
-    /// Spread duration, in years (``-cs01 / (pv * 1bp)``).
-    #[getter]
-    fn spread_duration(&self) -> f64 {
-        self.inner.spread_duration
-    }
-
-    /// Spread convexity at the solved z-spread, in years squared.
-    #[getter]
-    fn spread_convexity(&self) -> f64 {
-        self.inner.spread_convexity
-    }
-
-    /// Effective (rate) duration, in years: the cashflows are re-projected
-    /// with every rate curve bumped ±1 bp, so a floater's coupon resets move
-    /// with the curve and its duration is short.
-    #[getter]
-    fn effective_duration(&self) -> f64 {
-        self.inner.effective_duration
-    }
-
-    /// Effective convexity from the same ±1 bp re-projection, in years
-    /// squared.
-    #[getter]
-    fn effective_convexity(&self) -> f64 {
-        self.inner.effective_convexity
-    }
-
-    /// Discount margin to maturity at ``target_price_pct`` for a
-    /// floating-rate tranche, in basis points; ``None`` for fixed-rate
-    /// tranches.
-    #[getter]
-    fn dm_bp(&self) -> Option<f64> {
-        self.inner.dm_bp
-    }
-
-    /// Price the yield, z-spread and CS01 were solved against, as a
-    /// percentage of current balance.
-    #[getter]
-    fn target_price_pct(&self) -> f64 {
-        self.inner.target_price_pct
-    }
-
-    /// Weighted-average life to the assumed call, in years, or ``None`` when
-    /// the deal carries no call covering this tranche.
-    #[getter]
-    fn wal_to_call(&self) -> Option<f64> {
-        self.inner.wal_to_call
-    }
-
-    /// Z-spread of the to-call flows to ``target_price_pct``, in basis
-    /// points, or ``None`` without a call.
-    #[getter]
-    fn z_spread_to_call_bp(&self) -> Option<f64> {
-        self.inner.z_spread_to_call_bp
-    }
-
-    /// Discount margin to call for a floating-rate tranche, in basis points,
-    /// or ``None`` for fixed-rate tranches or without a call.
-    #[getter]
-    fn dm_to_call_bp(&self) -> Option<f64> {
-        self.inner.dm_to_call_bp
-    }
-
     /// Requested registry metrics valued on this note, keyed by metric id
     /// (empty when none were requested); units follow each metric.
     #[getter]
@@ -761,6 +612,84 @@ impl PyTrancheMetrics {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyTrancheMetrics |s| {
+    /// Identifier of the tranche.
+    tranche_id -> &str = &s.inner.tranche_id;
+
+    /// ISO-4217 code of the currency ``pv``, ``accrued`` and ``cs01`` are
+    /// denominated in.
+    currency -> String = s.inner.currency.to_string();
+
+    /// Present value of the tranche, in ``currency`` units.
+    pv -> f64 = s.inner.pv;
+
+    /// Model clean settlement price, as a percentage of the tranche's current
+    /// balance (the factor-adjusted secondary-market quote basis).
+    clean_price_pct -> f64 = s.inner.clean_price_pct;
+
+    /// Model dirty settlement price (clean plus accrued), as a percentage of
+    /// the tranche's current balance.
+    dirty_price_pct -> f64 = s.inner.dirty_price_pct;
+
+    /// Accrued coupon at buyer settlement, in ``currency`` units.
+    accrued -> f64 = s.inner.accrued;
+
+    /// Pool factor of the note: current balance over original balance, so a
+    /// price on original face is ``clean_price_pct * factor``.
+    factor -> f64 = s.inner.factor;
+
+    /// Weighted-average life, in years.
+    wal -> f64 = s.inner.wal;
+
+    /// Decimal yield reproducing the ``target_price_pct`` dirty value,
+    /// compounded at the note's coupon frequency in its own day count;
+    /// ``None`` for an impaired note.
+    ytm -> Option<f64> = s.inner.ytm;
+
+    /// Z-spread to ``target_price_pct``, in basis points.
+    z_spread_bp -> f64 = s.inner.z_spread_bp;
+
+    /// Credit-spread DV01 — currency change for a +1 bp z-spread shock,
+    /// in ``currency`` units. Negative for a long tranche.
+    cs01 -> f64 = s.inner.cs01;
+
+    /// Spread duration, in years (``-cs01 / (pv * 1bp)``).
+    spread_duration -> f64 = s.inner.spread_duration;
+
+    /// Spread convexity at the solved z-spread, in years squared.
+    spread_convexity -> f64 = s.inner.spread_convexity;
+
+    /// Effective (rate) duration, in years: the cashflows are re-projected
+    /// with every rate curve bumped ±1 bp, so a floater's coupon resets move
+    /// with the curve and its duration is short.
+    effective_duration -> f64 = s.inner.effective_duration;
+
+    /// Effective convexity from the same ±1 bp re-projection, in years
+    /// squared.
+    effective_convexity -> f64 = s.inner.effective_convexity;
+
+    /// Discount margin to maturity at ``target_price_pct`` for a
+    /// floating-rate tranche, in basis points; ``None`` for fixed-rate
+    /// tranches.
+    dm_bp -> Option<f64> = s.inner.dm_bp;
+
+    /// Price the yield, z-spread and CS01 were solved against, as a
+    /// percentage of current balance.
+    target_price_pct -> f64 = s.inner.target_price_pct;
+
+    /// Weighted-average life to the assumed call, in years, or ``None`` when
+    /// the deal carries no call covering this tranche.
+    wal_to_call -> Option<f64> = s.inner.wal_to_call;
+
+    /// Z-spread of the to-call flows to ``target_price_pct``, in basis
+    /// points, or ``None`` without a call.
+    z_spread_to_call_bp -> Option<f64> = s.inner.z_spread_to_call_bp;
+
+    /// Discount margin to call for a floating-rate tranche, in basis points,
+    /// or ``None`` for fixed-rate tranches or without a call.
+    dm_to_call_bp -> Option<f64> = s.inner.dm_to_call_bp;
+});
 
 /// Scenario/yield table for a single structured-credit tranche
 /// ([`structured_credit_tranche_scenario_table`]'s return value).
@@ -839,12 +768,6 @@ impl PyScenarioTable {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Identifier of the tranche evaluated.
-    #[getter]
-    fn tranche_id(&self) -> &str {
-        &self.inner.tranche_id
-    }
-
     /// Evaluated cells, in CPR-major, then CDR, then severity order.
     ///
     /// Each cell is a dict with keys ``cpr`` (annual decimal), ``cdr``
@@ -916,6 +839,11 @@ impl PyScenarioTable {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyScenarioTable |s| {
+    /// Identifier of the tranche evaluated.
+    tranche_id -> &str = &s.inner.tranche_id;
+});
 
 /// Names registered by this module, in the order they appear in `__all__`.
 pub(crate) const EXPORTS: &[&str] = &[

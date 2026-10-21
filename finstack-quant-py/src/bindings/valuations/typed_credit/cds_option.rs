@@ -9,19 +9,17 @@ use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;
-use finstack_quant_valuations::instruments::InstrumentJson;
 use rust_decimal::Decimal;
 
 use super::super::convert::{
-    attributes_from_py, bool_repr, builder_repr, date_repr, enum_to_py_string, float_repr,
-    money_repr, money_to_py,
+    attributes_from_py, bool_repr, date_repr, enum_to_py_string, float_repr, money_repr,
+    money_to_py,
 };
-use super::super::instruments::{enum_from_str, serialize_typed_instrument_json, spec_from_py};
+use super::super::instruments::{enum_from_str, spec_from_py};
 use super::super::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
 use super::cds::cds_convention_from_str;
-use crate::bindings::valuations::convert::take_builder;
 
 type CdsOptionBuilderInner =
     finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionBuilder;
@@ -56,19 +54,30 @@ pub struct PyCdsOption {
     pub(crate) inner: finstack_quant_valuations::instruments::CdsOption,
 }
 
-impl PyCdsOption {
-    /// Serialize as the canonical instrument envelope accepted by the JSON loader.
-    pub(crate) fn envelope_json(&self) -> PyResult<String> {
-        serialize_typed_instrument_json(InstrumentJson::CdsOption(self.inner.clone()), "CdsOption")
-    }
-}
-
 instrument_envelope_methods!(
     PyCdsOption,
     CdsOption,
     "cds_option",
-    PyCdsOptionBuilder,
-    finstack_quant_valuations::instruments::CdsOption::builder()
+    builder = PyCdsOptionBuilder("CdsOptionBuilder", fields),
+    seed = finstack_quant_valuations::instruments::CdsOption::builder(),
+    pricing_overrides = none,
+    /// Build the validated CDS option.
+    ///
+    /// Validation is the Rust ``CdsOption::builder().build()`` invariants
+    /// only; there is no additional binding-side check.
+    ///
+    /// Returns
+    /// -------
+    /// CdsOption
+    ///     The validated option.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the builder was already consumed, a required field is missing,
+    ///     or the completed option fails validation (expiry not before CDS
+    ///     maturity, non-positive notional, inconsistent strike state).
+    build
 );
 instrument_pricing_methods!(PyCdsOption);
 
@@ -113,18 +122,6 @@ impl PyCdsOption {
         serde_to_py(py, &self.inner.strike)
     }
 
-    /// ``"call"`` (right to buy protection) or ``"put"`` (right to sell protection).
-    #[getter]
-    fn option_type(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.option_type)
-    }
-
-    /// Exercise style (only ``"european"`` prices).
-    #[getter]
-    fn exercise_style(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.exercise_style)
-    }
-
     /// Option expiry date.
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -135,18 +132,6 @@ impl PyCdsOption {
     #[getter]
     fn underlying_maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.underlying_maturity)
-    }
-
-    /// Option notional.
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        money_to_py(self.inner.notional)
-    }
-
-    /// Settlement type: ``"cash"`` or ``"physical"``.
-    #[getter]
-    fn settlement(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.settlement)
     }
 
     /// Option premium payment date, or ``None`` for the convention default.
@@ -170,72 +155,6 @@ impl PyCdsOption {
         opt_date_to_py(py, self.inner.underlying_start_date)
     }
 
-    /// Underlying accrual-start convention: ``"spot"`` or ``"forward"``.
-    #[getter]
-    fn protection_start_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.protection_start_convention)
-    }
-
-    /// Whether the option knocks out if the reference entity defaults before expiry.
-    #[getter]
-    fn knockout(&self) -> bool {
-        self.inner.knockout
-    }
-
-    /// Recovery rate assumption as a decimal (``0.4`` = 40%).
-    #[getter]
-    fn recovery_rate(&self) -> f64 {
-        self.inner.recovery_rate
-    }
-
-    /// Discount curve identifier.
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    /// Hazard (credit) curve identifier.
-    #[getter]
-    fn credit_curve_id(&self) -> String {
-        self.inner.credit_curve_id.to_string()
-    }
-
-    /// Volatility surface identifier.
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
-
-    /// ISDA convention of the underlying CDS (``"isda_na"``, ``"isda_eu"``, ...).
-    #[getter]
-    fn underlying_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.underlying_convention)
-    }
-
-    /// ``True`` when the underlying is a CDS index rather than a single name.
-    #[getter]
-    fn underlying_is_index(&self) -> bool {
-        self.inner.underlying_is_index
-    }
-
-    /// Current index factor ``f`` in ``(0, 1]``.
-    #[getter]
-    fn index_factor(&self) -> f64 {
-        self.inner.index_factor
-    }
-
-    /// Original index factor ``f0`` of a clean-price strike, or ``None``.
-    #[getter]
-    fn strike_index_factor(&self) -> Option<f64> {
-        self.inner.strike_index_factor
-    }
-
-    /// Settled cumulative index loss since inception, as a decimal of original notional.
-    #[getter]
-    fn realized_loss(&self) -> f64 {
-        self.inner.realized_loss
-    }
-
     /// Running coupon of the underlying CDS in basis points as ``decimal.Decimal``,
     /// or ``None`` (the strike spread is then the coupon).
     #[getter]
@@ -257,6 +176,54 @@ impl PyCdsOption {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyCdsOption |s| {
+    /// ``"call"`` (right to buy protection) or ``"put"`` (right to sell protection).
+    option_type -> PyResult<String> = enum_to_py_string(&s.inner.option_type);
+
+    /// Exercise style (only ``"european"`` prices).
+    exercise_style -> PyResult<String> = enum_to_py_string(&s.inner.exercise_style);
+
+    /// Option notional.
+    notional -> PyMoney = money_to_py(s.inner.notional);
+
+    /// Settlement type: ``"cash"`` or ``"physical"``.
+    settlement -> PyResult<String> = enum_to_py_string(&s.inner.settlement);
+
+    /// Underlying accrual-start convention: ``"spot"`` or ``"forward"``.
+    protection_start_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.protection_start_convention);
+
+    /// Whether the option knocks out if the reference entity defaults before expiry.
+    knockout -> bool = s.inner.knockout;
+
+    /// Recovery rate assumption as a decimal (``0.4`` = 40%).
+    recovery_rate -> f64 = s.inner.recovery_rate;
+
+    /// Discount curve identifier.
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    /// Hazard (credit) curve identifier.
+    credit_curve_id -> String = s.inner.credit_curve_id.to_string();
+
+    /// Volatility surface identifier.
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
+
+    /// ISDA convention of the underlying CDS (``"isda_na"``, ``"isda_eu"``, ...).
+    underlying_convention -> PyResult<String> = enum_to_py_string(&s.inner.underlying_convention);
+
+    /// ``True`` when the underlying is a CDS index rather than a single name.
+    underlying_is_index -> bool = s.inner.underlying_is_index;
+
+    /// Current index factor ``f`` in ``(0, 1]``.
+    index_factor -> f64 = s.inner.index_factor;
+
+    /// Original index factor ``f0`` of a clean-price strike, or ``None``.
+    strike_index_factor -> Option<f64> = s.inner.strike_index_factor;
+
+    /// Settled cumulative index loss since inception, as a decimal of original notional.
+    realized_loss -> f64 = s.inner.realized_loss;
+});
 
 /// Fluent builder for ``CdsOption``; wraps the Rust ``FinancialBuilder``
 /// builder (consuming setters).
@@ -924,33 +891,5 @@ impl PyCdsOptionBuilder {
         let shown = value.repr()?.to_string();
         builder_set!(slf, attributes, shown, |b: CdsOptionBuilderInner| b
             .attributes(attrs))
-    }
-
-    /// Build the validated CDS option.
-    ///
-    /// Validation is the Rust ``CdsOption::builder().build()`` invariants
-    /// only; there is no additional binding-side check.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOption
-    ///     The validated option.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the completed option fails validation (expiry not before CDS
-    ///     maturity, non-positive notional, inconsistent strike state).
-    #[pyo3(text_signature = "($self)")]
-    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyCdsOption> {
-        let b = take_builder(&mut slf.inner)?;
-        let inner = b.build().map_err(core_to_py)?;
-        Ok(PyCdsOption { inner })
-    }
-
-    /// Return ``repr(self)`` listing the fields set so far.
-    fn __repr__(&self) -> String {
-        builder_repr("CdsOptionBuilder", &self.fields)
     }
 }

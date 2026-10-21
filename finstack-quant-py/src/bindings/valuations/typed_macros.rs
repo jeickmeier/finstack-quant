@@ -3,9 +3,10 @@
 //! `instrument_pricing_methods!` stamps the common `price` / `metric` /
 //! `market_dependencies` / `default_model` / `attributes` / `to_dict` surface
 //! onto a wrapper, `instrument_envelope_methods!` the `builder` /
-//! `__reduce__` / `from_json` / `to_json` / `id` surface, and `builder_set!`
-//! is the body of one consuming builder setter. Each macro expands to a
-//! `#[pymethods]` block (the crate enables `multiple-pymethods`), so the
+//! `__reduce__` / `from_json` / `to_json` / `id` surface plus the builder's
+//! `build` / `__repr__` / pricing-override setters, and `builder_set!` is the
+//! body of one consuming builder setter. Each macro expands to
+//! `#[pymethods]` blocks (the crate enables `multiple-pymethods`), so the
 //! per-instrument constructors, accessors and typed helpers stay in a
 //! hand-written block beside the invocations.
 
@@ -217,57 +218,103 @@ macro_rules! instrument_pricing_methods {
 }
 pub(crate) use instrument_pricing_methods;
 
-/// Stamp `__reduce__` / `from_json` / `to_json` / `id` / `builder` on a typed
-/// instrument wrapper.
+/// Stamp fixed-metric Greek methods on a typed option wrapper.
 ///
-/// `$variant` is the `InstrumentJson` variant, `$type_tag` the serde type tag
-/// (`"fx_forward"`), `$builder` the Python builder wrapper and `$seed` an
-/// expression producing the seeded Rust builder. The wrapper must expose
-/// `pub(crate) inner` and `envelope_json()`.
-///
-/// The trailing selector names the builder wrapper's shape, as in
-/// `pricing_override_methods!`: `fields` (the default) for a builder that
-/// records `fields: Vec<(&'static str, String)>` for `__repr__`, `no_fields`
-/// for one that only holds `inner`. The optional `builder_doc = [ ... ]` list
-/// appends docstring lines (each a `str` literal with its own leading space,
-/// typically a NumPy ``Notes`` section) after the `builder` docstring's
-/// ``Returns`` section, for instrument-specific notes on the builder's
-/// defaults.
-macro_rules! instrument_envelope_methods {
-    ($ty:ident, $variant:ident, $type_tag:literal, $builder:ident, $seed:expr) => {
-        $crate::bindings::valuations::typed_macros::instrument_envelope_methods!(
-            $ty,
-            $variant,
-            $type_tag,
-            $builder,
-            $seed,
-            fields,
-            builder_doc = []
-        );
+/// Each entry `/// docs` + `name` expands to
+/// `name(market, as_of, model="default") -> float`, which prices the wrapped
+/// instrument and returns the metric whose id is `stringify!(name)` (the same
+/// call as ``metric(market, as_of, "name", model)``). The docstring is
+/// forwarded verbatim.
+macro_rules! instrument_greek_methods {
+    ($ty:ident { $( $(#[$doc:meta])* $name:ident ),+ $(,)? }) => {
+        #[pymethods]
+        impl $ty {
+            $(
+                $(#[$doc])*
+                #[pyo3(signature = (market, as_of, model="default"))]
+                fn $name(
+                    &self,
+                    py: Python<'_>,
+                    market: &Bound<'_, PyAny>,
+                    as_of: &Bound<'_, PyAny>,
+                    model: &str,
+                ) -> PyResult<f64> {
+                    $crate::bindings::valuations::instruments::metric_typed(
+                        py,
+                        Box::new(self.inner.clone()),
+                        market,
+                        as_of,
+                        stringify!($name),
+                        model,
+                    )
+                }
+            )+
+        }
     };
-    ($ty:ident, $variant:ident, $type_tag:literal, $builder:ident, $seed:expr, $shape:ident) => {
+}
+pub(crate) use instrument_greek_methods;
+
+/// Stamp the envelope and builder surface of a typed instrument wrapper.
+///
+/// On the instrument wrapper `$ty`: `builder`, `__reduce__`, `from_json`,
+/// `to_json` and `id`. On its builder wrapper `$builder`: `build`,
+/// `__repr__` and, unless `pricing_overrides = none` is given, the three
+/// `*_pricing_overrides` setters (with the matching getters on `$ty`; see
+/// `pricing_override_methods!`).
+///
+/// Arguments, in order:
+///
+/// * `$ty` — the Python instrument wrapper; it must expose
+///   `pub(crate) inner` (the Rust instrument, convertible with
+///   `InstrumentJson::from`).
+/// * `$variant` — the Rust type name, used in the `to_json` error context
+///   (`"failed to serialize {variant} instrument envelope"`).
+/// * `$type_tag` — the serde type tag (`"fx_forward"`), quoted in the
+///   `from_json` docstring.
+/// * `builder = $builder($builder_name, $shape)` — the Python builder wrapper
+///   (`inner: Option<RustBuilder>`), its Python class name, and its shape:
+///   `fields` for a builder that records `fields: Vec<(&'static str,
+///   String)>` for `__repr__`, `no_fields` for one that only holds `inner`
+///   (its repr is `"{builder_name}(consumed=...)"`).
+/// * `seed = $seed` — an expression producing the seeded Rust builder.
+/// * `builder_doc = [ ... ]` (optional) — docstring lines (each a `str`
+///   literal with its own leading space, typically a NumPy ``Notes``
+///   section) appended after the `builder` docstring's ``Returns`` section.
+/// * `pricing_overrides = none` (optional) — skip the pricing-override
+///   surface.
+/// * the `build` docstring, written as `///` lines before the closing
+///   `build` keyword, forwarded verbatim.
+macro_rules! instrument_envelope_methods {
+    (
+        $ty:ident, $variant:ident, $type_tag:literal,
+        builder = $builder:ident($builder_name:literal, $shape:ident),
+        seed = $seed:expr,
+        $(builder_doc = [ $($builder_doc:literal),* $(,)? ],)?
+        pricing_overrides = none,
+        $(#[$build_doc:meta])*
+        build $(,)?
+    ) => {
         $crate::bindings::valuations::typed_macros::instrument_envelope_methods!(
-            $ty,
-            $variant,
-            $type_tag,
-            $builder,
-            $seed,
-            $shape,
-            builder_doc = []
+            @impl $ty, $variant, $type_tag, $builder, $builder_name, $shape, $seed,
+            [$($($builder_doc),*)?],
+            $(#[$build_doc])*
         );
     };
     (
-        $ty:ident, $variant:ident, $type_tag:literal, $builder:ident, $seed:expr,
-        builder_doc = [ $($builder_doc:literal),* $(,)? ]
+        $ty:ident, $variant:ident, $type_tag:literal,
+        builder = $builder:ident($builder_name:literal, $shape:ident),
+        seed = $seed:expr,
+        $(builder_doc = [ $($builder_doc:literal),* $(,)? ],)?
+        $(#[$build_doc:meta])*
+        build $(,)?
     ) => {
         $crate::bindings::valuations::typed_macros::instrument_envelope_methods!(
-            $ty,
-            $variant,
-            $type_tag,
-            $builder,
-            $seed,
-            fields,
-            builder_doc = [$($builder_doc),*]
+            @impl $ty, $variant, $type_tag, $builder, $builder_name, $shape, $seed,
+            [$($($builder_doc),*)?],
+            $(#[$build_doc])*
+        );
+        $crate::bindings::valuations::typed_macros::pricing_override_methods!(
+            $ty, $builder, $builder_name, $shape
         );
     };
     (@new_builder fields, $builder:ident, $seed:expr) => {
@@ -279,9 +326,20 @@ macro_rules! instrument_envelope_methods {
     (@new_builder no_fields, $builder:ident, $seed:expr) => {
         $builder { inner: Some($seed) }
     };
+    (@repr fields, $builder_name:literal, $slf:ident) => {
+        $crate::bindings::valuations::convert::builder_repr($builder_name, &$slf.fields)
+    };
+    (@repr no_fields, $builder_name:literal, $slf:ident) => {
+        format!(
+            concat!($builder_name, "(consumed={})"),
+            $crate::bindings::valuations::convert::bool_repr($slf.inner.is_none())
+        )
+    };
     (
-        $ty:ident, $variant:ident, $type_tag:literal, $builder:ident, $seed:expr, $shape:ident,
-        builder_doc = [ $($builder_doc:literal),* $(,)? ]
+        @impl $ty:ident, $variant:ident, $type_tag:literal, $builder:ident,
+        $builder_name:literal, $shape:ident, $seed:expr,
+        [$($builder_doc:literal),*],
+        $(#[$build_doc:meta])*
     ) => {
         #[pymethods]
         impl $ty {
@@ -359,7 +417,12 @@ macro_rules! instrument_envelope_methods {
             ///     If the value cannot be serialized to JSON.
             #[pyo3(text_signature = "($self)")]
             fn to_json(&self) -> PyResult<String> {
-                self.envelope_json()
+                $crate::bindings::valuations::instruments::serialize_typed_instrument_json(
+                    finstack_quant_valuations::instruments::InstrumentJson::from(
+                        self.inner.clone(),
+                    ),
+                    stringify!($variant),
+                )
             }
 
             /// Instrument identifier.
@@ -368,9 +431,222 @@ macro_rules! instrument_envelope_methods {
                 self.inner.id.to_string()
             }
         }
+
+        #[pymethods]
+        impl $builder {
+            $(#[$build_doc])*
+            #[pyo3(text_signature = "($self)")]
+            fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<$ty> {
+                let b = $crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
+                let inner = b.build().map_err($crate::errors::core_to_py)?;
+                Ok($ty { inner })
+            }
+
+            /// Return ``repr(self)``.
+            fn __repr__(&self) -> String {
+                $crate::bindings::valuations::typed_macros::instrument_envelope_methods!(
+                    @repr $shape, $builder_name, self
+                )
+            }
+        }
     };
 }
 pub(crate) use instrument_envelope_methods;
+
+/// Bind the three Rust `*_pricing_overrides` fields of a typed instrument:
+/// serde-dict getters on the instrument and consuming setters on its
+/// `FinancialBuilder`. Invoked by `instrument_envelope_methods!`.
+///
+/// Arguments: the Python instrument wrapper (`inner` is the Rust instrument),
+/// the Python builder wrapper (`inner: Option<RustBuilder>`), the builder's
+/// Python class name, and `fields` when the builder records set fields for
+/// `__repr__` in a `fields` vector (`no_fields` otherwise).
+macro_rules! pricing_override_methods {
+    (@record fields, $slf:ident, $name:literal) => {
+        $slf.fields.push(($name, "{...}".to_string()));
+    };
+    (@record no_fields, $slf:ident, $name:literal) => {};
+    ($instrument:ty, $builder:ty, $builder_name:literal, $record:ident) => {
+        #[pyo3::pymethods]
+        impl $instrument {
+            /// Instrument-owned pricing inputs in serde form.
+            ///
+            /// Returns
+            /// -------
+            /// dict[str, object]
+            ///     ``InstrumentPricingOverrides``: ``market_quotes`` (quoted
+            ///     clean price, yield, spreads, implied volatility, premium) and
+            ///     ``model_config`` (tree model and steps, Monte Carlo and
+            ///     Hull-White parameters). Empty sections are omitted; ``{}``
+            ///     when none is set.
+            #[getter]
+            fn instrument_pricing_overrides<'py>(
+                &self,
+                py: pyo3::Python<'py>,
+            ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::PyAny>> {
+                $crate::bindings::pandas_utils::serde_to_py(
+                    py,
+                    &self.inner.instrument_pricing_overrides,
+                )
+            }
+
+            /// Metric-time pricing configuration in serde form.
+            ///
+            /// Returns
+            /// -------
+            /// dict[str, object]
+            ///     ``MetricPricingOverrides`` (bump sizes, theta period, ...);
+            ///     unset fields are ``None`` or omitted. A
+            ///     ``metric_pricing_overrides`` argument to ``price`` is merged
+            ///     over it per call.
+            #[getter]
+            fn metric_pricing_overrides<'py>(
+                &self,
+                py: pyo3::Python<'py>,
+            ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::PyAny>> {
+                $crate::bindings::pandas_utils::serde_to_py(
+                    py,
+                    &self.inner.metric_pricing_overrides,
+                )
+            }
+
+            /// Scenario-only pricing adjustments in serde form.
+            ///
+            /// Returns
+            /// -------
+            /// dict[str, object]
+            ///     ``ScenarioPricingOverrides`` (``scenario_price_shock_decimal``,
+            ///     ``scenario_spread_shock_bp``); ``{}`` when none is set.
+            #[getter]
+            fn scenario_pricing_overrides<'py>(
+                &self,
+                py: pyo3::Python<'py>,
+            ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::PyAny>> {
+                $crate::bindings::pandas_utils::serde_to_py(
+                    py,
+                    &self.inner.scenario_pricing_overrides,
+                )
+            }
+        }
+
+        #[pyo3::pymethods]
+        impl $builder {
+            /// Set the instrument-owned pricing inputs.
+            ///
+            /// Parameters
+            /// ----------
+            /// value : dict[str, object] | str
+            ///     Rust ``InstrumentPricingOverrides`` in serde form (dict or
+            ///     JSON string): ``{"market_quotes": {...}, "model_config": {...}}``,
+            ///     e.g. ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+            ///
+            /// Returns
+            /// -------
+            #[doc = concat!(" ", $builder_name)]
+            ///     ``self``, for chaining.
+            ///
+            /// Raises
+            /// ------
+            /// ValueError
+            ///     If the builder was already consumed by ``build()`` or
+            ///     ``value`` does not deserialize as ``InstrumentPricingOverrides``.
+            #[pyo3(text_signature = "($self, value)")]
+            fn instrument_pricing_overrides<'py>(
+                mut slf: pyo3::PyRefMut<'py, Self>,
+                py: pyo3::Python<'py>,
+                value: &pyo3::Bound<'py, pyo3::PyAny>,
+            ) -> pyo3::PyResult<pyo3::PyRefMut<'py, Self>> {
+                let overrides: finstack_quant_valuations::instruments::InstrumentPricingOverrides =
+                    $crate::bindings::valuations::instruments::spec_from_py(
+                        py,
+                        value,
+                        "instrument_pricing_overrides",
+                    )?;
+                let builder = $crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
+                slf.inner = Some(builder.instrument_pricing_overrides(overrides));
+                $crate::bindings::valuations::typed_macros::pricing_override_methods!(
+                    @record $record, slf, "instrument_pricing_overrides"
+                );
+                Ok(slf)
+            }
+
+            /// Set the metric-time pricing configuration stored on the instrument.
+            ///
+            /// Parameters
+            /// ----------
+            /// value : MetricPricingOverrides | dict[str, object] | str
+            ///     Rust ``MetricPricingOverrides`` as the typed class, a dict or a
+            ///     JSON string.
+            ///
+            /// Returns
+            /// -------
+            #[doc = concat!(" ", $builder_name)]
+            ///     ``self``, for chaining.
+            ///
+            /// Raises
+            /// ------
+            /// ValueError
+            ///     If the builder was already consumed by ``build()`` or
+            ///     ``value`` does not deserialize as ``MetricPricingOverrides``.
+            #[pyo3(text_signature = "($self, value)")]
+            fn metric_pricing_overrides<'py>(
+                mut slf: pyo3::PyRefMut<'py, Self>,
+                py: pyo3::Python<'py>,
+                value: &pyo3::Bound<'py, pyo3::PyAny>,
+            ) -> pyo3::PyResult<pyo3::PyRefMut<'py, Self>> {
+                let overrides =
+                    $crate::bindings::valuations::pricing::metric_pricing_overrides_from_py(
+                        py, value,
+                    )?;
+                let builder = $crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
+                slf.inner = Some(builder.metric_pricing_overrides(overrides));
+                $crate::bindings::valuations::typed_macros::pricing_override_methods!(
+                    @record $record, slf, "metric_pricing_overrides"
+                );
+                Ok(slf)
+            }
+
+            /// Set the scenario-only pricing adjustments.
+            ///
+            /// Parameters
+            /// ----------
+            /// value : dict[str, object] | str
+            ///     Rust ``ScenarioPricingOverrides`` in serde form (dict or JSON
+            ///     string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+            ///
+            /// Returns
+            /// -------
+            #[doc = concat!(" ", $builder_name)]
+            ///     ``self``, for chaining.
+            ///
+            /// Raises
+            /// ------
+            /// ValueError
+            ///     If the builder was already consumed by ``build()`` or
+            ///     ``value`` does not deserialize as ``ScenarioPricingOverrides``.
+            #[pyo3(text_signature = "($self, value)")]
+            fn scenario_pricing_overrides<'py>(
+                mut slf: pyo3::PyRefMut<'py, Self>,
+                py: pyo3::Python<'py>,
+                value: &pyo3::Bound<'py, pyo3::PyAny>,
+            ) -> pyo3::PyResult<pyo3::PyRefMut<'py, Self>> {
+                let overrides: finstack_quant_valuations::instruments::ScenarioPricingOverrides =
+                    $crate::bindings::valuations::instruments::spec_from_py(
+                        py,
+                        value,
+                        "scenario_pricing_overrides",
+                    )?;
+                let builder = $crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
+                slf.inner = Some(builder.scenario_pricing_overrides(overrides));
+                $crate::bindings::valuations::typed_macros::pricing_override_methods!(
+                    @record $record, slf, "scenario_pricing_overrides"
+                );
+                Ok(slf)
+            }
+        }
+    };
+}
+pub(crate) use pricing_override_methods;
 
 /// Apply one consuming Rust setter inside a Python builder method.
 ///

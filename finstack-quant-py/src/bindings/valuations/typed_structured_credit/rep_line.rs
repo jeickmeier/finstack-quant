@@ -194,101 +194,16 @@ spread_bp=None, forward_curve_id=None, index_floor_bp=None, cpr=None, cdr=None, 
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Rep line identifier.
-    #[getter]
-    fn id(&self) -> String {
-        self.inner.id.clone()
-    }
-
     /// Canonical asset classification, including its amortization behavior.
     #[getter]
     fn asset_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.asset_type)
     }
 
-    /// Aggregated balance.
-    #[getter]
-    fn balance(&self) -> PyMoney {
-        money_to_py(self.inner.balance)
-    }
-
-    /// Weighted average coupon as an annual decimal rate.
-    #[getter]
-    fn rate(&self) -> f64 {
-        self.inner.rate
-    }
-
-    /// Weighted average spread in basis points, or ``None`` for fixed lines.
-    #[getter]
-    fn spread_bp(&self) -> Option<f64> {
-        self.inner.spread_bp
-    }
-
-    /// Reference index identifier, or ``None``.
-    #[getter]
-    fn forward_curve_id(&self) -> Option<String> {
-        self.inner.forward_curve_id.clone()
-    }
-
-    /// Floor on the floating index in basis points, applied before the
-    /// spread, or ``None``.
-    #[getter]
-    fn index_floor_bp(&self) -> Option<f64> {
-        self.inner.index_floor_bp
-    }
-
-    /// Contractual periodic payment, or ``None`` when inferred.
-    #[getter]
-    fn contractual_payment(&self) -> Option<PyMoney> {
-        self.inner.contractual_payment.map(money_to_py)
-    }
-
-    /// Amortization schedule length in months from origination, or ``None``.
-    #[getter]
-    fn amortization_term_months(&self) -> Option<u32> {
-        self.inner.amortization_term_months
-    }
-
-    /// Interest-only window in months from origination, or ``None``.
-    #[getter]
-    fn io_months(&self) -> Option<u32> {
-        self.inner.io_months
-    }
-
     /// Weighted average maturity as ``datetime.date``.
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
-    }
-
-    /// Weighted average seasoning in months.
-    #[getter]
-    fn seasoning_months(&self) -> u32 {
-        self.inner.seasoning_months
-    }
-
-    /// Accrual day-count convention.
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
-
-    /// CPR override as an annual decimal, or ``None``.
-    #[getter]
-    fn cpr(&self) -> Option<f64> {
-        self.inner.cpr
-    }
-
-    /// CDR override as an annual decimal, or ``None``.
-    #[getter]
-    fn cdr(&self) -> Option<f64> {
-        self.inner.cdr
-    }
-
-    /// Recovery-rate override as a decimal fraction, or ``None``.
-    #[getter]
-    fn recovery_rate(&self) -> Option<f64> {
-        self.inner.recovery_rate
     }
 
     /// Return ``repr(self)``.
@@ -304,3 +219,48 @@ spread_bp=None, forward_curve_id=None, index_floor_bp=None, cpr=None, cdr=None, 
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyRepLine |s| {
+    /// Rep line identifier.
+    id -> String = s.inner.id.clone();
+
+    /// Aggregated balance.
+    balance -> PyMoney = money_to_py(s.inner.balance);
+
+    /// Weighted average coupon as an annual decimal rate.
+    rate -> f64 = s.inner.rate;
+
+    /// Weighted average spread in basis points, or ``None`` for fixed lines.
+    spread_bp -> Option<f64> = s.inner.spread_bp;
+
+    /// Reference index identifier, or ``None``.
+    forward_curve_id -> Option<String> = s.inner.forward_curve_id.clone();
+
+    /// Floor on the floating index in basis points, applied before the
+    /// spread, or ``None``.
+    index_floor_bp -> Option<f64> = s.inner.index_floor_bp;
+
+    /// Contractual periodic payment, or ``None`` when inferred.
+    contractual_payment -> Option<PyMoney> = s.inner.contractual_payment.map(money_to_py);
+
+    /// Amortization schedule length in months from origination, or ``None``.
+    amortization_term_months -> Option<u32> = s.inner.amortization_term_months;
+
+    /// Interest-only window in months from origination, or ``None``.
+    io_months -> Option<u32> = s.inner.io_months;
+
+    /// Weighted average seasoning in months.
+    seasoning_months -> u32 = s.inner.seasoning_months;
+
+    /// Accrual day-count convention.
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
+
+    /// CPR override as an annual decimal, or ``None``.
+    cpr -> Option<f64> = s.inner.cpr;
+
+    /// CDR override as an annual decimal, or ``None``.
+    cdr -> Option<f64> = s.inner.cdr;
+
+    /// Recovery-rate override as a decimal fraction, or ``None``.
+    recovery_rate -> Option<f64> = s.inner.recovery_rate;
+});

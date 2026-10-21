@@ -29,7 +29,7 @@ pub struct PyTermOutSpec {
     pub(crate) inner: TermOutSpec,
 }
 
-sc_wire_methods!(PyTermOutSpec, TermOutSpec, "TermOutSpec");
+crate::bindings::macros::wire_methods!(PyTermOutSpec, TermOutSpec, "TermOutSpec", to_dict);
 
 #[pymethods]
 impl PyTermOutSpec {
@@ -48,17 +48,16 @@ impl PyTermOutSpec {
         }
     }
 
-    /// Term-out length in months.
-    #[getter]
-    fn months(&self) -> u32 {
-        self.inner.months
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!("TermOutSpec(months={})", self.inner.months)
     }
 }
+
+crate::bindings::macros::py_getters!(PyTermOutSpec |s| {
+    /// Term-out length in months.
+    months -> u32 = s.inner.months;
+});
 
 /// An event that ends a facility's revolving period early.
 ///
@@ -87,7 +86,12 @@ pub struct PyAmortizationEvent {
     pub(crate) inner: AmortizationEvent,
 }
 
-sc_wire_methods!(PyAmortizationEvent, AmortizationEvent, "AmortizationEvent");
+crate::bindings::macros::wire_methods!(
+    PyAmortizationEvent,
+    AmortizationEvent,
+    "AmortizationEvent",
+    to_dict
+);
 
 #[pymethods]
 impl PyAmortizationEvent {

@@ -80,7 +80,7 @@ fn opt_spec<T: serde::de::DeserializeOwned + Send>(
         .transpose()
 }
 
-sc_wire_methods!(PyPoolAsset, PoolAsset, "PoolAsset");
+crate::bindings::macros::wire_methods!(PyPoolAsset, PoolAsset, "PoolAsset", to_dict);
 
 #[pymethods]
 impl PyPoolAsset {
@@ -406,47 +406,10 @@ impl PyPoolAsset {
         })
     }
 
-    /// Asset identifier.
-    #[getter]
-    fn id(&self) -> String {
-        self.inner.id.to_string()
-    }
-
     /// ``AssetType`` serde object (``{"type": ..., ...}``).
     #[getter]
     fn asset_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.asset_type)
-    }
-
-    /// Current principal balance.
-    #[getter]
-    fn balance(&self) -> PyMoney {
-        money_to_py(self.inner.balance)
-    }
-
-    /// Annual coupon as a decimal.
-    #[getter]
-    fn rate(&self) -> f64 {
-        self.inner.rate
-    }
-
-    /// Floating spread in basis points, or ``None`` for a fixed-rate row.
-    #[getter]
-    fn spread_bp(&self) -> Option<f64> {
-        self.inner.spread_bp
-    }
-
-    /// Floating index curve identifier, or ``None``.
-    #[getter]
-    fn forward_curve_id(&self) -> Option<String> {
-        self.inner.forward_curve_id.clone()
-    }
-
-    /// Floor on the floating index in basis points, applied before the
-    /// spread, or ``None``.
-    #[getter]
-    fn index_floor_bp(&self) -> Option<f64> {
-        self.inner.index_floor_bp
     }
 
     /// Contractual maturity as ``datetime.date``.
@@ -465,30 +428,6 @@ impl PyPoolAsset {
             .transpose()
     }
 
-    /// Industry label, or ``None``.
-    #[getter]
-    fn industry(&self) -> Option<String> {
-        self.inner.industry.clone()
-    }
-
-    /// Obligor identifier, or ``None``.
-    #[getter]
-    fn obligor_id(&self) -> Option<String> {
-        self.inner.obligor_id.clone()
-    }
-
-    /// ``True`` when the row is defaulted.
-    #[getter]
-    fn defaulted(&self) -> bool {
-        self.inner.defaulted
-    }
-
-    /// Expected recovery on a defaulted row, or ``None``.
-    #[getter]
-    fn recovery_amount(&self) -> Option<PyMoney> {
-        self.inner.recovery_amount.map(money_to_py)
-    }
-
     /// Default date as ``datetime.date``, or ``None``.
     #[getter]
     fn default_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -496,12 +435,6 @@ impl PyPoolAsset {
             .default_date
             .map(|date| date_to_py(py, date))
             .transpose()
-    }
-
-    /// Purchase price, or ``None``.
-    #[getter]
-    fn purchase_price(&self) -> Option<PyMoney> {
-        self.inner.purchase_price.map(money_to_py)
     }
 
     /// Acquisition date as ``datetime.date``, or ``None``.
@@ -521,71 +454,6 @@ impl PyPoolAsset {
             .origination_date
             .map(|date| date_to_py(py, date))
             .transpose()
-    }
-
-    /// Accrual day count.
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount {
-            inner: self.inner.day_count,
-        }
-    }
-
-    /// Row-level SMM override (decimal), or ``None``.
-    #[getter]
-    fn smm_override(&self) -> Option<f64> {
-        self.inner.smm_override
-    }
-
-    /// Row-level MDR override (decimal), or ``None``.
-    #[getter]
-    fn mdr_override(&self) -> Option<f64> {
-        self.inner.mdr_override
-    }
-
-    /// Row-level recovery rate (decimal), or ``None``.
-    #[getter]
-    fn recovery_rate(&self) -> Option<f64> {
-        self.inner.recovery_rate
-    }
-
-    /// Total commitment of a revolving row, or ``None``.
-    #[getter]
-    fn commitment(&self) -> Option<PyMoney> {
-        self.inner.commitment.map(money_to_py)
-    }
-
-    /// Monthly level payment, or ``None`` when derived from the terms.
-    #[getter]
-    fn contractual_payment(&self) -> Option<PyMoney> {
-        self.inner.contractual_payment.map(money_to_py)
-    }
-
-    /// Amortization schedule length in months from origination, or ``None``.
-    #[getter]
-    fn amortization_term_months(&self) -> Option<u32> {
-        self.inner.amortization_term_months
-    }
-
-    /// Interest-only window in months from origination, or ``None``.
-    #[getter]
-    fn io_months(&self) -> Option<u32> {
-        self.inner.io_months
-    }
-
-    /// Market price in percent of par, or ``None``.
-    #[getter]
-    fn market_price_pct(&self) -> Option<f64> {
-        self.inner.market_price_pct
-    }
-
-    /// Seeded delinquent balances per bucket, or ``None``.
-    #[getter]
-    fn delinquency_buckets(&self) -> Option<Vec<PyMoney>> {
-        self.inner
-            .delinquency_buckets
-            .as_ref()
-            .map(|buckets| buckets.iter().copied().map(money_to_py).collect())
     }
 
     /// ``BalloonSpec`` serde dict, or ``None``.
@@ -618,12 +486,6 @@ impl PyPoolAsset {
             .transpose()
     }
 
-    /// Annual net operating income, or ``None``.
-    #[getter]
-    fn noi(&self) -> Option<PyMoney> {
-        self.inner.noi.map(money_to_py)
-    }
-
     /// ``LiquidationSpec`` serde dict, or ``None`` for a performing loan.
     #[getter]
     fn liquidation<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -645,6 +507,78 @@ impl PyPoolAsset {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyPoolAsset |s| {
+    /// Asset identifier.
+    id -> String = s.inner.id.to_string();
+
+    /// Current principal balance.
+    balance -> PyMoney = money_to_py(s.inner.balance);
+
+    /// Annual coupon as a decimal.
+    rate -> f64 = s.inner.rate;
+
+    /// Floating spread in basis points, or ``None`` for a fixed-rate row.
+    spread_bp -> Option<f64> = s.inner.spread_bp;
+
+    /// Floating index curve identifier, or ``None``.
+    forward_curve_id -> Option<String> = s.inner.forward_curve_id.clone();
+
+    /// Floor on the floating index in basis points, applied before the
+    /// spread, or ``None``.
+    index_floor_bp -> Option<f64> = s.inner.index_floor_bp;
+
+    /// Industry label, or ``None``.
+    industry -> Option<String> = s.inner.industry.clone();
+
+    /// Obligor identifier, or ``None``.
+    obligor_id -> Option<String> = s.inner.obligor_id.clone();
+
+    /// ``True`` when the row is defaulted.
+    defaulted -> bool = s.inner.defaulted;
+
+    /// Expected recovery on a defaulted row, or ``None``.
+    recovery_amount -> Option<PyMoney> = s.inner.recovery_amount.map(money_to_py);
+
+    /// Purchase price, or ``None``.
+    purchase_price -> Option<PyMoney> = s.inner.purchase_price.map(money_to_py);
+
+    /// Accrual day count.
+    day_count -> PyDayCount = PyDayCount { inner: s.inner.day_count };
+
+    /// Row-level SMM override (decimal), or ``None``.
+    smm_override -> Option<f64> = s.inner.smm_override;
+
+    /// Row-level MDR override (decimal), or ``None``.
+    mdr_override -> Option<f64> = s.inner.mdr_override;
+
+    /// Row-level recovery rate (decimal), or ``None``.
+    recovery_rate -> Option<f64> = s.inner.recovery_rate;
+
+    /// Total commitment of a revolving row, or ``None``.
+    commitment -> Option<PyMoney> = s.inner.commitment.map(money_to_py);
+
+    /// Monthly level payment, or ``None`` when derived from the terms.
+    contractual_payment -> Option<PyMoney> = s.inner.contractual_payment.map(money_to_py);
+
+    /// Amortization schedule length in months from origination, or ``None``.
+    amortization_term_months -> Option<u32> = s.inner.amortization_term_months;
+
+    /// Interest-only window in months from origination, or ``None``.
+    io_months -> Option<u32> = s.inner.io_months;
+
+    /// Market price in percent of par, or ``None``.
+    market_price_pct -> Option<f64> = s.inner.market_price_pct;
+
+    /// Seeded delinquent balances per bucket, or ``None``.
+    delinquency_buckets -> Option<Vec<PyMoney>> = s.inner
+        .delinquency_buckets
+        .as_ref()
+        .map(|buckets| buckets.iter().copied().map(money_to_py).collect());
+
+    /// Annual net operating income, or ``None``.
+    noi -> Option<PyMoney> = s.inner.noi.map(money_to_py);
+});
 
 /// Coerce ``Sequence[PoolAsset | dict] | str`` into Rust asset rows.
 pub(crate) fn pool_assets_from_py(

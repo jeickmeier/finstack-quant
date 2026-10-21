@@ -180,39 +180,6 @@ pub(crate) struct PyVarResult {
 
 #[pymethods]
 impl PyVarResult {
-    /// Value-at-Risk: the signed P&L at the ``1 - confidence_level`` quantile
-    /// (negative for a loss, ``0.0`` for an all-gain distribution), in the
-    /// portfolio or reporting currency.
-    #[getter]
-    fn var(&self) -> f64 {
-        self.inner.var
-    }
-
-    /// Expected shortfall: mean signed P&L over the worst
-    /// ``1 - confidence_level`` tail; same sign convention as ``var``.
-    #[getter]
-    fn expected_shortfall(&self) -> f64 {
-        self.inner.expected_shortfall
-    }
-
-    /// Portfolio P&L per scenario, sorted ascending (worst first).
-    #[getter]
-    fn pnl_distribution(&self) -> Vec<f64> {
-        self.inner.pnl_distribution.clone()
-    }
-
-    /// Number of scenarios in the distribution.
-    #[getter]
-    fn num_scenarios(&self) -> usize {
-        self.inner.num_scenarios
-    }
-
-    /// Confidence level used, as a decimal (``0.95`` = 95%).
-    #[getter]
-    fn confidence_level(&self) -> f64 {
-        self.inner.confidence_level
-    }
-
     /// The P&L distribution as a one-column pandas ``DataFrame``.
     ///
     /// Column ``pnl`` (``float64``), one row per scenario in the stored
@@ -287,6 +254,26 @@ impl PyVarResult {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyVarResult |s| {
+    /// Value-at-Risk: the signed P&L at the ``1 - confidence_level`` quantile
+    /// (negative for a loss, ``0.0`` for an all-gain distribution), in the
+    /// portfolio or reporting currency.
+    var -> f64 = s.inner.var;
+
+    /// Expected shortfall: mean signed P&L over the worst
+    /// ``1 - confidence_level`` tail; same sign convention as ``var``.
+    expected_shortfall -> f64 = s.inner.expected_shortfall;
+
+    /// Portfolio P&L per scenario, sorted ascending (worst first).
+    pnl_distribution -> Vec<f64> = s.inner.pnl_distribution.clone();
+
+    /// Number of scenarios in the distribution.
+    num_scenarios -> usize = s.inner.num_scenarios;
+
+    /// Confidence level used, as a decimal (``0.95`` = 95%).
+    confidence_level -> f64 = s.inner.confidence_level;
+});
 
 /// Register the VaR entry point and result type on the instruments submodule.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {

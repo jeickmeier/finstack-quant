@@ -31,7 +31,7 @@ pub struct PyCoverageRules {
     pub(crate) inner: CoverageRules,
 }
 
-sc_wire_methods!(PyCoverageRules, CoverageRules, "CoverageRules");
+crate::bindings::macros::wire_methods!(PyCoverageRules, CoverageRules, "CoverageRules", to_dict);
 
 #[pymethods]
 impl PyCoverageRules {

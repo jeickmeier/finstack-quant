@@ -130,50 +130,11 @@ impl PyEnhancedMonteCarloResult {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Mean present value across paths (facility currency).
-    #[getter]
-    fn pv(&self) -> PyMoney {
-        money_to_py(self.inner.mc_result.estimate.mean)
-    }
-
-    /// Standard error of the mean present value, in currency units.
-    #[getter]
-    fn pv_std_error(&self) -> f64 {
-        self.inner.mc_result.estimate.stderr
-    }
-
     /// 95% confidence interval of the mean present value.
     #[getter]
     fn pv_ci_95(&self) -> (PyMoney, PyMoney) {
         let (low, high) = self.inner.mc_result.estimate.ci_95;
         (money_to_py(low), money_to_py(high))
-    }
-
-    /// Number of independent path estimators (antithetic pairs count once).
-    #[getter]
-    fn num_paths(&self) -> usize {
-        self.inner.mc_result.estimate.num_paths
-    }
-
-    /// Number of simulated paths, including both members of antithetic pairs.
-    #[getter]
-    fn num_simulated_paths(&self) -> usize {
-        self.inner.path_results.len()
-    }
-
-    /// Mean draw option cost across paths (facility currency): the value to
-    /// the lender of the simulated draws having been made at the contractual
-    /// margin instead of each path's fair spread. Negative when spreads
-    /// widen after draws.
-    #[getter]
-    fn draw_option_cost(&self) -> PyMoney {
-        money_to_py(self.inner.draw_option_cost.mean)
-    }
-
-    /// Standard error of the mean draw option cost, in currency units.
-    #[getter]
-    fn draw_option_cost_std_error(&self) -> f64 {
-        self.inner.draw_option_cost.stderr
     }
 
     /// 95% confidence interval of the mean draw option cost.
@@ -270,3 +231,26 @@ impl PyEnhancedMonteCarloResult {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyEnhancedMonteCarloResult |s| {
+    /// Mean present value across paths (facility currency).
+    pv -> PyMoney = money_to_py(s.inner.mc_result.estimate.mean);
+
+    /// Standard error of the mean present value, in currency units.
+    pv_std_error -> f64 = s.inner.mc_result.estimate.stderr;
+
+    /// Number of independent path estimators (antithetic pairs count once).
+    num_paths -> usize = s.inner.mc_result.estimate.num_paths;
+
+    /// Number of simulated paths, including both members of antithetic pairs.
+    num_simulated_paths -> usize = s.inner.path_results.len();
+
+    /// Mean draw option cost across paths (facility currency): the value to
+    /// the lender of the simulated draws having been made at the contractual
+    /// margin instead of each path's fair spread. Negative when spreads
+    /// widen after draws.
+    draw_option_cost -> PyMoney = money_to_py(s.inner.draw_option_cost.mean);
+
+    /// Standard error of the mean draw option cost, in currency units.
+    draw_option_cost_std_error -> f64 = s.inner.draw_option_cost.stderr;
+});

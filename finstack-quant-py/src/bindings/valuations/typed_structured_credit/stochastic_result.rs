@@ -151,101 +151,10 @@ impl PyStochasticPricingResult {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Mean deal present value across paths (pool currency).
-    #[getter]
-    fn npv(&self) -> PyMoney {
-        money_to_py(self.inner.npv)
-    }
-
-    /// Dirty price as a percent of the sum of current tranche balances
-    /// (the same face as the deterministic ``dirty_price`` metric).
-    #[getter]
-    fn dirty_price(&self) -> f64 {
-        self.inner.dirty_price
-    }
-
-    /// Expected (mean) loss across paths.
-    #[getter]
-    fn expected_loss(&self) -> PyMoney {
-        money_to_py(self.inner.expected_loss)
-    }
-
-    /// Unexpected loss (standard deviation of the path losses).
-    #[getter]
-    fn unexpected_loss(&self) -> PyMoney {
-        money_to_py(self.inner.unexpected_loss)
-    }
-
-    /// Expected shortfall of the path losses at ``es_confidence``.
-    #[getter]
-    fn expected_shortfall(&self) -> PyMoney {
-        money_to_py(self.inner.expected_shortfall)
-    }
-
-    /// Confidence level of ``expected_shortfall`` (decimal).
-    #[getter]
-    fn es_confidence(&self) -> f64 {
-        self.inner.es_confidence
-    }
-
-    /// Sample standard error of the mean present value, in currency units.
-    /// Monte Carlo uses the sample standard deviation divided by the square
-    /// root of the independent-estimator count; each antithetic pair contributes
-    /// its average as one observation.
-    #[getter]
-    fn pv_std_error(&self) -> f64 {
-        self.inner.pv_std_error
-    }
-
-    /// Two-sided 95% Student-t confidence interval of mean present value, in
-    /// currency units. Monte Carlo uses one fewer degree of freedom than the
-    /// independent-estimator count; each antithetic pair counts once.
-    #[getter]
-    fn pv_confidence_interval(&self) -> (f64, f64) {
-        self.inner.pv_confidence_interval
-    }
-
-    /// Number of simulated scenario paths (two per antithetic estimator).
-    /// Monte Carlo sampling uncertainty uses independent estimator counts,
-    /// which equal half this value when antithetic pairing is enabled.
-    #[getter]
-    fn num_paths(&self) -> usize {
-        self.inner.num_paths
-    }
-
     /// Pricing mode used, as its serde ``dict``.
     #[getter]
     fn pricing_mode<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.pricing_mode)
-    }
-
-    /// Fraction of paths on which a collateral draw could not be funded from
-    /// the reserve account and that period's principal collections.
-    #[getter]
-    fn unfunded_draw_path_fraction(&self) -> f64 {
-        self.inner.unfunded_draw_path_fraction
-    }
-
-    /// Mean over paths of the collateral draws funded through the reserve
-    /// account and principal collections.
-    #[getter]
-    fn expected_collateral_draws(&self) -> PyMoney {
-        money_to_py(self.inner.expected_collateral_draws)
-    }
-
-    /// Mean draw option cost across paths: the value to the deal of its
-    /// revolvers' draws having been made at the contractual margin instead
-    /// of each path's fair spread (negative when spreads widen).
-    #[getter]
-    fn draw_option_cost(&self) -> PyMoney {
-        money_to_py(self.inner.draw_option_cost)
-    }
-
-    /// Per-path draw option cost in path order (empty for pools without
-    /// stochastic revolvers).
-    #[getter]
-    fn draw_option_cost_paths(&self) -> Vec<f64> {
-        self.inner.draw_option_cost_paths.clone()
     }
 
     /// Tranche-level results as a list of dicts (``TranchePricingResult``
@@ -358,3 +267,57 @@ impl PyStochasticPricingResult {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyStochasticPricingResult |s| {
+    /// Mean deal present value across paths (pool currency).
+    npv -> PyMoney = money_to_py(s.inner.npv);
+
+    /// Dirty price as a percent of the sum of current tranche balances
+    /// (the same face as the deterministic ``dirty_price`` metric).
+    dirty_price -> f64 = s.inner.dirty_price;
+
+    /// Expected (mean) loss across paths.
+    expected_loss -> PyMoney = money_to_py(s.inner.expected_loss);
+
+    /// Unexpected loss (standard deviation of the path losses).
+    unexpected_loss -> PyMoney = money_to_py(s.inner.unexpected_loss);
+
+    /// Expected shortfall of the path losses at ``es_confidence``.
+    expected_shortfall -> PyMoney = money_to_py(s.inner.expected_shortfall);
+
+    /// Confidence level of ``expected_shortfall`` (decimal).
+    es_confidence -> f64 = s.inner.es_confidence;
+
+    /// Sample standard error of the mean present value, in currency units.
+    /// Monte Carlo uses the sample standard deviation divided by the square
+    /// root of the independent-estimator count; each antithetic pair contributes
+    /// its average as one observation.
+    pv_std_error -> f64 = s.inner.pv_std_error;
+
+    /// Two-sided 95% Student-t confidence interval of mean present value, in
+    /// currency units. Monte Carlo uses one fewer degree of freedom than the
+    /// independent-estimator count; each antithetic pair counts once.
+    pv_confidence_interval -> (f64, f64) = s.inner.pv_confidence_interval;
+
+    /// Number of simulated scenario paths (two per antithetic estimator).
+    /// Monte Carlo sampling uncertainty uses independent estimator counts,
+    /// which equal half this value when antithetic pairing is enabled.
+    num_paths -> usize = s.inner.num_paths;
+
+    /// Fraction of paths on which a collateral draw could not be funded from
+    /// the reserve account and that period's principal collections.
+    unfunded_draw_path_fraction -> f64 = s.inner.unfunded_draw_path_fraction;
+
+    /// Mean over paths of the collateral draws funded through the reserve
+    /// account and principal collections.
+    expected_collateral_draws -> PyMoney = money_to_py(s.inner.expected_collateral_draws);
+
+    /// Mean draw option cost across paths: the value to the deal of its
+    /// revolvers' draws having been made at the contractual margin instead
+    /// of each path's fair spread (negative when spreads widen).
+    draw_option_cost -> PyMoney = money_to_py(s.inner.draw_option_cost);
+
+    /// Per-path draw option cost in path order (empty for pools without
+    /// stochastic revolvers).
+    draw_option_cost_paths -> Vec<f64> = s.inner.draw_option_cost_paths.clone();
+});

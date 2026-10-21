@@ -53,7 +53,12 @@ pub struct PyTrancheCashflows {
     pub(crate) inner: TrancheCashflows,
 }
 
-sc_wire_methods!(PyTrancheCashflows, TrancheCashflows, "TrancheCashflows");
+crate::bindings::macros::wire_methods!(
+    PyTrancheCashflows,
+    TrancheCashflows,
+    "TrancheCashflows",
+    to_dict
+);
 
 /// Convert dated flows to ``(datetime.date, Money)`` pairs.
 fn flows_to_py<'py>(
@@ -68,12 +73,6 @@ fn flows_to_py<'py>(
 
 #[pymethods]
 impl PyTrancheCashflows {
-    /// Tranche identifier.
-    #[getter]
-    fn tranche_id(&self) -> String {
-        self.inner.tranche_id.clone()
-    }
-
     /// Total cash paid to the tranche per payment date, as
     /// ``(datetime.date, Money)`` pairs.
     #[getter]
@@ -123,42 +122,6 @@ impl PyTrancheCashflows {
         serde_to_py(py, &self.inner.detailed_flows)
     }
 
-    /// Balance outstanding after the last projected payment.
-    #[getter]
-    fn final_balance(&self) -> PyMoney {
-        money_to_py(self.inner.final_balance)
-    }
-
-    /// Total interest paid over the projection.
-    #[getter]
-    fn total_interest(&self) -> PyMoney {
-        money_to_py(self.inner.total_interest)
-    }
-
-    /// Total principal paid over the projection.
-    #[getter]
-    fn total_principal(&self) -> PyMoney {
-        money_to_py(self.inner.total_principal)
-    }
-
-    /// Total interest capitalized over the projection.
-    #[getter]
-    fn total_pik(&self) -> PyMoney {
-        money_to_py(self.inner.total_pik)
-    }
-
-    /// Total interest deferred as a claim over the projection.
-    #[getter]
-    fn total_deferred(&self) -> PyMoney {
-        money_to_py(self.inner.total_deferred)
-    }
-
-    /// Total principal written down over the projection.
-    #[getter]
-    fn total_writedown(&self) -> PyMoney {
-        money_to_py(self.inner.total_writedown)
-    }
-
     /// One row per payment date as a pandas ``DataFrame``.
     ///
     /// Columns: ``date`` (ISO 8601 string), ``cashflow`` (total paid),
@@ -193,3 +156,26 @@ impl PyTrancheCashflows {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyTrancheCashflows |s| {
+    /// Tranche identifier.
+    tranche_id -> String = s.inner.tranche_id.clone();
+
+    /// Balance outstanding after the last projected payment.
+    final_balance -> PyMoney = money_to_py(s.inner.final_balance);
+
+    /// Total interest paid over the projection.
+    total_interest -> PyMoney = money_to_py(s.inner.total_interest);
+
+    /// Total principal paid over the projection.
+    total_principal -> PyMoney = money_to_py(s.inner.total_principal);
+
+    /// Total interest capitalized over the projection.
+    total_pik -> PyMoney = money_to_py(s.inner.total_pik);
+
+    /// Total interest deferred as a claim over the projection.
+    total_deferred -> PyMoney = money_to_py(s.inner.total_deferred);
+
+    /// Total principal written down over the projection.
+    total_writedown -> PyMoney = money_to_py(s.inner.total_writedown);
+});

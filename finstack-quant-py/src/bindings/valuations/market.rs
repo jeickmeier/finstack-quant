@@ -106,48 +106,6 @@ convention_record_methods!(PyRateIndexConventions, RateIndexConventions);
 
 #[pymethods]
 impl PyRateIndexConventions {
-    /// ISO-4217 currency code of the index.
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
-    }
-
-    /// Index family: ``"overnight_rfr"``, ``"term_ibor"`` or the serde name of the variant.
-    #[getter]
-    fn kind(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.kind)
-    }
-
-    /// Index tenor (``"3M"``) or ``None`` for overnight indices.
-    #[getter]
-    fn tenor(&self) -> PyResult<Option<String>> {
-        self.inner.tenor.as_ref().map(enum_to_py_string).transpose()
-    }
-
-    /// Accrual day count of the floating leg (serde name, e.g. ``"act_360"``).
-    #[getter]
-    fn day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.day_count)
-    }
-
-    /// Default floating-leg payment frequency (``"3M"``, ``"1Y"`` ...).
-    #[getter]
-    fn default_payment_frequency(&self) -> String {
-        self.inner.default_payment_frequency.to_string()
-    }
-
-    /// Default payment lag in business days after period end.
-    #[getter]
-    fn default_payment_lag_days(&self) -> i32 {
-        self.inner.default_payment_lag_days
-    }
-
-    /// Default fixing (reset) lag in business days before accrual start.
-    #[getter]
-    fn default_reset_lag_days(&self) -> i32 {
-        self.inner.default_reset_lag_days
-    }
-
     /// OIS compounding style for overnight indices, or ``None``.
     #[getter]
     fn ois_compounding(&self) -> PyResult<Option<String>> {
@@ -156,36 +114,6 @@ impl PyRateIndexConventions {
             .as_ref()
             .map(enum_to_py_string)
             .transpose()
-    }
-
-    /// Calendar identifier used for fixings and payments.
-    #[getter]
-    fn market_calendar_id(&self) -> String {
-        self.inner.market_calendar_id.clone()
-    }
-
-    /// Spot settlement lag in business days (T+n).
-    #[getter]
-    fn market_settlement_days(&self) -> i32 {
-        self.inner.market_settlement_days
-    }
-
-    /// Business-day convention for date rolls (serde name).
-    #[getter]
-    fn market_business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.market_business_day_convention)
-    }
-
-    /// Default fixed-leg day count for a standard swap on this index.
-    #[getter]
-    fn default_fixed_leg_day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.default_fixed_leg_day_count)
-    }
-
-    /// Default fixed-leg payment frequency for a standard swap on this index.
-    #[getter]
-    fn default_fixed_leg_frequency(&self) -> String {
-        self.inner.default_fixed_leg_frequency.to_string()
     }
 
     /// Return ``repr(self)``.
@@ -207,6 +135,46 @@ impl PyRateIndexConventions {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyRateIndexConventions |s| {
+    /// ISO-4217 currency code of the index.
+    currency -> String = s.inner.currency.to_string();
+
+    /// Index family: ``"overnight_rfr"``, ``"term_ibor"`` or the serde name of the variant.
+    kind -> PyResult<String> = enum_to_py_string(&s.inner.kind);
+
+    /// Index tenor (``"3M"``) or ``None`` for overnight indices.
+    tenor -> PyResult<Option<String>> = s.inner.tenor.as_ref().map(enum_to_py_string).transpose();
+
+    /// Accrual day count of the floating leg (serde name, e.g. ``"act_360"``).
+    day_count -> PyResult<String> = enum_to_py_string(&s.inner.day_count);
+
+    /// Default floating-leg payment frequency (``"3M"``, ``"1Y"`` ...).
+    default_payment_frequency -> String = s.inner.default_payment_frequency.to_string();
+
+    /// Default payment lag in business days after period end.
+    default_payment_lag_days -> i32 = s.inner.default_payment_lag_days;
+
+    /// Default fixing (reset) lag in business days before accrual start.
+    default_reset_lag_days -> i32 = s.inner.default_reset_lag_days;
+
+    /// Calendar identifier used for fixings and payments.
+    market_calendar_id -> String = s.inner.market_calendar_id.clone();
+
+    /// Spot settlement lag in business days (T+n).
+    market_settlement_days -> i32 = s.inner.market_settlement_days;
+
+    /// Business-day convention for date rolls (serde name).
+    market_business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.market_business_day_convention);
+
+    /// Default fixed-leg day count for a standard swap on this index.
+    default_fixed_leg_day_count -> PyResult<String> =
+        enum_to_py_string(&s.inner.default_fixed_leg_day_count);
+
+    /// Default fixed-leg payment frequency for a standard swap on this index.
+    default_fixed_leg_frequency -> String = s.inner.default_fixed_leg_frequency.to_string();
+});
 
 /// Schedule conventions for one CDS family (``isda_na``, ``isda_eu``, ...).
 ///
@@ -234,48 +202,6 @@ convention_record_methods!(PyCdsConventionSpec, CdsConventionSpec);
 
 #[pymethods]
 impl PyCdsConventionSpec {
-    /// Convention family (``"isda_na"``, ``"isda_eu"``, ``"isda_as"``, ``"custom"``).
-    #[getter]
-    fn family(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.family)
-    }
-
-    /// Calendar identifier for premium-leg date rolls.
-    #[getter]
-    fn calendar_id(&self) -> String {
-        self.inner.calendar_id.clone()
-    }
-
-    /// Premium-leg accrual day count (serde name).
-    #[getter]
-    fn day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.day_count)
-    }
-
-    /// Business-day convention for premium dates (serde name).
-    #[getter]
-    fn business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    /// Stub rule for the first premium period (serde name).
-    #[getter]
-    fn stub(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.stub)
-    }
-
-    /// Settlement lag in business days (T+n; SNAC is T+1 for the step-in date).
-    #[getter]
-    fn settlement_days(&self) -> u16 {
-        self.inner.settlement_days
-    }
-
-    /// Premium payment frequency (``"3M"`` for standard IMM-roll CDS).
-    #[getter]
-    fn frequency(&self) -> String {
-        self.inner.frequency.to_string()
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -288,6 +214,30 @@ impl PyCdsConventionSpec {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyCdsConventionSpec |s| {
+    /// Convention family (``"isda_na"``, ``"isda_eu"``, ``"isda_as"``, ``"custom"``).
+    family -> PyResult<String> = enum_to_py_string(&s.inner.family);
+
+    /// Calendar identifier for premium-leg date rolls.
+    calendar_id -> String = s.inner.calendar_id.clone();
+
+    /// Premium-leg accrual day count (serde name).
+    day_count -> PyResult<String> = enum_to_py_string(&s.inner.day_count);
+
+    /// Business-day convention for premium dates (serde name).
+    business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.business_day_convention);
+
+    /// Stub rule for the first premium period (serde name).
+    stub -> PyResult<String> = enum_to_py_string(&s.inner.stub);
+
+    /// Settlement lag in business days (T+n; SNAC is T+1 for the step-in date).
+    settlement_days -> u16 = s.inner.settlement_days;
+
+    /// Premium payment frequency (``"3M"`` for standard IMM-roll CDS).
+    frequency -> String = s.inner.frequency.to_string();
+});
 
 /// Market conventions for a swaption family (settlement, fixed-leg schedule, index).
 ///
@@ -315,42 +265,6 @@ convention_record_methods!(PySwaptionConventions, SwaptionConventions);
 
 #[pymethods]
 impl PySwaptionConventions {
-    /// Calendar identifier for expiry and settlement rolls.
-    #[getter]
-    fn calendar_id(&self) -> String {
-        self.inner.calendar_id.clone()
-    }
-
-    /// Settlement lag in business days from expiry to swap start.
-    #[getter]
-    fn settlement_days(&self) -> i32 {
-        self.inner.settlement_days
-    }
-
-    /// Business-day convention for schedule rolls (serde name).
-    #[getter]
-    fn business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    /// Fixed-leg payment frequency of the underlying swap.
-    #[getter]
-    fn fixed_leg_frequency(&self) -> String {
-        self.inner.fixed_leg_frequency.to_string()
-    }
-
-    /// Fixed-leg day count of the underlying swap (serde name).
-    #[getter]
-    fn fixed_leg_day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.fixed_leg_day_count)
-    }
-
-    /// Floating-leg index identifier of the underlying swap.
-    #[getter]
-    fn float_leg_index(&self) -> String {
-        self.inner.float_leg_index.clone()
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -362,6 +276,27 @@ impl PySwaptionConventions {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PySwaptionConventions |s| {
+    /// Calendar identifier for expiry and settlement rolls.
+    calendar_id -> String = s.inner.calendar_id.clone();
+
+    /// Settlement lag in business days from expiry to swap start.
+    settlement_days -> i32 = s.inner.settlement_days;
+
+    /// Business-day convention for schedule rolls (serde name).
+    business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.business_day_convention);
+
+    /// Fixed-leg payment frequency of the underlying swap.
+    fixed_leg_frequency -> String = s.inner.fixed_leg_frequency.to_string();
+
+    /// Fixed-leg day count of the underlying swap (serde name).
+    fixed_leg_day_count -> PyResult<String> = enum_to_py_string(&s.inner.fixed_leg_day_count);
+
+    /// Floating-leg index identifier of the underlying swap.
+    float_leg_index -> String = s.inner.float_leg_index.clone();
+});
 
 /// Market conventions for a zero-coupon inflation swap family.
 ///
@@ -389,42 +324,6 @@ convention_record_methods!(PyInflationSwapConventions, InflationSwapConventions)
 
 #[pymethods]
 impl PyInflationSwapConventions {
-    /// Monthly reference-index rule: ``linear`` daily weights or ``step`` monthly values.
-    #[getter]
-    fn interpolation(&self) -> String {
-        self.inner.interpolation.to_string()
-    }
-
-    /// Calendar identifier for schedule rolls.
-    #[getter]
-    fn calendar_id(&self) -> String {
-        self.inner.calendar_id.clone()
-    }
-
-    /// Settlement lag in business days.
-    #[getter]
-    fn settlement_days(&self) -> i32 {
-        self.inner.settlement_days
-    }
-
-    /// Business-day convention for schedule rolls (serde name).
-    #[getter]
-    fn business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    /// Accrual day count (serde name).
-    #[getter]
-    fn day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.day_count)
-    }
-
-    /// Index observation lag (``"3M"`` for the standard 3-month lag).
-    #[getter]
-    fn inflation_lag(&self) -> String {
-        self.inner.inflation_lag.to_string()
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -436,6 +335,27 @@ impl PyInflationSwapConventions {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyInflationSwapConventions |s| {
+    /// Monthly reference-index rule: ``linear`` daily weights or ``step`` monthly values.
+    interpolation -> String = s.inner.interpolation.to_string();
+
+    /// Calendar identifier for schedule rolls.
+    calendar_id -> String = s.inner.calendar_id.clone();
+
+    /// Settlement lag in business days.
+    settlement_days -> i32 = s.inner.settlement_days;
+
+    /// Business-day convention for schedule rolls (serde name).
+    business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.business_day_convention);
+
+    /// Accrual day count (serde name).
+    day_count -> PyResult<String> = enum_to_py_string(&s.inner.day_count);
+
+    /// Index observation lag (``"3M"`` for the standard 3-month lag).
+    inflation_lag -> String = s.inner.inflation_lag.to_string();
+});
 
 /// Market conventions for a cross-currency basis swap pair.
 ///
@@ -463,72 +383,6 @@ convention_record_methods!(PyXccyConventions, XccyConventions);
 
 #[pymethods]
 impl PyXccyConventions {
-    /// ISO-4217 code of the base (first) currency.
-    #[getter]
-    fn base_currency(&self) -> String {
-        self.inner.base_currency.to_string()
-    }
-
-    /// ISO-4217 code of the quote (second) currency.
-    #[getter]
-    fn quote_currency(&self) -> String {
-        self.inner.quote_currency.to_string()
-    }
-
-    /// Floating index identifier of the base-currency leg.
-    #[getter]
-    fn base_index_id(&self) -> String {
-        self.inner.base_index_id.to_string()
-    }
-
-    /// Floating index identifier of the quote-currency leg.
-    #[getter]
-    fn quote_index_id(&self) -> String {
-        self.inner.quote_index_id.to_string()
-    }
-
-    /// T+N spot settlement lag in business days.
-    #[getter]
-    fn settlement_days(&self) -> u32 {
-        self.inner.settlement_days
-    }
-
-    /// Payment frequency of both legs.
-    #[getter]
-    fn payment_frequency(&self) -> String {
-        self.inner.payment_frequency.to_string()
-    }
-
-    /// Accrual day count (serde name).
-    #[getter]
-    fn day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.day_count)
-    }
-
-    /// Business-day convention for schedule rolls (serde name).
-    #[getter]
-    fn business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    /// Calendar identifier of the base-currency leg.
-    #[getter]
-    fn base_calendar_id(&self) -> String {
-        self.inner.base_calendar_id.clone()
-    }
-
-    /// Calendar identifier of the quote-currency leg.
-    #[getter]
-    fn quote_calendar_id(&self) -> String {
-        self.inner.quote_calendar_id.clone()
-    }
-
-    /// Notional-exchange style (serde name of ``NotionalExchange``).
-    #[getter]
-    fn notional_exchange(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.notional_exchange)
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -541,6 +395,42 @@ impl PyXccyConventions {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyXccyConventions |s| {
+    /// ISO-4217 code of the base (first) currency.
+    base_currency -> String = s.inner.base_currency.to_string();
+
+    /// ISO-4217 code of the quote (second) currency.
+    quote_currency -> String = s.inner.quote_currency.to_string();
+
+    /// Floating index identifier of the base-currency leg.
+    base_index_id -> String = s.inner.base_index_id.to_string();
+
+    /// Floating index identifier of the quote-currency leg.
+    quote_index_id -> String = s.inner.quote_index_id.to_string();
+
+    /// T+N spot settlement lag in business days.
+    settlement_days -> u32 = s.inner.settlement_days;
+
+    /// Payment frequency of both legs.
+    payment_frequency -> String = s.inner.payment_frequency.to_string();
+
+    /// Accrual day count (serde name).
+    day_count -> PyResult<String> = enum_to_py_string(&s.inner.day_count);
+
+    /// Business-day convention for schedule rolls (serde name).
+    business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.business_day_convention);
+
+    /// Calendar identifier of the base-currency leg.
+    base_calendar_id -> String = s.inner.base_calendar_id.clone();
+
+    /// Calendar identifier of the quote-currency leg.
+    quote_calendar_id -> String = s.inner.quote_calendar_id.clone();
+
+    /// Notional-exchange style (serde name of ``NotionalExchange``).
+    notional_exchange -> PyResult<String> = enum_to_py_string(&s.inner.notional_exchange);
+});
 
 /// Contract conventions for a listed interest-rate future.
 ///
@@ -568,68 +458,6 @@ convention_record_methods!(PyIrFutureConventions, IrFutureConventions);
 
 #[pymethods]
 impl PyIrFutureConventions {
-    /// Underlying floating index identifier.
-    #[getter]
-    fn index_id(&self) -> String {
-        self.inner.index_id.to_string()
-    }
-
-    /// Reference-rate compounding over the reference period: ``"simple"``,
-    /// ``"simple_average"``, or the JSON text of a compounded variant such as
-    /// ``{"compounded_in_arrears":{"lookback_days":0}}``.
-    #[getter]
-    fn compounding(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.compounding)
-    }
-
-    /// Reference-period placement relative to expiry (serde name).
-    #[getter]
-    fn reference_period(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.reference_period)
-    }
-
-    /// Exchange calendar identifier.
-    #[getter]
-    fn calendar_id(&self) -> String {
-        self.inner.calendar_id.clone()
-    }
-
-    /// Settlement lag in business days.
-    #[getter]
-    fn settlement_days(&self) -> i32 {
-        self.inner.settlement_days
-    }
-
-    /// Number of listed delivery months.
-    #[getter]
-    fn delivery_months(&self) -> u8 {
-        self.inner.delivery_months
-    }
-
-    /// Contract face value in the contract currency.
-    #[getter]
-    fn face_value(&self) -> f64 {
-        self.inner.face_value
-    }
-
-    /// Minimum price increment in price points.
-    #[getter]
-    fn tick_size(&self) -> f64 {
-        self.inner.tick_size
-    }
-
-    /// Currency value of one tick.
-    #[getter]
-    fn tick_value(&self) -> f64 {
-        self.inner.tick_value
-    }
-
-    /// Fixed convexity adjustment in decimal rate, or ``None``.
-    #[getter]
-    fn convexity_adjustment(&self) -> Option<f64> {
-        self.inner.convexity_adjustment
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -642,6 +470,40 @@ impl PyIrFutureConventions {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyIrFutureConventions |s| {
+    /// Underlying floating index identifier.
+    index_id -> String = s.inner.index_id.to_string();
+
+    /// Reference-rate compounding over the reference period: ``"simple"``,
+    /// ``"simple_average"``, or the JSON text of a compounded variant such as
+    /// ``{"compounded_in_arrears":{"lookback_days":0}}``.
+    compounding -> PyResult<String> = enum_to_py_string(&s.inner.compounding);
+
+    /// Reference-period placement relative to expiry (serde name).
+    reference_period -> PyResult<String> = enum_to_py_string(&s.inner.reference_period);
+
+    /// Exchange calendar identifier.
+    calendar_id -> String = s.inner.calendar_id.clone();
+
+    /// Settlement lag in business days.
+    settlement_days -> i32 = s.inner.settlement_days;
+
+    /// Number of listed delivery months.
+    delivery_months -> u8 = s.inner.delivery_months;
+
+    /// Contract face value in the contract currency.
+    face_value -> f64 = s.inner.face_value;
+
+    /// Minimum price increment in price points.
+    tick_size -> f64 = s.inner.tick_size;
+
+    /// Currency value of one tick.
+    tick_value -> f64 = s.inner.tick_value;
+
+    /// Fixed convexity adjustment in decimal rate, or ``None``.
+    convexity_adjustment -> Option<f64> = s.inner.convexity_adjustment;
+});
 
 /// Process-global registry of embedded market conventions.
 ///

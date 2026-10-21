@@ -13,21 +13,18 @@ use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
 use super::super::convert::{
-    attributes_from_py, bdc_from_py, bps_from_py, builder_repr, date_repr, dated_money_from_py,
+    attributes_from_py, bdc_from_py, bps_from_py, date_repr, dated_money_from_py,
     day_count_from_py, enum_to_py_string, float_repr, money_from_py, money_repr, money_to_py,
     tenor_from_py,
 };
-use super::super::instruments::{
-    enum_from_str, serialize_typed_instrument_json, stub_kind_from_py,
-};
+use super::super::instruments::{enum_from_str, stub_kind_from_py};
 use super::super::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
-use crate::bindings::valuations::convert::take_builder;
 
 type CdsTrancheBuilderInner =
     finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheBuilder;
@@ -247,52 +244,10 @@ impl PyCdsTrancheParams {
         })
     }
 
-    /// Underlying index name.
-    #[getter]
-    fn index_name(&self) -> String {
-        self.inner.index_name.clone()
-    }
-
-    /// Index series number.
-    #[getter]
-    fn series(&self) -> u16 {
-        self.inner.series
-    }
-
-    /// Attachment point in percent.
-    #[getter]
-    fn attach_pct(&self) -> f64 {
-        self.inner.attach_pct
-    }
-
-    /// Detachment point in percent.
-    #[getter]
-    fn detach_pct(&self) -> f64 {
-        self.inner.detach_pct
-    }
-
-    /// Tranche notional.
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        money_to_py(self.inner.notional)
-    }
-
     /// Scheduled maturity.
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
-    }
-
-    /// Running coupon in basis points.
-    #[getter]
-    fn coupon_bp(&self) -> f64 {
-        self.inner.coupon_bp
-    }
-
-    /// Realized portfolio loss so far (fraction of original notional).
-    #[getter]
-    fn realized_loss(&self) -> f64 {
-        self.inner.realized_loss
     }
 
     /// Return ``repr(self)``.
@@ -310,6 +265,29 @@ impl PyCdsTrancheParams {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyCdsTrancheParams |s| {
+    /// Underlying index name.
+    index_name -> String = s.inner.index_name.clone();
+
+    /// Index series number.
+    series -> u16 = s.inner.series;
+
+    /// Attachment point in percent.
+    attach_pct -> f64 = s.inner.attach_pct;
+
+    /// Detachment point in percent.
+    detach_pct -> f64 = s.inner.detach_pct;
+
+    /// Tranche notional.
+    notional -> PyMoney = money_to_py(s.inner.notional);
+
+    /// Running coupon in basis points.
+    coupon_bp -> f64 = s.inner.coupon_bp;
+
+    /// Realized portfolio loss so far (fraction of original notional).
+    realized_loss -> f64 = s.inner.realized_loss;
+});
 
 /// Synthetic CDO / index tranche (typed wrapper for Rust ``CdsTranche``).
 ///
@@ -341,22 +319,29 @@ pub struct PyCdsTranche {
     pub(crate) inner: finstack_quant_valuations::instruments::CdsTranche,
 }
 
-impl PyCdsTranche {
-    /// Serialize as the canonical instrument envelope accepted by the JSON loader.
-    pub(crate) fn envelope_json(&self) -> PyResult<String> {
-        serialize_typed_instrument_json(
-            InstrumentJson::CdsTranche(self.inner.clone()),
-            "CdsTranche",
-        )
-    }
-}
-
 instrument_envelope_methods!(
     PyCdsTranche,
     CdsTranche,
     "cds_tranche",
-    PyCdsTrancheBuilder,
-    finstack_quant_valuations::instruments::CdsTranche::builder().realized_loss(0.0)
+    builder = PyCdsTrancheBuilder("CdsTrancheBuilder", fields),
+    seed = finstack_quant_valuations::instruments::CdsTranche::builder().realized_loss(0.0),
+    /// Build the validated CDS tranche.
+    ///
+    /// Validation is the Rust ``CdsTranche::builder().build()`` invariants
+    /// only; there is no additional binding-side check.
+    ///
+    /// Returns
+    /// -------
+    /// CdsTranche
+    ///     The validated CDS tranche.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the builder was already consumed, a required field is missing,
+    ///     or the completed tranche fails validation (``attach_pct >=
+    ///     detach_pct``, fractional attach/detach, loss outside ``[0, 1]``).
+    build
 );
 instrument_pricing_methods!(PyCdsTranche);
 
@@ -497,115 +482,16 @@ impl PyCdsTranche {
             .map_err(core_to_py)
     }
 
-    /// Underlying index name.
-    #[getter]
-    fn index_name(&self) -> String {
-        self.inner.index_name.clone()
-    }
-
-    /// Index series number.
-    #[getter]
-    fn series(&self) -> u16 {
-        self.inner.series
-    }
-
-    /// Attachment point in percent.
-    #[getter]
-    fn attach_pct(&self) -> f64 {
-        self.inner.attach_pct
-    }
-
-    /// Detachment point in percent.
-    #[getter]
-    fn detach_pct(&self) -> f64 {
-        self.inner.detach_pct
-    }
-
-    /// Tranche notional.
-    #[getter]
-    fn notional(&self) -> PyMoney {
-        money_to_py(self.inner.notional)
-    }
-
     /// Scheduled maturity.
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
     }
 
-    /// Running coupon in basis points.
-    #[getter]
-    fn coupon_bp(&self) -> f64 {
-        self.inner.coupon_bp
-    }
-
-    /// Payment frequency.
-    #[getter]
-    fn frequency(&self) -> PyTenor {
-        PyTenor::from_inner(self.inner.frequency)
-    }
-
-    /// Accrual day-count convention.
-    #[getter]
-    fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
-    }
-
-    /// Business day convention (serde name, default ``"modified_following"``).
-    #[getter]
-    fn business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    /// Holiday calendar identifier, if any.
-    #[getter]
-    fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.as_ref().map(ToString::to_string)
-    }
-
-    /// Discount curve identifier.
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    /// Credit index identifier for the loss distribution.
-    #[getter]
-    fn credit_index_id(&self) -> String {
-        self.inner.credit_index_id.to_string()
-    }
-
-    /// ``"pay"`` (buy protection) or ``"receive"`` (sell protection).
-    #[getter]
-    fn side(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.side)
-    }
-
     /// Explicit contract start (effective) date for schedule anchoring, or ``None``.
     #[getter]
     fn start_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner.start_date.map(|d| date_to_py(py, d)).transpose()
-    }
-
-    /// Realized portfolio loss so far (fraction of original notional).
-    #[getter]
-    fn realized_loss(&self) -> f64 {
-        self.inner.realized_loss
-    }
-
-    /// Coupon roll-date grid: ``RollRule.CDS_IMM`` (CDS roll dates, 20th of
-    /// Mar/Jun/Sep/Dec) or ``RollRule.NONE`` (bespoke ``frequency``/``stub``).
-    #[getter]
-    fn roll_rule(&self) -> PyRollRule {
-        PyRollRule {
-            inner: self.inner.roll_rule,
-        }
-    }
-
-    /// Stub convention for a bespoke (``RollRule.NONE``) coupon schedule.
-    #[getter]
-    fn stub(&self) -> PyStubKind {
-        PyStubKind::from_inner(self.inner.stub)
     }
 
     /// Upfront payment as ``(payment_date, amount)``, or ``None``.
@@ -642,6 +528,58 @@ impl PyCdsTranche {
     }
 }
 
+crate::bindings::macros::py_getters!(PyCdsTranche |s| {
+    /// Underlying index name.
+    index_name -> String = s.inner.index_name.clone();
+
+    /// Index series number.
+    series -> u16 = s.inner.series;
+
+    /// Attachment point in percent.
+    attach_pct -> f64 = s.inner.attach_pct;
+
+    /// Detachment point in percent.
+    detach_pct -> f64 = s.inner.detach_pct;
+
+    /// Tranche notional.
+    notional -> PyMoney = money_to_py(s.inner.notional);
+
+    /// Running coupon in basis points.
+    coupon_bp -> f64 = s.inner.coupon_bp;
+
+    /// Payment frequency.
+    frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
+
+    /// Accrual day-count convention.
+    day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
+
+    /// Business day convention (serde name, default ``"modified_following"``).
+    business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.business_day_convention);
+
+    /// Holiday calendar identifier, if any.
+    calendar_id -> Option<String> = s.inner.calendar_id.as_ref().map(ToString::to_string);
+
+    /// Discount curve identifier.
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    /// Credit index identifier for the loss distribution.
+    credit_index_id -> String = s.inner.credit_index_id.to_string();
+
+    /// ``"pay"`` (buy protection) or ``"receive"`` (sell protection).
+    side -> PyResult<String> = enum_to_py_string(&s.inner.side);
+
+    /// Realized portfolio loss so far (fraction of original notional).
+    realized_loss -> f64 = s.inner.realized_loss;
+
+    /// Coupon roll-date grid: ``RollRule.CDS_IMM`` (CDS roll dates, 20th of
+    /// Mar/Jun/Sep/Dec) or ``RollRule.NONE`` (bespoke ``frequency``/``stub``).
+    roll_rule -> PyRollRule = PyRollRule { inner: s.inner.roll_rule };
+
+    /// Stub convention for a bespoke (``RollRule.NONE``) coupon schedule.
+    stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
+});
+
 /// Fluent builder for ``CdsTranche``; wraps the Rust
 /// ``FinancialBuilder``-generated builder (consuming setters).
 ///
@@ -659,13 +597,6 @@ pub struct PyCdsTrancheBuilder {
     inner: Option<CdsTrancheBuilderInner>,
     fields: Vec<(&'static str, String)>,
 }
-
-crate::bindings::valuations::pricing::pricing_override_methods!(
-    PyCdsTranche,
-    PyCdsTrancheBuilder,
-    "CdsTrancheBuilder",
-    fields
-);
 
 #[pymethods]
 impl PyCdsTrancheBuilder {
@@ -1213,34 +1144,6 @@ impl PyCdsTrancheBuilder {
         let shown = value.repr()?.to_string();
         builder_set!(slf, attributes, shown, |b: CdsTrancheBuilderInner| b
             .attributes(attrs))
-    }
-
-    /// Build the validated CDS tranche.
-    ///
-    /// Validation is the Rust ``CdsTranche::builder().build()`` invariants
-    /// only; there is no additional binding-side check.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTranche
-    ///     The validated CDS tranche.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the completed tranche fails validation (``attach_pct >=
-    ///     detach_pct``, fractional attach/detach, loss outside ``[0, 1]``).
-    #[pyo3(text_signature = "($self)")]
-    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyCdsTranche> {
-        let b = take_builder(&mut slf.inner)?;
-        let inner = b.build().map_err(core_to_py)?;
-        Ok(PyCdsTranche { inner })
-    }
-
-    /// Return ``repr(self)`` listing the fields set so far.
-    fn __repr__(&self) -> String {
-        builder_repr("CdsTrancheBuilder", &self.fields)
     }
 }
 
