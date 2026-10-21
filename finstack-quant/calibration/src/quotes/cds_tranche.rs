@@ -2,7 +2,7 @@
 
 use super::ids::QuoteId;
 use finstack_quant_core::validation::{
-    validate_f64_abs_le, validate_f64_finite, validate_f64_positive, validate_f64_unit_interval,
+    require_with, validate_f64_finite, validate_f64_positive, validate_f64_unit_interval,
 };
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::market::conventions::ids::CdsConventionKey;
@@ -125,7 +125,12 @@ impl CdsTrancheQuote {
             )));
         }
         validate_f64_finite(self.upfront_pct, "upfront_pct")?;
-        validate_f64_abs_le(self.upfront_pct, 1.0, "upfront_pct", None)?;
+        require_with(self.upfront_pct.abs() <= 1.0, || {
+            format!(
+                "Invalid upfront_pct: |value| exceeds 1 (got {})",
+                self.upfront_pct
+            )
+        })?;
         validate_f64_positive(self.coupon_bp, "coupon_bp")
     }
 }

@@ -511,29 +511,6 @@ impl DiscountCurveTarget {
 
         Ok((curve, report))
     }
-
-    fn rate_calibration(
-        params: &DiscountCurveParams,
-        curve_day_count: DayCount,
-        projection_curve_id: CurveId,
-        quotes: &[RateQuote],
-    ) -> Result<RateCalibrationRecipe> {
-        Ok(RateCalibrationRecipe {
-            currency: params.currency,
-            method: (&params.method).into(),
-            curve_day_count,
-            ois_compounding: params
-                .conventions
-                .ois_compounding
-                .as_ref()
-                .map(recipe_ois_compounding)
-                .transpose()?,
-            role: RateCalibrationCurveRole::Discount {
-                projection_curve_id,
-            },
-            quotes: quotes.iter().map(Into::into).collect(),
-        })
-    }
 }
 
 impl BootstrapTarget for DiscountCurveTarget {
