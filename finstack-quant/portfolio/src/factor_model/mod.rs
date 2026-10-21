@@ -37,7 +37,6 @@ mod assignment;
 mod credit_vol_report;
 mod dependencies;
 mod model;
-mod weight_allocation;
 mod whatif;
 
 pub use assignment::{FactorAssignmentReport, PositionAssignment, UnmatchedEntry};
@@ -45,9 +44,4 @@ pub use credit_vol_report::{
     build_credit_vol_report, CreditVolReport, LevelVolContribution, PositionVolContribution,
 };
 pub use model::FactorModel;
-pub use weight_allocation::{
-    allocate_weights, allocate_weights_json, validate_allocation_json, AllocationDiagnostics,
-    AllocationScheme, StrategyAllocation, StrategyAllocationInput, WeightAllocationResult,
-    WeightAllocationSpec,
-};
 pub use whatif::{FactorContributionDelta, PositionChange, StressPnl, StressResult, WhatIfResult};

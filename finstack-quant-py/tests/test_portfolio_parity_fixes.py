@@ -136,8 +136,8 @@ class TestValuationAndResult:
         valuation = value_portfolio(_portfolio(), _market())
         assert isinstance(valuation, PortfolioValuation)
         assert valuation.as_of == AS_OF
-        assert not valuation.has_degraded_risk
-        metrics = aggregate_metrics(valuation, "USD", _market(), AS_OF)
+        assert valuation.degraded_positions == []
+        metrics = aggregate_metrics(valuation, _market())
         assert metrics.get_total("dv01") is not None
         assert metrics.get_total("theta") is None
         assert metrics.get_metric("dv01")["metric_id"] == "dv01"
@@ -159,13 +159,13 @@ class TestValuationAndResult:
 
     def test_portfolio_result_assembly(self) -> None:
         valuation = value_portfolio(_portfolio(), _market())
-        metrics = aggregate_metrics(valuation, "USD", _market(), AS_OF)
+        metrics = aggregate_metrics(valuation, _market())
         result = PortfolioResult(valuation, metrics)
-        assert result.total_value == pytest.approx(valuation.total_value)
+        assert result.valuation.total_value == pytest.approx(valuation.total_value)
         assert isinstance(result.valuation, PortfolioValuation)
         assert isinstance(result.metrics, PortfolioMetrics)
         assert "rounding" in result.meta
-        assert result.get_metric("dv01") == pytest.approx(metrics.get_total("dv01"))
+        assert result.metrics.require_total("dv01") == pytest.approx(metrics.get_total("dv01"))
 
 
 class TestScenarioInputs:
@@ -174,8 +174,9 @@ class TestScenarioInputs:
         pf, mkt = _portfolio(), _market()
         _valuation, report = apply_scenario_and_revalue(pf, spec, mkt)
         assert report.operations_applied == 0
-        pnl, _ = scenario_pnl(pf, spec, mkt)
-        assert pnl.total == pytest.approx(0.0)
+        item = scenario_pnl(pf, spec, mkt)
+        assert item.scenario_id == "s"
+        assert item.pnl.total == pytest.approx(0.0)
         batch = scenario_pnl_batch(pf, [spec, spec.to_json()], mkt)
         assert [item.scenario_id for item in batch] == ["s", "s"]
         assert scenario_pnl_batch(pf, "[]", mkt) == []
@@ -189,8 +190,7 @@ class TestCashflows:
     def test_typed_accessors_and_collapse_frame(self) -> None:
         cfs = aggregate_full_cashflows(_portfolio(), _market())
         assert isinstance(cfs, PortfolioCashflows)
-        assert cfs.num_positions == 1
-        assert cfs.num_issues == 0
+        assert len(cfs.by_position) == 1
         assert cfs.events
         assert cfs.by_position["P1"]
         assert cfs.issues == []
@@ -205,7 +205,7 @@ class TestCashflows:
     @pytest.mark.parametrize("date", ["wrong-date", "2025-02-30"])
     def test_json_netting_rejects_invalid_payment_dates(self, date: str) -> None:
         payload = {date: {"USD": {"coupon": {"amount": "100", "currency": "USD"}}}}
-        with pytest.raises(PortfolioError, match="invalid cashflow date"):
+        with pytest.raises(PortfolioError, match="invalid cashflow by_date ladder"):
             net_in_currency_by_date(json.dumps(payload), "USD")
 
     @pytest.mark.parametrize(
@@ -230,7 +230,7 @@ class TestCashflows:
                 }
             }
         }
-        with pytest.raises(PortfolioError, match="cashflow money"):
+        with pytest.raises(PortfolioError, match=r"invalid cashflow by_date ladder|cashflow money at"):
             net_in_currency_by_date(json.dumps(payload), "USD")
 
     def test_json_netting_validates_currencies_outside_the_requested_output(self) -> None:
@@ -240,7 +240,7 @@ class TestCashflows:
                 "EUR": {"Principal": {"amount": "invalid", "currency": "EUR"}},
             }
         }
-        with pytest.raises(PortfolioError, match="EUR/Principal"):
+        with pytest.raises(PortfolioError, match='invalid value: string "invalid"'):
             net_in_currency_by_date(json.dumps(payload), "USD")
         payload["2025-01-15"]["EUR"]["Principal"]["amount"] = "200"
         assert net_in_currency_by_date(json.dumps(payload), "USD") == [("2025-01-15", 100.0)]
@@ -319,7 +319,6 @@ class TestOptimizationAndResultsAudit:
             "optimal_weights",
             "weight_deltas",
             "implied_quantities",
-            "metric_values",
             "constraint_slacks",
         ]
         wire = {
@@ -334,8 +333,6 @@ class TestOptimizationAndResultsAudit:
             },
             "schema_version": 1,
             "status": "optimal",
-            "status_label": "optimal",
-            "is_feasible": True,
             "objective_value": 0.0,
             "turnover": 0.0,
             "trades": [],
@@ -411,7 +408,7 @@ class TestOptimizationAndResultsAudit:
         from finstack_quant.core.config import FinstackConfig
 
         valuation = value_portfolio(_portfolio(), _market())
-        metrics = aggregate_metrics(valuation, "USD", _market(), AS_OF)
+        metrics = aggregate_metrics(valuation, _market())
         first = PortfolioResult(valuation, metrics)
         assert first.meta["fx_policy_applied"] == valuation.fx_collapse_policy == "cashflow_date"
         assert "timestamp" not in first.meta
@@ -450,8 +447,9 @@ class TestOptimizationAndResultsAudit:
         )
         report = fi.reconciliation_check(1e-9)
         assert report.is_reconciled
-        assert report.to_json() == pf.campisi_reconciliation_check(fi, 1e-9).to_json()
-        assert report.to_json() == pf.campisi_reconciliation_check(fi.to_json(), 1e-9).to_json()
+        assert isinstance(report, pf.ReconciliationReport)
+        rebuilt = pf.FiAttributionResult.from_json(fi.to_json())
+        assert report.to_json() == rebuilt.reconciliation_check(1e-9).to_json()
         linked = pf.campisi_carino_link([fi, fi])
         assert linked.to_json() == pf.campisi_carino_link([json.loads(fi.to_json())] * 2).to_json()
 

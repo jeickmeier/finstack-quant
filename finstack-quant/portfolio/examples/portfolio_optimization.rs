@@ -19,11 +19,11 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::metrics::aggregate_metrics;
 use finstack_quant_portfolio::optimization::{
-    optimize, Constraint, MetricExpr, MissingMetricPolicy, Objective, PerPositionMetric,
+    optimize, rebalance, Constraint, MetricExpr, MissingMetricPolicy, Objective, PerPositionMetric,
     PortfolioOptimizationProblem, WeightingScheme,
 };
 use finstack_quant_portfolio::position::{Position, PositionUnit};
-use finstack_quant_portfolio::types::Entity;
+use finstack_quant_portfolio::types::{AttributeValue, Entity};
 use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
@@ -106,7 +106,7 @@ fn build_bond_portfolio(as_of: Date) -> finstack_quant_portfolio::Portfolio {
         PositionUnit::FaceValue,
     )
     .expect("AAA position should build")
-    .with_text_attribute("rating", "AAA");
+    .with_attribute("rating", "AAA");
 
     let pos_bbb = Position::new(
         "POS_BBB",
@@ -117,7 +117,7 @@ fn build_bond_portfolio(as_of: Date) -> finstack_quant_portfolio::Portfolio {
         PositionUnit::FaceValue,
     )
     .expect("BBB position should build")
-    .with_text_attribute("rating", "BBB");
+    .with_attribute("rating", "BBB");
 
     let pos_ccc = Position::new(
         "POS_CCC",
@@ -128,7 +128,7 @@ fn build_bond_portfolio(as_of: Date) -> finstack_quant_portfolio::Portfolio {
         PositionUnit::FaceValue,
     )
     .expect("CCC position should build")
-    .with_text_attribute("rating", "CCC");
+    .with_attribute("rating", "CCC");
 
     Portfolio::builder("BOND_FUND")
         .name("Credit Portfolio – Optimization Example")
@@ -173,7 +173,7 @@ fn main() -> finstack_quant_portfolio::Result<()> {
     let result = optimize(&problem, &market, &config)?;
 
     println!("=== Portfolio Optimization Example ===");
-    println!("Label: {:?}", result.problem.label);
+    println!("Label: {:?}", result.label);
     println!("Status: {:?}", result.status);
     println!("Objective: maximize value‑weighted YTM");
     println!("Objective value (YTM): {:.6}", result.objective_value);
@@ -186,10 +186,10 @@ fn main() -> finstack_quant_portfolio::Result<()> {
 
     // Compute CCC weight directly from result.
     let mut ccc_weight = 0.0_f64;
-    let portfolio_ref = &result.problem.portfolio;
+    let portfolio_ref = &problem.portfolio;
     for (pos_id, &w) in &result.optimal_weights {
         if let Some(position) = portfolio_ref.get_position(pos_id.as_str()) {
-            if position.attributes.get("rating").and_then(|v| v.as_text()) == Some("CCC") {
+            if position.attributes.get("rating") == Some(&AttributeValue::from("CCC")) {
                 ccc_weight += w;
             }
         }
@@ -209,19 +209,19 @@ fn main() -> finstack_quant_portfolio::Result<()> {
 
     // Optionally, compute aggregated metrics at the optimal allocation by
     // revaluing the portfolio with implied quantities.
-    let rebalanced = result.to_rebalanced_portfolio()?;
+    let rebalanced = rebalance(
+        problem.portfolio.clone(),
+        &problem.trade_universe.candidates,
+        &result,
+    )?;
     let valuation = finstack_quant_portfolio::valuation::value_portfolio(
         &rebalanced,
         &market,
         &config,
         &Default::default(),
     )?;
-    let metrics: finstack_quant_portfolio::metrics::PortfolioMetrics = aggregate_metrics(
-        &valuation,
-        rebalanced.base_currency,
-        &market,
-        rebalanced.as_of,
-    )?;
+    let metrics: finstack_quant_portfolio::metrics::PortfolioMetrics =
+        aggregate_metrics(&valuation, &market)?;
 
     println!("\nAggregated metrics at optimum (first few):");
     for (metric_id, metric) in metrics.aggregated.iter().take(5) {

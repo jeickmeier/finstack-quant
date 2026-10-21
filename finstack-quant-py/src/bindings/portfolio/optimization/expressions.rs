@@ -1,4 +1,6 @@
 use pyo3::prelude::*;
+
+use crate::errors::core_to_py;
 use pyo3::types::PyType;
 
 use finstack_quant_portfolio::optimization::{
@@ -158,19 +160,12 @@ impl PyPerPositionMetric {
 
     /// Variant tag (``"metric"``, ``"pv_base"``, etc.).
     #[getter]
-    fn kind(&self) -> &'static str {
-        match &self.inner {
-            PerPositionMetric::Metric(_) => "metric",
-            PerPositionMetric::CustomKey(_) => "custom_key",
-            PerPositionMetric::PvBase => "pv_base",
-            PerPositionMetric::Attribute(_) => "attribute",
-            PerPositionMetric::AttributeIndicator(_) => "attribute_indicator",
-            PerPositionMetric::Constant(_) => "constant",
-        }
+    fn kind(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
-    fn __repr__(&self) -> String {
-        format!("PerPositionMetric.{}(...)", self.kind())
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("PerPositionMetric.{}(...)", self.kind()?))
     }
 }
 
@@ -284,20 +279,12 @@ impl PyPositionFilter {
 
     /// Variant tag (``"all"``, ``"by_entity_id"``, ...).
     #[getter]
-    fn kind(&self) -> &'static str {
-        match &self.inner {
-            PositionFilter::All => "all",
-            PositionFilter::ByEntityId(_) => "by_entity_id",
-            PositionFilter::ByAttribute(_) => "by_attribute",
-            PositionFilter::ByPositionIds(_) => "by_position_ids",
-            PositionFilter::Not(_) => "not",
-            PositionFilter::And(_) => "and",
-            PositionFilter::Or(_) => "or",
-        }
+    fn kind(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
-    fn __repr__(&self) -> String {
-        format!("PositionFilter.{}(...)", self.kind())
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("PositionFilter.{}(...)", self.kind()?))
     }
 }
 
@@ -374,15 +361,12 @@ impl PyMetricExpr {
     }
 
     #[getter]
-    fn kind(&self) -> &'static str {
-        match &self.inner {
-            MetricExpr::WeightedSum { .. } => "weighted_sum",
-            MetricExpr::ValueWeightedAverage { .. } => "value_weighted_average",
-        }
+    fn kind(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
-    fn __repr__(&self) -> String {
-        format!("MetricExpr.{}(...)", self.kind())
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("MetricExpr.{}(...)", self.kind()?))
     }
 }
 
@@ -442,11 +426,8 @@ impl PyObjective {
 
     /// Variant tag: ``"maximize"`` or ``"minimize"``.
     #[getter]
-    fn direction(&self) -> &'static str {
-        match self.inner {
-            Objective::Maximize(_) => "maximize",
-            Objective::Minimize(_) => "minimize",
-        }
+    fn direction(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
     /// Inner :class:`MetricExpr` being optimized.
@@ -457,8 +438,8 @@ impl PyObjective {
         }
     }
 
-    fn __repr__(&self) -> String {
-        format!("Objective.{}(...)", self.direction())
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("Objective.{}(...)", self.direction()?))
     }
 }
 
@@ -504,8 +485,8 @@ impl PyConstraint {
         }))
     }
 
-    /// Weight bounds for positions matching the filter. Raises
-    /// ``PortfolioError`` when ``min > max``.
+    /// Weight bounds for positions matching the filter. Inputs are checked
+    /// (finite, ``min <= max``) when the problem is optimized.
     #[classmethod]
     #[pyo3(text_signature = "(cls, filter, min, max, label=None)")]
     #[pyo3(signature = (filter, min, max, label=None))]
@@ -515,36 +496,33 @@ impl PyConstraint {
         min: f64,
         max: f64,
         label: Option<String>,
-    ) -> PyResult<Self> {
-        let mut c = Constraint::weight_bounds(filter.inner, min, max).map_err(portfolio_to_py)?;
-        if let Some(lbl) = label {
-            c = c.with_label(lbl);
-        }
-        Ok(Self::from_inner(c))
+    ) -> Self {
+        Self::from_inner(Constraint::WeightBounds {
+            label,
+            filter: filter.inner,
+            min,
+            max,
+        })
     }
 
-    /// Maximum turnover: `Σ |w_new - w_current| <= max_turnover`.
+    /// Maximum turnover: `Σ |w_new - w_current| <= max_turnover`. The cap is
+    /// checked (finite, non-negative) when the problem is optimized.
     #[classmethod]
     #[pyo3(text_signature = "(cls, max_turnover, label=None)")]
     #[pyo3(signature = (max_turnover, label=None))]
-    fn max_turnover(
-        _cls: &Bound<'_, PyType>,
-        max_turnover: f64,
-        label: Option<String>,
-    ) -> PyResult<Self> {
-        let mut c = Constraint::max_turnover(max_turnover).map_err(portfolio_to_py)?;
-        if let Some(lbl) = label {
-            c = c.with_label(lbl);
-        }
-        Ok(Self::from_inner(c))
+    fn max_turnover(_cls: &Bound<'_, PyType>, max_turnover: f64, label: Option<String>) -> Self {
+        Self::from_inner(Constraint::MaxTurnover {
+            label,
+            max_turnover,
+        })
     }
 
-    /// Budget / normalization constraint (typically ``rhs = 1.0``).
+    /// Budget / normalization constraint (typically ``rhs = 1.0``). ``rhs`` is
+    /// checked (finite, non-negative) when the problem is optimized.
     #[classmethod]
     #[pyo3(text_signature = "(cls, rhs)")]
-    fn budget(_cls: &Bound<'_, PyType>, rhs: f64) -> PyResult<Self> {
-        let c = Constraint::budget(rhs).map_err(portfolio_to_py)?;
-        Ok(Self::from_inner(c))
+    fn budget(_cls: &Bound<'_, PyType>, rhs: f64) -> Self {
+        Self::from_inner(Constraint::Budget { rhs })
     }
 
     /// Shorthand: `sum w_i * I[attr == value] <= max_share`.
@@ -613,13 +591,8 @@ impl PyConstraint {
 
     /// Variant tag (``"metric_bound"`` / ``"weight_bounds"`` / ``"max_turnover"`` / ``"budget"``).
     #[getter]
-    fn kind(&self) -> &'static str {
-        match &self.inner {
-            Constraint::MetricBound { .. } => "metric_bound",
-            Constraint::WeightBounds { .. } => "weight_bounds",
-            Constraint::MaxTurnover { .. } => "max_turnover",
-            Constraint::Budget { .. } => "budget",
-        }
+    fn kind(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_tag(&self.inner).map_err(core_to_py)
     }
 
     /// Constraint label, when present.
@@ -628,10 +601,11 @@ impl PyConstraint {
         self.inner.label().map(str::to_owned)
     }
 
-    fn __repr__(&self) -> String {
-        match self.inner.label() {
-            Some(lbl) => format!("Constraint.{}(label={:?})", self.kind(), lbl),
-            None => format!("Constraint.{}(...)", self.kind()),
-        }
+    fn __repr__(&self) -> PyResult<String> {
+        let kind = self.kind()?;
+        Ok(match self.inner.label() {
+            Some(lbl) => format!("Constraint.{kind}(label={lbl:?})"),
+            None => format!("Constraint.{kind}(...)"),
+        })
     }
 }

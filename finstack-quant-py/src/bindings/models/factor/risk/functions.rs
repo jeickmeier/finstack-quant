@@ -4,12 +4,14 @@ use pyo3::types::PyDict;
 
 use finstack_quant_factor::risk as model_risk;
 
-use crate::errors::{core_to_py, value_error};
+use crate::errors::{core_to_py, display_to_py, value_error};
 
-use super::contributions::PyPositionRiskDecomposition;
+use super::contributions::{PyPositionRiskDecomposition, PyRiskDecomposition};
 use crate::bindings::matrix_input::{
     extract_position_pnls, extract_square_matrix, PositionPnlMatrix,
 };
+use crate::bindings::module_utils::py_to_serde;
+use crate::bindings::portfolio::sensitivity::PySensitivityMatrix;
 
 /// `True` when `obj` is a `pandas.DataFrame` (checked by module + type name so
 /// pandas is not imported when it is not already loaded).
@@ -258,4 +260,53 @@ pub(super) fn position_component_var(
     position_id: &str,
 ) -> PyResult<f64> {
     decomp.inner.component_var(position_id).map_err(core_to_py)
+}
+
+/// Decompose portfolio risk into factor and position contributions.
+///
+/// Uses the parametric (covariance-based) Euler decomposition to attribute
+/// forecasted portfolio risk across factors and individual positions.
+///
+/// Args:
+///     sensitivities: Weighted position x factor ``SensitivityMatrix``, as
+///         returned by ``finstack_quant.portfolio.compute_factor_sensitivities``.
+///     covariance_json: ``FactorCovarianceMatrix`` as JSON text or a dict
+///         (``{"factor_ids", "n", "data"}``, ``data`` row-major). Must use the
+///         same factor IDs and ordering as the sensitivity matrix.
+///     risk_measure: ``RiskMeasure`` wire value: ``"variance"``,
+///         ``"volatility"``, ``{"var": {"confidence": 0.99}}`` or
+///         ``{"expected_shortfall": {"confidence": 0.975}}``. ``None`` uses
+///         the Rust default (``"variance"``).
+///
+/// Returns:
+///     ``RiskDecomposition`` with portfolio-level risk and factor and
+///     position detail.
+///
+/// Raises:
+///     ValueError: If the covariance or risk measure is malformed, the factor
+///         axes of the sensitivities and covariance disagree, or the
+///         decomposition produces a non-finite value.
+#[pyfunction]
+#[pyo3(signature = (sensitivities, covariance_json, risk_measure=None))]
+pub(super) fn decompose_factors(
+    py: Python<'_>,
+    sensitivities: &PySensitivityMatrix,
+    covariance_json: &Bound<'_, PyAny>,
+    risk_measure: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyRiskDecomposition> {
+    let covariance_json =
+        crate::bindings::extract::extract_records_json(py, covariance_json, "covariance")?;
+    let measure: finstack_quant_factor::RiskMeasure = match risk_measure {
+        Some(obj) => py_to_serde(py, obj, "risk_measure")?,
+        None => finstack_quant_factor::RiskMeasure::default(),
+    };
+
+    let matrix = sensitivities.inner.clone();
+    py.detach(move || {
+        let covariance: finstack_quant_factor::FactorCovarianceMatrix =
+            serde_json::from_str(&covariance_json).map_err(display_to_py)?;
+        let result =
+            model_risk::decompose_factors(&matrix, &covariance, &measure).map_err(core_to_py)?;
+        Ok(PyRiskDecomposition::from_inner(result))
+    })
 }

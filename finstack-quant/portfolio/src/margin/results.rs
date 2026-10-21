@@ -160,6 +160,17 @@ pub struct PortfolioMarginResult {
 }
 
 impl PortfolioMarginResult {
+    /// Netting sets in the canonical wire order: ascending identifier string.
+    ///
+    /// # Returns
+    ///
+    /// Borrowed netting-set results, ordered as the serialized result lists them.
+    pub fn netting_sets_sorted(&self) -> Vec<&NettingSetMargin> {
+        let mut netting_sets: Vec<&NettingSetMargin> = self.by_netting_set.values().collect();
+        netting_sets.sort_by_key(|margin| margin.netting_set_id.to_string());
+        netting_sets
+    }
+
     /// Create a new portfolio margin result.
     ///
     /// # Returns

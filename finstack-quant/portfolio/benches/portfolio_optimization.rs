@@ -78,7 +78,7 @@ fn bond_book(n_positions: usize, as_of: Date) -> finstack_quant_portfolio::Portf
             PositionUnit::FaceValue,
         )
         .expect("bench: position")
-        .with_text_attribute("rating", rating);
+        .with_attribute("rating", rating);
         builder = builder.position(position);
     }
     builder.build().expect("bench: opt portfolio")

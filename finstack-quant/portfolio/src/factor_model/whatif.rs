@@ -56,10 +56,10 @@ pub struct StressPnl {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct StressResult {
-    /// Total portfolio P&L under the stressed market.
-    pub total_pnl: f64,
-    /// Per-position P&L contributions.
-    pub position_pnl: Vec<(PositionId, f64)>,
+    /// Total and per-position P&L under the stressed market; its fields
+    /// (`total_pnl`, `position_pnl`) are flattened into this object on the wire.
+    #[serde(flatten)]
+    pub pnl: StressPnl,
     /// Risk decomposition recomputed under the stressed market.
     pub stressed_decomposition: RiskDecomposition,
 }
@@ -88,223 +88,299 @@ pub enum PositionChange {
     },
 }
 
-/// Decompose baseline risk, then reallocate sensitivity rows to simulate
-/// remove or resize scenarios.
-///
-/// A removal zeroes that position's sensitivity row; a resize scales it in
-/// proportion to the original nonzero quantity. Risk decomposition and credit
-/// residual risk are then recomputed for the edited portfolio.
-pub(super) fn position_what_if(
-    model: &FactorModel,
-    portfolio: &Portfolio,
-    market: &MarketContext,
-    as_of: Date,
-    changes: &[PositionChange],
-) -> Result<WhatIfResult> {
-    let (before, mut sensitivities) = model.analyze_with_sensitivities(portfolio, market, as_of)?;
-    let position_ids = sensitivities.position_ids().to_vec();
-    let position_index = |position_id: &PositionId| {
-        position_ids
-            .iter()
-            .position(|current| current == position_id.as_str())
-    };
-    let mut scenario_positions = portfolio.positions().to_vec();
+impl FactorModel {
+    /// Shock configured factors and reprice the portfolio without decomposing
+    /// stressed risk.
+    ///
+    /// Use this when only shocked-minus-base P&L is required. Call
+    /// [`Self::factor_stress`] when the stressed risk decomposition is also
+    /// needed; that path reuses this P&L evaluation and then analyzes the
+    /// shocked market once.
+    ///
+    /// # Arguments
+    ///
+    /// * `portfolio` - Portfolio whose position P&L is evaluated.
+    /// * `market` - Baseline market snapshot to shock.
+    /// * `as_of` - Valuation date used for both endpoints.
+    /// * `stresses` - Factor IDs and shock magnitudes in each factor's
+    ///   configured market-mapping convention.
+    ///
+    /// # Returns
+    ///
+    /// Total and per-position stressed-minus-base P&L in the portfolio base
+    /// currency.
+    ///
+    /// # Errors
+    ///
+    /// Propagates unknown-factor, market-bump, valuation, and
+    /// currency-validation failures.
+    pub fn factor_stress_pnl(
+        &self,
+        portfolio: &Portfolio,
+        market: &MarketContext,
+        as_of: Date,
+        stresses: &[(FactorId, f64)],
+    ) -> Result<StressPnl> {
+        self.stress_pnl_and_market(portfolio, market, as_of, stresses)
+            .map(|(pnl, _)| pnl)
+    }
 
-    let mut changed = HashSet::default();
-    for change in changes {
-        match change {
-            PositionChange::Remove { position_id } => {
-                if !changed.insert(position_id) {
-                    return Err(Error::invalid_input(format!(
+    /// Run a position remove/resize what-if against this model's baseline.
+    ///
+    /// Decomposes the portfolio's baseline risk with
+    /// the same sensitivities [`Self::analyze`] uses, then applies `changes` to that
+    /// baseline: a removal zeroes the position's sensitivity row and a resize
+    /// scales it in proportion to the original nonzero quantity.
+    ///
+    /// # Arguments
+    ///
+    /// * `portfolio` - Portfolio the baseline is computed for and the changes
+    ///   are applied to.
+    /// * `market` - Market data used to value positions and compute
+    ///   sensitivities.
+    /// * `as_of` - Valuation date of the analysis.
+    /// * `changes` - Position removals and resizes to apply, in order; every
+    ///   `position_id` must exist in `portfolio`.
+    ///
+    /// # Returns
+    ///
+    /// The baseline and post-change risk decompositions with per-factor deltas.
+    ///
+    /// # Errors
+    ///
+    /// Propagates factor assignment, sensitivity, decomposition and
+    /// unknown-position failures.
+    pub fn position_what_if(
+        &self,
+        portfolio: &Portfolio,
+        market: &MarketContext,
+        as_of: Date,
+        changes: &[PositionChange],
+    ) -> Result<WhatIfResult> {
+        let (before, mut sensitivities) =
+            self.analyze_with_sensitivities(portfolio, market, as_of)?;
+        let position_ids = sensitivities.position_ids().to_vec();
+        let position_index = |position_id: &PositionId| {
+            position_ids
+                .iter()
+                .position(|current| current == position_id.as_str())
+        };
+        let mut scenario_positions = portfolio.positions().to_vec();
+
+        let mut changed = HashSet::default();
+        for change in changes {
+            match change {
+                PositionChange::Remove { position_id } => {
+                    if !changed.insert(position_id) {
+                        return Err(Error::invalid_input(format!(
                         "Multiple what-if changes for position '{position_id}'; supply one final change per position"
                     )));
+                    }
+                    let Some(position_idx) = position_index(position_id) else {
+                        return Err(Error::invalid_input(format!(
+                            "Unknown position '{}'",
+                            position_id
+                        )));
+                    };
+                    for factor_idx in 0..sensitivities.n_factors() {
+                        sensitivities.set_delta(position_idx, factor_idx, 0.0);
+                    }
+                    scenario_positions.retain(|position| position.position_id != *position_id);
                 }
-                let Some(position_idx) = position_index(position_id) else {
-                    return Err(Error::invalid_input(format!(
-                        "Unknown position '{}'",
-                        position_id
-                    )));
-                };
-                for factor_idx in 0..sensitivities.n_factors() {
-                    sensitivities.set_delta(position_idx, factor_idx, 0.0);
-                }
-                scenario_positions.retain(|position| position.position_id != *position_id);
-            }
-            PositionChange::Resize {
-                position_id,
-                new_quantity,
-            } => {
-                if !changed.insert(position_id) {
-                    return Err(Error::invalid_input(format!(
+                PositionChange::Resize {
+                    position_id,
+                    new_quantity,
+                } => {
+                    if !changed.insert(position_id) {
+                        return Err(Error::invalid_input(format!(
                         "Multiple what-if changes for position '{position_id}'; supply one final change per position"
                     )));
-                }
-                if !new_quantity.is_finite() {
-                    return Err(Error::invalid_input(format!(
+                    }
+                    if !new_quantity.is_finite() {
+                        return Err(Error::invalid_input(format!(
                         "PositionChange::Resize new_quantity must be finite for position '{}', got {}",
                         position_id, new_quantity
                     )));
-                }
-                let Some(position_idx) = position_index(position_id) else {
-                    return Err(Error::invalid_input(format!(
-                        "Unknown position '{}'",
-                        position_id
-                    )));
-                };
-                let Some(position) = portfolio.get_position(position_id.as_str()) else {
-                    return Err(Error::invalid_input(format!(
-                        "Unknown position '{}'",
-                        position_id
-                    )));
-                };
-                if position.quantity.abs() < f64::EPSILON {
-                    return Err(Error::invalid_input(format!(
-                        "Position '{}' has zero quantity and cannot be resized proportionally",
-                        position_id
-                    )));
-                }
-                let scale = *new_quantity / position.quantity;
-                let row = sensitivities.position_deltas(position_idx)?.to_vec();
-                for (factor_idx, delta) in row.into_iter().enumerate() {
-                    sensitivities.set_delta(position_idx, factor_idx, delta * scale);
-                }
-                if let Some(scenario_position) = scenario_positions
-                    .iter_mut()
-                    .find(|current| current.position_id == *position_id)
-                {
-                    scenario_position.quantity = *new_quantity;
+                    }
+                    let Some(position_idx) = position_index(position_id) else {
+                        return Err(Error::invalid_input(format!(
+                            "Unknown position '{}'",
+                            position_id
+                        )));
+                    };
+                    let Some(position) = portfolio.get_position(position_id.as_str()) else {
+                        return Err(Error::invalid_input(format!(
+                            "Unknown position '{}'",
+                            position_id
+                        )));
+                    };
+                    if position.quantity.abs() < f64::EPSILON {
+                        return Err(Error::invalid_input(format!(
+                            "Position '{}' has zero quantity and cannot be resized proportionally",
+                            position_id
+                        )));
+                    }
+                    let scale = *new_quantity / position.quantity;
+                    let row = sensitivities.position_deltas(position_idx)?.to_vec();
+                    for (factor_idx, delta) in row.into_iter().enumerate() {
+                        sensitivities.set_delta(position_idx, factor_idx, delta * scale);
+                    }
+                    if let Some(scenario_position) = scenario_positions
+                        .iter_mut()
+                        .find(|current| current.position_id == *position_id)
+                    {
+                        scenario_position.quantity = *new_quantity;
+                    }
                 }
             }
         }
+
+        let mut after = finstack_quant_factor::risk::decompose_factors(
+            &sensitivities,
+            &self.covariance,
+            &self.risk_measure,
+        )?;
+        let mut scenario_portfolio = portfolio.clone();
+        scenario_portfolio.set_positions(scenario_positions)?;
+        self.add_credit_residual_risk(&mut after, &scenario_portfolio, market, as_of)?;
+
+        Ok(WhatIfResult {
+            delta: factor_deltas(&before, &after),
+            before,
+            after,
+        })
     }
 
-    let mut after = finstack_quant_factor::risk::decompose_factors(
-        &sensitivities,
-        model.covariance(),
-        model.risk_measure(),
-    )?;
-    let mut scenario_portfolio = portfolio.clone();
-    scenario_portfolio.set_positions(scenario_positions)?;
-    model.add_credit_residual_risk(&mut after, &scenario_portfolio, market, as_of)?;
+    /// Stressed-minus-base P&L plus the stressed market it was priced on.
+    fn stress_pnl_and_market(
+        &self,
+        portfolio: &Portfolio,
+        market: &MarketContext,
+        as_of: Date,
+        stresses: &[(FactorId, f64)],
+    ) -> Result<(StressPnl, MarketContext)> {
+        let (stressed_market, changed_factor_keys) =
+            self.stressed_market_with_factor_keys(portfolio, market, as_of, stresses)?;
 
-    Ok(WhatIfResult {
-        delta: factor_deltas(&before, &after),
-        before,
-        after,
-    })
-}
-
-pub(super) fn factor_stress_pnl(
-    model: &FactorModel,
-    portfolio: &Portfolio,
-    market: &MarketContext,
-    as_of: Date,
-    stresses: &[(FactorId, f64)],
-) -> Result<(StressPnl, MarketContext)> {
-    let (stressed_market, changed_factor_keys) =
-        model.stressed_market_with_factor_keys(portfolio, market, as_of, stresses)?;
-
-    let base_valuation = evaluate_raw_portfolio(RawEvaluationInput {
-        portfolio,
-        market,
-        as_of,
-        execution: PositionExecution::Auto,
-        seed: None,
-    })?;
-
-    let affected_indices = changed_factor_keys
-        .as_ref()
-        .map(|changed_factor_keys| -> Result<Option<Vec<usize>>> {
-            if changed_factor_keys
-                .iter()
-                .any(|key| matches!(key, crate::MarketFactorKey::Fx { .. }))
-            {
-                // Translation through bumped spot FX can move every cross-currency
-                // position, including instruments that do not declare an FX
-                // dependency. Reprice the whole book so convert_to_base sees the
-                // bumped matrix.
-                Ok(None)
-            } else {
-                Ok(Some(portfolio.dependency_index().affected_positions(
-                    changed_factor_keys,
-                    &stressed_market,
-                )?))
-            }
-        })
-        .transpose()?
-        .flatten();
-    let stressed_valuation = if let Some(affected_indices) = &affected_indices {
-        evaluate_raw_portfolio(RawEvaluationInput {
+        let base_valuation = evaluate_raw_portfolio(RawEvaluationInput {
             portfolio,
-            market: &stressed_market,
-            as_of,
-            execution: PositionExecution::Auto,
-            seed: Some(RawSelectiveSeed {
-                prior: &base_valuation,
-                reprice_indices: affected_indices,
-            }),
-        })?
-    } else {
-        evaluate_raw_portfolio(RawEvaluationInput {
-            portfolio,
-            market: &stressed_market,
+            market,
             as_of,
             execution: PositionExecution::Auto,
             seed: None,
-        })?
-    };
+        })?;
 
-    let mut position_pnl = Vec::with_capacity(portfolio.positions.len());
-    for (position_index, position) in portfolio.positions.iter().enumerate() {
-        let base_endpoint = base_valuation.endpoint(position_index).ok_or_else(|| {
-            Error::validation(format!(
-                "Factor stress base endpoint is missing position '{}'",
-                position.position_id
-            ))
+        let affected_indices = changed_factor_keys
+            .as_ref()
+            .map(|changed_factor_keys| -> Result<Option<Vec<usize>>> {
+                if changed_factor_keys
+                    .iter()
+                    .any(|key| matches!(key, crate::dependencies::MarketFactorKey::Fx { .. }))
+                {
+                    // Translation through bumped spot FX can move every cross-currency
+                    // position, including instruments that do not declare an FX
+                    // dependency. Reprice the whole book so convert_to_base sees the
+                    // bumped matrix.
+                    Ok(None)
+                } else {
+                    Ok(Some(portfolio.dependency_index().affected_positions(
+                        changed_factor_keys,
+                        &stressed_market,
+                    )?))
+                }
+            })
+            .transpose()?
+            .flatten();
+        let stressed_valuation = evaluate_raw_portfolio(RawEvaluationInput {
+            portfolio,
+            market: &stressed_market,
+            as_of,
+            execution: PositionExecution::Auto,
+            seed: affected_indices
+                .as_ref()
+                .map(|reprice_indices| RawSelectiveSeed {
+                    prior: &base_valuation,
+                    reprice_indices,
+                }),
         })?;
-        let stressed_endpoint = stressed_valuation.endpoint(position_index).ok_or_else(|| {
-            Error::validation(format!(
-                "Factor stress stressed endpoint is missing position '{}'",
-                position.position_id
-            ))
-        })?;
-        let base_value = base_endpoint.amount;
-        let stressed_value = stressed_endpoint.amount;
-        position_pnl.push((
-            position.position_id.clone(),
-            (stressed_value - base_value) * position.scale_factor(),
-        ));
+
+        let mut position_pnl = Vec::with_capacity(portfolio.positions.len());
+        for (position_index, position) in portfolio.positions.iter().enumerate() {
+            let base_endpoint = base_valuation.endpoint(position_index).ok_or_else(|| {
+                Error::invalid_input(format!(
+                    "Factor stress base endpoint is missing position '{}'",
+                    position.position_id
+                ))
+            })?;
+            let stressed_endpoint =
+                stressed_valuation.endpoint(position_index).ok_or_else(|| {
+                    Error::invalid_input(format!(
+                        "Factor stress stressed endpoint is missing position '{}'",
+                        position.position_id
+                    ))
+                })?;
+            position_pnl.push((
+                position.position_id.clone(),
+                (stressed_endpoint - base_endpoint) * position.scale_factor(),
+            ));
+        }
+
+        let mut total_pnl_acc = NeumaierAccumulator::new();
+        for (_, pnl) in &position_pnl {
+            total_pnl_acc.add(*pnl);
+        }
+
+        Ok((
+            StressPnl {
+                total_pnl: total_pnl_acc.total(),
+                position_pnl,
+            },
+            stressed_market,
+        ))
     }
 
-    let mut total_pnl_acc = NeumaierAccumulator::new();
-    for (_, pnl) in &position_pnl {
-        total_pnl_acc.add(*pnl);
+    /// Shock configured factors, reprice the portfolio, and decompose risk
+    /// under the stressed market.
+    ///
+    /// This direct workflow does not compute an unused baseline sensitivity
+    /// matrix; use [`Self::position_what_if`] for position remove/resize
+    /// scenarios against a baseline decomposition.
+    ///
+    /// # Arguments
+    ///
+    /// * `portfolio` - Portfolio whose position P&L and stressed risk are
+    ///   evaluated.
+    /// * `market` - Baseline market snapshot to shock.
+    /// * `as_of` - Valuation date used for both endpoints and stressed
+    ///   sensitivities.
+    /// * `stresses` - Factor IDs and shock magnitudes in each factor's
+    ///   configured market-mapping convention.
+    ///
+    /// # Returns
+    ///
+    /// Total and per-position stressed-minus-base P&L plus the risk
+    /// decomposition under the stressed market.
+    ///
+    /// # Errors
+    ///
+    /// Propagates unknown-factor, market-bump, valuation, currency-validation,
+    /// sensitivity, and decomposition failures.
+    pub fn factor_stress(
+        &self,
+        portfolio: &Portfolio,
+        market: &MarketContext,
+        as_of: Date,
+        stresses: &[(FactorId, f64)],
+    ) -> Result<StressResult> {
+        let (pnl, stressed_market) =
+            self.stress_pnl_and_market(portfolio, market, as_of, stresses)?;
+        let stressed_decomposition = self.analyze(portfolio, &stressed_market, as_of)?;
+
+        Ok(StressResult {
+            pnl,
+            stressed_decomposition,
+        })
     }
-
-    Ok((
-        StressPnl {
-            total_pnl: total_pnl_acc.total(),
-            position_pnl,
-        },
-        stressed_market,
-    ))
-}
-
-pub(super) fn factor_stress(
-    model: &FactorModel,
-    portfolio: &Portfolio,
-    market: &MarketContext,
-    as_of: Date,
-    stresses: &[(FactorId, f64)],
-) -> Result<StressResult> {
-    let (pnl, stressed_market) = factor_stress_pnl(model, portfolio, market, as_of, stresses)?;
-    let stressed_decomposition = model.analyze(portfolio, &stressed_market, as_of)?;
-
-    Ok(StressResult {
-        total_pnl: pnl.total_pnl,
-        position_pnl: pnl.position_pnl,
-        stressed_decomposition,
-    })
 }
 
 fn factor_deltas(
@@ -339,7 +415,7 @@ mod tests {
     use super::*;
     use crate::factor_model::FactorModel;
     use crate::position::{Position, PositionUnit};
-    use crate::sensitivity::{FactorSensitivityEngine, SensitivityMatrix};
+    use crate::sensitivity::FactorSensitivityEngine;
     use crate::test_utils::build_test_market_at;
     use crate::types::{PositionId, DUMMY_ENTITY_ID};
     use crate::Portfolio;
@@ -350,6 +426,7 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{Attributes, CurveId};
     use finstack_quant_factor::matching::{DependencyFilter, MappingRule, MatchingConfig};
+    use finstack_quant_factor::SensitivityMatrix;
     use finstack_quant_factor::{
         CurveType, DependencyType, FactorCovarianceMatrix, FactorDefinition, FactorId,
         FactorModelConfig, FactorType, MarketMapping, RiskMeasure, UnmatchedPolicy,
@@ -490,8 +567,8 @@ mod tests {
             return;
         };
 
-        assert_eq!(stress_result.position_pnl.len(), 1);
-        assert!(stress_result.total_pnl.is_finite());
+        assert_eq!(stress_result.pnl.position_pnl.len(), 1);
+        assert!(stress_result.pnl.total_pnl.is_finite());
     }
 
     #[test]
@@ -507,8 +584,8 @@ mod tests {
         let pnl = model
             .factor_stress_pnl(&portfolio, &market, as_of, &stresses)
             .expect("pnl-only factor stress");
-        assert_eq!(pnl.total_pnl, full.total_pnl);
-        assert_eq!(pnl.position_pnl, full.position_pnl);
+        assert_eq!(pnl.total_pnl, full.pnl.total_pnl);
+        assert_eq!(pnl.position_pnl, full.pnl.position_pnl);
     }
 
     #[test]
@@ -538,6 +615,7 @@ mod tests {
                     &[(FactorId::new("Rates"), 1.0)],
                 )
                 .expect("stress")
+                .pnl
                 .total_pnl
         };
 
@@ -596,7 +674,7 @@ mod tests {
         let expected = (stressed_raw - base_raw) * portfolio.positions[0].scale_factor();
 
         assert!(expected.abs() > 1e-12);
-        assert!((result.total_pnl - expected).abs() < 1e-12);
+        assert!((result.pnl.total_pnl - expected).abs() < 1e-12);
     }
 
     #[test]
@@ -646,7 +724,7 @@ mod tests {
         let expected = (stressed_raw - base_raw) * portfolio.positions[0].scale_factor();
 
         assert!(expected.abs() > 1e-12);
-        assert_eq!(result.total_pnl, expected);
+        assert_eq!(result.pnl.total_pnl, expected);
     }
 
     #[test]
@@ -851,8 +929,8 @@ mod tests {
             .value_raw(&manually_stressed, as_of)
             .expect("stressed value");
 
-        assert!((result.total_pnl - (stressed_value - base_value)).abs() < 1e-8);
-        assert!(result.total_pnl.abs() > 1e-8);
+        assert!((result.pnl.total_pnl - (stressed_value - base_value)).abs() < 1e-8);
+        assert!(result.pnl.total_pnl.abs() > 1e-8);
     }
 
     #[test]
@@ -906,6 +984,7 @@ mod tests {
 
         assert_eq!(
             result
+                .pnl
                 .position_pnl
                 .iter()
                 .map(|(position_id, _)| position_id.as_str())
@@ -914,7 +993,7 @@ mod tests {
         );
         assert_eq!(affected_calls.load(Ordering::SeqCst), 2);
         assert_eq!(unaffected_calls.load(Ordering::SeqCst), 1);
-        assert_eq!(result.position_pnl[1].1, 0.0);
+        assert_eq!(result.pnl.position_pnl[1].1, 0.0);
     }
 
     fn build_test_model() -> Option<(FactorModel, Portfolio, MarketContext)> {

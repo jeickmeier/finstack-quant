@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use finstack_quant_portfolio::optimization::PortfolioOptimizationResultWire;
+use finstack_quant_portfolio::optimization::PortfolioOptimizationResult;
 use finstack_quant_portfolio::PortfolioResult;
 use serde_json::Value;
 
@@ -43,7 +43,7 @@ fn portfolio_result_schema_covers_nested_wire_shape() {
 
 #[test]
 fn optimization_result_schema_matches_serde_wire_type() {
-    let schema = schema_value::<PortfolioOptimizationResultWire>();
+    let schema = schema_value::<PortfolioOptimizationResult>();
 
     assert_eq!(
         property_names(&schema),
@@ -51,15 +51,12 @@ fn optimization_result_schema_matches_serde_wire_type() {
             "meta",
             "schema_version",
             "status",
-            "status_label",
-            "is_feasible",
             "objective_value",
             "turnover",
             "optimal_weights",
             "current_weights",
             "weight_deltas",
             "implied_quantities",
-            "metric_values",
             "trades",
             "constraint_slacks",
             "binding_constraints",

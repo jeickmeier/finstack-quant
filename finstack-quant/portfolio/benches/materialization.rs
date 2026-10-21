@@ -10,7 +10,9 @@ use std::time::Instant;
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion, Throughput};
 use finstack_quant_core::contract::LoadLimits;
-use finstack_quant_portfolio::{InstrumentArtifactCache, MaterializationReport, Portfolio};
+use finstack_quant_portfolio::{
+    materialization::InstrumentArtifactCache, materialization::MaterializationReport, Portfolio,
+};
 use materialization_fixtures::{fixture_a, fixture_b, BenchmarkFixture};
 use materialization_gate::{evaluate_latency_gates, p95_millis, parse_sample_count};
 

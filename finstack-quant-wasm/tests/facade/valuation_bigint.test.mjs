@@ -136,7 +136,11 @@ test('replay keeps seeds as bigint and the step count as a number', () => {
     { date: '2026-05-01', market },
   ]);
   const config = JSON.stringify({ mode: 'pv_only', attribution_method: 'parallel' });
-  const replay = portfolio.replayPortfolio(portfolioSpec(), snapshots, config);
+  const replay = portfolio.replayPortfolio(
+    portfolio.Portfolio.fromSpec(portfolioSpec()),
+    snapshots,
+    config
+  );
   assertBigintsOnlyInValuations(replay, 'replayPortfolio');
   assert.equal(replay.summary.num_steps, 2);
 });

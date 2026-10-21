@@ -4,15 +4,21 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-define_string_id! {
-    /// Entity identifier (company, fund, etc.)
-    pub struct EntityId;
-}
+/// Marker type for portfolio entity identifiers.
+#[derive(Debug, Clone, Copy, Default)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct EntityTag;
 
-define_string_id! {
-    /// Position identifier.
-    pub struct PositionId;
-}
+/// Marker type for portfolio position identifiers.
+#[derive(Debug, Clone, Copy, Default)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct PositionTag;
+
+/// Entity identifier (company, fund, etc.); serialized as a bare string.
+pub type EntityId = finstack_quant_core::types::Id<EntityTag>;
+
+/// Position identifier; serialized as a bare string.
+pub type PositionId = finstack_quant_core::types::Id<PositionTag>;
 
 /// Constant for the dummy entity used for standalone instruments.
 ///
@@ -170,14 +176,6 @@ pub enum AttributeValue {
 }
 
 impl AttributeValue {
-    /// Return the text value if this is a `Text` variant.
-    pub fn as_text(&self) -> Option<&str> {
-        match self {
-            Self::Text(s) => Some(s),
-            Self::Number(_) => None,
-        }
-    }
-
     /// Return the numeric value if this is a `Number` variant.
     pub fn as_number(&self) -> Option<f64> {
         match self {
@@ -239,7 +237,7 @@ pub enum ComparisonOp {
 }
 
 impl std::str::FromStr for ComparisonOp {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
 
     /// Parse a comparison operator from its serde name or symbol alias.
     ///
@@ -262,7 +260,7 @@ impl std::str::FromStr for ComparisonOp {
             "le" | "<=" => Ok(Self::Le),
             "gt" | ">" => Ok(Self::Gt),
             "ge" | ">=" => Ok(Self::Ge),
-            other => Err(crate::error::Error::invalid_input(format!(
+            other => Err(crate::Error::invalid_input(format!(
                 "Unknown comparison operator {other:?}; expected one of eq/ne/lt/le/gt/ge \
                  or ==/!=/</<=/>/>="
             ))),
@@ -307,16 +305,6 @@ impl AttributeTest {
             op,
             value: value.into(),
         }
-    }
-
-    /// Convenience: text equality test.
-    pub fn text_eq(key: impl Into<String>, value: impl Into<String>) -> Self {
-        Self::new(key, ComparisonOp::Eq, AttributeValue::Text(value.into()))
-    }
-
-    /// Convenience: numeric comparison test.
-    pub fn numeric(key: impl Into<String>, op: ComparisonOp, value: f64) -> Self {
-        Self::new(key, op, AttributeValue::Number(value))
     }
 
     /// Evaluate this test against a set of attributes.
@@ -436,7 +424,7 @@ mod tests {
     #[test]
     fn test_attribute_value_text() {
         let v = AttributeValue::Text("CCC".to_string());
-        assert_eq!(v.as_text(), Some("CCC"));
+        assert_eq!(v, AttributeValue::from("CCC"));
         assert_eq!(v.as_number(), None);
         assert_eq!(format!("{v}"), "CCC");
     }
@@ -444,7 +432,6 @@ mod tests {
     #[test]
     fn test_attribute_value_number() {
         let v = AttributeValue::Number(72.5);
-        assert_eq!(v.as_text(), None);
         assert_eq!(v.as_number(), Some(72.5));
         assert_eq!(format!("{v}"), "72.5");
     }
@@ -481,30 +468,30 @@ mod tests {
             "rating".to_string(),
             AttributeValue::Text("CCC".to_string()),
         )]);
-        assert!(AttributeTest::text_eq("rating", "CCC").evaluate(&attrs));
-        assert!(!AttributeTest::text_eq("rating", "BB").evaluate(&attrs));
-        assert!(!AttributeTest::text_eq("missing", "CCC").evaluate(&attrs));
+        assert!(AttributeTest::new("rating", ComparisonOp::Eq, "CCC").evaluate(&attrs));
+        assert!(!AttributeTest::new("rating", ComparisonOp::Eq, "BB").evaluate(&attrs));
+        assert!(!AttributeTest::new("missing", ComparisonOp::Eq, "CCC").evaluate(&attrs));
     }
 
     #[test]
     fn test_attribute_test_numeric_comparisons() {
         let attrs = IndexMap::from([("score".to_string(), AttributeValue::Number(650.0))]);
-        assert!(AttributeTest::numeric("score", ComparisonOp::Ge, 600.0).evaluate(&attrs));
-        assert!(!AttributeTest::numeric("score", ComparisonOp::Lt, 600.0).evaluate(&attrs));
-        assert!(AttributeTest::numeric("score", ComparisonOp::Le, 650.0).evaluate(&attrs));
-        assert!(AttributeTest::numeric("score", ComparisonOp::Eq, 650.0).evaluate(&attrs));
-        assert!(!AttributeTest::numeric("score", ComparisonOp::Ne, 650.0).evaluate(&attrs));
-        assert!(AttributeTest::numeric("score", ComparisonOp::Gt, 600.0).evaluate(&attrs));
+        assert!(AttributeTest::new("score", ComparisonOp::Ge, 600.0).evaluate(&attrs));
+        assert!(!AttributeTest::new("score", ComparisonOp::Lt, 600.0).evaluate(&attrs));
+        assert!(AttributeTest::new("score", ComparisonOp::Le, 650.0).evaluate(&attrs));
+        assert!(AttributeTest::new("score", ComparisonOp::Eq, 650.0).evaluate(&attrs));
+        assert!(!AttributeTest::new("score", ComparisonOp::Ne, 650.0).evaluate(&attrs));
+        assert!(AttributeTest::new("score", ComparisonOp::Gt, 600.0).evaluate(&attrs));
     }
 
     #[test]
     fn numeric_eq_uses_tolerance_but_ordering_is_exact() {
         let attrs = IndexMap::from([("score".to_string(), AttributeValue::Number(600.0 + 1e-10))]);
 
-        assert!(AttributeTest::numeric("score", ComparisonOp::Eq, 600.0).evaluate(&attrs));
-        assert!(!AttributeTest::numeric("score", ComparisonOp::Ne, 600.0).evaluate(&attrs));
-        assert!(AttributeTest::numeric("score", ComparisonOp::Gt, 600.0).evaluate(&attrs));
-        assert!(!AttributeTest::numeric("score", ComparisonOp::Le, 600.0).evaluate(&attrs));
+        assert!(AttributeTest::new("score", ComparisonOp::Eq, 600.0).evaluate(&attrs));
+        assert!(!AttributeTest::new("score", ComparisonOp::Ne, 600.0).evaluate(&attrs));
+        assert!(AttributeTest::new("score", ComparisonOp::Gt, 600.0).evaluate(&attrs));
+        assert!(!AttributeTest::new("score", ComparisonOp::Le, 600.0).evaluate(&attrs));
     }
 
     #[test]
@@ -513,6 +500,6 @@ mod tests {
             "rating".to_string(),
             AttributeValue::Text("CCC".to_string()),
         )]);
-        assert!(!AttributeTest::numeric("rating", ComparisonOp::Gt, 5.0).evaluate(&attrs));
+        assert!(!AttributeTest::new("rating", ComparisonOp::Gt, 5.0).evaluate(&attrs));
     }
 }

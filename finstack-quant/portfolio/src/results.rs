@@ -3,7 +3,6 @@
 use crate::metrics::PortfolioMetrics;
 use crate::valuation::PortfolioValuation;
 use finstack_quant_core::config::{results_meta, FinstackConfig, ResultsMeta};
-use finstack_quant_core::money::Money;
 use finstack_quant_core::wire::SchemaVersion;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
@@ -67,47 +66,6 @@ impl PortfolioResult {
             meta,
         }
     }
-
-    /// Get the total portfolio value.
-    ///
-    /// # Returns
-    ///
-    /// Borrowed reference to the base-currency portfolio total.
-    pub fn total_value(&self) -> &Money {
-        &self.valuation.total_base_currency
-    }
-
-    /// Get a specific aggregated metric.
-    ///
-    /// # Arguments
-    ///
-    /// * `metric_id` - Identifier of the metric to retrieve.
-    ///
-    /// # Returns
-    ///
-    /// The aggregated metric total, if the metric was produced.
-    pub fn get_metric(&self, metric_id: &str) -> Option<f64> {
-        self.metrics.get_total(metric_id)
-    }
-
-    /// Get a specific aggregated metric, failing when it was not produced.
-    ///
-    /// # Arguments
-    ///
-    /// * `metric_id` - Fully qualified identifier of the metric to retrieve
-    ///   (for example `dv01` or `bucketed_dv01::USD-OIS::10y`).
-    ///
-    /// # Returns
-    ///
-    /// The aggregated metric total.
-    ///
-    /// # Errors
-    ///
-    /// Returns a not-found [`crate::Error`] naming `metric_id` when the result
-    /// carries no aggregate for it.
-    pub fn require_metric(&self, metric_id: &str) -> crate::Result<f64> {
-        self.metrics.require_total(metric_id)
-    }
 }
 
 #[cfg(test)]
@@ -120,6 +78,7 @@ mod tests {
     use crate::valuation::value_portfolio;
     use crate::Portfolio;
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::money::Money;
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
     use std::sync::Arc;
     use time::macros::date;
@@ -164,8 +123,7 @@ mod tests {
 
         let valuation = value_portfolio(&portfolio, &market, &config, &Default::default())
             .expect("test should succeed");
-        let metrics = aggregate_metrics(&valuation, Currency::USD, &market, as_of)
-            .expect("test should succeed");
+        let metrics = aggregate_metrics(&valuation, &market).expect("test should succeed");
         let results = PortfolioResult::new(valuation.clone(), metrics.clone(), &config, None);
 
         // The meta stamp names the valuation's FX policy and, without a
@@ -185,11 +143,12 @@ mod tests {
         assert_eq!(stamped.meta.timestamp, Some(stamp));
 
         // Note: With flat curve, deposit PV is small but portfolio results should be present
-        assert!(results.total_value().amount().abs() >= 0.0);
+        assert!(results.valuation.total_base_currency.amount().abs() >= 0.0);
 
-        assert_eq!(results.get_metric("absent"), None);
+        assert_eq!(results.metrics.get_total("absent"), None);
         let missing = results
-            .require_metric("absent")
+            .metrics
+            .require_total("absent")
             .expect_err("an absent metric is an error");
         assert_eq!(
             missing.kind(),
@@ -198,7 +157,8 @@ mod tests {
         assert!(missing.to_string().contains("metric 'absent'"));
         for (metric_id, aggregate) in &results.metrics.aggregated {
             let required = results
-                .require_metric(metric_id.as_str())
+                .metrics
+                .require_total(metric_id.as_str())
                 .expect("present metric");
             assert_eq!(required.to_bits(), aggregate.total.to_bits());
         }

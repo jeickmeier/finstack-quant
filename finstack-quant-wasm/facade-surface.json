@@ -2981,6 +2981,7 @@
     "kind": "namespace",
     "keys": [
       "buildStressAttribution",
+      "decomposeFactors",
       "defaultUtilizationThreshold",
       "evaluateRiskBudget",
       "historicalVarDecomposition",
@@ -3005,6 +3006,9 @@
     "kind": "function"
   },
   "models.factor.risk.positionComponentVar": {
+    "kind": "function"
+  },
+  "models.factor.risk.decomposeFactors": {
     "kind": "function"
   },
   "models.factor.risk.defaultUtilizationThreshold": {
@@ -3468,34 +3472,26 @@
       "InstrumentArtifactCache",
       "Portfolio",
       "PortfolioBuilder",
-      "PortfolioMarginAggregator",
       "aggregateFullCashflows",
       "aggregateMetrics",
       "allocateWeights",
-      "allocateWeightsJson",
       "applyScenarioAndRevalue",
       "attributePortfolioPnl",
       "brinsonFachler",
       "buildCreditVolReport",
       "campisiAttribution",
       "campisiCarinoLink",
-      "campisiCarinoLinkFromSnapshots",
-      "campisiReconciliationCheck",
       "carinoLink",
-      "carinoLinkFromSectorPeriods",
       "cellReturnsFromCurves",
       "cellReturnsFromReference",
       "collapseToBaseByDateKind",
       "computeFactorSensitivities",
       "computePnlProfiles",
-      "constraintBudget",
       "constraintExposureLimit",
       "constraintExposureMinimum",
-      "constraintMaxTurnover",
-      "constraintWeightBounds",
-      "decomposeFactorRisk",
       "excessReturns",
       "factorBrinsonAttribution",
+      "fiAttributionResultReconciliationCheck",
       "gridAttribution",
       "gridCarinoLink",
       "mwrXirr",
@@ -3504,12 +3500,14 @@
       "parsePortfolioSpecJson",
       "portfolioAttributionExplainText",
       "portfolioAttributionReconciliationCheck",
+      "portfolioMargin",
       "portfolioMetricsGetMetric",
       "portfolioMetricsGetPositionMetrics",
       "portfolioMetricsGetTotal",
       "portfolioMetricsRequireTotal",
       "portfolioMetricsSeries",
       "portfolioOptimizationResultBindingConstraints",
+      "portfolioOptimizationResultIsFeasible",
       "portfolioOptimizationResultNewPositionTrades",
       "portfolioOptimizationResultToTradeList",
       "portfolioValuationGetEntityValue",
@@ -3525,7 +3523,6 @@
       "sensitivityMatrixPositionDeltas",
       "twrrLinked",
       "twrrModifiedDietz",
-      "validateAllocationJson",
       "valuePortfolio"
     ]
   },
@@ -3555,11 +3552,8 @@
     ],
     "getters": []
   },
-  "portfolio.PortfolioMarginAggregator": {
-    "kind": "class",
-    "statics": ["fromPortfolio"],
-    "methods": ["calculate", "free"],
-    "getters": []
+  "portfolio.portfolioMargin": {
+    "kind": "function"
   },
   "portfolio.parsePortfolioSpecJson": {
     "kind": "function"
@@ -3570,19 +3564,13 @@
   "portfolio.carinoLink": {
     "kind": "function"
   },
-  "portfolio.carinoLinkFromSectorPeriods": {
-    "kind": "function"
-  },
   "portfolio.campisiAttribution": {
     "kind": "function"
   },
   "portfolio.campisiCarinoLink": {
     "kind": "function"
   },
-  "portfolio.campisiCarinoLinkFromSnapshots": {
-    "kind": "function"
-  },
-  "portfolio.campisiReconciliationCheck": {
+  "portfolio.fiAttributionResultReconciliationCheck": {
     "kind": "function"
   },
   "portfolio.cellReturnsFromReference": {
@@ -3651,9 +3639,6 @@
   "portfolio.computePnlProfiles": {
     "kind": "function"
   },
-  "portfolio.decomposeFactorRisk": {
-    "kind": "function"
-  },
   "portfolio.PortfolioBuilder": {
     "kind": "class",
     "statics": [],
@@ -3661,12 +3646,6 @@
     "getters": []
   },
   "portfolio.allocateWeights": {
-    "kind": "function"
-  },
-  "portfolio.allocateWeightsJson": {
-    "kind": "function"
-  },
-  "portfolio.validateAllocationJson": {
     "kind": "function"
   },
   "portfolio.buildCreditVolReport": {
@@ -3711,6 +3690,9 @@
   "portfolio.portfolioOptimizationResultToTradeList": {
     "kind": "function"
   },
+  "portfolio.portfolioOptimizationResultIsFeasible": {
+    "kind": "function"
+  },
   "portfolio.portfolioMetricsRequireTotal": {
     "kind": "function"
   },
@@ -3721,15 +3703,6 @@
     "kind": "function"
   },
   "portfolio.sensitivityMatrixFactorDeltas": {
-    "kind": "function"
-  },
-  "portfolio.constraintBudget": {
-    "kind": "function"
-  },
-  "portfolio.constraintWeightBounds": {
-    "kind": "function"
-  },
-  "portfolio.constraintMaxTurnover": {
     "kind": "function"
   },
   "portfolio.constraintExposureLimit": {

@@ -9,6 +9,7 @@ mod executor;
 mod plan;
 mod state;
 
+pub(crate) use executor::try_map_positions;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use executor::POSITION_PARALLEL_MIN_POSITIONS;
 pub(crate) use executor::{
