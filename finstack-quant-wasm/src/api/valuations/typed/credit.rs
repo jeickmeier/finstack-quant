@@ -3,7 +3,9 @@
 
 use crate::api::core::dates::{JsDayCount, JsTenor};
 use crate::api::core::money::JsMoney;
-use crate::utils::input::js_string;
+use crate::api::valuations::pricing::parse_market;
+use crate::utils::input::{from_js_json, js_f64, js_string};
+use crate::utils::wire::{js_date, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
@@ -774,15 +776,15 @@ impl JsCdsIndex {
         credit_curve_id: JsValue,
     ) -> Result<JsCdsIndex, JsValue> {
         let preset: finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndexParams =
-            super::arg::json(&preset, "preset")?;
+            from_js_json(&preset, "preset")?;
         finstack_quant_valuations::instruments::CdsIndex::from_preset(
             &preset,
             js_string(&id, "id")?,
             notional.inner,
-            super::arg::en(&side, "side")?,
-            super::arg::date(&start, "start")?,
-            super::arg::date(&end, "end")?,
-            super::arg::num(&recovery_rate, "recoveryRate")?,
+            js_wire(&side, "side")?,
+            js_date(&start, "start")?,
+            js_date(&end, "end")?,
+            js_f64(&recovery_rate, "recoveryRate")?,
             js_string(&discount_curve_id, "discountCurveId")?,
             js_string(&credit_curve_id, "creditCurveId")?,
         )
@@ -799,8 +801,8 @@ impl JsCdsIndex {
     /// @returns Change in present value for a one basis point spread widening, in the notional currency.
     /// @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if recalibration or pricing fails.
     pub fn cs01(&self, market_json: JsValue, as_of: JsValue) -> Result<f64, JsValue> {
-        let market = super::market(&market_json)?;
-        let as_of = super::as_of(&as_of)?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
         let provider =
             finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
         self.inner
@@ -829,13 +831,13 @@ impl JsCdsTranche {
         side: JsValue,
     ) -> Result<JsCdsTranche, JsValue> {
         let params: finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams =
-            super::arg::json(&params, "params")?;
+            from_js_json(&params, "params")?;
         finstack_quant_valuations::instruments::CdsTranche::standard(
             js_string(&id, "id")?,
             &params,
             js_string(&discount_curve_id, "discountCurveId")?,
             js_string(&credit_index_id, "creditIndexId")?,
-            super::arg::en(&side, "side")?,
+            js_wire(&side, "side")?,
         )
         .map(|inner| Self { inner })
         .map_err(to_js_err)
@@ -847,7 +849,7 @@ impl JsCdsTranche {
     /// @throws Error - Throws with kind `not_found` if the credit index data is missing, kind `validation` if the market JSON is malformed, and kind `computation` if the loss model fails.
     #[wasm_bindgen(js_name = expectedLoss)]
     pub fn expected_loss(&self, market_json: JsValue) -> Result<f64, JsValue> {
-        let market = super::market(&market_json)?;
+        let market = parse_market(&market_json)?;
         self.inner.expected_loss(&market).map_err(to_js_err)
     }
 }
@@ -859,7 +861,7 @@ impl JsConvertibleBond {
     /// @returns Value of the shares received on conversion, in the bond's currency.
     /// @throws Error - Throws with kind `not_found` if the spot is missing, and kind `validation` if the market JSON is malformed or the bond fails validation.
     pub fn parity(&self, market_json: JsValue) -> Result<f64, JsValue> {
-        let market = super::market(&market_json)?;
+        let market = parse_market(&market_json)?;
         self.inner.parity(&market).map_err(to_js_err)
     }
 
@@ -874,8 +876,8 @@ impl JsConvertibleBond {
         market_json: JsValue,
         bond_price: JsValue,
     ) -> Result<f64, JsValue> {
-        let market = super::market(&market_json)?;
-        let bond_price = super::arg::num(&bond_price, "bondPrice")?;
+        let market = parse_market(&market_json)?;
+        let bond_price = js_f64(&bond_price, "bondPrice")?;
         self.inner
             .conversion_premium(&market, bond_price)
             .map_err(to_js_err)
@@ -890,8 +892,8 @@ impl JsConvertibleBond {
     /// @returns `ConvertibleGreeks` plain object with the price and its delta, gamma, vega, rho and theta.
     /// @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if the tree fails.
     pub fn greeks(&self, market_json: JsValue, as_of: JsValue) -> Result<JsValue, JsValue> {
-        let market = super::market(&market_json)?;
-        let as_of = super::as_of(&as_of)?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
         to_js_value(&self.inner.greeks(&market, as_of).map_err(to_js_err)?)
     }
 }

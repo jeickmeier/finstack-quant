@@ -111,30 +111,3 @@ crate::bindings::macros::py_getters!(PyHedgeSwap |s| {
     /// ``"senior_fee"`` or ``"junior_fee"``.
     priority -> PyResult<String> = enum_to_py_string(&s.inner.priority);
 });
-
-/// Coerce ``list[HedgeSwap | dict] | str`` into Rust hedges.
-pub(crate) fn hedge_swaps_from_py(
-    py: Python<'_>,
-    value: &Bound<'_, PyAny>,
-) -> PyResult<Vec<HedgeSwap>> {
-    if let Ok(json) = value.extract::<std::borrow::Cow<'_, str>>() {
-        return serde_json::from_str(&json)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid hedge_swaps JSON"));
-    }
-    if let Ok(items) = value.cast::<pyo3::types::PyList>() {
-        let mut hedges = Vec::with_capacity(items.len());
-        for item in items.iter() {
-            if let Ok(hedge) = item.cast::<PyHedgeSwap>() {
-                hedges.push(hedge.borrow().inner.clone());
-            } else {
-                hedges.push(crate::bindings::module_utils::py_to_serde(
-                    py,
-                    &item,
-                    "hedge_swaps",
-                )?);
-            }
-        }
-        return Ok(hedges);
-    }
-    crate::bindings::module_utils::py_to_serde(py, value, "hedge_swaps")
-}

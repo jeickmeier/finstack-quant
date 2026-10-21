@@ -17,8 +17,10 @@ use super::data::JsMertonMcConfig;
 use crate::api::core::dates::{JsDayCount, JsTenor};
 use crate::api::core::money::JsMoney;
 use crate::api::core::types::{JsBps, JsRate};
-use crate::utils::input::{js_f64, js_string, json_text};
-use crate::utils::{parse_iso_date, to_js_err, to_js_value};
+use crate::api::valuations::pricing::parse_market;
+use crate::utils::input::{js_f64, js_string};
+use crate::utils::wire::js_date;
+use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::StubKind;
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
@@ -53,16 +55,16 @@ impl JsBond {
         discount_curve_id: JsValue,
     ) -> Result<JsBond, JsValue> {
         let id: &str = &js_string(&id, "id")?;
-        let issue_date: &str = &js_string(&issue_date, "issueDate")?;
-        let maturity: &str = &js_string(&maturity, "maturity")?;
+        let issue_date = js_date(&issue_date, "issueDate")?;
+        let maturity = js_date(&maturity, "maturity")?;
         let stub: &str = &js_string(&stub, "stub")?;
         let discount_curve_id: &str = &js_string(&discount_curve_id, "discountCurveId")?;
         let inner = finstack_quant_valuations::instruments::Bond::fixed(
             id,
             notional.inner,
             coupon_rate.inner,
-            parse_iso_date(issue_date)?,
-            parse_iso_date(maturity)?,
+            issue_date,
+            maturity,
             stub.parse::<StubKind>().map_err(to_js_err)?,
             discount_curve_id,
         )
@@ -99,16 +101,16 @@ impl JsBond {
         discount_curve_id: JsValue,
     ) -> Result<JsBond, JsValue> {
         let id: &str = &js_string(&id, "id")?;
-        let issue_date: &str = &js_string(&issue_date, "issueDate")?;
-        let maturity: &str = &js_string(&maturity, "maturity")?;
+        let issue_date = js_date(&issue_date, "issueDate")?;
+        let maturity = js_date(&maturity, "maturity")?;
         let convention: &str = &js_string(&convention, "convention")?;
         let discount_curve_id: &str = &js_string(&discount_curve_id, "discountCurveId")?;
         let inner = finstack_quant_valuations::instruments::Bond::with_convention(
             id,
             notional.inner,
             coupon_rate.inner,
-            parse_iso_date(issue_date)?,
-            parse_iso_date(maturity)?,
+            issue_date,
+            maturity,
             convention
                 .parse::<finstack_quant_valuations::instruments::BondConvention>()
                 .map_err(to_js_err)?,
@@ -170,16 +172,16 @@ impl JsBond {
     ) -> Result<JsBond, JsValue> {
         let id: &str = &js_string(&id, "id")?;
         let forward_curve_id: &str = &js_string(&forward_curve_id, "forwardCurveId")?;
-        let issue_date: &str = &js_string(&issue_date, "issueDate")?;
-        let maturity: &str = &js_string(&maturity, "maturity")?;
+        let issue_date = js_date(&issue_date, "issueDate")?;
+        let maturity = js_date(&maturity, "maturity")?;
         let discount_curve_id: &str = &js_string(&discount_curve_id, "discountCurveId")?;
         let inner = finstack_quant_valuations::instruments::Bond::floating(
             id,
             notional.inner,
             forward_curve_id,
             spread_bp.inner,
-            parse_iso_date(issue_date)?,
-            parse_iso_date(maturity)?,
+            issue_date,
+            maturity,
             frequency.inner,
             day_count.inner,
             discount_curve_id,
@@ -227,8 +229,8 @@ impl JsBond {
             notional.inner,
             js_string(&forward_curve_id, "forwardCurveId")?,
             spread_bp.inner,
-            parse_iso_date(&js_string(&issue_date, "issueDate")?)?,
-            parse_iso_date(&js_string(&maturity, "maturity")?)?,
+            js_date(&issue_date, "issueDate")?,
+            js_date(&maturity, "maturity")?,
             frequency.inner,
             day_count.inner,
             js_string(&convention, "convention")?
@@ -262,8 +264,8 @@ impl JsBond {
         let inner = finstack_quant_valuations::instruments::Bond::zero_coupon(
             js_string(&id, "id")?,
             notional.inner,
-            parse_iso_date(&js_string(&issue_date, "issueDate")?)?,
-            parse_iso_date(&js_string(&maturity, "maturity")?)?,
+            js_date(&issue_date, "issueDate")?,
+            js_date(&maturity, "maturity")?,
             js_string(&discount_curve_id, "discountCurveId")?,
         )
         .map_err(to_js_err)?;
@@ -377,11 +379,8 @@ impl JsAssetBackedFacility {
     /// @returns Plain `FacilityProjection` object: `facility` and `residual` tranche cashflows, `commitment_fees` and `draws` as `[date, Money]` pairs, and the per-period `diagnostics`.
     /// @throws Error - Throws with kind `validation` if the facility fails validation or an input is malformed, and kind `not_found` if market data is missing.
     pub fn project(&self, market_json: JsValue, as_of: JsValue) -> Result<JsValue, JsValue> {
-        let market = crate::api::valuations::pricing::parse_market_json(&json_text(
-            &market_json,
-            "marketJson",
-        )?)?;
-        let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
         to_js_value(&self.inner.project(&market, as_of).map_err(to_js_err)?)
     }
 
@@ -454,11 +453,8 @@ impl JsRevolvingCredit {
         as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
         use finstack_quant_cashflows::CashflowScheduleSource;
-        let market = crate::api::valuations::pricing::parse_market_json(&json_text(
-            &market_json,
-            "marketJson",
-        )?)?;
-        let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
         to_js_value(
             &self
                 .inner
@@ -485,10 +481,8 @@ impl JsRevolvingCredit {
         market_json: JsValue,
         as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
-        let market_json: &str = &json_text(&market_json, "marketJson")?;
-        let as_of: &str = &js_string(&as_of, "asOf")?;
-        let market = crate::api::valuations::pricing::parse_market_json(market_json)?;
-        let as_of = parse_iso_date(as_of)?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
         let result =
             finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer::price_with_paths(
                 &self.inner,
@@ -793,7 +787,7 @@ setters!(JsTermLoanBuilder, "TermLoanBuilder", {
         /// @param value - Amortization as the serde name of a unit variant (`"none"`) or an `AmortizationSpec` plain object / JSON string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        amortization as amortization => js_wire,
+        amortization as amortization => en,
         /// Set the coupon type.
         /// @param value - Coupon type (serde string). `"cash"` (default), `"pik"`, ...
         /// @returns The builder, for chaining.
@@ -1351,8 +1345,8 @@ impl JsBond {
         discount_rate: JsValue,
         as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
-        let discount_rate = super::arg::num(&discount_rate, "discountRate")?;
-        let as_of = super::as_of(&as_of)?;
+        let discount_rate = js_f64(&discount_rate, "discountRate")?;
+        let as_of = js_date(&as_of, "asOf")?;
         to_js_value(
             &self
                 .inner

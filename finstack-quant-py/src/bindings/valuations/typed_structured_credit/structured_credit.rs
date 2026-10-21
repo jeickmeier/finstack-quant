@@ -7,23 +7,23 @@ use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::serde_to_py;
-use crate::bindings::valuations::convert::{attributes_from_py, enum_to_py_string};
+use crate::bindings::valuations::convert::{
+    attributes_from_py, enum_to_py_string, typed_list_from_py,
+};
 use crate::errors::core_to_py;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_equity_metrics, run_simulation_with_diagnostics, CreditModelConfig, DealFees,
-    DealType, LossAllocationPolicy, LossRecognition, MarketConditions, Metadata, StructuredCredit,
-    TrancheDraw, TrancheReadvance, WaterfallRules,
+    DealType, LossAllocationPolicy, LossRecognition, MarketConditions, Metadata,
+    StandardDealParams, StructuredCredit, TrancheDraw, TrancheReadvance, WaterfallRules,
 };
-use finstack_quant_valuations::instruments::Instrument;
 
 use super::super::instruments::{enum_from_str, instrument_expiry};
 use super::super::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
-use super::hedge_swap::hedge_swaps_from_py;
 use super::{
     PyAssetPool, PyCallAssumption, PyCoverageRules, PyEquityMetrics, PyHedgeSwap,
     PySimulationDiagnostics, PyStochasticPricingResult, PyTrancheCashflows, PyTrancheStructure,
@@ -166,20 +166,18 @@ impl PyStructuredCredit {
         discount_curve_id: &str,
         calendar_id: Option<&str>,
     ) -> PyResult<Self> {
-        let mut inner = StructuredCredit::new_abs(
-            id,
-            pool.inner.clone(),
-            tranches.inner.clone(),
-            py_to_date(closing_date)?,
-            py_to_date(maturity)?,
-            discount_curve_id,
-        )
-        .map_err(core_to_py)?;
-        if let Some(calendar_id) = calendar_id {
-            inner = inner.with_calendar_id(calendar_id);
-        }
-        inner.validate_for_pricing().map_err(core_to_py)?;
-        Ok(Self { inner })
+        let params = StandardDealParams {
+            id: id.into(),
+            pool: pool.inner.clone(),
+            tranches: tranches.inner.clone(),
+            closing_date: py_to_date(closing_date)?,
+            maturity: py_to_date(maturity)?,
+            discount_curve_id: discount_curve_id.into(),
+            calendar_id: calendar_id.map(Into::into),
+        };
+        StructuredCredit::new_standard(DealType::Abs, params)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
     }
 
     /// Create a new CLO deal with registry-calibrated defaults.
@@ -202,20 +200,18 @@ impl PyStructuredCredit {
         discount_curve_id: &str,
         calendar_id: Option<&str>,
     ) -> PyResult<Self> {
-        let mut inner = StructuredCredit::new_clo(
-            id,
-            pool.inner.clone(),
-            tranches.inner.clone(),
-            py_to_date(closing_date)?,
-            py_to_date(maturity)?,
-            discount_curve_id,
-        )
-        .map_err(core_to_py)?;
-        if let Some(calendar_id) = calendar_id {
-            inner = inner.with_calendar_id(calendar_id);
-        }
-        inner.validate_for_pricing().map_err(core_to_py)?;
-        Ok(Self { inner })
+        let params = StandardDealParams {
+            id: id.into(),
+            pool: pool.inner.clone(),
+            tranches: tranches.inner.clone(),
+            closing_date: py_to_date(closing_date)?,
+            maturity: py_to_date(maturity)?,
+            discount_curve_id: discount_curve_id.into(),
+            calendar_id: calendar_id.map(Into::into),
+        };
+        StructuredCredit::new_standard(DealType::Clo, params)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
     }
 
     /// Create a new CMBS deal with registry-calibrated defaults.
@@ -238,20 +234,18 @@ impl PyStructuredCredit {
         discount_curve_id: &str,
         calendar_id: Option<&str>,
     ) -> PyResult<Self> {
-        let mut inner = StructuredCredit::new_cmbs(
-            id,
-            pool.inner.clone(),
-            tranches.inner.clone(),
-            py_to_date(closing_date)?,
-            py_to_date(maturity)?,
-            discount_curve_id,
-        )
-        .map_err(core_to_py)?;
-        if let Some(calendar_id) = calendar_id {
-            inner = inner.with_calendar_id(calendar_id);
-        }
-        inner.validate_for_pricing().map_err(core_to_py)?;
-        Ok(Self { inner })
+        let params = StandardDealParams {
+            id: id.into(),
+            pool: pool.inner.clone(),
+            tranches: tranches.inner.clone(),
+            closing_date: py_to_date(closing_date)?,
+            maturity: py_to_date(maturity)?,
+            discount_curve_id: discount_curve_id.into(),
+            calendar_id: calendar_id.map(Into::into),
+        };
+        StructuredCredit::new_standard(DealType::Cmbs, params)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
     }
 
     /// Create a new RMBS deal with registry-calibrated defaults.
@@ -274,20 +268,18 @@ impl PyStructuredCredit {
         discount_curve_id: &str,
         calendar_id: Option<&str>,
     ) -> PyResult<Self> {
-        let mut inner = StructuredCredit::new_rmbs(
-            id,
-            pool.inner.clone(),
-            tranches.inner.clone(),
-            py_to_date(closing_date)?,
-            py_to_date(maturity)?,
-            discount_curve_id,
-        )
-        .map_err(core_to_py)?;
-        if let Some(calendar_id) = calendar_id {
-            inner = inner.with_calendar_id(calendar_id);
-        }
-        inner.validate_for_pricing().map_err(core_to_py)?;
-        Ok(Self { inner })
+        let params = StandardDealParams {
+            id: id.into(),
+            pool: pool.inner.clone(),
+            tranches: tranches.inner.clone(),
+            closing_date: py_to_date(closing_date)?,
+            maturity: py_to_date(maturity)?,
+            discount_curve_id: discount_curve_id.into(),
+            calendar_id: calendar_id.map(Into::into),
+        };
+        StructuredCredit::new_standard(DealType::Rmbs, params)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
     }
 
     /// Price the deal with the scenario-waterfall Monte Carlo engine.
@@ -1764,7 +1756,9 @@ impl PyStructuredCreditBuilder {
         py: Python<'_>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let hedges = hedge_swaps_from_py(py, value)?;
+        let hedges = typed_list_from_py(py, value, "hedge_swaps", |hedge: &PyHedgeSwap| {
+            hedge.inner.clone()
+        })?;
         builder_set!(slf, |b: StructuredCreditBuilderInner| b.hedge_swaps(hedges))
     }
 

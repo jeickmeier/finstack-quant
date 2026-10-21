@@ -4,9 +4,9 @@ use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::extract::extract_rate_decimal;
 use crate::bindings::valuations::convert::{
     attributes_from_py, attributes_to_py, bool_repr, enum_to_py_string, money_to_py, opt_repr,
-    rate_decimal_from_py,
 };
 use crate::errors::core_to_py;
 use finstack_quant_cashflows::builder::RateSpec;
@@ -372,7 +372,7 @@ impl PyTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         rate: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let rate = rate_decimal_from_py(rate, "rate")?;
+        let rate = extract_rate_decimal(rate, "rate")?;
         builder_set!(slf, |b: TrancheBuilderInner| b
             .coupon(RateSpec::Fixed { rate }))
     }
@@ -612,7 +612,7 @@ impl PyTrancheBuilder {
     ///     If ``value`` is not a known rating or the builder was consumed.
     #[pyo3(text_signature = "($self, value)")]
     fn rating<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let rating: CreditRating = enum_from_str(value, "rating")?;
+        let rating: CreditRating = value.parse().map_err(core_to_py)?;
         builder_set!(slf, |b: TrancheBuilderInner| b.rating(rating))
     }
 

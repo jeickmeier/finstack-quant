@@ -8,8 +8,13 @@
 use crate::bindings::core::currency::PyCurrency;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::extract::{extract_instrument, extract_market};
+use crate::bindings::json_bridge::{deserialize_json_with_context, serialize_json_with_context};
+use crate::bindings::module_utils::opt_spec_from_py;
 use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::bindings::pandas_utils::{serde_to_py, ColumnSchema};
+use crate::bindings::valuations::instruments::{
+    parse_typed_instrument_json, serialize_typed_instrument_json,
+};
 use crate::errors::core_to_py;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations::instruments::composite::{
@@ -51,20 +56,6 @@ const COMPOSITE_HISTORY_COLUMNS: &[ColumnSchema<'static>] = &[
     ("rebalance_trade_count", "int64"),
 ];
 
-fn parse_json<T: serde::de::DeserializeOwned>(json: &str, what: &str) -> PyResult<T> {
-    serde_json::from_str(json)
-        .map_err(|err| crate::errors::serde_json_to_py(err, &format!("invalid {what} JSON")))
-}
-
-fn to_json<T: serde::Serialize>(value: &T, what: &str) -> PyResult<String> {
-    serde_json::to_string(value)
-        .map_err(|err| crate::errors::serde_json_to_py(err, &format!("failed to serialize {what}")))
-}
-
-fn parse_composite_envelope(json: &str) -> PyResult<CompositeInstrument> {
-    finstack_quant_valuations::pricer::parse_typed_instrument_json(json).map_err(core_to_py)
-}
-
 /// Accept a ``CompositeMarketObservation`` array as a Python list of dicts,
 /// a JSON string, or ``None`` (no observations).
 fn observations_from_py(
@@ -72,14 +63,7 @@ fn observations_from_py(
     obj: Option<&Bound<'_, PyAny>>,
     what: &str,
 ) -> PyResult<Vec<CompositeMarketObservation>> {
-    match obj {
-        None => Ok(Vec::new()),
-        Some(obj) if obj.is_none() => Ok(Vec::new()),
-        Some(obj) => {
-            let json = crate::bindings::module_utils::py_to_json_string(py, obj, what)?;
-            parse_json(&json, what)
-        }
-    }
+    Ok(opt_spec_from_py(py, obj, what)?.unwrap_or_default())
 }
 
 /// Render the fields of a serde object Python-style (``key='str'``, ``True``,
@@ -165,7 +149,8 @@ impl PyCompositeLegSpec {
     ///     If the JSON is malformed or does not match the strict leg schema.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        parse_json(json, "CompositeLegSpec").map(|inner| Self { inner })
+        deserialize_json_with_context(json, "invalid CompositeLegSpec JSON")
+            .map(|inner| Self { inner })
     }
 
     /// Serialize this leg as a bare canonical JSON object.
@@ -180,7 +165,7 @@ impl PyCompositeLegSpec {
     /// ValueError
     ///     If the canonical Rust value cannot be serialized.
     fn to_json(&self) -> PyResult<String> {
-        to_json(&self.inner, "CompositeLegSpec")
+        serialize_json_with_context(&self.inner, "failed to serialize CompositeLegSpec")
     }
 
     /// Support pickle through the canonical JSON round-trip.
@@ -254,9 +239,9 @@ crate::bindings::macros::py_getters!(PyCompositeLegSpec |s| {
     /// ------
     /// ValueError
     ///     If canonical JSON serialization fails.
-    instrument_json -> PyResult<String> = to_json(
-        &InstrumentEnvelope::new(s.inner.instrument.as_ref().clone()),
-        "embedded instrument envelope",
+    instrument_json -> PyResult<String> = serialize_typed_instrument_json(
+        s.inner.instrument.as_ref().clone(),
+        "embedded",
     );
 });
 
@@ -491,7 +476,8 @@ impl PyWeightingMethod {
     ///     If JSON is malformed or carries an unknown field or variant.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        parse_json(json, "WeightingMethod").map(|inner| Self { inner })
+        deserialize_json_with_context(json, "invalid WeightingMethod JSON")
+            .map(|inner| Self { inner })
     }
 
     /// Serialize the canonical weighting policy.
@@ -506,7 +492,7 @@ impl PyWeightingMethod {
     /// ValueError
     ///     If serialization of the canonical Rust policy fails.
     fn to_json(&self) -> PyResult<String> {
-        to_json(&self.inner, "WeightingMethod")
+        serialize_json_with_context(&self.inner, "failed to serialize WeightingMethod")
     }
 
     /// Support pickle through the canonical JSON round-trip.
@@ -652,7 +638,8 @@ impl PyRebalanceRule {
     ///     If JSON, dates, schedule ordering, or calendar lookup is invalid.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: RebalanceRule = parse_json(json, "RebalanceRule")?;
+        let inner: RebalanceRule =
+            deserialize_json_with_context(json, "invalid RebalanceRule JSON")?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
     }
@@ -669,7 +656,7 @@ impl PyRebalanceRule {
     /// ValueError
     ///     If serialization of the canonical Rust rule fails.
     fn to_json(&self) -> PyResult<String> {
-        to_json(&self.inner, "RebalanceRule")
+        serialize_json_with_context(&self.inner, "failed to serialize RebalanceRule")
     }
 
     /// Support pickle through the canonical JSON round-trip.
@@ -761,7 +748,8 @@ impl PyCompositeSpec {
     ///     If JSON or any nested specification invariant is invalid.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: CompositeSpec = parse_json(json, "CompositeSpec")?;
+        let inner: CompositeSpec =
+            deserialize_json_with_context(json, "invalid CompositeSpec JSON")?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
     }
@@ -778,7 +766,7 @@ impl PyCompositeSpec {
     /// ValueError
     ///     If canonical serialization fails.
     fn to_json(&self) -> PyResult<String> {
-        to_json(&self.inner, "CompositeSpec")
+        serialize_json_with_context(&self.inner, "failed to serialize CompositeSpec")
     }
 
     /// Support pickle through the canonical JSON round-trip.
@@ -933,7 +921,8 @@ impl PyCompositeState {
     ///     If JSON does not match the strict state schema.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        parse_json(json, "CompositeState").map(|inner| Self { inner })
+        deserialize_json_with_context(json, "invalid CompositeState JSON")
+            .map(|inner| Self { inner })
     }
 
     /// Serialize the frozen state as canonical JSON.
@@ -948,7 +937,7 @@ impl PyCompositeState {
     /// ValueError
     ///     If canonical serialization fails.
     fn to_json(&self) -> PyResult<String> {
-        to_json(&self.inner, "CompositeState")
+        serialize_json_with_context(&self.inner, "failed to serialize CompositeState")
     }
 
     /// Support pickle through the canonical JSON round-trip.
@@ -1032,7 +1021,7 @@ impl PyCompositeInstrument {
     ///     If JSON is malformed, non-composite, unresolved, or internally inconsistent.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        parse_composite_envelope(json).map(|inner| Self { inner })
+        parse_typed_instrument_json::<CompositeInstrument>(json).map(|inner| Self { inner })
     }
 
     /// Serialize as the canonical instrument envelope accepted by pricing APIs.
@@ -1047,10 +1036,7 @@ impl PyCompositeInstrument {
     /// ValueError
     ///     If canonical serialization fails.
     fn to_json(&self) -> PyResult<String> {
-        to_json(
-            &InstrumentEnvelope::new(InstrumentJson::from(self.inner.clone())),
-            "composite instrument envelope",
-        )
+        serialize_typed_instrument_json(InstrumentJson::from(self.inner.clone()), "composite")
     }
 
     /// Support pickle through the canonical JSON round-trip.
@@ -1201,7 +1187,7 @@ impl PyCompositeInstrument {
             .inner
             .execution_trades(previous.map(|value| &value.inner))
             .map_err(core_to_py)?;
-        to_json(&trades, "composite execution trades")
+        serialize_json_with_context(&trades, "failed to serialize composite execution trades")
     }
 
     /// ``execution_trades`` as a pandas ``DataFrame``.
@@ -1323,7 +1309,8 @@ impl PyCompositeRebalanceResult {
     ///     embedded composite state is invalid.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        parse_json(json, "CompositeRebalanceResult").map(|inner| Self { inner })
+        deserialize_json_with_context(json, "invalid CompositeRebalanceResult JSON")
+            .map(|inner| Self { inner })
     }
 
     /// Return net primitive quantity deltas as a list of dicts.
@@ -1360,7 +1347,7 @@ impl PyCompositeRebalanceResult {
     /// ValueError
     ///     If canonical serialization fails.
     fn to_json(&self) -> PyResult<String> {
-        to_json(&self.inner, "CompositeRebalanceResult")
+        serialize_json_with_context(&self.inner, "failed to serialize CompositeRebalanceResult")
     }
 
     /// Support pickle through the canonical JSON round-trip.
@@ -1403,7 +1390,7 @@ crate::bindings::macros::py_getters!(PyCompositeRebalanceResult |s| {
     /// ------
     /// ValueError
     ///     If canonical JSON serialization fails.
-    trades_json -> PyResult<String> = to_json(&s.inner.trades, "composite rebalance trades");
+    trades_json -> PyResult<String> = serialize_json_with_context(&s.inner.trades, "failed to serialize composite rebalance trades");
 });
 
 /// Primitive path, net, and gross exposure report.
@@ -1444,7 +1431,8 @@ impl PyCompositeExposureReport {
     ///     If JSON is malformed or does not match the report contract.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        parse_json(json, "CompositeExposureReport").map(|inner| Self { inner })
+        deserialize_json_with_context(json, "invalid CompositeExposureReport JSON")
+            .map(|inner| Self { inner })
     }
 
     /// Export net and gross primitive aggregates as a pandas ``DataFrame``.
@@ -1480,7 +1468,7 @@ impl PyCompositeExposureReport {
     /// ValueError
     ///     If canonical serialization fails.
     fn to_json(&self) -> PyResult<String> {
-        to_json(&self.inner, "CompositeExposureReport")
+        serialize_json_with_context(&self.inner, "failed to serialize CompositeExposureReport")
     }
 
     /// Support pickle through the canonical JSON round-trip.
@@ -1542,7 +1530,8 @@ impl PyCompositeHistoryResult {
     ///     If JSON is malformed or a row violates its serialized contract.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        parse_json(json, "composite history").map(|inner| Self { inner })
+        deserialize_json_with_context(json, "invalid composite history JSON")
+            .map(|inner| Self { inner })
     }
 
     /// Return the number of chronological output rows.
@@ -1606,7 +1595,7 @@ impl PyCompositeHistoryResult {
                 "history row index {index} is out of range"
             ))
         })?;
-        to_json(row, "CompositeHistoryRow")
+        serialize_json_with_context(row, "failed to serialize CompositeHistoryRow")
     }
 
     /// Serialize every dated history row as a JSON array.
@@ -1621,7 +1610,7 @@ impl PyCompositeHistoryResult {
     /// ValueError
     ///     If canonical serialization fails.
     fn to_json(&self) -> PyResult<String> {
-        to_json(&self.inner, "composite history")
+        serialize_json_with_context(&self.inner, "failed to serialize composite history")
     }
 
     /// Support pickle through the canonical JSON round-trip.

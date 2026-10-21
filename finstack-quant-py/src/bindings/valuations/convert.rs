@@ -4,8 +4,9 @@
 //! same loose input forms, so the rules live here rather than being restated
 //! per class:
 //!
-//! - rates: `float | int | Rate` (decimal, `0.05` = 5%)
-//! - spreads: `float | int | Bps` (basis points)
+//! - rates: `float | int | Rate | Bps` (decimal, `0.05` = 5%) and spreads:
+//!   `float | int | Bps | Rate` (basis points), through the crate-wide
+//!   `extract::{extract_rate_decimal, extract_basis_points}`
 //! - money: `Money | float | int` (a bare number needs a currency from the caller)
 //! - enums: serde string names, resolved through `enum_from_str`
 //! - attributes: `Attributes | dict | None`, a `dict` being the serde form of
@@ -18,48 +19,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::core::types::{PyAttributes, PyBps, PyRate};
+use crate::bindings::core::types::PyAttributes;
 use crate::errors::value_error;
-
-/// Coerce `float | int | Rate` to a decimal rate (`0.05` = 5%).
-///
-/// # Arguments
-///
-/// * `obj` - A Python `float`/`int` already in decimal form, or a
-///   `finstack_quant.core.types.Rate`.
-/// * `what` - Parameter name used in the `TypeError` message.
-pub(crate) fn rate_decimal_from_py(obj: &Bound<'_, PyAny>, what: &str) -> PyResult<f64> {
-    if let Ok(rate) = obj.cast::<PyRate>() {
-        return Ok(rate.borrow().inner.as_decimal());
-    }
-    if let Ok(value) = obj.extract::<f64>() {
-        return Ok(value);
-    }
-    Err(pyo3::exceptions::PyTypeError::new_err(format!(
-        "{what}: expected a decimal float (0.05 = 5%) or finstack_quant.core.types.Rate, got {}",
-        obj.get_type().name()?
-    )))
-}
-
-/// Coerce `float | int | Bps` to a basis-point value (`25.0` = 25bp).
-///
-/// # Arguments
-///
-/// * `obj` - A Python `float`/`int` already in basis points, or a
-///   `finstack_quant.core.types.Bps`.
-/// * `what` - Parameter name used in the `TypeError` message.
-pub(crate) fn bps_from_py(obj: &Bound<'_, PyAny>, what: &str) -> PyResult<f64> {
-    if let Ok(bps) = obj.cast::<PyBps>() {
-        return Ok(f64::from(bps.borrow().inner.as_bp()));
-    }
-    if let Ok(value) = obj.extract::<f64>() {
-        return Ok(value);
-    }
-    Err(pyo3::exceptions::PyTypeError::new_err(format!(
-        "{what}: expected basis points as float or finstack_quant.core.types.Bps, got {}",
-        obj.get_type().name()?
-    )))
-}
 
 /// Coerce `Money | float | int` to [`Money`](finstack_quant_core::money::Money).
 ///
@@ -375,4 +336,60 @@ pub(crate) fn take_builder<B>(inner: &mut Option<B>) -> PyResult<B> {
     inner
         .take()
         .ok_or_else(|| value_error("builder already consumed by build()"))
+}
+
+/// Coerce `Sequence[P | dict] | JSON str` to a list of Rust rows.
+///
+/// A `str` is parsed as a JSON array; any other iterable is walked item by
+/// item, a typed `P` handing over its Rust row through `inner` and any other
+/// item going through the serde round trip of
+/// [`py_to_serde`](crate::bindings::module_utils::py_to_serde). Typed rows and
+/// dicts may be mixed.
+///
+/// # Arguments
+///
+/// * `py` - GIL token used for the serde round trip.
+/// * `value` - The Python argument.
+/// * `label` - Parameter name used in error messages.
+/// * `inner` - Extracts the Rust row from a typed `P` wrapper.
+///
+/// # Errors
+///
+/// `ValueError` when `value` is neither a string nor iterable, or the JSON
+/// text or an item does not match the row shape.
+pub(crate) fn typed_list_from_py<P, T>(
+    py: Python<'_>,
+    value: &Bound<'_, PyAny>,
+    label: &str,
+    inner: impl Fn(&P) -> T,
+) -> PyResult<Vec<T>>
+where
+    P: pyo3::PyClass,
+    T: serde::de::DeserializeOwned + Send,
+{
+    if let Ok(json) = value.extract::<&str>() {
+        return serde_json::from_str(json)
+            .map_err(|err| crate::errors::serde_json_to_py(err, &format!("invalid {label} JSON")));
+    }
+    let items = value.try_iter().map_err(|_| {
+        let class = P::type_object(py)
+            .name()
+            .map_or_else(|_| "typed".to_string(), |name| name.to_string());
+        let got = value
+            .get_type()
+            .name()
+            .map_or_else(|_| "object".to_string(), |name| name.to_string());
+        value_error(format!(
+            "{label}: expected a sequence of {class} objects or dicts, or a JSON array string, got {got}"
+        ))
+    })?;
+    items
+        .map(|item| {
+            let item = item?;
+            match item.cast::<P>() {
+                Ok(typed) => Ok(inner(&typed.borrow())),
+                Err(_) => crate::bindings::module_utils::py_to_serde(py, &item, label),
+            }
+        })
+        .collect()
 }

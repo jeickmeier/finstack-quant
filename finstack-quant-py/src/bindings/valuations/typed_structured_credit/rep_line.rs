@@ -3,9 +3,8 @@ use pyo3::prelude::*;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::valuations::convert::{
-    bps_from_py, money_from_py, money_to_py, opt_repr, rate_decimal_from_py,
-};
+use crate::bindings::extract::{extract_basis_points, extract_rate_decimal};
+use crate::bindings::valuations::convert::{money_from_py, money_to_py, opt_repr};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::RepLine;
 
 /// Typed wrapper for the Rust `RepLine` (aggregated representative pool line).
@@ -126,9 +125,9 @@ spread_bp=None, forward_curve_id=None, index_floor_bp=None, cpr=None, cdr=None, 
     ) -> PyResult<Self> {
         let maturity = py_to_date(maturity)?;
         let balance = money_from_py(balance, None, "balance")?;
-        let rate = rate_decimal_from_py(rate, "rate")?;
+        let rate = extract_rate_decimal(rate, "rate")?;
         let spread_bp = spread_bp
-            .map(|value| bps_from_py(value, "spread_bp"))
+            .map(|value| extract_basis_points(value, "spread_bp"))
             .transpose()?;
         let mut inner = RepLine::new(
             id,

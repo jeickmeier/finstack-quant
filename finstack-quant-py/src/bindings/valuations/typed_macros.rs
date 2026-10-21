@@ -557,7 +557,7 @@ macro_rules! pricing_override_methods {
                 value: &pyo3::Bound<'py, pyo3::PyAny>,
             ) -> pyo3::PyResult<pyo3::PyRefMut<'py, Self>> {
                 let overrides: finstack_quant_valuations::instruments::InstrumentPricingOverrides =
-                    $crate::bindings::valuations::instruments::spec_from_py(
+                    $crate::bindings::module_utils::spec_from_py(
                         py,
                         value,
                         "instrument_pricing_overrides",
@@ -631,7 +631,7 @@ macro_rules! pricing_override_methods {
                 value: &pyo3::Bound<'py, pyo3::PyAny>,
             ) -> pyo3::PyResult<pyo3::PyRefMut<'py, Self>> {
                 let overrides: finstack_quant_valuations::instruments::ScenarioPricingOverrides =
-                    $crate::bindings::valuations::instruments::spec_from_py(
+                    $crate::bindings::module_utils::spec_from_py(
                         py,
                         value,
                         "scenario_pricing_overrides",

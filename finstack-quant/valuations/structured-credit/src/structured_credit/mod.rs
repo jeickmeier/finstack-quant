@@ -46,11 +46,11 @@ pub use types::{
     PutExercisePolicy, Recipient, RecipientType, ReinvestmentAssumptions, ReinvestmentCriteria,
     ReinvestmentPeriod, RepLine, ReserveAccountSpec, ReserveInterestDestination, ReserveTarget,
     RoundingConvention, ShiftMode, ShiftingInterestSpec, ShiftingInterestStep,
-    SpecialServicingSpec, StepDownSpec, StepDownTrigger, StructuredCredit, StructuredCreditBuilder,
-    SwapNotional, SwapPriority, TargetOcSpec, TemplateFees, Tranche, TrancheAccrualPeriod,
-    TrancheBuilder, TrancheCashflows, TrancheDraw, TrancheReadvance, TrancheSeniority,
-    TrancheStructure, TriggerConsequence, Waterfall, WaterfallBuilder, WaterfallDistribution,
-    WaterfallRules, WaterfallTier,
+    SpecialServicingSpec, StandardDealParams, StepDownSpec, StepDownTrigger, StructuredCredit,
+    StructuredCreditBuilder, SwapNotional, SwapPriority, TargetOcSpec, TemplateFees, Tranche,
+    TrancheAccrualPeriod, TrancheBuilder, TrancheCashflows, TrancheDraw, TrancheReadvance,
+    TrancheSeniority, TrancheStructure, TriggerConsequence, Waterfall, WaterfallBuilder,
+    WaterfallDistribution, WaterfallRules, WaterfallTier,
 };
 
 pub use pricing::{execute_waterfall, run_simulation};

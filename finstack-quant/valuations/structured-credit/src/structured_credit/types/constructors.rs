@@ -12,9 +12,9 @@ use crate::structured_credit::assumptions::{embedded_registry_or_panic, required
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, Tenor};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 
-use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
 
 /// Deal-specific configuration for constructor
 pub(super) struct DealConfig {
@@ -24,6 +24,32 @@ pub(super) struct DealConfig {
     pub default_spec: DefaultModelSpec,
     pub recovery_spec: RecoveryModelSpec,
     pub deal_metadata: Metadata,
+}
+
+/// Inputs of [`StructuredCredit::new_standard`], the validated deal-type
+/// constructor the Python and WASM bindings call.
+///
+/// The fields carry the same meaning as the arguments of
+/// [`StructuredCredit::new_abs`]; `calendar_id` is the optional payment
+/// calendar applied before validation.
+#[derive(Debug, Clone)]
+pub struct StandardDealParams {
+    /// Stable deal identifier used for pricing results and risk labels.
+    pub id: InstrumentId,
+    /// Current collateral balances and contractual asset terms, in the pool currency.
+    pub pool: AssetPool,
+    /// Capital structure, current note balances and coupon terms.
+    pub tranches: TrancheStructure,
+    /// Contractual deal inception; the first accrual boundary is one registry
+    /// payment period later (capped at maturity).
+    pub closing_date: Date,
+    /// Legal final date, strictly after closing.
+    pub maturity: Date,
+    /// Market-context discount curve used for tranche PV.
+    pub discount_curve_id: CurveId,
+    /// Holiday calendar for payment-date adjustment; `None` leaves payment
+    /// dates unadjusted.
+    pub calendar_id: Option<CalendarId>,
 }
 
 /// Core instrument parameters shared across constructors
@@ -135,6 +161,81 @@ impl StructuredCredit {
             // Template waterfall by default; custom via `waterfall`.
             waterfall: None,
         }
+    }
+
+    /// Create a validated deal of a standard deal type with its registry
+    /// defaults and an optional payment calendar.
+    ///
+    /// Dispatches to [`Self::new_abs`], [`Self::new_clo`], [`Self::new_cmbs`] or
+    /// [`Self::new_rmbs`], applies `params.calendar_id`, then runs
+    /// [`Instrument::validate_for_pricing`] so the returned deal is ready to price.
+    ///
+    /// # Arguments
+    ///
+    /// * `deal_type` - Deal family selecting the registry constructor profile;
+    ///   one of [`DealType::Abs`], [`DealType::Clo`], [`DealType::Cmbs`] or
+    ///   [`DealType::Rmbs`].
+    /// * `params` - Deal identifier, collateral pool, tranches, closing and
+    ///   maturity dates, discount curve and optional payment calendar.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if `deal_type` has no standard constructor
+    /// (CBO, auto, card), if the first registry payment period exceeds the
+    /// supported calendar range, or if the deal fails pricing validation.
+    pub fn new_standard(
+        deal_type: DealType,
+        params: StandardDealParams,
+    ) -> finstack_quant_core::Result<Self> {
+        let StandardDealParams {
+            id,
+            pool,
+            tranches,
+            closing_date,
+            maturity,
+            discount_curve_id,
+            calendar_id,
+        } = params;
+        let mut deal = match deal_type {
+            DealType::Abs => Self::new_abs(
+                id,
+                pool,
+                tranches,
+                closing_date,
+                maturity,
+                discount_curve_id,
+            ),
+            DealType::Clo => Self::new_clo(
+                id,
+                pool,
+                tranches,
+                closing_date,
+                maturity,
+                discount_curve_id,
+            ),
+            DealType::Cmbs => Self::new_cmbs(
+                id,
+                pool,
+                tranches,
+                closing_date,
+                maturity,
+                discount_curve_id,
+            ),
+            DealType::Rmbs => Self::new_rmbs(
+                id,
+                pool,
+                tranches,
+                closing_date,
+                maturity,
+                discount_curve_id,
+            ),
+            other => Err(finstack_quant_core::Error::Validation(format!(
+                "deal type {other:?} has no standard constructor; use the StructuredCredit builder"
+            ))),
+        }?;
+        deal.calendar_id = calendar_id;
+        deal.validate_for_pricing()?;
+        Ok(deal)
     }
 
     /// Create a new ABS instrument from its building blocks.

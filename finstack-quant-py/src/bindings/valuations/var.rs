@@ -5,9 +5,9 @@
 //! instrument; this entry point reprices a whole list under every scenario and
 //! takes the quantile of the summed P&L, so diversification is preserved.
 
-use super::instruments::spec_from_py;
 use super::pricing::PyMarketHistory;
 use crate::bindings::extract::{extract_instrument, extract_market, InstrumentArg};
+use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_valuations::metrics::risk::{
@@ -23,15 +23,6 @@ fn extract_history(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<MarketHis
         return Ok(typed.borrow().inner.clone());
     }
     spec_from_py(py, obj, "MarketHistory")
-}
-
-/// Coerce ``dict | str | None`` into a `VarConfig`; ``None`` is Rust's default.
-fn extract_config(py: Python<'_>, obj: Option<&Bound<'_, PyAny>>) -> PyResult<VarConfig> {
-    match obj {
-        None => Ok(VarConfig::default()),
-        Some(obj) if obj.is_none() => Ok(VarConfig::default()),
-        Some(obj) => spec_from_py(py, obj, "VarConfig"),
-    }
 }
 
 /// Historical VaR and expected shortfall of a list of instruments.
@@ -124,7 +115,7 @@ fn calculate_var(
         .map(extract_instrument)
         .collect::<PyResult<Vec<InstrumentArg>>>()?;
     let history = extract_history(py, history)?;
-    let config = extract_config(py, config)?;
+    let config: VarConfig = opt_spec_from_py(py, config, "VarConfig")?.unwrap_or_default();
     let market = extract_market(py, market)?;
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let model = model.to_owned();

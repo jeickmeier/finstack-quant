@@ -743,6 +743,41 @@ impl AssetPool {
         }
     }
 
+    /// Configure the pool's reserve account, returning the updated pool.
+    ///
+    /// Replaces all four reserve fields at once, so a field left out falls back
+    /// to its default rather than keeping a previous value.
+    ///
+    /// # Arguments
+    ///
+    /// * `reserve_account` - Opening reserve balance, in the pool currency.
+    /// * `reserve_account_rate` - Annual simple interest rate earned on the
+    ///   reserve, as a decimal (`0.03` = 3%), ACT/360 on the opening balance per
+    ///   legal period.
+    /// * `reserve_target` - Target balance that revolver repayments replenish
+    ///   toward before counting as principal collections; `None` disables
+    ///   replenishment from repayments.
+    /// * `reserve_interest_destination` - Where reserve interest is paid;
+    ///   `None` selects [`ReserveInterestDestination::default`] (the waterfall).
+    ///
+    /// # Returns
+    ///
+    /// The pool with the reserve fields set; every other field is unchanged.
+    #[must_use]
+    pub fn with_reserve(
+        mut self,
+        reserve_account: Money,
+        reserve_account_rate: f64,
+        reserve_target: Option<Money>,
+        reserve_interest_destination: Option<ReserveInterestDestination>,
+    ) -> Self {
+        self.reserve_account = reserve_account;
+        self.reserve_account_rate = reserve_account_rate;
+        self.reserve_target = reserve_target;
+        self.reserve_interest_destination = reserve_interest_destination.unwrap_or_default();
+        self
+    }
+
     /// Add asset from existing bond
     pub fn add_bond(
         &mut self,
