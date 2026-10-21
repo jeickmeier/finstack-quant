@@ -332,3 +332,71 @@ fn discount_curve_global_solve_smoke() {
         "discount factors should decay"
     );
 }
+
+/// Global-solve residuals are keyed by quote id, exactly as bootstrap keys
+/// them, so `worst_quote_id` and host quote rows name the envelope quote.
+#[test]
+fn global_solve_residuals_are_keyed_by_quote_id() {
+    use finstack_quant_calibration::api::schema::HazardCurveParams;
+    use std::collections::BTreeSet;
+
+    let base_date = Date::from_calendar_date(2025, Month::March, 20).unwrap();
+    let global = CalibrationMethod::GlobalSolve {
+        use_analytical_jacobian: false,
+    };
+    let ids = |quotes: &[MarketQuote]| -> BTreeSet<String> {
+        quotes
+            .iter()
+            .map(|q| format!("step-0:{}:tolerance_ratio", q.id()))
+            .collect()
+    };
+
+    let discount_quotes = build_discount_quotes(base_date);
+    let (_, report) = cal_utils::execute_step(
+        &StepParams::Discount(DiscountCurveParams {
+            curve_id: "USD-OIS".into(),
+            currency: Currency::USD,
+            base_date,
+            method: global.clone(),
+            interpolation: Default::default(),
+            extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::FlatForward,
+            pricing_discount_id: None,
+            pricing_forward_id: None,
+            conventions: Default::default(),
+        }),
+        &discount_quotes,
+        &MarketContext::new(),
+        &CalibrationConfig::default(),
+    )
+    .expect("discount global solve");
+    assert_eq!(
+        report.residuals.keys().cloned().collect::<BTreeSet<_>>(),
+        ids(&discount_quotes)
+    );
+
+    let credit_quotes = build_credit_quotes();
+    let (_, report) = cal_utils::execute_step(
+        &StepParams::Hazard(HazardCurveParams {
+            curve_id: "TEST-ENTITY-SENIOR".into(),
+            entity: "TEST-ENTITY".to_string(),
+            seniority: finstack_quant_core::market_data::term_structures::Seniority::Senior,
+            currency: Currency::USD,
+            base_date,
+            discount_curve_id: "TEST-DISC".into(),
+            recovery_rate: 0.40,
+            notional: 1.0,
+            method: global,
+            par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
+            doc_clause: None,
+            cds_valuation_convention: None,
+        }),
+        &credit_quotes,
+        &MarketContext::new().insert(create_test_discount_curve(base_date)),
+        &CalibrationConfig::default(),
+    )
+    .expect("hazard global solve");
+    assert_eq!(
+        report.residuals.keys().cloned().collect::<BTreeSet<_>>(),
+        ids(&credit_quotes)
+    );
+}

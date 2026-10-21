@@ -405,6 +405,8 @@ fn bench_rate_quote_risk_cache(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("rate_quote_risk_portfolio");
     group.sample_size(10);
+    // Uncached: every FRA gets its own provider, so no recalibration is shared
+    // across the portfolio (DV01 is quote-space and needs a provider).
     group.bench_function("4_fras_uncached", |b| {
         b.iter(|| {
             fras.iter()
@@ -413,10 +415,13 @@ fn bench_rate_quote_risk_cache(c: &mut Criterion) {
                         black_box(&market),
                         black_box(as_of),
                         black_box(&[MetricId::Dv01]),
-                        PricingOptions::default(),
+                        PricingOptions::default().with_recalibration_provider(Arc::new(
+                            CachedRecalibrationProvider::new(),
+                        )),
                     )
                 })
                 .collect::<Result<Vec<_>, _>>()
+                .expect("uncached FRA DV01 should price")
         })
     });
     group.bench_function("4_fras_batch_cached", |b| {
@@ -436,6 +441,7 @@ fn bench_rate_quote_risk_cache(c: &mut Criterion) {
                         )
                     })
                     .collect::<Result<Vec<_>, _>>()
+                    .expect("cached FRA DV01 should price")
             },
             BatchSize::SmallInput,
         )

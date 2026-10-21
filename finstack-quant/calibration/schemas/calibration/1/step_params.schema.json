@@ -602,8 +602,12 @@
         },
         "method": {
           "$ref": "#/$defs/CalibrationMethod",
-          "default": "bootstrap",
-          "description": "Calibration method to use.\n\nForward curves require [`CalibrationMethod::GlobalSolve`]. Sequential\nbootstrap is rejected because contractual off-grid reset intervals\ncouple adjacent rates through projection discount factors."
+          "default": {
+            "global_solve": {
+              "use_analytical_jacobian": false
+            }
+          },
+          "description": "Calibration method to use.\n\nForward curves require [`CalibrationMethod::GlobalSolve`], which is the\ndefault (finite-difference Jacobian). Sequential bootstrap is rejected\nbecause contractual off-grid reset intervals couple adjacent rates\nthrough projection discount factors."
         },
         "tenor_years": {
           "description": "Tenor in years for the forward curve.",
@@ -1027,7 +1031,7 @@
         },
         "detachment_points": {
           "default": [],
-          "description": "Detachment points (as percentages) for the tranches.",
+          "description": "Expected tranche detachment points as decimals in `(0, 1]` (e.g. `0.03`\nfor 3%), the same unit as `CdsTrancheQuote.detachment`. When non-empty,\nevery quote must match one point and every point must be quoted.",
           "items": {
             "format": "double",
             "type": "number"

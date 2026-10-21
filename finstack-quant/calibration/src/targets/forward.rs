@@ -728,6 +728,26 @@ mod tests {
         }
     }
 
+    /// A forward step that omits `method` must default to the only method the
+    /// forward target accepts, not to a bootstrap it rejects at solve time.
+    #[test]
+    fn forward_params_default_to_global_solve() {
+        let params: ForwardCurveParams = serde_json::from_value(serde_json::json!({
+            "curve_id": "USD-SOFR-3M",
+            "currency": "USD",
+            "base_date": "2025-01-15",
+            "tenor_years": 0.25,
+            "discount_curve_id": "USD-OIS",
+        }))
+        .expect("forward params without method parse");
+        assert_eq!(
+            params.method,
+            CalibrationMethod::GlobalSolve {
+                use_analytical_jacobian: false
+            }
+        );
+    }
+
     #[test]
     fn global_forward_target_uses_configured_bounds_and_weights() {
         let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");

@@ -521,8 +521,8 @@ impl GlobalSolveTarget for InflationCurveTarget {
         Some(quote.quote.rate())
     }
 
-    fn residual_key(&self, quote: &Self::Quote, idx: usize) -> String {
-        format!("{}-{:03}", quote.instrument.id(), idx)
+    fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
+        quote.quote.id().as_str().to_string()
     }
 
     fn residual_weights(&self, quotes: &[Self::Quote], weights_out: &mut [f64]) -> Result<()> {
