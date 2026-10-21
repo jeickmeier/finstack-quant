@@ -128,9 +128,7 @@ pub use engine::{
 };
 pub use envelope::{ScenarioEnvelope, ScenarioSchema};
 pub use error::{Error, Result};
-pub use horizon::{
-    attribution_method_from_str, HorizonAnalysis, HorizonReport, HorizonResult, HorizonSummary,
-};
+pub use horizon::{HorizonAnalysis, HorizonReport, HorizonResult, HorizonSummary};
 pub use spec::{
     CurveKind, HazardBumpMode, OperationSpec, RateBindingSpec, ScenarioSpec, TenorMatchMode,
     TimeRollMode,

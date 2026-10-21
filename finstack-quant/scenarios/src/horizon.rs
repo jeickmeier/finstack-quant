@@ -76,44 +76,6 @@ use finstack_quant_valuations::recalibration::RecalibrationProvider;
 use crate::engine::ApplicationReport;
 use crate::{ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec};
 
-/// Parse an [`AttributionMethod`] from its binding string form.
-///
-/// This is the single shared parser behind the Python
-/// `compute_horizon_return(method=...)` keyword and the WASM
-/// `computeHorizonReturn` `method` parameter. It cannot be replaced by a
-/// bare serde deserialization: `AttributionMethod` is externally tagged, so
-/// serde only accepts the plain strings `"parallel"` / `"metrics_based"` —
-/// the tuple variants require `{"waterfall": [...]}` / `{"taylor": {...}}`
-/// payloads, whereas the binding contract maps the bare strings
-/// `"waterfall"` and `"taylor"` to their canonical defaults
-/// ([`finstack_quant_attribution::default_waterfall_order`] and
-/// [`finstack_quant_attribution::TaylorAttributionConfig::default`]).
-///
-/// # Arguments
-///
-/// * `method` - One of `"parallel"`, `"waterfall"`, `"metrics_based"`, or
-///   `"taylor"`.
-///
-/// # Errors
-///
-/// Returns [`crate::Error::Validation`] for any other string, naming the
-/// accepted values.
-pub fn attribution_method_from_str(method: &str) -> crate::Result<AttributionMethod> {
-    match method {
-        "parallel" => Ok(AttributionMethod::Parallel),
-        "waterfall" => Ok(AttributionMethod::Waterfall(
-            finstack_quant_attribution::default_waterfall_order(),
-        )),
-        "metrics_based" => Ok(AttributionMethod::MetricsBased),
-        "taylor" => Ok(AttributionMethod::Taylor(
-            finstack_quant_attribution::TaylorAttributionConfig::default(),
-        )),
-        other => Err(crate::Error::Validation(format!(
-            "Unknown attribution method '{other}'. Expected: parallel, waterfall, metrics_based, taylor"
-        ))),
-    }
-}
-
 /// Horizon total return analyzer.
 ///
 /// Composes scenario application with P&L attribution.  Construct with an

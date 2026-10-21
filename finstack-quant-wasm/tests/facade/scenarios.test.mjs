@@ -11,12 +11,9 @@ await init({
 function horizonMethods() {
   return [
     ['parallel', 'parallel'],
-    ['waterfall shorthand', 'waterfall'],
     ['waterfall', { waterfall: attribution.defaultWaterfallOrder() }],
     ['metrics_based', 'metrics_based'],
-    ['taylor shorthand', 'taylor'],
     ['taylor', { taylor: {} }],
-    ['taylor JSON', JSON.stringify({ taylor: {} })],
   ];
 }
 

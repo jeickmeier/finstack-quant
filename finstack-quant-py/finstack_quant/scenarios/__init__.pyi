@@ -1663,9 +1663,7 @@ def compute_horizon_return(
         ``"metrics_based"``, ``{"waterfall": [...factors]}`` (for example
         ``{"waterfall": default_waterfall_order()}``) or
         ``{"taylor": {...config}}`` (``{"taylor": {}}`` for the defaults), or
-        the shorthand strings ``"waterfall"`` and ``"taylor"`` for their
-        canonical defaults, or the same wire value as JSON text. ``None`` selects
-        the Rust default
+        the same value as JSON text. ``None`` selects the Rust default
         (``AttributionMethod::default()``, currently ``"parallel"``).
         ``"metrics_based"`` calculates the instrument's applicable subset of
         the default attribution metrics (DV01, CS01, vega, ...) at the opening

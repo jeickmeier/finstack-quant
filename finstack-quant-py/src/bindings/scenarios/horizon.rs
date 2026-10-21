@@ -32,9 +32,8 @@ use super::extract::extract_config;
 ///     ``{"waterfall": [...factors]}`` (for example
 ///     ``{"waterfall": default_waterfall_order()}``) or
 ///     ``{"taylor": {...config}}`` (``{"taylor": {}}`` for the defaults),
-///     the shorthand strings ``"waterfall"`` and ``"taylor"`` for their
-///     canonical defaults, or the same wire value as JSON text. ``None`` selects
-///     the Rust default (``AttributionMethod::default()``, currently ``"parallel"``).
+///     or the same value as JSON text. ``None`` selects the Rust default
+///     (``AttributionMethod::default()``, currently ``"parallel"``).
 ///     ``"metrics_based"`` calculates the instrument's applicable subset of
 ///     the default attribution metrics (DV01, CS01, vega, ...) at the opening
 ///     snapshot, using the same configuration and recalibration provider as
@@ -103,23 +102,12 @@ pub(crate) fn compute_horizon_return<'py>(
     let market_ctx = extract_market(py, market)?;
     let date = crate::bindings::date_utils::py_to_date(as_of)?;
     let scenario = crate::bindings::extract::extract_scenario_spec(py, scenario)?;
-    let attribution_method = method
-        .map(
-            |method| -> PyResult<finstack_quant_attribution::AttributionMethod> {
-                if let Ok(method_text) = method.extract::<String>() {
-                    if !method_text.trim_start().starts_with(['{', '[', '"']) {
-                        return finstack_quant_scenarios::attribution_method_from_str(&method_text)
-                            .map_err(scenarios_to_py);
-                    }
-                    return serde_json::from_str(&method_text).map_err(|e| {
-                        crate::errors::serde_json_to_py(e, "invalid attribution method")
-                    });
-                }
-                let json = crate::bindings::module_utils::py_to_json_string(py, method, "method")?;
-                serde_json::from_str(&json)
-                    .map_err(|e| crate::errors::serde_json_to_py(e, "invalid attribution method"))
-            },
-        )
+    let attribution_method: finstack_quant_attribution::AttributionMethod = method
+        .map(|method| -> PyResult<_> {
+            let json = crate::bindings::module_utils::py_to_json_string(py, method, "method")?;
+            serde_json::from_str(&json)
+                .map_err(|e| crate::errors::serde_json_to_py(e, "invalid attribution method"))
+        })
         .transpose()?
         .unwrap_or_default();
     let finstack_config = extract_config(config)?;

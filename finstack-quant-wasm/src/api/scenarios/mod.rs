@@ -278,8 +278,7 @@ pub fn apply_scenario(
 /// * `method` - `AttributionMethod` wire value: a unit variant name such as
 ///   `"parallel"` or `"metrics_based"`, an object such as
 ///   `{ waterfall: ["carry", "rates_curves"] }` or `{ taylor: {} }`, or the
-///   shorthand strings `"waterfall"` and `"taylor"` for their canonical
-///   defaults; structured values may also be passed as JSON text. Omit for the Rust default
+///   same value as JSON text. Omit for the Rust default
 ///   (`AttributionMethod::default()`, currently "parallel"). "metrics_based"
 ///   calculates the canonical registry's
 ///   applicable subset of default attribution metrics at the opening snapshot;
@@ -324,6 +323,8 @@ pub fn compute_horizon_return(
     let market_json: &str = &json_text(&market_json, "marketJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
     let scenario = scenario_spec(&scenario_json, "scenarioJson")?;
+    let attribution_method: finstack_quant_attribution::AttributionMethod =
+        crate::utils::wire::js_opt_wire(method.as_ref(), "method")?.unwrap_or_default();
     let config = parse_config(config_json.as_ref())?;
     let calendar_id = js_opt_string(calendar_id.as_ref(), "calendarId")?;
     use std::sync::Arc;
@@ -341,14 +342,6 @@ pub fn compute_horizon_return(
 
     let date = parse_iso_date(as_of)?;
 
-    let attribution_method: finstack_quant_attribution::AttributionMethod =
-        match method.as_ref().and_then(JsValue::as_string) {
-            Some(method_text) if !method_text.trim_start().starts_with(['{', '[', '"']) => {
-                finstack_quant_scenarios::attribution_method_from_str(&method_text)
-                    .map_err(to_js_err)?
-            }
-            _ => crate::utils::wire::js_opt_wire(method.as_ref(), "method")?.unwrap_or_default(),
-        };
     let mut analyzer = finstack_quant_scenarios::HorizonAnalysis::new(attribution_method, config);
     if let Some(id) = calendar_id.as_deref() {
         analyzer = analyzer.with_calendar_id(id);
