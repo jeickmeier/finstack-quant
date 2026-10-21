@@ -60,9 +60,9 @@ Calibrated trees price over the horizon they were calibrated to. `oas_bp` is
 the option-adjusted spread in basis points (continuously compounded); pass
 `0.0` to price on the calibrated curve.
 
-`HullWhiteTree` exposes `backward_induction`, `bond_price`,
-`forward_swap_rate`, and `annuity` accessors instead, because swaption pricing
-needs the calibrated tree's internals directly.
+`HullWhiteTree` exposes `backward_induction` and `bond_price` accessors
+instead, because swaption pricing needs the calibrated tree's internals
+directly.
 
 ## Model comparison
 
