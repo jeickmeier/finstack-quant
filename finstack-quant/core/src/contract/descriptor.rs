@@ -31,12 +31,6 @@ impl ContractDescriptor {
         Self { id }
     }
 
-    /// Return the current schema marker as `"<contract>/<version>"`.
-    #[must_use]
-    pub fn schema_string(&self) -> String {
-        format!("{}/{}", self.id, Self::VERSION)
-    }
-
     /// Parse and validate an exact schema marker for this contract.
     ///
     /// The contract identifier must match exactly. Any version other than v1,
@@ -113,7 +107,7 @@ impl ContractDescriptor {
     ///
     /// Returns [`ContractError::Report`] with stable code
     /// `"contract/version-missing"` or `"contract/version-unsupported"`.
-    pub fn resolve_strict(
+    fn resolve_strict(
         &self,
         found: Option<u32>,
         pointer: &str,
@@ -185,7 +179,7 @@ impl ContractDescriptor {
     /// this contract's numeric version.
     ///
     /// The bytes are parsed under `limits`, the root `/schema_version`
-    /// integer is checked with [`Self::resolve_strict`], and the whole
+    /// integer must equal [`Self::VERSION`], and the whole
     /// document is then deserialized into `T`. Domain validation of `T` is
     /// left to the caller; report its failure with [`Self::semantic_error`].
     ///

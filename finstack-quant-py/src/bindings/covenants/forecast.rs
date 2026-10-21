@@ -108,17 +108,17 @@ impl PyCovenantForecastConfig {
     /// ``scope`` must be ``maintenance`` or ``incurrence``; other strings raise ``ValueError``.
     #[pyo3(text_signature = "(scope)")]
     fn with_scope(&self, scope: &str) -> PyResult<Self> {
-        Ok(Self::from_inner(
-            self.inner
-                .clone()
-                .with_scope(super::spec::parse_scope(scope)?),
-        ))
+        Ok(Self::from_inner(self.inner.clone().with_scope(
+            crate::bindings::extract::parse_label::<finstack_quant_covenants::CovenantScope>(
+                scope,
+            )?,
+        )))
     }
 
     /// Scope selected by batch forecasts: maintenance or hypothetical incurrence capacity.
     #[getter]
     fn scope(&self) -> PyResult<String> {
-        super::spec::wire_label(&self.inner.scope)
+        crate::bindings::extract::label(&self.inner.scope)
     }
 
     /// Whether breach probabilities use the stochastic overlay.
@@ -241,7 +241,7 @@ impl PyCovenantForecast {
     /// Test direction: ``"at_most"`` or ``"at_least"``.
     #[getter]
     fn comparator(&self) -> PyResult<String> {
-        super::spec::wire_label(&self.inner.comparator)
+        crate::bindings::extract::label(&self.inner.comparator)
     }
 
     /// Forecast test dates as ``datetime.date``.

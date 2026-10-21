@@ -8,6 +8,7 @@ use crate::metrics::{MetricContext, MetricId};
 use crate::pricer::PricingDispatch;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::market_data::{
     context::MarketContext,
     scalars::{InflationIndex, MarketScalar, SeriesInterpolation},
@@ -259,7 +260,7 @@ pub fn schedule_trade_pv_raw<S>(
 where
     S: finstack_quant_cashflows::CashflowProvider,
 {
-    use finstack_quant_core::math::NeumaierAccumulator;
+    use finstack_quant_core::math::summation::NeumaierAccumulator;
 
     let flows = S::dated_cashflows(instrument, market, as_of)?;
     let disc = market.get_discount(discount_curve_id.as_str())?;
@@ -915,13 +916,8 @@ mod tests {
             },
         )?;
 
-        let usd_scale = result
-            .meta
-            .rounding
-            .get_output_scale_by_currency()
-            .get(&Currency::USD)
-            .copied();
-        assert_eq!(usd_scale, Some(4), "meta should reflect provided config");
+        let usd_scale = result.meta.rounding.output_scale(Currency::USD);
+        assert_eq!(usd_scale, 4, "meta should reflect provided config");
         Ok(())
     }
 

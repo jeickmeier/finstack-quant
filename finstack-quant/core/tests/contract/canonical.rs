@@ -2,9 +2,7 @@ use std::cell::Cell;
 use std::fs;
 use std::path::Path;
 
-use finstack_quant_core::canonical::{
-    canonical_bytes_of_value, content_hash, to_canonical_bytes, CANONICAL_VERSION,
-};
+use finstack_quant_core::canonical::{content_hash, to_canonical_bytes, CANONICAL_VERSION};
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
 use finstack_quant_core::{Error, InputError};
@@ -40,7 +38,7 @@ fn canonical_bytes_sort_map_keys_recursively_without_reordering_arrays() {
 
     let value = json!({"items": [3, 1, 2], "z": 0, "a": 1});
     assert_eq!(
-        canonical_bytes_of_value(&value).unwrap(),
+        to_canonical_bytes(&value).unwrap(),
         br#"{"a":1,"items":[3,1,2],"z":0}"#
     );
 }
@@ -55,7 +53,7 @@ fn canonical_bytes_use_compact_serde_json_number_and_string_forms() {
     });
 
     assert_eq!(
-        canonical_bytes_of_value(&value).unwrap(),
+        to_canonical_bytes(&value).unwrap(),
         r#"{"escaped":"line\nbreak","float":1.25,"integer":9007199254740991,"unicode":"é"}"#
             .as_bytes()
     );
@@ -199,7 +197,6 @@ fn market_state_with_tags(tags: &str) -> (Vec<u8>, MarketContextState) {
             "credit_indices": [],
             "fx_delta_vol_surfaces": [],
             "vol_cubes": [],
-            "collateral": {{}},
             "hierarchy": {{
                 "roots": {{
                     "Rates": {{

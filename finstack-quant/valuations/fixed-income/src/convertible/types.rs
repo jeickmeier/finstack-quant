@@ -32,14 +32,12 @@ use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instr
 #[serde(deny_unknown_fields)]
 pub struct ConvertibleSettlement {
     /// Date the holder's exercise decision extinguished the debt.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub exercise_date: Date,
     /// Contractual delivery/payment date; not earlier than exercise.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -74,14 +72,12 @@ pub struct ConvertibleBond {
     /// Principal amount.
     pub notional: Money,
     /// Issue date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub issue_date: Date,
     /// Maturity date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

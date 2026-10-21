@@ -208,7 +208,7 @@ impl ImResult {
         methodology: ImMethodology,
         as_of: Date,
         mpor_days: u32,
-        breakdown: finstack_quant_core::HashMap<String, Money>,
+        breakdown: finstack_quant_core::FxHashMap<String, Money>,
     ) -> Self {
         Self {
             amount,

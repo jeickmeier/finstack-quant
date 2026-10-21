@@ -121,7 +121,7 @@ fn flat_market() -> MarketContext {
 fn run_sim(
     instrument: &StructuredCredit,
     market: &MarketContext,
-) -> finstack_quant_core::HashMap<
+) -> finstack_quant_core::FxHashMap<
     String,
     finstack_quant_valuations_structured_credit::structured_credit::TrancheCashflows,
 > {

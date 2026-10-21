@@ -205,7 +205,7 @@ mod tests {
                 .expect("base correlation"),
         );
 
-        let mut issuer_curves = finstack_quant_core::HashMap::default();
+        let mut issuer_curves = finstack_quant_core::FxHashMap::default();
         for i in 0..3 {
             let id = format!("ISS-{i}");
             issuer_curves.insert(id, Arc::clone(&hz));
@@ -219,7 +219,7 @@ mod tests {
             .issuer_curves(issuer_curves);
 
         if with_per_issuer_recovery {
-            let mut rates = finstack_quant_core::HashMap::default();
+            let mut rates = finstack_quant_core::FxHashMap::default();
             rates.insert("ISS-0".to_string(), 0.10);
             rates.insert("ISS-1".to_string(), 0.50);
             rates.insert("ISS-2".to_string(), 0.70);
@@ -227,7 +227,7 @@ mod tests {
         }
 
         if with_per_issuer_weight {
-            let mut weights = finstack_quant_core::HashMap::default();
+            let mut weights = finstack_quant_core::FxHashMap::default();
             weights.insert("ISS-0".to_string(), 0.50);
             weights.insert("ISS-1".to_string(), 0.30);
             weights.insert("ISS-2".to_string(), 0.20);

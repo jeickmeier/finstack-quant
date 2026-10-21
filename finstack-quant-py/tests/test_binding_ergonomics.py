@@ -196,7 +196,6 @@ class TestDateArguments:
             "credit_indices": [],
             "fx_delta_vol_surfaces": [],
             "vol_cubes": [],
-            "collateral": {},
             "hierarchy": None,
         })
 

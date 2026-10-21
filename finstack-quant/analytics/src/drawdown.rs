@@ -11,6 +11,7 @@
 
 use crate::risk_metrics::ratio_or_sign_infinity;
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::math::stats::mean;
 
 /// Drawdown episode with start, valley, optional recovery, and max drawdown.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -381,11 +382,7 @@ pub(crate) fn deepest(drawdown: &[f64]) -> f64 {
 ///   [`to_drawdown_series`]).
 #[must_use]
 pub(crate) fn mean_drawdown(drawdowns: &[f64]) -> f64 {
-    if drawdowns.is_empty() {
-        0.0
-    } else {
-        drawdowns.iter().copied().sum::<f64>() / drawdowns.len() as f64
-    }
+    mean(drawdowns)
 }
 
 /// Sterling ratio: risk-adjusted return using average drawdown.
@@ -487,7 +484,7 @@ pub(crate) fn pain_ratio(cagr_val: f64, pain: f64, risk_free_rate: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::dates::{Duration, Month};
+    use time::{Duration, Month};
 
     fn make_dates(n: usize) -> Vec<Date> {
         (0..n)

@@ -36,6 +36,7 @@ use crate::cms_common::annuity_weight;
 use crate::cms_option::types::CmsOption;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::{black_call, black_put};

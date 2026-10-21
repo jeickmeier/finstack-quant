@@ -1,6 +1,6 @@
 //! Tests for date extension traits
 
-use finstack_quant_core::dates::calendar::TARGET2;
+use super::common::by_id;
 use finstack_quant_core::dates::{Date, DateExt, FiscalConfig};
 use time::Month;
 
@@ -24,9 +24,11 @@ fn date_arithmetic_rejects_range_overflow() {
     assert!(Date::MIN.add_months(-1).is_err());
     assert!(Date::MAX.add_weekdays(1).is_err());
     assert!(Date::MIN.add_weekdays(-1).is_err());
-    assert!(Date::MAX.add_business_days(1, &TARGET2).is_err());
-    assert!(Date::MIN.add_business_days(-1, &TARGET2).is_err());
-    assert!(anchor.add_business_days(i32::MAX, &TARGET2).is_err());
+    assert!(Date::MAX.add_business_days(1, by_id("target2")).is_err());
+    assert!(Date::MIN.add_business_days(-1, by_id("target2")).is_err());
+    assert!(anchor
+        .add_business_days(i32::MAX, by_id("target2"))
+        .is_err());
     assert_eq!(Date::MAX.add_days(0).unwrap(), Date::MAX);
 }
 
@@ -122,7 +124,7 @@ fn date_ext_add_weekdays_over_weekend() {
 
 #[test]
 fn date_ext_add_business_days_with_calendar() {
-    let cal = TARGET2;
+    let cal = by_id("target2");
 
     // Friday June 27, 2025 + 3 business days = Wed July 2
     let friday = make_date(2025, 6, 27);
@@ -132,7 +134,7 @@ fn date_ext_add_business_days_with_calendar() {
 
 #[test]
 fn date_ext_add_business_days_backward() {
-    let cal = TARGET2;
+    let cal = by_id("target2");
 
     // Monday June 30, 2025 - 3 business days = Wednesday June 25
     let monday = make_date(2025, 6, 30);
@@ -142,7 +144,7 @@ fn date_ext_add_business_days_backward() {
 
 #[test]
 fn date_ext_add_business_days_zero() {
-    let cal = TARGET2;
+    let cal = by_id("target2");
     let date = make_date(2025, 6, 27);
     let result = date.add_business_days(0, &cal).unwrap();
     assert_eq!(result, date);

@@ -587,11 +587,6 @@ export type D_826Db27Dbb673D9F5F86 =
        * second axis.
        */
       tenors: number[];
-    }
-  | {
-      csa_currency: Currency5;
-      id: Currency6;
-      kind: "collateral";
     };
 /**
  * Rate index identifier (e.g. "USD-SOFR-3M").
@@ -1481,332 +1476,6 @@ export type Date11 = string;
  */
 export type Id5 = string;
 /**
- * ISO 4217 currency code.
- */
-export type Currency5 =
-  | "AED"
-  | "AFN"
-  | "ALL"
-  | "AMD"
-  | "ANG"
-  | "AOA"
-  | "ARS"
-  | "AUD"
-  | "AWG"
-  | "AZN"
-  | "BAM"
-  | "BBD"
-  | "BDT"
-  | "BGN"
-  | "BHD"
-  | "BIF"
-  | "BMD"
-  | "BND"
-  | "BOB"
-  | "BRL"
-  | "BSD"
-  | "BTN"
-  | "BWP"
-  | "BYN"
-  | "BZD"
-  | "CAD"
-  | "CDF"
-  | "CHF"
-  | "CLF"
-  | "CLP"
-  | "CNY"
-  | "COP"
-  | "CRC"
-  | "CUC"
-  | "CUP"
-  | "CVE"
-  | "CZK"
-  | "DJF"
-  | "DKK"
-  | "DOP"
-  | "DZD"
-  | "EGP"
-  | "ERN"
-  | "ETB"
-  | "EUR"
-  | "FJD"
-  | "FKP"
-  | "GBP"
-  | "GEL"
-  | "GHS"
-  | "GIP"
-  | "GMD"
-  | "GNF"
-  | "GTQ"
-  | "GYD"
-  | "HKD"
-  | "HNL"
-  | "HRK"
-  | "HTG"
-  | "HUF"
-  | "IDR"
-  | "ILS"
-  | "INR"
-  | "IQD"
-  | "IRR"
-  | "ISK"
-  | "JMD"
-  | "JOD"
-  | "JPY"
-  | "KES"
-  | "KGS"
-  | "KHR"
-  | "KMF"
-  | "KPW"
-  | "KRW"
-  | "KWD"
-  | "KYD"
-  | "KZT"
-  | "LAK"
-  | "LBP"
-  | "LKR"
-  | "LRD"
-  | "LSL"
-  | "LYD"
-  | "MAD"
-  | "MDL"
-  | "MGA"
-  | "MKD"
-  | "MMK"
-  | "MNT"
-  | "MOP"
-  | "MRU"
-  | "MUR"
-  | "MVR"
-  | "MWK"
-  | "MXN"
-  | "MYR"
-  | "MZN"
-  | "NAD"
-  | "NGN"
-  | "NIO"
-  | "NOK"
-  | "NPR"
-  | "NZD"
-  | "OMR"
-  | "PAB"
-  | "PEN"
-  | "PGK"
-  | "PHP"
-  | "PKR"
-  | "PLN"
-  | "PYG"
-  | "QAR"
-  | "RON"
-  | "RSD"
-  | "RUB"
-  | "RWF"
-  | "SAR"
-  | "SBD"
-  | "SCR"
-  | "SDG"
-  | "SEK"
-  | "SGD"
-  | "SHP"
-  | "SLE"
-  | "SLL"
-  | "SOS"
-  | "SRD"
-  | "SSP"
-  | "STN"
-  | "SYP"
-  | "SZL"
-  | "THB"
-  | "TJS"
-  | "TMT"
-  | "TND"
-  | "TOP"
-  | "TRY"
-  | "TTD"
-  | "TWD"
-  | "TZS"
-  | "UAH"
-  | "UGX"
-  | "USD"
-  | "UYU"
-  | "UZS"
-  | "VED"
-  | "VES"
-  | "VND"
-  | "VUV"
-  | "WST"
-  | "XAF"
-  | "XCD"
-  | "XOF"
-  | "XPF"
-  | "YER"
-  | "ZAR"
-  | "ZMW"
-  | "ZWL";
-/**
- * ISO 4217 currency code.
- */
-export type Currency6 =
-  | "AED"
-  | "AFN"
-  | "ALL"
-  | "AMD"
-  | "ANG"
-  | "AOA"
-  | "ARS"
-  | "AUD"
-  | "AWG"
-  | "AZN"
-  | "BAM"
-  | "BBD"
-  | "BDT"
-  | "BGN"
-  | "BHD"
-  | "BIF"
-  | "BMD"
-  | "BND"
-  | "BOB"
-  | "BRL"
-  | "BSD"
-  | "BTN"
-  | "BWP"
-  | "BYN"
-  | "BZD"
-  | "CAD"
-  | "CDF"
-  | "CHF"
-  | "CLF"
-  | "CLP"
-  | "CNY"
-  | "COP"
-  | "CRC"
-  | "CUC"
-  | "CUP"
-  | "CVE"
-  | "CZK"
-  | "DJF"
-  | "DKK"
-  | "DOP"
-  | "DZD"
-  | "EGP"
-  | "ERN"
-  | "ETB"
-  | "EUR"
-  | "FJD"
-  | "FKP"
-  | "GBP"
-  | "GEL"
-  | "GHS"
-  | "GIP"
-  | "GMD"
-  | "GNF"
-  | "GTQ"
-  | "GYD"
-  | "HKD"
-  | "HNL"
-  | "HRK"
-  | "HTG"
-  | "HUF"
-  | "IDR"
-  | "ILS"
-  | "INR"
-  | "IQD"
-  | "IRR"
-  | "ISK"
-  | "JMD"
-  | "JOD"
-  | "JPY"
-  | "KES"
-  | "KGS"
-  | "KHR"
-  | "KMF"
-  | "KPW"
-  | "KRW"
-  | "KWD"
-  | "KYD"
-  | "KZT"
-  | "LAK"
-  | "LBP"
-  | "LKR"
-  | "LRD"
-  | "LSL"
-  | "LYD"
-  | "MAD"
-  | "MDL"
-  | "MGA"
-  | "MKD"
-  | "MMK"
-  | "MNT"
-  | "MOP"
-  | "MRU"
-  | "MUR"
-  | "MVR"
-  | "MWK"
-  | "MXN"
-  | "MYR"
-  | "MZN"
-  | "NAD"
-  | "NGN"
-  | "NIO"
-  | "NOK"
-  | "NPR"
-  | "NZD"
-  | "OMR"
-  | "PAB"
-  | "PEN"
-  | "PGK"
-  | "PHP"
-  | "PKR"
-  | "PLN"
-  | "PYG"
-  | "QAR"
-  | "RON"
-  | "RSD"
-  | "RUB"
-  | "RWF"
-  | "SAR"
-  | "SBD"
-  | "SCR"
-  | "SDG"
-  | "SEK"
-  | "SGD"
-  | "SHP"
-  | "SLE"
-  | "SLL"
-  | "SOS"
-  | "SRD"
-  | "SSP"
-  | "STN"
-  | "SYP"
-  | "SZL"
-  | "THB"
-  | "TJS"
-  | "TMT"
-  | "TND"
-  | "TOP"
-  | "TRY"
-  | "TTD"
-  | "TWD"
-  | "TZS"
-  | "UAH"
-  | "UGX"
-  | "USD"
-  | "UYU"
-  | "UZS"
-  | "VED"
-  | "VES"
-  | "VND"
-  | "VUV"
-  | "WST"
-  | "XAF"
-  | "XCD"
-  | "XOF"
-  | "XPF"
-  | "YER"
-  | "ZAR"
-  | "ZMW"
-  | "ZWL";
-/**
  * A stable identifier for a market quote (e.g., "USD-OIS-SWAP-5Y").
  *
  * This ID is used for human readability, logging, and potentially matching against external
@@ -1830,7 +1499,7 @@ export type D_5Faecdb7B217A77D4Df7 = string;
 /**
  * ISO 4217 currency code.
  */
-export type Currency7 =
+export type Currency5 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -2012,7 +1681,7 @@ export type D_08Aea844Abd10Cb00E40 =
       quote_set: string;
       base_date: Date12;
       conventions?: D_5F0B38036294B8235C6A;
-      currency: Currency8;
+      currency: Currency6;
       curve_id: Id7;
       /**
        * Extrapolation policy for the curve.
@@ -2061,7 +1730,7 @@ export type D_08Aea844Abd10Cb00E40 =
       quote_set: string;
       base_date: Date13;
       conventions?: D_5F0B38036294B8235C6A1;
-      currency: Currency9;
+      currency: Currency7;
       curve_id: Id8;
       discount_curve_id: Id9;
       /**
@@ -2112,7 +1781,7 @@ export type D_08Aea844Abd10Cb00E40 =
        * during hazard calibration and rebootstrap.
        */
       cds_valuation_convention?: D_3D7928F8797773779Aed | null;
-      currency: Currency10;
+      currency: Currency8;
       curve_id: Id10;
       discount_curve_id: Id11;
       /**
@@ -2185,7 +1854,7 @@ export type D_08Aea844Abd10Cb00E40 =
        */
       base_cpi: number;
       base_date: Date15;
-      currency: Currency11;
+      currency: Currency9;
       curve_id: Id12;
       discount_curve_id: Id13;
       /**
@@ -2304,7 +1973,7 @@ export type D_08Aea844Abd10Cb00E40 =
        * Optional calendar identifier for date adjustments.
        */
       calendar_id?: string | null;
-      currency: Currency12;
+      currency: Currency10;
       discount_curve_id: Id14;
       /**
        * Optional day count convention for fixed-leg coupon accrual only.
@@ -2392,7 +2061,7 @@ export type D_08Aea844Abd10Cb00E40 =
        * Optional calendar identifier for schedule generation and date adjustments.
        */
       calendar_id?: string | null;
-      currency: Currency13;
+      currency: Currency11;
       /**
        * Day count convention for synthetic tranche premium accrual.
        */
@@ -2490,7 +2159,7 @@ export type D_08Aea844Abd10Cb00E40 =
        */
       quote_set: string;
       base_date: Date19;
-      currency: Currency14;
+      currency: Currency12;
       curve_id: Id16;
       /**
        * Required positive maximum implied-quote error in quoted volatility units.
@@ -2518,7 +2187,7 @@ export type D_08Aea844Abd10Cb00E40 =
        */
       quote_set: string;
       base_date: Date20;
-      currency: Currency15;
+      currency: Currency13;
       discount_curve_id: Id17;
       /**
        * Required positive maximum implied-quote error in quoted volatility units.
@@ -2604,7 +2273,7 @@ export type D_08Aea844Abd10Cb00E40 =
        */
       basis_spread_curve_id?: Id6 | null;
       conventions?: D_5F0B38036294B8235C6A2;
-      currency: Currency16;
+      currency: Currency14;
       curve_id: Id20;
       domestic_discount_id: Id21;
       /**
@@ -2754,7 +2423,7 @@ export type D_9F40E937966E31F97B30 =
 /**
  * ISO 4217 currency code.
  */
-export type Currency8 =
+export type Currency6 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -2925,7 +2594,7 @@ export type Date13 = string;
 /**
  * ISO 4217 currency code.
  */
-export type Currency9 =
+export type Currency7 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -3111,7 +2780,7 @@ export type D_3D7928F8797773779Aed =
 /**
  * ISO 4217 currency code.
  */
-export type Currency10 =
+export type Currency8 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -3286,7 +2955,7 @@ export type Date15 = string;
 /**
  * ISO 4217 currency code.
  */
-export type Currency11 =
+export type Currency9 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -3465,7 +3134,7 @@ export type Date17 = string;
 /**
  * ISO 4217 currency code.
  */
-export type Currency12 =
+export type Currency10 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -3641,7 +3310,7 @@ export type BusinessDayConvention =
 /**
  * ISO 4217 currency code.
  */
-export type Currency13 =
+export type Currency11 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -3812,7 +3481,7 @@ export type Date19 = string;
 /**
  * ISO 4217 currency code.
  */
-export type Currency14 =
+export type Currency12 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -3983,7 +3652,7 @@ export type Date20 = string;
 /**
  * ISO 4217 currency code.
  */
-export type Currency15 =
+export type Currency13 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -4166,7 +3835,7 @@ export type Date22 = string;
 /**
  * ISO 4217 currency code.
  */
-export type Currency16 =
+export type Currency14 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -4416,10 +4085,6 @@ export type DE988Ea453181Acf6E6F1 =
        * no calendar.
        */
       calendar_id?: string | null;
-      /**
-       * OIS cut-off (business days) the curve was calibrated under, if any.
-       */
-      calibration_ois_cutoff_days?: number | null;
       day_count: DayCount1;
       /**
        * Extrapolation policy
@@ -4813,7 +4478,7 @@ export type DayCount1 =
 /**
  * ISO 4217 currency code.
  */
-export type Currency17 =
+export type Currency15 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -5855,7 +5520,7 @@ export interface D_82889F5B5A91A21407F1 {
    * search multi-hop paths or alternative pivots.
    */
   enable_triangulation?: boolean;
-  pivot_currency?: Currency7;
+  pivot_currency?: Currency5;
 }
 /**
  * Hazard-curve specific solver configuration.
@@ -6197,7 +5862,7 @@ export interface D_5F0B38036294B8235C6A2 {
  * Typed conventions required to replay a rate-curve calibration.
  */
 export interface D_1Da7F2B6C0211Ad55Af2 {
-  currency: Currency17;
+  currency: Currency15;
   curve_day_count: DayCount2;
   /**
    * Numerical calibration method.

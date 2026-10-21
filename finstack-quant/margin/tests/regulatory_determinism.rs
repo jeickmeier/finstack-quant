@@ -7,7 +7,7 @@ use finstack_quant_margin::regulatory::frtb::{
 use std::hash::Hash;
 
 fn insert_entries<K, V>(
-    map: &mut finstack_quant_core::HashMap<K, V>,
+    map: &mut finstack_quant_core::FxHashMap<K, V>,
     mut entries: [(K, V); 2],
     reverse: bool,
 ) where

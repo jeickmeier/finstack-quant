@@ -2,7 +2,7 @@
 //!
 //! Crate-internal building blocks for [`crate::Performance`]. Functions take
 //! `&[f64]` return slices. Annualization uses the caller-supplied factor
-//! (typically from `PeriodKind::annualization_factor()`).
+//! (typically from `PeriodKind::periods_per_year()`).
 
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, HolidayCalendar};
 use finstack_quant_core::math::stats::{mean, mean_var, variance};
@@ -91,7 +91,7 @@ impl std::fmt::Display for CagrDayCount {
 ///
 /// Returns [`Error::Validation`](finstack_quant_core::Error::Validation) when `returns` is empty or the
 /// date range has a non-positive span. Propagates
-/// [`finstack_quant_core::error::InputError::MissingCalendarForBus252`] when Bus/252 is
+/// [`finstack_quant_core::InputError::MissingCalendarForBus252`] when Bus/252 is
 /// requested without a calendar.
 pub(crate) fn cagr(
     returns: &[f64],
@@ -577,8 +577,8 @@ pub(crate) fn modified_sharpe(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::dates::Month;
     use finstack_quant_core::math::stats::{mean, variance};
+    use time::Month;
 
     fn jan1(year: i32) -> finstack_quant_core::dates::Date {
         finstack_quant_core::dates::Date::from_calendar_date(year, Month::January, 1)

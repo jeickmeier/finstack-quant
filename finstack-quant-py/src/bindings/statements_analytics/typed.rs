@@ -2,10 +2,11 @@
 
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::envelope_to_pandas;
+use crate::bindings::extract::{label, parse_label};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
 use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements::types::PyForecastSpec;
-use crate::errors::{core_to_py, display_to_py, serde_json_to_py, statements_to_py};
+use crate::errors::{display_to_py, serde_json_to_py, statements_to_py};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::types::AmountOrScalar;
 use finstack_quant_statements_analytics::analysis::{
@@ -44,16 +45,6 @@ const BRIDGE_STEP_COLUMNS: [ColumnSchema<'static>; 2] =
 
 fn parse_period(period: &str) -> PyResult<PeriodId> {
     period.parse().map_err(crate::errors::core_to_py)
-}
-
-/// Parse the serde name of a [`SensitivityMode`] (`"diagonal"`, `"full_grid"`, `"tornado"`).
-fn parse_sensitivity_mode(mode: &str) -> PyResult<SensitivityMode> {
-    finstack_quant_core::wire::serde_parse(mode).map_err(core_to_py)
-}
-
-/// Serde name of a [`SensitivityMode`]; identical to the `to_json` form.
-fn sensitivity_mode_name(mode: SensitivityMode) -> PyResult<String> {
-    finstack_quant_core::wire::serde_label(&mode).map_err(core_to_py)
 }
 
 fn extract_amount_or_scalar(value: &Bound<'_, PyAny>) -> PyResult<AmountOrScalar> {
@@ -288,7 +279,7 @@ impl PySensitivityConfig {
             .collect::<PyResult<Vec<_>>>()?;
         Ok(Self {
             inner: RustSensitivityConfig {
-                mode: parse_sensitivity_mode(mode)?,
+                mode: parse_label::<SensitivityMode>(mode)?,
                 parameters,
                 target_metrics,
             },
@@ -381,7 +372,7 @@ impl PySensitivityConfig {
     /// serde name, identical to ``to_json``).
     #[getter]
     fn mode(&self) -> PyResult<String> {
-        sensitivity_mode_name(self.inner.mode)
+        label(&self.inner.mode)
     }
 
     /// Node identifiers of the statement metrics tracked across scenarios.

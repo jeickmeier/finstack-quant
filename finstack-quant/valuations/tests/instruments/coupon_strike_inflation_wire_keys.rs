@@ -20,6 +20,7 @@
 //! independently reconciled in the September 2026 valuation audit evidence.
 
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_valuations::instruments::instrument_json_of;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::pricer::{parse_boxed_instrument_from_json, price_instrument};

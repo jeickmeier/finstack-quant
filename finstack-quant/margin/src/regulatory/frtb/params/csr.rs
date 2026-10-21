@@ -151,15 +151,15 @@ pub const CSR_SEC_NONCTP_RISK_WEIGHTS: &[(u8, f64)] = &[
 
 use std::sync::LazyLock;
 
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 
 // Index the fixed `pub const` slices into hashmaps so per-trade lookups
 // are O(1). Built once on first use.
-static CSR_NONSEC_BY_BUCKET: LazyLock<HashMap<u8, f64>> =
+static CSR_NONSEC_BY_BUCKET: LazyLock<FxHashMap<u8, f64>> =
     LazyLock::new(|| CSR_NONSEC_RISK_WEIGHTS.iter().copied().collect());
-static CSR_SEC_CTP_BY_BUCKET: LazyLock<HashMap<u8, f64>> =
+static CSR_SEC_CTP_BY_BUCKET: LazyLock<FxHashMap<u8, f64>> =
     LazyLock::new(|| CSR_SEC_CTP_RISK_WEIGHTS.iter().copied().collect());
-static CSR_SEC_NONCTP_BY_BUCKET: LazyLock<HashMap<u8, f64>> =
+static CSR_SEC_NONCTP_BY_BUCKET: LazyLock<FxHashMap<u8, f64>> =
     LazyLock::new(|| CSR_SEC_NONCTP_RISK_WEIGHTS.iter().copied().collect());
 
 /// Look up a CSR non-sec delta risk weight by bucket (MAR21.53, Table 4).

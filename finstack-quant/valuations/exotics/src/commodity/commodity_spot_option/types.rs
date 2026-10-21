@@ -3,6 +3,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_core::Result;
@@ -40,7 +41,6 @@ pub struct CommodityMcParams {
 #[serde(deny_unknown_fields)]
 pub struct CommoditySpotOptionExercise {
     /// Exercise date, or expiry observation date for an unexercised option.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -49,7 +49,6 @@ pub struct CommoditySpotOptionExercise {
     /// Positive observed commodity spot price in strike units.
     pub spot: f64,
     /// Actual cash-payment or physical-delivery date, on or after exercise.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -125,14 +124,12 @@ pub struct CommoditySpotOption {
     ///
     /// Required when `exercise_style == ExerciseStyle::Bermudan`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<Vec<finstack_quant_core::wire::DateWire>>")
     )]
     pub exercise_dates: Option<Vec<Date>>,
     /// Option expiry date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -528,12 +525,12 @@ impl CommoditySpotOption {
         Money,
         Option<finstack_quant_valuations_core::results::MonteCarloValuationDetails>,
     )> {
+        use finstack_quant_core::math::time_grid::TimeGrid;
         use finstack_quant_models::monte_carlo::discretization::ExactSchwartzSmith;
         use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
         use finstack_quant_models::monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
         use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithProcess;
         use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
-        use finstack_quant_models::monte_carlo::TimeGrid;
 
         self.validate()?;
         if let Some(claim) = self.resolved_claim(market, as_of)? {

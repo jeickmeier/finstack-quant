@@ -9,7 +9,7 @@ use crate::structured_credit::types::{
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 use finstack_quant_core::{Error as CoreError, InputError};
 
@@ -502,7 +502,7 @@ pub struct TestContext<'a> {
     /// Optional market context for floating rate index lookups in IC tests.
     pub market: Option<&'a MarketContext>,
     /// Current tranche balances (overrides `tranche.current_balance` when present).
-    pub tranche_balances: Option<&'a HashMap<String, Money>>,
+    pub tranche_balances: Option<&'a FxHashMap<String, Money>>,
     /// Ordered tranche IDs paid by the waterfall's coverage-diversion principal tier.
     ///
     /// Direct callers may omit this to use structural `payment_priority` order.
@@ -539,7 +539,7 @@ pub struct TestContext<'a> {
     ///
     /// Always supplied from the waterfall spec, so IC measures coverage of
     /// what the structure actually owes.
-    pub interest_claim_caps: &'a HashMap<&'a str, Option<f64>>,
+    pub interest_claim_caps: &'a FxHashMap<&'a str, Option<f64>>,
     /// Simulated floating-coupon shift (OAS rate path); zero outside
     /// OAS runs. Keeps the IC due on the same rate path as collections.
     pub floating_rate_shift: f64,
@@ -548,7 +548,7 @@ pub struct TestContext<'a> {
     /// The waterfall interest claim is current coupon plus these arrears.
     /// IC uses the same denominator so a carried shortfall cannot make the
     /// test look healthier than the cash the structure actually owes.
-    pub deferred_interest: Option<&'a HashMap<String, Money>>,
+    pub deferred_interest: Option<&'a FxHashMap<String, Money>>,
 }
 
 /// Result of a coverage test calculation.
@@ -700,7 +700,7 @@ fn collateral_value(
 #[cfg(test)]
 /// The engine always supplies a claim map. Tests that want "every tranche
 /// owes its full uncapped coupon" state that explicitly with this helper.
-fn uncapped_claims(ids: &[&'static str]) -> HashMap<&'static str, Option<f64>> {
+fn uncapped_claims(ids: &[&'static str]) -> FxHashMap<&'static str, Option<f64>> {
     ids.iter().map(|id| (*id, None)).collect()
 }
 
@@ -833,7 +833,7 @@ mod tests {
         )
         .expect("Valid tranche");
         let tranches = TrancheStructure::new(vec![tranche]).expect("Valid tranche structure");
-        let mut deferred = HashMap::default();
+        let mut deferred = FxHashMap::default();
         deferred.insert(
             "TEST_TRANCHE".to_string(),
             Money::from((1_250_i64, Currency::USD)),
@@ -891,7 +891,7 @@ mod tests {
         .expect("Valid tranche");
         tranche.pik_enabled = true;
         let tranches = TrancheStructure::new(vec![tranche]).expect("Valid tranche structure");
-        let mut deferred = HashMap::default();
+        let mut deferred = FxHashMap::default();
         deferred.insert(
             "TEST_TRANCHE".to_string(),
             Money::from((1_250_i64, Currency::USD)),
@@ -1307,7 +1307,7 @@ mod haircut_tests {
         let market = MarketContext::new();
         let as_of = Date::from_calendar_date(2025, Month::April, 1).expect("date");
         let period_start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
-        let mut balances = HashMap::default();
+        let mut balances = FxHashMap::default();
         balances.insert("A".to_string(), Money::from((500_000_i64, Currency::USD)));
 
         let ratio_with_fees = |fees: f64| {
@@ -1375,7 +1375,7 @@ mod haircut_tests {
 
         // Single senior note, 5% coupon, quarterly.
         let tranches = single_tranche();
-        let mut balances = HashMap::default();
+        let mut balances = FxHashMap::default();
         balances.insert("A".to_string(), Money::from((500_000_i64, Currency::USD)));
 
         let ctx = TestContext {

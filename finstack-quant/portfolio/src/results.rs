@@ -150,10 +150,7 @@ mod tests {
             .metrics
             .require_total("absent")
             .expect_err("an absent metric is an error");
-        assert_eq!(
-            missing.kind(),
-            finstack_quant_core::error::ErrorKind::NotFound
-        );
+        assert_eq!(missing.kind(), finstack_quant_core::ErrorKind::NotFound);
         assert!(missing.to_string().contains("metric 'absent'"));
         for (metric_id, aggregate) in &results.metrics.aggregated {
             let required = results

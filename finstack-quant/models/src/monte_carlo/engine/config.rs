@@ -1,7 +1,7 @@
 //! Execution, configuration, and diagnostics for Monte Carlo pricing.
 //!
 use super::path_capture::PathCaptureConfig;
-use crate::monte_carlo::TimeGrid;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::Result;
 
 /// Maximum number of Monte Carlo paths allowed per simulation run.

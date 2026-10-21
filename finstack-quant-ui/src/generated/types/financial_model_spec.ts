@@ -195,8 +195,7 @@ export type D_557De6D70142Abc041E8 = string;
  * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
  *   frequency, take (actual days) / (actual days in coupon period) for each,
  *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
- *   first/last coupons use
- *   [`act_act_isma_year_fraction_with_reference_period`].
+ *   first/last coupons also supply the enclosing regular `coupon_period`.
  * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
  *   **backwards from `end`** until the candidate is before `start`; each
  *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -228,8 +227,7 @@ export type D_557De6D70142Abc041E8 = string;
  * # Examples
  *
  * ```rust
- * use finstack_quant_core::dates::calendar::NYSE;
- * use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+ * use finstack_quant_core::dates::{calendar_by_id_strict, Date, DayCount, DayCountContext, Tenor};
  * use time::Month;
  *
  * let date = |y, m, d| Date::from_calendar_date(y, m, d).expect("Valid date");
@@ -288,7 +286,8 @@ export type D_557De6D70142Abc041E8 = string;
  * // Business/252: Monday to next Monday is 4 business days, because the
  * // NYSE was closed on January 9, 2025.
  * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
- * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
+ * let nyse = calendar_by_id_strict("nyse").expect("built-in calendar");
+ * let ctx = DayCountContext { calendar: Some(nyse), ..Default::default() };
  * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
  * ```
  */
@@ -2097,8 +2096,7 @@ export interface D_78D4B16242Febe84F62B {
    * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
    *   frequency, take (actual days) / (actual days in coupon period) for each,
    *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons use
-   *   [`act_act_isma_year_fraction_with_reference_period`].
+   *   first/last coupons also supply the enclosing regular `coupon_period`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -2130,8 +2128,7 @@ export interface D_78D4B16242Febe84F62B {
    * # Examples
    *
    * ```rust
-   * use finstack_quant_core::dates::calendar::NYSE;
-   * use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+   * use finstack_quant_core::dates::{calendar_by_id_strict, Date, DayCount, DayCountContext, Tenor};
    * use time::Month;
    *
    * let date = |y, m, d| Date::from_calendar_date(y, m, d).expect("Valid date");
@@ -2190,7 +2187,8 @@ export interface D_78D4B16242Febe84F62B {
    * // Business/252: Monday to next Monday is 4 business days, because the
    * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
-   * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
+   * let nyse = calendar_by_id_strict("nyse").expect("built-in calendar");
+   * let ctx = DayCountContext { calendar: Some(nyse), ..Default::default() };
    * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
@@ -2743,8 +2741,7 @@ export interface D_09Ad66Dca63Dbc62Aee4 {
    * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
    *   frequency, take (actual days) / (actual days in coupon period) for each,
    *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons use
-   *   [`act_act_isma_year_fraction_with_reference_period`].
+   *   first/last coupons also supply the enclosing regular `coupon_period`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -2776,8 +2773,7 @@ export interface D_09Ad66Dca63Dbc62Aee4 {
    * # Examples
    *
    * ```rust
-   * use finstack_quant_core::dates::calendar::NYSE;
-   * use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+   * use finstack_quant_core::dates::{calendar_by_id_strict, Date, DayCount, DayCountContext, Tenor};
    * use time::Month;
    *
    * let date = |y, m, d| Date::from_calendar_date(y, m, d).expect("Valid date");
@@ -2836,7 +2832,8 @@ export interface D_09Ad66Dca63Dbc62Aee4 {
    * // Business/252: Monday to next Monday is 4 business days, because the
    * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
-   * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
+   * let nyse = calendar_by_id_strict("nyse").expect("built-in calendar");
+   * let ctx = DayCountContext { calendar: Some(nyse), ..Default::default() };
    * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
@@ -3045,8 +3042,7 @@ export interface D_63Aec3D47748D9F3D86A {
    * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
    *   frequency, take (actual days) / (actual days in coupon period) for each,
    *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons use
-   *   [`act_act_isma_year_fraction_with_reference_period`].
+   *   first/last coupons also supply the enclosing regular `coupon_period`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -3078,8 +3074,7 @@ export interface D_63Aec3D47748D9F3D86A {
    * # Examples
    *
    * ```rust
-   * use finstack_quant_core::dates::calendar::NYSE;
-   * use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+   * use finstack_quant_core::dates::{calendar_by_id_strict, Date, DayCount, DayCountContext, Tenor};
    * use time::Month;
    *
    * let date = |y, m, d| Date::from_calendar_date(y, m, d).expect("Valid date");
@@ -3138,7 +3133,8 @@ export interface D_63Aec3D47748D9F3D86A {
    * // Business/252: Monday to next Monday is 4 business days, because the
    * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
-   * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
+   * let nyse = calendar_by_id_strict("nyse").expect("built-in calendar");
+   * let ctx = DayCountContext { calendar: Some(nyse), ..Default::default() };
    * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
@@ -6204,8 +6200,7 @@ export interface D_756Aabf913F51B821A96 {
    * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
    *   frequency, take (actual days) / (actual days in coupon period) for each,
    *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons use
-   *   [`act_act_isma_year_fraction_with_reference_period`].
+   *   first/last coupons also supply the enclosing regular `coupon_period`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -6237,8 +6232,7 @@ export interface D_756Aabf913F51B821A96 {
    * # Examples
    *
    * ```rust
-   * use finstack_quant_core::dates::calendar::NYSE;
-   * use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+   * use finstack_quant_core::dates::{calendar_by_id_strict, Date, DayCount, DayCountContext, Tenor};
    * use time::Month;
    *
    * let date = |y, m, d| Date::from_calendar_date(y, m, d).expect("Valid date");
@@ -6297,7 +6291,8 @@ export interface D_756Aabf913F51B821A96 {
    * // Business/252: Monday to next Monday is 4 business days, because the
    * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
-   * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
+   * let nyse = calendar_by_id_strict("nyse").expect("built-in calendar");
+   * let ctx = DayCountContext { calendar: Some(nyse), ..Default::default() };
    * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
@@ -9172,8 +9167,7 @@ export interface D_8Dd62D29564577Ef6F97 {
    * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
    *   frequency, take (actual days) / (actual days in coupon period) for each,
    *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons use
-   *   [`act_act_isma_year_fraction_with_reference_period`].
+   *   first/last coupons also supply the enclosing regular `coupon_period`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -9205,8 +9199,7 @@ export interface D_8Dd62D29564577Ef6F97 {
    * # Examples
    *
    * ```rust
-   * use finstack_quant_core::dates::calendar::NYSE;
-   * use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+   * use finstack_quant_core::dates::{calendar_by_id_strict, Date, DayCount, DayCountContext, Tenor};
    * use time::Month;
    *
    * let date = |y, m, d| Date::from_calendar_date(y, m, d).expect("Valid date");
@@ -9265,7 +9258,8 @@ export interface D_8Dd62D29564577Ef6F97 {
    * // Business/252: Monday to next Monday is 4 business days, because the
    * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
-   * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
+   * let nyse = calendar_by_id_strict("nyse").expect("built-in calendar");
+   * let ctx = DayCountContext { calendar: Some(nyse), ..Default::default() };
    * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
@@ -10760,8 +10754,7 @@ export interface DF6Da7F7Ae3129Fc74F07 {
    * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
    *   frequency, take (actual days) / (actual days in coupon period) for each,
    *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons use
-   *   [`act_act_isma_year_fraction_with_reference_period`].
+   *   first/last coupons also supply the enclosing regular `coupon_period`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -10793,8 +10786,7 @@ export interface DF6Da7F7Ae3129Fc74F07 {
    * # Examples
    *
    * ```rust
-   * use finstack_quant_core::dates::calendar::NYSE;
-   * use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+   * use finstack_quant_core::dates::{calendar_by_id_strict, Date, DayCount, DayCountContext, Tenor};
    * use time::Month;
    *
    * let date = |y, m, d| Date::from_calendar_date(y, m, d).expect("Valid date");
@@ -10853,7 +10845,8 @@ export interface DF6Da7F7Ae3129Fc74F07 {
    * // Business/252: Monday to next Monday is 4 business days, because the
    * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
-   * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
+   * let nyse = calendar_by_id_strict("nyse").expect("built-in calendar");
+   * let ctx = DayCountContext { calendar: Some(nyse), ..Default::default() };
    * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
@@ -11150,8 +11143,7 @@ export interface D_450829Dac3A74A5C8761 {
    * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
    *   frequency, take (actual days) / (actual days in coupon period) for each,
    *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons use
-   *   [`act_act_isma_year_fraction_with_reference_period`].
+   *   first/last coupons also supply the enclosing regular `coupon_period`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -11183,8 +11175,7 @@ export interface D_450829Dac3A74A5C8761 {
    * # Examples
    *
    * ```rust
-   * use finstack_quant_core::dates::calendar::NYSE;
-   * use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+   * use finstack_quant_core::dates::{calendar_by_id_strict, Date, DayCount, DayCountContext, Tenor};
    * use time::Month;
    *
    * let date = |y, m, d| Date::from_calendar_date(y, m, d).expect("Valid date");
@@ -11243,7 +11234,8 @@ export interface D_450829Dac3A74A5C8761 {
    * // Business/252: Monday to next Monday is 4 business days, because the
    * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
-   * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
+   * let nyse = calendar_by_id_strict("nyse").expect("built-in calendar");
+   * let ctx = DayCountContext { calendar: Some(nyse), ..Default::default() };
    * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
@@ -13395,8 +13387,7 @@ export interface DB925Ced0Cbd67041A76F {
    * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
    *   frequency, take (actual days) / (actual days in coupon period) for each,
    *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons use
-   *   [`act_act_isma_year_fraction_with_reference_period`].
+   *   first/last coupons also supply the enclosing regular `coupon_period`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -13428,8 +13419,7 @@ export interface DB925Ced0Cbd67041A76F {
    * # Examples
    *
    * ```rust
-   * use finstack_quant_core::dates::calendar::NYSE;
-   * use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+   * use finstack_quant_core::dates::{calendar_by_id_strict, Date, DayCount, DayCountContext, Tenor};
    * use time::Month;
    *
    * let date = |y, m, d| Date::from_calendar_date(y, m, d).expect("Valid date");
@@ -13488,7 +13478,8 @@ export interface DB925Ced0Cbd67041A76F {
    * // Business/252: Monday to next Monday is 4 business days, because the
    * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
-   * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
+   * let nyse = calendar_by_id_strict("nyse").expect("built-in calendar");
+   * let ctx = DayCountContext { calendar: Some(nyse), ..Default::default() };
    * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
@@ -14671,8 +14662,7 @@ export interface DF6Da7F7Ae3129Fc74F071 {
    * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
    *   frequency, take (actual days) / (actual days in coupon period) for each,
    *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons use
-   *   [`act_act_isma_year_fraction_with_reference_period`].
+   *   first/last coupons also supply the enclosing regular `coupon_period`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -14704,8 +14694,7 @@ export interface DF6Da7F7Ae3129Fc74F071 {
    * # Examples
    *
    * ```rust
-   * use finstack_quant_core::dates::calendar::NYSE;
-   * use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+   * use finstack_quant_core::dates::{calendar_by_id_strict, Date, DayCount, DayCountContext, Tenor};
    * use time::Month;
    *
    * let date = |y, m, d| Date::from_calendar_date(y, m, d).expect("Valid date");
@@ -14764,7 +14753,8 @@ export interface DF6Da7F7Ae3129Fc74F071 {
    * // Business/252: Monday to next Monday is 4 business days, because the
    * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
-   * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
+   * let nyse = calendar_by_id_strict("nyse").expect("built-in calendar");
+   * let ctx = DayCountContext { calendar: Some(nyse), ..Default::default() };
    * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
@@ -15025,8 +15015,7 @@ export interface D_450829Dac3A74A5C87611 {
    * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
    *   frequency, take (actual days) / (actual days in coupon period) for each,
    *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons use
-   *   [`act_act_isma_year_fraction_with_reference_period`].
+   *   first/last coupons also supply the enclosing regular `coupon_period`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -15058,8 +15047,7 @@ export interface D_450829Dac3A74A5C87611 {
    * # Examples
    *
    * ```rust
-   * use finstack_quant_core::dates::calendar::NYSE;
-   * use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+   * use finstack_quant_core::dates::{calendar_by_id_strict, Date, DayCount, DayCountContext, Tenor};
    * use time::Month;
    *
    * let date = |y, m, d| Date::from_calendar_date(y, m, d).expect("Valid date");
@@ -15118,7 +15106,8 @@ export interface D_450829Dac3A74A5C87611 {
    * // Business/252: Monday to next Monday is 4 business days, because the
    * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
-   * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
+   * let nyse = calendar_by_id_strict("nyse").expect("built-in calendar");
+   * let ctx = DayCountContext { calendar: Some(nyse), ..Default::default() };
    * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */

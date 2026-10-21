@@ -9,12 +9,13 @@ use serde::{Deserialize, Serialize};
 /// The policy tells a provider *how* the rate will be applied so it can decide
 /// between spot, forward, or averaged sources.
 ///
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum FxConversionPolicy {
     /// Use spot/forward on the cashflow date.
+    #[default]
     CashflowDate,
     /// Use period end date.
     PeriodEnd,
@@ -30,7 +31,7 @@ impl std::fmt::Display for FxConversionPolicy {
 }
 
 impl std::str::FromStr for FxConversionPolicy {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
 
     /// Parses the serde label; the error names the accepted labels.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -52,23 +53,14 @@ pub struct FxQuery {
     /// Date on which the provider's rate must be applicable.
     pub on: Date,
     /// Rate-selection hint; deserialization defaults to CashflowDate.
-    #[serde(default = "default_policy")]
+    #[serde(default)]
     pub policy: FxConversionPolicy,
-}
-
-fn default_policy() -> FxConversionPolicy {
-    FxConversionPolicy::CashflowDate
 }
 
 impl FxQuery {
     /// Create a query using the CashflowDate policy.
     pub fn new(from: Currency, to: Currency, on: Date) -> Self {
-        Self {
-            from,
-            to,
-            on,
-            policy: FxConversionPolicy::CashflowDate,
-        }
+        Self::with_policy(from, to, on, FxConversionPolicy::default())
     }
 
     /// Create a query with an explicit provider rate-selection policy.
@@ -138,7 +130,7 @@ impl std::str::FromStr for CurrencyPair {
 /// Attach [`FxPolicyMeta`] to valuation results so auditors can understand how
 /// FX conversions were sourced.
 ///
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FxPolicyMeta {
@@ -148,16 +140,6 @@ pub struct FxPolicyMeta {
     pub target_currency: Option<Currency>,
     /// Free-form provenance or audit notes supplied by the provider.
     pub notes: String,
-}
-
-impl Default for FxPolicyMeta {
-    fn default() -> Self {
-        Self {
-            strategy: FxConversionPolicy::CashflowDate,
-            target_currency: None,
-            notes: String::new(),
-        }
-    }
 }
 
 /// Observed-quote capacity of [`FxConfig::default`].

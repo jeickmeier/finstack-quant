@@ -276,8 +276,8 @@ fn iterative_breakeven(
     // too small. The adaptive default (1% of the initial guess, floored at
     // 0.01) is correctly scaled for this objective.
     let solved = BrentSolver::new()
-        .tolerance(1e-8)
-        .max_iterations(50)
+        .with_tolerance(1e-8)
+        .with_max_iterations(50)
         .solve(objective, initial_guess);
 
     match first_error.into_inner() {

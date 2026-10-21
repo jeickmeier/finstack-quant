@@ -129,7 +129,6 @@ def _market() -> MarketContext:
     hazard = HazardCurve.flat("CDX-IG-HZD", "2025-01-02", 0.01, 0.4)
     market.insert(hazard)
     market.insert_credit_index("CDX-IG-43", CreditIndexData(125, 0.4, hazard, _base_correlation()))
-    market.map_collateral("USD-CSA", "USD-OIS")
     return market
 
 
@@ -190,13 +189,9 @@ CASES: dict[str, Callable[[], Any]] = {
     # --- dates: SIFMA ------------------------------------------------------
     "sifma_settlement_date": lambda: _iso(dates.sifma_settlement_date(3, 2027)),
     "sifma_settlement_date_uncovered": lambda: _iso(dates.sifma_settlement_date(3, 1990)),
-    "sifma_settlement_date_for_class": lambda: _iso(
-        dates.sifma_settlement_date_for_class(1, 2026, dates.SifmaSettlementClass.B)
-    ),
-    "estimated_sifma_settlement_date_for_class": lambda: _iso(
-        dates.estimated_sifma_settlement_date_for_class(
-            3, 2031, dates.SifmaSettlementClass.from_agency_term("GNMA", 30)
-        )
+    "sifma_settlement_date_class_b": lambda: _iso(dates.sifma_settlement_date(1, 2026, dates.SifmaSettlementClass.B)),
+    "estimated_sifma_settlement_date": lambda: _iso(
+        dates.estimated_sifma_settlement_date(3, 2031, dates.SifmaSettlementClass.from_agency_term("GNMA", 30))
     ),
     "next_sifma_settlement": lambda: _iso(dates.next_sifma_settlement("2027-03-16")),
     # --- dates: DateExt, calendars, day counts ---------------------------------
@@ -214,7 +209,7 @@ CASES: dict[str, Callable[[], Any]] = {
     ],
     "days_30e_360_isda": lambda: [dates.days_30e_360_isda("2025-01-31", "2025-02-28", flag) for flag in (False, True)],
     "holiday_calendar": lambda: {
-        "code": dates.HolidayCalendar("NYSE + gblo").code,
+        "code": str(dates.HolidayCalendar("NYSE + gblo")),
         "is_holiday": NYSE.is_holiday("2025-01-01"),
         "is_business_day": NYSE.is_business_day("2025-01-06"),
         "count_business_days": NYSE.count_business_days("2025-01-01", "2025-02-01"),
@@ -222,9 +217,9 @@ CASES: dict[str, Callable[[], Any]] = {
     },
     # --- dates: periods and schedules -------------------------------------------
     "period_id": lambda: [
-        dates.PeriodId.parse("2025M12").next().code,
-        dates.PeriodId.quarter(2025, 1).prev().code,
-        dates.PeriodId.parse("FY2025Q4").next_fiscal(US_FEDERAL).code,
+        str(dates.PeriodId.parse("2025M12").shift(1)),
+        str(dates.PeriodId.quarter(2025, 1).shift(-1)),
+        str(dates.PeriodId.parse("FY2025Q4").next_fiscal(US_FEDERAL)),
         dates.PeriodId.week(2025, 5).kind.periods_per_year,
     ],
     "period_kind_prior_observation_date": lambda: _iso(dates.PeriodKind.QUARTERLY.prior_observation_date("2025-03-31")),
@@ -270,21 +265,21 @@ CASES: dict[str, Callable[[], Any]] = {
         _config().output_scale("JPY"),
         _config().output_scale("USD"),
         _config().ingest_scale("USD"),
-        _config().rounding_mode.name,
+        str(_config().rounding_mode),
         _config().extension_keys(),
     ],
     "rating_registry": lambda: {
         "default_scale_id": REGISTRY.default_scale_id(),
         "default_score": REGISTRY.default_scorecard_score(),
         "scale_ids": REGISTRY.scale_ids(),
-        "policy": REGISTRY.unknown_scale_policy().name,
+        "policy": str(REGISTRY.unknown_scale_policy()),
         "known": REGISTRY.is_known_rating_scale(REGISTRY.default_scale_id()),
         "scale": json.loads(REGISTRY.rating_scale(REGISTRY.default_scale_id()).to_json()),
         "extension_key": rating_scales.RATING_SCALES_EXTENSION_KEY,
         "from_config": rating_scales.registry_from_config(config.FinstackConfig()).default_scale_id(),
     },
     "credit_rating": lambda: [
-        types.CreditRating("Baa3").name,
+        str(types.CreditRating("Baa3")),
         types.CreditRating.BBB.notches_to("BB"),
         types.CreditRating.AA_PLUS.to_moodys_string(),
         types.CreditRating.BB_PLUS.is_investment_grade(),
@@ -418,8 +413,11 @@ CASES: dict[str, Callable[[], Any]] = {
         "credit_index": _market().get_credit_index("CDX-IG-43").num_constituents,
         "fx_rate": _market().fx_required().rate("EUR", "USD", "2025-01-02").rate,
         "converted": [
-            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").amount,
-            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").currency.code,
+            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").amount.amount,
+            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").amount.currency.code,
+            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").rate.rate,
+            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").rate.triangulated,
+            _market().convert_money(Money(100.0, "USD"), "USD", "2025-01-02").rate is None,
         ],
         "rolled_base_date": _iso(_market().roll_forward(30).get_discount("USD-OIS").base_date),
         "round_trip": json.loads(MarketContext.from_json(_market().to_json()).to_json())

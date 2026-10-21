@@ -324,13 +324,6 @@ impl VolSurface {
         self.interpolation_mode
     }
 
-    /// Return a copy of this surface with an explicit secondary-axis contract.
-    #[must_use]
-    pub fn with_secondary_axis(mut self, secondary_axis: VolSurfaceAxis) -> Self {
-        self.secondary_axis = secondary_axis;
-        self
-    }
-
     /// Return a copy of this surface with an explicit quote-type contract.
     ///
     /// # Arguments
@@ -529,7 +522,7 @@ impl VolSurface {
 
 impl Bumpable for VolSurface {
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        use crate::error::InputError;
+        use crate::InputError;
 
         spec.validate()?;
         if !matches!(spec.bump_type, BumpType::Parallel) {

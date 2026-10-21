@@ -72,9 +72,8 @@ use crate::{
     dates::{Date, DayCount},
     error::InputError,
     math::interp::{
-        strategies::{LinearStrategy, LogLinearStrategy},
-        types::Interp,
-        ExtrapolationPolicy, InterpStyle, InterpolationStrategy, ValidationPolicy,
+        ExtrapolationPolicy, Interp, InterpStyle, InterpolationStrategy, LinearStrategy,
+        LogLinearStrategy, ValidationPolicy,
     },
     types::CurveId,
 };
@@ -140,7 +139,7 @@ pub struct HazardCurve {
 
 /// What a hazard-curve bump shifts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum HazardBumpTarget {
+pub(crate) enum HazardBumpTarget {
     /// The CDS par spread: the hazard shift is `s / (1 - R)` (credit triangle).
     ParSpread,
     /// The hazard intensity itself, in the bump's rate units.
@@ -187,7 +186,7 @@ impl core::fmt::Display for Seniority {
 }
 
 impl core::str::FromStr for Seniority {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
 
     fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
         match s {

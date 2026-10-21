@@ -3271,30 +3271,6 @@
             "interpolation_mode"
           ],
           "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Collateral / CSA mapping entry.",
-          "properties": {
-            "csa_currency": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-              "description": "Collateral / CSA currency."
-            },
-            "id": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-              "description": "Trade-leg currency this CSA mapping applies to."
-            },
-            "kind": {
-              "const": "collateral",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "id",
-            "csa_currency"
-          ],
-          "type": "object"
         }
       ]
     },
@@ -3595,14 +3571,6 @@
               "description": "Registered holiday calendar id of the business-day time axis (for\nexample `\"brbd\"` for a Bus/252 curve). Omitted when the day count needs\nno calendar.",
               "type": [
                 "string",
-                "null"
-              ]
-            },
-            "calibration_ois_cutoff_days": {
-              "description": "OIS cut-off (business days) the curve was calibrated under, if any.",
-              "format": "int32",
-              "type": [
-                "integer",
                 "null"
               ]
             },

@@ -38,7 +38,6 @@ const EMPTY_BUNDLE = {
 };
 
 const EMPTY_MARKET = JSON.stringify({
-  collateral: {},
   credit_indices: [],
   curves: [],
   dividends: [],

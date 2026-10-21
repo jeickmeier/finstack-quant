@@ -8,6 +8,7 @@ use super::frame::{opt_str, records, req_bool, req_date, req_f64, req_str, sensi
 use super::types::{extract_netting_set_id, PyNettingSetId};
 use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::extract::parse_label;
 use crate::bindings::module_utils::parse_currency;
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
@@ -27,16 +28,6 @@ use finstack_quant_margin::regulatory::{
 use pyo3::prelude::*;
 use std::collections::BTreeMap;
 
-/// Parse the serde name of a [`CorrelationScenario`] (`"low"`, `"medium"`, `"high"`).
-fn parse_correlation_scenario(s: &str) -> PyResult<CorrelationScenario> {
-    finstack_quant_core::wire::serde_parse(s).map_err(core_to_py)
-}
-
-/// Parse a lower-case serde wire label into an enum.
-fn parse_label<T: serde::de::DeserializeOwned>(s: &str) -> PyResult<T> {
-    finstack_quant_core::wire::serde_parse(s).map_err(core_to_py)
-}
-
 /// Render a value as its own canonical serde wire label.
 ///
 /// Reading the serde representation rather than re-listing variants here means
@@ -45,18 +36,6 @@ fn parse_label<T: serde::de::DeserializeOwned>(s: &str) -> PyResult<T> {
 /// charge as soon as two new variants collided.
 fn serde_label<T: serde::Serialize + std::fmt::Debug>(value: T) -> String {
     finstack_quant_core::wire::serde_label(&value).unwrap_or_else(|_| format!("{value:?}"))
-}
-
-fn risk_class_label(rc: FrtbRiskClass) -> String {
-    serde_label(rc)
-}
-
-fn scenario_label(scenario: CorrelationScenario) -> String {
-    serde_label(scenario)
-}
-
-fn asset_class_label(ac: SaCcrAssetClass) -> String {
-    serde_label(ac)
 }
 
 fn py_bool(value: bool) -> &'static str {
@@ -588,7 +567,7 @@ impl PyFrtbSbaEngine {
             .map(|labels| {
                 labels
                     .iter()
-                    .map(|s| parse_correlation_scenario(s))
+                    .map(|s| parse_label::<CorrelationScenario>(s))
                     .collect::<PyResult<Vec<_>>>()
             })
             .transpose()?;
@@ -610,7 +589,7 @@ impl PyFrtbSbaEngine {
         self.inner
             .scenarios()
             .iter()
-            .map(|s| scenario_label(*s))
+            .map(|s| serde_label(*s))
             .collect()
     }
 
@@ -620,7 +599,7 @@ impl PyFrtbSbaEngine {
         self.inner
             .risk_classes()
             .iter()
-            .map(|rc| risk_class_label(*rc))
+            .map(|rc| serde_label(*rc))
             .collect()
     }
 
@@ -690,7 +669,7 @@ impl PySaCcrTrade {
         let t = &self.inner;
         serde_json::json!({
             "trade_id": t.trade_id,
-            "asset_class": asset_class_label(t.asset_class),
+            "asset_class": serde_label(t.asset_class),
             "notional": t.notional,
             "start_date": t.start_date.to_string(),
             "end_date": t.end_date.to_string(),
@@ -873,7 +852,7 @@ impl PySaCcrTrade {
     /// ``credit``, ``equity``, or ``commodity``).
     #[getter]
     fn asset_class(&self) -> String {
-        asset_class_label(self.inner.asset_class)
+        serde_label(self.inner.asset_class)
     }
 
     /// Supervisory category wire label, or None for IR and FX.
@@ -956,7 +935,7 @@ impl PySaCcrTrade {
         format!(
             "SaCcrTrade(trade_id={:?}, asset_class={:?}, notional={:.2}, start_date={}, end_date={}, direction={}, supervisory_delta={}, mtm={:.2}, is_option={})",
             self.inner.trade_id,
-            asset_class_label(self.inner.asset_class),
+            serde_label(self.inner.asset_class),
             self.inner.notional,
             self.inner.start_date,
             self.inner.end_date,
@@ -1253,9 +1232,7 @@ impl PyFrtbSbaResult {
     }
 
     fn labeled(map: &BTreeMap<FrtbRiskClass, f64>) -> BTreeMap<String, f64> {
-        map.iter()
-            .map(|(rc, v)| (risk_class_label(*rc), *v))
-            .collect()
+        map.iter().map(|(rc, v)| (serde_label(*rc), *v)).collect()
     }
 }
 
@@ -1308,7 +1285,7 @@ impl PyFrtbSbaResult {
     /// (``"low"``, ``"medium"``, or ``"high"``).
     #[getter]
     fn binding_scenario(&self) -> String {
-        scenario_label(self.inner.binding_scenario)
+        serde_label(self.inner.binding_scenario)
     }
 
     /// Delta risk charge keyed by risk-class wire label (e.g. ``"girr"``).
@@ -1335,7 +1312,7 @@ impl PyFrtbSbaResult {
         self.inner
             .scenario_charges
             .iter()
-            .map(|(s, v)| (scenario_label(*s), *v))
+            .map(|(s, v)| (serde_label(*s), *v))
             .collect()
     }
 
@@ -1405,7 +1382,7 @@ impl PyFrtbSbaResult {
             for (rc, charge) in map {
                 rows.push(serde_json::json!({
                     "component": component,
-                    "risk_class": risk_class_label(*rc),
+                    "risk_class": serde_label(*rc),
                     "charge": charge,
                 }));
             }
@@ -1433,7 +1410,7 @@ impl PyFrtbSbaResult {
             .iter()
             .map(|(scenario, charge)| {
                 serde_json::json!({
-                    "scenario": scenario_label(*scenario),
+                    "scenario": serde_label(*scenario),
                     "charge": charge,
                     "binding": *scenario == self.inner.binding_scenario,
                 })
@@ -1563,7 +1540,7 @@ impl PyEadResult {
         self.inner
             .add_on_by_asset_class
             .iter()
-            .map(|(ac, v)| (asset_class_label(*ac), *v))
+            .map(|(ac, v)| (serde_label(*ac), *v))
             .collect()
     }
 
@@ -1626,7 +1603,7 @@ impl PyEadResult {
             .iter()
             .map(|(ac, add_on)| {
                 serde_json::json!({
-                    "asset_class": asset_class_label(*ac),
+                    "asset_class": serde_label(*ac),
                     "add_on": add_on,
                 })
             })
@@ -1674,7 +1651,7 @@ pub fn frtb_sba_charge(
     correlation_scenario: Option<&str>,
 ) -> PyResult<PyFrtbSbaResult> {
     let scenario = correlation_scenario
-        .map(parse_correlation_scenario)
+        .map(parse_label::<CorrelationScenario>)
         .transpose()?;
     let result = py
         .detach(|| frtb_sba_charge_rs(&sensitivities.inner, scenario))

@@ -10,7 +10,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     run_simulation, run_simulation_with_diagnostics, AssetPool, CoverageTestAction,
     CoverageTestSpec, DealType, PoolAsset, SimulationRun, StructuredCredit, Tranche,
@@ -126,17 +126,17 @@ fn clo(tests: Vec<CoverageTestSpec>) -> (StructuredCredit, Date) {
     (deal, close)
 }
 
-fn simulate(tests: Vec<CoverageTestSpec>) -> HashMap<String, TrancheCashflows> {
+fn simulate(tests: Vec<CoverageTestSpec>) -> FxHashMap<String, TrancheCashflows> {
     let (deal, as_of) = clo(tests);
     let market = market(as_of);
     run_simulation(&deal, &market, as_of).expect("simulation")
 }
 
-fn first_deferral(results: &HashMap<String, TrancheCashflows>, id: &str) -> Option<Date> {
+fn first_deferral(results: &FxHashMap<String, TrancheCashflows>, id: &str) -> Option<Date> {
     results[id].deferred_flows.first().map(|(date, _)| *date)
 }
 
-fn first_principal(results: &HashMap<String, TrancheCashflows>, id: &str) -> Option<Date> {
+fn first_principal(results: &FxHashMap<String, TrancheCashflows>, id: &str) -> Option<Date> {
     results[id]
         .principal_flows
         .iter()
@@ -152,11 +152,11 @@ fn flow_on(flows: &[(Date, Money)], date: Date) -> f64 {
         .sum()
 }
 
-fn principal_on(results: &HashMap<String, TrancheCashflows>, id: &str, date: Date) -> f64 {
+fn principal_on(results: &FxHashMap<String, TrancheCashflows>, id: &str, date: Date) -> f64 {
     flow_on(&results[id].principal_flows, date)
 }
 
-fn residual_on(results: &HashMap<String, TrancheCashflows>, date: Date) -> f64 {
+fn residual_on(results: &FxHashMap<String, TrancheCashflows>, date: Date) -> f64 {
     flow_on(&results["E"].interest_flows, date)
 }
 
@@ -178,7 +178,7 @@ fn original_balance(id: &str) -> f64 {
 
 /// Balance of `id` at the start of the period paid on `date` (par-preserving
 /// notes: original balance less the principal received before that date).
-fn opening_balance(results: &HashMap<String, TrancheCashflows>, id: &str, date: Date) -> f64 {
+fn opening_balance(results: &FxHashMap<String, TrancheCashflows>, id: &str, date: Date) -> f64 {
     original_balance(id)
         - results[id]
             .principal_flows

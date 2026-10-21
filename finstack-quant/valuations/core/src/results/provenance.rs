@@ -56,7 +56,6 @@ pub struct ValuationProvenance {
     /// The result's `as_of` is the effective date after the instrument resolved
     /// it (for example to the market's spot date); the two differ only when
     /// the instrument moved it.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

@@ -4,7 +4,8 @@
 //! invokes most public methods with valid parameters.
 
 use finstack_quant_analytics::Performance;
-use finstack_quant_core::dates::{Date, FiscalConfig, Month, PeriodKind};
+use finstack_quant_core::dates::{Date, FiscalConfig, PeriodKind};
+use time::Month;
 
 fn calendar_days(start: Date, n: usize) -> Vec<Date> {
     let mut out = Vec::with_capacity(n);

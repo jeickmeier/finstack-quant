@@ -50,7 +50,7 @@ impl MetricCalculator for ImpliedVolCalculator {
             VolatilityModel::Black => 5.0,
         };
         let sigma = BrentSolver::new()
-            .tolerance(1e-12)
+            .with_tolerance(1e-12)
             .solve_in_bracket(objective, 0.0, upper)?;
         let residual = price(sigma)?.amount() - target;
         let tolerance = 1e-8 * target.abs().max(1.0);

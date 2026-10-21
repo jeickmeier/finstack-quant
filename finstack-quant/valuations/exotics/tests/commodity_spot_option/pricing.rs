@@ -4,8 +4,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
+use finstack_quant_core::market_data::traits::Discounting;
 #[allow(unused_imports)]
-use finstack_quant_core::math::norm_cdf;
+use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;

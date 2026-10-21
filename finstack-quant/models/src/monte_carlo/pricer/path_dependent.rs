@@ -13,13 +13,13 @@ use crate::monte_carlo::payoff::asian::{default_fixing_steps, Asian, AveragingMe
 use crate::monte_carlo::process::gbm::GbmProcess;
 use crate::monte_carlo::process::metadata::ProcessMetadata;
 use crate::monte_carlo::rng::philox::PhiloxRng;
-use crate::monte_carlo::rng::sobol::{SobolRng, MAX_SOBOL_DIMENSION};
 use crate::monte_carlo::traits::{Discretization, RandomStream, StochasticProcess};
-use crate::monte_carlo::OnlineStats;
-use crate::monte_carlo::TimeGrid;
 use finstack_quant_core::cashflow::flat_discount_factor;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::random::BrownianBridge;
+use finstack_quant_core::math::random::{SobolRng, MAX_SOBOL_DIMENSION};
+use finstack_quant_core::math::stats::OnlineStats;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::{Error, Result};
 
 /// Domain-separation salt for the per-path auxiliary-uniform Philox streams
@@ -1153,11 +1153,7 @@ fn fill_sobol_increments(
     match bridge {
         Some(bridge) => {
             debug_assert_eq!(num_factors, 1, "Brownian bridge only supports 1 factor");
-            if time_grid.is_uniform() {
-                bridge.construct_path(z_path, w_path, time_grid.dt(0))?;
-            } else {
-                bridge.construct_path_irregular(z_path, w_path, time_grid.times())?;
-            }
+            bridge.construct_path(z_path, w_path, time_grid.times())?;
             for step in 0..num_steps {
                 let dt = time_grid.dt(step);
                 z_increments[step] = (w_path[step + 1] - w_path[step]) / dt.sqrt();
@@ -1283,9 +1279,9 @@ mod tests {
     use crate::monte_carlo::payoff::asian::{Asian, AveragingMethod};
     use crate::monte_carlo::payoff::vanilla::EuropeanCall;
     use crate::monte_carlo::process::gbm::{GbmParams, GbmProcess};
-    use crate::monte_carlo::rng::sobol::MAX_SOBOL_DIMENSION;
-    use crate::monte_carlo::TimeGrid;
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::math::random::MAX_SOBOL_DIMENSION;
+    use finstack_quant_core::math::time_grid::TimeGrid;
 
     use crate::monte_carlo::payoff::lookback::Lookback;
 

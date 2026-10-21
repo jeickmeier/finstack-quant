@@ -146,8 +146,8 @@ impl MetricCalculator for DiscountMarginCalculator {
         let bracket =
             maturity_scaled_bracket(bond, quote_date, DM_BASE_BRACKET_BP, DM_MAX_BRACKET_BP)?;
         let solver = BrentSolver::new()
-            .tolerance(DM_TOLERANCE)
-            .initial_bracket_size(Some(bracket));
+            .with_tolerance(DM_TOLERANCE)
+            .with_initial_bracket_size(Some(bracket));
         // Initial guess 0.0 (0 bp). DM returned in decimal (e.g., 0.01 = 100bp)
         let dm = solver.solve(objective, 0.0)?;
 

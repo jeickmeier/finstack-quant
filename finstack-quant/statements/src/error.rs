@@ -173,12 +173,12 @@ impl Error {
     /// always reports a malformed formula (unknown identifier, wrong argument
     /// count, missing reference) rather than a numerical failure.
     ///
-    /// [`ErrorKind::NotFound`]: finstack_quant_core::error::ErrorKind::NotFound
-    /// [`ErrorKind::Computation`]: finstack_quant_core::error::ErrorKind::Computation
-    /// [`ErrorKind::Validation`]: finstack_quant_core::error::ErrorKind::Validation
+    /// [`ErrorKind::NotFound`]: finstack_quant_core::ErrorKind::NotFound
+    /// [`ErrorKind::Computation`]: finstack_quant_core::ErrorKind::Computation
+    /// [`ErrorKind::Validation`]: finstack_quant_core::ErrorKind::Validation
     #[must_use]
-    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
-        use finstack_quant_core::error::ErrorKind;
+    pub fn kind(&self) -> finstack_quant_core::ErrorKind {
+        use finstack_quant_core::ErrorKind;
         match self {
             Error::Core(core) => core.kind(),
             Error::NodeNotFound(_) | Error::MissingData(_) | Error::RegistryNotFound(_) => {
@@ -204,7 +204,7 @@ impl From<Error> for finstack_quant_core::Error {
     /// core `CircularDependency`, capital-structure failures become
     /// `Internal`, and the rest validation errors with the full message.
     fn from(err: Error) -> Self {
-        use finstack_quant_core::error::InputError;
+        use finstack_quant_core::InputError;
         match err {
             Error::Core(core) => core,
             Error::CurrencyMismatch(expected, actual) => {
@@ -240,7 +240,7 @@ mod tests {
 
     #[test]
     fn kind_is_preserved_by_the_core_fold() {
-        use finstack_quant_core::error::ErrorKind;
+        use finstack_quant_core::ErrorKind;
         let cases = [
             (Error::NodeNotFound("revenue".into()), ErrorKind::NotFound),
             (Error::MissingData("2025Q1".into()), ErrorKind::NotFound),

@@ -31,7 +31,8 @@ fn usd(amount: f64) -> Money {
 fn vm_cashflows_follow_desk_direction_on_both_sides() {
     let csa = CsaSpec::usd_regulatory().expect("registry");
     let calc = VmCalculator::new(csa);
-    let date = time::Date::from_calendar_date(2025, time::Month::January, 10).expect("date");
+    let date = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 10)
+        .expect("date");
     for (exposure, expected) in [
         (1_000_000.0, CFKind::VariationMarginReceive),
         (-1_000_000.0, CFKind::VariationMarginPay),
@@ -80,7 +81,8 @@ fn utilization_zero_requirement_survives_json_roundtrip() {
 
 #[test]
 fn haircut_enforces_maturity_rating_and_contractual_fx_addon() {
-    let date = time::Date::from_calendar_date(2025, time::Month::January, 10).expect("date");
+    let date = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 10)
+        .expect("date");
     let calc = HaircutImCalculator::us_treasuries().expect("registry");
     assert!(calc
         .calculate_for_collateral(
@@ -124,7 +126,8 @@ fn haircut_enforces_maturity_rating_and_contractual_fx_addon() {
 
 #[test]
 fn heterogeneous_schedule_uses_trade_rates_before_one_ngr() {
-    let date = time::Date::from_calendar_date(2025, time::Month::January, 10).expect("date");
+    let date = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 10)
+        .expect("date");
     let trades = [
         (usd(100.0), usd(1e6), ScheduleAssetClass::InterestRate, 1.0),
         (usd(-100.0), usd(1e6), ScheduleAssetClass::Equity, 1.0),
@@ -160,7 +163,8 @@ fn simm_preserves_ir_direction_and_does_not_erase_unrelated_equities() {
     let mut equity = SimmSensitivities::new(Currency::USD);
     equity.add_equity_delta("AAPL", 100_000.0);
     equity.add_equity_delta("MSFT", -100_000.0);
-    let date = time::Date::from_calendar_date(2025, time::Month::January, 10).expect("date");
+    let date = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 10)
+        .expect("date");
     let result = calc
         .calculate_from_sensitivities(&equity, Currency::USD, date)
         .expect("indicative IM");
@@ -170,7 +174,8 @@ fn simm_preserves_ir_direction_and_does_not_erase_unrelated_equities() {
 
 #[test]
 fn opening_exposure_is_not_halved_in_funding_integral() {
-    let date = time::Date::from_calendar_date(2025, time::Month::January, 10).expect("date");
+    let date = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 10)
+        .expect("date");
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(date)
         .knots([(0.0, 1.0), (2.0, 1.0)])
@@ -238,8 +243,10 @@ fn frtb_equity_small_cap_vega_and_curvature_match_basel() {
 
 #[test]
 fn saccr_categories_mpor_and_unmargined_cap_match_prescribed_stages() {
-    let as_of = time::Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
-    let end = time::Date::from_calendar_date(2026, time::Month::January, 1).expect("date");
+    let as_of = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+        .expect("date");
+    let end = finstack_quant_core::dates::Date::from_calendar_date(2026, time::Month::January, 1)
+        .expect("date");
     let config = SaCcrNettingSetConfig::unmargined(NettingSetId::bilateral("A", "CSA"), 0.0, as_of);
     let mut trade = SaCcrTrade {
         trade_id: "POWER".into(),
@@ -293,8 +300,12 @@ fn frtb_basis_and_equity_repo_keep_distinct_risk_factors() {
 
 #[test]
 fn repo_margin_call_settles_after_weekend_and_preserves_call_date() {
-    let call_date = time::Date::from_calendar_date(2025, time::Month::January, 10).expect("date");
-    let settlement = time::Date::from_calendar_date(2025, time::Month::January, 13).expect("date");
+    let call_date =
+        finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 10)
+            .expect("date");
+    let settlement =
+        finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 13)
+            .expect("date");
     let mut spec = RepoMarginSpec::mark_to_market(1.02, 0.0).expect("terms");
     spec.settlement_lag = 1;
     let calendar = finstack_quant_core::dates::calendar_by_id_strict("usny").expect("calendar");
@@ -306,7 +317,8 @@ fn repo_margin_call_settles_after_weekend_and_preserves_call_date() {
 #[test]
 fn schedule_rejects_invalid_maturity_at_every_entry_point() {
     let calc = ScheduleImCalculator::bcbs_standard().expect("registry");
-    let date = time::Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
+    let date = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+        .expect("date");
     for maturity in [-1.0, f64::NAN, f64::INFINITY] {
         assert!(calc.clone().with_maturity(maturity).is_err());
         assert!(calc

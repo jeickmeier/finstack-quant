@@ -166,8 +166,8 @@ pub(crate) fn implied_vol(
         .unwrap_or((ln_min + ln_max) * 0.5)
         .clamp(ln_min, ln_max);
     let solver = BrentSolver::new()
-        .tolerance(1e-10)
-        .bracket_bounds(ln_min, ln_max);
+        .with_tolerance(1e-10)
+        .with_bracket_bounds(ln_min, ln_max);
     let log_sigma = solver.solve(f, initial_log_guess)?;
     if let Some(err) = captured.into_inner() {
         return Err(err);
@@ -402,8 +402,6 @@ mod settlement_and_sigma_tests {
     use rust_decimal::Decimal;
     use time::macros::date;
 
-    const BP: f64 = 10_000.0;
-
     fn flat_discount(base: Date) -> DiscountCurve {
         DiscountCurve::builder("USD-OIS")
             .base_date(base)
@@ -419,7 +417,7 @@ mod settlement_and_sigma_tests {
 
     fn flat_hazard(base: Date) -> HazardCurve {
         let hazard_rate = 0.02;
-        let par = hazard_rate * BP * 0.6;
+        let par = hazard_rate * finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT * 0.6;
         HazardCurve::builder("HZ-SN")
             .base_date(base)
             .recovery_rate(0.4)

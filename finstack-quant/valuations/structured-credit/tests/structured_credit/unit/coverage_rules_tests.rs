@@ -12,7 +12,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_fixed_income::bond::{Bond, CashflowSpec};
 use finstack_quant_valuations_structured_credit::structured_credit::{
@@ -75,7 +75,7 @@ fn senior(balance: f64) -> TrancheStructure {
 
 /// OC ratio of class A at par, no cash, evaluated directly through the test.
 fn oc_ratio(pool: &AssetPool, tranches: &TrancheStructure, rules: Option<&CoverageRules>) -> f64 {
-    let caps: HashMap<&str, Option<f64>> = HashMap::default();
+    let caps: FxHashMap<&str, Option<f64>> = FxHashMap::default();
     let ctx = TestContext {
         pool,
         tranches,
@@ -363,7 +363,7 @@ fn clo_with_closing_default(valuation: DefaultedValuation) -> (StructuredCredit,
     (deal, close)
 }
 
-fn principal_on(results: &HashMap<String, TrancheCashflows>, id: &str, date: Date) -> f64 {
+fn principal_on(results: &FxHashMap<String, TrancheCashflows>, id: &str, date: Date) -> f64 {
     results[id]
         .principal_flows
         .iter()

@@ -2,23 +2,7 @@
 //!
 use crate::monte_carlo::estimate::Estimate;
 use crate::monte_carlo::paths::SimulatedPath;
-
-fn interpolated_percentile(sorted_values: &[f64], percentile: f64) -> f64 {
-    let len = sorted_values.len();
-    if len == 1 {
-        return sorted_values[0];
-    }
-
-    let rank = percentile.clamp(0.0, 1.0) * (len - 1) as f64;
-    let lower = rank.floor() as usize;
-    let upper = rank.ceil() as usize;
-    if lower == upper {
-        sorted_values[lower]
-    } else {
-        let weight = rank - lower as f64;
-        sorted_values[lower] * (1.0 - weight) + sorted_values[upper] * weight
-    }
-}
+use finstack_quant_core::math::stats::quantile_sorted;
 
 pub(crate) fn apply_captured_path_statistics(
     estimate: Estimate,
@@ -35,16 +19,11 @@ pub(crate) fn apply_captured_path_statistics(
     );
     values.sort_by(|a, b| a.total_cmp(b));
 
-    let len = values.len();
-    let median = if len.is_multiple_of(2) {
-        (values[len / 2 - 1] + values[len / 2]) / 2.0
-    } else {
-        values[len / 2]
-    };
-    let percentile_25 = interpolated_percentile(&values, 0.25);
-    let percentile_75 = interpolated_percentile(&values, 0.75);
+    let median = quantile_sorted(&values, 0.5);
+    let percentile_25 = quantile_sorted(&values, 0.25);
+    let percentile_75 = quantile_sorted(&values, 0.75);
     let min = values[0];
-    let max = values[len - 1];
+    let max = values[values.len() - 1];
 
     estimate
         .with_median(median)

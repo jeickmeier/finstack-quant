@@ -12,8 +12,8 @@ use finstack_quant_core::dates::{
 };
 use finstack_quant_core::expr::Expr;
 use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
+use finstack_quant_core::math::stats::variance;
 use finstack_quant_core::math::summation::neumaier_sum;
-use finstack_quant_core::math::variance;
 use finstack_quant_core::money::{fx::FxQuery, Money};
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::{Error, Result};
@@ -80,7 +80,6 @@ pub enum RebalanceRule {
     /// Rebalance on the supplied adjusted dates.
     Dates {
         /// Strictly increasing dates on which the new state becomes eligible.
-        #[serde(with = "finstack_quant_core::wire::dates")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
@@ -90,14 +89,13 @@ pub enum RebalanceRule {
     /// Generate dates from a calendar-aware cadence.
     Calendar {
         /// Unadjusted schedule start.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
         )]
         start: Date,
         /// Optional final unadjusted schedule date.
-        #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+        #[serde(default)]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -444,7 +442,6 @@ impl WeightingMethod {
 #[serde(deny_unknown_fields)]
 pub struct CompositeState {
     /// Date from which the resolved quantities are effective.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -462,7 +459,6 @@ pub struct CompositeState {
 #[serde(deny_unknown_fields)]
 pub struct CompositeMarketObservation {
     /// Observation date; must be strictly increasing within a supplied history.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

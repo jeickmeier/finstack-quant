@@ -114,7 +114,7 @@ proptest! {
         // Property: For normal (decreasing DF) curves, zero rates are typically positive
         for (t, _df) in &knots {
             if *t > 0.0 {
-                let zero = curve.zero(*t);
+                let zero = curve.zero_rate(*t, finstack_quant_core::math::Compounding::Continuous);
 
                 // Zero rates should be in reasonable range for normal curves
                 // Widened to accommodate wider DF ranges: -25% to +50%
@@ -162,7 +162,7 @@ fn test_negative_rate_curve_via_zero_rates() {
     let curve = curve.unwrap();
 
     // Verify zero rates are very small
-    let z1 = curve.zero(1.0);
+    let z1 = curve.zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous);
     assert!(
         z1.abs() < 0.01,
         "Zero rate should be < 1% for near-zero curve: {:.4}",
@@ -193,7 +193,7 @@ fn test_flat_near_zero_rate_curve() {
     let curve = curve.unwrap();
 
     // Verify zero rates are small but positive
-    let z5 = curve.zero(5.0);
+    let z5 = curve.zero_rate(5.0, finstack_quant_core::math::Compounding::Continuous);
     assert!(
         z5.abs() < 0.001,
         "Zero rate should be < 10bp for near-zero curve"
@@ -228,7 +228,7 @@ fn test_steep_high_rate_curve() {
     assert!(curve.df(10.0) < curve.df(5.0), "DF should decrease");
 
     // Verify zero rates are high
-    let z10 = curve.zero(10.0);
+    let z10 = curve.zero_rate(10.0, finstack_quant_core::math::Compounding::Continuous);
     assert!(z10 > 0.10, "Zero rate should be > 10% for high rate curve");
 }
 
@@ -257,8 +257,8 @@ fn test_inverted_curve_shape() {
     let curve = curve.unwrap();
 
     // Verify zero rates are higher at short end
-    let z1 = curve.zero(1.0);
-    let z10 = curve.zero(10.0);
+    let z1 = curve.zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous);
+    let z10 = curve.zero_rate(10.0, finstack_quant_core::math::Compounding::Continuous);
     // Note: With these DFs, z1 ≈ 8% and z10 ≈ 7%
     // The relationship depends on interpolation
     assert!(z1 > 0.07, "Short-end zero rate should be high");

@@ -2,8 +2,9 @@
 //!
 use finstack_quant_core::dates::{Date, DateExt, DayCount, HolidayCalendar};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::constants::{credit, numerical};
+use finstack_quant_valuations_core::constants::credit;
 use time::Duration;
 
 /// Tolerance for recovery-rate consistency between the CDS instrument and the
@@ -59,7 +60,7 @@ pub(super) fn haz_t(surv: &HazardCurve, date: Date) -> Result<f64> {
 /// `days_per_year` inverse drifted by tens of days at multi-year horizons.
 ///
 /// Why it matters: the returned date is then used with
-/// [`DiscountCurve::df_between_dates`] on the *discount* curve. When
+/// [`Discounting::df_between_dates`](finstack_quant_core::market_data::traits::Discounting::df_between_dates) on the *discount* curve. When
 /// `surv.day_count() != disc.day_count()`, an off-by-N-days inverse
 /// mis-attributes the discount lookup, shifting CDS protection-leg PV by tens
 /// of dollars per million on cross-currency or mixed-convention setups. See C2
@@ -131,7 +132,8 @@ pub(super) fn settlement_date(
 
     // Fallback: approximate business days into calendar days, then roll the
     // result forward off any weekend so settlement always lands on a weekday.
-    let delay_days = ((settlement_delay as f64) * credit::CALENDAR_DAYS_PER_YEAR
+    let delay_days = ((settlement_delay as f64)
+        * finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR
         / business_days_per_year)
         .round() as i64;
     let mut settle = default_date + Duration::days(delay_days);
@@ -229,7 +231,7 @@ pub(super) fn isda_standard_model_boundaries(
         ));
     }
     boundaries.sort_by(f64::total_cmp);
-    boundaries.dedup_by(|a, b| (*a - *b).abs() <= numerical::ZERO_TOLERANCE);
+    boundaries.dedup_by(|a, b| (*a - *b).abs() <= ZERO_TOLERANCE);
     Ok(boundaries)
 }
 

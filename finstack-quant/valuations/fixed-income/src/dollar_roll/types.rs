@@ -95,7 +95,6 @@ pub struct DollarRoll {
     ///
     /// When set, bypasses the SIFMA calendar lookup for the front leg.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -105,7 +104,6 @@ pub struct DollarRoll {
     ///
     /// When set, bypasses the SIFMA calendar lookup for the back leg.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -117,7 +115,6 @@ pub struct DollarRoll {
     pub back_price: f64,
     /// Trade date.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")

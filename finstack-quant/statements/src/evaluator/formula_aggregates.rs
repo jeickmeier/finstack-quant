@@ -11,9 +11,12 @@ use super::EvaluationContext;
 use crate::error::Result;
 use finstack_quant_core::dates::{PeriodId, PeriodKind};
 use finstack_quant_core::expr::{Expr, ExprNode, Function};
-use finstack_quant_core::math::{finite_count, finite_max_or_nan, finite_min_or_nan, neumaier_sum};
-use finstack_quant_core::math::{
+use finstack_quant_core::math::stats::{
     mean_or_nan, median_or_nan, sample_std_or_nan, sample_variance_or_nan,
+};
+use finstack_quant_core::math::{
+    stats::{finite_count, finite_max_or_nan, finite_min_or_nan},
+    summation::neumaier_sum,
 };
 
 /// NaN policy for aggregate helpers: **skip non-finite values** (pandas

@@ -7,7 +7,7 @@
 use super::SimmCurvatureSensitivity;
 use core::hash::Hash;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 
 /// The twelve signed-amount maps of [`SimmSensitivities`], listed once so
 /// `is_empty`, `merge`, and `scale_amounts` walk them in one place.
@@ -95,7 +95,7 @@ pub fn commodity_bucket_id(bucket: &str) -> Option<u8> {
     }
 }
 
-fn merge_into<K>(target: &mut HashMap<K, f64>, source: &HashMap<K, f64>)
+fn merge_into<K>(target: &mut FxHashMap<K, f64>, source: &FxHashMap<K, f64>)
 where
     K: Eq + Hash + Clone,
 {
@@ -533,20 +533,20 @@ pub struct SimmSensitivities {
     /// Interest rate delta by (currency, tenor bucket).
     ///
     /// Tenor buckets follow SIMM specification: 2W, 1M, 3M, 6M, 1Y, 2Y, 3Y, 5Y, 10Y, 15Y, 20Y, 30Y
-    pub ir_delta: HashMap<(Currency, String), f64>,
+    pub ir_delta: FxHashMap<(Currency, String), f64>,
 
     /// Interest rate vega by `(currency, tenor bucket)`.
     ///
     /// Values are sigma times dPV/dsigma in currency before VRW or concentration.
     /// This legacy two-dimensional vega input collapses underlying-maturity detail;
     /// curvature has the separate full expiry-resolved input.
-    pub ir_vega: HashMap<(Currency, String), f64>,
+    pub ir_vega: FxHashMap<(Currency, String), f64>,
 
     /// Credit qualifying delta by `(sector, issuer/index, tenor bucket)`.
     ///
     /// Sector assignment is mandatory so the calculator can apply ISDA SIMM
     /// intra- and inter-bucket aggregation without a scalar approximation.
-    pub credit_qualifying_delta: HashMap<(SimmCreditSector, String, String), f64>,
+    pub credit_qualifying_delta: FxHashMap<(SimmCreditSector, String, String), f64>,
 
     /// Credit qualifying vega by `(sector, issuer/index, tenor bucket)`.
     ///
@@ -554,48 +554,48 @@ pub struct SimmSensitivities {
     /// so ISDA SIMM applies the same intra- and inter-bucket aggregation to the
     /// vega risk class, weighted by the single credit-qualifying vega risk
     /// weight rather than the per-bucket delta weights.
-    pub credit_qualifying_vega: HashMap<(SimmCreditSector, String, String), f64>,
+    pub credit_qualifying_vega: FxHashMap<(SimmCreditSector, String, String), f64>,
 
     /// Credit non-qualifying delta by (issuer/index, tenor bucket).
     ///
     /// For securitizations and exposures explicitly classified as non-qualifying.
-    pub credit_non_qualifying_delta: HashMap<(String, String), f64>,
+    pub credit_non_qualifying_delta: FxHashMap<(String, String), f64>,
 
     /// Credit non-qualifying vega by `(issuer/index, tenor bucket)`.
     ///
     /// Pooled like [`credit_non_qualifying_delta`](Self::credit_non_qualifying_delta)
     /// and weighted by the credit-non-qualifying vega risk weight.
-    pub credit_non_qualifying_vega: HashMap<(String, String), f64>,
+    pub credit_non_qualifying_vega: FxHashMap<(String, String), f64>,
 
     /// Equity delta by underlier.
     ///
     /// Values are signed currency P&L per 1% relative equity-price increase.
-    pub equity_delta: HashMap<String, f64>,
+    pub equity_delta: FxHashMap<String, f64>,
 
     /// Equity vega by underlier.
-    pub equity_vega: HashMap<String, f64>,
+    pub equity_vega: FxHashMap<String, f64>,
 
     /// FX delta by currency.
     ///
     /// Values are signed currency P&L per 1% relative FX-price increase,
     /// before risk weighting or concentration. USD is the calculation currency.
-    pub fx_delta: HashMap<Currency, f64>,
+    pub fx_delta: FxHashMap<Currency, f64>,
 
     /// FX vega by currency pair.
-    pub fx_vega: HashMap<(Currency, Currency), f64>,
+    pub fx_vega: FxHashMap<(Currency, Currency), f64>,
 
     /// Commodity delta P&L per 1% relative price increase by bucket.
     ///
     /// Bucket labels should match the SIMM commodity bucket naming expected by
     /// the calculator's registry-backed lookup table.
-    pub commodity_delta: HashMap<String, f64>,
+    pub commodity_delta: FxHashMap<String, f64>,
 
     /// Commodity vega by bucket.
     ///
     /// Bucket labels follow the same SIMM commodity bucket naming as
     /// [`commodity_delta`](Self::commodity_delta); the single commodity vega
     /// risk weight replaces the per-bucket delta weights.
-    pub commodity_vega: HashMap<String, f64>,
+    pub commodity_vega: FxHashMap<String, f64>,
 
     /// Expiry-resolved signed `sigma * dPV/dsigma` inputs before SF, HVR,
     /// vega risk weights or concentration. Entries are retained separately
@@ -618,18 +618,18 @@ impl SimmSensitivities {
     pub fn new(base_currency: Currency) -> Self {
         Self {
             base_currency,
-            ir_delta: HashMap::default(),
-            ir_vega: HashMap::default(),
-            credit_qualifying_delta: HashMap::default(),
-            credit_qualifying_vega: HashMap::default(),
-            credit_non_qualifying_delta: HashMap::default(),
-            credit_non_qualifying_vega: HashMap::default(),
-            equity_delta: HashMap::default(),
-            equity_vega: HashMap::default(),
-            fx_delta: HashMap::default(),
-            fx_vega: HashMap::default(),
-            commodity_delta: HashMap::default(),
-            commodity_vega: HashMap::default(),
+            ir_delta: FxHashMap::default(),
+            ir_vega: FxHashMap::default(),
+            credit_qualifying_delta: FxHashMap::default(),
+            credit_qualifying_vega: FxHashMap::default(),
+            credit_non_qualifying_delta: FxHashMap::default(),
+            credit_non_qualifying_vega: FxHashMap::default(),
+            equity_delta: FxHashMap::default(),
+            equity_vega: FxHashMap::default(),
+            fx_delta: FxHashMap::default(),
+            fx_vega: FxHashMap::default(),
+            commodity_delta: FxHashMap::default(),
+            commodity_vega: FxHashMap::default(),
             curvature: Vec::new(),
         }
     }
@@ -1094,7 +1094,7 @@ mod tests {
         }
     }
 
-    fn insert_entries<K>(map: &mut HashMap<K, f64>, mut entries: [(K, f64); 2], reverse: bool)
+    fn insert_entries<K>(map: &mut FxHashMap<K, f64>, mut entries: [(K, f64); 2], reverse: bool)
     where
         K: Eq + Hash,
     {

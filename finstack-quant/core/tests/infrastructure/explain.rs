@@ -19,7 +19,10 @@ fn test_explain_opts_enabled() {
 #[test]
 fn test_explanation_trace_size_cap() {
     let mut trace = ExplanationTrace::new("calibration");
-    let opts = ExplainOpts::with_max_entries(3);
+    let opts = ExplainOpts {
+        enabled: true,
+        max_entries: Some(3),
+    };
 
     // Add more entries than the cap
     for i in 0..10 {
@@ -56,7 +59,7 @@ fn test_explanation_trace_serialization() {
     );
 
     // Serialize to JSON
-    let json = trace.to_json_pretty().expect("Failed to serialize");
+    let json = serde_json::to_string_pretty(&trace).expect("Failed to serialize");
 
     // Verify structure
     assert!(json.contains("\"type\": \"pricing\""));
@@ -86,7 +89,7 @@ fn test_computation_step_extensibility() {
     );
 
     assert_eq!(trace.entries.len(), 1);
-    let json = trace.to_json_pretty().expect("Failed to serialize");
+    let json = serde_json::to_string_pretty(&trace).expect("Failed to serialize");
     assert!(json.contains("Risk Calculation"));
     assert!(json.contains("bump_size_bp"));
 }
@@ -94,7 +97,7 @@ fn test_computation_step_extensibility() {
 #[test]
 fn test_zero_overhead_when_disabled() {
     // When explanation is disabled, we should not create traces
-    let opts = ExplainOpts::disabled();
+    let opts = ExplainOpts::default();
     assert!(!opts.enabled);
 
     // This pattern should be used in production code:
@@ -114,7 +117,10 @@ mod property_tests {
     #[test]
     fn property_trace_entries_never_exceed_max() {
         let max = 5;
-        let opts = ExplainOpts::with_max_entries(max);
+        let opts = ExplainOpts {
+            enabled: true,
+            max_entries: Some(max),
+        };
         let mut trace = ExplanationTrace::new("test");
 
         // Try to add many entries

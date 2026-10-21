@@ -16,18 +16,14 @@ mod xva;
 #[cfg(all(test, target_arch = "wasm32"))]
 mod tests;
 
-use crate::api::core::market_data::{JsDiscountCurve, JsHazardCurve};
-use crate::utils::input::{js_f64, js_string, json_text, opt_json_text};
-use crate::utils::{parse_iso_date, to_js_err, to_js_value};
+use crate::api::core::market_discount::JsDiscountCurve;
+use crate::api::core::market_hazard::JsHazardCurve;
+use crate::utils::input::{js_currency, js_f64, json_text, opt_json_text};
+use crate::utils::wire::js_date;
+use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use wasm_bindgen::prelude::*;
-
-/// An ISO-4217 currency argument.
-fn js_currency(value: &JsValue, label: &str) -> Result<Currency, JsValue> {
-    js_string(value, label)?.parse().map_err(to_js_err)
-}
 
 /// A numeric amount argument in major units of `currency`.
 fn js_money(value: &JsValue, label: &str, currency: Currency) -> Result<Money, JsValue> {
@@ -37,11 +33,6 @@ fn js_money(value: &JsValue, label: &str, currency: Currency) -> Result<Money, J
 /// An amount in major units of a CSA's base currency.
 fn base_money(csa: &finstack_quant_margin::CsaSpec, amount: f64) -> Result<Money, JsValue> {
     Money::new(amount, csa.base_currency).map_err(to_js_err)
-}
-
-/// An ISO-8601 date argument.
-fn js_date(value: &JsValue, label: &str) -> Result<Date, JsValue> {
-    parse_iso_date(&js_string(value, label)?)
 }
 
 /// Compute bilateral XVA: CVA, DVA, FVA, MVA, and the all-in adjustment.

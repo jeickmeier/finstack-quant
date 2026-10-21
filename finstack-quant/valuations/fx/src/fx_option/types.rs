@@ -176,7 +176,6 @@ pub struct FxOption {
     /// Pair/venue delta convention and premium currency.
     pub delta_convention: FxDeltaConvention,
     /// Option expiry date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

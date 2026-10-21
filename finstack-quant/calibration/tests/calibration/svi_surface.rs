@@ -38,7 +38,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::types::UnderlyingId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_models::volatility::svi::SviParams;
 use finstack_quant_valuations_core::instruments::OptionType;
 use time::Month;
@@ -186,7 +186,7 @@ fn svi_surface_grid_is_calendar_monotone_under_nonflat_curve() {
     target_strikes.sort_by(f64::total_cmp);
     target_strikes.dedup();
 
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("svi_quotes".to_string(), cal_utils::quote_set_ids(&quotes));
 
     let plan = CalibrationPlan {

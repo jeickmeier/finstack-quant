@@ -124,23 +124,7 @@ class RoundingMode:
         """
         ...
 
-    @property
-    def name(self) -> str:
-        """
-        Canonical lowercase name, e.g. ``"bankers"``.
-
-        Returns
-        -------
-        str
-            The serde label.
-
-        Notes
-        -----
-        This accessor does not raise.
-        """
-        ...
-
-    def __reduce__(self) -> tuple[object, tuple[str]]: ...
+    def __reduce__(self) -> tuple[object, tuple[type[RoundingMode], str]]: ...
     def __repr__(self) -> str:
         """Return a debug representation of this rounding mode.
 
@@ -176,13 +160,10 @@ class RoundingMode:
 
 class ToleranceConfig:
     """
-    Numerical tolerance settings for rate and generic comparisons.
+    Numerical tolerance settings for generic floating-point comparisons.
 
     Parameters
     ----------
-    rate_epsilon : float | None
-        Epsilon for rate-style comparisons. If ``None``, the library
-        default is used.
     generic_epsilon : float | None
         Epsilon for generic floating-point comparisons. If ``None``,
         the library default is used.
@@ -190,49 +171,28 @@ class ToleranceConfig:
     Examples
     --------
     >>> from finstack_quant.core.config import ToleranceConfig
-    >>> tolerances = ToleranceConfig(rate_epsilon=1e-9, generic_epsilon=1e-12)
-    >>> (tolerances.rate_epsilon, tolerances.generic_epsilon)
-    (1e-09, 1e-12)
+    >>> ToleranceConfig(generic_epsilon=1e-12).generic_epsilon
+    1e-12
 
     """
 
     def __init__(
         self,
-        rate_epsilon: Optional[float] = None,
         generic_epsilon: Optional[float] = None,
     ) -> None:
         """
-        Create tolerance settings, optionally overriding default epsilons.
+        Create tolerance settings, optionally overriding the default epsilon.
 
         Parameters
         ----------
-        rate_epsilon : float | None
-            Epsilon for rate-style comparisons.
         generic_epsilon : float | None
             Epsilon for generic floating-point comparisons.
 
         Raises
         ------
         ValueError
-            If either supplied epsilon is non-finite or not strictly positive.
+            If the supplied epsilon is non-finite or not strictly positive.
 
-        """
-        ...
-
-    @property
-    def rate_epsilon(self) -> float:
-        """
-        Epsilon used for rate-style comparisons.
-
-        Returns
-        -------
-        float
-
-            Epsilon used for rate-style comparisons.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
         """
         ...
 
@@ -262,7 +222,7 @@ class ToleranceConfig:
         """
         ...
     def __eq__(self, other: object) -> bool:
-        """Return whether both epsilons are equal.
+        """Return whether the epsilons are equal.
 
         Returns
         -------
@@ -272,7 +232,7 @@ class ToleranceConfig:
 
     def to_json(self) -> str:
         """
-        Serialize to JSON ``{"rate_epsilon": ..., "generic_epsilon": ...}``.
+        Serialize to JSON ``{"generic_epsilon": ...}``.
 
         Returns
         -------
@@ -289,7 +249,7 @@ class ToleranceConfig:
     @classmethod
     def from_json(cls, json: str) -> ToleranceConfig:
         """
-        Deserialize from JSON; the epsilons are re-validated.
+        Deserialize from JSON; the epsilon is re-validated.
 
         Parameters
         ----------
@@ -304,13 +264,13 @@ class ToleranceConfig:
         Raises
         ------
         ValueError
-            If *json* is malformed or an epsilon is non-finite or not
+            If *json* is malformed or the epsilon is non-finite or not
             strictly positive.
 
         Examples
         --------
         >>> from finstack_quant.core.config import ToleranceConfig
-        >>> t = ToleranceConfig(rate_epsilon=1e-9)
+        >>> t = ToleranceConfig(generic_epsilon=1e-9)
         >>> ToleranceConfig.from_json(t.to_json()) == t
         True
         """
@@ -352,7 +312,7 @@ class FinstackConfig:
     2
     >>> cfg = FinstackConfig(rounding_mode="floor")
     >>> cfg.set_output_scale("JPY", 2)
-    >>> (cfg.rounding_mode.name, cfg.output_scale("JPY"), cfg.output_scale_overrides())
+    >>> (str(cfg.rounding_mode), cfg.output_scale("JPY"), cfg.output_scale_overrides())
     ('floor', 2, {'JPY': 2})
 
     """

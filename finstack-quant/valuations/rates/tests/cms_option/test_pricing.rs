@@ -6,6 +6,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::instruments::{Instrument, OptionType};
@@ -197,7 +198,7 @@ fn test_vanna_computable() {
     // forward with respect to one absolute vol point. This replaces the old
     // self-captured value, which embedded obsolete reference-swap defaults.
     use finstack_quant_core::dates::{DateExt, DayCountContext};
-    use finstack_quant_core::math::norm_cdf;
+    use finstack_quant_core::math::special_functions::norm_cdf;
     use finstack_quant_valuations_rates::cms_option::pricer::convexity_adjustment_with_frequency;
     let disc = market
         .get_discount(inst.discount_curve_id.as_str())
@@ -610,7 +611,7 @@ fn replication_greeks_reprice_with_the_replication_pricer() {
 /// carry no vol dependence and are skipped.
 fn vanna_oracle(inst: &CmsOption, market: &MarketContext, as_of: Date) -> f64 {
     use finstack_quant_core::dates::{DateExt, DayCountContext};
-    use finstack_quant_core::math::norm_cdf;
+    use finstack_quant_core::math::special_functions::norm_cdf;
     use finstack_quant_valuations_rates::cms_option::pricer::convexity_adjustment_with_frequency;
 
     let disc = market

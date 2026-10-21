@@ -3,7 +3,7 @@
 //! Provides [`SimpleContext`], the single concrete context type used by
 //! expression evaluators to resolve column references to array indices.
 
-use crate::HashMap;
+use crate::FxHashMap;
 
 /// Column name → index context for expression evaluation.
 ///
@@ -19,7 +19,7 @@ use crate::HashMap;
 #[serde(deny_unknown_fields)]
 pub struct SimpleContext {
     /// Column name to index mapping for O(1) resolution.
-    column_indices: HashMap<String, usize>,
+    column_indices: FxHashMap<String, usize>,
 }
 
 impl SimpleContext {
@@ -30,7 +30,7 @@ impl SimpleContext {
     /// Returns [`Error::Validation`](crate::Error::Validation) if any column
     /// name appears more than once.
     pub fn new(columns: impl IntoIterator<Item = impl Into<String>>) -> crate::Result<Self> {
-        let mut column_indices = HashMap::default();
+        let mut column_indices = FxHashMap::default();
         for (idx, name) in columns.into_iter().enumerate() {
             let name = name.into();
             if column_indices.contains_key(&name) {

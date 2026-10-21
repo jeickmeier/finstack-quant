@@ -15,7 +15,7 @@ mod brent {
     fn finds_root_simple_quadratic() {
         // f(x) = x^2 - 2 ⇒ root = sqrt(2)
         let f = |x: f64| x * x - 2.0;
-        let solver = BrentSolver::new().tolerance(1e-12);
+        let solver = BrentSolver::new().with_tolerance(1e-12);
         let r = solver.solve(f, 1.5).unwrap();
 
         assert!(
@@ -30,7 +30,7 @@ mod brent {
     fn handles_cubic() {
         // f(x)=x^3 - x, roots at -1, 0, 1 ⇒ 1
         let f = |x: f64| x * x * x - x;
-        let solver = BrentSolver::new().tolerance(1e-12);
+        let solver = BrentSolver::new().with_tolerance(1e-12);
         let r = solver.solve(f, 0.85).unwrap();
 
         assert!(
@@ -44,7 +44,7 @@ mod brent {
     #[test]
     fn simple_quadratic() {
         let f = |x: f64| x * x - 4.0; // root at x = 2
-        let solver = BrentSolver::new().tolerance(1e-12);
+        let solver = BrentSolver::new().with_tolerance(1e-12);
 
         let root = solver.solve(f, 1.8).unwrap();
 
@@ -60,7 +60,7 @@ mod brent {
     fn with_distant_guess() {
         // Case where initial guess is far from root
         let f = |x: f64| x * x * x - x - 2.0; // Cubic with root near 1.5
-        let solver = BrentSolver::new().tolerance(1e-12);
+        let solver = BrentSolver::new().with_tolerance(1e-12);
 
         // Bad initial guess that would cause Newton to diverge
         let root = solver.solve(f, 100.0).unwrap();
@@ -90,7 +90,7 @@ mod brent {
             annuity_pv + principal_pv - target_price
         };
 
-        let solver = BrentSolver::new().tolerance(1e-10);
+        let solver = BrentSolver::new().with_tolerance(1e-10);
         let yield_result = solver.solve(f, 0.06).unwrap();
 
         // 5% coupon, $95 price, 5-period bond YTM ≈ 6.20%
@@ -106,7 +106,7 @@ mod brent {
     fn sqrt_function() {
         // Pathological case where derivative is problematic
         let f = |x: f64| (x - 1.5).signum() * (x - 1.5).abs().powf(0.5);
-        let solver = BrentSolver::new().tolerance(1e-6);
+        let solver = BrentSolver::new().with_tolerance(1e-6);
 
         let root = solver.solve(f, 2.0).unwrap();
         assert!(
@@ -128,7 +128,7 @@ mod error_diagnostics {
     fn brent_no_bracket_found_error() {
         // Function with no roots
         let f = |x: f64| x * x + 1.0;
-        let solver = BrentSolver::new().tolerance(1e-12);
+        let solver = BrentSolver::new().with_tolerance(1e-12);
 
         let result = solver.solve(f, 0.0);
         assert!(result.is_err());

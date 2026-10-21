@@ -28,6 +28,22 @@ pub enum Thirty360Convention {
     Italian,
 }
 
+impl std::fmt::Display for Thirty360Convention {
+    /// Writes the serde label (`us_sia`, `isda`, `european`, `italian`).
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
+    }
+}
+
+impl std::str::FromStr for Thirty360Convention {
+    type Err = crate::Error;
+
+    /// Parses the serde label, ignoring surrounding whitespace and ASCII case.
+    fn from_str(s: &str) -> crate::Result<Self> {
+        crate::wire::serde_parse(&s.trim().to_ascii_lowercase())
+    }
+}
+
 /// Compute day count between `start` (inclusive) and `end` (exclusive) under a 30/360 convention.
 ///
 /// Precondition: `start <= end`. If violated, the returned value will be negative.
@@ -183,5 +199,3 @@ pub fn days_30e_360_isda(start: Date, end: Date, end_is_termination_date: bool) 
 
     (y2 - y1) * 360 + (m2 - m1) * 30 + (d2_adj - d1_adj)
 }
-
-// (Wrappers removed in favor of the public `days_30_360` with `Thirty360Convention`.)

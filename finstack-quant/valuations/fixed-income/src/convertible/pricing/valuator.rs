@@ -2,12 +2,13 @@
 
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::{Error, Result};
 
 use crate::convertible::{ConversionEvent, ConversionPolicy, ConvertibleBond, PriceTrigger};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_core::math::map_date_to_step;
+use finstack_quant_core::math::time_grid::map_date_to_step;
 
 /// Contractual debt events and exercise decisions for the defaultable-equity tree.
 pub(super) struct ConvertibleBondValuator {
@@ -16,9 +17,9 @@ pub(super) struct ConvertibleBondValuator {
     /// Face value of the bond
     pub(super) face_value: f64,
     /// Coupon cashflows mapped to tree steps
-    pub(super) coupon_map: HashMap<usize, f64>,
+    pub(super) coupon_map: FxHashMap<usize, f64>,
     /// Scheduled principal payments, distinct from coupons and PIK capitalization.
-    pub(super) principal_map: HashMap<usize, f64>,
+    pub(super) principal_map: FxHashMap<usize, f64>,
     /// Principal after scheduled events at each node; terminal entry is the
     /// amount exchangeable for shares immediately before final redemption.
     pub(super) principal_by_step: Vec<f64>,
@@ -27,10 +28,10 @@ pub(super) struct ConvertibleBondValuator {
     pub(super) recovery_by_step: Vec<f64>,
     /// Call prices mapped to tree steps (step -> price).
     /// For exercise periods, every step within the period maps to the call price.
-    call_map: HashMap<usize, f64>,
+    call_map: FxHashMap<usize, f64>,
     /// Put prices mapped to tree steps (step -> price).
     /// For exercise periods, every step within the period maps to the put price.
-    put_map: HashMap<usize, f64>,
+    put_map: FxHashMap<usize, f64>,
     /// Conversion policy
     conversion_policy: ConversionPolicy,
     /// Steps (or spot condition) at which conversion is permitted, resolved
@@ -82,7 +83,7 @@ impl ConvertibleBondValuator {
     ) -> Result<Self> {
         // Use effective conversion ratio (includes anti-dilution adjustments)
         let conversion_ratio = bond.effective_conversion_ratio().ok_or_else(|| {
-            Error::internal("convertible tree pricer requires effective conversion ratio")
+            Error::Internal("convertible tree pricer requires effective conversion ratio".into())
         })?;
 
         // Date mapping uses the same ACT/365F clock as the equity process.
@@ -122,8 +123,8 @@ impl ConvertibleBondValuator {
                 Ok(1.0)
             }
         };
-        let mut coupon_map: HashMap<usize, f64> = HashMap::default();
-        let mut principal_map: HashMap<usize, f64> = HashMap::default();
+        let mut coupon_map: FxHashMap<usize, f64> = FxHashMap::default();
+        let mut principal_map: FxHashMap<usize, f64> = FxHashMap::default();
         for cf in cashflow_schedule.get_flows() {
             if cf.date <= base_date || !cf.kind.is_cash_settlement() {
                 continue;
@@ -182,8 +183,8 @@ impl ConvertibleBondValuator {
         let accrual = super::engine::accrual_index(bond, cashflow_schedule)?;
 
         // Map call/put schedules to tree steps, supporting exercise periods.
-        let mut call_map: HashMap<usize, f64> = HashMap::default();
-        let mut put_map: HashMap<usize, f64> = HashMap::default();
+        let mut call_map: FxHashMap<usize, f64> = FxHashMap::default();
+        let mut put_map: FxHashMap<usize, f64> = FxHashMap::default();
 
         if let Some(ref call_put) = bond.call_put {
             for call in &call_put.calls {

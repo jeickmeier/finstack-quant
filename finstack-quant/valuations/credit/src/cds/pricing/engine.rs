@@ -8,10 +8,12 @@ use super::helpers::{
 use crate::cds::CreditDefaultSwap;
 use finstack_quant_core::dates::{Date, HolidayCalendar};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
+use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::constants::{credit, numerical};
+use finstack_quant_valuations_core::constants::credit;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
 use rust_decimal::prelude::ToPrimitive;
 
@@ -168,10 +170,8 @@ impl CdsPricer {
         // covered); Bloomberg CDSW/CDSO conventions integrate from the
         // valuation date ("protection starts immediately"). See
         // `CdsValuationConvention::protection_step_in_days`.
-        let step_in = as_of
-            + finstack_quant_core::dates::Duration::days(
-                cds.valuation_convention.protection_step_in_days(),
-            );
+        let step_in =
+            as_of + time::Duration::days(cds.valuation_convention.protection_step_in_days());
         let protection_start = step_in.max(cds.protection_start());
         let protection_end = cds.premium_leg.end;
 
@@ -338,10 +338,7 @@ impl CdsPricer {
             && inp.cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360
             && inp.end_date > inp.accrual_start_date
         {
-            let days = finstack_quant_core::dates::DayCount::calendar_days(
-                inp.accrual_start_date,
-                inp.end_date,
-            ) + 1;
+            let days = (inp.end_date - inp.accrual_start_date).whole_days() + 1;
             (days.max(0) as f64) / 360.0
         } else {
             year_fraction(
@@ -370,7 +367,7 @@ impl CdsPricer {
             let t1 = window[0];
             let t2 = window[1];
             let dt = t2 - t1;
-            if dt <= numerical::ZERO_TOLERANCE {
+            if dt <= ZERO_TOLERANCE {
                 continue;
             }
 
@@ -433,7 +430,7 @@ impl CdsPricer {
             //   I0 = (1 - e^{-kΔ})/k
             //   I1 = (1 - e^{-kΔ}(1 + kΔ))/k²
             let k = hazard_rate + interest_rate;
-            let contribution = if k.abs() > numerical::ZERO_TOLERANCE {
+            let contribution = if k.abs() > ZERO_TOLERANCE {
                 let exp_term = (-k * dt).exp();
                 let i0 = (1.0 - exp_term) / k;
                 let i1 = (1.0 - exp_term * (1.0 + k * dt)) / (k * k);
@@ -733,7 +730,7 @@ mod cds_review_regression_tests {
     use crate::cds::pricing::{AccrualDayCountPolicy, CdsPricerConfig};
     use crate::cds::{CdsConvention, CdsValuationConvention, CreditDefaultSwap, PayReceive};
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{Date, DayCount};
+    use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
     use finstack_quant_core::money::Money;
@@ -803,8 +800,7 @@ mod cds_review_regression_tests {
             let final_period = periods.last().expect("coupon period");
             assert_eq!(final_period.accrual_end, end);
             assert!(final_period.payment_date >= end);
-            let expected =
-                (DayCount::calendar_days(final_period.accrual_start, end) + 1) as f64 / 360.0;
+            let expected = ((end - final_period.accrual_start).whole_days() + 1) as f64 / 360.0;
             close(pricer.coupon_accrual(&cds, final_period)?, expected);
         }
         Ok(())
@@ -822,7 +818,7 @@ mod cds_review_regression_tests {
             let cds = contract(start, end, convention)?;
             let pricer = CdsPricer::with_config(CdsPricerConfig::from_cds(&cds));
             let expected_days =
-                DayCount::calendar_days(start, end) + i64::from(convention.uses_clean_price());
+                (end - start).whole_days() + i64::from(convention.uses_clean_price());
             let expected_coupon = 10_000_000.0 * 0.01 * expected_days as f64 / 360.0;
             for as_of in [
                 end,
@@ -890,8 +886,8 @@ mod cds_review_regression_tests {
         ] {
             let cds = contract(start, end, convention)?;
             let pricer = CdsPricer::with_config(CdsPricerConfig::from_cds(&cds));
-            let accrual = (DayCount::calendar_days(start, end)
-                + i64::from(convention.uses_clean_price())) as f64
+            let accrual = ((end - start).whole_days() + i64::from(convention.uses_clean_price()))
+                as f64
                 / 360.0;
             for as_of in [end, date!(2025 - 09 - 21), date!(2025 - 09 - 22)] {
                 let (disc, _) = flat_market(as_of, 0.0)?;
@@ -948,9 +944,9 @@ mod cds_review_regression_tests {
             ] {
                 let cds = contract(start, end, convention)?;
                 let pricer = CdsPricer::with_config(CdsPricerConfig::from_cds(&cds));
-                let t = DayCount::calendar_days(as_of, end) as f64 / 365.0;
-                let elapsed = DayCount::calendar_days(start, as_of) as f64 / 360.0;
-                let coupon = (DayCount::calendar_days(start, end) + 1) as f64 / 360.0;
+                let t = (end - as_of).whole_days() as f64 / 365.0;
+                let elapsed = (as_of - start).whole_days() as f64 / 360.0;
+                let coupon = ((end - start).whole_days() + 1) as f64 / 360.0;
                 // Independent integral of [elapsed + 365/360*t] times the
                 // conditional exponential default density lambda*exp(-lambda*t).
                 // Clean accrued settlement is a separate deterministic cashflow.

@@ -22,8 +22,8 @@ use finstack_quant_valuations::instruments::fx::fx_option::{
 use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
 use super::convert::{
-    attributes_from_py, bdc_from_py, builder_repr, currency_from_py, date_repr, day_count_from_py,
-    enum_to_py_string, float_repr, money_repr, money_to_py, opt_repr, tenor_from_py,
+    attributes_from_py, bdc_from_py, builder_repr, date_repr, day_count_from_py, enum_to_py_string,
+    float_repr, money_repr, money_to_py, opt_repr,
 };
 use super::instruments::{enum_from_str, serialize_typed_instrument_json};
 use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
@@ -226,8 +226,8 @@ end_of_month=False)"
         business_day_convention: Option<&Bound<'_, PyAny>>,
         end_of_month: bool,
     ) -> PyResult<Self> {
-        let base = currency_from_py(base_currency, "base_currency")?;
-        let quote = currency_from_py(quote_currency, "quote_currency")?;
+        let base = crate::bindings::core::currency::extract_currency(base_currency)?;
+        let quote = crate::bindings::core::currency::extract_currency(quote_currency)?;
         let convention = business_day_convention
             .filter(|value| !value.is_none())
             .map(|value| bdc_from_py(value, "business_day_convention"))
@@ -237,7 +237,7 @@ end_of_month=False)"
             base,
             quote,
             py_to_date(trade_date)?,
-            tenor_from_py(tenor, "tenor")?,
+            crate::bindings::core::dates::tenor::extract_tenor(tenor)?,
             super::convert::money_from_py(notional, Some(base.as_ref()), "notional")?,
             CurveId::new(domestic_discount_curve_id.to_string()),
             CurveId::new(foreign_discount_curve_id.to_string()),
@@ -279,8 +279,8 @@ end_of_month=False)"
     ) -> PyResult<u32> {
         Ok(
             finstack_quant_valuations::instruments::FxForward::standard_settlement_days(
-                currency_from_py(base, "base")?,
-                currency_from_py(quote, "quote")?,
+                crate::bindings::core::currency::extract_currency(base)?,
+                crate::bindings::core::currency::extract_currency(quote)?,
             ),
         )
     }
@@ -535,7 +535,7 @@ impl PyFxForwardBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let ccy = currency_from_py(value, "base_currency")?;
+        let ccy = crate::bindings::core::currency::extract_currency(value)?;
         builder_set!(
             slf,
             base_currency,
@@ -565,7 +565,7 @@ impl PyFxForwardBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let ccy = currency_from_py(value, "quote_currency")?;
+        let ccy = crate::bindings::core::currency::extract_currency(value)?;
         builder_set!(
             slf,
             quote_currency,
@@ -884,7 +884,7 @@ fn delta_convention_from_parts(
     let kind: FxDeltaConventionKind = enum_from_str(kind, "delta convention kind")?;
     FxDeltaConvention::new(
         kind,
-        currency_from_py(premium_currency, "premium_currency")?,
+        crate::bindings::core::currency::extract_currency(premium_currency)?,
         venue,
     )
     .map_err(core_to_py)
@@ -977,8 +977,8 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
         premium_currency: &Bound<'_, PyAny>,
         venue: &str,
     ) -> PyResult<Self> {
-        let base = currency_from_py(base_currency, "base_currency")?;
-        let quote = currency_from_py(quote_currency, "quote_currency")?;
+        let base = crate::bindings::core::currency::extract_currency(base_currency)?;
+        let quote = crate::bindings::core::currency::extract_currency(quote_currency)?;
         let inner = finstack_quant_valuations::instruments::FxOption::european(
             InstrumentId::new(id.to_string()),
             base,
@@ -1449,7 +1449,7 @@ impl PyFxOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let ccy = currency_from_py(value, "base_currency")?;
+        let ccy = crate::bindings::core::currency::extract_currency(value)?;
         builder_set!(
             slf,
             base_currency,
@@ -1479,7 +1479,7 @@ impl PyFxOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let ccy = currency_from_py(value, "quote_currency")?;
+        let ccy = crate::bindings::core::currency::extract_currency(value)?;
         builder_set!(
             slf,
             quote_currency,

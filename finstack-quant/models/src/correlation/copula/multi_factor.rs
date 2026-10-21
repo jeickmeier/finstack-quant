@@ -26,7 +26,7 @@
 //!
 
 use super::{select_quadrature, Copula};
-use finstack_quant_core::math::{norm_cdf, GaussHermiteQuadrature};
+use finstack_quant_core::math::{integration::GaussHermiteQuadrature, special_functions::norm_cdf};
 
 /// CDF argument clipping to prevent overflow.
 const CDF_CLIP: f64 = 10.0;
@@ -231,7 +231,7 @@ impl Copula for MultiFactorCopula {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::math::standard_normal_inv_cdf;
+    use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
 
     #[test]
     fn test_multi_factor_creation() {

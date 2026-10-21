@@ -5,6 +5,7 @@ use crate::structured_credit::{StructuredCredit, TrancheCashflows};
 use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::metrics::MetricContext;
 

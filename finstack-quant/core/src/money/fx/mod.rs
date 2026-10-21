@@ -77,7 +77,7 @@ mod tests {
         // Six bytes but not six characters: must error, never slice mid-char.
         for text in ["é€x", "EURUS", "EURUSDX", "", "EUR-USD"] {
             let err = text.parse::<CurrencyPair>().expect_err("malformed pair");
-            assert_eq!(err.kind(), crate::error::ErrorKind::Validation);
+            assert_eq!(err.kind(), crate::ErrorKind::Validation);
         }
         let err = "EUR/XYZ".parse::<CurrencyPair>().expect_err("bad quote");
         assert!(err.to_string().contains("\"XYZ\""), "{err}");

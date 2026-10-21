@@ -45,7 +45,10 @@
 //!
 
 use super::RecoveryModel;
-use finstack_quant_core::math::{integration::adaptive_simpson, norm_cdf, norm_pdf};
+use finstack_quant_core::math::{
+    integration::adaptive_simpson,
+    special_functions::{norm_cdf, norm_pdf},
+};
 
 /// Market-correlated stochastic recovery model.
 ///

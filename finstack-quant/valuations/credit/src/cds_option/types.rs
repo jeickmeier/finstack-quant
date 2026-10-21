@@ -99,14 +99,12 @@ pub struct CdsOption {
     /// Exercise style
     pub exercise_style: ExerciseStyle,
     /// Option expiry date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub expiry: Date,
     /// Underlying CDS maturity date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -120,7 +118,6 @@ pub struct CdsOption {
     /// accessor. This does not change variance time or front-end protection;
     /// the option value excludes the separately agreed trade premium.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -131,7 +128,6 @@ pub struct CdsOption {
     /// Must be on or after expiry and before CDS maturity. Discounting uses
     /// this date; spread variance ends at legal expiry.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -143,7 +139,6 @@ pub struct CdsOption {
     /// option expiry; in that case premium accrues from this date while
     /// protection starts at expiry.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")

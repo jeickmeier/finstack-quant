@@ -86,7 +86,6 @@ use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instr
 #[serde(deny_unknown_fields)]
 pub struct EquityOptionExercise {
     /// Exercise date, or the expiry observation date for an unexercised option.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -95,7 +94,6 @@ pub struct EquityOptionExercise {
     /// Observed underlying level used to determine the fixed cash payoff.
     pub spot: f64,
     /// Contractual cash-payment or physical-delivery date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -150,7 +148,6 @@ pub struct EquityOption {
     #[builder(default)]
     pub exercise_style: ExerciseStyle,
     /// Option expiry date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -223,7 +220,6 @@ pub struct EquityOption {
     ///   discrete dividend problem"
     #[builder(default)]
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -235,7 +231,6 @@ pub struct EquityOption {
     /// at which early exercise is permitted. Dates before as_of or after expiry
     /// are filtered out automatically.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<Vec<finstack_quant_core::wire::DateWire>>")
@@ -596,7 +591,7 @@ impl EquityOption {
         while price(upper)? < target && upper < 8.0 {
             upper *= 2.0;
         }
-        let sigma = BrentSolver::new().tolerance(1e-12).solve_in_bracket(
+        let sigma = BrentSolver::new().with_tolerance(1e-12).solve_in_bracket(
             |sigma| price(sigma).map_or(f64::NAN, |pv| pv - target),
             lower,
             upper,
@@ -899,6 +894,7 @@ finstack_quant_valuations_core::impl_empty_cashflow_provider!(
 
 #[cfg(test)]
 mod tests {
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_valuations_test_support::date as date_support;
     use finstack_quant_valuations_test_support::discount_forward_curves as discount_forward_curve_support;
     use finstack_quant_valuations_test_support::volatility as volatility_support;

@@ -153,16 +153,12 @@ impl RevolvingCredit {
         )?;
 
         // Date ordering: commitment must be before maturity
-        validation::validate_date_range_strict_with(
-            self.issue_date,
-            self.maturity,
-            |start, end| {
-                format!(
-                    "RevolvingCredit issue_date ({}) must be before maturity ({})",
-                    start, end
-                )
-            },
-        )?;
+        validation::require_with(self.maturity > self.issue_date, || {
+            format!(
+                "RevolvingCredit issue_date ({}) must be before maturity ({})",
+                self.issue_date, self.maturity
+            )
+        })?;
 
         // Recovery is an explicit decimal fraction. Downstream hazard mappings
         // handle the full-recovery boundary without changing the stored input.

@@ -53,7 +53,6 @@ pub struct Swaption {
     /// Notional amount of underlying swap
     pub notional: Money,
     /// Option expiry date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -266,7 +265,12 @@ impl Swaption {
 
         let strike = self.strike_f64()?;
         validation::validate_f64_finite(strike, "swaption strike")?;
-        validation::validate_f64_abs_le(strike, 2.0, "swaption strike", Some(" (rate)"))?;
+        crate::rate_validation::validate_f64_abs_le(
+            strike,
+            2.0,
+            "swaption strike",
+            Some(" (rate)"),
+        )?;
 
         self.underlying_fixed_leg.validate()?;
         self.underlying_float_leg.validate()?;
@@ -993,7 +997,7 @@ fn single_curve_float_leg_pv(
     periods: &[finstack_quant_cashflows::builder::SchedulePeriod],
     spread: f64,
 ) -> Result<(f64, f64)> {
-    use finstack_quant_core::math::NeumaierAccumulator;
+    use finstack_quant_core::math::summation::NeumaierAccumulator;
 
     let mut float_leg = NeumaierAccumulator::new();
     let mut annuity = NeumaierAccumulator::new();

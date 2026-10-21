@@ -24,13 +24,11 @@ fn extract_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize, usize
     if let Ok(array) = matrix.extract::<PyReadonlyArray2<'_, f64>>() {
         let shape = array.shape();
         let (rows, cols) = (shape[0], shape[1]);
-        let flat = match array.as_slice() {
-            Ok(slice) if array.is_c_contiguous() => slice.to_vec(),
-            // Fortran-contiguous slices expose column-major storage; strided
-            // views also need logical-order iteration before calling Rust.
-            _ => array.as_array().iter().copied().collect(),
-        };
-        return Ok((flat, rows, cols));
+        return Ok((
+            crate::bindings::matrix_input::numpy_row_major(&array),
+            rows,
+            cols,
+        ));
     }
     let rows: Vec<Vec<f64>> = matrix
         .extract()
@@ -49,7 +47,7 @@ fn extract_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize, usize
 }
 
 /// Extract an n×n matrix from a NumPy array or a nested list.
-fn extract_square_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize)> {
+fn square_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize)> {
     let (flat, rows, cols) = extract_matrix(matrix)?;
     if rows != cols {
         return Err(crate::errors::value_error(format!(
@@ -86,7 +84,7 @@ fn extract_square_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize
 #[pyfunction]
 #[pyo3(text_signature = "(matrix)")]
 fn cholesky_decomposition(py: Python<'_>, matrix: &Bound<'_, PyAny>) -> PyResult<Vec<Vec<f64>>> {
-    let (flat, n) = extract_square_matrix(matrix)?;
+    let (flat, n) = square_matrix(matrix)?;
     let result = py
         .detach(|| linalg::cholesky_decomposition(&flat, n))
         .map_err(cholesky_err)?;
@@ -116,7 +114,7 @@ fn cholesky_decomposition(py: Python<'_>, matrix: &Bound<'_, PyAny>) -> PyResult
 #[pyfunction]
 #[pyo3(text_signature = "(chol, b)")]
 fn cholesky_solve(py: Python<'_>, chol: &Bound<'_, PyAny>, b: Vec<f64>) -> PyResult<Vec<f64>> {
-    let (flat, _) = extract_square_matrix(chol)?;
+    let (flat, _) = square_matrix(chol)?;
     let mut x = vec![0.0; b.len()];
     py.detach(|| linalg::cholesky_solve(&flat, &b, &mut x))
         .map_err(core_to_py)?;
@@ -137,7 +135,7 @@ fn cholesky_solve(py: Python<'_>, chol: &Bound<'_, PyAny>, b: Vec<f64>) -> PyRes
 #[pyfunction]
 #[pyo3(text_signature = "(l, z)")]
 fn apply_lower_triangular(py: Python<'_>, l: &Bound<'_, PyAny>, z: Vec<f64>) -> PyResult<Vec<f64>> {
-    let (flat, n) = extract_square_matrix(l)?;
+    let (flat, n) = square_matrix(l)?;
     py.detach(|| linalg::apply_lower_triangular(&flat, n, &z))
         .map_err(core_to_py)
 }
@@ -156,7 +154,7 @@ fn symmetric_eigen(
     py: Python<'_>,
     matrix: &Bound<'_, PyAny>,
 ) -> PyResult<(Vec<f64>, Vec<Vec<f64>>)> {
-    let (flat, n) = extract_square_matrix(matrix)?;
+    let (flat, n) = square_matrix(matrix)?;
     let (values, vectors) = py
         .detach(|| linalg::symmetric_eigen(&flat, n))
         .map_err(cholesky_err)?;

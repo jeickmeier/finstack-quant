@@ -58,7 +58,7 @@ fn benchmark_eval(c: &mut Criterion) {
                     let res = compiled
                         .eval(black_box(&ctx), black_box(&cols))
                         .expect("eval");
-                    black_box(res.values.len())
+                    black_box(res.len())
                 });
             },
         );

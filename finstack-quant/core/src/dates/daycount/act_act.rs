@@ -5,7 +5,7 @@ use time::{Date, Month};
 use super::DayCountContext;
 use crate::dates::date_extensions::DateExt;
 use crate::dates::tenor::TenorUnit;
-use crate::error::InputError;
+use crate::InputError;
 
 const MAX_ACT_ACT_ISMA_PERIODS: usize = 512;
 
@@ -46,7 +46,7 @@ const MAX_ACT_ACT_ISMA_PERIODS: usize = 512;
 /// # References
 ///
 /// - ICMA convention background: `docs/REFERENCES.md#icma-rule-book`
-pub fn act_act_isma_year_fraction_with_reference_period(
+pub(super) fn act_act_isma_year_fraction_with_reference_period(
     start: Date,
     end: Date,
     reference_start: Date,

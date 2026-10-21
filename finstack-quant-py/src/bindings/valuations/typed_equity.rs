@@ -14,8 +14,8 @@ use finstack_quant_valuations::instruments::equity::equity_option::{
 use finstack_quant_valuations::instruments::InstrumentJson;
 
 use super::convert::{
-    attributes_from_py, bool_repr, builder_repr, currency_from_py, date_repr, day_count_from_py,
-    enum_to_py_string, float_repr,
+    attributes_from_py, bool_repr, builder_repr, date_repr, day_count_from_py, enum_to_py_string,
+    float_repr,
 };
 use super::instruments::{enum_from_str, serialize_typed_instrument_json};
 use super::typed_fx::typed_option_greeks;
@@ -176,7 +176,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
             py_to_date(expiry)?,
             enum_from_str(option_type, "option_type")?,
             quantity,
-            currency_from_py(currency, "currency")?,
+            crate::bindings::core::currency::extract_currency(currency)?,
         )
         .with_settlement(finstack_quant_valuations::instruments::SettlementType::Cash);
         let inner =
@@ -854,7 +854,7 @@ impl PyEquityOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let ccy = currency_from_py(value, "currency")?;
+        let ccy = crate::bindings::core::currency::extract_currency(value)?;
         builder_set!(
             slf,
             currency,

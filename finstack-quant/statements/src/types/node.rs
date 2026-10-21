@@ -21,35 +21,6 @@ mod node_id {
 
 pub use node_id::NodeId;
 
-mod period_availability_dates {
-    use super::{IndexMap, PeriodId};
-    use finstack_quant_core::{dates::Date, wire::DateWire};
-    use serde::{Deserialize, Serialize};
-
-    pub fn serialize<S>(values: &IndexMap<PeriodId, Date>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        values
-            .iter()
-            .map(|(period, date)| (period, DateWire::from(*date)))
-            .collect::<IndexMap<_, _>>()
-            .serialize(serializer)
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<IndexMap<PeriodId, Date>, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        IndexMap::<PeriodId, DateWire>::deserialize(deserializer).map(|values| {
-            values
-                .into_iter()
-                .map(|(period, date)| (period, date.into()))
-                .collect()
-        })
-    }
-}
-
 /// Specification for a single node (metric/line item) in the financial model.
 ///
 /// A node can be:
@@ -84,11 +55,7 @@ pub struct NodeSpec {
     /// entry permits filing/release dates later than period end, or earlier
     /// availability for operational data known before the reporting period
     /// closes.
-    #[serde(
-        default,
-        with = "period_availability_dates",
-        skip_serializing_if = "IndexMap::is_empty"
-    )]
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "IndexMap<String, finstack_quant_core::wire::DateWire>")

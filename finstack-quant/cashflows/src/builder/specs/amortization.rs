@@ -32,7 +32,6 @@ pub enum AmortizationSpec {
     /// Each pair stores `(date, remaining_principal_after_date)`.
     StepRemaining {
         /// Ordered list of `(date, remaining_principal_after_date)`.
-        #[serde(with = "finstack_quant_core::wire::dated_money_values")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
@@ -66,7 +65,6 @@ pub enum AmortizationSpec {
     LinearBetween {
         /// Economic amortization start, on or after issue; installments fall
         /// on coupon accrual boundaries strictly after it.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -75,7 +73,6 @@ pub enum AmortizationSpec {
         /// Economic end of amortization (full repayment), which must be an
         /// actual coupon accrual boundary on or before the effective terminal
         /// accrual date. Cash settlement may follow this date due to payment lag.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -88,7 +85,6 @@ pub enum AmortizationSpec {
     /// and PIK. Lifetime repayments may therefore exceed initial principal.
     CustomPrincipal {
         /// List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
-        #[serde(with = "finstack_quant_core::wire::dated_money_values")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")

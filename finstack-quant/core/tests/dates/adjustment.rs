@@ -342,8 +342,7 @@ impl HolidayCalendar for MetadataCal {
     }
 
     fn is_business_day(&self, date: finstack_quant_core::dates::Date) -> bool {
-        !finstack_quant_core::dates::WeekendRule::SaturdaySunday.is_weekend(date.weekday())
-            && !self.is_holiday(date)
+        !finstack_quant_core::dates::DateExt::is_weekend(date) && !self.is_holiday(date)
     }
 
     fn metadata(&self) -> Option<CalendarMetadata> {
@@ -351,7 +350,6 @@ impl HolidayCalendar for MetadataCal {
             id: "meta-cal",
             name: "Metadata Calendar",
             ignore_weekends: false,
-            weekend_rule: finstack_quant_core::dates::WeekendRule::default(),
         })
     }
 }

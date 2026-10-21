@@ -325,7 +325,6 @@ struct RawParametricCurve {
     /// Curve identifier.
     id: String,
     /// Base date.
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     base_date: Date,
     /// Day count convention.
@@ -399,21 +398,6 @@ impl ParametricCurve {
             / source_discount_factor(&self.model, self.time_offset)
     }
 
-    /// Relative discount factor from `from` to `to`: `df(t_to) / df(t_from)`.
-    ///
-    /// # Arguments
-    ///
-    /// * `from` - Start date for the relative discounting interval.
-    /// * `to` - End date for the relative discounting interval.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the day-count year-fraction calculation fails or
-    /// if the resulting discount factors are non-finite or non-positive.
-    pub fn df_between_dates(&self, from: Date, to: Date) -> crate::Result<f64> {
-        <Self as Discounting>::df_between_dates(self, from, to)
-    }
-
     /// Continuously compounded zero rate at time `t`.
     ///
     /// # Arguments
@@ -467,17 +451,6 @@ impl ParametricCurve {
         self.day_count
     }
 
-    /// Create a builder from this curve with a new ID (for rebuildable-with-id pattern).
-    pub fn to_builder_with_id(&self, id: CurveId) -> ParametricCurveBuilder {
-        ParametricCurveBuilder {
-            id,
-            base_date: Some(self.base_date),
-            day_count: self.day_count,
-            model: Some(self.model.clone()),
-            time_offset: self.time_offset,
-        }
-    }
-
     /// Roll the curve forward, retaining its source parameters and realizing
     /// the forward discount-factor ratio `D(t + h) / D(h)`.
     ///
@@ -497,10 +470,10 @@ impl ParametricCurve {
             return Ok(self.clone());
         }
         let base_date = self.base_date.add_days(days)?;
-        let years = crate::market_data::term_structures::common::year_fraction_to(
+        let years = self.day_count.signed_year_fraction(
             self.base_date,
             base_date,
-            self.day_count,
+            crate::dates::DayCountContext::default(),
         )?;
         let time_offset = self.time_offset + years;
         if !time_offset.is_finite() {
@@ -510,7 +483,7 @@ impl ParametricCurve {
         }
         let normalization = source_discount_factor(&self.model, time_offset);
         if !normalization.is_finite() || normalization <= 0.0 {
-            return Err(crate::error::InputError::NonPositiveValue.into());
+            return Err(crate::InputError::NonPositiveValue.into());
         }
         let mut rolled = self.clone();
         rolled.base_date = base_date;
@@ -597,7 +570,7 @@ impl ParametricCurveBuilder {
         }
         let normalization = source_discount_factor(&model, self.time_offset);
         if !normalization.is_finite() || normalization <= 0.0 {
-            return Err(crate::error::InputError::NonPositiveValue.into());
+            return Err(crate::InputError::NonPositiveValue.into());
         }
 
         Ok(ParametricCurve {
@@ -781,11 +754,6 @@ mod tests {
             let restored: ParametricCurve =
                 serde_json::from_str(&serde_json::to_string(&rolled).unwrap()).unwrap();
             assert!((restored.df(0.5) - rolled.df(0.5)).abs() < 1e-14);
-            let rebuilt = rolled
-                .to_builder_with_id("NS-ROLL-REBUILT".into())
-                .build()
-                .unwrap();
-            assert!((rebuilt.df(0.5) - rolled.df(0.5)).abs() < 1e-14);
 
             let twice = restored.roll_forward(180).unwrap();
             let source_time = 1.0 + 180.0 / 365.0;

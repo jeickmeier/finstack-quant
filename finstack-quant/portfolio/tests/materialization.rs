@@ -242,7 +242,10 @@ fn limits_are_enforced_before_artifact_decode() {
     let error = load(
         &bundle,
         &cache,
-        &LoadLimits::default().with_max_artifacts(1),
+        &LoadLimits {
+            max_artifacts: 1,
+            ..LoadLimits::default()
+        },
     )
     .expect_err("artifact limit");
     assert!(matches!(
@@ -258,7 +261,10 @@ fn limits_are_enforced_before_artifact_decode() {
     let error = load(
         &bundle,
         &cache,
-        &LoadLimits::default().with_max_positions(1),
+        &LoadLimits {
+            max_positions: 1,
+            ..LoadLimits::default()
+        },
     )
     .expect_err("position limit");
     assert!(matches!(
@@ -286,7 +292,10 @@ fn collection_limits_precede_typed_element_validation() {
     let error = Portfolio::from_materialization(
         &bytes,
         &cache,
-        &LoadLimits::default().with_max_artifacts(1),
+        &LoadLimits {
+            max_artifacts: 1,
+            ..LoadLimits::default()
+        },
     )
     .expect_err("artifact limit must precede element validation");
 

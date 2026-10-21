@@ -29,7 +29,7 @@ pub use multi_factor::MultiFactorCopula;
 pub use random_factor_loading::RandomFactorLoadingCopula;
 pub use student_t::StudentTCopula;
 
-use finstack_quant_core::math::GaussHermiteQuadrature;
+use finstack_quant_core::math::integration::GaussHermiteQuadrature;
 
 use crate::correlation::{Error, Result};
 
@@ -532,11 +532,16 @@ impl CopulaSpec {
         match self {
             CopulaSpec::StudentT { degrees_of_freedom } => {
                 validate_student_t_degrees_of_freedom(*degrees_of_freedom)?;
-                finstack_quant_core::math::student_t_inv_cdf(pd, *degrees_of_freedom)
+                finstack_quant_core::math::special_functions::student_t_inv_cdf(
+                    pd,
+                    *degrees_of_freedom,
+                )
             }
             CopulaSpec::Gaussian
             | CopulaSpec::RandomFactorLoading { .. }
-            | CopulaSpec::MultiFactor => Ok(finstack_quant_core::math::standard_normal_inv_cdf(pd)),
+            | CopulaSpec::MultiFactor => {
+                Ok(finstack_quant_core::math::special_functions::standard_normal_inv_cdf(pd))
+            }
         }
     }
 

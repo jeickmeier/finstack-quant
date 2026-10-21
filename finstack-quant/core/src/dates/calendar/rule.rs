@@ -11,8 +11,9 @@
 //! - **Nth weekday**: MLK Day (3rd Monday), Thanksgiving (4th Thursday)
 //! - **Weekend observation**: US-style (Fri/Mon) or UK-style (next Monday)
 //! - **Easter-based**: Good Friday, Easter Monday, Ascension Day
-//! - **Lunar calendars**: Chinese New Year, Qing Ming, Buddha's Birthday
-//! - **Japanese holidays**: Vernal/Autumnal Equinox Days
+//! - **Lunar calendars**: Chinese New Year, Qing Ming, Dragon Boat, Mid-Autumn
+//! - **Jurisdiction rules**: Hong Kong and Japan public holidays (lunar festivals,
+//!   equinox days, substitute holidays)
 //! - **Multi-day spans**: Golden Week, extended holiday periods
 //!
 //! # Rule Evaluation
@@ -20,31 +21,6 @@
 //! Each rule implements two core methods:
 //! - `applies(&self, date)`: O(1) check if date matches the rule
 //! - `materialize_year(&self, year, out)`: Generate all matching dates for a year
-//!
-//! # Quick Example
-//!
-//! ```rust
-//! use finstack_quant_core::dates::{Rule, Observed};
-//! use time::{Date, Month};
-//!
-//! // Fixed date: July 4th (US Independence Day)
-//! let july4 = Rule::Fixed {
-//!     month: Month::July,
-//!     day: 4,
-//!     observed: Observed::FriIfSatMonIfSun,
-//! };
-//!
-//! // Check if specific date is a holiday
-//! let date = Date::from_calendar_date(2025, Month::July, 4)?;
-//! assert!(july4.applies(date));
-//!
-//! // If July 4 falls on Saturday, observed on Friday July 3
-//! let saturday = Date::from_calendar_date(2026, Month::July, 4)?; // Saturday
-//! assert!(!july4.applies(saturday));
-//! let friday = Date::from_calendar_date(2026, Month::July, 3)?;
-//! assert!(july4.applies(friday));
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! ```
 //!
 //! # See Also
 //!
@@ -72,27 +48,6 @@ use time::{Date, Duration, Month, Weekday};
 /// - **`MonIfSatTueIfSun`**: Saturday → Monday, Sunday → Tuesday (two days later;
 ///   UK Christmas/Boxing Day chained substitution)
 ///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::dates::{Rule, Observed};
-/// use time::{Date, Month};
-///
-/// // US Independence Day: if weekend, observe Fri (Sat) or Mon (Sun)
-/// let july4 = Rule::Fixed {
-///     month: Month::July,
-///     day: 4,
-///     observed: Observed::FriIfSatMonIfSun,
-/// };
-///
-/// // July 4, 2026 is Saturday → observed July 3 (Friday)
-/// let sat = Date::from_calendar_date(2026, Month::July, 4)?;
-/// assert!(!july4.applies(sat));
-/// let fri = Date::from_calendar_date(2026, Month::July, 3)?;
-/// assert!(july4.applies(fri));
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-///
 /// # Standards Reference
 ///
 /// - **US exchanges / OPM**: FriIfSatMonIfSun (NYSE, NASDAQ, federal workforce)
@@ -105,7 +60,7 @@ use time::{Date, Duration, Month, Weekday};
 /// - **European markets**: Mixed; often NextMonday or None
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum Observed {
+pub(crate) enum Observed {
     /// No adjustment—holiday is observed **only** on the exact calendar date.
     ///
     /// If the date falls on a weekend, the weekend itself is the holiday.
@@ -158,29 +113,9 @@ pub enum Observed {
 ///
 /// - **`After`**: Find nearest weekday on or after the reference date
 /// - **`Before`**: Find nearest weekday on or before the reference date
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::dates::{Rule, Direction};
-/// use time::{Date, Month, Weekday};
-///
-/// // US Election Day: Tuesday on or after November 2
-/// let election_day = Rule::WeekdayShift {
-///     weekday: Weekday::Tuesday,
-///     month: Month::November,
-///     day: 2,
-///     dir: Direction::After,
-/// };
-///
-/// // November 2, 2026 is Monday → find Tuesday after (Nov 3)
-/// let date = Date::from_calendar_date(2026, Month::November, 3)?;
-/// assert!(election_day.applies(date));
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum Direction {
+pub(crate) enum Direction {
     /// Find the nearest occurrence of the weekday **on or after** the reference date.
     After,
 
@@ -207,12 +142,6 @@ pub enum Direction {
 /// - **`EasterOffset`**: Offset from Easter Monday (Good Friday = -3, Ascension = +38)
 /// - **`ChineseNewYear`**: Spring Festival (lunar new year)
 /// - **`QingMing`**: Tomb-Sweeping Day (Chinese solar term)
-/// - **`BuddhasBirthday`**: Vesak (8th day of 4th lunar month)
-///
-/// ## Regional
-///
-/// - **`VernalEquinoxJP`**: Japanese Vernal Equinox Day (Shunbun no Hi)
-/// - **`AutumnalEquinoxJP`**: Japanese Autumnal Equinox Day (Shūbun no Hi)
 ///
 /// ## Composite
 ///
@@ -224,57 +153,6 @@ pub enum Direction {
 /// Each rule can be evaluated against a specific date using `applies()` or
 /// materialized for an entire year using `materialize_year()`.
 ///
-/// # Examples
-///
-/// Fixed date with weekend observation:
-/// ```rust
-/// use finstack_quant_core::dates::{Rule, Observed};
-/// use time::{Date, Month};
-///
-/// let new_years = Rule::Fixed {
-///     month: Month::January,
-///     day: 1,
-///     observed: Observed::NextMonday,
-/// };
-///
-/// // Jan 1, 2022 is Saturday → observed Monday Jan 3
-/// let sat = Date::from_calendar_date(2022, Month::January, 1)?;
-/// assert!(!new_years.applies(sat));
-/// let mon = Date::from_calendar_date(2022, Month::January, 3)?;
-/// assert!(new_years.applies(mon));
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-///
-/// Nth weekday of month:
-/// ```rust
-/// use finstack_quant_core::dates::Rule;
-/// use time::{Date, Month, Weekday};
-///
-/// // US Thanksgiving: 4th Thursday of November
-/// let thanksgiving = Rule::NthWeekday {
-///     n: 4,
-///     weekday: Weekday::Thursday,
-///     month: Month::November,
-/// };
-///
-/// let date = Date::from_calendar_date(2025, Month::November, 27)?;
-/// assert!(thanksgiving.applies(date));
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-///
-/// Easter offset:
-/// ```rust
-/// use finstack_quant_core::dates::Rule;
-/// use time::{Date, Month};
-///
-/// // Good Friday = Easter Monday - 3 days
-/// let good_friday = Rule::EasterOffset(-3);
-///
-/// let date = Date::from_calendar_date(2025, Month::April, 18)?;
-/// assert!(good_friday.applies(date));
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-///
 /// # See Also
 ///
 /// - [`Observed`] for weekend observation conventions
@@ -284,7 +162,7 @@ pub enum Direction {
 /// [`HolidayCalendar`]: super::business_days::HolidayCalendar
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
-pub enum Rule {
+pub(crate) enum Rule {
     /// Exact one-off calendar date.
     ///
     /// Used for exchange-announced closures and other dated exceptions that
@@ -408,15 +286,6 @@ pub enum Rule {
     /// Public holiday in Mainland China, Hong Kong, Taiwan.
     QingMing,
 
-    /// Buddha's Birthday (Vesak, 佛誕).
-    ///
-    /// Celebrated on the 8th day of the 4th Chinese lunar month. Uses an exact
-    /// lunar-calendar date table for years 1970-2150, including leap months.
-    ///
-    /// # Markets
-    /// Public holiday in Hong Kong, Macau, and some other Asian markets.
-    BuddhasBirthday,
-
     /// Dragon Boat Festival (端午节, Duānwǔ).
     ///
     /// Celebrated on the 5th day of the 5th Chinese lunar month, typically
@@ -438,24 +307,6 @@ pub enum Rule {
     /// National statutory holiday in Mainland China (since 2008); also observed
     /// in Hong Kong, Taiwan, and Macau.
     MidAutumn,
-
-    /// Vernal Equinox Day (春分の日, Shunbun no Hi).
-    ///
-    /// Japanese national holiday around March 20-21. Uses astronomical dates
-    /// in UTC+9 for 1970-2150; future dates remain subject to official announcement.
-    ///
-    /// # Reference
-    /// - Historical dates validated against the Japanese Cabinet Office list
-    VernalEquinoxJP,
-
-    /// Autumnal Equinox Day (秋分の日, Shūbun no Hi).
-    ///
-    /// Japanese national holiday around September 22-23. Uses astronomical dates
-    /// in UTC+9 for 1970-2150; future dates remain subject to official announcement.
-    ///
-    /// # Reference
-    /// - Historical dates validated against the Japanese Cabinet Office list
-    AutumnalEquinoxJP,
 
     /// Hong Kong general holidays, including lunar festivals, Sunday
     /// substitutions and additional holidays when two holidays coincide.
@@ -763,13 +614,6 @@ impl Rule {
             Rule::DragonBoat => algo::dragon_boat_date(date.year()) == Some(date),
             Rule::MidAutumn => algo::mid_autumn_date(date.year()) == Some(date),
             Rule::QingMing => algo::qing_ming_date(date.year()) == Some(date),
-            Rule::BuddhasBirthday => algo::buddhas_birthday_date(date.year()) == Some(date),
-            Rule::VernalEquinoxJP => {
-                algo::vernal_equinox_jp_date(date.year()).is_some_and(|d| d == date)
-            }
-            Rule::AutumnalEquinoxJP => {
-                algo::autumnal_equinox_jp_date(date.year()).is_some_and(|d| d == date)
-            }
             Rule::HongKongPublicHolidays | Rule::JapanPublicHolidays => {
                 let mut holidays = smallvec::SmallVec::<[Date; 32]>::new();
                 self.materialize_year(date.year(), &mut holidays);
@@ -879,21 +723,6 @@ impl Rule {
             }
             Rule::QingMing => {
                 if let Some(d) = algo::qing_ming_date(year) {
-                    out.push(d);
-                }
-            }
-            Rule::BuddhasBirthday => {
-                if let Some(d) = algo::buddhas_birthday_date(year) {
-                    out.push(d);
-                }
-            }
-            Rule::VernalEquinoxJP => {
-                if let Some(d) = algo::vernal_equinox_jp_date(year) {
-                    out.push(d);
-                }
-            }
-            Rule::AutumnalEquinoxJP => {
-                if let Some(d) = algo::autumnal_equinox_jp_date(year) {
                     out.push(d);
                 }
             }

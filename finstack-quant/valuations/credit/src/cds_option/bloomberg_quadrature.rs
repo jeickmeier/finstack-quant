@@ -58,17 +58,18 @@ use crate::cds_option::CdsOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::math::special_functions::norm_pdf;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
+use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::constants::{bloomberg_cdso, numerical};
+use finstack_quant_valuations_core::constants::bloomberg_cdso;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
 use rust_decimal::Decimal;
 
-/// `1/√(2π)` — the standard normal density's normalising constant.
-const INV_SQRT_2_PI: f64 = 0.398_942_280_401_432_7_f64;
 /// Above 10% forward spread, the lognormal-mean calibration is outside the
 /// Bloomberg CDSO model's intended liquid-credit regime.
 const DISTRESSED_FORWARD_SPREAD_LIMIT: f64 = 0.10;
@@ -246,13 +247,11 @@ impl ForwardCdsContext {
         // `NaN <= ZERO_TOLERANCE` is false; using a positive guard
         // (`!is_finite || <= tol`) makes the NaN case explicit.
         let lgd = 1.0 - option.recovery_rate;
-        if !lgd.is_finite() || lgd <= numerical::ZERO_TOLERANCE {
+        if !lgd.is_finite() || lgd <= ZERO_TOLERANCE {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "CDS option recovery_rate={} yields degenerate LGD={:.3e}; \
                  expected recovery in (0, 1) so LGD > {}",
-                option.recovery_rate,
-                lgd,
-                numerical::ZERO_TOLERANCE
+                option.recovery_rate, lgd, ZERO_TOLERANCE
             )));
         }
 
@@ -264,7 +263,7 @@ impl ForwardCdsContext {
             option.exercise_settlement_date.unwrap_or(option.expiry),
         )?;
         let sp_asof_raw = surv.sp_on_date(as_of)?;
-        let sp_asof = sp_asof_raw.clamp(numerical::ZERO_TOLERANCE, 1.0);
+        let sp_asof = sp_asof_raw.clamp(ZERO_TOLERANCE, 1.0);
         let sp_expiry_raw = surv.sp_on_date(option.expiry)?;
         let sp_expiry = sp_expiry_raw.clamp(0.0, 1.0);
         // Survival probabilities should be monotonically non-increasing on a
@@ -307,7 +306,7 @@ impl ForwardCdsContext {
             let t_e_to_pay =
                 ((*pay_date - option.expiry).whole_days() as f64) / bloomberg_cdso::G_DAYS_IN_YEAR;
             let df_pay = DiscountCurve::df_between_dates(disc, as_of, *pay_date)?;
-            if df_to_expiry < numerical::ZERO_TOLERANCE {
+            if df_to_expiry < ZERO_TOLERANCE {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "degenerate forward discount factor at t_expiry: df_to_expiry={df_to_expiry:.3e}"
                 )));
@@ -354,7 +353,7 @@ impl ForwardCdsContext {
             1.0
         };
         let denom_te = df_to_expiry * survival_denom;
-        if denom_te <= numerical::ZERO_TOLERANCE {
+        if denom_te <= ZERO_TOLERANCE {
             return Err(finstack_quant_core::Error::Validation(
                 "CDS option has no surviving discounted exercise notional".into(),
             ));
@@ -362,7 +361,7 @@ impl ForwardCdsContext {
         let pcd_stub_at_value_dt = accrual_pcd_to_expiry * df_to_expiry * survival_to_expiry;
         let risky_annuity_at_value_dt = raw_annuity_at_value_dt_no_aod - pcd_stub_at_value_dt;
         let bootstrapped_l_at_expiry = risky_annuity_at_value_dt / denom_te;
-        if risky_annuity_at_value_dt <= numerical::ZERO_TOLERANCE {
+        if risky_annuity_at_value_dt <= ZERO_TOLERANCE {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "CDS option '{}' has non-positive forward clean risky annuity {}",
                 option.id, risky_annuity_at_value_dt,
@@ -411,9 +410,7 @@ impl ForwardCdsContext {
             if fep_start >= option.expiry {
                 0.0
             } else {
-                let sp_start = surv
-                    .sp_on_date(fep_start)?
-                    .clamp(numerical::ZERO_TOLERANCE, 1.0);
+                let sp_start = surv.sp_on_date(fep_start)?.clamp(ZERO_TOLERANCE, 1.0);
                 // Adjacent front-end and delivered-CDS windows share expiry
                 // as their boundary, with no overlap or omitted day.
                 let sp_end = surv.sp_on_date(option.expiry)?.clamp(0.0, 1.0);
@@ -521,7 +518,7 @@ impl ForwardCdsContext {
                 strike_fraction,
                 strike_index_factor,
             } => {
-                let scale = self.scale.max(numerical::ZERO_TOLERANCE);
+                let scale = self.scale.max(ZERO_TOLERANCE);
                 self.sign() * (strike_fraction - 1.0) * strike_index_factor / scale
             }
         }
@@ -550,7 +547,7 @@ impl ForwardCdsContext {
         if !self.is_index {
             return 0.0;
         }
-        let scale = self.scale.max(numerical::ZERO_TOLERANCE);
+        let scale = self.scale.max(ZERO_TOLERANCE);
         self.sign() * self.realized_loss / scale
     }
 
@@ -690,7 +687,7 @@ pub fn calibrate_lognormal_mean(ctx: &ForwardCdsContext) -> Result<f64> {
              f(m_min)={lo_f:.6e}, f(m_max)={hi_f:.6e}",
         )));
     };
-    let solver = BrentSolver::new().tolerance(1e-12);
+    let solver = BrentSolver::new().with_tolerance(1e-12);
     let log_m = solver.solve_in_bracket(f, bracket_lo, bracket_hi)?;
     Ok(log_m.exp())
 }
@@ -752,9 +749,7 @@ pub fn quadrature_payoff(
     let limit = z_limit(ctx.sigma, t_expiry);
     let density_weighted_payoff = |z: f64| {
         let s = m * s0 * (sigma_sqrt_t * z).exp();
-        (sign * ctx.swap_value_per_n(s) + h_k + d_loss).max(0.0)
-            * (-0.5 * z * z).exp()
-            * INV_SQRT_2_PI
+        (sign * ctx.swap_value_per_n(s) + h_k + d_loss).max(0.0) * norm_pdf(z)
     };
     // Refine the exercise kink instead of sampling it on the calibration
     // grid. Seed half-standard-deviation panels so a small tail exercise
@@ -805,9 +800,9 @@ where
     for i in 0..=n_steps {
         let z = -limit + (i as f64) * step;
         let weight = if i == 0 || i == n_steps { 0.5 } else { 1.0 };
-        acc += weight * value_at(z) * (-0.5 * z * z).exp();
+        acc += weight * value_at(z) * norm_pdf(z);
     }
-    acc * INV_SQRT_2_PI * step
+    acc * step
 }
 
 #[cfg(test)]
@@ -924,7 +919,7 @@ mod tests {
             * (0.319_381_530
                 + t * (-0.356_563_782
                     + t * (1.781_477_937 + t * (-1.821_255_978 + t * 1.330_274_429))));
-        let tail = INV_SQRT_2_PI * (-0.5 * x * x).exp() * poly;
+        let tail = norm_pdf(x) * poly;
         if x >= 0.0 {
             1.0 - tail
         } else {
@@ -933,11 +928,11 @@ mod tests {
     }
 
     fn black76_payer_per_n(ctx: &ForwardCdsContext) -> f64 {
-        let f = ctx.forward_par_spread.max(numerical::ZERO_TOLERANCE);
+        let f = ctx.forward_par_spread.max(ZERO_TOLERANCE);
         let k = ctx
             .spread_strike()
             .expect("Black-76 helper requires a spread strike")
-            .max(numerical::ZERO_TOLERANCE);
+            .max(ZERO_TOLERANCE);
         let vol_sqrt_t = ctx.sigma * ctx.t_expiry.sqrt();
         let d1 = ((f / k).ln() + 0.5 * vol_sqrt_t * vol_sqrt_t) / vol_sqrt_t;
         let d2 = d1 - vol_sqrt_t;

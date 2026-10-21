@@ -106,11 +106,11 @@ pub trait InterpolationStrategy: Send + Sync + Debug {
     ///
     /// Returns [`crate::Error`] when strategy-specific validation fails:
     ///
-    /// - [`InputError::NonMonotonicKnots`](crate::error::InputError::NonMonotonicKnots):
+    /// - [`InputError::NonMonotonicKnots`](crate::InputError::NonMonotonicKnots):
     ///   Values violate monotonicity requirement (MonotoneConvex strategy)
-    /// - [`InputError::TooFewPoints`](crate::error::InputError::TooFewPoints):
+    /// - [`InputError::TooFewPoints`](crate::InputError::TooFewPoints):
     ///   Insufficient knots for the strategy (e.g., cubic requires ≥ 4 points)
-    /// - [`InputError::NonPositiveValue`](crate::error::InputError::NonPositiveValue):
+    /// - [`InputError::NonPositiveValue`](crate::InputError::NonPositiveValue):
     ///   Log-based strategies require positive values for logarithm
     /// - [`Error::Validation`](crate::Error::Validation):
     ///   General validation failure (non-finite values, degenerate segments)

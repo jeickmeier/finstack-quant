@@ -378,7 +378,11 @@ impl Discretization<HestonProcess> for QeHeston {
         x[1] = v_next;
     }
 
-    fn prepare(&mut self, process: &HestonProcess, time_grid: &crate::monte_carlo::TimeGrid) {
+    fn prepare(
+        &mut self,
+        process: &HestonProcess,
+        time_grid: &finstack_quant_core::math::time_grid::TimeGrid,
+    ) {
         if time_grid.num_steps() == 0 {
             return;
         }

@@ -94,7 +94,8 @@ an `ImResult` with methodology and MPOR stamped.
 
 ```rust
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, Month};
+use finstack_quant_core::dates::Date;
+use time::Month;
 use finstack_quant_core::money::Money;
 use finstack_quant_margin::{CsaSpec, VmCalculator};
 

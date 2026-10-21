@@ -10,6 +10,7 @@
 use super::common::*;
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_valuations_core::instruments::Instrument;
 
 #[test]

@@ -185,7 +185,6 @@ pub struct CreditDefaultSwap {
     /// - If positive: Buyer pays Seller.
     /// - If negative: Seller pays Buyer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_dated_money")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<(finstack_quant_core::wire::DateWire, Money)>")
@@ -218,7 +217,6 @@ pub struct CreditDefaultSwap {
     ///
     /// When `None`, protection starts on the premium leg start date (standard CDS).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")

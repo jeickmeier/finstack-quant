@@ -64,7 +64,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 use tracing::debug;
 
@@ -232,7 +232,7 @@ impl DetailCollector {
 
     fn finish(
         mut self,
-        risk_class_margins: &HashMap<SimmRiskClass, f64>,
+        risk_class_margins: &FxHashMap<SimmRiskClass, f64>,
         mpor_scale: f64,
     ) -> Option<SimmDetail> {
         if !self.enabled {
@@ -345,7 +345,7 @@ const SIMM_CURVATURE_Z: f64 = 2.575_829_303_548_900_4;
 /// Avoids per-lookup String allocations in the O(n^2) delta/vega loops.
 #[derive(Debug, Clone)]
 struct IrTenorCorrelationMatrix {
-    tenor_to_idx: HashMap<String, usize>,
+    tenor_to_idx: FxHashMap<String, usize>,
     matrix: Vec<f64>,
     n: usize,
 }
@@ -354,7 +354,7 @@ impl IrTenorCorrelationMatrix {
     fn build(params: &SimmParams) -> Self {
         let tenors: Vec<String> = params.ir_delta_weights.keys().cloned().collect();
         let n = tenors.len();
-        let mut tenor_to_idx = HashMap::default();
+        let mut tenor_to_idx = FxHashMap::default();
         for (i, t) in tenors.iter().enumerate() {
             tenor_to_idx.insert(t.clone(), i);
         }
@@ -530,7 +530,7 @@ impl SimmCalculator {
     /// * `ir_delta` - Map of (currency, tenor) to DV01 sensitivity
     fn calculate_ir_delta_multi_currency(
         &self,
-        ir_delta: &HashMap<(Currency, String), f64>,
+        ir_delta: &FxHashMap<(Currency, String), f64>,
         detail: BucketSink<'_>,
     ) -> f64 {
         self.aggregate_ir(ir_delta, false, detail)
@@ -538,7 +538,7 @@ impl SimmCalculator {
 
     fn aggregate_ir(
         &self,
-        sensitivities: &HashMap<(Currency, String), f64>,
+        sensitivities: &FxHashMap<(Currency, String), f64>,
         vega: bool,
         mut detail: BucketSink<'_>,
     ) -> f64 {
@@ -646,7 +646,7 @@ impl SimmCalculator {
     /// * `ir_vega` - Map of (currency, tenor) to signed IR vega sensitivity.
     fn calculate_ir_vega_multi_currency(
         &self,
-        ir_vega: &HashMap<(Currency, String), f64>,
+        ir_vega: &FxHashMap<(Currency, String), f64>,
         detail: BucketSink<'_>,
     ) -> f64 {
         self.aggregate_ir(ir_vega, true, detail)
@@ -680,7 +680,7 @@ impl SimmCalculator {
     /// The credit qualifying delta margin after bucket diversification.
     fn calculate_credit_qualifying_delta(
         &self,
-        bucketed_delta: &HashMap<(SimmCreditSector, String, String), f64>,
+        bucketed_delta: &FxHashMap<(SimmCreditSector, String, String), f64>,
         detail: BucketSink<'_>,
     ) -> f64 {
         self.aggregate_credit_qualifying(
@@ -710,7 +710,7 @@ impl SimmCalculator {
     /// The credit-qualifying vega margin after bucket diversification.
     fn calculate_credit_qualifying_vega(
         &self,
-        bucketed_vega: &HashMap<(SimmCreditSector, String, String), f64>,
+        bucketed_vega: &FxHashMap<(SimmCreditSector, String, String), f64>,
         detail: BucketSink<'_>,
     ) -> f64 {
         let weight = self.params.cq_vega_weight;
@@ -720,12 +720,13 @@ impl SimmCalculator {
     /// Credit aggregation with concentration netted by issuer before weighting.
     fn aggregate_credit_qualifying(
         &self,
-        bucketed: &HashMap<(SimmCreditSector, String, String), f64>,
+        bucketed: &FxHashMap<(SimmCreditSector, String, String), f64>,
         weight_for: impl Fn(SimmCreditSector) -> f64,
         delta: bool,
         detail: BucketSink<'_>,
     ) -> f64 {
-        let mut by_sector: HashMap<SimmCreditSector, Vec<(&str, &str, f64)>> = HashMap::default();
+        let mut by_sector: FxHashMap<SimmCreditSector, Vec<(&str, &str, f64)>> =
+            FxHashMap::default();
         for ((sector, issuer, tenor), amount) in bucketed {
             by_sector
                 .entry(*sector)
@@ -737,7 +738,7 @@ impl SimmCalculator {
         let mut bucket_details: Vec<(SimmCreditSector, SimmBucketDetail)> = Vec::new();
         for (sector, mut entries) in by_sector {
             entries.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
-            let mut raw_by_name: HashMap<&str, f64> = HashMap::default();
+            let mut raw_by_name: FxHashMap<&str, f64> = FxHashMap::default();
             for (name, _, raw) in &entries {
                 *raw_by_name.entry(name).or_default() += raw;
             }
@@ -829,7 +830,7 @@ impl SimmCalculator {
     /// depend on map iteration order.
     fn equity_margin(
         &self,
-        by_name: &HashMap<String, f64>,
+        by_name: &FxHashMap<String, f64>,
         vega: bool,
         detail: BucketSink<'_>,
     ) -> f64 {
@@ -880,7 +881,7 @@ impl SimmCalculator {
     /// currency deltas from receiving full rho=1 offset.
     fn calculate_fx_delta_bucketed(
         &self,
-        fx_delta: &HashMap<Currency, f64>,
+        fx_delta: &FxHashMap<Currency, f64>,
         detail: BucketSink<'_>,
     ) -> f64 {
         let mut entries: Vec<_> = fx_delta
@@ -940,7 +941,7 @@ impl SimmCalculator {
     /// The commodity delta margin contribution after bucket weighting and inter-bucket correlation.
     fn calculate_commodity_delta(
         &self,
-        delta_by_bucket: &HashMap<String, f64>,
+        delta_by_bucket: &FxHashMap<String, f64>,
         detail: BucketSink<'_>,
     ) -> f64 {
         self.aggregate_commodity(delta_by_bucket, false, detail)
@@ -962,7 +963,7 @@ impl SimmCalculator {
     /// The commodity vega margin contribution after inter-bucket correlation.
     fn calculate_commodity_vega(
         &self,
-        vega_by_bucket: &HashMap<String, f64>,
+        vega_by_bucket: &FxHashMap<String, f64>,
         detail: BucketSink<'_>,
     ) -> f64 {
         self.aggregate_commodity(vega_by_bucket, true, detail)
@@ -974,7 +975,7 @@ impl SimmCalculator {
     /// dropped, matching the delta behaviour prior to this refactor.
     fn aggregate_commodity(
         &self,
-        by_bucket: &HashMap<String, f64>,
+        by_bucket: &FxHashMap<String, f64>,
         vega: bool,
         detail: BucketSink<'_>,
     ) -> f64 {
@@ -1051,7 +1052,7 @@ impl SimmCalculator {
 
     fn fx_vega_bucketed(
         &self,
-        inputs: &HashMap<(Currency, Currency), f64>,
+        inputs: &FxHashMap<(Currency, Currency), f64>,
         detail: BucketSink<'_>,
     ) -> f64 {
         let mut pairs: std::collections::BTreeMap<(Currency, Currency), Vec<f64>> =
@@ -1097,13 +1098,13 @@ impl SimmCalculator {
 
     fn non_qualifying_margin(
         &self,
-        inputs: &HashMap<(String, String), f64>,
+        inputs: &FxHashMap<(String, String), f64>,
         vega: bool,
         detail: BucketSink<'_>,
     ) -> f64 {
         let mut entries: Vec<_> = inputs.iter().collect();
         entries.sort_by(|a, b| a.0.cmp(b.0));
-        let mut raw_by_name: HashMap<&str, f64> = HashMap::default();
+        let mut raw_by_name: FxHashMap<&str, f64> = FxHashMap::default();
         for ((name, _), amount) in &entries {
             *raw_by_name.entry(name).or_default() += **amount;
         }
@@ -1220,7 +1221,7 @@ impl SimmCalculator {
         &self,
         sensitivities: &SimmSensitivities,
         currency: Currency,
-    ) -> finstack_quant_core::Result<(f64, HashMap<String, Money>)> {
+    ) -> finstack_quant_core::Result<(f64, FxHashMap<String, Money>)> {
         let (total_im, breakdown, _) = self.calculate_detailed(sensitivities, currency, false)?;
         Ok((total_im, breakdown))
     }
@@ -1234,15 +1235,15 @@ impl SimmCalculator {
         sensitivities: &SimmSensitivities,
         currency: Currency,
         want_detail: bool,
-    ) -> finstack_quant_core::Result<(f64, HashMap<String, Money>, Option<SimmDetail>)> {
+    ) -> finstack_quant_core::Result<(f64, FxHashMap<String, Money>, Option<SimmDetail>)> {
         sensitivities.validate()?;
         if currency != sensitivities.base_currency || currency != Currency::USD {
             return Err(finstack_quant_core::Error::Validation(
                 "SIMM requires USD-normalized sensitivities and USD output because concentration thresholds are in USD; convert inputs explicitly before calculation".into()
             ));
         }
-        let mut breakdown = HashMap::default();
-        let mut risk_class_margins = HashMap::default();
+        let mut breakdown = FxHashMap::default();
+        let mut risk_class_margins = FxHashMap::default();
         let mut detail = DetailCollector::new(want_detail);
 
         // IR Delta — per-currency calculation with inter-currency aggregation
@@ -1487,9 +1488,9 @@ impl SimmCalculator {
     /// Aggregate risk class margins with the SIMM inter-risk-class correlation matrix.
     ///
     /// `Total = sqrt(sum_i sum_j rho(i,j) * K_i * K_j)`
-    fn aggregate_risk_classes(&self, risk_class_margins: &HashMap<SimmRiskClass, f64>) -> f64 {
+    fn aggregate_risk_classes(&self, risk_class_margins: &FxHashMap<SimmRiskClass, f64>) -> f64 {
         // Reduce in a canonical risk-class order so the f64 quadratic form is
-        // bit-reproducible across runs, independent of `HashMap` iteration order
+        // bit-reproducible across runs, independent of `FxHashMap` iteration order
         // (mirrors `calculate_curvature`).
         let mut margins: Vec<(SimmRiskClass, f64)> =
             risk_class_margins.iter().map(|(rc, m)| (*rc, *m)).collect();
@@ -1525,13 +1526,13 @@ impl ImCalculator for SimmCalculator {
 #[cfg(test)]
 mod tests {
     use crate::types::SimmCurvatureSensitivity;
-    fn usd_tenors(values: &HashMap<String, f64>) -> HashMap<(Currency, String), f64> {
+    fn usd_tenors(values: &FxHashMap<String, f64>) -> FxHashMap<(Currency, String), f64> {
         values
             .iter()
             .map(|(tenor, amount)| ((Currency::USD, tenor.clone()), *amount))
             .collect()
     }
-    fn single_credit(amount: f64) -> HashMap<(String, String), f64> {
+    fn single_credit(amount: f64) -> FxHashMap<(String, String), f64> {
         [(("NAME".to_string(), "5Y".to_string()), amount)]
             .into_iter()
             .collect()
@@ -1587,7 +1588,7 @@ mod tests {
 
         // Single-tenor: correlation matrix is 1.0 on diagonal so
         // result = sqrt((dv01 * weight)^2) = |dv01 * weight|
-        let dv01_by_tenor: HashMap<String, f64> = [
+        let dv01_by_tenor: FxHashMap<String, f64> = [
             ("5Y".to_string(), 100_000.0), // $100K DV01 at 5y
         ]
         .into_iter()
@@ -1614,7 +1615,7 @@ mod tests {
     #[test]
     fn fx_delta_bucketed_preserves_partial_offset() {
         let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry should load");
-        let mut fx_delta = HashMap::default();
+        let mut fx_delta = FxHashMap::default();
         fx_delta.insert(Currency::EUR, 100.0);
         fx_delta.insert(Currency::JPY, -100.0);
 
@@ -1642,7 +1643,7 @@ mod tests {
     fn aggregation() {
         let calc = SimmCalculator::new(SimmVersion::default()).expect("embedded registry");
 
-        let risk_class_margins: HashMap<SimmRiskClass, f64> = [
+        let risk_class_margins: FxHashMap<SimmRiskClass, f64> = [
             (SimmRiskClass::InterestRate, 1_000_000.0),
             (SimmRiskClass::CreditQualifying, 500_000.0),
         ]
@@ -1687,7 +1688,7 @@ mod tests {
     fn ir_delta_multi_tenor_with_correlations() {
         let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry should load");
 
-        let dv01_by_tenor: HashMap<String, f64> = [
+        let dv01_by_tenor: FxHashMap<String, f64> = [
             ("5Y".to_string(), 100_000.0),
             ("10Y".to_string(), -80_000.0), // Partially hedged
         ]
@@ -1707,7 +1708,7 @@ mod tests {
     fn ir_vega_calculation() {
         let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry should load");
 
-        let vega_by_tenor: HashMap<String, f64> =
+        let vega_by_tenor: FxHashMap<String, f64> =
             [("5Y".to_string(), 500_000.0)].into_iter().collect();
 
         let ir_vega_margin =
@@ -1777,7 +1778,7 @@ mod tests {
     #[test]
     fn commodity_delta_uses_bucket_correlations() {
         let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry should load");
-        let delta_by_bucket: HashMap<String, f64> =
+        let delta_by_bucket: FxHashMap<String, f64> =
             [("2".to_string(), 100_000.0), ("3".to_string(), -100_000.0)]
                 .into_iter()
                 .collect();
@@ -1902,7 +1903,7 @@ mod tests {
         let cf = concentration(cs01, calc.params.cq_concentration_thresholds[&sector]);
 
         // Bucketed path: single name in one bucket.
-        let mut bucketed: HashMap<(SimmCreditSector, String, String), f64> = HashMap::default();
+        let mut bucketed: FxHashMap<(SimmCreditSector, String, String), f64> = FxHashMap::default();
         bucketed.insert((sector, "ISSUER_A".to_string(), "5Y".to_string()), cs01);
         let bucketed_margin = calc.calculate_credit_qualifying_delta(&bucketed, None);
 
@@ -1923,7 +1924,7 @@ mod tests {
         let cs01_per_name = 1_000.0;
 
         // Bucketed path: spread across four different sectors.
-        let mut bucketed: HashMap<(SimmCreditSector, String, String), f64> = HashMap::default();
+        let mut bucketed: FxHashMap<(SimmCreditSector, String, String), f64> = FxHashMap::default();
         bucketed.insert(
             (
                 SimmCreditSector::Sovereign,
@@ -2001,7 +2002,7 @@ mod tests {
         // Expected: sqrt(K_a^2 + K_b^2 + 2*gamma*S_a*S_b)
         let expected = (k_a * k_a + k_b * k_b + 2.0 * gamma * s_a * s_b).sqrt();
 
-        let mut bucketed: HashMap<(SimmCreditSector, String, String), f64> = HashMap::default();
+        let mut bucketed: FxHashMap<(SimmCreditSector, String, String), f64> = FxHashMap::default();
         bucketed.insert((sector_a, "GOVT_A".to_string(), "5Y".to_string()), cs01_a);
         bucketed.insert((sector_b, "BANK_A".to_string(), "5Y".to_string()), cs01_b);
         let actual = calc.calculate_credit_qualifying_delta(&bucketed, None);
@@ -2036,7 +2037,7 @@ mod tests {
             + 2.0 * rho * (cf_1.min(cf_2) / cf_1.max(cf_2)) * scaled_1 * scaled_2)
             .sqrt();
 
-        let mut bucketed: HashMap<(SimmCreditSector, String, String), f64> = HashMap::default();
+        let mut bucketed: FxHashMap<(SimmCreditSector, String, String), f64> = FxHashMap::default();
         bucketed.insert((sector, "BANK_A".to_string(), "5Y".to_string()), cs01_1);
         bucketed.insert((sector, "BANK_B".to_string(), "5Y".to_string()), cs01_2);
         let actual = calc.calculate_credit_qualifying_delta(&bucketed, None);
@@ -2226,7 +2227,7 @@ mod tests {
         assert!(!breakdown.contains_key("Commodity_Vega"));
 
         assert_eq!(
-            calc.calculate_credit_qualifying_vega(&HashMap::default(), None),
+            calc.calculate_credit_qualifying_vega(&FxHashMap::default(), None),
             0.0
         );
         assert_eq!(
@@ -2234,7 +2235,7 @@ mod tests {
             0.0
         );
         assert_eq!(
-            calc.calculate_commodity_vega(&HashMap::default(), None),
+            calc.calculate_commodity_vega(&FxHashMap::default(), None),
             0.0
         );
     }
@@ -2245,7 +2246,7 @@ mod tests {
     fn single_factor_credit_and_commodity_vega_match_closed_form() {
         let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry should load");
 
-        let mut cq: HashMap<(SimmCreditSector, String, String), f64> = HashMap::default();
+        let mut cq: FxHashMap<(SimmCreditSector, String, String), f64> = FxHashMap::default();
         cq.insert(
             (
                 SimmCreditSector::Financial,
@@ -2269,7 +2270,7 @@ mod tests {
             "vega margin is sign-insensitive, matching the delta path"
         );
 
-        let mut commodity: HashMap<String, f64> = HashMap::default();
+        let mut commodity: FxHashMap<String, f64> = FxHashMap::default();
         commodity.insert("Crude".to_string(), 20_000.0);
         let expected_commodity = 20_000.0 * 0.74 * calc.params.commodity_vega_weight;
         assert!(

@@ -471,6 +471,7 @@ pub(crate) fn resolve_capfloor_hw1f_model_params(
 
 #[cfg(test)]
 mod tests {
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_valuations_test_support::date as date_support;
     use finstack_quant_valuations_test_support::discount_forward_curves as discount_forward_curve_support;
 

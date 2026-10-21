@@ -885,12 +885,9 @@ mod tests {
 
     #[test]
     fn missing_or_non_finite_futures_convexity_is_envelope_error() {
-        let expiry = finstack_quant_core::dates::Date::from_calendar_date(
-            2026,
-            finstack_quant_core::dates::Month::March,
-            17,
-        )
-        .expect("valid expiry");
+        let expiry =
+            finstack_quant_core::dates::Date::from_calendar_date(2026, time::Month::March, 17)
+                .expect("valid expiry");
         let mut env = empty_envelope("bad-convexity");
         env.plan
             .quote_sets
@@ -1170,8 +1167,16 @@ mod tests {
         }
 
         let mut restore_failure = base;
-        restore_failure["result"]["final_market"]["collateral"] =
-            serde_json::json!({"USD-CSA": "MISSING"});
+        restore_failure["result"]["final_market"]["credit_indices"] = serde_json::json!([{
+            "id": "CDX-IG",
+            "num_constituents": 125,
+            "recovery_rate": 0.4,
+            "index_credit_curve_id": "MISSING",
+            "base_correlation_curve_id": "MISSING-BC",
+            "issuer_credit_curve_ids": null,
+            "issuer_recovery_rates": null,
+            "issuer_weights": null
+        }]);
         let bytes = serde_json::to_vec(&restore_failure).expect("restore case serializes");
         let error = CalibrationResultEnvelope::from_slice_strict(&bytes, &LoadLimits::default())
             .expect_err("invalid nested market references must fail");
@@ -1181,11 +1186,11 @@ mod tests {
         let diagnostic = report
             .diagnostics
             .iter()
-            .find(|diagnostic| diagnostic.code == "market-context/missing-collateral-curve")
+            .find(|diagnostic| diagnostic.code == "market-context/missing-credit-index-reference")
             .expect("restore diagnostic");
         assert_eq!(
             diagnostic.pointer.as_deref(),
-            Some("/result/final_market/collateral/USD-CSA")
+            Some("/result/final_market/credit_indices/0/index_credit_curve_id")
         );
     }
 
@@ -1247,7 +1252,7 @@ mod canonical_validation_tests {
     use crate::api::market_datum::{MarketDatum, PriceDatum};
     use crate::api::schema::CalibrationPlan;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::HashMap;
+    use finstack_quant_core::FxHashMap;
 
     #[test]
     fn duplicate_price_id_is_flagged() {
@@ -1288,7 +1293,7 @@ mod canonical_validation_tests {
     #[test]
     fn unresolved_quote_id_is_flagged() {
         use crate::quotes::ids::QuoteId;
-        let mut quote_sets = HashMap::default();
+        let mut quote_sets = FxHashMap::default();
         quote_sets.insert("usd".to_string(), vec![QuoteId::new("MISSING")]);
         let envelope = CalibrationEnvelope {
             schema_url: None,

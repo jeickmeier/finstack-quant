@@ -24,7 +24,6 @@ pub enum AmortizationEvent {
     /// A scheduled amortization date earlier than `revolving_end`.
     Date {
         /// Date revolving stops.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -163,21 +162,18 @@ pub struct AssetBackedFacility {
     )]
     pub commitment_fee_bp: Decimal,
     /// Closing date; the first payment date is one `frequency` later.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub closing_date: Date,
     /// Scheduled end of the revolving period.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub revolving_end: Date,
     /// Legal final maturity of the facility.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

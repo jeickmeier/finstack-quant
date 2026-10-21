@@ -3,7 +3,7 @@ use super::shifts::{credit_curve_abs_shift_bp, note_twist};
 use super::{note_warning, push_first_order_step, push_second_order_step};
 use crate::helpers::*;
 use crate::{MoveUnit, PnlAttribution};
-use finstack_quant_core::math::NeumaierAccumulator;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_valuations::metrics::MetricId;
 
 /// Maximum credit spread shift (in basis points) before warning.
@@ -125,11 +125,11 @@ pub(super) fn apply(
             credit_convexity_avg_shift_bp = inputs.shifts.avg_credit_shift_bp;
             if inputs.shifts.credit_curves_measured > 1 {
                 attribution.meta.notes.push(format!(
-                "Credit attribution uses aggregate Cs01 with average credit-curve shift across \
+                    "Credit attribution uses aggregate Cs01 with average credit-curve shift across \
                      {} curves; provide BucketedCs01 for key-rate-aware attribution of \
                      non-parallel moves",
-                inputs.shifts.credit_curves_measured
-            ));
+                    inputs.shifts.credit_curves_measured
+                ));
             }
         } else if inputs
             .shifts

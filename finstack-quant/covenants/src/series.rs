@@ -26,7 +26,6 @@ use crate::report::CovenantReport;
 #[serde(deny_unknown_fields)]
 pub struct DatedMetrics {
     /// Covenant test date the metric values belong to.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -44,7 +43,6 @@ pub struct DatedMetrics {
 #[serde(deny_unknown_fields)]
 pub struct DatedCovenantReports {
     /// Test date the covenants were evaluated on.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -148,7 +146,8 @@ impl ModelTimeSeries for DatedMetricSeries {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::{create_date, Month, Tenor};
+/// use finstack_quant_core::dates::{create_date, Tenor};
+/// use time::Month;
 /// use finstack_quant_covenants::{
 ///     forecast_covenant, Covenant, CovenantForecastConfig, CovenantSpec, CovenantType,
 ///     DatedMetricSeries, DatedMetrics,

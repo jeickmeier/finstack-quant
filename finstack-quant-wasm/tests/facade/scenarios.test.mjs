@@ -55,7 +55,6 @@ function depositFixture() {
           allow_non_monotonic: false,
           min_forward_tenor: 1e-6,
           rate_calibration: null,
-          calibration_ois_cutoff_days: null,
           fx_policy: null,
         },
       ],
@@ -68,7 +67,6 @@ function depositFixture() {
       credit_indices: [],
       fx_delta_vol_surfaces: [],
       vol_cubes: [],
-      collateral: {},
       hierarchy: null,
     }),
   };
@@ -311,7 +309,6 @@ test('scenario facade returns reusable shocked instrument copies', () => {
     credit_indices: [],
     fx_delta_vol_surfaces: [],
     vol_cubes: [],
-    collateral: {},
     hierarchy: null,
   });
   const op = { kind: 'instrument_price_pct_by_type', instrument_types: ['bond'], pct: -60 };
@@ -365,7 +362,6 @@ const OIS_MARKET = {
       allow_non_monotonic: false,
       min_forward_tenor: 1e-6,
       rate_calibration: null,
-      calibration_ois_cutoff_days: null,
       fx_policy: null,
     },
   ],
@@ -378,7 +374,6 @@ const OIS_MARKET = {
   credit_indices: [],
   fx_delta_vol_surfaces: [],
   vol_cubes: [],
-  collateral: {},
   hierarchy: null,
 };
 const DEPOSIT = {

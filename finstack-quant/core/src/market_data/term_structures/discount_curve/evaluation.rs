@@ -3,7 +3,7 @@
 use super::super::common::{validate_pillars, PiecewiseLinearAdjustment, RateShock};
 use super::DiscountCurve;
 use crate::market_data::bumps::BumpType;
-use crate::math::interp::types::Interp;
+use crate::math::interp::Interp;
 
 /// Source interpolation and a single accumulated transformation, never a chain
 /// of nested curves. The adjustment is stored as its piecewise-linear derivative
@@ -68,7 +68,7 @@ impl CurveTransform {
         }
         self.normalization = interp.interp(self.offset);
         if !self.normalization.is_finite() || self.normalization <= 0.0 {
-            return Err(crate::error::InputError::NonPositiveValue.into());
+            return Err(crate::InputError::NonPositiveValue.into());
         }
         Ok(())
     }

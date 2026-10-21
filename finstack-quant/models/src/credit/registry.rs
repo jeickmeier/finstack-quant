@@ -4,7 +4,7 @@ use crate::credit::lgd::seniority::{BetaRecovery, SeniorityCalibration, Seniorit
 use crate::credit::pd::MasterScaleGrade;
 use finstack_quant_core::embedded_registry::EmbeddedJsonRegistry;
 use finstack_quant_core::types::CreditRating;
-use finstack_quant_core::{Error, HashMap, InputError, Result};
+use finstack_quant_core::{Error, FxHashMap, InputError, Result};
 use serde::{Deserialize, Serialize};
 
 static EMBEDDED_REGISTRY: EmbeddedJsonRegistry<CreditAssumptionRegistry> =
@@ -302,7 +302,7 @@ fn first_id(ids: &[String]) -> &str {
 }
 
 /// Lookup miss for `id` in the `kind` section of the registry. Its kind is
-/// [`ErrorKind::NotFound`](finstack_quant_core::error::ErrorKind::NotFound), so
+/// [`ErrorKind::NotFound`](finstack_quant_core::ErrorKind::NotFound), so
 /// hosts raise their missing-key error (`KeyError` / `not_found`).
 fn not_found(kind: &str, id: &str) -> Error {
     InputError::NotFound {
@@ -313,7 +313,7 @@ fn not_found(kind: &str, id: &str) -> Error {
 
 #[derive(Clone, Debug)]
 pub(crate) struct RatingFactorTableParts {
-    pub(crate) factors: HashMap<CreditRating, f64>,
+    pub(crate) factors: FxHashMap<CreditRating, f64>,
     pub(crate) agency: String,
     pub(crate) methodology: String,
     pub(crate) default_factor: f64,
@@ -449,7 +449,7 @@ mod tests {
         let err = registry
             .rating_factor_table("nope")
             .expect_err("unknown id should fail");
-        assert_eq!(err.kind(), finstack_quant_core::error::ErrorKind::NotFound);
+        assert_eq!(err.kind(), finstack_quant_core::ErrorKind::NotFound);
         assert!(
             err.to_string().contains("rating factor table 'nope'"),
             "unexpected error: {err}"

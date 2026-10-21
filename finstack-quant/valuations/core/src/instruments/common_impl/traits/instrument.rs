@@ -32,6 +32,7 @@ use super::pricing_options::PricingOptions;
 /// use finstack_quant_core::dates::{Date, DayCount};
 /// use finstack_quant_core::market_data::context::MarketContext;
 /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
+/// use finstack_quant_core::market_data::traits::Discounting;
 /// use finstack_quant_core::money::Money;
 /// use finstack_quant_core::types::{Attributes, CurveId};
 /// use finstack_quant_core::{currency::Currency, Result};

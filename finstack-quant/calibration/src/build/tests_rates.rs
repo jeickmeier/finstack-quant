@@ -14,14 +14,14 @@ use crate::quotes::ids::Pillar;
 use crate::quotes::rates::RateQuote;
 
 fn usd_build_ctx(as_of: Date) -> BuildCtx {
-    let mut curve_ids = finstack_quant_core::HashMap::default();
+    let mut curve_ids = finstack_quant_core::FxHashMap::default();
     curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
     curve_ids.insert("forward".to_string(), "USD-SOFR-3M".to_string());
     BuildCtx::new(as_of, 1_000_000.0, curve_ids)
 }
 
 fn eur_build_ctx(as_of: Date) -> BuildCtx {
-    let mut curve_ids = finstack_quant_core::HashMap::default();
+    let mut curve_ids = finstack_quant_core::FxHashMap::default();
     curve_ids.insert("discount".to_string(), "EUR-OIS".to_string());
     curve_ids.insert("forward".to_string(), "EUR-EURIBOR-3M".to_string());
     BuildCtx::new(as_of, 1_000_000.0, curve_ids)

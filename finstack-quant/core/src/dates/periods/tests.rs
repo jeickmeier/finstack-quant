@@ -132,7 +132,7 @@ fn period_errors_name_the_value_and_grammar() {
 fn next_rolls_to_next_iso_year_after_last_week() {
     let next = PeriodId::week(2021, 52)
         .expect("valid period fixture")
-        .next()
+        .shift(1)
         .expect("next week");
     assert_eq!(next, PeriodId::week(2022, 1).expect("valid period fixture"));
 }
@@ -141,7 +141,7 @@ fn next_rolls_to_next_iso_year_after_last_week() {
 fn prev_rolls_to_previous_iso_year_last_week() {
     let prev = PeriodId::week(2022, 1)
         .expect("valid period fixture")
-        .prev()
+        .shift(-1)
         .expect("previous week");
     assert_eq!(
         prev,
@@ -235,7 +235,7 @@ fn period_kind_display_parse_and_counts() {
     assert!(PeriodKind::from_str("unknown").is_err());
 
     assert_eq!(PeriodKind::Daily.periods_per_year(), 252);
-    assert_eq!(PeriodKind::Quarterly.annualization_factor(), 4.0);
+    assert_eq!(PeriodKind::Quarterly.periods_per_year(), 4);
 }
 
 #[test]
@@ -423,7 +423,7 @@ fn fiscal_week_stepping_uses_fiscal_year_capacity() {
     assert_eq!(
         PeriodId::week(2025, 52)
             .expect("valid period fixture")
-            .next()
+            .shift(1)
             .expect("ISO next remains Gregorian"),
         PeriodId::week(2026, 1).expect("valid period fixture")
     );
@@ -457,10 +457,12 @@ fn fiscal_stepping_needs_a_calendar_only_across_fiscal_day_365() {
     let federal = FiscalConfig::us_federal();
     let week = PeriodId::from_str("FY2025W52").expect("fiscal week");
     for id in [week, week.next_fiscal(federal).expect("FY2025W53")] {
-        assert_eq!(id.next(), id.next_fiscal(federal));
+        assert_eq!(id.shift(1), id.next_fiscal(federal));
     }
     assert_eq!(
-        PeriodId::from_str("FY2026W01").expect("fiscal week").prev(),
+        PeriodId::from_str("FY2026W01")
+            .expect("fiscal week")
+            .shift(-1),
         PeriodId::from_str("FY2026W01")
             .expect("fiscal week")
             .prev_fiscal(federal)
@@ -468,18 +470,18 @@ fn fiscal_stepping_needs_a_calendar_only_across_fiscal_day_365() {
     assert_eq!(
         PeriodId::from_str("FY2025Q1")
             .expect("fiscal quarter")
-            .prev(),
+            .shift(-1),
         PeriodId::from_str("FY2024Q4")
     );
 
     let day_365 = PeriodId::from_str("FY2025D365").expect("fiscal day");
     let next_error = day_365
-        .next()
+        .shift(1)
         .expect_err("FY day 366 depends on the calendar");
     assert!(next_error.to_string().contains("next_fiscal"));
     let day_1 = PeriodId::from_str("FY2025D001").expect("fiscal day");
     let prev_error = day_1
-        .prev()
+        .shift(-1)
         .expect_err("prior FY length depends on the calendar");
     assert!(prev_error.to_string().contains("prev_fiscal"));
     assert_eq!(day_365.shift(-364), Ok(day_1));
@@ -487,7 +489,7 @@ fn fiscal_stepping_needs_a_calendar_only_across_fiscal_day_365() {
     assert_eq!(
         PeriodId::from_str("2025W52")
             .expect("ISO week")
-            .next()
+            .shift(1)
             .expect("ISO next")
             .to_string(),
         "2026W01"
@@ -553,7 +555,7 @@ fn shift_matches_repeated_stepping_and_rolls_years() {
 #[test]
 fn daily_next_rolls_year_on_last_ordinal() {
     let last = PeriodId::day(2023, 365).expect("valid period fixture");
-    let next = last.next().expect("next day");
+    let next = last.shift(1).expect("next day");
     assert_eq!(next, PeriodId::day(2024, 1).expect("valid period fixture"));
 }
 
@@ -562,19 +564,19 @@ fn quarterly_semi_and_annual_stepping() {
     assert_eq!(
         PeriodId::quarter(2025, 4)
             .expect("valid period fixture")
-            .next()
+            .shift(1)
             .expect("nq"),
         PeriodId::quarter(2026, 1).expect("valid period fixture")
     );
     assert_eq!(
         PeriodId::half(2025, 2)
             .expect("valid period fixture")
-            .prev()
+            .shift(-1)
             .expect("ph"),
         PeriodId::half(2025, 1).expect("valid period fixture")
     );
     assert_eq!(
-        PeriodId::annual(2025).next().expect("na"),
+        PeriodId::annual(2025).shift(1).expect("na"),
         PeriodId::annual(2026)
     );
 }
@@ -609,7 +611,7 @@ fn fiscal_config_from_parts_fills_the_omitted_half() {
 
 #[test]
 fn period_kind_annualization_factor_is_const() {
-    const DAILY: f64 = PeriodKind::Daily.annualization_factor();
+    const DAILY: f64 = PeriodKind::Daily.periods_per_year() as f64;
     assert_eq!(DAILY, 252.0);
 }
 
@@ -643,8 +645,8 @@ fn period_builder_does_not_step_beyond_the_requested_terminal_period() {
 
 #[test]
 fn period_year_stepping_rejects_integer_overflow() {
-    assert!(PeriodId::annual(i32::MAX).next().is_err());
-    assert!(PeriodId::annual(i32::MIN).prev().is_err());
+    assert!(PeriodId::annual(i32::MAX).shift(1).is_err());
+    assert!(PeriodId::annual(i32::MIN).shift(-1).is_err());
     assert!(PeriodId::annual(i32::MAX)
         .next_fiscal(FiscalConfig::us_federal())
         .is_err());

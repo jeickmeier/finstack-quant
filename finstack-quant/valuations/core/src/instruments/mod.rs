@@ -152,8 +152,6 @@ pub mod envelope;
 /// umbrella crate's JSON entry points and the Python and WASM bindings.
 pub mod cashflow_export;
 
-pub use finstack_quant_core::dates::{resolve_calendar, resolve_joint_calendar};
-
 /// Model parameter snapshots used by attribution.
 pub mod model_params;
 

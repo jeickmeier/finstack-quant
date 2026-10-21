@@ -40,7 +40,6 @@ pub struct CdsTranche {
     /// Notional amount of the tranche
     pub notional: Money,
     /// Maturity date of the tranche
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -66,7 +65,7 @@ pub struct CdsTranche {
     /// running premium), `receive` sells protection (receives the premium).
     pub side: PayReceive,
     /// Optional effective date for schedule anchoring (if None, uses as_of date)
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -89,7 +88,6 @@ pub struct CdsTranche {
     pub stub: StubKind,
     /// Optional upfront payment (date, amount). Positive means paid by protection buyer.
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::optional_dated_money")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<(finstack_quant_core::wire::DateWire, Money)>")

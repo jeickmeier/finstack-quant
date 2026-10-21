@@ -28,7 +28,7 @@ fn column_evaluation() {
     let cols: Vec<&[f64]> = data.iter().map(|v| v.as_slice()).collect();
 
     let col_expr = CompiledExpr::new(Expr::column("x")).expect("elementwise expression compiles");
-    let result = col_expr.eval(&ctx, &cols).unwrap().values;
+    let result = col_expr.eval(&ctx, &cols).unwrap();
     assert_eq!(result, vec![1.0, 2.0, 3.0, 4.0, 5.0]);
 }
 
@@ -38,7 +38,7 @@ fn literal_evaluation() {
     let cols: Vec<&[f64]> = data.iter().map(|v| v.as_slice()).collect();
 
     let lit_expr = CompiledExpr::new(Expr::literal(42.0)).expect("elementwise expression compiles");
-    let result = lit_expr.eval(&ctx, &cols).unwrap().values;
+    let result = lit_expr.eval(&ctx, &cols).unwrap();
     assert_eq!(result, vec![42.0, 42.0, 42.0, 42.0, 42.0]);
 }
 
@@ -49,7 +49,7 @@ fn literal_zero_length() {
     let cols: Vec<&[f64]> = empty_data.iter().map(|v| v.as_slice()).collect();
 
     let lit_expr = CompiledExpr::new(Expr::literal(5.0)).expect("elementwise expression compiles");
-    let result = lit_expr.eval(&ctx, &cols).unwrap().values;
+    let result = lit_expr.eval(&ctx, &cols).unwrap();
     assert!(result.is_empty());
 }
 
@@ -66,7 +66,7 @@ fn binop_add() {
         Expr::literal(10.0),
     ))
     .expect("elementwise expression compiles");
-    let result = add.eval(&ctx, &cols).unwrap().values;
+    let result = add.eval(&ctx, &cols).unwrap();
     assert_eq!(result, vec![11.0, 12.0, 13.0, 14.0, 15.0]);
 }
 
@@ -81,7 +81,7 @@ fn binop_sub() {
         Expr::column("x"),
     ))
     .expect("elementwise expression compiles");
-    let result = sub.eval(&ctx, &cols).unwrap().values;
+    let result = sub.eval(&ctx, &cols).unwrap();
     assert_eq!(result, vec![9.0, 18.0, 27.0, 36.0, 45.0]);
 }
 
@@ -96,7 +96,7 @@ fn binop_mul() {
         Expr::literal(2.0),
     ))
     .expect("elementwise expression compiles");
-    let result = mul.eval(&ctx, &cols).unwrap().values;
+    let result = mul.eval(&ctx, &cols).unwrap();
     assert_eq!(result, vec![2.0, 4.0, 6.0, 8.0, 10.0]);
 }
 
@@ -111,7 +111,7 @@ fn binop_div() {
         Expr::column("x"),
     ))
     .expect("elementwise expression compiles");
-    let result = div.eval(&ctx, &cols).unwrap().values;
+    let result = div.eval(&ctx, &cols).unwrap();
     assert_eq!(result, vec![10.0, 10.0, 10.0, 10.0, 10.0]);
 }
 
@@ -128,7 +128,7 @@ fn binop_division_by_zero_returns_nan() {
         Expr::column("den"),
     ))
     .expect("elementwise expression compiles");
-    let result = div.eval(&ctx, &cols).unwrap().values;
+    let result = div.eval(&ctx, &cols).unwrap();
 
     assert!(result[0].is_nan());
     assert!(result[1].is_nan());
@@ -148,7 +148,7 @@ fn binop_comparisons() {
         Expr::literal(3.0),
     ))
     .expect("elementwise expression compiles");
-    let result = gt.eval(&ctx, &cols).unwrap().values;
+    let result = gt.eval(&ctx, &cols).unwrap();
     assert_eq!(result, vec![0.0, 0.0, 0.0, 1.0, 1.0]); // 0 = false, 1 = true
 
     // Less than
@@ -158,7 +158,7 @@ fn binop_comparisons() {
         Expr::literal(3.0),
     ))
     .expect("elementwise expression compiles");
-    let result = lt.eval(&ctx, &cols).unwrap().values;
+    let result = lt.eval(&ctx, &cols).unwrap();
     assert_eq!(result, vec![1.0, 1.0, 0.0, 0.0, 0.0]);
 }
 
@@ -182,7 +182,7 @@ fn binop_extended_comparisons_logic_and_modulo() {
     for (op, expected) in cases {
         let expr = CompiledExpr::new(Expr::bin_op(op, Expr::column("lhs"), Expr::column("rhs")))
             .expect("elementwise expression compiles");
-        let result = expr.eval(&ctx, &cols).unwrap().values;
+        let result = expr.eval(&ctx, &cols).unwrap();
         assert_eq!(result, expected, "{op:?}");
     }
 }
@@ -195,7 +195,7 @@ fn unary_not_maps_zero_to_true_and_non_zero_to_false() {
 
     let expr = CompiledExpr::new(Expr::unary_op(UnaryOp::Not, Expr::column("flag")))
         .expect("elementwise expression compiles");
-    let result = expr.eval(&ctx, &cols).unwrap().values;
+    let result = expr.eval(&ctx, &cols).unwrap();
 
     assert_eq!(result, vec![1.0, 0.0, 0.0, 0.0]);
 }
@@ -247,7 +247,7 @@ fn if_then_else_evaluation() {
     let expr = Expr::if_then_else(cond, then_expr, else_expr);
 
     let compiled = CompiledExpr::new(expr).expect("elementwise expression compiles");
-    let out = compiled.eval(&ctx, &cols).unwrap().values;
+    let out = compiled.eval(&ctx, &cols).unwrap();
 
     // x: [1, 2, 3, 4, 5], y: [10, 20, 30, 40, 50]
     // x > y is always false, so we get y - x
@@ -268,7 +268,7 @@ fn if_then_else_mixed_condition() {
     let expr = Expr::if_then_else(cond, then_expr, else_expr);
 
     let compiled = CompiledExpr::new(expr).expect("elementwise expression compiles");
-    let out = compiled.eval(&ctx, &cols).unwrap().values;
+    let out = compiled.eval(&ctx, &cols).unwrap();
 
     // x > y: [false, true, true, true]
     // Results: [2-1=1, 2-1=1, 3-0=3, 4-(-1)=5]
@@ -276,18 +276,6 @@ fn if_then_else_mixed_condition() {
 }
 
 // Metadata and Results
-
-#[test]
-fn evaluation_result_metadata() {
-    let (ctx, data) = create_test_data();
-    let cols: Vec<&[f64]> = data.iter().map(|v| v.as_slice()).collect();
-
-    let expr = CompiledExpr::new(Expr::column("x")).expect("elementwise expression compiles");
-    let result = expr.eval(&ctx, &cols).unwrap();
-
-    assert_eq!(result.values, vec![1.0, 2.0, 3.0, 4.0, 5.0]);
-    assert_eq!(result.metadata.numeric_mode, "f64");
-}
 
 // Edge Cases
 
@@ -298,7 +286,7 @@ fn empty_data_column() {
     let cols: Vec<&[f64]> = empty_data.iter().map(|v| v.as_slice()).collect();
 
     let expr = CompiledExpr::new(Expr::column("empty")).expect("elementwise expression compiles");
-    let result = expr.eval(&ctx, &cols).unwrap().values;
+    let result = expr.eval(&ctx, &cols).unwrap();
     assert!(result.is_empty());
 }
 
@@ -310,7 +298,7 @@ fn empty_data_function() {
 
     let expr = CompiledExpr::new(Expr::call(Function::Abs, vec![Expr::column("empty")]))
         .expect("elementwise expression compiles");
-    let result = expr.eval(&ctx, &cols).unwrap().values;
+    let result = expr.eval(&ctx, &cols).unwrap();
     assert!(result.is_empty());
 }
 
@@ -321,7 +309,7 @@ fn single_element_data() {
     let cols: Vec<&[f64]> = data.iter().map(|v| v.as_slice()).collect();
 
     let expr = CompiledExpr::new(Expr::column("single")).expect("elementwise expression compiles");
-    let result = expr.eval(&ctx, &cols).unwrap().values;
+    let result = expr.eval(&ctx, &cols).unwrap();
     assert_eq!(result, vec![42.0]);
 }
 
@@ -339,7 +327,7 @@ fn nested_function_calls() {
     let sqrt = Expr::call(Function::Sqrt, vec![abs]);
 
     let compiled = CompiledExpr::new(sqrt).expect("elementwise expression compiles");
-    let result = compiled.eval(&ctx, &cols).unwrap().values;
+    let result = compiled.eval(&ctx, &cols).unwrap();
 
     // abs(x - 3) = [2, 1, 0, 1, 2]
     assert_eq!(result.len(), 5);
@@ -361,7 +349,7 @@ fn binop_with_function_result() {
     let add = Expr::bin_op(BinOp::Add, Expr::column("x"), abs);
 
     let compiled = CompiledExpr::new(add).expect("elementwise expression compiles");
-    let result = compiled.eval(&ctx, &cols).unwrap().values;
+    let result = compiled.eval(&ctx, &cols).unwrap();
 
     assert_eq!(result, vec![2.0, 4.0, 6.0, 8.0, 10.0]);
 }

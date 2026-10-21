@@ -146,7 +146,7 @@ fn test_hetero_matches_homogeneous_when_issuers_identical() {
     let index_data = base_market.get_credit_index("CDX.NA.IG.42").unwrap();
 
     // Build heterogeneous market with identical issuer curves
-    let mut issuer_curves = finstack_quant_core::HashMap::default();
+    let mut issuer_curves = finstack_quant_core::FxHashMap::default();
     for i in 0..10 {
         let id = format!("ISSUER-{:03}", i + 1);
         issuer_curves.insert(id, std::sync::Arc::clone(index_data.index_credit_curve()));

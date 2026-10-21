@@ -11,7 +11,7 @@ use finstack_quant_core::dates::{
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_core::{Error, InputError, Result};
+use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::instruments::{
     FixedLegSpec, FloatLegSpec, Instrument, ListedFutureTerms, PayReceive, Position,
 };
@@ -313,9 +313,7 @@ fn build_deposit(
         .start_date(start)
         .maturity(end)
         .day_count(conv.day_count)
-        .fixed_rate_opt(Some(
-            Decimal::try_from(*rate).map_err(|_| InputError::ConversionOverflow)?,
-        ))
+        .fixed_rate_opt(Some(finstack_quant_core::decimal::f64_to_decimal(*rate)?))
         .discount_curve_id(CurveId::new(ctx.require_curve_id("discount")?.to_string()))
         .business_day_convention(conv.market_business_day_convention)
         .calendar_id_opt(Some(conv.market_calendar_id.clone().into()))
@@ -358,7 +356,7 @@ fn build_fra(
         .fixing_date(fixing)
         .start_date(start_date)
         .maturity(end_date)
-        .fixed_rate(Decimal::try_from(*rate).map_err(|_| InputError::ConversionOverflow)?)
+        .fixed_rate(finstack_quant_core::decimal::f64_to_decimal(*rate)?)
         .day_count(conv.day_count)
         .reset_lag_days(conv.default_reset_lag_days)
         .discount_curve_id(CurveId::new(ctx.require_curve_id("discount")?.to_string()))
@@ -489,8 +487,7 @@ fn build_swap(
         payment_lag_days: conv.default_payment_lag_days,
     };
 
-    let rate_decimal = Decimal::try_from(*rate)
-        .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?;
+    let rate_decimal = finstack_quant_core::decimal::f64_to_decimal(*rate)?;
     let compounding = match conv.kind {
         RateIndexKind::Term => FloatingLegCompounding::Simple,
         RateIndexKind::OvernightRfr => match ctx.ois_compounding_override() {
@@ -579,8 +576,7 @@ fn apply_swap_spread(swap: &mut InterestRateSwap, spread_decimal: &Option<f64>) 
         };
         return Err(finstack_quant_core::InputError::NonFiniteValue { kind }.into());
     }
-    swap.float_leg.spread_bp = Decimal::try_from(spread_bp_f64)
-        .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?;
+    swap.float_leg.spread_bp = finstack_quant_core::decimal::f64_to_decimal(spread_bp_f64)?;
     Ok(())
 }
 
@@ -596,12 +592,12 @@ mod tests {
     use super::*;
     use crate::quotes::ids::{Pillar, QuoteId};
     use finstack_quant_core::types::IndexId;
-    use finstack_quant_core::HashMap;
+    use finstack_quant_core::FxHashMap;
 
     fn usd_build_ctx() -> BuildCtx {
         let as_of = Date::from_calendar_date(2024, time::Month::January, 2)
             .expect("valid USD rate build date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("forward".to_string(), "USD-SOFR".to_string());
         BuildCtx::new(as_of, 1_000_000.0, curve_ids)
@@ -897,7 +893,7 @@ mod tests {
     fn test_swap_enables_eom_when_start_is_month_end() -> Result<()> {
         let as_of = Date::from_calendar_date(2024, time::Month::January, 31)
             .expect("valid month-end swap build date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "GBP-SONIA-OIS".to_string());
         curve_ids.insert("forward".to_string(), "GBP-SONIA-OIS".to_string());
         let ctx = BuildCtx::new(as_of, 1_000_000.0, curve_ids);

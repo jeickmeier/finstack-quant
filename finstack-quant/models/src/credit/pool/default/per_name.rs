@@ -435,8 +435,9 @@ mod tests {
             .expect("valid copula simulation");
         assert_eq!(out.len(), marginals.len());
         for (pd, cond) in marginals.iter().zip(&out) {
-            let threshold = finstack_quant_core::math::standard_normal_inv_cdf(*pd);
-            let expected = finstack_quant_core::math::norm_cdf(
+            let threshold =
+                finstack_quant_core::math::special_functions::standard_normal_inv_cdf(*pd);
+            let expected = finstack_quant_core::math::special_functions::norm_cdf(
                 (threshold - rho.sqrt() * z) / (1.0 - rho).sqrt(),
             );
             assert!(

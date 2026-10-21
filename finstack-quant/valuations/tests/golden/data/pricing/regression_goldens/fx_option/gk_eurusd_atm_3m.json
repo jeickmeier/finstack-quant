@@ -77,7 +77,6 @@
         {
           "allow_non_monotonic": false,
           "base": "2026-04-30",
-          "calibration_ois_cutoff_days": null,
           "day_count": "act_365f",
           "extrapolation": "flat_forward",
           "fx_policy": null,
@@ -117,7 +116,6 @@
         {
           "allow_non_monotonic": false,
           "base": "2026-04-30",
-          "calibration_ois_cutoff_days": null,
           "day_count": "act_365f",
           "extrapolation": "flat_forward",
           "fx_policy": null,
@@ -157,7 +155,6 @@
         {
           "allow_non_monotonic": false,
           "base": "2026-04-30",
-          "calibration_ois_cutoff_days": null,
           "day_count": "act_365f",
           "extrapolation": "flat_forward",
           "fx_policy": null,

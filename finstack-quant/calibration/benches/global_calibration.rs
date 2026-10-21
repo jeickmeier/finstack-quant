@@ -32,7 +32,7 @@ use finstack_quant_core::market_data::term_structures::Seniority;
 use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use std::hint::black_box;
 use time::Month;
@@ -160,7 +160,7 @@ fn discount_envelope(
     let base = base_date();
     let market_data = quotes_to_data(&quotes);
     let ids = quote_set_ids(&quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("disc".to_string(), ids);
 
     let curve_id = CurveId::from(format!("USD-OIS-{curve_suffix}"));
@@ -205,7 +205,7 @@ fn hazard_envelope(
     market_data.extend(quotes_to_data(&cds_quotes));
     let disc_ids = quote_set_ids(&disc_quotes);
     let cds_ids = quote_set_ids(&cds_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("disc".to_string(), disc_ids);
     quote_sets.insert("cds".to_string(), cds_ids);
 

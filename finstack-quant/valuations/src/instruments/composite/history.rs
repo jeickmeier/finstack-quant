@@ -32,7 +32,6 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub struct CompositeHistoryRow {
     /// Market observation date of this close.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -50,14 +49,13 @@ pub struct CompositeHistoryRow {
     /// Chained total-return index, initialized to `100` on the first row.
     pub return_index: f64,
     /// Effective date of quantities held into this close.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub held_state_effective_date: Date,
     /// New state date made effective for the next interval, when rebalanced.
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")

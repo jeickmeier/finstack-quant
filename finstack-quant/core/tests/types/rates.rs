@@ -166,12 +166,6 @@ fn non_finite_constructors_reject_input() {
     assert!(Rate::from_percent(f64::INFINITY).is_err());
     assert!(Rate::from_percent(f64::NEG_INFINITY).is_err());
     assert!(Rate::from_decimal(f64::NAN).is_err());
-    assert!(Rate::try_from_bp(f64::NAN).is_err());
-    assert!(Rate::try_from_bp(62.5).is_err());
-    assert_eq!(
-        Rate::try_from_bp(250.0).expect("whole bp"),
-        Rate::from_bp(250)
-    );
 }
 
 #[test]

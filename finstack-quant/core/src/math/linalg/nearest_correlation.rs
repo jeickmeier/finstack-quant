@@ -40,9 +40,7 @@
 //! application rejects any silent modification — validate first and let the
 //! caller decide.
 
-use super::CorrelationError as Error;
-
-type Result<T> = std::result::Result<T, Error>;
+use super::CorrelationError;
 
 /// Convergence parameters for [`nearest_correlation()`].
 ///
@@ -93,23 +91,23 @@ impl Default for NearestCorrelationOpts {
 ///
 /// # Errors
 ///
-/// * [`Error::InvalidSize`] if `n * n` overflows or `input.len() != n * n`.
-/// * [`Error::NotSymmetric`] if the input deviates from symmetry by more than
+/// * [`CorrelationError::InvalidSize`] if `n * n` overflows or `input.len() != n * n`.
+/// * [`CorrelationError::NotSymmetric`] if the input deviates from symmetry by more than
 ///   `1e-6` at any off-diagonal entry.
-/// * [`Error::DiagonalNotOne`] if any diagonal entry is further than `1e-3`
+/// * [`CorrelationError::DiagonalNotOne`] if any diagonal entry is further than `1e-3`
 ///   from `1.0`.
-/// * [`Error::EigenDecompositionFailed`] if `input` contains a non-finite entry
+/// * [`CorrelationError::EigenDecompositionFailed`] if `input` contains a non-finite entry
 ///   or a PSD projection cannot decompose its symmetric input.
-/// * [`Error::DidNotConverge`] if the algorithm fails to converge within
+/// * [`CorrelationError::DidNotConverge`] if the algorithm fails to converge within
 ///   `opts.max_iter` iterations.
 pub fn nearest_correlation(
     input: &[f64],
     n: usize,
     opts: NearestCorrelationOpts,
-) -> Result<Vec<f64>> {
+) -> Result<Vec<f64>, CorrelationError> {
     let size = n.checked_mul(n).filter(|&size| size == input.len());
     let Some(size) = size else {
-        return Err(Error::InvalidSize {
+        return Err(CorrelationError::InvalidSize {
             expected: n,
             actual: input.len(),
         });
@@ -118,7 +116,7 @@ pub fn nearest_correlation(
         return Ok(Vec::new());
     }
     if input.iter().any(|value| !value.is_finite()) {
-        return Err(Error::EigenDecompositionFailed);
+        return Err(CorrelationError::EigenDecompositionFailed);
     }
 
     // Sanity gates: reject pathological inputs. Small defects are fine —
@@ -130,7 +128,7 @@ pub fn nearest_correlation(
     for i in 0..n {
         let diag = input[i * n + i];
         if (diag - 1.0).abs() > DIAGONAL_GATE {
-            return Err(Error::DiagonalNotOne {
+            return Err(CorrelationError::DiagonalNotOne {
                 index: i,
                 value: diag,
             });
@@ -138,7 +136,7 @@ pub fn nearest_correlation(
         for j in (i + 1)..n {
             let diff = (input[i * n + j] - input[j * n + i]).abs();
             if diff > SYMMETRY_GATE {
-                return Err(Error::NotSymmetric { i, j, diff });
+                return Err(CorrelationError::NotSymmetric { i, j, diff });
             }
         }
     }
@@ -193,7 +191,7 @@ pub fn nearest_correlation(
         std::mem::swap(&mut prev, &mut next);
     }
 
-    Err(Error::DidNotConverge {
+    Err(CorrelationError::DidNotConverge {
         max_iter: opts.max_iter,
         tol: opts.tol,
     })
@@ -227,13 +225,13 @@ fn rescale_to_unit_diagonal(matrix: &mut [f64], n: usize) {
 /// tridiagonal QR, `O(n³)`), which scales to portfolio-size correlation
 /// matrices without the `O(n⁵)` worst case of a hand-rolled Jacobi
 /// sweep.
-fn project_psd(matrix: &[f64], n: usize) -> Result<Vec<f64>> {
+fn project_psd(matrix: &[f64], n: usize) -> Result<Vec<f64>, CorrelationError> {
     if n == 0 {
         return Ok(Vec::new());
     }
 
-    let (eigenvalues, eigenvectors) =
-        super::symmetric_eigen(matrix, n).map_err(|_| Error::EigenDecompositionFailed)?;
+    let (eigenvalues, eigenvectors) = super::symmetric_eigen(matrix, n)
+        .map_err(|_| CorrelationError::EigenDecompositionFailed)?;
 
     // Reconstruct using only non-negative eigenvalues: X = V · diag(max(λ, 0)) · Vᵀ.
     // `eigenvectors[i * n + k]` is the `i`-th component of the `k`-th
@@ -335,7 +333,7 @@ mod tests {
         let input = vec![1.0, 0.5, 0.5, 1.0];
         let err = nearest_correlation(&input, 3, NearestCorrelationOpts::default())
             .expect_err("size mismatch");
-        assert!(matches!(err, Error::InvalidSize { .. }));
+        assert!(matches!(err, CorrelationError::InvalidSize { .. }));
     }
 
     #[test]
@@ -343,7 +341,9 @@ mod tests {
         for n in [usize::MAX, 1usize << (usize::BITS / 2)] {
             let err = nearest_correlation(&[], n, NearestCorrelationOpts::default())
                 .expect_err("an overflowing dimension is invalid");
-            assert!(matches!(err, Error::InvalidSize { expected, actual: 0 } if expected == n));
+            assert!(
+                matches!(err, CorrelationError::InvalidSize { expected, actual: 0 } if expected == n)
+            );
             assert!(err.to_string().contains("Invalid matrix size"));
         }
     }
@@ -353,7 +353,7 @@ mod tests {
         let input = vec![0.5, 0.1, 0.1, 1.0];
         let err = nearest_correlation(&input, 2, NearestCorrelationOpts::default())
             .expect_err("diagonal guard");
-        assert!(matches!(err, Error::DiagonalNotOne { .. }));
+        assert!(matches!(err, CorrelationError::DiagonalNotOne { .. }));
     }
 
     #[test]
@@ -361,7 +361,7 @@ mod tests {
         let input = vec![1.0, 0.5, 0.3, 1.0];
         let err = nearest_correlation(&input, 2, NearestCorrelationOpts::default())
             .expect_err("symmetry guard");
-        assert!(matches!(err, Error::NotSymmetric { .. }));
+        assert!(matches!(err, CorrelationError::NotSymmetric { .. }));
     }
 
     #[test]
@@ -370,7 +370,7 @@ mod tests {
         let err = nearest_correlation(&input, 2, NearestCorrelationOpts::default())
             .expect_err("eigendecomposition failure must be reported");
 
-        assert!(matches!(err, Error::EigenDecompositionFailed));
+        assert!(matches!(err, CorrelationError::EigenDecompositionFailed));
         assert_eq!(err.to_string(), "Symmetric eigendecomposition failed");
     }
 
@@ -379,7 +379,7 @@ mod tests {
         let err = nearest_correlation(&[f64::NAN], 1, NearestCorrelationOpts::default())
             .expect_err("non-finite diagonal must be reported");
 
-        assert!(matches!(err, Error::EigenDecompositionFailed));
+        assert!(matches!(err, CorrelationError::EigenDecompositionFailed));
     }
 
     /// The algorithm is Higham (2002) Algorithm 3.3: the Dykstra correction is
@@ -468,7 +468,10 @@ mod tests {
             tol: 1e-16,
         };
         let err = nearest_correlation(&input, 3, opts).expect_err("must not converge");
-        assert!(matches!(err, Error::DidNotConverge { max_iter: 1, .. }));
+        assert!(matches!(
+            err,
+            CorrelationError::DidNotConverge { max_iter: 1, .. }
+        ));
     }
 
     /// With a loose user tolerance the converged iterate alone is only PSD up

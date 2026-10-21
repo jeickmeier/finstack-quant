@@ -132,8 +132,7 @@ where
 /// The actual 20th of `month` in `year`.
 #[inline]
 fn twentieth(month: Month, year: i32) -> crate::Result<Date> {
-    Date::from_calendar_date(year, month, 20)
-        .map_err(|error| crate::Error::Validation(error.to_string()))
+    super::create_date(year, month, 20)
 }
 
 /// Return the **third Wednesday** of `month` in `year`.
@@ -154,8 +153,6 @@ pub fn third_wednesday(month: Month, year: i32) -> crate::Result<Date> {
 
 /// Third `weekday` of `month` in `year`, validating the year range.
 fn third_weekday(month: Month, year: i32, weekday: Weekday) -> crate::Result<Date> {
-    Date::from_calendar_date(year, month, 1)
-        .map_err(|error| crate::Error::Validation(error.to_string()))?;
     nth_weekday_of_month(year, month, weekday, 3).ok_or_else(|| {
         crate::Error::Validation(format!("year {year} is outside the supported date range"))
     })
@@ -182,13 +179,7 @@ pub fn next_imm(date: Date) -> crate::Result<Date> {
 ///   convention.
 #[must_use]
 pub fn is_cds_date(date: Date) -> bool {
-    if date.day() != 20 {
-        return false;
-    }
-    matches!(
-        date.month(),
-        Month::March | Month::June | Month::September | Month::December
-    )
+    date.day() == 20 && QUARTERLY_MONTHS.contains(&date.month())
 }
 
 /// Check if a date is a standard IMM date (third Wednesday of Mar/Jun/Sep/Dec).
@@ -216,10 +207,7 @@ pub fn is_cds_date(date: Date) -> bool {
 #[must_use]
 pub fn is_imm_date(date: Date) -> bool {
     // Must be a quarterly month
-    if !matches!(
-        date.month(),
-        Month::March | Month::June | Month::September | Month::December
-    ) {
+    if !QUARTERLY_MONTHS.contains(&date.month()) {
         return false;
     }
     // Must be a Wednesday
@@ -455,6 +443,22 @@ pub enum SifmaSettlementClass {
     D,
 }
 
+impl std::fmt::Display for SifmaSettlementClass {
+    /// Writes the serde label (`a` through `d`).
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
+    }
+}
+
+impl std::str::FromStr for SifmaSettlementClass {
+    type Err = crate::Error;
+
+    /// Parses the serde label, ignoring surrounding whitespace and ASCII case.
+    fn from_str(s: &str) -> crate::Result<Self> {
+        crate::wire::serde_parse(&s.trim().to_ascii_lowercase())
+    }
+}
+
 impl SifmaSettlementClass {
     /// Infer the standard settlement class from agency program and original term.
     ///
@@ -493,7 +497,7 @@ const fn estimated_sifma_business_day_index(class: SifmaSettlementClass) -> u8 {
 
 /// Estimate a SIFMA settlement date when no published calendar entry exists.
 ///
-/// This is deliberately separate from [`sifma_settlement_date_for_class`],
+/// This is deliberately separate from [`sifma_settlement_date`],
 /// which fails closed outside published coverage. The estimate targets the
 /// SIFMA business-day-of-month that each settlement class normally uses,
 /// accounting for the embedded SIFMA holiday calendar when available. It is
@@ -506,17 +510,17 @@ const fn estimated_sifma_business_day_index(class: SifmaSettlementClass) -> u8 {
 /// * `year` - Settlement year to estimate using the embedded SIFMA calendar.
 /// * `class` - Agency-MBS settlement class whose business-day anchor is used.
 /// # Errors
-/// Returns `Error::Validation` when `year` is outside the supported date range or
-/// the requested month has too few business days for the class's estimate.
-pub fn estimated_sifma_settlement_date_for_class(
+/// Returns `InputError::InvalidDate` when `year` is outside the supported date
+/// range, or `Error::Validation` when the requested month has too few business
+/// days for the class's estimate.
+pub fn estimated_sifma_settlement_date(
     month: Month,
     year: i32,
     class: SifmaSettlementClass,
 ) -> crate::Result<Date> {
     let calendar = super::calendar_by_id_strict("sifma")?;
     let target = estimated_sifma_business_day_index(class);
-    let mut date = Date::from_calendar_date(year, month, 1)
-        .map_err(|error| crate::Error::Validation(error.to_string()))?;
+    let mut date = super::create_date(year, month, 1)?;
     let mut seen = 0;
 
     while date.month() == month {
@@ -540,7 +544,7 @@ pub fn estimated_sifma_settlement_date_for_class(
 // classes where SIFMA has published only partial coverage.
 include!(concat!(env!("OUT_DIR"), "/sifma_settlements_generated.rs"));
 
-/// Look up or compute the SIFMA settlement date for a specific class.
+/// Look up the published SIFMA TBA settlement date for a settlement class.
 ///
 /// Returns the exact date from the embedded published calendar when available.
 /// Returns `None` for uncovered year/class combinations; SIFMA settlement
@@ -550,13 +554,22 @@ include!(concat!(env!("OUT_DIR"), "/sifma_settlements_generated.rs"));
 ///
 /// * `month` - Settlement month to look up in the embedded SIFMA schedule.
 /// * `year` - Settlement year to look up; uncovered years return `None`.
-/// * `class` - Agency-MBS settlement class whose published date is requested.
+/// * `class` - Agency-MBS settlement class whose published date is requested;
+///   [`SifmaSettlementClass::default`] is Class A (conventional 30-year UMBS).
+///
+/// # Example
+/// ```rust
+/// use finstack_quant_core::dates::{sifma_settlement_date, SifmaSettlementClass};
+/// use time::{Date, Month};
+///
+/// let settle = sifma_settlement_date(Month::March, 2027, SifmaSettlementClass::A);
+/// assert_eq!(
+///     settle,
+///     Some(Date::from_calendar_date(2027, Month::March, 11).expect("Valid date"))
+/// );
+/// ```
 #[must_use]
-pub fn sifma_settlement_date_for_class(
-    month: Month,
-    year: i32,
-    class: SifmaSettlementClass,
-) -> Option<Date> {
+pub fn sifma_settlement_date(month: Month, year: i32, class: SifmaSettlementClass) -> Option<Date> {
     // Exact dates are maintained in the published SIFMA data file.
     let month_num = month as u8;
     let class_index = match class {
@@ -572,32 +585,6 @@ pub fn sifma_settlement_date_for_class(
         }
     }
     None
-}
-
-/// Return the **SIFMA TBA settlement date** for the given `month` and `year`.
-///
-/// Defaults to **Class A** (conventional 30-year UMBS). For other settlement
-/// classes, use [`sifma_settlement_date_for_class`].
-///
-/// # Example
-/// ```rust
-/// use finstack_quant_core::dates::sifma_settlement_date;
-/// use time::{Date, Month};
-///
-/// let settle = sifma_settlement_date(Month::March, 2027);
-/// assert_eq!(
-///     settle,
-///     Some(Date::from_calendar_date(2027, Month::March, 11).expect("Valid date"))
-/// );
-/// ```
-///
-/// # Arguments
-///
-/// * `month` - Settlement month to look up for the conventional Class A cycle.
-/// * `year` - Settlement year to look up; uncovered years return `None`.
-#[must_use]
-pub fn sifma_settlement_date(month: Month, year: i32) -> Option<Date> {
-    sifma_settlement_date_for_class(month, year, SifmaSettlementClass::A)
 }
 
 /// Return the **next SIFMA TBA settlement date** (Class A)
@@ -627,8 +614,7 @@ pub fn next_sifma_settlement(date: Date) -> Option<Date> {
     let mut current_year = date.year();
 
     for _ in 0..14 {
-        let settle =
-            sifma_settlement_date_for_class(current_month, current_year, SifmaSettlementClass::A)?;
+        let settle = sifma_settlement_date(current_month, current_year, SifmaSettlementClass::A)?;
 
         if settle > date {
             return Some(settle);
@@ -649,6 +635,31 @@ pub fn next_sifma_settlement(date: Date) -> Option<Date> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unit_enum_labels_round_trip_and_parse_leniently() {
+        use crate::dates::{ScheduleErrorPolicy, Thirty360Convention};
+
+        assert_eq!(SifmaSettlementClass::C.to_string(), "c");
+        assert_eq!(
+            " B ".parse::<SifmaSettlementClass>().unwrap(),
+            SifmaSettlementClass::B
+        );
+        assert_eq!(
+            ScheduleErrorPolicy::GracefulEmpty.to_string(),
+            "graceful_empty"
+        );
+        assert_eq!(
+            "STRICT".parse::<ScheduleErrorPolicy>().unwrap(),
+            ScheduleErrorPolicy::Strict
+        );
+        assert_eq!(Thirty360Convention::UsSia.to_string(), "us_sia");
+        assert_eq!(
+            "ISDA".parse::<Thirty360Convention>().unwrap(),
+            Thirty360Convention::Isda
+        );
+        assert!("isda2006".parse::<Thirty360Convention>().is_err());
+    }
 
     #[test]
     fn roll_helpers_reject_unrepresentable_successors_and_predecessors() {
@@ -693,24 +704,19 @@ mod tests {
             assert!(third_wednesday(Month::January, year).is_err());
             assert!(third_friday(Month::December, year).is_err());
             assert!(imm_option_expiry(Month::March, year).is_err());
-            assert!(estimated_sifma_settlement_date_for_class(
-                Month::January,
-                year,
-                SifmaSettlementClass::A
-            )
-            .is_err());
+            assert!(
+                estimated_sifma_settlement_date(Month::January, year, SifmaSettlementClass::A)
+                    .is_err()
+            );
         }
         for year in [Date::MIN.year(), Date::MAX.year()] {
             for month in [Month::January, Month::December] {
                 assert!(third_wednesday(month, year).is_ok());
                 assert!(third_friday(month, year).is_ok());
                 assert!(imm_option_expiry(month, year).is_ok());
-                assert!(estimated_sifma_settlement_date_for_class(
-                    month,
-                    year,
-                    SifmaSettlementClass::D
-                )
-                .is_ok());
+                assert!(
+                    estimated_sifma_settlement_date(month, year, SifmaSettlementClass::D).is_ok()
+                );
             }
         }
     }
@@ -968,7 +974,7 @@ mod tests {
 
     #[test]
     fn sifma_class_b_jan_2026_from_calendar() {
-        let d = sifma_settlement_date_for_class(Month::January, 2026, SifmaSettlementClass::B);
+        let d = sifma_settlement_date(Month::January, 2026, SifmaSettlementClass::B);
         assert_eq!(
             d,
             Some(Date::from_calendar_date(2026, Month::January, 20).expect("valid"))
@@ -977,7 +983,7 @@ mod tests {
 
     #[test]
     fn sifma_class_a_jan_2026_from_calendar() {
-        let d = sifma_settlement_date_for_class(Month::January, 2026, SifmaSettlementClass::A);
+        let d = sifma_settlement_date(Month::January, 2026, SifmaSettlementClass::A);
         assert_eq!(
             d,
             Some(Date::from_calendar_date(2026, Month::January, 14).expect("valid"))
@@ -986,7 +992,7 @@ mod tests {
 
     #[test]
     fn sifma_class_d_mar_2027_from_calendar() {
-        let d = sifma_settlement_date_for_class(Month::March, 2027, SifmaSettlementClass::D);
+        let d = sifma_settlement_date(Month::March, 2027, SifmaSettlementClass::D);
         assert_eq!(
             d,
             Some(Date::from_calendar_date(2027, Month::March, 23).expect("valid"))
@@ -996,19 +1002,15 @@ mod tests {
     #[test]
     fn sifma_uncovered_year_class_fails_closed() {
         assert_eq!(
-            sifma_settlement_date_for_class(Month::March, 2024, SifmaSettlementClass::B),
+            sifma_settlement_date(Month::March, 2024, SifmaSettlementClass::B),
             None
         );
     }
 
     #[test]
     fn sifma_estimate_is_explicit_for_projection_use() {
-        let date = estimated_sifma_settlement_date_for_class(
-            Month::January,
-            2025,
-            SifmaSettlementClass::B,
-        )
-        .expect("supported roll date");
+        let date = estimated_sifma_settlement_date(Month::January, 2025, SifmaSettlementClass::B)
+            .expect("supported roll date");
         assert_eq!(date.year(), 2025);
         assert_eq!(date.month(), Month::January);
     }
@@ -1026,7 +1028,7 @@ mod tests {
         ];
         for (class, day) in expected {
             assert_eq!(
-                estimated_sifma_settlement_date_for_class(Month::January, 2026, class)
+                estimated_sifma_settlement_date(Month::January, 2026, class)
                     .expect("supported roll date"),
                 Date::from_calendar_date(2026, Month::January, day).expect("valid date"),
                 "Class {class:?} should use its SIFMA business-day anchor"
@@ -1063,13 +1065,6 @@ mod tests {
     #[test]
     fn sifma_default_class_is_a() {
         assert_eq!(SifmaSettlementClass::default(), SifmaSettlementClass::A);
-    }
-
-    #[test]
-    fn sifma_default_is_class_a() {
-        let old = sifma_settlement_date(Month::January, 2026);
-        let new = sifma_settlement_date_for_class(Month::January, 2026, SifmaSettlementClass::A);
-        assert_eq!(old, new);
     }
 
     #[test]
@@ -1114,7 +1109,7 @@ mod tests {
             Month::December,
         ];
         for (month, expected_day) in months.into_iter().zip(expected_days) {
-            let date = sifma_settlement_date_for_class(month, 2025, SifmaSettlementClass::A)
+            let date = sifma_settlement_date(month, 2025, SifmaSettlementClass::A)
                 .expect("published 2025 Class A date");
             assert_eq!(date.day(), expected_day);
         }
@@ -1128,7 +1123,7 @@ mod tests {
 
     #[test]
     fn sifma_published_class_b_date() {
-        let date = sifma_settlement_date_for_class(Month::March, 2026, SifmaSettlementClass::B)
+        let date = sifma_settlement_date(Month::March, 2026, SifmaSettlementClass::B)
             .expect("published SIFMA table should contain March 2026 Class B");
         assert_eq!(
             date,
@@ -1144,10 +1139,7 @@ mod tests {
             SifmaSettlementClass::C,
             SifmaSettlementClass::D,
         ] {
-            assert_eq!(
-                sifma_settlement_date_for_class(Month::June, 2030, class),
-                None
-            );
+            assert_eq!(sifma_settlement_date(Month::June, 2030, class), None);
         }
     }
 }

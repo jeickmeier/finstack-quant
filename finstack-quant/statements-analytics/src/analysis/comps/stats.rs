@@ -4,7 +4,7 @@
 //! style. Provides descriptive statistics, percentile ranking, z-scores,
 //! and single-factor OLS regression for fair-value estimation.
 
-use finstack_quant_core::math::stats::{mean, OnlineCovariance, OnlineStats};
+use finstack_quant_core::math::stats::{mean, quantile_sorted, OnlineCovariance, OnlineStats};
 use serde::{Deserialize, Serialize};
 
 /// Descriptive statistics for a peer set metric.
@@ -55,9 +55,9 @@ pub fn peer_stats(values: &[f64]) -> Option<PeerStats> {
 
     let n = sorted.len();
     let m = mean(&finite);
-    let median = percentile_sorted(&sorted, 0.50);
-    let q1 = percentile_sorted(&sorted, 0.25);
-    let q3 = percentile_sorted(&sorted, 0.75);
+    let median = quantile_sorted(&sorted, 0.50);
+    let q1 = quantile_sorted(&sorted, 0.25);
+    let q3 = quantile_sorted(&sorted, 0.75);
 
     let mut os = OnlineStats::new();
     for &v in &finite {
@@ -244,28 +244,6 @@ pub fn regression_fair_value(
         residual,
         n,
     })
-}
-
-/// Interpolated percentile from a pre-sorted slice.
-///
-/// Uses linear interpolation between adjacent ranks.
-fn percentile_sorted(sorted: &[f64], p: f64) -> f64 {
-    let n = sorted.len();
-    if n == 0 {
-        return f64::NAN;
-    }
-    if n == 1 {
-        return sorted[0];
-    }
-    let rank = p * (n - 1) as f64;
-    let lo = rank.floor() as usize;
-    let hi = rank.ceil() as usize;
-    if lo == hi {
-        sorted[lo]
-    } else {
-        let frac = rank - lo as f64;
-        sorted[lo] * (1.0 - frac) + sorted[hi] * frac
-    }
 }
 
 #[cfg(test)]

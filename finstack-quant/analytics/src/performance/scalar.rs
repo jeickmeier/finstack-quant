@@ -48,7 +48,8 @@ impl Performance {
     ///
     /// ```rust
     /// # use finstack_quant_analytics::{CagrDayCount, Performance};
-    /// # use finstack_quant_core::dates::{Date, Month, PeriodKind};
+    /// # use finstack_quant_core::dates::{Date, PeriodKind};
+    /// # use time::Month;
     /// # let dates: Vec<Date> = (1..=4)
     /// #     .map(|d| Date::from_calendar_date(2025, Month::January, d).unwrap())
     /// #     .collect();
@@ -210,7 +211,8 @@ impl Performance {
     ///
     /// ```rust
     /// # use finstack_quant_analytics::Performance;
-    /// # use finstack_quant_core::dates::{Date, Month, PeriodKind};
+    /// # use finstack_quant_core::dates::{Date, PeriodKind};
+    /// # use time::Month;
     /// # let dates: Vec<Date> = (1..=4)
     /// #     .map(|d| Date::from_calendar_date(2025, Month::January, d).unwrap())
     /// #     .collect();
@@ -753,7 +755,8 @@ mod from_returns_cagr_tests {
 
     use crate::risk_metrics::{self, cagr, CagrDayCount};
     use crate::Performance;
-    use finstack_quant_core::dates::{Date, Month, PeriodKind};
+    use finstack_quant_core::dates::{Date, PeriodKind};
+    use time::Month;
 
     fn d(year: i32, month: Month, day: u8) -> Date {
         Date::from_calendar_date(year, month, day).expect("valid date")

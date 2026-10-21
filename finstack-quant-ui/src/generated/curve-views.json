@@ -6,7 +6,6 @@
       "allow_non_monotonic",
       "base",
       "calendar_id",
-      "calibration_ois_cutoff_days",
       "day_count",
       "extrapolation",
       "fx_policy",
@@ -23,7 +22,7 @@
       "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
       "pointer": "#/$defs/CurveState/oneOf/0",
       "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-      "sha256": "54c0c17b1f975969c253f3fa7fcda5bbd60aad80f2b50790e76451d96d36303c",
+      "sha256": "95272c02841e9b81d1d6960d7b34fe6fea845c33eee2f526628ce3468601e384",
       "description": "Discount curve state"
     }
   },

@@ -124,7 +124,7 @@ mod discount_curve;
 /// Forward‐rate curves.
 mod forward_curve;
 /// Forward variance curves for rough volatility models.
-pub mod forward_variance;
+mod forward_variance;
 /// Serializable hazard-curve calibration replay inputs.
 mod hazard_calibration;
 /// Credit hazard curves.
@@ -140,17 +140,16 @@ mod rate_calibration;
 
 pub use base_correlation::{
     BaseCorrelationCurve, BaseCorrelationCurveBuilder, CorrelationShapeReport,
-    CorrelationShapeViolation, BASE_CORR_DETACHMENT_MATCH_TOLERANCE,
+    CorrelationShapeViolation,
 };
 pub use basis_spread_curve::{BasisSpreadCurve, BasisSpreadCurveBuilder};
 pub use credit_index::{CreditIndexData, CreditIndexDataBuilder};
-pub use discount_curve::{
-    DiscountCurve, DiscountCurveBuilder, ValidationMode, DEFAULT_MIN_FORWARD_TENOR,
-};
+pub use discount_curve::{DiscountCurve, DiscountCurveBuilder, ValidationMode};
 pub use forward_curve::{ForwardCurve, ForwardCurveBuilder};
 pub use forward_variance::ForwardVarianceCurve;
 pub use hazard_calibration::{HazardCalibrationInput, HazardCalibrationRecipe};
-pub use hazard_curve::{HazardBumpTarget, HazardCurve, HazardCurveBuilder, ParInterp, Seniority};
+pub(crate) use hazard_curve::HazardBumpTarget;
+pub use hazard_curve::{HazardCurve, HazardCurveBuilder, ParInterp, Seniority};
 pub use inflation::{InflationCurve, InflationCurveBuilder};
 pub use parametric_curve::{NelsonSiegelModel, NsVariant, ParametricCurve, ParametricCurveBuilder};
 pub use price_curve::{PriceCurve, PriceCurveBuilder, PriceCurveKind};

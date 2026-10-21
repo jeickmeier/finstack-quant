@@ -2,15 +2,14 @@
 
 use std::sync::Arc;
 
-use crate::market_data::dividends::DividendSchedule;
 use crate::market_data::scalars::{InflationIndex, MarketScalar, ScalarTimeSeries};
 use crate::market_data::surfaces::{FxDeltaVolSurface, VolCube, VolSurface};
 use crate::market_data::term_structures::{
-    BaseCorrelationCurve, BasisSpreadCurve, CreditIndexData, DiscountCurve, ForwardCurve,
-    HazardCurve, InflationCurve, ParametricCurve, PriceCurve, PriceCurveKind,
+    BaseCorrelationCurve, CreditIndexData, DiscountCurve, ForwardCurve, HazardCurve,
+    InflationCurve, PriceCurve, PriceCurveKind,
 };
 use crate::types::CurveId;
-use crate::HashMap;
+use crate::FxHashMap;
 use crate::Result;
 
 use super::{CurveStorage, MarketContext};
@@ -18,25 +17,25 @@ use super::{CurveStorage, MarketContext};
 impl MarketContext {
     #[inline]
     fn not_found_error(id: &str) -> crate::Error {
-        crate::error::InputError::NotFound { id: id.to_string() }.into()
+        crate::InputError::NotFound { id: id.to_string() }.into()
     }
 
     fn missing_curve_error(&self, id: &str) -> crate::Error {
-        // Sort for deterministic error messages (HashMap iteration order varies).
+        // Sort for deterministic error messages (FxHashMap iteration order varies).
         let mut available: Vec<&str> = self.curves.keys().map(|k| k.as_str()).collect();
         available.sort_unstable();
-        crate::error::Error::missing_curve_with_suggestions(id, &available)
+        crate::Error::missing_curve_with_suggestions(id, &available)
     }
 
     #[inline]
-    fn get_cloned<T>(&self, map: &HashMap<CurveId, Arc<T>>, id: &str) -> Result<Arc<T>> {
+    fn get_cloned<T>(&self, map: &FxHashMap<CurveId, Arc<T>>, id: &str) -> Result<Arc<T>> {
         map.get(id)
             .cloned()
             .ok_or_else(|| Self::not_found_error(id))
     }
 
     #[inline]
-    fn get_ref<'a, T>(&self, map: &'a HashMap<CurveId, T>, id: &str) -> Result<&'a T> {
+    fn get_ref<'a, T>(&self, map: &'a FxHashMap<CurveId, T>, id: &str) -> Result<&'a T> {
         map.get(id).ok_or_else(|| Self::not_found_error(id))
     }
 
@@ -52,7 +51,7 @@ impl MarketContext {
     {
         match self.curves.get(id) {
             Some(storage) => extractor(storage).ok_or_else(|| {
-                crate::error::InputError::WrongCurveType {
+                crate::InputError::WrongCurveType {
                     id: id.to_string(),
                     expected: expected_type.to_string(),
                     actual: storage.curve_type().to_string(),
@@ -188,34 +187,6 @@ impl MarketContext {
                 .price()
                 .filter(|curve| curve.kind() == PriceCurveKind::Price)
                 .map(Arc::clone)
-        })
-    }
-
-    /// Get a basis spread curve by identifier.
-    ///
-    /// Basis spread curves store cross-currency or multi-curve spread data.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the identifier is missing or refers to a different curve type.
-    pub fn get_basis_spread(&self, id: impl AsRef<str>) -> Result<Arc<BasisSpreadCurve>> {
-        let id_str = id.as_ref();
-        self.get_curve_with_type_check(id_str, "BasisSpread", |storage| {
-            storage.basis_spread().map(Arc::clone)
-        })
-    }
-
-    /// Get a parametric curve by identifier.
-    ///
-    /// Parametric curves use Nelson-Siegel or Nelson-Siegel-Svensson models.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the identifier is missing or refers to a different curve type.
-    pub fn get_parametric(&self, id: impl AsRef<str>) -> Result<Arc<ParametricCurve>> {
-        let id_str = id.as_ref();
-        self.get_curve_with_type_check(id_str, "Parametric", |storage| {
-            storage.parametric().map(Arc::clone)
         })
     }
 
@@ -366,7 +337,8 @@ impl MarketContext {
     /// #     None,
     /// #     None,
     /// # ).expect("surface should build");
-    /// # let ctx = MarketContext::new().insert_fx_delta_vol_surface(surface);
+    /// # let mut ctx = MarketContext::new();
+    /// # ctx.insert_fx_delta_vol_surface_mut(surface);
     /// let surf = ctx.get_fx_delta_vol_surface("EURUSD-DELTA-VOL")
     ///     .expect("surface should exist");
     /// assert_eq!(surf.id().as_str(), "EURUSD-DELTA-VOL");
@@ -377,15 +349,6 @@ impl MarketContext {
     /// * `id` - Identifier used when the surface was inserted.
     pub fn get_fx_delta_vol_surface(&self, id: impl AsRef<str>) -> Result<Arc<FxDeltaVolSurface>> {
         self.get_cloned(&self.fx_delta_vol_surfaces, id.as_ref())
-    }
-
-    /// Clone a dividend schedule by identifier.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the identifier is not present.
-    pub fn get_dividend_schedule(&self, id: impl AsRef<str>) -> Result<Arc<DividendSchedule>> {
-        self.get_cloned(&self.dividends, id.as_ref())
     }
 
     /// Clone a credit index aggregate by identifier.
@@ -430,46 +393,5 @@ impl MarketContext {
     /// Returns an error if the identifier is not present.
     pub fn get_vol_cube(&self, id: impl AsRef<str>) -> Result<Arc<VolCube>> {
         self.get_cloned(&self.vol_cubes, id.as_ref())
-    }
-
-    /// Resolve a collateral discount curve for a CSA code.
-    ///
-    /// This performs the indirection from a CSA or collateral agreement code to
-    /// the discount curve configured for that collateral set. The returned trait
-    /// object exposes the generic [`Discounting`](crate::market_data::traits::Discounting) interface rather than the
-    /// concrete [`DiscountCurve`] type.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the CSA code is not mapped or if the mapped curve is missing.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use finstack_quant_core::market_data::context::MarketContext;
-    /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    /// use finstack_quant_core::math::interp::InterpStyle;
-    /// use finstack_quant_core::dates::Date;
-    /// use finstack_quant_core::types::CurveId;
-    /// use time::Month;
-    ///
-    /// let curve = DiscountCurve::builder("USD-OIS")
-    ///     .base_date(Date::from_calendar_date(2024, Month::January, 1).expect("Valid date"))
-    ///     .knots([(0.0, 1.0), (1.0, 0.99)])
-    ///     .build()
-    ///     .expect("... builder should succeed");
-    /// let ctx = MarketContext::new()
-    ///     .insert(curve)
-    ///     .map_collateral("USD-CSA", CurveId::from("USD-OIS"));
-    /// let discount = ctx.get_collateral("USD-CSA").expect("Collateral curve should exist");
-    /// assert!(discount.df(0.5) <= 1.0);
-    /// ```
-    pub fn get_collateral(&self, csa_code: &str) -> Result<Arc<DiscountCurve>> {
-        let curve_id = self
-            .collateral
-            .get(csa_code)
-            .ok_or(crate::error::InputError::NotFound {
-                id: format!("collateral:{}", csa_code),
-            })?;
-        self.get_discount(curve_id.as_str())
     }
 }

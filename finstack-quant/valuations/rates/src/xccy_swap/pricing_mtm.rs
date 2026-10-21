@@ -21,6 +21,7 @@
 
 use crate::xccy_swap::types::{initial_principal_sign, XccySwap};
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::money::Money;
@@ -388,7 +389,7 @@ pub(crate) fn mtm_cashflow_schedule(
 /// Per-period resetting-leg notional under CIP no-FX-vol: `N_C / X_t^FRA`.
 ///
 /// Uses *relative* discount factors from `as_of` via
-/// [`DiscountCurve::df_between_dates`] so the CIP forward FX
+/// [`Discounting::df_between_dates`](finstack_quant_core::market_data::traits::Discounting::df_between_dates) so the CIP forward FX
 /// `X_t^FRA = spot_x_at_as_of · P_R(as_of, t) / P_C(as_of, t)` is consistent
 /// with the spot rate observed at `as_of`. Using absolute DFs from each curve's
 /// base date would only agree when `as_of == curve.base_date` — i.e., the same

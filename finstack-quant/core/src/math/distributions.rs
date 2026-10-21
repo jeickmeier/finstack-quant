@@ -45,7 +45,7 @@
 //! ```
 //! use finstack_quant_core::math::distributions::sample_beta;
 //! use finstack_quant_core::math::random::Pcg64Rng;
-//! use finstack_quant_core::math::RandomNumberGenerator;
+//! use finstack_quant_core::math::random::RandomNumberGenerator;
 //!
 //! let mut rng = Pcg64Rng::new(42);
 //!
@@ -108,7 +108,7 @@ use super::random::RandomNumberGenerator;
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::math::binomial_pmf_all;
+/// use finstack_quant_core::math::distributions::binomial_pmf_all;
 ///
 /// let pmf = binomial_pmf_all(10, 0.5)?;
 /// assert_eq!(pmf.len(), 11);
@@ -241,7 +241,7 @@ pub fn binomial_pmf_all_into(out: &mut Vec<f64>, n: usize, p: f64) -> crate::Res
 /// ```rust
 /// use finstack_quant_core::math::distributions::sample_beta;
 /// use finstack_quant_core::math::random::Pcg64Rng;
-/// use finstack_quant_core::math::RandomNumberGenerator;
+/// use finstack_quant_core::math::random::RandomNumberGenerator;
 ///
 /// let mut rng = Pcg64Rng::new(42);
 ///
@@ -504,8 +504,8 @@ pub fn chi_squared_quantile(p: f64, df: f64) -> crate::Result<f64> {
     // by a representable p < 1, including very small degrees of freedom.
     let log_max = (df + 64.0 * df.sqrt() + 128.0).ln();
     let log_quantile = BrentSolver::new()
-        .tolerance(1e-13)
-        .max_iterations(256)
+        .with_tolerance(1e-13)
+        .with_max_iterations(256)
         .solve_in_bracket(residual, log_min, log_max)
         .map_err(|error| {
             crate::Error::Validation(format!(
@@ -548,8 +548,6 @@ fn chi_squared_log_cdf(shape: f64, log_x: f64, log_gamma_next: f64) -> f64 {
     let largest = log_term.max(log_shifted);
     (largest + ((log_term - largest).exp() + (log_shifted - largest).exp()).ln()).min(0.0)
 }
-
-// Student's t Distribution (Sampler)
 
 #[cfg(test)]
 mod tests {

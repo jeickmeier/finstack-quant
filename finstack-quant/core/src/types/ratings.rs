@@ -313,7 +313,7 @@ impl core::str::FromStr for CreditRating {
 fn parse_credit_rating(value: &str) -> Result<CreditRating, crate::Error> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        return Err(crate::error::InputError::InvalidRating {
+        return Err(crate::InputError::InvalidRating {
             value: value.to_string(),
         }
         .into());
@@ -351,7 +351,7 @@ fn parse_credit_rating(value: &str) -> Result<CreditRating, crate::Error> {
                 '2' => Notch::Flat,
                 '3' => Notch::Minus,
                 _ => {
-                    return Err(crate::error::InputError::InvalidRating {
+                    return Err(crate::InputError::InvalidRating {
                         value: value.to_string(),
                     }
                     .into())
@@ -362,7 +362,7 @@ fn parse_credit_rating(value: &str) -> Result<CreditRating, crate::Error> {
     }
 
     if base_slice.is_empty() {
-        return Err(crate::error::InputError::InvalidRating {
+        return Err(crate::InputError::InvalidRating {
             value: value.to_string(),
         }
         .into());
@@ -407,7 +407,7 @@ fn parse_credit_rating(value: &str) -> Result<CreditRating, crate::Error> {
         "D" => CreditRating::D,
         "NR" => CreditRating::NR,
         _ => {
-            return Err(crate::error::InputError::InvalidRating {
+            return Err(crate::InputError::InvalidRating {
                 value: value.to_string(),
             }
             .into())

@@ -170,7 +170,7 @@ pub(super) fn fit_make_whole_policies(
         .enumerate()
         .map(|(index, policy)| {
             policy.ok_or_else(|| {
-                Error::internal(format!(
+                Error::Internal(format!(
                     "bond hazard LSMC did not fit make-whole claim {index}"
                 ))
             })
@@ -190,9 +190,9 @@ pub(super) fn fit_policies(
     make_whole_policies: &[RegressionPolicy],
 ) -> Result<Vec<Option<RegressionPolicy>>> {
     let decisions = template.decision_steps.len();
-    let last = decisions
-        .checked_sub(1)
-        .ok_or_else(|| Error::internal("bond hazard LSMC replay produced no decision snapshots"))?;
+    let last = decisions.checked_sub(1).ok_or_else(|| {
+        Error::Internal("bond hazard LSMC replay produced no decision snapshots".into())
+    })?;
     let boundaries = training_boundaries(template)?;
     let checkpoints = build_training_checkpoints(
         tree,
@@ -216,11 +216,11 @@ pub(super) fn fit_policies(
         })?;
         let mut block_snapshots = Vec::with_capacity(capacity);
         let block_checkpoints = checkpoints.get(block_index).ok_or_else(|| {
-            Error::internal("bond hazard LSMC block checkpoint boundary is missing")
+            Error::Internal("bond hazard LSMC block checkpoint boundary is missing".into())
         })?;
         if block_checkpoints.len() != simulated_paths {
-            return Err(Error::internal(
-                "bond hazard LSMC block checkpoint count is inconsistent",
+            return Err(Error::Internal(
+                "bond hazard LSMC block checkpoint count is inconsistent".into(),
             ));
         }
         for (physical, checkpoint) in block_checkpoints.iter().enumerate() {
@@ -239,19 +239,19 @@ pub(super) fn fit_policies(
                 &mut sampled,
             )?;
             if record.snapshots.len() != owned {
-                return Err(Error::internal(
-                    "bond hazard LSMC block snapshot count is inconsistent",
+                return Err(Error::Internal(
+                    "bond hazard LSMC block snapshot count is inconsistent".into(),
                 ));
             }
             if high == last {
                 let terminal = record.terminal.ok_or_else(|| {
-                    Error::internal("bond hazard LSMC final block has no terminal snapshot")
+                    Error::Internal("bond hazard LSMC final block has no terminal snapshot".into())
                 })?;
                 values[physical] = terminal.current_cash
                     + terminal.exercise_value(terminal.hold_redemption, terminal.hold_redemption);
             } else if record.terminal.is_some() {
-                return Err(Error::internal(
-                    "bond hazard LSMC non-terminal block produced a terminal snapshot",
+                return Err(Error::Internal(
+                    "bond hazard LSMC non-terminal block produced a terminal snapshot".into(),
                 ));
             }
             block_snapshots.extend(record.snapshots);
@@ -302,9 +302,9 @@ pub(super) fn block_requires_policy(
         let index = physical
             .checked_mul(decisions_in_block)
             .and_then(|offset| offset.checked_add(local_decision))
-            .ok_or_else(|| Error::internal("bond hazard LSMC block index overflow"))?;
+            .ok_or_else(|| Error::Internal("bond hazard LSMC block index overflow".into()))?;
         let snapshot = snapshots.get(index).ok_or_else(|| {
-            Error::internal("bond hazard LSMC block snapshot is missing for a training path")
+            Error::Internal("bond hazard LSMC block snapshot is missing for a training path".into())
         })?;
         if snapshot.requires_policy() {
             return Ok(true);
@@ -318,8 +318,8 @@ pub(super) fn value_with_policy(
     policies: &[Option<RegressionPolicy>],
 ) -> Result<f64> {
     if path.snapshots.len() != policies.len() || path.snapshots.is_empty() {
-        return Err(Error::internal(
-            "bond hazard LSMC pricing replay does not match the trained decision grid",
+        return Err(Error::Internal(
+            "bond hazard LSMC pricing replay does not match the trained decision grid".into(),
         ));
     }
     let last = path.snapshots.len() - 1;
@@ -331,7 +331,7 @@ pub(super) fn value_with_policy(
         let continuation = snapshot.a_to_next * value + snapshot.b_to_next;
         if snapshot.requires_policy() {
             let policy = policies[decision].as_ref().ok_or_else(|| {
-                Error::internal(format!(
+                Error::Internal(format!(
                     "bond hazard LSMC has no fitted policy for exercise decision {decision}"
                 ))
             })?;

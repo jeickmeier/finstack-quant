@@ -438,7 +438,7 @@ mod cds_invariants {
     fn metric_value(
         cds: &finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap,
         market: &MarketContext,
-        as_of: time::Date,
+        as_of: finstack_quant_core::dates::Date,
         metric: MetricId,
     ) -> f64 {
         let result = cds
@@ -710,7 +710,7 @@ mod cs_gamma_consistency {
     fn compute_metric_error(
         cds: &finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap,
         market: &MarketContext,
-        as_of: time::Date,
+        as_of: finstack_quant_core::dates::Date,
         metric: MetricId,
     ) -> String {
         let pv = cds

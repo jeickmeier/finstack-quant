@@ -9,6 +9,7 @@
 #![allow(dead_code)]
 
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::BarrierType;
 use finstack_quant_models::monte_carlo::discretization::lmm_predictor_corrector::LmmPredictorCorrector;
@@ -35,7 +36,6 @@ use finstack_quant_models::monte_carlo::process::schwartz_smith::{
 };
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff};
-use finstack_quant_models::monte_carlo::TimeGrid;
 use finstack_quant_models::types::OptionType;
 
 pub const SPOT: f64 = 100.0;

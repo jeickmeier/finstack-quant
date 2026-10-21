@@ -46,7 +46,7 @@
 //! # Available Generators
 //!
 //! - [`philox::PhiloxRng`]: Counter-based PRNG for parallel pseudo-random simulation
-//! - [`sobol::SobolRng`]: Low-discrepancy sequence for quasi-Monte Carlo
+//! - [`SobolRng`](finstack_quant_core::math::random::SobolRng) (`RandomStream` impl in [`sobol`]): Low-discrepancy sequence for quasi-Monte Carlo
 //! - [`finstack_quant_core::math::random::BrownianBridge`]: Path construction with variance reduction
 //! - [`fbm`]: True fractional-Brownian-motion increment generators
 //!   (exact Cholesky and windowed conditional-Gaussian recursion)

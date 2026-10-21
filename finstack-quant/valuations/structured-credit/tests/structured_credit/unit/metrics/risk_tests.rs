@@ -8,6 +8,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     calculate_tranche_convexity, calculate_tranche_cs01, calculate_tranche_duration,

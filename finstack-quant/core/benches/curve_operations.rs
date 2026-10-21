@@ -97,7 +97,10 @@ fn bench_discount_curve_zero(c: &mut Criterion) {
 
     c.bench_function("curve_discount_zero_single", |b| {
         b.iter(|| {
-            let zero = black_box(&curve).zero(black_box(2.5));
+            let zero = black_box(&curve).zero_rate(
+                black_box(2.5),
+                finstack_quant_core::math::Compounding::Continuous,
+            );
             black_box(zero);
         })
     });
@@ -108,7 +111,12 @@ fn bench_discount_curve_zero(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
             let times: Vec<f64> = (0..size).map(|i| (i as f64) * 0.05).collect();
             b.iter(|| {
-                let zeros: Vec<_> = times.iter().map(|&t| curve.zero(t)).collect();
+                let zeros: Vec<_> = times
+                    .iter()
+                    .map(|&t| {
+                        curve.zero_rate(t, finstack_quant_core::math::Compounding::Continuous)
+                    })
+                    .collect();
                 black_box(zeros);
             })
         });

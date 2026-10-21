@@ -22,7 +22,6 @@ use finstack_quant_core::dates::Date;
 #[serde(deny_unknown_fields)]
 pub struct BermudanCallProvision {
     /// Dates on which the issuer can call (must be sorted ascending).
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
@@ -34,7 +33,6 @@ pub struct BermudanCallProvision {
     /// End of the no-call (lockout) period. Call dates on or before this
     /// date are dropped (exclusive bound); `None` means no lockout.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")

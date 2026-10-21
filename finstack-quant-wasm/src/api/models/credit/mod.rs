@@ -14,7 +14,7 @@ pub mod scoring;
 
 use std::sync::Arc;
 
-use crate::api::core::market_data::JsHazardCurve;
+use crate::api::core::market_hazard::JsHazardCurve;
 use crate::utils::input::{from_js_json, js_bool, js_f64, js_f64_seq, js_string, js_u64, js_uint};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::dates::DayCount;

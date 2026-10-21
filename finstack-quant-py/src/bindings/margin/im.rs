@@ -3,7 +3,7 @@
 //! These bindings expose the explicit calculator helper methods that do not
 //! require a Python representation of the Rust `Marginable` trait.
 
-use super::calculators::{money_from_amount, PyImResult};
+use super::calculators::PyImResult;
 use super::frame::sensitivity_rows;
 use super::im_curvature::PySimmCurvatureSensitivity;
 use super::types::{extract_asset_class, PyEligibleCollateralSchedule};
@@ -610,7 +610,7 @@ impl PyScheduleImCalculator {
         Ok(PyImResult::from_inner(
             self.inner
                 .calculate_for_notional(
-                    money_from_amount(notional, ccy)?,
+                    finstack_quant_core::money::Money::new(notional, ccy).map_err(core_to_py)?,
                     asset_class,
                     maturity_years,
                     as_of,
@@ -647,8 +647,8 @@ impl PyScheduleImCalculator {
             .into_iter()
             .map(|(mtm, notional, asset_class, maturity)| {
                 Ok((
-                    money_from_amount(mtm, ccy)?,
-                    money_from_amount(notional, ccy)?,
+                    finstack_quant_core::money::Money::new(mtm, ccy).map_err(core_to_py)?,
+                    finstack_quant_core::money::Money::new(notional, ccy).map_err(core_to_py)?,
                     parse_schedule_asset_class(&asset_class)?,
                     maturity,
                 ))
@@ -784,7 +784,8 @@ impl PyHaircutImCalculator {
         Ok(PyImResult::from_inner(
             self.inner
                 .calculate_for_collateral(
-                    money_from_amount(collateral_value, ccy)?,
+                    finstack_quant_core::money::Money::new(collateral_value, ccy)
+                        .map_err(core_to_py)?,
                     &extract_asset_class(asset_class)?,
                     currency_mismatch,
                     as_of,

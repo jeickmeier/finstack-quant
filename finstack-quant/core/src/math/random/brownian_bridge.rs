@@ -36,8 +36,6 @@ pub struct BrownianBridge {
     num_steps: usize,
     /// Construction order (indices into time grid)
     construction_order: Vec<usize>,
-    /// Multipliers for conditional variance
-    std_multipliers: Vec<f64>,
     /// Precomputed `(left, right)` bracketing neighbours, parallel to
     /// [`Self::construction_order`].
     ///
@@ -62,13 +60,12 @@ impl BrownianBridge {
     /// - Bridge order:   [4, 2, 1, 3] (terminal, half, quarters, ...)
     pub fn new(num_steps: usize) -> Self {
         let mut construction_order = Vec::with_capacity(num_steps);
-        let mut std_multipliers = Vec::with_capacity(num_steps);
 
         // Binary subdivision
-        Self::build_bridge_recursive(0, num_steps, &mut construction_order, &mut std_multipliers);
+        Self::build_bridge_recursive(0, num_steps, &mut construction_order);
 
         // One simulation pass records each step's bracketing neighbours. The
-        // populated set evolves identically inside every construct_path*
+        // populated set evolves identically inside every construct_path
         // call, so this table serves all paths ever built by this bridge.
         let mut populated = BTreeSet::new();
         populated.insert(0);
@@ -88,41 +85,19 @@ impl BrownianBridge {
         Self {
             num_steps,
             construction_order,
-            std_multipliers,
             brackets,
         }
     }
 
     /// Recursive builder for bridge order.
-    fn build_bridge_recursive(
-        left: usize,
-        right: usize,
-        order: &mut Vec<usize>,
-        multipliers: &mut Vec<f64>,
-    ) {
+    fn build_bridge_recursive(left: usize, right: usize, order: &mut Vec<usize>) {
         if right - left <= 1 {
             return;
         }
-
         let mid = (left + right) / 2;
         order.push(mid);
-
-        // Conditional variance multiplier for Brownian bridge:
-        // Var[B(t) | B(s), B(u)] = (t-s)(u-t)/(u-s)
-        let left_time = left as f64;
-        let mid_time = mid as f64;
-        let right_time = right as f64;
-
-        let variance_factor = if right > left {
-            ((mid_time - left_time) * (right_time - mid_time)) / (right_time - left_time)
-        } else {
-            1.0
-        };
-
-        multipliers.push(variance_factor.sqrt());
-
-        Self::build_bridge_recursive(left, mid, order, multipliers);
-        Self::build_bridge_recursive(mid, right, order, multipliers);
+        Self::build_bridge_recursive(left, mid, order);
+        Self::build_bridge_recursive(mid, right, order);
     }
 
     /// Construction order, exposed to the unit tests that pin the bridge layout.
@@ -131,76 +106,19 @@ impl BrownianBridge {
         &self.construction_order
     }
 
-    /// Standard deviation multipliers, exposed to the unit tests.
-    #[cfg(test)]
-    fn multipliers(&self) -> &[f64] {
-        &self.std_multipliers
-    }
-
-    /// Apply bridge construction to generate path from independent shocks.
+    /// Apply bridge construction to generate a Brownian path from independent
+    /// shocks on a (uniform or irregular) time grid.
+    ///
+    /// `times` must contain `num_steps + 1` monotonically increasing time points
+    /// with `times[0] == 0.0`. On return `w_out[0] = 0` and `w_out[i]` is the
+    /// Brownian motion at `times[i]`; `z[0]` drives the terminal point and
+    /// `z[i + 1]` the `i`-th bridge construction step.
     ///
     /// # Arguments
     ///
     /// * `z` - Independent standard normal shocks (length = num_steps)
     /// * `w_out` - Output Brownian path (length = num_steps + 1)
-    /// * `dt` - Time step size
-    ///
-    /// # Notes
-    ///
-    /// `w_out[0] = 0` (Brownian motion starts at 0)
-    /// `w_out[i] = cumulative Brownian motion at step i`
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::Validation`] when `w_out.len() != z.len() + 1`, when
-    /// `z.len()` does not match the number of steps this bridge was built
-    /// for, or when `dt` is not finite and positive.
-    pub fn construct_path(&self, z: &[f64], w_out: &mut [f64], dt: f64) -> Result<()> {
-        let num_steps = z.len();
-        self.validate_shocks_and_output(num_steps, w_out.len())?;
-        if !dt.is_finite() || dt <= 0.0 {
-            return Err(Error::Validation(format!(
-                "construct_path: dt must be finite and positive, got {dt}"
-            )));
-        }
-
-        w_out.fill(f64::NAN);
-        w_out[0] = 0.0;
-        if num_steps == 0 {
-            return Ok(());
-        }
-
-        // Terminal point (standard Brownian motion)
-        w_out[num_steps] = z[0] * (num_steps as f64 * dt).sqrt();
-
-        // Brackets are precomputed in `new`; this loop is allocation-free.
-        for (i, (&idx, &(left, right))) in self
-            .construction_order
-            .iter()
-            .zip(&self.brackets)
-            .enumerate()
-        {
-            // Conditional mean: linear interpolation
-            let left_time = left as f64 * dt;
-            let idx_time = idx as f64 * dt;
-            let right_time = right as f64 * dt;
-
-            let alpha = (idx_time - left_time) / (right_time - left_time);
-            let conditional_mean = w_out[left] + alpha * (w_out[right] - w_out[left]);
-
-            // Conditional std dev
-            let conditional_std = self.std_multipliers[i] * dt.sqrt();
-
-            // Generate point using z[i+1] (since z[0] is for terminal)
-            w_out[idx] = conditional_mean + conditional_std * z[i + 1];
-        }
-        Ok(())
-    }
-
-    /// Apply bridge construction on an irregular time grid.
-    ///
-    /// `times` must contain `num_steps + 1` monotonically increasing time points
-    /// with `times[0] == 0.0`.
+    /// * `times` - Time grid in years (length = num_steps + 1, `times[0] == 0.0`)
     ///
     /// # Errors
     ///
@@ -208,31 +126,26 @@ impl BrownianBridge {
     /// violated: `times.len() != z.len() + 1`, `w_out.len() != z.len() + 1`,
     /// `z.len()` does not match the bridge's step count, `times[0] != 0.0`,
     /// or `times` is not finite and strictly increasing.
-    pub fn construct_path_irregular(
-        &self,
-        z: &[f64],
-        w_out: &mut [f64],
-        times: &[f64],
-    ) -> Result<()> {
+    pub fn construct_path(&self, z: &[f64], w_out: &mut [f64], times: &[f64]) -> Result<()> {
         let num_steps = z.len();
         self.validate_shocks_and_output(num_steps, w_out.len())?;
         if times.len() != num_steps + 1 {
             return Err(Error::Validation(format!(
-                "construct_path_irregular: times.len()={} != z.len()+1={}",
+                "construct_path: times.len()={} != z.len()+1={}",
                 times.len(),
                 num_steps + 1
             )));
         }
         if times[0] != 0.0 {
             return Err(Error::Validation(format!(
-                "construct_path_irregular: times[0] must be 0.0, got {}",
+                "construct_path: times[0] must be 0.0, got {}",
                 times[0]
             )));
         }
         for w in times.windows(2) {
             if !w[1].is_finite() || w[1] <= w[0] {
                 return Err(Error::Validation(format!(
-                    "construct_path_irregular: times must be finite and strictly increasing, \
+                    "construct_path: times must be finite and strictly increasing, \
                      got {} after {}",
                     w[1], w[0]
                 )));
@@ -295,6 +208,11 @@ impl BrownianBridge {
 mod tests {
     use super::*;
 
+    /// Uniform grid `[0, dt, 2·dt, …, num_steps·dt]`.
+    fn uniform_times(num_steps: usize, dt: f64) -> Vec<f64> {
+        (0..=num_steps).map(|i| i as f64 * dt).collect()
+    }
+
     #[test]
     fn test_brownian_bridge_order() {
         let bridge = BrownianBridge::new(4);
@@ -318,7 +236,9 @@ mod tests {
         let mut w = vec![f64::NAN; 5];
         let dt = 0.25;
 
-        bridge.construct_path(&z, &mut w, dt).unwrap();
+        bridge
+            .construct_path(&z, &mut w, &uniform_times(4, dt))
+            .unwrap();
 
         assert_eq!(w[0], 0.0);
 
@@ -337,11 +257,12 @@ mod tests {
         let z = vec![1.0, 0.5, -0.5, 0.0];
         let dt = 0.25;
 
+        let times = uniform_times(4, dt);
         let mut nan_buffer = vec![f64::NAN; 5];
-        bridge.construct_path(&z, &mut nan_buffer, dt).unwrap();
+        bridge.construct_path(&z, &mut nan_buffer, &times).unwrap();
 
         let mut zero_buffer = vec![0.0; 5];
-        bridge.construct_path(&z, &mut zero_buffer, dt).unwrap();
+        bridge.construct_path(&z, &mut zero_buffer, &times).unwrap();
 
         assert_eq!(zero_buffer, nan_buffer);
     }
@@ -353,35 +274,13 @@ mod tests {
         let times = vec![0.0, 0.1, 0.4, 1.0];
         let mut w = vec![f64::NAN; 4];
 
-        bridge.construct_path_irregular(&z, &mut w, &times).unwrap();
+        bridge.construct_path(&z, &mut w, &times).unwrap();
 
         assert_eq!(w[0], 0.0);
         assert!((w[3] - 1.0).abs() < 1e-12);
         assert!((w[1] - 0.1).abs() < 1e-12);
         for value in w {
             assert!(value.is_finite());
-        }
-    }
-
-    #[test]
-    fn test_uniform_grid_matches_irregular_constructor() {
-        let bridge = BrownianBridge::new(4);
-        let z = vec![0.75, -0.25, 1.25, -1.0];
-        let dt = 0.25;
-        let times = vec![0.0, dt, 2.0 * dt, 3.0 * dt, 4.0 * dt];
-        let mut uniform_path = vec![f64::NAN; 5];
-        let mut irregular_path = vec![f64::NAN; 5];
-
-        bridge.construct_path(&z, &mut uniform_path, dt).unwrap();
-        bridge
-            .construct_path_irregular(&z, &mut irregular_path, &times)
-            .unwrap();
-
-        for (uniform, irregular) in uniform_path.iter().zip(irregular_path.iter()) {
-            assert!(
-                (uniform - irregular).abs() < 1e-12,
-                "uniform and irregular constructors diverged: {uniform} vs {irregular}"
-            );
         }
     }
 
@@ -393,7 +292,7 @@ mod tests {
 
         let z: Vec<f64> = vec![];
         let mut w = vec![f64::NAN; 1];
-        bridge.construct_path(&z, &mut w, 0.25).unwrap();
+        bridge.construct_path(&z, &mut w, &[0.0]).unwrap();
         assert_eq!(w, vec![0.0]);
     }
 
@@ -401,14 +300,17 @@ mod tests {
     fn zero_and_one_step_bridges_validate_their_own_dimensions() {
         let zero = BrownianBridge::new(0);
         let mut two_points = [0.0; 2];
-        assert!(zero.construct_path(&[0.0], &mut two_points, 0.25).is_err());
+        assert!(zero
+            .construct_path(&[0.0], &mut two_points, &[0.0, 0.25])
+            .is_err());
 
         let one = BrownianBridge::new(1);
         let mut one_point = [0.0; 1];
-        assert!(one.construct_path(&[], &mut one_point, 0.25).is_err());
+        assert!(one.construct_path(&[], &mut one_point, &[0.0]).is_err());
 
         let mut valid = [f64::NAN; 2];
-        one.construct_path(&[2.0], &mut valid, 0.25).unwrap();
+        one.construct_path(&[2.0], &mut valid, &[0.0, 0.25])
+            .unwrap();
         assert_eq!(valid, [0.0, 1.0]);
     }
 
@@ -417,29 +319,34 @@ mod tests {
         let bridge = BrownianBridge::new(4);
         let z = vec![1.0, 0.5, -0.5, 0.0];
 
+        let times = uniform_times(4, 0.25);
+
         // Wrong output length
         let mut w_short = vec![0.0; 4];
-        assert!(bridge.construct_path(&z, &mut w_short, 0.25).is_err());
+        assert!(bridge.construct_path(&z, &mut w_short, &times).is_err());
 
         // Wrong shock count for this bridge
         let mut w = vec![0.0; 3];
-        assert!(bridge.construct_path(&[1.0, 0.5], &mut w, 0.25).is_err());
+        assert!(bridge
+            .construct_path(&[1.0, 0.5], &mut w, &[0.0, 0.25, 0.5])
+            .is_err());
 
-        // Bad dt
-        let mut w5 = vec![0.0; 5];
-        assert!(bridge.construct_path(&z, &mut w5, 0.0).is_err());
-        assert!(bridge.construct_path(&z, &mut w5, f64::NAN).is_err());
-
-        // Irregular grid: times[0] != 0, non-monotonic, wrong length
+        // Non-finite times
         let mut w5 = vec![0.0; 5];
         assert!(bridge
-            .construct_path_irregular(&z, &mut w5, &[0.1, 0.2, 0.3, 0.4, 0.5])
+            .construct_path(&z, &mut w5, &[0.0, 0.25, f64::NAN, 0.75, 1.0])
+            .is_err());
+
+        // times[0] != 0, non-monotonic, wrong length
+        let mut w5 = vec![0.0; 5];
+        assert!(bridge
+            .construct_path(&z, &mut w5, &[0.1, 0.2, 0.3, 0.4, 0.5])
             .is_err());
         assert!(bridge
-            .construct_path_irregular(&z, &mut w5, &[0.0, 0.2, 0.15, 0.4, 0.5])
+            .construct_path(&z, &mut w5, &[0.0, 0.2, 0.15, 0.4, 0.5])
             .is_err());
         assert!(bridge
-            .construct_path_irregular(&z, &mut w5, &[0.0, 0.2, 0.4, 0.5])
+            .construct_path(&z, &mut w5, &[0.0, 0.2, 0.4, 0.5])
             .is_err());
     }
 
@@ -449,17 +356,16 @@ mod tests {
     fn reference_construct_path(
         num_steps: usize,
         construction_order: &[usize],
-        std_multipliers: &[f64],
         z: &[f64],
         w_out: &mut [f64],
-        dt: f64,
+        times: &[f64],
     ) {
         w_out.fill(f64::NAN);
         w_out[0] = 0.0;
         if num_steps == 0 {
             return;
         }
-        w_out[num_steps] = z[0] * (num_steps as f64 * dt).sqrt();
+        w_out[num_steps] = z[0] * times[num_steps].sqrt();
 
         let mut populated = std::collections::BTreeSet::new();
         populated.insert(0);
@@ -471,13 +377,14 @@ mod tests {
                 .next()
                 .copied()
                 .unwrap_or(num_steps);
-            let left_time = left as f64 * dt;
-            let idx_time = idx as f64 * dt;
-            let right_time = right as f64 * dt;
+            let left_time = times[left];
+            let idx_time = times[idx];
+            let right_time = times[right];
             let alpha = (idx_time - left_time) / (right_time - left_time);
             let conditional_mean = w_out[left] + alpha * (w_out[right] - w_out[left]);
-            let conditional_std = std_multipliers[i] * dt.sqrt();
-            w_out[idx] = conditional_mean + conditional_std * z[i + 1];
+            let conditional_variance =
+                ((idx_time - left_time) * (right_time - idx_time)) / (right_time - left_time);
+            w_out[idx] = conditional_mean + conditional_variance.sqrt() * z[i + 1];
             populated.insert(idx);
         }
     }
@@ -489,38 +396,13 @@ mod tests {
             let z: Vec<f64> = (0..num_steps)
                 .map(|i| ((i % 23) as f64 * 0.113) - 1.2)
                 .collect();
+            let times = uniform_times(num_steps, 1.0 / 252.0);
 
-            let mut fast_uniform = vec![0.0; num_steps + 1];
-            bridge
-                .construct_path(&z, &mut fast_uniform, 1.0 / 252.0)
-                .expect("valid");
+            let mut fast = vec![0.0; num_steps + 1];
+            bridge.construct_path(&z, &mut fast, &times).expect("valid");
             let mut reference = vec![0.0; num_steps + 1];
-            reference_construct_path(
-                num_steps,
-                bridge.order(),
-                bridge.multipliers(),
-                &z,
-                &mut reference,
-                1.0 / 252.0,
-            );
-            assert_eq!(fast_uniform, reference, "uniform grid, n={num_steps}");
-
-            // Irregular grids share the same bracket table; on an identical
-            // spacing the two paths agree up to floating-point op order
-            // (the variance is recomputed from `times` rather than taken from
-            // the multiplier table).
-            let dt = 1.0 / 252.0;
-            let times: Vec<f64> = (0..=num_steps).map(|i| i as f64 * dt).collect();
-            let mut fast_irregular = vec![0.0; num_steps + 1];
-            bridge
-                .construct_path_irregular(&z, &mut fast_irregular, &times)
-                .expect("valid");
-            for (irregular, uniform) in fast_irregular.iter().zip(&fast_uniform) {
-                assert!(
-                    (irregular - uniform).abs() < 1e-12,
-                    "irregular vs uniform diverged at n={num_steps}: {irregular} vs {uniform}"
-                );
-            }
+            reference_construct_path(num_steps, bridge.order(), &z, &mut reference, &times);
+            assert_eq!(fast, reference, "n={num_steps}");
         }
     }
 }

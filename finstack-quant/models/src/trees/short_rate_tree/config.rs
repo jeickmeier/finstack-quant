@@ -33,29 +33,14 @@ pub trait TreeDiscounting: Copy {
     fn tree_to_continuous(self, rate: f64, dt: f64) -> f64;
 }
 
-/// Compounding periods per year for the periodic conventions (`Annual` = 1).
-fn periods(comp: Compounding) -> Option<f64> {
-    match comp {
-        Compounding::Continuous | Compounding::Simple => None,
-        Compounding::Annual => Some(1.0),
-        Compounding::Periodic(n) => Some(f64::from(n.get())),
-    }
-}
-
 impl TreeDiscounting for Compounding {
     #[inline]
     fn tree_df(self, rate: f64, dt: f64) -> f64 {
         const FLOOR: f64 = 1e-15;
-        match (self, periods(self)) {
-            (_, Some(n)) => {
-                let base = (1.0 + rate / n).max(FLOOR);
-                base.powf(-n * dt)
-            }
-            (Compounding::Simple, None) => {
-                let denom = 1.0 + rate * dt;
-                1.0 / denom.max(FLOOR)
-            }
-            _ => (-rate * dt).exp(),
+        match (self, self.periods_per_year().map(f64::from)) {
+            (_, Some(n)) if 1.0 + rate / n < FLOOR => FLOOR.powf(-n * dt),
+            (Compounding::Simple, None) if 1.0 + rate * dt < FLOOR => 1.0 / FLOOR,
+            _ => self.df_from_rate(rate, dt),
         }
     }
 
@@ -68,11 +53,7 @@ impl TreeDiscounting for Compounding {
             );
             return 0.0;
         }
-        match (self, periods(self)) {
-            (_, Some(n)) => n * (df.powf(-1.0 / (n * dt)) - 1.0),
-            (Compounding::Simple, None) => (1.0 / df - 1.0) / dt,
-            _ => -df.ln() / dt,
-        }
+        self.rate_from_df(df, dt)
     }
 
     #[inline]

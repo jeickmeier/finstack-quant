@@ -79,11 +79,11 @@ impl RatingFactorTable {
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::error::InputError::NotFound`] when the
+    /// Returns [`finstack_quant_core::InputError::NotFound`] when the
     /// table contains no factor for `rating`.
     pub fn get_factor(&self, rating: CreditRating) -> Result<f64> {
         self.factors.get(&rating).copied().ok_or_else(|| {
-            Error::Input(finstack_quant_core::error::InputError::NotFound {
+            Error::Input(finstack_quant_core::InputError::NotFound {
                 id: format!("rating factor for {rating}"),
             })
         })

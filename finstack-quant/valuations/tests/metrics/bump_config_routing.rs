@@ -30,6 +30,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::math::special_functions::{norm_cdf, norm_pdf};
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider, SimpleFxProvider};

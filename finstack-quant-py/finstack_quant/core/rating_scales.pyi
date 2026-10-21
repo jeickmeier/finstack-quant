@@ -30,7 +30,7 @@ class UnknownScalePolicy:
     Examples
     --------
     >>> from finstack_quant.core.rating_scales import UnknownScalePolicy
-    >>> UnknownScalePolicy.from_name("error").name
+    >>> str(UnknownScalePolicy.from_name("error"))
     'error'
 
     """
@@ -47,13 +47,14 @@ class UnknownScalePolicy:
     @classmethod
     def from_name(cls, name: str) -> UnknownScalePolicy:
         """
-        Parse a policy from its exact lowercase snake_case name (case-sensitive).
+        Parse a policy from its snake_case name, case-insensitively.
 
         Parameters
         ----------
         name : str
-            Exactly one of ``"error"``, ``"fallback_to_default"``, or
-            ``"warn_and_fallback"``; ``"ERROR"`` is rejected.
+            One of ``"error"``, ``"fallback_to_default"``, or
+            ``"warn_and_fallback"``, in any ASCII case; surrounding whitespace
+            is ignored.
 
         Returns
         -------
@@ -68,41 +69,11 @@ class UnknownScalePolicy:
         Examples
         --------
         >>> from finstack_quant.core.rating_scales import UnknownScalePolicy
-        >>> UnknownScalePolicy.from_name("error").name
+        >>> str(UnknownScalePolicy.from_name("error"))
         'error'
 
         """
 
-    @property
-    def name(self) -> str:
-        """
-        Canonical snake_case policy name.
-
-        Returns
-        -------
-        str
-            Policy identifier string.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-
-    def to_json(self) -> str:
-        """
-        Serialize this policy to a JSON string.
-
-        Returns
-        -------
-        str
-            Canonical JSON representation of this `UnknownScalePolicy`, suitable for a matching `from_json` call.
-
-        Raises
-        ------
-        ValueError
-            If the value cannot be serialized to JSON.
-        """
-        ...
     @classmethod
     def from_json(cls, json: str) -> UnknownScalePolicy:
         """
@@ -126,7 +97,7 @@ class UnknownScalePolicy:
         Examples
         --------
         >>> from finstack_quant.core.rating_scales import UnknownScalePolicy
-        >>> UnknownScalePolicy.from_json(UnknownScalePolicy.ERROR.to_json()).name
+        >>> str(UnknownScalePolicy.from_json(UnknownScalePolicy.ERROR.to_json()))
         'error'
 
         """
@@ -521,7 +492,7 @@ class RatingScaleRegistry:
     >>> from finstack_quant.core.config import FinstackConfig
     >>> from finstack_quant.core.rating_scales import registry_from_config
     >>> registry = registry_from_config(FinstackConfig())
-    >>> (registry.default_scale_id(), registry.default_scorecard_score(), registry.unknown_scale_policy().name)
+    >>> (registry.default_scale_id(), registry.default_scorecard_score(), str(registry.unknown_scale_policy()))
     ('sp', 50.0, 'fallback_to_default')
     >>> (registry.is_known_rating_scale("S&P"), registry.rating_scale("S&P").scale_name)
     (True, 'S&P')
@@ -752,7 +723,7 @@ def registry_from_config(config: FinstackConfig) -> RatingScaleRegistry:
     >>> from finstack_quant.core.config import FinstackConfig
     >>> from finstack_quant.core.rating_scales import registry_from_config
     >>> registry = registry_from_config(FinstackConfig())
-    >>> (registry.default_scale_id(), registry.default_scorecard_score(), registry.unknown_scale_policy().name)
+    >>> (registry.default_scale_id(), registry.default_scorecard_score(), str(registry.unknown_scale_policy()))
     ('sp', 50.0, 'fallback_to_default')
     >>> (registry.is_known_rating_scale("S&P"), registry.rating_scale("S&P").scale_name)
     (True, 'S&P')

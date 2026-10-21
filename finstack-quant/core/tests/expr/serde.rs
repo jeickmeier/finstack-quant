@@ -3,11 +3,9 @@
 //! This module tests serde roundtrip for:
 //! - Expression AST nodes (Column, Literal, Call, BinOp, IfThenElse)
 //! - Function enum variants
-//! - Evaluation result envelope (EvaluationResult)
 //! - Context types (SimpleContext)
 
-use finstack_quant_core::config::{ResultsMeta, RoundingContext, NUMERIC_MODE_F64};
-use finstack_quant_core::expr::{EvaluationResult, Expr, ExprNode, Function, SimpleContext};
+use finstack_quant_core::expr::{Expr, ExprNode, Function, SimpleContext};
 
 #[test]
 fn test_expr_ast_serde_roundtrip() {
@@ -115,35 +113,6 @@ fn test_function_enum_serde() {
             .unwrap_or_else(|_| panic!("Failed to deserialize {:?}", func));
         assert_eq!(func, deserialized);
     }
-}
-
-#[test]
-fn test_evaluation_result_serde() {
-    let result = EvaluationResult {
-        values: vec![1.0, 2.0, 3.0, 4.0, 5.0],
-        metadata: ResultsMeta {
-            numeric_mode: NUMERIC_MODE_F64.to_owned(),
-            rounding: RoundingContext::default(),
-            fx_policy_applied: None,
-            parallel: false,
-            timestamp: None,
-            version: None,
-        },
-    };
-
-    let json = serde_json::to_string(&result).expect("Failed to serialize EvaluationResult");
-    let deserialized: EvaluationResult =
-        serde_json::from_str(&json).expect("Failed to deserialize EvaluationResult");
-
-    assert_eq!(result.values, deserialized.values);
-    assert_eq!(
-        result.metadata.numeric_mode,
-        deserialized.metadata.numeric_mode
-    );
-    assert_eq!(
-        result.metadata.rounding.version,
-        deserialized.metadata.rounding.version
-    );
 }
 
 #[test]

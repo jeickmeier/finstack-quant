@@ -38,7 +38,6 @@
   "kind": "pricing",
   "market": {
     "data": {
-      "collateral": {},
       "credit_indices": [],
       "curves": [
         {

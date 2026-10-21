@@ -44,7 +44,6 @@ use rust_decimal::Decimal;
 #[serde(deny_unknown_fields)]
 pub struct DrawEvent {
     /// Date of the draw.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -65,7 +64,6 @@ pub struct DrawEvent {
 #[serde(deny_unknown_fields)]
 pub struct MarginStep {
     /// Effective-from date of the margin change.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -117,7 +115,6 @@ impl Default for OidEirSpec {
 pub struct CommitmentStep {
     /// Date the new commitment takes effect (strictly after the commitment
     /// date, on or before maturity).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -148,7 +145,6 @@ pub struct CommitmentStep {
 #[serde(deny_unknown_fields)]
 pub struct FeeStep {
     /// Date the deltas take effect (strictly inside the facility life).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -176,7 +172,6 @@ pub struct FeeStep {
 pub struct ScheduledFee {
     /// Payment date (strictly after the commitment date, on or before
     /// maturity).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -228,7 +223,6 @@ impl UpfrontFee {
 pub struct LcEvent {
     /// Date the letter of credit is issued or expires (strictly after the
     /// simulation anchor, on or before maturity).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

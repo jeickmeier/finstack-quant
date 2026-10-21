@@ -120,16 +120,21 @@ Exported functions never declare `&str`, `String`, `bool`, integer or
 coerces it silently. Declare `JsValue` (`Option<JsValue>` when optional) and
 convert; `tests/boundary_signatures.rs` enforces this.
 
-| Argument | Helper |
-| --- | --- |
-| string, boolean, integer | `input::js_string`, `js_bool`, `js_uint` / `js_int` (and the `js_opt_*` twins) |
-| number sequence / matrix | `input::js_f64_seq`, `js_f64_matrix` |
-| ISO date string | `wire::js_date` |
-| struct-shaped spec / config / result (object or JSON text) | `input::from_js_json::<T>` |
-| value whose wire form can be a bare string — a unit enum variant (`"parallel"`), a day count, a currency | `wire::js_wire::<T>` / `js_opt_wire` |
+| Argument                                                                                     | Helper                                                                         |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| string, boolean, integer                                                                     | `input::js_string`, `js_bool`, `js_uint` / `js_int` (and the `js_opt_*` twins) |
+| number sequence / matrix                                                                     | `input::js_f64_seq`, `js_f64_matrix`                                           |
+| ISO date string                                                                              | `wire::js_date`                                                                |
+| ISO-4217 currency code (any ASCII case, as `new Currency("usd")`)                            | `input::js_currency` / `js_opt_currency`                                       |
+| struct-shaped spec / config / result (object or JSON text)                                   | `input::from_js_json::<T>`                                                     |
+| value whose wire form can be a bare string — a unit enum variant (`"parallel"`), a day count | `wire::js_wire::<T>` / `js_opt_wire`                                           |
+| unit-enum label already read as a string                                                     | `wire::parse_label::<T>` (and `wire::label` for the reverse)                   |
 
 `from_js_json` parses a JavaScript string as JSON text, so it rejects the bare
 label `"parallel"`; any type with a string-valued wire form must use `js_wire`.
+Currencies are the exception: `js_wire` follows the strict upper-case serde
+form, while every currency argument accepts any ASCII case through
+`js_currency` (Rust `Currency::from_str`).
 Never call `serde_wasm_bindgen::from_value`: its struct visitor ignores
 `deny_unknown_fields`.
 
@@ -189,7 +194,7 @@ Each `exports/<crate>.js` groups raw bindgen exports into a namespace. From
 `exports/valuations/market.js`:
 
 ```javascript
-import * as wasm from '../../pkg/finstack_quant_wasm.js';
+import * as wasm from "../../pkg/finstack_quant_wasm.js";
 
 export const market = {
   listedProductCatalog: wasm.listedProductCatalog,
@@ -200,10 +205,10 @@ export const market = {
 And `index.js` re-exports the initializer and all namespaces:
 
 ```javascript
-export { default } from './pkg/finstack_quant_wasm.js';
+export { default } from "./pkg/finstack_quant_wasm.js";
 
-export { core } from './exports/core.js';
-export { analytics } from './exports/analytics.js';
+export { core } from "./exports/core.js";
+export { analytics } from "./exports/analytics.js";
 // ... one per crate domain
 ```
 
@@ -257,17 +262,19 @@ a complete program: `mise run wasm-doc` type-checks each one against
 A facade test reads the `.wasm` bytes, because Node cannot fetch a file URL:
 
 ```javascript
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import init, { core } from '../../index.js';
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import init, { core } from "../../index.js";
 
 await init({
-  module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
+  module_or_path: readFileSync(
+    new URL("../../pkg/finstack_quant_wasm_bg.wasm", import.meta.url),
+  ),
 });
 
-test('core namespace exposes Currency', () => {
-  assert.equal(typeof core.Currency, 'function');
+test("core namespace exposes Currency", () => {
+  assert.equal(typeof core.Currency, "function");
 });
 ```
 

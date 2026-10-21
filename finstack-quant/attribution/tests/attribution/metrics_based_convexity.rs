@@ -20,7 +20,11 @@ use indexmap::IndexMap;
 use std::sync::Arc;
 use time::macros::date;
 
-fn build_flat_curve(curve_id: &str, as_of: time::Date, rate: f64) -> DiscountCurve {
+fn build_flat_curve(
+    curve_id: &str,
+    as_of: finstack_quant_core::dates::Date,
+    rate: f64,
+) -> DiscountCurve {
     let tenors = [0.0, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 20.0, 30.0];
     let knots: Vec<(f64, f64)> = tenors.iter().map(|&t| (t, (-rate * t).exp())).collect();
 

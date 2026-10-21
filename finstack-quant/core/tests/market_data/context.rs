@@ -39,7 +39,7 @@ fn surface_node(surface: &VolSurface, expiry: f64, strike: f64) -> f64 {
 
 #[test]
 fn vol_cube_accessors_reject_each_out_of_bounds_axis_before_flattening() {
-    let params = SabrParameterData::new(0.03, 0.5, -0.2, 0.3).expect("SABR node");
+    let params = SabrParameterData::new(0.03, 0.5, 0.3, -0.2).expect("SABR node");
     let cube = VolCube::from_grid(
         "CUBE",
         &[1.0, 2.0],
@@ -258,7 +258,9 @@ fn market_context_manages_fx_and_scalars() {
         Some(Currency::USD)
     );
     assert!(ctx.get_inflation_index("US-CPI").is_ok());
-    assert!(ctx.get_dividend_schedule("AAPL-DIVS").is_ok());
+    assert!(ctx
+        .dividends_iter()
+        .any(|(id, _)| id.as_str() == "AAPL-DIVS"));
     assert!(ctx.get_credit_index("CDX").is_ok());
 
     let ids: Vec<_> = ctx
@@ -632,7 +634,7 @@ fn credit_index_to_builder_revalidates_modified_fields() {
 }
 
 #[test]
-fn retaining_curves_removes_dangling_indices_and_collateral_mappings() {
+fn retaining_curves_removes_dangling_indices() {
     use std::collections::BTreeMap;
 
     let hazard = Arc::new(sample_hazard_curve("INDEX-HAZ"));
@@ -651,7 +653,6 @@ fn retaining_curves_removes_dangling_indices_and_collateral_mappings() {
         .insert(issuer)
         .insert(correlation)
         .insert(sample_discount_curve("USD-OIS"))
-        .map_collateral("CSA", CurveId::new("USD-OIS"))
         .insert_credit_index("INDEX", index)
         .expect("index dependencies");
 
@@ -660,7 +661,6 @@ fn retaining_curves_removes_dangling_indices_and_collateral_mappings() {
         let invalidated = retained.retain_curves_mut(|id, _| id.as_str() != removed);
         assert_eq!(invalidated, vec![CurveId::new("INDEX")]);
         assert!(retained.get_credit_index("INDEX").is_err());
-        assert!(retained.get_collateral("CSA").is_ok());
         let json = serde_json::to_string(&retained).expect("snapshot after retention");
         let _: MarketContext = serde_json::from_str(&json).expect("no dangling references");
     }
@@ -669,9 +669,8 @@ fn retaining_curves_removes_dangling_indices_and_collateral_mappings() {
     let invalidated = retained.retain_curves_mut(|id, _| id.as_str() != "USD-OIS");
     assert!(invalidated.is_empty());
     assert!(retained.get_credit_index("INDEX").is_ok());
-    assert!(retained.get_collateral("CSA").is_err());
     let json = serde_json::to_string(&retained).expect("snapshot without discount curve");
-    let _: MarketContext = serde_json::from_str(&json).expect("no dangling collateral mapping");
+    let _: MarketContext = serde_json::from_str(&json).expect("snapshot restores");
 }
 
 #[test]
@@ -904,7 +903,7 @@ fn market_context_snapshot_restore_mutators_drop_and_replace_owned_families() {
         "SWPT",
         &[1.0],
         &[5.0],
-        &[SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap()],
+        &[SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap()],
         &[0.03],
     )
     .unwrap();
@@ -924,12 +923,12 @@ fn market_context_snapshot_restore_mutators_drop_and_replace_owned_families() {
         .insert(sample_forward_curve("USD-LIBOR"))
         .insert_surface(sample_vol_surface())
         .insert_vol_cube(cube)
-        .insert_fx_delta_vol_surface(fx_delta)
         .insert_price("SPOT", MarketScalar::Unitless(100.0))
         .insert_series(series_keep)
         .insert_series(series_drop)
         .insert_inflation_index(index)
         .insert_dividends(divs);
+    ctx.insert_fx_delta_vol_surface_mut(fx_delta);
 
     ctx.retain_curves_mut(|id, _| id.as_str() == "USD-OIS");
     ctx.retain_series_mut(|id, _| id.as_str() == "KEEP")
@@ -951,7 +950,7 @@ fn market_context_snapshot_restore_mutators_drop_and_replace_owned_families() {
                     "NEW-SWPT",
                     &[1.0],
                     &[5.0],
-                    &[SabrParameterData::new(0.030, 0.5, -0.1, 0.3).unwrap()],
+                    &[SabrParameterData::new(0.030, 0.5, 0.3, -0.1).unwrap()],
                     &[0.025],
                 )
                 .unwrap(),
@@ -988,25 +987,7 @@ fn market_context_snapshot_restore_mutators_drop_and_replace_owned_families() {
     assert!(ctx.get_price("SPOT").is_err());
     assert!(ctx.get_series("KEEP").is_err());
     assert!(ctx.get_inflation_index("US-CPI").is_err());
-    assert!(ctx.get_dividend_schedule("DIVS").is_err());
-}
-
-#[test]
-fn market_context_collateral_and_stats() {
-    let ctx = MarketContext::new()
-        .insert(sample_discount_curve("USD-OIS"))
-        .map_collateral("USD-CSA", CurveId::from("USD-OIS"));
-
-    assert!(!ctx.is_empty());
-
-    let stats = ctx.stats();
-    assert_eq!(stats.total_curves, 1);
-    assert_eq!(stats.collateral_mapping_count, 1);
-
-    let collateral = ctx.get_collateral("USD-CSA").unwrap();
-    assert!(collateral.df(0.5) < 1.0);
-    let collateral_ref = ctx.get_collateral("USD-CSA").unwrap();
-    assert!(collateral_ref.df(1.0) < 1.0);
+    assert!(ctx.dividends_iter().all(|(id, _)| id.as_str() != "DIVS"));
 }
 
 #[test]
@@ -1026,8 +1007,8 @@ fn market_context_getters_type_mismatch_and_not_found() {
     assert!(ctx.get_credit_index("MISSING").is_err());
     assert!(ctx.get_inflation_index("MISSING").is_err());
     assert!(ctx.get_inflation_index("MISSING").is_err());
-    assert!(ctx.get_dividend_schedule("MISSING").is_err());
-    assert!(ctx.get_dividend_schedule("MISSING").is_err());
+    assert!(ctx.dividends_iter().all(|(id, _)| id.as_str() != "MISSING"));
+    assert!(ctx.dividends_iter().all(|(id, _)| id.as_str() != "MISSING"));
 
     // Type mismatch cases (ensure the "mismatch" branches are exercised)
     assert!(ctx.get_forward("USD-OIS").is_err());
@@ -1056,21 +1037,12 @@ fn market_context_surface_and_dividends_arc_variants_preserve_identity() {
     let got_surface = ctx.get_surface("EQ-VOL").unwrap();
     assert_eq!(got_surface.id(), surface.id());
 
-    let got_divs = ctx.get_dividend_schedule("AAPL-DIVS").unwrap();
+    let got_divs = ctx
+        .dividends_iter()
+        .find(|(id, _)| id.as_str() == "AAPL-DIVS")
+        .map(|(_, schedule)| schedule)
+        .unwrap();
     assert_eq!(got_divs.get_id(), dividends.get_id());
-}
-
-#[test]
-fn market_context_collateral_error_paths() {
-    // Missing mapping
-    let ctx = MarketContext::new().insert(sample_discount_curve("USD-OIS"));
-    assert!(ctx.get_collateral("MISSING-CSA").is_err());
-    assert!(ctx.get_collateral("MISSING-CSA").is_err());
-
-    // Mapping exists but curve is missing
-    let ctx = MarketContext::new().map_collateral("USD-CSA", CurveId::from("USD-OIS"));
-    assert!(ctx.get_collateral("USD-CSA").is_err());
-    assert!(ctx.get_collateral("USD-CSA").is_err());
 }
 
 #[test]
@@ -1084,7 +1056,6 @@ fn market_context_roll_forward_preserves_ids_and_clones_non_curves() {
         .insert(sample_base_correlation_curve("CDX-BC"))
         .insert_surface(surface)
         .insert_price("EQ-SPOT", MarketScalar::Unitless(1.0))
-        .map_collateral("USD-CSA", CurveId::from("USD-OIS"))
         .insert_fx(sample_fx_matrix());
 
     let before_base = ctx.get_discount("USD-OIS").unwrap().base_date();
@@ -1116,7 +1087,6 @@ fn market_context_roll_forward_preserves_ids_and_clones_non_curves() {
     assert!(rolled.fx().is_some());
     assert!(rolled.get_surface("EQ-VOL").is_ok());
     assert!(rolled.get_price("EQ-SPOT").is_ok());
-    assert!(rolled.get_collateral("USD-CSA").is_ok());
 
     // Curve count should be unchanged across roll
     assert_eq!(rolled.stats().total_curves, ctx.stats().total_curves);
@@ -1290,8 +1260,7 @@ fn market_context_apply_bumps_exercises_all_variants() {
 #[test]
 fn market_context_insert_and_stats_setters_cover_remaining_paths() {
     // Cover insert_surface(by value), insert_dividends(by value), insert_fx/insert_fx_mut,
-    // insert_credit_index_mut, map_collateral_mut and
-    // the mutable setters/iterators in stats.rs.
+    // insert_credit_index_mut and the mutable setters/iterators in stats.rs.
     let date = sample_base_date();
 
     let surface_by_value =
@@ -1335,10 +1304,6 @@ fn market_context_insert_and_stats_setters_cover_remaining_paths() {
         .expect("canonical credit index")
         .insert_fx(sample_fx_matrix());
 
-    // map_collateral
-    ctx = ctx.map_collateral("USD-CSA", CurveId::from("USD-OIS"));
-    assert!(ctx.get_collateral("USD-CSA").is_ok());
-
     // scalars / series / indices / dividends
     ctx = ctx.insert_price("PX", MarketScalar::Unitless(42.0));
 
@@ -1378,7 +1343,6 @@ fn market_context_insert_and_stats_setters_cover_remaining_paths() {
     assert!(stats.total_curves >= 1);
     assert!(stats.has_fx);
     assert!(stats.surface_count >= 1);
-    assert_eq!(stats.collateral_mapping_count, 1);
 }
 
 #[test]
@@ -1729,10 +1693,10 @@ fn inflation_bumps_match_direct_curve_and_context_entry_points() {
         .is_err());
 }
 
-/// `len()` counts every store, including the FX matrix, collateral mappings
-/// and dividend schedules; `is_empty()` agrees with it (dividends included).
+/// `len()` counts every store, including the FX matrix and dividend
+/// schedules; `is_empty()` agrees with it (dividends included).
 #[test]
-fn market_context_len_counts_fx_collateral_and_dividends() {
+fn market_context_len_counts_fx_and_dividends() {
     let empty = MarketContext::new();
     assert_eq!(empty.len(), 0);
     assert!(empty.is_empty());
@@ -1740,10 +1704,6 @@ fn market_context_len_counts_fx_collateral_and_dividends() {
     let fx_only = MarketContext::new().insert_fx(sample_fx_matrix());
     assert_eq!(fx_only.len(), 1);
     assert!(!fx_only.is_empty());
-
-    let collateral_only = MarketContext::new().map_collateral("USD-CSA", CurveId::from("USD-OIS"));
-    assert_eq!(collateral_only.len(), 1);
-    assert!(!collateral_only.is_empty());
 
     let dividends = DividendSchedule::builder("AAPL-DIVS")
         .build()
@@ -1757,7 +1717,6 @@ fn market_context_len_counts_fx_collateral_and_dividends() {
 
     let mixed = MarketContext::new()
         .insert(sample_discount_curve("USD-OIS"))
-        .insert_fx(sample_fx_matrix())
-        .map_collateral("USD-CSA", CurveId::from("USD-OIS"));
-    assert_eq!(mixed.len(), 3);
+        .insert_fx(sample_fx_matrix());
+    assert_eq!(mixed.len(), 2);
 }

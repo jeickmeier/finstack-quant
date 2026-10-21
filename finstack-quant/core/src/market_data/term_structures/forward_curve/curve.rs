@@ -24,17 +24,16 @@ impl ForwardCurve {
     #[must_use]
     pub fn builder(id: impl Into<CurveId>, tenor_years: f64) -> ForwardCurveBuilder {
         let id: CurveId = id.into();
-        let defaults = infer_forward_curve_defaults(id.as_str());
+        let (day_count, reset_lag) = infer_forward_curve_defaults(id.as_str());
         ForwardCurveBuilder {
             id,
             base: None,
-            reset_lag: defaults.reset_lag_business_days,
-            day_count: defaults.day_count,
+            reset_lag,
+            day_count,
             tenor: tenor_years,
             points: Vec::new(),
             projection_grid: None,
             style: InterpStyle::Linear,
-            min_forward_rate: None,
             extrapolation: ExtrapolationPolicy::FlatForward,
             rate_calibration: None,
             fx_policy: None,
@@ -86,27 +85,23 @@ impl ForwardCurve {
 
     /// Curve-basis forward rate starting on `date` for the curve's tenor.
     ///
-    /// Converts `date` to a year fraction from the base date under the curve
-    /// day count and evaluates [`ForwardCurve::rate`]. The returned rate is
+    /// Converts `date` to curve time with [`ForwardCurve::curve_time`] (dates
+    /// on or before the base date map to `0.0`, so they return the spot-start
+    /// forward) and evaluates [`ForwardCurve::rate`]. The returned rate is
     /// annualized on this curve's day-count basis; a contractual index with a
     /// different accrual basis requires conversion before calculating a coupon.
     ///
     /// # Arguments
     ///
-    /// * `date` - Calendar date on or after the curve base date at which the
-    ///   forward rate is observed.
+    /// * `date` - Calendar date at which the forward rate is observed; dates
+    ///   on or before the curve base date read the rate at curve time zero.
     ///
     /// # Errors
     ///
     /// Propagates a failure while computing the curve day-count fraction from
     /// the base date to `date`.
     pub fn rate_on_date(&self, date: Date) -> crate::Result<f64> {
-        let t = crate::market_data::term_structures::common::year_fraction_to(
-            self.base,
-            date,
-            self.day_count,
-        )?;
-        Ok(self.rate(t))
+        Ok(self.rate(self.curve_time(date)?))
     }
 
     /// Curve time of a calendar date: year fraction from the curve base date on
@@ -130,12 +125,11 @@ impl ForwardCurve {
         if date <= self.base {
             return Ok(0.0);
         }
-        let t = crate::market_data::term_structures::common::year_fraction_to(
+        self.day_count.signed_year_fraction(
             self.base,
             date,
-            self.day_count,
-        )?;
-        Ok(t.max(0.0))
+            crate::dates::DayCountContext::default(),
+        )
     }
 
     /// Discount-factor-implied simple term forward over a date interval,
@@ -576,10 +570,10 @@ impl ForwardCurve {
     #[inline]
     #[must_use = "computed discount factor should not be discarded"]
     pub fn df_on_date(&self, date: Date) -> crate::Result<f64> {
-        let t = crate::market_data::term_structures::common::year_fraction_to(
+        let t = self.day_count.signed_year_fraction(
             self.base,
             date,
-            self.day_count,
+            crate::dates::DayCountContext::default(),
         )?;
         self.df(t)
     }

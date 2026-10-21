@@ -211,7 +211,12 @@ fn heterogeneous_context_rolls_backward_with_each_curves_time_basis() {
         expected_base
     );
     assert_eq!(
-        rolled.get_basis_spread("BASIS").expect("basis").base_date(),
+        rolled
+            .curve("BASIS")
+            .and_then(|c| c.basis_spread())
+            .cloned()
+            .expect("basis")
+            .base_date(),
         expected_base
     );
 }

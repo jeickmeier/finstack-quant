@@ -6,18 +6,18 @@ use crate::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::Error;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use std::str::FromStr;
 
 /// Parsed CDS convention tables used to build [`ConventionRegistry`].
 #[derive(Debug)]
 pub(crate) struct CdsRegistryTables {
     /// Explicit `{currency}:{clause}` rows.
-    pub entries: HashMap<CdsConventionKey, CdsConventionSpec>,
+    pub entries: FxHashMap<CdsConventionKey, CdsConventionSpec>,
     /// `ANY:{family}` fallback rows resolved by the registry.
-    pub any: HashMap<CdsConvention, CdsConventionSpec>,
+    pub any: FxHashMap<CdsConvention, CdsConventionSpec>,
     /// Explicit regional family per currency (`isda_na` / `isda_eu` / `isda_as`).
-    pub primary_family: HashMap<Currency, CdsConvention>,
+    pub primary_family: FxHashMap<Currency, CdsConvention>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -82,10 +82,10 @@ fn load_registry_from_str(json: &str) -> Result<CdsRegistryTables, Error> {
     })?;
     file.validate_metadata("CDS")?;
 
-    let mut entries: HashMap<CdsConventionKey, CdsConventionSpec> = HashMap::default();
-    let mut any: HashMap<CdsConvention, CdsConventionSpec> = HashMap::default();
-    let mut primary_family: HashMap<Currency, CdsConvention> = HashMap::default();
-    let mut seen_ids: HashMap<String, ()> = HashMap::default();
+    let mut entries: FxHashMap<CdsConventionKey, CdsConventionSpec> = FxHashMap::default();
+    let mut any: FxHashMap<CdsConvention, CdsConventionSpec> = FxHashMap::default();
+    let mut primary_family: FxHashMap<Currency, CdsConvention> = FxHashMap::default();
+    let mut seen_ids: FxHashMap<String, ()> = FxHashMap::default();
 
     for entry in file.entries {
         let spec = entry.record.clone().into_spec()?;

@@ -77,11 +77,7 @@ pub enum RateCalibrationPillar {
     /// Relative tenor resolved from the calibration base date.
     Tenor(Tenor),
     /// Absolute calendar date.
-    Date(
-        #[serde(with = "crate::wire::date")]
-        #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
-        Date,
-    ),
+    Date(#[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))] Date),
 }
 
 /// Lossless rate quote representation used by calibration replay.
@@ -114,7 +110,6 @@ pub enum RateCalibrationQuote {
         /// Convention-registry identifier for the futures contract.
         contract: RateCalibrationFutureContractId,
         /// Futures expiry date.
-        #[serde(with = "crate::wire::date")]
         #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
         expiry: Date,
         /// Quoted futures price.

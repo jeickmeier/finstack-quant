@@ -1,19 +1,20 @@
 //! Discount curve bindings.
 
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ValidationMode};
+use finstack_quant_core::market_data::traits::Discounting;
 
 use std::sync::Arc;
 
+use finstack_quant_core::math::interp::ExtrapolationPolicy;
+use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::math::Compounding;
 use pyo3::prelude::*;
 
 use super::forward::PyForwardCurve;
-use super::helpers::{
-    columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods, parse_compounding,
-    parse_extrapolation, parse_interp_style, TimePoint,
-};
+use super::helpers::{columns_to_dataframe, extract_time_point, TimePoint};
 use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::macros::impl_repr_html_via_dataframe;
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::errors::core_to_py;
 
 /// Discount factor curve for present-value calculations.
@@ -48,12 +49,6 @@ impl PyDiscountCurve {
     /// Build from an existing `Arc<DiscountCurve>`.
     pub(crate) fn from_inner(inner: Arc<DiscountCurve>) -> Self {
         Self { inner }
-    }
-
-    fn wrap(curve: DiscountCurve) -> Self {
-        Self {
-            inner: Arc::new(curve),
-        }
     }
 }
 
@@ -131,10 +126,14 @@ impl PyDiscountCurve {
             .knots(knots)
             .calendar_id_opt(calendar_id);
         if let Some(interp) = interp {
-            builder = builder.interp(parse_interp_style(interp)?);
+            builder = builder.interp(interp.parse::<InterpStyle>().map_err(core_to_py)?);
         }
         if let Some(extrapolation) = extrapolation {
-            builder = builder.extrapolation(parse_extrapolation(extrapolation)?);
+            builder = builder.extrapolation(
+                extrapolation
+                    .parse::<ExtrapolationPolicy>()
+                    .map_err(core_to_py)?,
+            );
         }
         if let Some(day_count) = day_count {
             builder = builder.day_count(extract_day_count(day_count)?);
@@ -143,7 +142,10 @@ impl PyDiscountCurve {
             ValidationMode::from_preset(validation_mode, forward_floor).map_err(core_to_py)?,
         );
 
-        builder.build().map(Self::wrap).map_err(core_to_py)
+        builder
+            .build()
+            .map(|curve| Self::from_inner(Arc::new(curve)))
+            .map_err(core_to_py)
     }
 
     /// Construct a flat continuously-compounded discount curve.
@@ -177,7 +179,7 @@ impl PyDiscountCurve {
     #[pyo3(text_signature = "(id, base_date, continuous_rate)")]
     fn flat(id: &str, base_date: &Bound<'_, PyAny>, continuous_rate: f64) -> PyResult<Self> {
         DiscountCurve::flat(id, py_to_date(base_date)?, continuous_rate)
-            .map(Self::wrap)
+            .map(|curve| Self::from_inner(Arc::new(curve)))
             .map_err(core_to_py)
     }
 
@@ -224,9 +226,9 @@ impl PyDiscountCurve {
             id,
             py_to_date(base_date)?,
             &points,
-            parse_compounding(compounding)?,
+            compounding.parse::<Compounding>().map_err(core_to_py)?,
         )
-        .map(Self::wrap)
+        .map(|curve| Self::from_inner(Arc::new(curve)))
         .map_err(core_to_py)
     }
 
@@ -273,7 +275,7 @@ impl PyDiscountCurve {
             .collect::<PyResult<Vec<_>>>()?;
         let day_count = day_count.map(extract_day_count).transpose()?;
         DiscountCurve::from_dates(id, py_to_date(base_date)?, &points, day_count)
-            .map(Self::wrap)
+            .map(|curve| Self::from_inner(Arc::new(curve)))
             .map_err(core_to_py)
     }
 
@@ -301,33 +303,6 @@ impl PyDiscountCurve {
         }
     }
 
-    /// Continuously-compounded zero rate (decimal) at a year fraction or date.
-    ///
-    /// Parameters
-    /// ----------
-    /// t : float | datetime.date | str
-    ///     Year fraction from ``base_date``, or a date converted with the curve day count.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Zero rate as a decimal (``0.05`` is 5%); ``0.0`` at ``t = 0``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a date precedes ``base_date``.
-    #[pyo3(text_signature = "(self, t)")]
-    fn zero(&self, t: &Bound<'_, PyAny>) -> PyResult<f64> {
-        match extract_time_point(t)? {
-            TimePoint::Years(t) => Ok(self.inner.zero(t)),
-            TimePoint::Date(d) => self
-                .inner
-                .zero_rate_on_date(d, finstack_quant_core::math::Compounding::Continuous)
-                .map_err(core_to_py),
-        }
-    }
-
     /// Zero rate at a year fraction or date under an explicit compounding convention.
     ///
     /// Parameters
@@ -349,7 +324,7 @@ impl PyDiscountCurve {
     ///     If ``t`` is a date preceding ``base_date`` or ``compounding`` is not a recognised label.
     #[pyo3(signature = (t, compounding="continuous"))]
     fn zero_rate(&self, t: &Bound<'_, PyAny>, compounding: &str) -> PyResult<f64> {
-        let comp = parse_compounding(compounding)?;
+        let comp = compounding.parse::<Compounding>().map_err(core_to_py)?;
         match extract_time_point(t)? {
             TimePoint::Years(t) => Ok(self.inner.zero_rate(t, comp)),
             TimePoint::Date(d) => self.inner.zero_rate_on_date(d, comp).map_err(core_to_py),
@@ -436,7 +411,10 @@ impl PyDiscountCurve {
         tenor: f64,
         interp: Option<&str>,
     ) -> PyResult<PyForwardCurve> {
-        let style = interp.map(parse_interp_style).transpose()?;
+        let style = interp
+            .map(str::parse::<InterpStyle>)
+            .transpose()
+            .map_err(core_to_py)?;
         self.inner
             .to_forward_curve(forward_id, tenor, style)
             .map(|curve| PyForwardCurve::from_inner(Arc::new(curve)))
@@ -539,5 +517,5 @@ impl PyDiscountCurve {
     }
 }
 
-impl_arc_serde_pymethods!(PyDiscountCurve, DiscountCurve, "DiscountCurve");
+wire_methods!(PyDiscountCurve, DiscountCurve, "DiscountCurve", arc);
 impl_repr_html_via_dataframe!(PyDiscountCurve);

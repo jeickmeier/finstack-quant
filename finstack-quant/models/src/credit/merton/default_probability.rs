@@ -1,4 +1,4 @@
-use finstack_quant_core::math::{log_norm_cdf, norm_cdf};
+use finstack_quant_core::math::special_functions::{log_norm_cdf, norm_cdf};
 use finstack_quant_core::{Error, Result};
 
 use super::{AssetDynamics, MertonBarrierType, MertonModel};
@@ -112,11 +112,11 @@ impl MertonModel {
         }
         // Start at the mode: exp(-lambda_t) underflows at about 746,
         // even though probabilities near the mean are still substantial.
-        // statrs' log-factorial gives a finite mode probability, anchoring
+        // ln Γ(mode + 1) = ln(mode!) gives a finite mode probability, anchoring
         // both recurrence directions without building large factorials.
         let mode = lambda_t.floor() as usize;
         let mode_log_weight = -lambda_t + mode as f64 * lambda_t.ln()
-            - statrs::function::factorial::ln_factorial(mode as u64);
+            - finstack_quant_core::math::special_functions::ln_gamma(mode as f64 + 1.0);
         components[mode].0 = mode_log_weight.exp();
         for n in (1..=mode).rev() {
             components[n - 1].0 = components[n].0 * n as f64 / lambda_t;
@@ -444,7 +444,7 @@ impl MertonModel {
 
 #[cfg(test)]
 mod tests {
-    use finstack_quant_core::math::norm_cdf;
+    use finstack_quant_core::math::special_functions::norm_cdf;
 
     use super::super::{AssetDynamics, MertonBarrierType, MertonModel};
 

@@ -1,13 +1,13 @@
 //! Tests for schedule iterator functionality.
 
-use super::common::{make_date, TestCal};
+use super::common::make_date;
 use finstack_quant_core::dates::{
-    BusinessDayConvention, ScheduleBuilder, ScheduleErrorPolicy, StubKind, Tenor,
+    BusinessDayConvention, Schedule, ScheduleErrorPolicy, StubKind, Tenor,
 };
 
 #[test]
 fn eom_rejects_incompatible_schedule_rules() {
-    let builder = || ScheduleBuilder::new(make_date(2025, 1, 1), make_date(2025, 12, 20)).unwrap();
+    let builder = || Schedule::builder(make_date(2025, 1, 1), make_date(2025, 12, 20)).unwrap();
     for frequency in [Tenor::daily(), Tenor::weekly()] {
         assert!(builder()
             .frequency(frequency)
@@ -18,7 +18,7 @@ fn eom_rejects_incompatible_schedule_rules() {
     assert!(builder().cds_imm().end_of_month(true).build().is_err());
     assert!(builder().end_of_month(true).cds_imm().build().is_err());
     assert!(builder().imm().end_of_month(true).build().is_err());
-    let weekly = ScheduleBuilder::new(make_date(2025, 1, 1), make_date(2025, 1, 29))
+    let weekly = Schedule::builder(make_date(2025, 1, 1), make_date(2025, 1, 29))
         .unwrap()
         .frequency(Tenor::weekly())
         .build()
@@ -30,11 +30,10 @@ fn eom_rejects_incompatible_schedule_rules() {
 
 #[test]
 fn schedule_calendar_setters_replace_the_previous_representation() {
-    use finstack_quant_core::dates::WEEKENDS_ONLY;
-    let builder = || ScheduleBuilder::new(make_date(2025, 6, 4), make_date(2025, 7, 4)).unwrap();
+    let builder = || Schedule::builder(make_date(2025, 6, 4), make_date(2025, 7, 4)).unwrap();
     let replaced_id = builder()
-        .adjust_with_id(BusinessDayConvention::Following, "usny")
-        .adjust_with(BusinessDayConvention::Following, &WEEKENDS_ONLY)
+        .adjust_with(BusinessDayConvention::Following, "usny")
+        .adjust_with(BusinessDayConvention::Following, "weekends_only")
         .build()
         .unwrap();
     assert_eq!(
@@ -42,8 +41,8 @@ fn schedule_calendar_setters_replace_the_previous_representation() {
         Some(&make_date(2025, 7, 4))
     );
     let replaced_calendar = builder()
-        .adjust_with(BusinessDayConvention::Following, &WEEKENDS_ONLY)
-        .adjust_with_id(BusinessDayConvention::Following, "usny")
+        .adjust_with(BusinessDayConvention::Following, "weekends_only")
+        .adjust_with(BusinessDayConvention::Following, "usny")
         .build()
         .unwrap();
     assert_eq!(
@@ -52,8 +51,8 @@ fn schedule_calendar_setters_replace_the_previous_representation() {
     );
     // Replacing an invalid deferred ID must discard its pending lookup too.
     assert!(builder()
-        .adjust_with_id(BusinessDayConvention::Following, "invalid_calendar")
-        .adjust_with(BusinessDayConvention::Following, &WEEKENDS_ONLY)
+        .adjust_with(BusinessDayConvention::Following, "invalid_calendar")
+        .adjust_with(BusinessDayConvention::Following, "weekends_only")
         .build()
         .is_ok());
 }
@@ -68,14 +67,13 @@ fn eom_roll_grid_accepts_regular_quarters_from_february() {
             StubKind::ShortFront,
             StubKind::LongFront,
         ] {
-            let schedule =
-                ScheduleBuilder::new(make_date(year, 2, feb_end), make_date(year, 8, 31))
-                    .unwrap()
-                    .frequency(Tenor::quarterly())
-                    .end_of_month(true)
-                    .stub_rule(stub)
-                    .build()
-                    .unwrap();
+            let schedule = Schedule::builder(make_date(year, 2, feb_end), make_date(year, 8, 31))
+                .unwrap()
+                .frequency(Tenor::quarterly())
+                .end_of_month(true)
+                .stub_rule(stub)
+                .build()
+                .unwrap();
             assert_eq!(
                 schedule.dates.as_slice(),
                 [
@@ -87,7 +85,7 @@ fn eom_roll_grid_accepts_regular_quarters_from_february() {
         }
     }
     assert!(
-        ScheduleBuilder::new(make_date(2025, 2, 28), make_date(2025, 8, 28))
+        Schedule::builder(make_date(2025, 2, 28), make_date(2025, 8, 28))
             .unwrap()
             .frequency(Tenor::quarterly())
             .end_of_month(true)
@@ -101,7 +99,7 @@ fn test_basic_schedule() {
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 4, 15);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
         .build()
@@ -122,7 +120,7 @@ fn test_quarterly_schedule_with_short_back_stub() {
     let start = make_date(2025, 1, 1);
     let end = make_date(2025, 11, 1); // 10 months
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::ShortBack)
@@ -145,7 +143,7 @@ fn test_stub_none_rejects_non_integer_tenor() {
     let start = make_date(2025, 1, 1);
     let end = make_date(2025, 11, 1); // 10 months, not a multiple of 3
 
-    let result = ScheduleBuilder::new(start, end)
+    let result = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::None)
@@ -162,7 +160,7 @@ fn test_short_front_stub() {
     let start = make_date(2025, 1, 1);
     let end = make_date(2025, 11, 1);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::ShortFront)
@@ -185,7 +183,7 @@ fn test_day_based_frequency() {
     let start = make_date(2025, 1, 1); // Wednesday
     let end = make_date(2025, 1, 15);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::weekly()) // 7 days
         .build()
@@ -203,7 +201,7 @@ fn test_day_based_frequency() {
 fn test_single_date_schedule() {
     let date = make_date(2025, 1, 15);
 
-    let result = ScheduleBuilder::new(date, date)
+    let result = Schedule::builder(date, date)
         .unwrap()
         .frequency(Tenor::monthly())
         .build();
@@ -216,15 +214,14 @@ fn test_single_date_schedule() {
 
 #[test]
 fn test_schedule_with_business_day_adjustment() {
-    let cal = TestCal::new().with_holiday(make_date(2025, 1, 1)); // New Year's Day (Wednesday)
-
+    // TARGET2 closes on New Year's Day (Wednesday 1 Jan 2025).
     let start = make_date(2025, 1, 1); // Holiday Wednesday
     let end = make_date(2025, 1, 8);
 
-    let schedule = ScheduleBuilder::new(start, end)
+    let schedule = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::weekly())
-        .adjust_with(BusinessDayConvention::Following, &cal)
+        .adjust_with(BusinessDayConvention::Following, "target2")
         .build()
         .unwrap();
     let dates: Vec<_> = schedule.dates.clone();
@@ -238,15 +235,14 @@ fn test_schedule_with_business_day_adjustment() {
 
 #[test]
 fn test_schedule_builder_with_adjustment() {
-    let cal = TestCal::new().with_holiday(make_date(2025, 1, 1)); // New Year's Day
-
+    // TARGET2: New Year's Day is the only Jan-Mar 2025 holiday.
     let start = make_date(2025, 1, 1); // Wednesday (holiday)
     let end = make_date(2025, 3, 1);
 
-    let schedule = ScheduleBuilder::new(start, end)
+    let schedule = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
-        .adjust_with(BusinessDayConvention::Following, &cal)
+        .adjust_with(BusinessDayConvention::Following, "target2")
         .build()
         .unwrap();
 
@@ -268,7 +264,7 @@ fn test_uneven_period_clamping() {
     let end = make_date(2025, 1, 20); // Not a multiple of monthly frequency
 
     // Verify StubKind::None rejects it
-    let none_result = ScheduleBuilder::new(start, end)
+    let none_result = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
         .build();
@@ -278,7 +274,7 @@ fn test_uneven_period_clamping() {
     );
 
     // ShortBack clamps to end date
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
         .stub_rule(StubKind::ShortBack)
@@ -298,7 +294,7 @@ fn test_long_front_stub() {
     let start = make_date(2025, 1, 1);
     let end = make_date(2025, 11, 1);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::LongFront)
@@ -326,7 +322,7 @@ fn test_long_front_stub_aligned_schedule_has_no_stub() {
     let start = make_date(2025, 1, 1);
     let end = make_date(2026, 1, 1); // exactly 4 quarters
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::LongFront)
@@ -350,7 +346,7 @@ fn test_long_front_stub_sub_period_range_is_single_period() {
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 6, 1); // 4.5 months on a quarterly schedule
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::LongFront)
@@ -370,7 +366,7 @@ fn test_no_roll_day_drift_backward_through_short_month() {
     let start = make_date(2024, 8, 31);
     let end = make_date(2026, 8, 31);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::semi_annual())
         .stub_rule(StubKind::ShortFront)
@@ -399,7 +395,7 @@ fn test_no_roll_day_drift_forward_through_short_month() {
     let start = make_date(2025, 1, 31);
     let end = make_date(2025, 5, 31);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
         .stub_rule(StubKind::ShortBack)
@@ -427,7 +423,7 @@ fn test_stub_none_accepts_aligned_month_end_schedule() {
     let start = make_date(2025, 1, 31);
     let end = make_date(2025, 7, 31);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
         .build()
@@ -455,7 +451,7 @@ fn test_long_back_stub() {
     let start = make_date(2025, 1, 1);
     let end = make_date(2025, 11, 1);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::LongBack)
@@ -480,7 +476,7 @@ fn test_long_back_even_schedule_emits_all_dates() {
     let start = make_date(2025, 1, 1);
     let end = make_date(2026, 1, 1); // exactly 4 quarters
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::LongBack)
@@ -509,7 +505,7 @@ fn stub_schedules_terminate_at_finite_date_boundaries() {
     ] {
         for stub in [StubKind::ShortBack, StubKind::LongBack] {
             let start = make_date(maximum.year(), 12, 30);
-            let schedule = ScheduleBuilder::new(start, maximum)
+            let schedule = Schedule::builder(start, maximum)
                 .unwrap()
                 .frequency(frequency)
                 .stub_rule(stub)
@@ -519,7 +515,7 @@ fn stub_schedules_terminate_at_finite_date_boundaries() {
         }
         for stub in [StubKind::ShortFront, StubKind::LongFront] {
             let end = make_date(minimum.year(), 1, 2);
-            let schedule = ScheduleBuilder::new(minimum, end)
+            let schedule = Schedule::builder(minimum, end)
                 .unwrap()
                 .frequency(frequency)
                 .stub_rule(stub)
@@ -537,7 +533,7 @@ fn monthly_stubs_preserve_contractual_boundary_endpoints_with_eom() {
     for eom in [false, true] {
         for stub in [StubKind::ShortBack, StubKind::LongBack] {
             let start = make_date(maximum.year(), 12, 1);
-            let schedule = ScheduleBuilder::new(start, maximum)
+            let schedule = Schedule::builder(start, maximum)
                 .unwrap()
                 .frequency(Tenor::monthly())
                 .stub_rule(stub)
@@ -548,7 +544,7 @@ fn monthly_stubs_preserve_contractual_boundary_endpoints_with_eom() {
         }
         for stub in [StubKind::ShortFront, StubKind::LongFront] {
             let end = make_date(minimum.year(), 1, 31);
-            let schedule = ScheduleBuilder::new(minimum, end)
+            let schedule = Schedule::builder(minimum, end)
                 .unwrap()
                 .frequency(Tenor::monthly())
                 .stub_rule(stub)
@@ -578,7 +574,7 @@ fn aligned_long_stubs_keep_regular_anchors_at_both_date_boundaries() {
     ];
     for expected in cases {
         for stub in [StubKind::LongBack, StubKind::LongFront] {
-            let schedule = ScheduleBuilder::new(expected[0], expected[2])
+            let schedule = Schedule::builder(expected[0], expected[2])
                 .unwrap()
                 .frequency(Tenor::monthly())
                 .stub_rule(stub)
@@ -593,7 +589,7 @@ fn aligned_long_stubs_keep_regular_anchors_at_both_date_boundaries() {
 fn boundary_rolls_keep_noninteger_and_invalid_tenor_errors() {
     let start = make_date(time::Date::MAX.year(), 12, 1);
     let end = time::Date::MAX;
-    let error = ScheduleBuilder::new(start, end)
+    let error = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
         .build()
@@ -613,7 +609,7 @@ fn test_end_of_month_convention() {
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 4, 15);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
         .stub_rule(StubKind::ShortBack)
@@ -632,7 +628,7 @@ fn test_end_of_month_convention() {
 
 #[test]
 fn stub_none_rejects_maturity_hidden_by_eom_snap() {
-    let result = ScheduleBuilder::new(make_date(2025, 1, 15), make_date(2025, 2, 20))
+    let result = Schedule::builder(make_date(2025, 1, 15), make_date(2025, 2, 20))
         .unwrap()
         .frequency(Tenor::monthly())
         .stub_rule(StubKind::None)
@@ -650,7 +646,7 @@ fn test_end_of_month_with_leap_year() {
     let start = make_date(2024, 1, 15); // 2024 is a leap year
     let end = make_date(2024, 3, 15);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
         .stub_rule(StubKind::ShortBack)
@@ -672,7 +668,7 @@ fn test_eom_with_stub_conventions() {
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 5, 15);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::ShortBack)
@@ -694,7 +690,7 @@ fn test_eom_jan30_roll_to_feb_leap_year() {
     let start = make_date(2024, 1, 30);
     let end = make_date(2024, 3, 30);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
         .stub_rule(StubKind::ShortBack)
@@ -716,7 +712,7 @@ fn test_eom_jan30_roll_to_feb_non_leap() {
     let start = make_date(2025, 1, 30);
     let end = make_date(2025, 3, 30);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
         .stub_rule(StubKind::ShortBack)
@@ -738,7 +734,7 @@ fn test_eom_quarterly_through_feb() {
     let start = make_date(2024, 1, 31);
     let end = make_date(2024, 7, 31);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::quarterly())
         .end_of_month(true)
@@ -755,30 +751,27 @@ fn test_eom_quarterly_through_feb() {
 
 #[test]
 fn test_adjustment_collision_keeps_maturity_date() {
-    // Daily schedule ending Fri Mar 29 2024 with Mar 27 + Mar 28 holidays.
-    // Accrual dates stay unadjusted (including the holiday 27ths/28ths).
+    // Daily schedule ending Fri Dec 27 2024 with the London Dec 25 + Dec 26
+    // holidays. Accrual dates stay unadjusted (including the holidays).
     // Payment dates may collide after Following adjustment; they stay 1:1
     // with period ends rather than merging the accrual grid.
-    let start = make_date(2024, 3, 26);
-    let end = make_date(2024, 3, 29);
-    let cal = TestCal::new()
-        .with_holiday(make_date(2024, 3, 27))
-        .with_holiday(make_date(2024, 3, 28));
+    let start = make_date(2024, 12, 24);
+    let end = make_date(2024, 12, 27);
 
-    let schedule = ScheduleBuilder::new(start, end)
+    let schedule = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::daily())
-        .adjust_with(BusinessDayConvention::Following, &cal)
+        .adjust_with(BusinessDayConvention::Following, "gblo")
         .build()
         .unwrap();
 
     assert_eq!(
         schedule.dates,
         vec![
-            make_date(2024, 3, 26),
-            make_date(2024, 3, 27),
-            make_date(2024, 3, 28),
-            make_date(2024, 3, 29),
+            make_date(2024, 12, 24),
+            make_date(2024, 12, 25),
+            make_date(2024, 12, 26),
+            make_date(2024, 12, 27),
         ]
     );
     assert_eq!(
@@ -789,9 +782,9 @@ fn test_adjustment_collision_keeps_maturity_date() {
     assert_eq!(
         schedule.payment_dates,
         vec![
-            make_date(2024, 3, 29),
-            make_date(2024, 3, 29),
-            make_date(2024, 3, 29),
+            make_date(2024, 12, 27),
+            make_date(2024, 12, 27),
+            make_date(2024, 12, 27),
         ]
     );
 }
@@ -802,7 +795,7 @@ fn test_adjustment_collision_keeps_maturity_date() {
 fn imm_schedule_stops_at_last_representable_roll() {
     let start = make_date(time::Date::MAX.year(), 1, 1);
     let end = time::Date::MAX;
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .expect("valid date range")
         .imm()
         .build()
@@ -825,7 +818,7 @@ fn test_imm_schedule_basic() {
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 12, 31);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .imm()
         .build()
@@ -848,7 +841,7 @@ fn test_imm_schedule_start_on_imm_date() {
     let start = make_date(2025, 3, 19); // Third Wednesday of March 2025
     let end = make_date(2025, 9, 30);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .imm()
         .build()
@@ -869,7 +862,7 @@ fn test_imm_schedule_start_after_first_imm() {
     let start = make_date(2025, 3, 20); // Day after March IMM
     let end = make_date(2025, 9, 30);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .imm()
         .build()
@@ -890,11 +883,11 @@ fn test_imm_schedule_empty_range_errors() {
     let start = make_date(2025, 3, 20); // day after the Mar 19 IMM date
     let end = make_date(2025, 4, 30); // before the Jun 18 IMM date
 
-    let result = ScheduleBuilder::new(start, end).unwrap().imm().build();
+    let result = Schedule::builder(start, end).unwrap().imm().build();
     assert!(result.is_err(), "empty IMM range must error in strict mode");
 
     // Graceful policy converts the error to an empty schedule WITH warning.
-    let sched = ScheduleBuilder::new(start, end)
+    let sched = Schedule::builder(start, end)
         .unwrap()
         .imm()
         .error_policy(ScheduleErrorPolicy::GracefulEmpty)
@@ -909,7 +902,7 @@ fn test_imm_schedule_preserves_effective_date_front_anchor() {
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 6, 20);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .imm()
         .build()
@@ -929,7 +922,7 @@ fn test_imm_schedule_year_rollover() {
     let start = make_date(2025, 10, 1);
     let end = make_date(2026, 6, 30);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .imm()
         .build()
@@ -955,7 +948,7 @@ fn test_cds_imm_schedule_basic() {
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 12, 20);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .cds_imm()
         .build()
@@ -979,7 +972,7 @@ fn test_cds_imm_schedule_start_on_roll_date_has_no_front_accrual() {
     let start = make_date(2025, 3, 20);
     let end = make_date(2025, 12, 20);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .cds_imm()
         .build()
@@ -999,7 +992,7 @@ fn test_imm_vs_cds_imm_difference() {
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 6, 20); // Exactly on CDS roll date
 
-    let imm_dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let imm_dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .imm()
         .build()
@@ -1007,7 +1000,7 @@ fn test_imm_vs_cds_imm_difference() {
         .into_iter()
         .collect();
 
-    let cds_dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let cds_dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .cds_imm()
         .build()
@@ -1035,14 +1028,14 @@ fn imm_and_cds_imm_setters_use_last_call_wins() {
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 9, 30);
 
-    let cds_dates = ScheduleBuilder::new(start, end)
+    let cds_dates = Schedule::builder(start, end)
         .unwrap()
         .imm()
         .cds_imm()
         .build()
         .expect("CDS IMM should win")
         .dates;
-    let imm_dates = ScheduleBuilder::new(start, end)
+    let imm_dates = Schedule::builder(start, end)
         .unwrap()
         .cds_imm()
         .imm()
@@ -1061,11 +1054,11 @@ fn test_schedule_error_policy_missing_calendar_warning() {
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 3, 15);
 
-    let schedule = ScheduleBuilder::new(start, end)
+    let schedule = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
         .error_policy(ScheduleErrorPolicy::MissingCalendarWarning)
-        .adjust_with_id(BusinessDayConvention::Following, "unknown_calendar")
+        .adjust_with(BusinessDayConvention::Following, "unknown_calendar")
         .build()
         .expect("warning policy should preserve schedule generation");
 
@@ -1082,7 +1075,7 @@ fn test_no_roll_day_drift_backward_day30_anchor() {
     let start = make_date(2025, 8, 30);
     let end = make_date(2027, 8, 30);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::semi_annual())
         .stub_rule(StubKind::ShortFront)
@@ -1112,7 +1105,7 @@ fn test_stub_none_accepts_month_end_quarterly_schedule() {
     let start = make_date(2025, 8, 31);
     let end = make_date(2026, 8, 31);
 
-    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+    let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::None)
@@ -1167,12 +1160,12 @@ fn test_zero_count_tenor_rejected_via_serde() {
 fn cds_imm_accrual_20ths_stay_unadjusted() {
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 12, 20);
-    let cal = TestCal::new().with_holiday(make_date(2025, 3, 20));
+    // Thursday 20 Mar 2025 is Japan's Vernal Equinox Day (a JPTO holiday).
 
-    let schedule = ScheduleBuilder::new(start, end)
+    let schedule = Schedule::builder(start, end)
         .unwrap()
         .cds_imm()
-        .adjust_with(BusinessDayConvention::Following, &cal)
+        .adjust_with(BusinessDayConvention::Following, "jpto")
         .build()
         .unwrap();
 
@@ -1192,12 +1185,11 @@ fn cds_imm_accrual_20ths_stay_unadjusted() {
 fn payment_lag_shifts_adjusted_period_ends() {
     let start = make_date(2025, 1, 2);
     let end = make_date(2025, 1, 9);
-    let cal = TestCal::new();
 
-    let schedule = ScheduleBuilder::new(start, end)
+    let schedule = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::weekly())
-        .adjust_with(BusinessDayConvention::Following, &cal)
+        .adjust_with(BusinessDayConvention::Following, "weekends_only")
         .payment_lag_days(2)
         .build()
         .unwrap();
@@ -1210,12 +1202,11 @@ fn payment_lag_shifts_adjusted_period_ends() {
 fn fixing_lag_is_t_minus_from_accrual_start() {
     let start = make_date(2025, 1, 2);
     let end = make_date(2025, 1, 9);
-    let cal = TestCal::new();
 
-    let schedule = ScheduleBuilder::new(start, end)
+    let schedule = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::weekly())
-        .adjust_with(BusinessDayConvention::Following, &cal)
+        .adjust_with(BusinessDayConvention::Following, "weekends_only")
         .fixing_lag_business_days(2)
         .build()
         .unwrap();
@@ -1229,13 +1220,12 @@ fn nearest_payment_tie_rolls_following() {
     // close, so Nearest must roll Following.
     let start = make_date(2024, 12, 18);
     let end = make_date(2025, 1, 1);
-    let cal = TestCal::new().with_holiday(make_date(2025, 1, 1));
-
-    let schedule = ScheduleBuilder::new(start, end)
+    // TARGET2 closes on New Year's Day; 31 Dec 2024 and 2 Jan 2025 are open.
+    let schedule = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::weekly())
         .stub_rule(StubKind::ShortBack)
-        .adjust_with(BusinessDayConvention::Nearest, &cal)
+        .adjust_with(BusinessDayConvention::Nearest, "target2")
         .build()
         .unwrap();
 

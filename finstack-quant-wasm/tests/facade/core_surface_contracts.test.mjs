@@ -8,12 +8,12 @@ await facade.default({
 });
 
 test('zero vol-of-vol SABR nodes retain the exact Black cube limit', () => {
-  const node = [0.2, 1, -0.5, 0, Number.NaN];
+  const node = { alpha: 0.2, beta: 1, rho: -0.5, nu: 0 };
   const cube = new facade.core.VolCube(
     'BLACK',
     [1, 5],
     [2, 10],
-    [...node, ...node, ...node, ...node],
+    [node, node, node, node],
     [0.03, 0.03, 0.03, 0.03]
   );
   const restored = facade.core.VolCube.fromJson(

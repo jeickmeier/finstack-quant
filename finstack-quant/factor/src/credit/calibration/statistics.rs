@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use finstack_quant_core::math::stats::{mean, OnlineCovariance};
 use finstack_quant_core::types::IssuerId;
 use finstack_quant_core::Result;
 
@@ -158,7 +159,7 @@ pub(super) fn assign_adder_vol(
                 if let Some(peer_vols) = peer_proxy_index[k].get(bucket) {
                     if !peer_vols.is_empty() {
                         return (
-                            mean_of(peer_vols).unwrap_or(0.0),
+                            mean(peer_vols),
                             AdderVolSource::BucketPeerProxy {
                                 peer_bucket: bucket.clone(),
                             },
@@ -172,22 +173,11 @@ pub(super) fn assign_adder_vol(
     // 4. Global mean of all IssuerBeta FromHistory vols.
     if !from_history_vols.is_empty() {
         let global_vols: Vec<f64> = from_history_vols.values().copied().collect();
-        return (
-            mean_of(&global_vols).unwrap_or(0.0),
-            AdderVolSource::Default,
-        );
+        return (mean(&global_vols), AdderVolSource::Default);
     }
 
     // 5. No IssuerBeta data anywhere: hardcoded 0.0.
     (0.0, AdderVolSource::Default)
-}
-
-/// Compute the arithmetic mean of a slice. Returns `None` for an empty slice.
-fn mean_of(values: &[f64]) -> Option<f64> {
-    if values.is_empty() {
-        return None;
-    }
-    Some(values.iter().sum::<f64>() / (values.len() as f64))
 }
 
 /// Annualized unbiased sample variance over the `Some` entries of a sparse
@@ -326,46 +316,14 @@ pub(super) fn sample_correlation_flat(
             // ratio that is not a Pearson correlation (it can even exceed 1
             // before the clamp). Compute the overlap mean for each factor here
             // so the assembled entry is a proper sample correlation.
-            // Two passes over the same slices (no per-pair Vec materialisation):
-            // pass 1 accumulates the overlap means, pass 2 the demeaned cross-
-            // and self-products. This keeps the exact two-pass demeaning math
-            // while avoiding O(n²) heap allocations across the factor pairs.
-            let mut sum_i = 0.0_f64;
-            let mut sum_j = 0.0_f64;
-            let mut count = 0usize;
+            let mut overlap = OnlineCovariance::new();
             for (vi_opt, vj_opt) in series[i].iter().zip(series[j].iter()) {
                 if let (Some(vi), Some(vj)) = (*vi_opt, *vj_opt) {
-                    sum_i += vi;
-                    sum_j += vj;
-                    count += 1;
+                    overlap.update(vi, vj);
                 }
             }
-            let corr = if count >= 2 {
-                let nf = count as f64;
-                let mean_i = sum_i / nf;
-                let mean_j = sum_j / nf;
-                let mut cov_ij = 0.0_f64;
-                let mut var_i = 0.0_f64;
-                let mut var_j = 0.0_f64;
-                for (vi_opt, vj_opt) in series[i].iter().zip(series[j].iter()) {
-                    if let (Some(vi), Some(vj)) = (*vi_opt, *vj_opt) {
-                        let di = vi - mean_i;
-                        let dj = vj - mean_j;
-                        cov_ij += di * dj;
-                        var_i += di * di;
-                        var_j += dj * dj;
-                    }
-                }
-                // `cov_ij`, `var_i`, `var_j` share the same denominator
-                // (n − 1), so it cancels in the ratio and need not be applied.
-                if var_i > 0.0 && var_j > 0.0 {
-                    (cov_ij / (var_i * var_j).sqrt()).clamp(-1.0, 1.0)
-                } else {
-                    0.0
-                }
-            } else {
-                0.0
-            };
+            // Fewer than two overlapping dates, or a constant series, give 0.
+            let corr = overlap.correlation();
             rho[i * n + j] = corr;
             rho[j * n + i] = corr;
         }

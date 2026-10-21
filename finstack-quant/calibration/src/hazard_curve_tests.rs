@@ -18,7 +18,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::Seniority;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use finstack_quant_valuations_core::recalibration::QuoteBump;
@@ -114,7 +114,7 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
 
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("credit".to_string(), cal_utils::quote_set_ids(&quotes));
 
     let hazard_id: CurveId = "ACME-Corp-SENIOR".into();
@@ -359,7 +359,7 @@ fn hazard_calibration_rejects_zero_spread() {
 
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("credit".to_string(), cal_utils::quote_set_ids(&quotes));
 
     let plan = CalibrationPlan {
@@ -433,7 +433,7 @@ fn hazard_calibration_rejects_negative_spread() {
 
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("credit".to_string(), cal_utils::quote_set_ids(&quotes));
 
     let plan = CalibrationPlan {
@@ -505,7 +505,7 @@ fn hazard_calibration_rejects_non_standard_upfront_running_coupon() {
 
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("credit".to_string(), cal_utils::quote_set_ids(&quotes));
 
     let plan = CalibrationPlan {
@@ -611,7 +611,7 @@ fn hazard_calibration_handles_extreme_high_spread() {
 
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("credit".to_string(), cal_utils::quote_set_ids(&quotes));
 
     let hazard_id: CurveId = "DISTRESSED-CORP-SENIOR".into();
@@ -741,7 +741,7 @@ fn hazard_calibration_global_solve_sqrt_time_is_not_rougher_than_bootstrap() {
 
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("credit".to_string(), cal_utils::quote_set_ids(&quotes));
 
     let hazard_id_boot: CurveId = "ACME-Corp-BOOT".into();
@@ -893,7 +893,7 @@ fn hazard_calibration_reprices_par_spread() {
     let credit_quotes = vec![MarketQuote::Cds(cds_quote.clone())];
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &credit_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert(
         "credit".to_string(),
         cal_utils::quote_set_ids(&credit_quotes),
@@ -939,7 +939,7 @@ fn hazard_calibration_reprices_par_spread() {
     let result = engine::calibrate(&envelope).expect("execute");
     let ctx = MarketContext::try_from(result.result.final_market).expect("restore context");
 
-    let mut curve_ids = HashMap::default();
+    let mut curve_ids = FxHashMap::default();
     curve_ids.insert("discount".to_string(), "TEST-DISC".to_string());
     curve_ids.insert("credit".to_string(), hazard_id.as_str().to_string());
     let build_ctx = BuildCtx::new(base, fixtures::STANDARD_NOTIONAL, curve_ids);

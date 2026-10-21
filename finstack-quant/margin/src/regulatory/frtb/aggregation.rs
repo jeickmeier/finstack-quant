@@ -10,7 +10,7 @@
 //! the SBA, unlike SIMM, has no cross-risk-class correlation matrix.
 
 use super::types::FrtbRiskClass;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 
 /// One bucket's intra-bucket result: `(K_b, S_b_uncapped)`.
 ///
@@ -186,9 +186,9 @@ pub(super) fn inter_bucket_plus_undiversified(
 /// - BCBS FRTB Minimum Capital Requirements: `docs/REFERENCES.md#bcbs-frtb-minimum-capital-requirements`
 ///
 pub fn aggregate_sba(
-    delta_charges: &HashMap<FrtbRiskClass, f64>,
-    vega_charges: &HashMap<FrtbRiskClass, f64>,
-    curvature_charges: &HashMap<FrtbRiskClass, f64>,
+    delta_charges: &FxHashMap<FrtbRiskClass, f64>,
+    vega_charges: &FxHashMap<FrtbRiskClass, f64>,
+    curvature_charges: &FxHashMap<FrtbRiskClass, f64>,
 ) -> f64 {
     let sum_delta: f64 = delta_charges.values().sum();
     let sum_vega: f64 = vega_charges.values().sum();

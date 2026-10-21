@@ -15,7 +15,6 @@ use finstack_quant_valuations_fixed_income::mbs_passthrough::pricer::pool_month_
 #[serde(deny_unknown_fields)]
 pub struct PacPayment {
     /// Contractual payment date, including the collateral's payment delay.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

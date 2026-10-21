@@ -272,7 +272,7 @@ fn test_dm_solver_convergence_across_spread_regimes() {
 /// projection curve both sit at `rate` (quarterly compounding, Act/360), so the
 /// solved curve DM of an FRN priced at par must equal its quoted margin.
 fn flat_frn_market(
-    as_of: time::Date,
+    as_of: finstack_quant_core::dates::Date,
     rate: f64,
 ) -> finstack_quant_core::market_data::context::MarketContext {
     use finstack_quant_core::dates::DayCount;
@@ -301,7 +301,11 @@ fn flat_frn_market(
     MarketContext::new().insert(disc).insert(fwd)
 }
 
-fn flat_market_frn(as_of: time::Date, maturity: time::Date, spread_bp: i32) -> Bond {
+fn flat_market_frn(
+    as_of: finstack_quant_core::dates::Date,
+    maturity: finstack_quant_core::dates::Date,
+    spread_bp: i32,
+) -> Bond {
     Bond::floating(
         "DM-PAR-PIN",
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -316,7 +320,11 @@ fn flat_market_frn(as_of: time::Date, maturity: time::Date, spread_bp: i32) -> B
     .expect("FRN construction should succeed")
 }
 
-fn solve_dm_at_clean_price(as_of: time::Date, spread_bp: i32, clean_px: f64) -> f64 {
+fn solve_dm_at_clean_price(
+    as_of: finstack_quant_core::dates::Date,
+    spread_bp: i32,
+    clean_px: f64,
+) -> f64 {
     use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
     let mut bond = flat_market_frn(as_of, date!(2027 - 01 - 01), spread_bp);
     bond.instrument_pricing_overrides =

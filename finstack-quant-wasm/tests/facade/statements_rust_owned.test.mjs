@@ -205,7 +205,6 @@ test('dcfSensitivity takes the Rust DcfOptions, including exit_multiple_metric_n
 });
 
 const EMPTY_MARKET = {
-  collateral: {},
   credit_indices: [],
   curves: [],
   dividends: [],

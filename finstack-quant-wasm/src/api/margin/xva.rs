@@ -8,7 +8,8 @@
 
 use super::im::{JsSimmCalculator, JsSimmSensitivities};
 use super::js_currency;
-use crate::api::core::market_data::{JsDiscountCurve, JsHazardCurve};
+use crate::api::core::market_discount::JsDiscountCurve;
+use crate::api::core::market_hazard::JsHazardCurve;
 use crate::utils::input::{from_js_json, js_f64, js_f64_seq};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_margin::xva::{mva, types as xva};

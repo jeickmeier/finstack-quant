@@ -39,7 +39,7 @@ def test_construction_and_accessors() -> None:
     surface = _example_surface()
     assert surface.id == "EURUSD-DELTA-VOL"
     assert surface.expiries == [0.25, 0.5, 1.0]
-    assert surface.num_expiries == 3
+    assert len(surface.expiries) == 3
     atm, put_25, call_25 = get_fx_delta_pillar_vols(surface, 0)
     assert math.isclose(atm, 0.08, abs_tol=1e-12)
     # 25D wings recovered from ATM + RR + BF — values should bracket ATM
@@ -83,7 +83,7 @@ def test_to_vol_surface_conversion_roundtrip() -> None:
     strike_surface = materialize_fx_delta_surface(surface, spot=1.20, domestic_rate=0.05, foreign_rate=0.03)
     assert isinstance(strike_surface, VolSurface)
     # The strike-axis surface must expose at least the same expiry count.
-    assert len(strike_surface.expiries) >= surface.num_expiries
+    assert len(strike_surface.expiries) >= len(surface.expiries)
 
 
 def test_static_delta_strike_roundtrip() -> None:
@@ -107,7 +107,7 @@ def test_market_context_insert_and_get() -> None:
 
 def test_with_10d_wings_smoke() -> None:
     surface = _example_surface(with_10d=True)
-    assert surface.num_expiries == 3
+    assert len(surface.expiries) == 3
     # 10D wings produce a 5-point smile in implied_vol; a sanity probe.
     vol = get_fx_delta_vol(surface, 0.5, 1.30, forward=1.20)
     assert vol > 0.0

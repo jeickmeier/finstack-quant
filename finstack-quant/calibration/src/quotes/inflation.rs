@@ -64,7 +64,6 @@ pub enum InflationQuote {
         /// Unique identifier for the quote.
         id: QuoteId,
         /// Swap maturity
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -83,7 +82,6 @@ pub enum InflationQuote {
         /// Unique identifier for the quote.
         id: QuoteId,
         /// Swap maturity
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")

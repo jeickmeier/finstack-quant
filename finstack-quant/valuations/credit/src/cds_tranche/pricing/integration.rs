@@ -2,7 +2,7 @@
 
 use super::config::{CdsTranchePricer, INTEGRATION_MAX_DEPTH, INTEGRATION_TOLERANCE};
 use finstack_quant_core::math::integration::adaptive_simpson;
-use finstack_quant_core::math::norm_pdf;
+use finstack_quant_core::math::special_functions::norm_pdf;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::correlation::copula::{CopulaSpec, FactorPairIntegrand};
 use std::cell::RefCell;

@@ -11,6 +11,7 @@
 
 use super::helpers::*;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_valuations_core::instruments::Instrument;
 use time::macros::date;
 

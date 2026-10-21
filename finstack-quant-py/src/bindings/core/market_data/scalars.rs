@@ -12,15 +12,16 @@ use pyo3::types::{PyDict, PyModule};
 use crate::bindings::core::currency::{extract_currency, PyCurrency};
 use crate::bindings::core::money::{decimal_from_py, is_python_decimal};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::macros::impl_repr_html_via_dataframe;
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{dates_to_datetime_index, dict_to_dataframe};
 use crate::errors::core_to_py;
 
 fn observations_to_dataframe<'py>(
     py: Python<'py>,
-    observations: Vec<(time::Date, f64)>,
+    observations: Vec<(finstack_quant_core::dates::Date, f64)>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let dates: Vec<time::Date> = observations.iter().map(|(date, _)| *date).collect();
+    let dates: Vec<finstack_quant_core::dates::Date> =
+        observations.iter().map(|(date, _)| *date).collect();
     let values: Vec<f64> = observations.iter().map(|(_, value)| *value).collect();
     let data = PyDict::new(py);
     data.set_item("value", values)?;
@@ -41,6 +42,33 @@ pub(crate) fn extract_f64(value: &Bound<'_, PyAny>, field: &str) -> PyResult<f64
             "{field} must be float, int, or decimal.Decimal"
         ))
     })
+}
+
+/// Parse `(date, value)` observation pairs and an optional interpolation
+/// label (default: step) for the series-backed scalar constructors.
+fn parse_series(
+    observations: &[(Bound<'_, PyAny>, Bound<'_, PyAny>)],
+    interpolation: Option<&str>,
+) -> PyResult<(
+    Vec<(finstack_quant_core::dates::Date, f64)>,
+    SeriesInterpolation,
+)> {
+    let observations = observations
+        .iter()
+        .enumerate()
+        .map(|(index, (date, value))| {
+            Ok((
+                py_to_date(date)?,
+                extract_f64(value, &format!("observations[{index}] value"))?,
+            ))
+        })
+        .collect::<PyResult<Vec<_>>>()?;
+    let interpolation = interpolation
+        .map(SeriesInterpolation::from_str)
+        .transpose()
+        .map_err(core_to_py)?
+        .unwrap_or_default();
+    Ok((observations, interpolation))
 }
 
 /// Date-indexed scalar market observations with Rust-owned interpolation.
@@ -99,22 +127,8 @@ impl PyScalarTimeSeries {
         currency: Option<&Bound<'_, PyAny>>,
         interpolation: Option<&str>,
     ) -> PyResult<Self> {
-        let observations = observations
-            .iter()
-            .enumerate()
-            .map(|(index, (date, value))| {
-                Ok((
-                    py_to_date(date)?,
-                    extract_f64(value, &format!("observations[{index}] value"))?,
-                ))
-            })
-            .collect::<PyResult<Vec<_>>>()?;
+        let (observations, interpolation) = parse_series(&observations, interpolation)?;
         let currency = currency.map(extract_currency).transpose()?;
-        let interpolation = interpolation
-            .map(SeriesInterpolation::from_str)
-            .transpose()
-            .map_err(core_to_py)?
-            .unwrap_or_default();
         let inner = ScalarTimeSeries::new(id, observations, currency)
             .map_err(core_to_py)?
             .with_interpolation(interpolation);
@@ -230,33 +244,6 @@ impl PyScalarTimeSeries {
         observations_to_dataframe(py, self.inner.observations())
     }
 
-    /// Serialize the canonical Rust series state to JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|err| {
-            crate::errors::value_error(format!("failed to serialize ScalarTimeSeries: {err}"))
-        })
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize canonical Rust series state from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| {
-                crate::errors::value_error(format!("invalid ScalarTimeSeries JSON: {err}"))
-            })
-    }
-
     fn __len__(&self) -> usize {
         self.inner.len()
     }
@@ -269,6 +256,8 @@ impl PyScalarTimeSeries {
         )
     }
 }
+
+wire_methods!(PyScalarTimeSeries, ScalarTimeSeries, "ScalarTimeSeries");
 
 impl_repr_html_via_dataframe!(PyScalarTimeSeries);
 
@@ -358,22 +347,8 @@ impl PyInflationIndex {
                 ))
             })?),
         };
-        let observations = observations
-            .iter()
-            .enumerate()
-            .map(|(index, (date, value))| {
-                Ok((
-                    py_to_date(date)?,
-                    extract_f64(value, &format!("observations[{index}] value"))?,
-                ))
-            })
-            .collect::<PyResult<Vec<_>>>()?;
+        let (observations, interpolation) = parse_series(&observations, interpolation)?;
         let currency = extract_currency(currency)?;
-        let interpolation = interpolation
-            .map(SeriesInterpolation::from_str)
-            .transpose()
-            .map_err(core_to_py)?
-            .unwrap_or_default();
         let mut inner = InflationIndex::new(id, observations, currency)
             .map_err(core_to_py)?
             .with_interpolation(interpolation);
@@ -606,33 +581,6 @@ impl PyInflationIndex {
         observations_to_dataframe(py, self.inner.observations())
     }
 
-    /// Serialize the canonical Rust inflation-index state to JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|err| {
-            crate::errors::value_error(format!("failed to serialize InflationIndex: {err}"))
-        })
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize canonical Rust inflation-index state from JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|err| {
-                crate::errors::value_error(format!("invalid InflationIndex JSON: {err}"))
-            })
-    }
-
     fn __len__(&self) -> usize {
         self.inner.len()
     }
@@ -645,6 +593,8 @@ impl PyInflationIndex {
         )
     }
 }
+
+wire_methods!(PyInflationIndex, InflationIndex, "InflationIndex", arc);
 
 impl_repr_html_via_dataframe!(PyInflationIndex);
 

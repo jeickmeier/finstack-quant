@@ -179,7 +179,7 @@ fn build_xi0_from_surface(
 fn simulate_rbergomi<F: finstack_quant_models::monte_carlo::traits::Payoff>(
     num_paths: usize,
     rng: &mut finstack_quant_models::monte_carlo::rng::philox::PhiloxRng,
-    time_grid: &finstack_quant_models::monte_carlo::TimeGrid,
+    time_grid: &finstack_quant_core::math::time_grid::TimeGrid,
     process: &finstack_quant_models::monte_carlo::process::rough_bergomi::RoughBergomiProcess,
     disc: &finstack_quant_models::monte_carlo::discretization::rough_bergomi::RoughBergomiEuler,
     initial_state: &[f64],
@@ -189,11 +189,11 @@ fn simulate_rbergomi<F: finstack_quant_models::monte_carlo::traits::Payoff>(
     num_steps: usize,
     err_ctx: finstack_quant_valuations_core::pricer::PricingErrorContext,
 ) -> std::result::Result<(f64, f64), PricingError> {
+    use finstack_quant_core::math::stats::OnlineStats;
     use finstack_quant_models::monte_carlo::rng::fbm::FractionalNoiseGenerator;
     use finstack_quant_models::monte_carlo::traits::{
         Discretization, RandomStream, StochasticProcess,
     };
-    use finstack_quant_models::monte_carlo::OnlineStats;
 
     let num_factors = process.num_factors();
     let work_size = disc.work_size(process);
@@ -402,7 +402,7 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughBergomi
                 params,
             );
 
-        let time_grid = finstack_quant_models::monte_carlo::TimeGrid::uniform(t, self.num_steps)
+        let time_grid = finstack_quant_core::math::time_grid::TimeGrid::uniform(t, self.num_steps)
             .map_err(|e| {
                 finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
             })?;
@@ -538,13 +538,29 @@ mod variance_strip_tests {
         (MarketContext::new().insert_surface(surface), option)
     }
 
+    /// Exact `∫₀ᵗ ξ₀(s) ds` of a piecewise-constant interval curve whose steps
+    /// change only at `breaks`: each step's value is read at its midpoint.
+    fn total_variance(
+        curve: &finstack_quant_core::market_data::term_structures::ForwardVarianceCurve,
+        breaks: &[f64],
+        t: f64,
+    ) -> f64 {
+        let mut start = 0.0;
+        let mut total = 0.0;
+        for end in breaks.iter().copied().filter(|&b| b < t).chain([t]) {
+            total += curve.value(0.5 * (start + end)) * (end - start);
+            start = end;
+        }
+        total
+    }
+
     #[test]
     fn bootstrap_conserves_every_input_total_variance() {
         let (market, option) = market_and_option();
         let curve =
             build_xi0_from_surface(&market, &option, 100.0, 0.0, 0.0, 1.5).expect("variance strip");
         for (time, total) in [(0.25, 0.01), (1.0, 0.1), (1.5, 0.11)] {
-            assert!((curve.integrated_variance(time) - total).abs() < 1e-14);
+            assert!((total_variance(&curve, &[0.25, 1.0, 1.5], time) - total).abs() < 1e-14);
         }
     }
 
@@ -563,10 +579,18 @@ mod variance_strip_tests {
                 .clone()
                 .with_quote_type(VolQuoteType::Normal)
                 .unwrap(),
-            surface
-                .as_ref()
-                .clone()
-                .with_secondary_axis(VolSurfaceAxis::Tenor),
+            finstack_quant_core::market_data::surfaces::VolSurface::from_grid_opts(
+                surface.id(),
+                surface.expiries(),
+                surface.strikes(),
+                surface.vols(),
+                finstack_quant_core::market_data::surfaces::VolGridOpts {
+                    secondary_axis: VolSurfaceAxis::Tenor,
+                    ..finstack_quant_core::market_data::surfaces::VolGridOpts::default()
+                },
+                None,
+            )
+            .expect("tenor surface"),
         ] {
             let market = market.clone().insert_surface(unsupported);
             assert!(build_xi0_from_surface(&market, &option, 100.0, 0.0, 0.0, 1.5).is_err());
@@ -585,7 +609,8 @@ mod variance_strip_tests {
             let vol = finstack_quant_models::volatility::get_surface_vol_clamped(
                 &surface, maturity, 100.0,
             );
-            assert!((curve.integrated_variance(maturity) - vol * vol * maturity).abs() < 1e-14);
+            let total = total_variance(&curve, &[0.25, 1.0, 1.5], maturity);
+            assert!((total - vol * vol * maturity).abs() < 1e-14);
         }
     }
 
@@ -600,7 +625,6 @@ mod variance_strip_tests {
             build_xi0_from_surface(&market, &option, 100.0, 0.0, 0.0, 1.5).expect("override");
         for time in [0.0, 0.25, 1.0, 1.5, 2.0] {
             assert!((curve.value(time) - 0.09).abs() < 1e-14);
-            assert!((curve.integrated_variance(time) - 0.09 * time).abs() < 1e-14);
         }
     }
 
@@ -642,7 +666,10 @@ mod variance_strip_tests {
         let curve =
             build_xi0_from_surface(&market, &option, 100.0, 0.0, 0.0, 1.0).expect("variance strip");
         let call_price = |variance: f64| {
-            100.0 * (2.0 * finstack_quant_core::math::norm_cdf(0.5 * variance.sqrt()) - 1.0)
+            100.0
+                * (2.0
+                    * finstack_quant_core::math::special_functions::norm_cdf(0.5 * variance.sqrt())
+                    - 1.0)
         };
         let exact = call_price(0.1);
         let mut previous_bias = f64::INFINITY;

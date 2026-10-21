@@ -145,7 +145,7 @@ class TestRoundTrips:
 
         from finstack_quant.core.money import Money
 
-        original = Money(Decimal("1234.56"), "USD")
+        original = Money.from_decimal(Decimal("1234.56"), "USD")
         restored = pickle.loads(pickle.dumps(original))  # noqa: S301
         assert restored.amount_decimal == original.amount_decimal
         assert restored == original
@@ -219,7 +219,6 @@ class TestRoundTrips:
             "credit_indices": [],
             "fx_delta_vol_surfaces": [],
             "vol_cubes": [],
-            "collateral": {},
             "hierarchy": None,
         })
         bond = Bond.fixed(

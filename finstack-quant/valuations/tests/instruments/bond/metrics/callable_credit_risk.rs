@@ -19,7 +19,7 @@ use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::ModelKey;
 use time::macros::date;
 
-fn build_callable_credit_bond(as_of: time::Date) -> Bond {
+fn build_callable_credit_bond(as_of: finstack_quant_core::dates::Date) -> Bond {
     let mut bond = Bond::fixed(
         "CALL-CREDIT",
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -50,7 +50,7 @@ fn build_callable_credit_bond(as_of: time::Date) -> Bond {
     bond
 }
 
-fn build_market(as_of: time::Date) -> MarketContext {
+fn build_market(as_of: finstack_quant_core::dates::Date) -> MarketContext {
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, 0.96), (2.0, 0.91), (5.0, 0.78)])

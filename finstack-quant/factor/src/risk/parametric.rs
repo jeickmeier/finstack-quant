@@ -113,7 +113,8 @@ pub(super) fn scale_for_measure(
         }
         RiskMeasure::VaR { confidence } => {
             // Loss convention: VaR is reported as a negative number.
-            let z_score = finstack_quant_core::math::standard_normal_inv_cdf(*confidence);
+            let z_score =
+                finstack_quant_core::math::special_functions::standard_normal_inv_cdf(*confidence);
             if sigma > 0.0 {
                 (-sigma * z_score, -z_score * sigma.recip())
             } else {
@@ -122,8 +123,10 @@ pub(super) fn scale_for_measure(
         }
         RiskMeasure::ExpectedShortfall { confidence } => {
             // Loss convention: ES is reported as a negative number.
-            let z_score = finstack_quant_core::math::standard_normal_inv_cdf(*confidence);
-            let es_multiplier = finstack_quant_core::math::norm_pdf(z_score) / (1.0 - confidence);
+            let z_score =
+                finstack_quant_core::math::special_functions::standard_normal_inv_cdf(*confidence);
+            let es_multiplier = finstack_quant_core::math::special_functions::norm_pdf(z_score)
+                / (1.0 - confidence);
             if sigma > 0.0 {
                 (-sigma * es_multiplier, -es_multiplier * sigma.recip())
             } else {

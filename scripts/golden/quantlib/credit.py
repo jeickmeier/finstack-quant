@@ -135,7 +135,6 @@ def build_single_name_cds() -> dict[str, Any]:
                         "allow_non_monotonic": False,
                         "min_forward_tenor": 1e-6,
                         "rate_calibration": None,
-                        "calibration_ois_cutoff_days": None,
                         "fx_policy": None,
                     },
                 ],

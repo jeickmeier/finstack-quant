@@ -844,7 +844,11 @@ fn compute_curve_factor(
             );
             STANDARD_BUCKETS_YEARS
                 .iter()
-                .map(|&t| (curve_t1.zero(t) - curve_t0.zero(t)) * 10_000.0)
+                .map(|&t| {
+                    (curve_t1.zero_rate(t, finstack_quant_core::math::Compounding::Continuous)
+                        - curve_t0.zero_rate(t, finstack_quant_core::math::Compounding::Continuous))
+                        * 10_000.0
+                })
                 .collect()
         }
         CurveKind::Forward => {
@@ -881,8 +885,9 @@ fn compute_curve_factor(
 
     // Key-rate-aware explained P&L: Σ DV01_bucket × Δr_bucket. Compensated
     // summation keeps the per-bucket accumulation stable.
-    let explained =
-        finstack_quant_core::math::neumaier_sum(buckets.iter().map(|b| b.dv01 * b.move_bp));
+    let explained = finstack_quant_core::math::summation::neumaier_sum(
+        buckets.iter().map(|b| b.dv01 * b.move_bp),
+    );
     let gamma_pnl = if config.include_gamma {
         Some(directional_gamma_pnl(
             instrument,
@@ -1049,7 +1054,7 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
     // Key-rate path: per-tenor CS01 × per-tenor credit-curve move.
     if let Some(buckets) = keyrate.filter(|b| !b.is_empty()) {
         let shifts: Vec<f64> = buckets.iter().map(|bucket| bucket.move_bp).collect();
-        let explained = finstack_quant_core::math::neumaier_sum(
+        let explained = finstack_quant_core::math::summation::neumaier_sum(
             buckets
                 .iter()
                 .map(|bucket| bucket.sensitivity * bucket.move_bp),

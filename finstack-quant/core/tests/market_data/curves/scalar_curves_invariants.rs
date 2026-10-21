@@ -4,8 +4,9 @@
 //! but they only cover `finstack_quant_core` curve types, so they now belong here
 //! as `finstack-quant-core` integration coverage.
 
-use finstack_quant_core::dates::{Date, Duration, Month};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::{PriceCurve, PriceCurveKind};
+use time::{Duration, Month};
 
 const TOL: f64 = 1e-12;
 

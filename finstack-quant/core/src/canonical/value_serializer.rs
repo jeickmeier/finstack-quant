@@ -13,7 +13,7 @@ use serde::ser::{
 use serde::{Serialize, Serializer};
 use serde_json::{Map, Number, Value};
 
-use crate::error::NonFiniteKind;
+use crate::NonFiniteKind;
 
 // RawValue advertises this pseudo-struct to serializers. Delegate that complete
 // pseudo-struct to serde_json's public Value serializer so serde_json, rather

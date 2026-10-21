@@ -504,7 +504,7 @@ pub fn find_schema_artifact<'a>(
                 || artifact.relative_path.ends_with(&anchored)
         })
         .ok_or_else(|| {
-            Error::Input(crate::error::InputError::NotFound {
+            Error::Input(crate::InputError::NotFound {
                 id: format!("schema {selector:?} (call index() for published artifacts)"),
             })
         })

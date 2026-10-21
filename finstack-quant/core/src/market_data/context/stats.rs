@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::types::CurveId;
-use crate::HashMap;
+use crate::FxHashMap;
 
 use super::{CurveStorage, MarketContext};
 
@@ -18,6 +18,27 @@ use crate::market_data::{
     scalars::{MarketScalar, ScalarTimeSeries},
     surfaces::{FxDeltaVolSurface, VolCube, VolSurface},
 };
+
+/// Id-keyed store of a [`MarketContext`], viewed for counting and lookup.
+trait KeyedMap {
+    /// Number of stored entries.
+    fn count(&self) -> usize;
+    /// Whether an entry is stored under `id`.
+    fn has(&self, id: &str) -> bool;
+}
+
+impl<K, V> KeyedMap for FxHashMap<K, V>
+where
+    K: std::borrow::Borrow<str> + std::hash::Hash + Eq,
+{
+    fn count(&self) -> usize {
+        self.len()
+    }
+
+    fn has(&self, id: &str) -> bool {
+        self.contains_key(id)
+    }
+}
 
 impl MarketContext {
     // Introspection and statistics
@@ -70,53 +91,54 @@ impl MarketContext {
             credit_index_count: self.credit_indices.len(),
             dividend_schedule_count: self.dividends.len(),
             fx_delta_vol_surface_count: self.fx_delta_vol_surfaces.len(),
-            collateral_mapping_count: self.collateral.len(),
         }
     }
 
-    /// Check whether any data (curve, surface, price, series, index, dividend, or collateral mapping) is registered under the given id.
+    /// Check whether any data (curve, surface, price, series, index, or dividend) is registered under the given id.
     pub fn contains(&self, id: impl AsRef<str>) -> bool {
         let id = id.as_ref();
-        self.curves.contains_key(id)
-            || self.surfaces.contains_key(id)
-            || self.vol_cubes.contains_key(id)
-            || self.prices.contains_key(id)
-            || self.series.contains_key(id)
-            || self.inflation_indices.contains_key(id)
-            || self.credit_indices.contains_key(id)
-            || self.dividends.contains_key(id)
-            || self.fx_delta_vol_surfaces.contains_key(id)
-            || self.collateral.contains_key(id)
+        self.keyed_maps().iter().any(|map| map.has(id))
     }
 
     /// Number of stored market-data objects.
     ///
     /// Counts every curve, volatility surface, volatility cube, price/scalar,
-    /// time series, inflation index, credit index, dividend schedule, FX
-    /// delta-vol surface and collateral mapping, plus one for an attached FX
-    /// matrix. The optional data hierarchy is metadata and is not counted.
+    /// time series, inflation index, credit index, dividend schedule and FX
+    /// delta-vol surface, plus one for an attached FX matrix. The optional data hierarchy is metadata and is not counted.
     ///
     /// # Examples
     /// ```rust
     /// use finstack_quant_core::market_data::context::MarketContext;
+    /// use finstack_quant_core::market_data::scalars::MarketScalar;
     ///
-    /// let ctx = MarketContext::new().map_collateral("USD-CSA", "USD-OIS".into());
+    /// let ctx = MarketContext::new().insert_price("USD-RATE", MarketScalar::Unitless(0.05));
     /// assert_eq!(ctx.len(), 1);
     /// assert!(!ctx.is_empty());
     /// assert_eq!(MarketContext::new().len(), 0);
     /// ```
     pub fn len(&self) -> usize {
-        self.curves.len()
-            + usize::from(self.fx.is_some())
-            + self.surfaces.len()
-            + self.vol_cubes.len()
-            + self.prices.len()
-            + self.series.len()
-            + self.inflation_indices.len()
-            + self.credit_indices.len()
-            + self.dividends.len()
-            + self.fx_delta_vol_surfaces.len()
-            + self.collateral.len()
+        usize::from(self.fx.is_some())
+            + self
+                .keyed_maps()
+                .iter()
+                .map(|map| map.count())
+                .sum::<usize>()
+    }
+
+    /// Every id-keyed store, in one list shared by [`Self::len`] and
+    /// [`Self::contains`].
+    fn keyed_maps(&self) -> [&dyn KeyedMap; 9] {
+        [
+            &*self.curves,
+            &*self.surfaces,
+            &*self.vol_cubes,
+            &*self.prices,
+            &*self.series,
+            &*self.inflation_indices,
+            &*self.credit_indices,
+            &*self.dividends,
+            &*self.fx_delta_vol_surfaces,
+        ]
     }
 
     /// Return `true` when no market data has been inserted (`len() == 0`).
@@ -188,8 +210,7 @@ impl MarketContext {
     /// Retain only the curves for which `pred` returns `true` (mutable).
     ///
     /// Credit indices whose dependencies are removed are dropped immediately
-    /// and reported in the returned mutation information. Collateral mappings
-    /// without a surviving discount curve are also removed. For snapshot
+    /// and reported in the returned mutation information. For snapshot
     /// replacement, insert replacement curves before removing obsolete IDs so
     /// dependent indices remain present throughout the operation.
     ///
@@ -205,9 +226,6 @@ impl MarketContext {
         mut pred: impl FnMut(&CurveId, &CurveStorage) -> bool,
     ) -> Vec<CurveId> {
         Arc::make_mut(&mut self.curves).retain(|id, curve| pred(id, curve));
-        let curves = &self.curves;
-        Arc::make_mut(&mut self.collateral)
-            .retain(|_, id| matches!(curves.get(id), Some(CurveStorage::Discount(_))));
         let mut invalidated = self.rebind_all_credit_indices();
         invalidated.sort();
         invalidated
@@ -268,10 +286,10 @@ impl MarketContext {
     /// semantics: a scalar present in the current market but absent from the
     /// snapshot must not survive the restore.
     pub fn clear_market_scalars_mut(&mut self) -> &mut Self {
-        self.prices = Arc::new(HashMap::default());
-        self.series = Arc::new(HashMap::default());
-        self.inflation_indices = Arc::new(HashMap::default());
-        self.dividends = Arc::new(HashMap::default());
+        self.prices = Arc::new(FxHashMap::default());
+        self.series = Arc::new(FxHashMap::default());
+        self.inflation_indices = Arc::new(FxHashMap::default());
+        self.dividends = Arc::new(FxHashMap::default());
         self
     }
 }
@@ -314,8 +332,6 @@ pub struct ContextStats {
     pub dividend_schedule_count: usize,
     /// Number of FX delta-quoted volatility surfaces
     pub fx_delta_vol_surface_count: usize,
-    /// Number of collateral mappings
-    pub collateral_mapping_count: usize,
 }
 
 impl core::fmt::Display for ContextStats {
@@ -337,11 +353,6 @@ impl core::fmt::Display for ContextStats {
             "  FX delta vol surfaces: {}",
             self.fx_delta_vol_surface_count
         )?;
-        writeln!(
-            f,
-            "  Collateral mappings: {}",
-            self.collateral_mapping_count
-        )?;
         writeln!(f, "  Has FX: {}", self.has_fx)?;
         Ok(())
     }
@@ -360,7 +371,6 @@ mod stats_serde_tests {
         assert_eq!(
             keys,
             [
-                "collateral_mapping_count",
                 "credit_index_count",
                 "curve_counts",
                 "dividend_schedule_count",

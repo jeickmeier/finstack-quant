@@ -10,7 +10,7 @@ use super::ids::{
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::{Error, Result};
 use std::sync::OnceLock;
 
@@ -39,21 +39,21 @@ use std::sync::OnceLock;
 #[derive(Debug, Default)]
 pub struct ConventionRegistry {
     /// Registry of Rate Index conventions.
-    rate_index: HashMap<IndexId, RateIndexConventions>,
+    rate_index: FxHashMap<IndexId, RateIndexConventions>,
     /// Registry of CDS conventions keyed by currency and documentation clause.
-    cds: HashMap<CdsConventionKey, CdsConventionSpec>,
+    cds: FxHashMap<CdsConventionKey, CdsConventionSpec>,
     /// Loader-only `ANY` fallback rows keyed by regional family.
-    cds_any: HashMap<CdsConvention, CdsConventionSpec>,
+    cds_any: FxHashMap<CdsConvention, CdsConventionSpec>,
     /// Explicit regional family for currencies listed in `cds_conventions.json`.
-    cds_primary: HashMap<Currency, CdsConvention>,
+    cds_primary: FxHashMap<Currency, CdsConvention>,
     /// Registry of Swaption conventions.
-    swaption: HashMap<SwaptionConventionId, SwaptionConventions>,
+    swaption: FxHashMap<SwaptionConventionId, SwaptionConventions>,
     /// Registry of Inflation Swap conventions.
-    inflation_swap: HashMap<InflationSwapConventionId, InflationSwapConventions>,
+    inflation_swap: FxHashMap<InflationSwapConventionId, InflationSwapConventions>,
     /// Registry of Interest Rate Futures conventions.
-    ir_future: HashMap<IrFutureContractId, IrFutureConventions>,
+    ir_future: FxHashMap<IrFutureContractId, IrFutureConventions>,
     /// Registry of cross-currency swap conventions.
-    xccy: HashMap<XccyConventionId, XccyConventions>,
+    xccy: FxHashMap<XccyConventionId, XccyConventions>,
 }
 
 impl ConventionRegistry {

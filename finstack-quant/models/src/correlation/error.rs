@@ -5,14 +5,14 @@
 //! credit-domain variants that core never constructs: factor volatilities,
 //! recovery inputs, and Student-t degrees of freedom.
 
-use finstack_quant_core::math::linalg::{CholeskyError, CorrelationError as MatrixError};
+use finstack_quant_core::math::linalg::{CholeskyError, CorrelationError};
 
 /// Convenience result type for models correlation constructors.
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Error type for models correlation constructors and matrix validation.
 ///
-/// Matrix failures wrap [`MatrixError`] via [`From`]. Domain variants are
+/// Matrix failures wrap [`CorrelationError`] via [`From`]. Domain variants are
 /// raised only by latent-factor, recovery, and copula constructors. Cholesky
 /// failures preserve the canonical core error and its structured diagnostics.
 #[derive(Debug, Clone, PartialEq, thiserror::Error, serde::Serialize, serde::Deserialize)]
@@ -24,7 +24,7 @@ pub enum Error {
     Matrix(
         /// Analytics matrix-validation or nearest-correlation failure.
         #[from]
-        MatrixError,
+        CorrelationError,
     ),
     /// Cholesky factorization failure from core linear algebra.
     #[error(transparent)]
@@ -109,11 +109,11 @@ impl From<Error> for finstack_quant_core::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::error::ErrorKind;
+    use finstack_quant_core::ErrorKind;
 
     #[test]
     fn convergence_failures_fold_to_computation_kind() {
-        let err: finstack_quant_core::Error = Error::Matrix(MatrixError::DidNotConverge {
+        let err: finstack_quant_core::Error = Error::Matrix(CorrelationError::DidNotConverge {
             max_iter: 10,
             tol: 1e-8,
         })
@@ -121,7 +121,7 @@ mod tests {
         assert_eq!(err.kind(), ErrorKind::Computation);
         assert!(err.to_string().contains("10 iterations"));
         let err: finstack_quant_core::Error =
-            Error::Matrix(MatrixError::EigenDecompositionFailed).into();
+            Error::Matrix(CorrelationError::EigenDecompositionFailed).into();
         assert_eq!(err.kind(), ErrorKind::Computation);
     }
 
@@ -131,7 +131,7 @@ mod tests {
             Error::InvalidStudentTDegreesOfFreedom { value: 1.0 }.into();
         assert_eq!(err.kind(), ErrorKind::Validation);
         assert!(err.to_string().contains("degrees of freedom"));
-        let err: finstack_quant_core::Error = Error::Matrix(MatrixError::DiagonalNotOne {
+        let err: finstack_quant_core::Error = Error::Matrix(CorrelationError::DiagonalNotOne {
             index: 0,
             value: 2.0,
         })

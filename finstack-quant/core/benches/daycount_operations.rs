@@ -11,8 +11,7 @@ mod bench_utils;
 
 use bench_utils::bench_iter;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_quant_core::dates::calendar::TARGET2;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+use finstack_quant_core::dates::{calendar_by_id_strict, Date, DayCount, DayCountContext, Tenor};
 use std::hint::black_box;
 use time::Month;
 
@@ -78,7 +77,7 @@ fn bench_daycount_actact_isma(c: &mut Criterion) {
 }
 
 fn bench_daycount_bus252(c: &mut Criterion) {
-    let calendar = &TARGET2;
+    let calendar = calendar_by_id_strict("target2").unwrap();
 
     let periods = [("1m", 1, 1), ("3m", 1, 1), ("6m", 1, 1), ("1y", 1, 1)];
 

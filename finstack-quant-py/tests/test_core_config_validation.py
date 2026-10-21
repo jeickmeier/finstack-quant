@@ -37,14 +37,12 @@ def test_config_maximum_scale_preserves_small_nonzero_money() -> None:
     restored = FinstackConfig.from_json(config.to_json())
     assert restored.ingest_scale("USD") == 28
     assert restored.output_scale("USD") == 28
-    money = Money(Decimal("1e-28"), "USD", config=restored)
+    money = Money.from_decimal(Decimal("1e-28"), "USD", config=restored)
     assert money.amount_decimal == Decimal("1e-28")
 
 
 @pytest.mark.parametrize("bad", [0.0, -1.0, math.nan, math.inf])
 def test_tolerance_config_rejects_nonpositive_and_nonfinite_values(bad: float) -> None:
-    with pytest.raises(ValueError, match="finite and positive"):
-        ToleranceConfig(rate_epsilon=bad)
     with pytest.raises(ValueError, match="finite and positive"):
         ToleranceConfig(generic_epsilon=bad)
 

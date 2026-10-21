@@ -84,7 +84,10 @@ pub(super) fn req_bool(row: &Bound<'_, PyDict>, key: &str) -> PyResult<bool> {
 }
 
 /// Read a required date-like cell.
-pub(super) fn req_date(row: &Bound<'_, PyDict>, key: &str) -> PyResult<time::Date> {
+pub(super) fn req_date(
+    row: &Bound<'_, PyDict>,
+    key: &str,
+) -> PyResult<finstack_quant_core::dates::Date> {
     match row.get_item(key)? {
         Some(value) if !is_missing(&value) => crate::bindings::date_utils::py_to_date(&value),
         _ => Err(crate::errors::value_error(format!(

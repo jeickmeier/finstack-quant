@@ -6,7 +6,6 @@
 
 use std::str::FromStr;
 
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::hierarchy::HierarchyTarget;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_scenarios::{CurveKind, TenorMatchMode, TimeRollMode};
@@ -15,12 +14,10 @@ use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::bindings::macros::typed_or_label;
+
 use super::hierarchy::PyHierarchyTarget;
 use super::kinds::{PyCompounding, PyCurveKind, PyTenorMatchMode, PyTimeRollMode};
-
-pub(super) fn parse_currency(code: &str) -> PyResult<Currency> {
-    Currency::from_str(code).map_err(crate::errors::core_to_py)
-}
 
 pub(super) fn parse_instrument_type(name: &str) -> PyResult<InstrumentType> {
     InstrumentType::from_str(name)
@@ -31,54 +28,30 @@ pub(super) fn parse_instrument_types(names: Vec<String>) -> PyResult<Vec<Instrum
     names.iter().map(|s| parse_instrument_type(s)).collect()
 }
 
-macro_rules! typed_or_label {
-    ($fn_name:ident, $wrapper:ty, $inner:ty, $type_name:literal) => {
-        /// Accept the typed wrapper or its snake-case wire label.
-        pub(crate) fn $fn_name(obj: &Bound<'_, PyAny>) -> PyResult<$inner> {
-            if let Ok(typed) = obj.cast::<$wrapper>() {
-                return Ok(typed.borrow().inner);
-            }
-            let label: String = obj.extract().map_err(|_| {
-                crate::errors::value_error(format!(
-                    "{} must be a {} or canonical string; got {}",
-                    $type_name,
-                    $type_name,
-                    obj.get_type()
-                ))
-            })?;
-            finstack_quant_core::wire::serde_parse::<$inner>(&label)
-                .map_err(crate::errors::core_to_py)
-        }
-    };
-}
-
-typed_or_label!(extract_curve_kind, PyCurveKind, CurveKind, "CurveKind");
 typed_or_label!(
-    extract_tenor_match_mode,
+    pub(crate) fn extract_curve_kind -> CurveKind,
+    PyCurveKind,
+    "CurveKind or canonical string",
+    |label| crate::bindings::extract::parse_label(label)
+);
+typed_or_label!(
+    pub(crate) fn extract_tenor_match_mode -> TenorMatchMode,
     PyTenorMatchMode,
-    TenorMatchMode,
-    "TenorMatchMode"
+    "TenorMatchMode or canonical string",
+    |label| crate::bindings::extract::parse_label(label)
 );
 typed_or_label!(
-    extract_time_roll_mode,
+    pub(crate) fn extract_time_roll_mode -> TimeRollMode,
     PyTimeRollMode,
-    TimeRollMode,
-    "TimeRollMode"
+    "TimeRollMode or canonical string",
+    |label| crate::bindings::extract::parse_label(label)
 );
-/// Accept the typed `Compounding` wrapper or its canonical label.
-pub(super) fn extract_compounding(obj: &Bound<'_, PyAny>) -> PyResult<Compounding> {
-    if let Ok(typed) = obj.cast::<PyCompounding>() {
-        return Ok(typed.borrow().inner);
-    }
-    let label: String = obj.extract().map_err(|_| {
-        crate::errors::value_error(format!(
-            "Compounding must be a Compounding or one of: {}; got {}",
-            super::kinds::COMPOUNDING_LABELS,
-            obj.get_type()
-        ))
-    })?;
-    super::kinds::parse_compounding(&label)
-}
+typed_or_label!(
+    pub(super) fn extract_compounding -> Compounding,
+    PyCompounding,
+    "Compounding or canonical string",
+    |label| label.parse().map_err(crate::errors::core_to_py)
+);
 
 /// Accept `Mapping[str, str]` or `Sequence[tuple[str, str]]`, preserving
 /// insertion order.

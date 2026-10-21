@@ -41,7 +41,6 @@ pub struct DiscountCurveBuilder {
     pub(super) allow_non_monotonic: bool,
     pub(super) min_forward_tenor: f64,
     pub(super) rate_calibration: Option<super::super::RateCalibrationRecipe>,
-    pub(super) calibration_ois_cutoff_days: Option<i32>,
     pub(super) fx_policy: Option<String>,
     pub(super) transform: Option<super::evaluation::CurveTransform>,
 }
@@ -144,8 +143,7 @@ impl DiscountCurveBuilder {
     ///
     /// # Default
     ///
-    /// The default value is [`DEFAULT_MIN_FORWARD_TENOR`](crate::market_data::term_structures::DEFAULT_MIN_FORWARD_TENOR)
-    /// (~30 seconds or 1e-6 years).
+    /// The default value is `1e-6` years (~30 seconds).
     ///
     /// # Use Cases
     ///
@@ -187,14 +185,6 @@ impl DiscountCurveBuilder {
         calibration: Option<super::super::RateCalibrationRecipe>,
     ) -> Self {
         self.rate_calibration = calibration;
-        self
-    }
-
-    /// Record the OIS rate cut-off (business days) this curve was calibrated
-    /// under. Pass `Some(days)` only when the bootstrap used a
-    /// `CompoundedWithRateCutoff` convention; leave unset otherwise.
-    pub fn calibration_ois_cutoff_days_opt(mut self, cutoff_days: Option<i32>) -> Self {
-        self.calibration_ois_cutoff_days = cutoff_days;
         self
     }
 
@@ -242,16 +232,16 @@ impl DiscountCurveBuilder {
         }
 
         if self.points.len() < 2 {
-            return Err(crate::error::InputError::TooFewPoints.into());
+            return Err(crate::InputError::TooFewPoints.into());
         }
         if self.points.iter().any(|&(_, df)| df <= 0.0) {
-            return Err(crate::error::InputError::NonPositiveValue.into());
+            return Err(crate::InputError::NonPositiveValue.into());
         }
         validate_origin(&self.points)?;
 
         let (knots_vec, dfs_vec): (Vec<f64>, Vec<f64>) =
             std::mem::take(&mut self.points).into_iter().unzip();
-        crate::math::interp::utils::validate_knots(&knots_vec)?;
+        crate::math::interp::validate_knots(&knots_vec)?;
 
         if !self.allow_non_monotonic {
             validate_monotonic_df(&knots_vec, &dfs_vec)?;
@@ -299,7 +289,6 @@ impl DiscountCurveBuilder {
             allow_non_monotonic: self.allow_non_monotonic,
             min_forward_tenor: self.min_forward_tenor,
             rate_calibration: self.rate_calibration,
-            calibration_ois_cutoff_days: self.calibration_ois_cutoff_days,
             fx_policy: self.fx_policy,
         };
         if let Some(transform) = self.transform {

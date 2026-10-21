@@ -82,7 +82,7 @@ impl ValidationMode {
 /// Non-monotonic discount factors violate no-arbitrage conditions and will
 /// produce incorrect pricing results.
 pub(super) fn validate_monotonic_df(knots: &[f64], dfs: &[f64]) -> crate::Result<()> {
-    if let Some((i, prev, curr)) = crate::math::interp::utils::find_monotone_violation(dfs, 1e-14) {
+    if let Some((i, prev, curr)) = crate::math::interp::find_monotone_violation(dfs, 1e-14) {
         return Err(crate::Error::Validation(format!(
             "Discount factors must be non-increasing: DF(t={:.4}) = {:.12} > DF(t={:.4}) = {:.12}",
             knots[i + 1],

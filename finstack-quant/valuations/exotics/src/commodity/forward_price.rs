@@ -2,6 +2,7 @@
 
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::scalar_numeric_value;
@@ -71,7 +72,7 @@ pub(crate) fn resolve_forward_price(request: ForwardPriceRequest<'_>) -> Result<
         return Ok(spot / df);
     }
     Err(finstack_quant_core::Error::Input(
-        finstack_quant_core::error::InputError::NotFound {
+        finstack_quant_core::InputError::NotFound {
             id: format!(
                 "PriceCurve '{forward_curve_id}' not found. \
                  Use MarketContext::insert_price_curve() to add a commodity forward price curve."

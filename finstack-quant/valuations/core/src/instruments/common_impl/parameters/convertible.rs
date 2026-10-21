@@ -120,7 +120,6 @@ pub enum ConversionPolicy {
     /// the mandatory date is not modeled. Forced conversion takes precedence
     /// over coincident call/put rights, and the scheduled coupon remains payable.
     MandatoryOn(
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -130,14 +129,12 @@ pub enum ConversionPolicy {
     /// Holder may convert within a window.
     Window {
         /// Start.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
         )]
         start: Date,
         /// End.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -166,7 +163,6 @@ pub enum ConversionPolicy {
     /// and the scheduled coupon remains payable.
     MandatoryVariable {
         /// Date of mandatory conversion.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -301,7 +297,6 @@ impl DividendAdjustment {
 #[serde(deny_unknown_fields)]
 pub struct DilutionEvent {
     /// Date of the dilutive event.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

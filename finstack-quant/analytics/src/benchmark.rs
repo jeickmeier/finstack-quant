@@ -11,7 +11,7 @@ use crate::regression::normalized_svd_least_squares;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::special_functions::student_t_inv_cdf;
 use finstack_quant_core::math::stats::{OnlineCovariance, OnlineStats};
-use finstack_quant_core::math::{neumaier_sum, NeumaierAccumulator};
+use finstack_quant_core::math::summation::{neumaier_sum, NeumaierAccumulator};
 use finstack_quant_core::wire::NonFiniteFields;
 use nalgebra::DMatrix;
 
@@ -1137,7 +1137,7 @@ pub(crate) fn multi_factor_greeks(
             reason = "factor_length_mismatch",
             "multi-factor greeks rejected input"
         );
-        return Err(finstack_quant_core::error::InputError::DimensionMismatch.into());
+        return Err(finstack_quant_core::InputError::DimensionMismatch.into());
     }
     let design = DMatrix::from_fn(
         n,
@@ -1413,7 +1413,7 @@ mod tests {
 
     use super::*;
 
-    use finstack_quant_core::dates::{Duration, Month};
+    use time::{Duration, Month};
 
     fn jan(day: u8) -> Date {
         Date::from_calendar_date(2025, Month::January, day).expect("valid date")
@@ -2135,7 +2135,8 @@ mod tests {
     #[test]
     fn performance_multi_factor_greeks_errors_on_invalid_factor_input() {
         use crate::performance::Performance;
-        use finstack_quant_core::dates::{Month, PeriodKind};
+        use finstack_quant_core::dates::PeriodKind;
+        use time::Month;
 
         let jan =
             |day: u8| Date::from_calendar_date(2024, Month::January, day).expect("valid date");

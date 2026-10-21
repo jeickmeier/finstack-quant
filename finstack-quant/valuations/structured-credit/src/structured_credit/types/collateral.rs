@@ -19,7 +19,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_core::{HashSet, Result};
+use finstack_quant_core::{FxHashSet, Result};
 use serde::{Deserialize, Serialize};
 
 use super::enums::AssetType;
@@ -257,7 +257,7 @@ impl InstrumentCollateral {
     ///
     /// * `currency` - Pool base currency every instrument must use.
     pub fn validate(&self, currency: Currency) -> Result<()> {
-        let mut seen: HashSet<&str> = HashSet::default();
+        let mut seen: FxHashSet<&str> = FxHashSet::default();
         for instrument in self.iter() {
             let id = instrument.id();
             if !seen.insert(id.as_str()) {

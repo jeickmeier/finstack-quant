@@ -375,7 +375,6 @@ pub enum FundEventKind {
 #[serde(deny_unknown_fields)]
 pub struct FundEvent {
     /// Date of the event
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -443,7 +442,6 @@ impl FundEvent {
 #[serde(deny_unknown_fields)]
 pub struct AllocationRow {
     /// Date of allocation
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -480,7 +478,6 @@ pub struct AllocationLedger {
     pub meta: ResultsMeta,
     /// LP contribution events stored as negative flows for cashflow reconstruction
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_money_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
@@ -524,7 +521,7 @@ impl AllocationLedger {
     /// Export as JSON string for external analysis.
     pub fn to_json(&self) -> finstack_quant_core::Result<String> {
         serde_json::to_string(self).map_err(|_| {
-            finstack_quant_core::Error::internal("failed to serialize PE fund waterfall")
+            finstack_quant_core::Error::Internal("failed to serialize PE fund waterfall".into())
         })
     }
 }

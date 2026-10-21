@@ -3,7 +3,7 @@ use finstack_quant_core::market_data::diff::{
     measure_discount_curve_shift, measure_inflation_index_shift, TenorSamplingMethod,
 };
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations::metrics::{parse_key_rate_label, MetricId};
 use finstack_quant_valuations::recalibration::RecalibrationProvider;
@@ -22,8 +22,8 @@ pub(crate) fn extract_keyrate_per_curve(
     measures: &indexmap::IndexMap<MetricId, f64>,
     curve_ids: &[CurveId],
     metric_prefix: &str,
-) -> Result<HashMap<CurveId, Vec<(f64, f64)>>> {
-    let mut result = HashMap::default();
+) -> Result<FxHashMap<CurveId, Vec<(f64, f64)>>> {
+    let mut result = FxHashMap::default();
     for curve_id in curve_ids {
         let prefix = format!("{metric_prefix}::{curve_id}::");
         let mut buckets = measures
@@ -49,7 +49,7 @@ pub(crate) fn extract_keyrate_per_curve(
 }
 
 fn validate_curve_coverage<T>(
-    buckets: &HashMap<CurveId, T>,
+    buckets: &FxHashMap<CurveId, T>,
     curve_ids: &[CurveId],
     metric_prefix: &str,
 ) -> Result<()> {
@@ -89,9 +89,9 @@ pub(crate) fn extract_credit_keyrates(
     market_t0: &MarketContext,
     market_t1: &MarketContext,
     provider: &dyn RecalibrationProvider,
-) -> Result<HashMap<CurveId, Vec<CreditKeyRateBucket>>> {
+) -> Result<FxHashMap<CurveId, Vec<CreditKeyRateBucket>>> {
     use finstack_quant_calibration::quotes::cds::CdsQuote;
-    let mut result = HashMap::default();
+    let mut result = FxHashMap::default();
     for curve_id in curve_ids {
         let prefix = format!("bucketed_cs01::{curve_id}::");
         let supplied: indexmap::IndexMap<_, _> = measures
@@ -244,7 +244,11 @@ fn measure_per_tenor_discount_shift(
     Some(
         tenors
             .iter()
-            .map(|&t| (curve_t1.zero(t) - curve_t0.zero(t)) * 10_000.0)
+            .map(|&t| {
+                (curve_t1.zero_rate(t, finstack_quant_core::math::Compounding::Continuous)
+                    - curve_t0.zero_rate(t, finstack_quant_core::math::Compounding::Continuous))
+                    * 10_000.0
+            })
             .collect(),
     )
 }
@@ -379,7 +383,16 @@ fn discount_curve_abs_shift_bp(
     ) else {
         return 0.0;
     };
-    mean_tenor_shift_bp(|t| (c0.zero(t), c1.zero(t)), true).unwrap_or(0.0)
+    mean_tenor_shift_bp(
+        |t| {
+            (
+                c0.zero_rate(t, finstack_quant_core::math::Compounding::Continuous),
+                c1.zero_rate(t, finstack_quant_core::math::Compounding::Continuous),
+            )
+        },
+        true,
+    )
+    .unwrap_or(0.0)
 }
 
 /// L1-mean rate shift (bp) for a curve that may be a discount or a

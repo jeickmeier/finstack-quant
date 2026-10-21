@@ -119,7 +119,6 @@ const market = () => {
     'CDX-IG-43',
     new core.CreditIndexData(125, 0.4, hazard, baseCorrelation())
   );
-  context.mapCollateral('USD-CSA', 'USD-OIS');
   return context;
 };
 const schedule = () =>
@@ -164,11 +163,11 @@ const CASES = {
   // --- dates: SIFMA ---------------------------------------------------------------
   sifma_settlement_date: () => iso(core.sifmaSettlementDate(3, 2027)),
   sifma_settlement_date_uncovered: () => iso(core.sifmaSettlementDate(3, 1990)),
-  sifma_settlement_date_for_class: () =>
-    iso(core.sifmaSettlementDateForClass(1, 2026, core.SifmaSettlementClass.b())),
-  estimated_sifma_settlement_date_for_class: () =>
+  sifma_settlement_date_class_b: () =>
+    iso(core.sifmaSettlementDate(1, 2026, core.SifmaSettlementClass.b())),
+  estimated_sifma_settlement_date: () =>
     iso(
-      core.estimatedSifmaSettlementDateForClass(
+      core.estimatedSifmaSettlementDate(
         3,
         2031,
         core.SifmaSettlementClass.fromAgencyTerm('GNMA', 30)
@@ -195,7 +194,7 @@ const CASES = {
   days_30e_360_isda: () =>
     [false, true].map((flag) => core.days30e360Isda(ep('2025-01-31'), ep('2025-02-28'), flag)),
   holiday_calendar: () => ({
-    code: new core.HolidayCalendar('NYSE + gblo').code,
+    code: new core.HolidayCalendar('NYSE + gblo').toString(),
     is_holiday: nyse.isHoliday(ep('2025-01-01')),
     is_business_day: nyse.isBusinessDay(ep('2025-01-06')),
     count_business_days: nyse.countBusinessDays(ep('2025-01-01'), ep('2025-02-01')),
@@ -203,9 +202,9 @@ const CASES = {
   }),
   // --- dates: periods and schedules ---------------------------------------------
   period_id: () => [
-    core.PeriodId.parse('2025M12').next().code,
-    core.PeriodId.quarter(2025, 1).prev().code,
-    core.PeriodId.parse('FY2025Q4').nextFiscal(usFederal).code,
+    core.PeriodId.parse('2025M12').shift(1).toString(),
+    core.PeriodId.quarter(2025, 1).shift(-1).toString(),
+    core.PeriodId.parse('FY2025Q4').nextFiscal(usFederal).toString(),
     core.PeriodId.week(2025, 5).kind.periodsPerYear,
   ],
   period_kind_prior_observation_date: () =>
@@ -262,21 +261,21 @@ const CASES = {
     config().outputScale('JPY'),
     config().outputScale('USD'),
     config().ingestScale('USD'),
-    config().roundingMode.name,
+    config().roundingMode.toString(),
     config().extensionKeys(),
   ],
   rating_registry: () => ({
     default_scale_id: registry.defaultScaleId(),
     default_score: registry.defaultScorecardScore(),
     scale_ids: registry.scaleIds(),
-    policy: registry.unknownScalePolicy().name,
+    policy: registry.unknownScalePolicy().toString(),
     known: registry.isKnownRatingScale(registry.defaultScaleId()),
     scale: registry.ratingScale(registry.defaultScaleId()),
     extension_key: core.ratingScalesExtensionKey(),
     from_config: core.registryFromConfig(new core.FinstackConfig()).defaultScaleId(),
   }),
   credit_rating: () => [
-    new core.CreditRating('Baa3').name,
+    new core.CreditRating('Baa3').toString(),
     core.CreditRating.bbb().notchesTo('BB'),
     core.CreditRating.aaPlus().toMoodysString(),
     core.CreditRating.bbPlus().isInvestmentGrade(),
@@ -414,9 +413,15 @@ const CASES = {
     credit_index: market().getCreditIndex('CDX-IG-43').numConstituents,
     fx_rate: market().fxRequired().rate('EUR', 'USD', '2025-01-02').rate,
     converted: [
-      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').amount,
-      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').currency
-        .code,
+      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').amount
+        .amount,
+      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').amount
+        .currency.code,
+      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').rate.rate,
+      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').rate
+        .triangulated,
+      market().convertMoney(money(100.0, 'USD'), new core.Currency('USD'), '2025-01-02').rate ===
+        undefined,
     ],
     rolled_base_date: market().rollForward(30).getDiscount('USD-OIS').baseDate,
     round_trip: core.MarketContext.fromJson(market().toJson()).toJson() === market().toJson(),
@@ -535,13 +540,6 @@ test('arguments of the wrong type are TypeErrors', () => {
 
 test('enum classes expose every Rust variant and round-trip their names', () => {
   const families = [
-    [
-      core.BusinessDayConvention,
-      ['unadjusted', 'following', 'modifiedFollowing', 'preceding', 'modifiedPreceding', 'nearest'],
-    ],
-    [core.StubKind, ['none', 'shortFront', 'shortBack', 'longFront', 'longBack']],
-    [core.ScheduleErrorPolicy, ['strict', 'missingCalendarWarning', 'gracefulEmpty']],
-    [core.Thirty360Convention, ['usSia', 'isda', 'european', 'italian']],
     [core.PeriodKind, ['daily', 'weekly', 'monthly', 'quarterly', 'semiAnnual', 'annual']],
     [core.RoundingMode, ['bankers', 'awayFromZero', 'towardZero', 'floor', 'ceil']],
     [core.UnknownScalePolicy, ['error', 'fallbackToDefault', 'warnAndFallback']],
@@ -555,15 +553,15 @@ test('enum classes expose every Rust variant and round-trip their names', () => 
     ['days', 'weeks', 'months', 'years'].map((unit) => core.TenorUnit[unit]().toString()),
     ['D', 'W', 'M', 'Y']
   );
-  assert.equal(core.TenorUnit.fromChar('y').toString(), 'Y');
-  assert.throws(() => core.TenorUnit.fromChar('MM'), kind('validation'));
+  assert.equal(core.TenorUnit.fromName('y').toString(), 'Y');
+  assert.throws(() => core.TenorUnit.fromName('MM'), kind('validation'));
   assert.deepEqual(
     ['a', 'b', 'c', 'd'].map((cls) => core.SifmaSettlementClass[cls]().toString()),
     ['a', 'b', 'c', 'd']
   );
-  assert.equal(core.RoundingMode.fromJson(core.RoundingMode.floor().toJson()).name, 'floor');
+  assert.equal(core.RoundingMode.fromJson(core.RoundingMode.floor().toJson()).toString(), 'floor');
   assert.equal(
-    core.UnknownScalePolicy.fromJson(core.UnknownScalePolicy.error().toJson()).name,
+    core.UnknownScalePolicy.fromJson(core.UnknownScalePolicy.error().toJson()).toString(),
     'error'
   );
 });
@@ -596,7 +594,10 @@ test('handles round-trip through their JSON wire form', () => {
     assert.equal(handle.fromJson(json).toJson(), json);
     assert.equal(handle.fromJson(JSON.parse(json)).toJson(), json);
   }
-  assert.equal(core.CreditRating.fromJson(core.CreditRating.bbbMinus().toJson()).name, 'BBB-');
+  assert.equal(
+    core.CreditRating.fromJson(core.CreditRating.bbbMinus().toJson()).toString(),
+    'BBB-'
+  );
 });
 
 test('ScheduleBuilder setters update the builder in place and round-trip its spec', () => {
@@ -625,14 +626,11 @@ test('cdsImm / imm set quarterly short_back like Rust ScheduleBuilder; a later f
   assert.deepEqual([imm.frequency, imm.stub], [{ count: 3, unit: 'months' }, 'short_back']);
 });
 
-test('MarketContext.len counts the FX matrix and collateral mappings', () => {
+test('MarketContext.len counts the FX matrix', () => {
   assert.equal(new core.MarketContext().len(), 0);
   const fxOnly = new core.MarketContext();
   fxOnly.insertFx(fx());
   assert.deepEqual([fxOnly.len(), fxOnly.isEmpty()], [1, false]);
-  const collateralOnly = new core.MarketContext();
-  collateralOnly.mapCollateral('USD-CSA', 'USD-OIS');
-  assert.deepEqual([collateralOnly.len(), collateralOnly.isEmpty()], [1, false]);
 });
 
 test('CreditIndexData issuer accessors fall back to the index data', () => {
@@ -684,15 +682,15 @@ test('MarketContext inserts change the context in place and share curve data', (
 });
 
 test('FinstackConfig extensions hold JSON values, not JSON text', () => {
-  const cfg = new core.FinstackConfig(null, { rate_epsilon: 1e-9 });
-  assert.deepEqual(cfg.tolerances, { rate_epsilon: 1e-9, generic_epsilon: 1e-10 });
+  const cfg = new core.FinstackConfig(null, { generic_epsilon: 1e-9 });
+  assert.deepEqual(cfg.tolerances, { generic_epsilon: 1e-9 });
   cfg.setExtension('core.example.v1', '{"not":"parsed"}');
   assert.equal(cfg.getExtension('core.example.v1'), '{"not":"parsed"}');
   assert.equal(cfg.getExtension('core.other.v1'), undefined);
   assert.equal(cfg.removeExtension('core.example.v1'), true);
   assert.equal(cfg.removeExtension('core.example.v1'), false);
   assert.throws(() => cfg.setExtension('bad key', 1), kind('validation'));
-  assert.throws(() => new core.FinstackConfig(null, { rate_epsilon: -1 }), kind('validation'));
+  assert.throws(() => new core.FinstackConfig(null, { generic_epsilon: -1 }), kind('validation'));
   cfg.setIngestScale('USD', 8);
   assert.deepEqual(cfg.ingestScaleOverrides(), { USD: 8 });
   assert.deepEqual(cfg.outputScaleOverrides(), {});

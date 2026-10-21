@@ -4,6 +4,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency;
@@ -43,7 +44,6 @@ pub struct EquityFuture {
     /// Optional discrete dividends `(ex_date, amount)` in index points.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -241,7 +241,7 @@ impl EquityFuture {
             let carry = (-self.dividend_yield(market)? * t).exp() / df;
             (spot * carry, carry)
         } else {
-            let mut pv_dividends = finstack_quant_core::math::NeumaierAccumulator::new();
+            let mut pv_dividends = finstack_quant_core::math::summation::NeumaierAccumulator::new();
             for (date, amount) in &self.discrete_dividends {
                 if *date > as_of {
                     pv_dividends.add(amount * discount.df_between_dates(as_of, *date)?);
@@ -577,7 +577,21 @@ mod tests {
                         .expect("shifted surface"),
                     "black_lognormal",
                 ),
-                (base.with_secondary_axis(VolSurfaceAxis::Tenor), "strike"),
+                (
+                    finstack_quant_core::market_data::surfaces::VolSurface::from_grid_opts(
+                        base.id(),
+                        base.expiries(),
+                        base.strikes(),
+                        base.vols(),
+                        finstack_quant_core::market_data::surfaces::VolGridOpts {
+                            secondary_axis: VolSurfaceAxis::Tenor,
+                            ..finstack_quant_core::market_data::surfaces::VolGridOpts::default()
+                        },
+                        None,
+                    )
+                    .expect("tenor surface"),
+                    "strike",
+                ),
             ];
             for (surface, expected) in incompatible {
                 let invalid_market = market.clone().insert_surface(surface);

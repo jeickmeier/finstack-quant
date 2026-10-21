@@ -35,14 +35,12 @@ pub struct CmsOption {
     /// Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based.
     pub cms_tenor: Tenor,
     /// Observation/fixing dates for CMS rate
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
     )]
     pub fixing_dates: Vec<Date>,
     /// Payment dates for each period (usually fixing date + lag or period end)
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")

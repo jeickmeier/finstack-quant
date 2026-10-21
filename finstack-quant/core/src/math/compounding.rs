@@ -365,7 +365,7 @@ impl Compounding {
 }
 
 impl std::str::FromStr for Compounding {
-    type Err = crate::error::Error;
+    type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -426,7 +426,8 @@ impl std::fmt::Display for Compounding {
 /// * `t` - Cashflow time in years on the discount curve clock; non-positive
 ///   times return `df_base` unchanged.
 /// * `z` - Additive decimal spread on the periodically compounded zero rate.
-/// * `compounds_per_year` - Compounding periods per year, floored at one.
+/// * `compounds_per_year` - Whole compounding periods per year (a fractional
+///   part is truncated), floored at one.
 ///
 /// # Errors
 ///
@@ -449,8 +450,10 @@ pub fn z_spread_discount_factor(
              this is a curve-data error"
         )));
     }
-    let m = compounds_per_year.max(1.0);
-    let base_rate = m * (df_base.powf(-1.0 / (m * t)) - 1.0);
+    let periods = NonZeroU32::new(compounds_per_year.max(1.0) as u32).unwrap_or(NonZeroU32::MIN);
+    let compounding = Compounding::Periodic(periods);
+    let m = f64::from(periods.get());
+    let base_rate = compounding.rate_from_df(df_base, t);
     let denom = 1.0 + (base_rate + z) / m;
     if denom <= 0.0 || !denom.is_finite() {
         return Err(crate::Error::Validation(format!(
@@ -459,7 +462,7 @@ pub fn z_spread_discount_factor(
              spread is too negative for this cashflow"
         )));
     }
-    Ok(denom.powf(-m * t))
+    Ok(compounding.df_from_rate(base_rate + z, t))
 }
 
 #[cfg(test)]

@@ -70,7 +70,7 @@ pub(crate) fn enum_from_str<T: serde::de::DeserializeOwned>(
 
 /// Convert a Python float to `Decimal`, rejecting non-finite values.
 pub(crate) fn decimal_from_f64(value: f64, what: &str) -> PyResult<rust_decimal::Decimal> {
-    rust_decimal::Decimal::try_from(value)
+    finstack_quant_core::decimal::f64_to_decimal(value)
         .map_err(|err| value_error(format!("invalid {what}: {err}")))
 }
 
@@ -2022,7 +2022,7 @@ impl PyTermLoanBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let tenor = crate::bindings::valuations::convert::tenor_from_py(value, "frequency")?;
+        let tenor = crate::bindings::core::dates::tenor::extract_tenor(value)?;
         builder_set!(
             slf,
             frequency,

@@ -178,7 +178,8 @@ fn test_non_monotone_positive_rate_curve_rejected() {
         .build()
         .expect("should build non-monotone curve for testing");
 
-    let short_rate = non_monotone_curve.zero(0.25);
+    let short_rate =
+        non_monotone_curve.zero_rate(0.25, finstack_quant_core::math::Compounding::Continuous);
     assert!(
         short_rate > 0.0,
         "Expected positive short-end rate, got {}",
@@ -218,7 +219,8 @@ fn test_negative_rate_environment_opt_in() {
         .build()
         .expect("should build negative rate curve for testing");
 
-    let short_rate = negative_rate_curve.zero(0.25);
+    let short_rate =
+        negative_rate_curve.zero_rate(0.25, finstack_quant_core::math::Compounding::Continuous);
     assert!(
         short_rate < 0.0,
         "Expected negative short-end rate, got {}",

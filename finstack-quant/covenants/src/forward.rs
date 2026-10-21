@@ -9,8 +9,8 @@ use crate::engine::{
     SpringingCondition,
 };
 use finstack_quant_core::dates::{Date, PeriodId};
-use finstack_quant_core::math::norm_cdf;
 use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
+use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::Error;
 use finstack_quant_core::InputError;
 use finstack_quant_core::Result;
@@ -832,13 +832,13 @@ mod tests {
     use time::Month;
 
     struct MockTs {
-        map: finstack_quant_core::HashMap<(String, String), f64>,
+        map: finstack_quant_core::FxHashMap<(String, String), f64>,
     }
 
     impl MockTs {
         fn new() -> Self {
             Self {
-                map: finstack_quant_core::HashMap::default(),
+                map: finstack_quant_core::FxHashMap::default(),
             }
         }
         fn with(mut self, node: &str, period: PeriodId, v: f64) -> Self {

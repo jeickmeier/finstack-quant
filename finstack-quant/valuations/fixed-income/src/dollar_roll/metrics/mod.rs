@@ -3,6 +3,7 @@
 //! Standard rate-sensitivity metrics (DV01, bucketed DV01, theta) plus
 //! carry-specific analytics: implied financing rate and roll specialness.
 
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricRegistry};
 
 /// Implied financing rate metric calculator.

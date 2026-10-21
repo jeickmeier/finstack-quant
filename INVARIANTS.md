@@ -49,7 +49,7 @@ Decimal path.
   when the boundary and rounding policy are documented.
 - Use compensated summation for mixed-sign cash flows, large dynamic ranges,
   or totals whose floating-point error can affect a reported result. Use
-  `finstack_quant_core::math::{neumaier_sum, NeumaierAccumulator}` or
+  `finstack_quant_core::math::summation::{neumaier_sum, NeumaierAccumulator}` or
   `OnlineStats` as appropriate.
 - Validate finiteness before Kahan/Neumaier accumulation. Compensation does
   not make `NaN` or infinity safe.

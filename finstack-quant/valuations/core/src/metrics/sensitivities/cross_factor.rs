@@ -558,7 +558,7 @@ impl MetricCalculator for CrossFactorCalculator {
                 k_abs,
             );
         }
-        let mut value = finstack_quant_core::math::NeumaierAccumulator::new();
+        let mut value = finstack_quant_core::math::summation::NeumaierAccumulator::new();
         for &(direction_a, weight_a) in bumper_a.stencil() {
             for &(direction_b, weight_b) in bumper_b.stencil() {
                 value.add(

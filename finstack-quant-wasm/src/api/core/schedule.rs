@@ -1,5 +1,6 @@
 //! WASM bindings for schedule generation from [`finstack_quant_core::dates`]:
-//! `StubKind`, `ScheduleErrorPolicy`, `Schedule` and `ScheduleBuilder`.
+//! `Schedule` and `ScheduleBuilder`. Stub rules, business-day conventions and
+//! error policies cross as their snake_case labels (Rust `FromStr`).
 //!
 //! Schedule dates are **epoch days** (`Int32Array`, days since 1970-01-01);
 //! the JSON wire form (`toJson`, `fromSpec`, `toSpec`) uses ISO-8601 strings.
@@ -7,176 +8,10 @@
 use crate::utils::input::{from_js_json, js_bool, js_epoch_days, js_int, js_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::{
-    days_since_epoch, BusinessDayConvention, Date, Schedule, ScheduleErrorPolicy, ScheduleSpec,
+    days_since_epoch, BusinessDayConvention, Date, Schedule, ScheduleBuilder, ScheduleSpec,
     StubKind, Tenor,
 };
-use finstack_quant_core::wire::{serde_label, serde_parse};
 use wasm_bindgen::prelude::*;
-
-/// Stub convention: where an irregular first or last accrual period goes.
-///
-/// @example
-/// ```typescript
-/// import init, { core } from "finstack-quant-wasm";
-/// await init();
-/// core.StubKind.shortFront().toString(); // "short_front"
-/// core.StubKind.fromName("long_back").toString(); // "long_back"
-/// ```
-#[wasm_bindgen(js_name = StubKind)]
-#[derive(Clone, Copy, Debug)]
-pub struct JsStubKind {
-    pub(crate) inner: StubKind,
-}
-
-impl JsStubKind {
-    const fn wrap(inner: StubKind) -> Self {
-        Self { inner }
-    }
-}
-
-#[wasm_bindgen(js_class = StubKind)]
-impl JsStubKind {
-    /// No stub: the range must divide evenly into the frequency.
-    ///
-    /// @returns The `none` stub rule (the Rust default).
-    #[wasm_bindgen(js_name = none)]
-    pub fn none() -> Self {
-        Self::wrap(StubKind::None)
-    }
-
-    /// A short irregular period at the start of the schedule.
-    ///
-    /// @returns The `short_front` stub rule.
-    #[wasm_bindgen(js_name = shortFront)]
-    pub fn short_front() -> Self {
-        Self::wrap(StubKind::ShortFront)
-    }
-
-    /// A short irregular period at the end of the schedule.
-    ///
-    /// @returns The `short_back` stub rule.
-    #[wasm_bindgen(js_name = shortBack)]
-    pub fn short_back() -> Self {
-        Self::wrap(StubKind::ShortBack)
-    }
-
-    /// A long irregular period at the start of the schedule.
-    ///
-    /// @returns The `long_front` stub rule.
-    #[wasm_bindgen(js_name = longFront)]
-    pub fn long_front() -> Self {
-        Self::wrap(StubKind::LongFront)
-    }
-
-    /// A long irregular period at the end of the schedule.
-    ///
-    /// @returns The `long_back` stub rule.
-    #[wasm_bindgen(js_name = longBack)]
-    pub fn long_back() -> Self {
-        Self::wrap(StubKind::LongBack)
-    }
-
-    /// Parse a stub rule name (Rust `StubKind::from_str`).
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Stub name: `"none"`, `"short_front"`, `"short_back"`,
-    ///   `"long_front"` or `"long_back"`.
-    ///
-    /// @returns The matching `StubKind`.
-    /// @throws `TypeError` (kind `invalid_type`) if `name` is not a string;
-    /// `FinstackError` (kind `validation`) if no stub rule matches.
-    #[wasm_bindgen(js_name = fromName)]
-    pub fn from_name(name: JsValue) -> Result<JsStubKind, JsValue> {
-        js_string(&name, "name")?
-            .parse::<StubKind>()
-            .map(Self::wrap)
-            .map_err(to_js_err)
-    }
-
-    /// Canonical snake_case name of the stub rule.
-    ///
-    /// @returns The name accepted by `fromName` and the JSON wire format.
-    #[wasm_bindgen(js_name = toString)]
-    #[allow(clippy::inherent_to_string)]
-    pub fn to_string(&self) -> String {
-        self.inner.to_string()
-    }
-}
-
-/// Policy for recoverable schedule-construction errors.
-///
-/// @example
-/// ```typescript
-/// import init, { core } from "finstack-quant-wasm";
-/// await init();
-/// core.ScheduleErrorPolicy.strict().toString(); // "strict"
-/// core.ScheduleErrorPolicy.fromName("graceful_empty").toString(); // "graceful_empty"
-/// ```
-#[wasm_bindgen(js_name = ScheduleErrorPolicy)]
-#[derive(Clone, Copy, Debug)]
-pub struct JsScheduleErrorPolicy {
-    pub(crate) inner: ScheduleErrorPolicy,
-}
-
-impl JsScheduleErrorPolicy {
-    const fn wrap(inner: ScheduleErrorPolicy) -> Self {
-        Self { inner }
-    }
-}
-
-#[wasm_bindgen(js_class = ScheduleErrorPolicy)]
-impl JsScheduleErrorPolicy {
-    /// Fail on any construction error, including an unknown calendar.
-    ///
-    /// @returns The `strict` policy (the Rust default).
-    #[wasm_bindgen(js_name = strict)]
-    pub fn strict() -> Self {
-        Self::wrap(ScheduleErrorPolicy::Strict)
-    }
-
-    /// Build an unadjusted schedule carrying a warning when the calendar is unknown.
-    ///
-    /// @returns The `missing_calendar_warning` policy.
-    #[wasm_bindgen(js_name = missingCalendarWarning)]
-    pub fn missing_calendar_warning() -> Self {
-        Self::wrap(ScheduleErrorPolicy::MissingCalendarWarning)
-    }
-
-    /// Return an empty schedule carrying a warning instead of a recoverable error.
-    ///
-    /// @returns The `graceful_empty` policy.
-    #[wasm_bindgen(js_name = gracefulEmpty)]
-    pub fn graceful_empty() -> Self {
-        Self::wrap(ScheduleErrorPolicy::GracefulEmpty)
-    }
-
-    /// Parse a policy name (the Rust serde label).
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Policy name: `"strict"`, `"missing_calendar_warning"` or
-    ///   `"graceful_empty"`.
-    ///
-    /// @returns The matching `ScheduleErrorPolicy`.
-    /// @throws `TypeError` (kind `invalid_type`) if `name` is not a string;
-    /// `FinstackError` (kind `validation`) if no policy matches.
-    #[wasm_bindgen(js_name = fromName)]
-    pub fn from_name(name: JsValue) -> Result<JsScheduleErrorPolicy, JsValue> {
-        serde_parse(&js_string(&name, "name")?)
-            .map(Self::wrap)
-            .map_err(to_js_err)
-    }
-
-    /// Canonical snake_case name of the policy.
-    ///
-    /// @returns The name accepted by `fromName` and the JSON wire format.
-    /// @throws If the label cannot be produced (not expected).
-    #[wasm_bindgen(js_name = toString)]
-    pub fn to_string(&self) -> Result<String, JsValue> {
-        serde_label(&self.inner).map_err(to_js_err)
-    }
-}
 
 /// Convert dates to an epoch-day array.
 fn epoch_day_array(dates: &[Date]) -> Box<[i32]> {
@@ -228,7 +63,7 @@ impl JsSchedule {
             .map_err(to_js_err)
     }
 
-    /// Build a schedule from a persisted specification (Rust `ScheduleSpec::build`).
+    /// Build a schedule from a persisted specification (Rust `ScheduleBuilder::build`).
     ///
     /// # Arguments
     ///
@@ -246,7 +81,7 @@ impl JsSchedule {
     /// calendar under the strict policy.
     #[wasm_bindgen(js_name = fromSpec)]
     pub fn from_spec(spec: JsValue) -> Result<JsSchedule, JsValue> {
-        from_js_json::<ScheduleSpec>(&spec, "spec")?
+        ScheduleBuilder::from(from_js_json::<ScheduleSpec>(&spec, "spec")?)
             .build()
             .map(|inner| JsSchedule { inner })
             .map_err(to_js_err)
@@ -367,8 +202,7 @@ impl JsScheduleBuilder {
     /// # Arguments
     ///
     /// * `stub` - Stub name: `"none"`, `"short_front"`, `"short_back"`,
-    ///   `"long_front"` or `"long_back"` (use `stubKind.toString()` for a
-    ///   `StubKind`).
+    ///   `"long_front"` or `"long_back"`, in any ASCII case.
     ///
     /// @returns This builder, updated in place.
     /// @throws `TypeError` if `stub` is not a string; `FinstackError` (kind
@@ -478,14 +312,14 @@ impl JsScheduleBuilder {
     /// # Arguments
     ///
     /// * `policy` - Policy name: `"strict"`, `"missing_calendar_warning"` or
-    ///   `"graceful_empty"`.
+    ///   `"graceful_empty"`, in any ASCII case.
     ///
     /// @returns This builder, updated in place.
     /// @throws `TypeError` if `policy` is not a string; `FinstackError` (kind
     /// `validation`) if no policy matches.
     #[wasm_bindgen(js_name = errorPolicy)]
     pub fn error_policy(&mut self, policy: JsValue) -> Result<(), JsValue> {
-        self.spec.error_policy = serde_parse(&js_string(&policy, "policy")?).map_err(to_js_err)?;
+        self.spec.error_policy = js_string(&policy, "policy")?.parse().map_err(to_js_err)?;
         Ok(())
     }
 
@@ -498,7 +332,7 @@ impl JsScheduleBuilder {
         to_js_value(&self.spec)
     }
 
-    /// Generate the schedule (Rust `ScheduleSpec::build`).
+    /// Generate the schedule (Rust `ScheduleBuilder::build`).
     ///
     /// @returns The generated `Schedule`.
     /// @throws `FinstackError` (kind `validation`) for an invalid frequency or
@@ -506,7 +340,7 @@ impl JsScheduleBuilder {
     /// the strict policy.
     #[wasm_bindgen(js_name = build)]
     pub fn build(&self) -> Result<JsSchedule, JsValue> {
-        self.spec
+        ScheduleBuilder::from(self.spec.clone())
             .build()
             .map(|inner| JsSchedule { inner })
             .map_err(to_js_err)

@@ -9,6 +9,7 @@ use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
@@ -241,14 +242,12 @@ pub struct Ndf {
     /// Settlement currency (freely convertible, typically USD, denominator and PV currency).
     pub settlement_currency: Currency,
     /// Fixing date (rate observation date, typically T-2 before maturity).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub fixing_date: Date,
     /// Maturity/settlement date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -341,14 +340,12 @@ struct NdfUnchecked {
     /// Settlement currency (freely convertible, typically USD, denominator and PV currency).
     settlement_currency: Currency,
     /// Fixing date (rate observation date, typically T-2 before maturity).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     fixing_date: Date,
     /// Maturity/settlement date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -579,14 +576,14 @@ impl Ndf {
         business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
         end_of_month: bool,
     ) -> finstack_quant_core::Result<Self> {
-        use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date_for_pair};
+        use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date};
         use finstack_quant_core::dates::{adjust, resolve_joint_calendar, DateExt};
 
         // CLS-consistent spot roll: a US holiday on an intermediate day does not
         // delay a USD pair's spot date (FX spot convention
         // finding). For NDFs the settlement currency (typically USD) takes the
         // second-currency slot of the pair.
-        let spot_date = fx_spot_date_for_pair(
+        let spot_date = fx_spot_date(
             trade_date,
             settlement_days,
             base_currency,

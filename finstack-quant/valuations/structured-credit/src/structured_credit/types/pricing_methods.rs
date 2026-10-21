@@ -12,6 +12,7 @@ use crate::structured_credit::pricing::stochastic::pricer::{
 use crate::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::correlation::RecoverySpec as StochasticRecoverySpec;

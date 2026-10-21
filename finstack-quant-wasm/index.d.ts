@@ -2160,9 +2160,9 @@ export interface MoneyConstructor {
   /**
    * A zero amount in a currency.
    *
+   * @throws If the amount cannot be constructed (not expected for zero).
    * @param currency - ISO-4217 `Currency` object that tags the amount.
    * @returns `Money` with amount `0` in `currency`.
-   * @throws If the amount cannot be constructed (not expected for zero).
    */
   zero(currency: Currency): Money;
 }
@@ -2301,10 +2301,11 @@ export interface RateConstructor {
   /**
    * Create a rate from a whole number of basis points.
    *
-   * Delegates to Rust `Rate::try_from_bp`, which rejects fractional input
-   * rather than silently rounding it: a sub-bp rate quietly rounded to
-   * whole bp is a pricing bug, not a convenience. Use `new Rate(decimal)`,
-   * `Rate.fromPercent`, or `Rate.parse("62.5bp")` for sub-bp rates.
+   * Delegates to Rust `Rate::from_bp` (the twin of Python `Rate.from_bp`).
+   * Fractional input is rejected rather than silently rounded: a sub-bp
+   * rate quietly rounded to whole bp is a pricing bug, not a convenience.
+   * Use `new Rate(decimal)`, `Rate.fromPercent`, or `Rate.parse("62.5bp")`
+   * for sub-bp rates.
    *
    * @example
    * ```javascript
@@ -2313,7 +2314,7 @@ export interface RateConstructor {
    * ```
    * @param bp - Rate in whole basis points (e.g. `500` for 5%).
    * @returns The constructed `Rate`.
-   * @throws If `bp` is non-finite or not a whole number of basis points.
+   * @throws `TypeError` (kind `invalid_type`) if `bp` is not a whole number in the `i32` range.
    */
   fromBp(bp: number): Rate;
   /**
@@ -2386,7 +2387,7 @@ export interface Bps extends WasmOwned {
    * @returns A new `Bps` with the sign removed.
    * @throws `FinstackError` (kind `validation`) when the quote is `-2147483648` bp, whose absolute value has no 32-bit representation.
    */
-  abs(): Bps;
+  checkedAbs(): Bps;
   /**
    * Whether the value is exactly zero.
    *
@@ -2739,9 +2740,9 @@ export interface DayCountContextConstructor {
   /**
    * Deserialize from the canonical JSON wire form produced by `toJson`.
    *
-   * @param json - Canonical DayCountContext JSON text or plain object; unknown fields are rejected. As in Rust and Python, the coupon period is validated when the context is used (`DayCountContextState::to_ctx`).
+   * @param json - Canonical DayCountContext JSON text or plain object; unknown fields are rejected. As in Rust and Python, it is validated on load by `DayCountContextState::try_new`.
    * @returns The parsed `DayCountContext`.
-   * @throws If `json` is malformed or has unknown or mistyped fields.
+   * @throws `FinstackError` (kind `validation`) if `json` is malformed, has unknown or mistyped fields, an inverted coupon period or a zero business-day basis.
    */
   fromJson(json: JsonInput): DayCountContext;
 }
@@ -2940,6 +2941,12 @@ export interface TenorConstructor {
 }
 
 /**
+ * 30/360 day-count variant label accepted by `core.days30360` (Rust
+ * `Thirty360Convention`; parsing is ASCII case-insensitive).
+ */
+export type Thirty360Convention = 'us_sia' | 'isda' | 'european' | 'italian';
+
+/**
  * Discount-curve validation policy: market-standard or negative-rate-friendly.
  */
 export type DiscountCurveValidationMode = 'market_standard' | 'negative_rate_friendly';
@@ -3009,7 +3016,7 @@ export interface DiscountCurveOptions {
  *   dayCount: "act_365f",
  * });
  * curve.df(2.5);          // discount factor at 2.5y
- * curve.zero(2.5);        // continuously-compounded zero rate at 2.5y
+ * curve.zeroRate(2.5);    // continuously-compounded zero rate at 2.5y
  * ```
  */
 export interface DiscountCurve extends WasmOwned {
@@ -3028,13 +3035,6 @@ export interface DiscountCurve extends WasmOwned {
    * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
    */
   df(t: number | string): number;
-  /**
-   * Continuously-compounded zero rate at year fraction or ISO date `t`.
-   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
-   * @returns The continuously-compounded zero rate as a decimal.
-   * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
-   */
-  zero(t: number | string): number;
   /**
    * Continuously-compounded forward rate between `t1` and `t2`.
    * @returns Continuously compounded forward rate as a decimal over `(t1, t2)`.
@@ -3141,7 +3141,7 @@ export interface DiscountCurve extends WasmOwned {
  *   dayCount: "act_365f",
  * });
  * curve.df(2.5);          // discount factor at 2.5y
- * curve.zero(2.5);        // continuously-compounded zero rate at 2.5y
+ * curve.zeroRate(2.5);    // continuously-compounded zero rate at 2.5y
  * ```
  */
 export interface DiscountCurveConstructor {
@@ -3489,7 +3489,7 @@ export interface ForwardCurve extends WasmOwned {
    * accrual growth to the contractual index basis before calculating a coupon
    * with a different accrual convention. Rust instrument pricing performs this
    * conversion from the contractual schedule.
-   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
+   * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count; a date on or before the base date reads the rate at curve time zero).
    * @returns Simple forward rate as a decimal, annualized on the curve day count.
    * @throws `TypeError` if `t` is neither a number nor a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
    */
@@ -3727,7 +3727,7 @@ export interface VolCube extends WasmOwned {
  *   "USD-SWAPTION",
  *   [1],
  *   [5],
- *   [0.02, 0.5, -0.2, 0.4, Number.NaN],
+ *   [{ alpha: 0.02, beta: 0.5, rho: -0.2, nu: 0.4 }],
  *   [0.03]
  * );
  * console.log(cube.id, cube.interpolationMode);
@@ -3736,23 +3736,23 @@ export interface VolCube extends WasmOwned {
  */
 export interface VolCubeConstructor {
   /**
-   * Construct a vol cube from a flat SABR parameter array.
+   * Construct a vol cube from SABR parameter nodes (Rust `VolCube::from_grid`).
    *
    * @returns A `VolCube` handle.
    * @param id - Curve identifier.
    * @param expiries - Option expiry axis in years (strictly increasing).
    * @param tenors - Swap tenor axis in years (strictly increasing).
-   * @param paramsFlat - Row-major SABR parameters: either a flat array `[alpha0, beta0, rho0, nu0, shift0, alpha1, …]` of length `expiries.len() * tenors.len() * 5` (pass `NaN` for `shift` to omit it), or an array of `{ alpha, beta, rho, nu, shift? }` objects of length `expiries.len() * tenors.len()`. The `nu` component is nonnegative; zero gives deterministic volatility.
-   * @param forwards - Row-major forward rates, one per grid node.
+   * @param paramsRowMajor - Row-major SABR nodes (expiry-major): an array of `{ alpha, beta, rho, nu, shift? }` objects (the `SabrParameterData` wire form) of length `expiries.length * tenors.length`; an omitted or `null` `shift` means an unshifted node. The `nu` component is nonnegative; zero gives deterministic volatility.
+   * @param forwardsRowMajor - Row-major forward rates, one per grid node.
    * @param interpolationMode - Interpolation across the expiry axis: `"vol"` or `"total_variance"`; omitted keeps the Rust `VolCube::from_grid` default (`"vol"`).
-   * @throws Error - Throws a JavaScript exception if an axis is empty, non-finite, non-positive, or not strictly increasing; the parameter or forward array has the wrong length or its grid-size product overflows; a forward is non-finite; any SABR node has invalid alpha, beta, rho, nu, or shift; or `interpolationMode` is neither `vol` nor `total_variance`.
+   * @throws Error - Throws a JavaScript exception if an axis is empty, non-finite, non-positive, or not strictly increasing; the parameter or forward array has the wrong length; a node has unknown fields; a forward is non-finite; any SABR node has invalid alpha, beta, rho, nu, or shift; or `interpolationMode` is neither `vol` nor `total_variance`.
    */
   new (
     id: string,
     expiries: NumericArray,
     tenors: NumericArray,
-    paramsFlat: NumericArray,
-    forwards: NumericArray,
+    paramsRowMajor: SabrParameterData[] | string,
+    forwardsRowMajor: NumericArray,
     interpolationMode?: string
   ): VolCube;
   /**
@@ -3805,7 +3805,13 @@ export interface FxConversionPolicy extends WasmOwned {
  */
 export interface FxConversionPolicyConstructor {
   /**
-   * JavaScript prototype of `FxConversionPolicy`; instances come from the static factories, not `new`.
+   * The Rust default policy (`FxConversionPolicy::default()`, cashflow date).
+   *
+   * @returns The default conversion policy, the one `FxMatrix.rate` uses when `policy` is omitted.
+   */
+  new (): FxConversionPolicy;
+  /**
+   * JavaScript prototype of `FxConversionPolicy`.
    */
   readonly prototype: FxConversionPolicy;
   /**
@@ -3884,6 +3890,61 @@ export interface FxRateResultConstructor {
    * @throws If `json` is malformed or has unknown or missing fields.
    */
   fromJson(json: JsonInput): FxRateResult;
+}
+
+/**
+ * Result of `MarketContext.convertMoney` (Rust `ConvertedMoney`): the
+ * converted amount and the FX rate lookup it used.
+ */
+export interface ConvertedMoney extends WasmOwned {
+  /**
+   * The amount in the target currency.
+   * @returns The converted `Money`.
+   */
+  readonly amount: Money;
+  /**
+   * The FX rate lookup behind the conversion; `undefined` for a same-currency input.
+   * @returns The applied `FxRateResult`, or `undefined` for a same-currency input.
+   */
+  readonly rate: FxRateResult | undefined;
+  /**
+   * Serialize to the canonical JSON wire form shared with Python `ConvertedMoney.to_json`.
+   *
+   * @returns Compact JSON text with `amount` and `rate`.
+   * @throws If serialization fails (not expected for a valid result).
+   */
+  toJson(): string;
+}
+
+/**
+ * `ConvertedMoney` has no public constructor; instances come from
+ * `MarketContext.convertMoney` or `ConvertedMoney.fromJson`.
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const fx = new core.FxMatrix();
+ * fx.setQuote("EUR", "USD", 1.1);
+ * const market = new core.MarketContext();
+ * market.insertFx(fx);
+ * const usd = new core.Currency("USD");
+ * const converted = market.convertMoney(new core.Money(100, new core.Currency("EUR")), usd, "2025-01-02");
+ * console.log(converted.amount.amount, converted.rate?.triangulated);
+ * ```
+ */
+export interface ConvertedMoneyConstructor {
+  /**
+   * JavaScript prototype of `ConvertedMoney`; instances come from `MarketContext.convertMoney`, not `new`.
+   */
+  readonly prototype: ConvertedMoney;
+  /**
+   * Deserialize from the canonical JSON wire form produced by `toJson`.
+   *
+   * @param json - Canonical ConvertedMoney JSON text or plain object; unknown fields are rejected.
+   * @returns The parsed `ConvertedMoney`.
+   * @throws `FinstackError` (kind `validation`) if `json` is malformed or has unknown or missing fields.
+   */
+  fromJson(json: JsonInput): ConvertedMoney;
 }
 
 /**
@@ -4092,10 +4153,6 @@ export interface FxDeltaVolSurface extends WasmOwned {
    */
   readonly expiries: Float64Array;
   /**
-   * Number of expiry pillars.
-   */
-  readonly numExpiries: number;
-  /**
    * ATM delta-neutral straddle vols per expiry (decimals).
    */
   readonly atmVols: Float64Array;
@@ -4141,7 +4198,7 @@ export interface FxDeltaVolSurface extends WasmOwned {
  *   [0.01],
  *   [0.002]
  * );
- * console.log(surface.id, surface.numExpiries);
+ * console.log(surface.id, surface.expiries.length);
  * surface.free();
  * ```
  */
@@ -4262,7 +4319,7 @@ export interface MarketContext extends WasmOwned {
    * @param value - Finite scalar value: an index level, a spot price, a recovery assumption and so on.
    * @param currency - ISO-4217 code that makes the scalar a monetary price; omitted stores a unitless number.
    * @returns This context, updated in place, so calls can be chained.
-   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an unknown currency or a value that is not finite (Rust `MarketScalar::unitless` / `Money::new`).
+   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an unknown currency or a value that is not finite (Rust `MarketScalar::from_parts`).
    */
   insertPrice(id: string, value: number, currency?: string | null): MarketContext;
   /**
@@ -4289,16 +4346,6 @@ export interface MarketContext extends WasmOwned {
    * @returns This context, updated in place, so calls can be chained.
    */
   insertInflationIndex(index: InflationIndex): MarketContext;
-  /**
-   * Map a CSA code to the discount curve used for collateralised trades
-   * (Rust `MarketContext::map_collateral_mut`).
-   *
-   * @param csaCode - Credit-support-annex code, such as `"USD-CSA"`.
-   * @param discountId - Identifier of the discount curve to use for that CSA; it is resolved when a collateral curve is requested.
-   * @returns This context, updated in place, so calls can be chained.
-   * @throws `TypeError` if an argument is not a string.
-   */
-  mapCollateral(csaCode: string, discountId: string): MarketContext;
   /**
    * Look up a discount curve by id (Rust `MarketContext::get_discount`).
    *
@@ -4425,10 +4472,10 @@ export interface MarketContext extends WasmOwned {
    * @param amount - Monetary amount to convert.
    * @param targetCurrency - Destination `Currency` object; an amount already in it is returned unchanged.
    * @param asOf - ISO-8601 date of the FX rate lookup.
-   * @returns The converted `Money` in `targetCurrency`.
+   * @returns A `ConvertedMoney` holding the converted `amount` in `targetCurrency` and the applied FX `rate` lookup (`undefined` for a same-currency input), whose `triangulated` flag records a pivot-derived rate.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `not_found`) if no FX matrix is attached or the pair has no rate, or kind `validation` for a malformed date.
    */
-  convertMoney(amount: Money, targetCurrency: Currency, asOf: string): Money;
+  convertMoney(amount: Money, targetCurrency: Currency, asOf: string): ConvertedMoney;
   /**
    * Whether any market data is stored under an id (Rust `MarketContext::contains`).
    *
@@ -4458,7 +4505,7 @@ export interface MarketContext extends WasmOwned {
   /**
    * Counts of the stored market data (Rust `MarketContext::stats`).
    *
-   * @returns A plain object with `curve_counts` (count per curve type), `total_curves`, `has_fx`, `surface_count`, `vol_cube_count`, `price_count`, `series_count`, `inflation_index_count`, `credit_index_count`, `dividend_schedule_count`, `fx_delta_vol_surface_count` and `collateral_mapping_count`.
+   * @returns A plain object with `curve_counts` (count per curve type), `total_curves`, `has_fx`, `surface_count`, `vol_cube_count`, `price_count`, `series_count`, `inflation_index_count`, `credit_index_count`, `dividend_schedule_count` and `fx_delta_vol_surface_count`.
    * @throws If the counts cannot be converted (not expected).
    */
   stats(): ContextStats;
@@ -4514,98 +4561,6 @@ export interface MarketContextConstructor {
 }
 
 /**
- * Business-day adjustment convention (ISDA 2006 Definitions, Section 4.12).
- *
- * Each static factory is one Rust `BusinessDayConvention` variant;
- * `toString()` is the canonical snake_case name that `adjust`,
- * `ScheduleBuilder.adjustWith` and the JSON wire format accept.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * const convention = core.BusinessDayConvention.modifiedFollowing();
- * convention.toString(); // "modified_following"
- * core.BusinessDayConvention.fromName("following").toString(); // "following"
- * ```
- */
-export interface BusinessDayConvention extends WasmOwned {
-  /**
-   * Canonical snake_case name of the convention.
-   *
-   * @returns The name accepted by `fromName` and the JSON wire format.
-   */
-  toString(): string;
-}
-
-/**
- * Business-day adjustment convention (ISDA 2006 Definitions, Section 4.12).
- *
- * Each static factory is one Rust `BusinessDayConvention` variant;
- * `toString()` is the canonical snake_case name that `adjust`,
- * `ScheduleBuilder.adjustWith` and the JSON wire format accept.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * const convention = core.BusinessDayConvention.modifiedFollowing();
- * convention.toString(); // "modified_following"
- * core.BusinessDayConvention.fromName("following").toString(); // "following"
- * ```
- */
-export interface BusinessDayConventionConstructor {
-  /**
-   * JavaScript prototype of `BusinessDayConvention`; instances come from the static factories, not `new`.
-   */
-  readonly prototype: BusinessDayConvention;
-  /**
-   * Leave the date unchanged even when it is not a business day.
-   *
-   * @returns The `unadjusted` convention.
-   */
-  unadjusted(): BusinessDayConvention;
-  /**
-   * Roll forward to the next business day.
-   *
-   * @returns The `following` convention.
-   */
-  following(): BusinessDayConvention;
-  /**
-   * Roll forward unless that crosses a month end, then roll backward.
-   *
-   * @returns The `modified_following` convention (the Rust default).
-   */
-  modifiedFollowing(): BusinessDayConvention;
-  /**
-   * Roll backward to the previous business day.
-   *
-   * @returns The `preceding` convention.
-   */
-  preceding(): BusinessDayConvention;
-  /**
-   * Roll backward unless that crosses a month start, then roll forward.
-   *
-   * @returns The `modified_preceding` convention.
-   */
-  modifiedPreceding(): BusinessDayConvention;
-  /**
-   * Roll to the nearest business day (forward on a tie).
-   *
-   * @returns The `nearest` convention.
-   */
-  nearest(): BusinessDayConvention;
-  /**
-   * Parse a convention name (Rust `BusinessDayConvention::from_str`).
-   *
-   * @param name - Convention name such as `"following"`, `"modified_following"` or `"preceding"`; case and `-`/space separators are normalised by the Rust parser.
-   * @returns The matching `BusinessDayConvention`.
-   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no convention matches.
-   */
-  fromName(name: string): BusinessDayConvention;
-}
-
-/**
  * Identifier, display name and weekend rule of a built-in holiday calendar
  * (the Rust `CalendarMetadata`), as returned by `HolidayCalendar.metadata`.
  */
@@ -4622,10 +4577,6 @@ export interface CalendarMetadata {
    * Whether weekends are ignored when classifying holidays.
    */
   ignore_weekends: boolean;
-  /**
-   * Weekend convention of the calendar, such as `"saturday_sunday"`.
-   */
-  weekend_rule: string;
 }
 
 /**
@@ -4642,21 +4593,17 @@ export interface CalendarMetadata {
  * const calendar = new core.HolidayCalendar("nyse");
  * calendar.isHoliday(core.createDate(2025, 1, 1)); // true
  * calendar.isBusinessDay(core.createDate(2025, 1, 6)); // true
- * calendar.code; // "nyse"
+ * calendar.toString(); // "nyse"
  * ```
  */
 export interface HolidayCalendar extends WasmOwned {
   /**
    * Calendar metadata, or `undefined` for union calendars.
    *
-   * A plain `CalendarMetadata` object with `id`, `name`,
-   * `ignore_weekends` and `weekend_rule`.
+   * A plain `CalendarMetadata` object with `id`, `name` and
+   * `ignore_weekends`.
    */
   readonly metadata: CalendarMetadata | undefined;
-  /**
-   * Canonical calendar id: the registry id, or the sorted `a+b` union form.
-   */
-  readonly code: string;
   /**
    * Whether a date is a holiday on this calendar.
    *
@@ -4704,7 +4651,7 @@ export interface HolidayCalendar extends WasmOwned {
  * const calendar = new core.HolidayCalendar("nyse");
  * calendar.isHoliday(core.createDate(2025, 1, 1)); // true
  * calendar.isBusinessDay(core.createDate(2025, 1, 6)); // true
- * calendar.code; // "nyse"
+ * calendar.toString(); // "nyse"
  * ```
  */
 export interface HolidayCalendarConstructor {
@@ -4738,10 +4685,6 @@ export interface PeriodKind extends WasmOwned {
    * Number of periods per year (daily uses the 252 trading-day convention).
    */
   readonly periodsPerYear: number;
-  /**
-   * Factor that scales per-period statistics to annual ones (`periodsPerYear` as a float).
-   */
-  readonly annualizationFactor: number;
   /**
    * Observation date one frequency step before `first` (Rust
    * `PeriodKind::prior_observation_date`).
@@ -4833,16 +4776,12 @@ export interface PeriodKindConstructor {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const q1 = core.PeriodId.quarter(2025, 1);
- * q1.code; // "2025Q1"
- * q1.next().code; // "2025Q2"
- * core.PeriodId.parse("2025M12").next().code; // "2026M01"
+ * q1.toString(); // "2025Q1"
+ * q1.shift(1).toString(); // "2025Q2"
+ * core.PeriodId.parse("2025M12").shift(1).toString(); // "2026M01"
  * ```
  */
 export interface PeriodId extends WasmOwned {
-  /**
-   * Period code, such as `"2025Q1"` (the text `parse` accepts).
-   */
-  readonly code: string;
   /**
    * Calendar (or fiscal) year of the period.
    */
@@ -4860,19 +4799,13 @@ export interface PeriodId extends WasmOwned {
    */
   readonly isFiscal: boolean;
   /**
-   * Step forward to the next period (Rust `PeriodId::next`).
+   * Move by a signed number of periods of the same kind and calendar (Rust `PeriodId::shift`).
    *
-   * @returns The following `PeriodId`, rolling the year where needed.
-   * @throws `FinstackError` (kind `validation`) when the year would overflow, or for a fiscal daily identifier at day 365, whose next day depends on the fiscal calendar (use `nextFiscal`).
+   * @param periods - Whole number of periods to move; negative moves back and `0` returns the identifier unchanged.
+   * @returns The `PeriodId` `periods` steps away, rolling the year where needed.
+   * @throws `TypeError` (kind `invalid_type`) when `periods` is not a whole number; `FinstackError` (kind `validation`) when the year would overflow, or for a fiscal daily identifier that would leave days `1..=365`, whose length depends on the fiscal calendar (use `nextFiscal` / `prevFiscal`).
    */
-  next(): PeriodId;
-  /**
-   * Step back to the previous period (Rust `PeriodId::prev`).
-   *
-   * @returns The preceding `PeriodId`, rolling the year where needed.
-   * @throws `FinstackError` (kind `validation`) when the year would overflow, or for a fiscal daily identifier at day 1, whose previous day depends on the fiscal calendar (use `prevFiscal`).
-   */
-  prev(): PeriodId;
+  shift(periods: number): PeriodId;
   /**
    * Step forward to the next fiscal period (Rust `PeriodId::next_fiscal`).
    *
@@ -4905,9 +4838,9 @@ export interface PeriodId extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const q1 = core.PeriodId.quarter(2025, 1);
- * q1.code; // "2025Q1"
- * q1.next().code; // "2025Q2"
- * core.PeriodId.parse("2025M12").next().code; // "2026M01"
+ * q1.toString(); // "2025Q1"
+ * q1.shift(1).toString(); // "2025Q2"
+ * core.PeriodId.parse("2025M12").shift(1).toString(); // "2026M01"
  * ```
  */
 export interface PeriodIdConstructor {
@@ -5056,147 +4989,6 @@ export interface FiscalConfigConstructor {
 }
 
 /**
- * Stub convention: where an irregular first or last accrual period goes.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * core.StubKind.shortFront().toString(); // "short_front"
- * core.StubKind.fromName("long_back").toString(); // "long_back"
- * ```
- */
-export interface StubKind extends WasmOwned {
-  /**
-   * Canonical snake_case name of the stub rule.
-   *
-   * @returns The name accepted by `fromName` and the JSON wire format.
-   */
-  toString(): string;
-}
-
-/**
- * Stub convention: where an irregular first or last accrual period goes.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * core.StubKind.shortFront().toString(); // "short_front"
- * core.StubKind.fromName("long_back").toString(); // "long_back"
- * ```
- */
-export interface StubKindConstructor {
-  /**
-   * JavaScript prototype of `StubKind`; instances come from the static factories, not `new`.
-   */
-  readonly prototype: StubKind;
-  /**
-   * No stub: the range must divide evenly into the frequency.
-   *
-   * @returns The `none` stub rule (the Rust default).
-   */
-  none(): StubKind;
-  /**
-   * A short irregular period at the start of the schedule.
-   *
-   * @returns The `short_front` stub rule.
-   */
-  shortFront(): StubKind;
-  /**
-   * A short irregular period at the end of the schedule.
-   *
-   * @returns The `short_back` stub rule.
-   */
-  shortBack(): StubKind;
-  /**
-   * A long irregular period at the start of the schedule.
-   *
-   * @returns The `long_front` stub rule.
-   */
-  longFront(): StubKind;
-  /**
-   * A long irregular period at the end of the schedule.
-   *
-   * @returns The `long_back` stub rule.
-   */
-  longBack(): StubKind;
-  /**
-   * Parse a stub rule name (Rust `StubKind::from_str`).
-   *
-   * @param name - Stub name: `"none"`, `"short_front"`, `"short_back"`, `"long_front"` or `"long_back"`.
-   * @returns The matching `StubKind`.
-   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no stub rule matches.
-   */
-  fromName(name: string): StubKind;
-}
-
-/**
- * Policy for recoverable schedule-construction errors.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * core.ScheduleErrorPolicy.strict().toString(); // "strict"
- * core.ScheduleErrorPolicy.fromName("graceful_empty").toString(); // "graceful_empty"
- * ```
- */
-export interface ScheduleErrorPolicy extends WasmOwned {
-  /**
-   * Canonical snake_case name of the policy.
-   *
-   * @returns The name accepted by `fromName` and the JSON wire format.
-   * @throws If the label cannot be produced (not expected).
-   */
-  toString(): string;
-}
-
-/**
- * Policy for recoverable schedule-construction errors.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * core.ScheduleErrorPolicy.strict().toString(); // "strict"
- * core.ScheduleErrorPolicy.fromName("graceful_empty").toString(); // "graceful_empty"
- * ```
- */
-export interface ScheduleErrorPolicyConstructor {
-  /**
-   * JavaScript prototype of `ScheduleErrorPolicy`; instances come from the static factories, not `new`.
-   */
-  readonly prototype: ScheduleErrorPolicy;
-  /**
-   * Fail on any construction error, including an unknown calendar.
-   *
-   * @returns The `strict` policy (the Rust default).
-   */
-  strict(): ScheduleErrorPolicy;
-  /**
-   * Build an unadjusted schedule carrying a warning when the calendar is unknown.
-   *
-   * @returns The `missing_calendar_warning` policy.
-   */
-  missingCalendarWarning(): ScheduleErrorPolicy;
-  /**
-   * Return an empty schedule carrying a warning instead of a recoverable error.
-   *
-   * @returns The `graceful_empty` policy.
-   */
-  gracefulEmpty(): ScheduleErrorPolicy;
-  /**
-   * Parse a policy name (the Rust serde label).
-   *
-   * @param name - Policy name: `"strict"`, `"missing_calendar_warning"` or `"graceful_empty"`.
-   * @returns The matching `ScheduleErrorPolicy`.
-   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no policy matches.
-   */
-  fromName(name: string): ScheduleErrorPolicy;
-}
-
-/**
  * A generated schedule: the accrual grid plus payment and fixing dates.
  *
  * Build one with `Schedule.builder(start, end)` or `Schedule.fromSpec(spec)`.
@@ -5290,7 +5082,7 @@ export interface ScheduleConstructor {
    */
   builder(start: number, end: number): ScheduleBuilder;
   /**
-   * Build a schedule from a persisted specification (Rust `ScheduleSpec::build`).
+   * Build a schedule from a persisted specification (Rust `ScheduleBuilder::build`).
    *
    * @param spec - `ScheduleSpec` JSON text or plain object, such as `ScheduleBuilder.toSpec()` output: ISO `start`/`end`, `frequency` (a `{ count, unit }` tenor), `stub`, `business_day_convention`, `calendar_id`, `end_of_month`, `imm_mode`, `cds_imm_mode`, `error_policy`, `payment_lag_days` and `fixing_lag_business_days`. Unknown fields are rejected.
    * @returns The generated `Schedule`.
@@ -5337,7 +5129,7 @@ export interface ScheduleBuilder extends WasmOwned {
   /**
    * Set the stub rule.
    *
-   * @param stub - Stub name: `"none"`, `"short_front"`, `"short_back"`, `"long_front"` or `"long_back"` (use `stubKind.toString()` for a `StubKind`).
+   * @param stub - Stub name: `"none"`, `"short_front"`, `"short_back"`, `"long_front"` or `"long_back"`, in any ASCII case.
    * @returns This builder, updated in place.
    * @throws `TypeError` if `stub` is not a string; `FinstackError` (kind `validation`) if no stub rule matches.
    */
@@ -5398,7 +5190,7 @@ export interface ScheduleBuilder extends WasmOwned {
   /**
    * Set the policy for recoverable construction errors.
    *
-   * @param policy - Policy name: `"strict"`, `"missing_calendar_warning"` or `"graceful_empty"`.
+   * @param policy - Policy name: `"strict"`, `"missing_calendar_warning"` or `"graceful_empty"`, in any ASCII case.
    * @returns This builder, updated in place.
    * @throws `TypeError` if `policy` is not a string; `FinstackError` (kind `validation`) if no policy matches.
    */
@@ -5411,7 +5203,7 @@ export interface ScheduleBuilder extends WasmOwned {
    */
   toSpec(): ScheduleSpec;
   /**
-   * Generate the schedule (Rust `ScheduleSpec::build`).
+   * Generate the schedule (Rust `ScheduleBuilder::build`).
    *
    * @returns The generated `Schedule`.
    * @throws `FinstackError` (kind `validation`) for an invalid frequency or a generation failure; kind `not_found` for an unknown calendar under the strict policy.
@@ -5455,7 +5247,7 @@ export interface ScheduleBuilderConstructor {
  * await init();
  * const cls = core.SifmaSettlementClass.fromAgencyTerm("FNMA", 15);
  * cls.toString(); // "b"
- * core.sifmaSettlementDateForClass(1, 2026, cls); // epoch days, or undefined
+ * core.sifmaSettlementDate(1, 2026, cls); // epoch days, or undefined
  * ```
  */
 export interface SifmaSettlementClass extends WasmOwned {
@@ -5463,7 +5255,6 @@ export interface SifmaSettlementClass extends WasmOwned {
    * Lower-case class letter (`"a"` through `"d"`), the JSON wire label.
    *
    * @returns The class label.
-   * @throws If the label cannot be produced (not expected).
    */
   toString(): string;
 }
@@ -5479,7 +5270,7 @@ export interface SifmaSettlementClass extends WasmOwned {
  * await init();
  * const cls = core.SifmaSettlementClass.fromAgencyTerm("FNMA", 15);
  * cls.toString(); // "b"
- * core.sifmaSettlementDateForClass(1, 2026, cls); // epoch days, or undefined
+ * core.sifmaSettlementDate(1, 2026, cls); // epoch days, or undefined
  * ```
  */
 export interface SifmaSettlementClassConstructor {
@@ -5524,77 +5315,6 @@ export interface SifmaSettlementClassConstructor {
 }
 
 /**
- * 30/360 day-count variant used by `days30360`.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * const isda = core.Thirty360Convention.isda();
- * core.days30360(core.createDate(2025, 1, 31), core.createDate(2025, 3, 31), isda.toString()); // 60
- * ```
- */
-export interface Thirty360Convention extends WasmOwned {
-  /**
-   * Canonical snake_case name of the variant.
-   *
-   * @returns The name accepted by `fromName` and `days30360`.
-   * @throws If the label cannot be produced (not expected).
-   */
-  toString(): string;
-}
-
-/**
- * 30/360 day-count variant used by `days30360`.
- *
- * @example
- * ```typescript
- * import init, { core } from "finstack-quant-wasm";
- * await init();
- * const isda = core.Thirty360Convention.isda();
- * core.days30360(core.createDate(2025, 1, 31), core.createDate(2025, 3, 31), isda.toString()); // 60
- * ```
- */
-export interface Thirty360ConventionConstructor {
-  /**
-   * JavaScript prototype of `Thirty360Convention`; instances come from the static factories, not `new`.
-   */
-  readonly prototype: Thirty360Convention;
-  /**
-   * 30U/360 (US SIA bond basis).
-   *
-   * @returns The `us_sia` variant.
-   */
-  usSia(): Thirty360Convention;
-  /**
-   * 30/360 ISDA bond basis (ISDA 2006 Section 4.16(f); no February month-end rule).
-   *
-   * @returns The `isda` variant.
-   */
-  isda(): Thirty360Convention;
-  /**
-   * 30E/360 (European): day 31 becomes 30 on both dates.
-   *
-   * @returns The `european` variant.
-   */
-  european(): Thirty360Convention;
-  /**
-   * 30/360 Italian: day 31 and any February day after the 27th become 30.
-   *
-   * @returns The `italian` variant.
-   */
-  italian(): Thirty360Convention;
-  /**
-   * Parse a variant name (the Rust serde label).
-   *
-   * @param name - Variant name: `"us_sia"`, `"isda"`, `"european"` or `"italian"`.
-   * @returns The matching `Thirty360Convention`.
-   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no variant matches.
-   */
-  fromName(name: string): Thirty360Convention;
-}
-
-/**
  * Unit of a tenor: days, weeks, months or years.
  *
  * @example
@@ -5602,14 +5322,14 @@ export interface Thirty360ConventionConstructor {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * core.TenorUnit.months().toString(); // "M"
- * core.TenorUnit.fromChar("y").toString(); // "Y"
+ * core.TenorUnit.fromName("y").toString(); // "Y"
  * ```
  */
 export interface TenorUnit extends WasmOwned {
   /**
    * One-letter unit code: `"D"`, `"W"`, `"M"` or `"Y"`.
    *
-   * @returns The designator accepted by `fromChar` and used in tenor text.
+   * @returns The designator accepted by `fromName` and used in tenor text.
    */
   toString(): string;
 }
@@ -5622,7 +5342,7 @@ export interface TenorUnit extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * core.TenorUnit.months().toString(); // "M"
- * core.TenorUnit.fromChar("y").toString(); // "Y"
+ * core.TenorUnit.fromName("y").toString(); // "Y"
  * ```
  */
 export interface TenorUnitConstructor {
@@ -5655,13 +5375,13 @@ export interface TenorUnitConstructor {
    */
   years(): TenorUnit;
   /**
-   * Parse a one-letter unit code (Rust `TenorUnit::from_char`).
+   * Parse a one-letter unit code (Rust `TenorUnit::from_str`).
    *
-   * @param ch - Exactly one character: `D`, `W`, `M` or `Y`, in either case.
+   * @param name - Exactly one character: `D`, `W`, `M` or `Y`, in either case.
    * @returns The matching `TenorUnit`.
-   * @throws `TypeError` (kind `invalid_type`) if `ch` is not a string; `FinstackError` (kind `validation`) if it is not exactly one of the four unit letters.
+   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if it is not exactly one of the four unit letters.
    */
-  fromChar(ch: string): TenorUnit;
+  fromName(name: string): TenorUnit;
 }
 
 /**
@@ -5671,15 +5391,11 @@ export interface TenorUnitConstructor {
  * ```typescript
  * import init, { core } from "finstack-quant-wasm";
  * await init();
- * core.RoundingMode.bankers().name; // "bankers"
+ * core.RoundingMode.bankers().toString(); // "bankers"
  * core.RoundingMode.fromName("away_from_zero").toJson(); // "\"away_from_zero\""
  * ```
  */
 export interface RoundingMode extends WasmOwned {
-  /**
-   * Lowercase name of the mode, such as `"bankers"`.
-   */
-  readonly name: string;
   /**
    * Serialize to the canonical JSON wire form (a quoted lowercase name).
    *
@@ -5702,7 +5418,7 @@ export interface RoundingMode extends WasmOwned {
  * ```typescript
  * import init, { core } from "finstack-quant-wasm";
  * await init();
- * core.RoundingMode.bankers().name; // "bankers"
+ * core.RoundingMode.bankers().toString(); // "bankers"
  * core.RoundingMode.fromName("away_from_zero").toJson(); // "\"away_from_zero\""
  * ```
  */
@@ -5772,7 +5488,7 @@ export interface RoundingModeConstructor {
  * config.outputScale("JPY"); // 2
  * config.outputScale("USD"); // 2 (the ISO-4217 minor units)
  * const copy = core.FinstackConfig.fromJson(config.toJson());
- * copy.roundingMode.name; // "away_from_zero"
+ * copy.roundingMode.toString(); // "away_from_zero"
  * ```
  */
 export interface FinstackConfig extends WasmOwned {
@@ -5781,7 +5497,7 @@ export interface FinstackConfig extends WasmOwned {
    */
   readonly roundingMode: RoundingMode;
   /**
-   * Numeric tolerances as a plain `ToleranceConfig` object (`rate_epsilon`, `generic_epsilon`).
+   * Numeric tolerances as a plain `ToleranceConfig` object (`generic_epsilon`).
    */
   readonly tolerances: ToleranceConfig;
   /**
@@ -5884,15 +5600,15 @@ export interface FinstackConfig extends WasmOwned {
  * config.outputScale("JPY"); // 2
  * config.outputScale("USD"); // 2 (the ISO-4217 minor units)
  * const copy = core.FinstackConfig.fromJson(config.toJson());
- * copy.roundingMode.name; // "away_from_zero"
+ * copy.roundingMode.toString(); // "away_from_zero"
  * ```
  */
 export interface FinstackConfigConstructor {
   /**
    * Create a configuration from the Rust defaults.
    *
-   * @param roundingMode - Lowercase rounding-mode name (for example `"bankers"`, or `mode.name` of a `RoundingMode`); omitted uses the Rust default, `"bankers"`.
-   * @param tolerances - `ToleranceConfig` object or JSON text with the optional absolute tolerances `rate_epsilon` (default `1e-12`) and `generic_epsilon` (default `1e-10`), both finite and positive; omitted uses the defaults.
+   * @param roundingMode - Lowercase rounding-mode name (for example `"bankers"`, or `mode.toString()` of a `RoundingMode`); omitted uses the Rust default, `"bankers"`.
+   * @param tolerances - `ToleranceConfig` object or JSON text with the optional absolute tolerance `generic_epsilon` (default `1e-10`), finite and positive; omitted uses the default.
    * @returns A new `FinstackConfig`.
    * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an unknown rounding mode, an unknown tolerance field, or a non-positive tolerance.
    */
@@ -5914,15 +5630,11 @@ export interface FinstackConfigConstructor {
  * ```typescript
  * import init, { core } from "finstack-quant-wasm";
  * await init();
- * core.UnknownScalePolicy.fallbackToDefault().name; // "fallback_to_default"
- * core.embeddedRegistry().unknownScalePolicy().name;
+ * core.UnknownScalePolicy.fallbackToDefault().toString(); // "fallback_to_default"
+ * core.embeddedRegistry().unknownScalePolicy().toString();
  * ```
  */
 export interface UnknownScalePolicy extends WasmOwned {
-  /**
-   * Snake_case name of the policy, such as `"fallback_to_default"`.
-   */
-  readonly name: string;
   /**
    * Serialize to the canonical JSON wire form (a quoted snake_case name).
    *
@@ -5934,7 +5646,6 @@ export interface UnknownScalePolicy extends WasmOwned {
    * Snake_case name of the policy (same as `name`).
    *
    * @returns The name accepted by `fromName`.
-   * @throws If the label cannot be produced (not expected).
    */
   toString(): string;
 }
@@ -5946,8 +5657,8 @@ export interface UnknownScalePolicy extends WasmOwned {
  * ```typescript
  * import init, { core } from "finstack-quant-wasm";
  * await init();
- * core.UnknownScalePolicy.fallbackToDefault().name; // "fallback_to_default"
- * core.embeddedRegistry().unknownScalePolicy().name;
+ * core.UnknownScalePolicy.fallbackToDefault().toString(); // "fallback_to_default"
+ * core.embeddedRegistry().unknownScalePolicy().toString();
  * ```
  */
 export interface UnknownScalePolicyConstructor {
@@ -5976,7 +5687,7 @@ export interface UnknownScalePolicyConstructor {
   /**
    * Parse a policy name (the Rust serde label).
    *
-   * @param name - Policy name: `"error"`, `"fallback_to_default"` or `"warn_and_fallback"`.
+   * @param name - Policy name: `"error"`, `"fallback_to_default"` or `"warn_and_fallback"`, in any ASCII case.
    * @returns The matching `UnknownScalePolicy`.
    * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no policy matches.
    */
@@ -6095,16 +5806,12 @@ export interface RatingScaleRegistryConstructor {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const rating = new core.CreditRating("Baa3"); // Moody's spelling
- * rating.name; // "BBB-"
+ * rating.toString(); // "BBB-"
  * rating.isInvestmentGrade(); // true
  * core.CreditRating.bbb().notchesTo("BB"); // 3
  * ```
  */
 export interface CreditRating extends WasmOwned {
-  /**
-   * S&P/Fitch spelling of the rating, such as `"BBB-"`.
-   */
-  readonly name: string;
   /**
    * Whether the rating is investment grade (`BBB-` or better).
    *
@@ -6132,7 +5839,7 @@ export interface CreditRating extends WasmOwned {
   /**
    * Signed notch distance to another rating (Rust `CreditRating::notches_to`).
    *
-   * @param other - Rating text to measure against (S&P/Fitch or Moody's spelling; use `rating.name` for a `CreditRating`).
+   * @param other - Rating text to measure against (S&P/Fitch or Moody's spelling; use `rating.toString()` for a `CreditRating`).
    * @returns Notches from this rating to `other`: positive when `other` is weaker, negative when stronger. `NR` sits between `C` and `D`.
    * @throws `TypeError` if `other` is not a string; `FinstackError` (kind `validation`) if it is not a rating.
    */
@@ -6160,7 +5867,7 @@ export interface CreditRating extends WasmOwned {
  * import init, { core } from "finstack-quant-wasm";
  * await init();
  * const rating = new core.CreditRating("Baa3"); // Moody's spelling
- * rating.name; // "BBB-"
+ * rating.toString(); // "BBB-"
  * rating.isInvestmentGrade(); // true
  * core.CreditRating.bbb().notchesTo("BB"); // 3
  * ```
@@ -6321,7 +6028,6 @@ export interface CreditRatingConstructor {
    */
   nr(): CreditRating;
 }
-
 
 /**
  * Tags and key/value metadata attached to an instrument or position, used
@@ -7101,7 +6807,7 @@ export interface VolSurfaceConstructor {
    * @param id - Surface identifier, the `MarketContext` lookup key.
    * @param expiries - Option expiries in years, strictly increasing.
    * @param strikes - Secondary-axis coordinates (strikes, or swap tenors in years), strictly increasing.
-   * @param vols - Decimal volatilities, either as a flat row-major grid of `expiries.length * strikes.length` entries or as `expiries.length` rows of `strikes.length` values. Entries must be finite and non-negative.
+   * @param vols - Decimal volatilities as a flat row-major (expiry-major) grid of `expiries.length * strikes.length` entries, finite and non-negative.
    * @param options - Optional `{ secondaryAxis, interpolationMode, quoteType, displacements }`: `secondaryAxis` is `"strike"` or `"tenor"`, `interpolationMode` is `"vol"` or `"total_variance"`, `quoteType` is `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`, and `displacements` holds one shifted-Black displacement per expiry (required for `"shifted_black_lognormal"` quotes). Every omitted key takes the Rust default.
    * @returns The validated `VolSurface`.
    * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an empty or unsorted axis, a grid of the wrong length, a negative or non-finite volatility, an unknown axis, mode or quote-type name, or displacements that do not match the quote convention and the expiry count.
@@ -7582,10 +7288,6 @@ export interface ContextStats {
    * Number of FX delta-quoted volatility surfaces.
    */
   fx_delta_vol_surface_count: number;
-  /**
-   * Number of CSA-code to discount-curve collateral mappings.
-   */
-  collateral_mapping_count: number;
 }
 
 /**
@@ -8007,6 +7709,10 @@ export interface CoreNamespace {
    */
   MarketContext: MarketContextConstructor;
   /**
+   * Result of `MarketContext.convertMoney`: converted amount plus the applied FX rate.
+   */
+  ConvertedMoney: ConvertedMoneyConstructor;
+  /**
    * FX conversion timing-policy constructor.
    */
   FxConversionPolicy: FxConversionPolicyConstructor;
@@ -8257,17 +7963,9 @@ export interface CoreNamespace {
    */
   RatingScaleRegistry: RatingScaleRegistryConstructor;
   /**
-   * 30/360 day-count variant factories used with `core.days30360`.
-   */
-  Thirty360Convention: Thirty360ConventionConstructor;
-  /**
    * Tenor-unit factories (`core.TenorUnit.months()`).
    */
   TenorUnit: TenorUnitConstructor;
-  /**
-   * Business-day convention factories (`core.BusinessDayConvention.following()`).
-   */
-  BusinessDayConvention: BusinessDayConventionConstructor;
   /**
    * Holiday-calendar constructor (`new core.HolidayCalendar("nyse")`).
    */
@@ -8284,14 +7982,6 @@ export interface CoreNamespace {
    * Fiscal-year start constructor and presets (`core.FiscalConfig.usFederal()`).
    */
   FiscalConfig: FiscalConfigConstructor;
-  /**
-   * Schedule stub-rule factories (`core.StubKind.shortFront()`).
-   */
-  StubKind: StubKindConstructor;
-  /**
-   * Schedule error-policy factories (`core.ScheduleErrorPolicy.strict()`).
-   */
-  ScheduleErrorPolicy: ScheduleErrorPolicyConstructor;
   /**
    * Generated date schedule; start with `core.Schedule.builder(start, end)`.
    */
@@ -8359,7 +8049,7 @@ export interface CoreNamespace {
    *
    * @param start - Inclusive accrual start as days since 1970-01-01.
    * @param end - Exclusive accrual end as days since 1970-01-01; an earlier end gives a negative count rather than an error.
-   * @param convention - Variant name: `"us_sia"`, `"isda"`, `"european"` or `"italian"`.
+   * @param convention - Variant name: `"us_sia"`, `"isda"`, `"european"` or `"italian"`, in any ASCII case.
    * @returns The 30/360 day count.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for an unknown variant or a date outside the supported range.
    */
@@ -8585,35 +8275,29 @@ export interface CoreNamespace {
    */
   nextThirdFriday(date: number): number;
   /**
-   * Published SIFMA class A settlement date of a month (Rust `sifma_settlement_date`).
-   *
-   * @param month - Settlement month number, `1` through `12`.
-   * @param year - Settlement year.
-   * @returns The published date as epoch days, or `undefined` when the month is outside the embedded SIFMA calendar (dates are never approximated).
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12`.
-   */
-  sifmaSettlementDate(month: number, year: number): number | undefined;
-  /**
    * Published SIFMA settlement date of a month for one class (Rust
-   * `sifma_settlement_date_for_class`).
+   * `sifma_settlement_date`).
+   *
+   * The published facade makes `settlementClass` optional: an omitted class is
+   * the Rust default `SifmaSettlementClass::default()` (Class A).
    *
    * @param month - Settlement month number, `1` through `12`.
    * @param year - Settlement year.
    * @param settlementClass - Agency-MBS settlement class whose date is requested.
-   * @returns The published date as epoch days, or `undefined` when that month and class are outside the embedded SIFMA calendar.
+   * @returns The published date as epoch days, or `undefined` when that month and class are outside the embedded SIFMA calendar (dates are never approximated).
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12`.
    */
-  sifmaSettlementDateForClass(
+  sifmaSettlementDate(
     month: number,
     year: number,
-    settlementClass: SifmaSettlementClass
+    settlementClass?: SifmaSettlementClass | null
   ): number | undefined;
   /**
    * Projection-only estimate of a SIFMA settlement date (Rust
-   * `estimated_sifma_settlement_date_for_class`).
+   * `estimated_sifma_settlement_date`).
    *
    * The estimate counts business days of the month on the SIFMA calendar; use
-   * `sifmaSettlementDateForClass` for published dates.
+   * `sifmaSettlementDate` for published dates.
    *
    * @param month - Settlement month number, `1` through `12`.
    * @param year - Settlement year.
@@ -8621,7 +8305,7 @@ export interface CoreNamespace {
    * @returns The estimated settlement date as epoch days.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12` or `year` is outside the supported date range.
    */
-  estimatedSifmaSettlementDateForClass(
+  estimatedSifmaSettlementDate(
     month: number,
     year: number,
     settlementClass: SifmaSettlementClass
@@ -11360,7 +11044,7 @@ export interface CorrelationNamespace {
    * @returns The lower-triangular factor `L` with `L * L^T = matrix`, flat row-major.
    * @throws Error - Throws a `validation` error if the length is not `n * n` or the matrix is not a valid positive-semidefinite correlation matrix.
    */
-  choleskyDecompose(matrix: NumericArray, n: number): Float64Array;
+  choleskyCorrelation(matrix: NumericArray, n: number): Float64Array;
   /**
    * Largest path count accepted by `simulatePortfolioLoss`. Twin of the Rust
    * and Python constant `MAX_PORTFOLIO_LOSS_PATHS`.
@@ -11959,9 +11643,7 @@ export interface MonteCarloNamespace {
    * @returns The `PathSummary` object: `num_paths`, `num_simulated_paths`, `dim`, `times`, `factor_names`, and `values` in row-major `[path][time][factor]` order, so factor `f` on path `p` at `times[s]` is `values[(p * times.length + s) * dim + f]`.
    * @throws Error - Throws a `TypeError` if `spec` is neither an object nor JSON text, and a `validation` error if it does not match `PathSimulationSpec`, a process parameter is out of range, the scheme is not available for the process, `fbm` is set for a process that does not consume fractional noise, `initial_state` has the wrong length or lies outside the process's domain, the time grid is invalid, `num_paths` is outside [1, 100000], the output would exceed 64 million stored values, or a simulated state is non-finite.
    */
-  simulatePaths(
-    spec: generated.models.PathSimulationSpec | string
-  ): generated.models.PathSummary;
+  simulatePaths(spec: generated.models.PathSimulationSpec | string): generated.models.PathSummary;
 }
 
 /**
@@ -14102,7 +13784,6 @@ export interface CashFlowBuilder extends WasmOwned {
    * @throws If a date or schedule is invalid, a required fixing is unavailable, or market data is missing.
    */
   buildAsOf(market: MarketContext, asOf: string): CashFlowSchedule;
-
 }
 
 /**
@@ -14541,10 +14222,6 @@ export interface CashflowsNamespace {
    * @throws If `fields` is missing a required field, has an unknown field or a field of the wrong shape (kind `validation`).
    */
   feeSpecPeriodicBp(fields: Record<string, unknown>): generated.cashflows.FeeSpec;
-
-
-
-
 
   /**
    * USD SOFR FRN compounding convention: ISDA 2021 observation shift of 2 business days (Rust `FloatingLegCompounding::sofr_observation_shift`).
@@ -18214,7 +17891,6 @@ export interface InterestRateSwap extends WasmOwned {
    * @throws This property does not throw.
    */
   readonly adjustFloatAccrualDates: boolean;
-
 }
 
 /**
@@ -18391,7 +18067,6 @@ export interface InterestRateSwapBuilder extends WasmOwned {
    * @throws Throws for a non-boolean value or an already consumed builder.
    */
   adjustFloatAccrualDates(value: boolean): InterestRateSwapBuilder;
-
 }
 
 /**
@@ -18623,7 +18298,6 @@ export interface SwaptionConstructor {
    * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
    */
   example(): Swaption;
-
 }
 
 /**
@@ -21125,7 +20799,9 @@ export interface ConvertibleBond extends WasmOwned {
    * @returns Canonical settlement record, or `null` while unresolved.
    * @throws Never; returns the stored record.
    */
-  readonly resolvedSettlement: NonNullable<generated.valuations.ConvertibleBond['resolved_settlement']> | null;
+  readonly resolvedSettlement: NonNullable<
+    generated.valuations.ConvertibleBond['resolved_settlement']
+  > | null;
   /**
    * Coupon/cashflow specification in serde form, the same shape as `Bond.cashflow_spec`.
    * @returns `{"fixed": {...}}`, `{"floating": {...}}`, `{"step_up": {...}}` or `{"amortizing": {...}}`; a zero-coupon convertible is a fixed spec with rate `"0"`.
@@ -21378,7 +21054,9 @@ export interface ConvertibleBondBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws for malformed input or a consumed builder; `build()` validates dates, currencies and amounts.
    */
-  resolvedSettlement(value: NonNullable<generated.valuations.ConvertibleBond['resolved_settlement']> | string): ConvertibleBondBuilder;
+  resolvedSettlement(
+    value: NonNullable<generated.valuations.ConvertibleBond['resolved_settlement']> | string
+  ): ConvertibleBondBuilder;
   /**
    * Set the coupon/cashflow specification.
    * @param value - Rust `CashflowSpec` as a plain object or JSON object string (the same shape as `Bond.cashflow_spec`, e.g. `{"fixed": {"coupon_type": "cash", "rate": "0.05", ...schedule}}`); a zero-coupon convertible uses a fixed spec with rate `"0"`.
@@ -27780,7 +27458,6 @@ export interface ModelCreditNamespace {
   ): generated.models.ScoringResult;
 }
 
-
 /**
  * A structured input: JSON text, or the equivalent plain object or array.
  *
@@ -28657,7 +28334,7 @@ export interface RatesNamespace {
  * import init, { core, models } from "finstack-quant-wasm";
  * await init();
  * const cube = new core.VolCube(
- *   "USD-SWAPTION", [1], [5], [0.03, 0.5, -0.2, 0.4, Number.NaN], [0.03]
+ *   "USD-SWAPTION", [1], [5], [{ alpha: 0.03, beta: 0.5, rho: -0.2, nu: 0.4 }], [0.03]
  * );
  * console.log(models.volatility.getCubeVol(cube, 1, 5, 0.03));
  * cube.free();

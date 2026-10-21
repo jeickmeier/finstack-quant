@@ -4,7 +4,8 @@
 //! feed the same code paths the correctness tests pin.
 
 use finstack_quant_analytics::Performance;
-use finstack_quant_core::dates::{Date, Month, PeriodKind};
+use finstack_quant_core::dates::{Date, PeriodKind};
+use time::Month;
 
 /// Splitmix64-style iteration mapped into `(-0.02, 0.02)`.
 pub fn synthetic_returns(n: usize, seed: u64) -> Vec<f64> {

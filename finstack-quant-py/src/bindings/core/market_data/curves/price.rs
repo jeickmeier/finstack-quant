@@ -4,15 +4,14 @@ use finstack_quant_core::market_data::term_structures::{PriceCurve, PriceCurveKi
 
 use std::sync::Arc;
 
+use finstack_quant_core::math::interp::ExtrapolationPolicy;
+use finstack_quant_core::math::interp::InterpStyle;
 use pyo3::prelude::*;
 
-use super::helpers::{
-    columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods, parse_extrapolation,
-    parse_interp_style, TimePoint,
-};
+use super::helpers::{columns_to_dataframe, extract_time_point, TimePoint};
 use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::macros::impl_repr_html_via_dataframe;
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::errors::core_to_py;
 
 /// Forward price curve for commodities, other price-based assets and
@@ -117,10 +116,14 @@ impl PyPriceCurve {
             builder = builder.spot_price(spot);
         }
         if let Some(extrapolation) = extrapolation {
-            builder = builder.extrapolation(parse_extrapolation(extrapolation)?);
+            builder = builder.extrapolation(
+                extrapolation
+                    .parse::<ExtrapolationPolicy>()
+                    .map_err(core_to_py)?,
+            );
         }
         if let Some(interp) = interp {
-            builder = builder.interp(parse_interp_style(interp)?);
+            builder = builder.interp(interp.parse::<InterpStyle>().map_err(core_to_py)?);
         }
         if let Some(day_count) = day_count {
             builder = builder.day_count(extract_day_count(day_count)?);
@@ -238,5 +241,5 @@ impl PyPriceCurve {
     }
 }
 
-impl_arc_serde_pymethods!(PyPriceCurve, PriceCurve, "PriceCurve");
+wire_methods!(PyPriceCurve, PriceCurve, "PriceCurve", arc);
 impl_repr_html_via_dataframe!(PyPriceCurve);

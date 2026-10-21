@@ -16,7 +16,6 @@ pub struct ProjectedFixing {
     /// Canonical market-series identifier, including the `FIXING:` prefix.
     pub series_id: String,
     /// Contractual index observation date, after fixing-calendar adjustments.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

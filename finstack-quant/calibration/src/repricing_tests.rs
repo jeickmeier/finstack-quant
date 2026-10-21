@@ -27,7 +27,7 @@ use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::ids::{
@@ -69,7 +69,7 @@ fn forward_only_envelope(
     let (prior_market, mut market_data) = cal_utils::split_market_context(&source_market);
     let quotes = vec![MarketQuote::Rates(quote)];
     cal_utils::extend_market_data(&mut market_data, &quotes);
-    let mut quote_sets = HashMap::default();
+    let mut quote_sets = FxHashMap::default();
     quote_sets.insert("forward".to_string(), cal_utils::quote_set_ids(&quotes));
 
     CalibrationEnvelope {
@@ -137,7 +137,7 @@ fn discount_curve_deposit_repricing() {
         .collect();
     let mut market_data = Vec::new();
     cal_utils::extend_market_data(&mut market_data, &mm_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("mm".to_string(), cal_utils::quote_set_ids(&mm_quotes));
 
     let settings = CalibrationConfig {
@@ -253,7 +253,7 @@ fn discount_curve_swap_repricing() {
 
     let mut market_data = Vec::new();
     cal_utils::extend_market_data(&mut market_data, &disc_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("disc".to_string(), cal_utils::quote_set_ids(&disc_quotes));
 
     let settings = CalibrationConfig {
@@ -377,7 +377,7 @@ fn forward_curve_fra_repricing() {
     let mut market_data = Vec::new();
     cal_utils::extend_market_data(&mut market_data, &disc_quote_bundle);
     cal_utils::extend_market_data(&mut market_data, &fra_quote_bundle);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert(
         "disc".to_string(),
         cal_utils::quote_set_ids(&disc_quote_bundle),
@@ -714,7 +714,7 @@ fn hazard_curve_cds_repricing() {
     let mut market_data = Vec::new();
     cal_utils::extend_market_data(&mut market_data, &disc_quote_bundle);
     cal_utils::extend_market_data(&mut market_data, &cds_quote_bundle);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert(
         "disc".to_string(),
         cal_utils::quote_set_ids(&disc_quote_bundle),
@@ -779,7 +779,7 @@ fn hazard_curve_cds_repricing() {
 
     let ctx = run_plan(&envelope);
 
-    let mut curve_ids = HashMap::default();
+    let mut curve_ids = FxHashMap::default();
     curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
     curve_ids.insert("credit".to_string(), "REPRICE-ACME-SENIOR".to_string());
     let build_ctx = BuildCtx::new(base_date, fixtures::STANDARD_NOTIONAL, curve_ids);
@@ -837,7 +837,7 @@ fn hazard_curve_step_report_matches_market_built_cds_repricing() {
     let mut market_data = Vec::new();
     cal_utils::extend_market_data(&mut market_data, &disc_quote_bundle);
     cal_utils::extend_market_data(&mut market_data, &cds_quote_bundle);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert(
         "disc".to_string(),
         cal_utils::quote_set_ids(&disc_quote_bundle),
@@ -908,7 +908,7 @@ fn hazard_curve_step_report_matches_market_built_cds_repricing() {
         .get("haz")
         .expect("hazard step report");
 
-    let mut unit_curve_ids = HashMap::default();
+    let mut unit_curve_ids = FxHashMap::default();
     unit_curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
     unit_curve_ids.insert("credit".to_string(), "REPRICE-DIAG-SENIOR".to_string());
     let unit_build_ctx = BuildCtx::new(base_date, 1.0, unit_curve_ids);
@@ -918,7 +918,7 @@ fn hazard_curve_step_report_matches_market_built_cds_repricing() {
         .value_raw(&ctx, base_date)
         .expect("unit cds valuation");
 
-    let mut curve_ids = HashMap::default();
+    let mut curve_ids = FxHashMap::default();
     curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
     curve_ids.insert("credit".to_string(), "REPRICE-DIAG-SENIOR".to_string());
     let build_ctx = BuildCtx::new(base_date, fixtures::STANDARD_NOTIONAL, curve_ids);
@@ -995,7 +995,7 @@ fn hazard_recipe_upfront_inputs_support_par_space_replay() {
     let mut market_data = Vec::new();
     cal_utils::extend_market_data(&mut market_data, &disc_quote_bundle);
     cal_utils::extend_market_data(&mut market_data, &cds_quote_bundle);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert(
         "disc".to_string(),
         cal_utils::quote_set_ids(&disc_quote_bundle),
@@ -1081,7 +1081,7 @@ fn hazard_recipe_upfront_inputs_support_par_space_replay() {
     .expect("upfront-calibrated curve should support par-space CS01 replay");
     assert!(spread_bumped.hazard_calibration().is_some());
 
-    let mut curve_ids = HashMap::default();
+    let mut curve_ids = FxHashMap::default();
     curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
     curve_ids.insert("credit".to_string(), "REPRICE-UPFRONT-SENIOR".to_string());
     let build_ctx = BuildCtx::new(base_date, fixtures::STANDARD_NOTIONAL, curve_ids);
@@ -1149,7 +1149,7 @@ fn inflation_curve_swap_repricing() {
     let mut market_data = Vec::new();
     cal_utils::extend_market_data(&mut market_data, &disc_quote_bundle);
     cal_utils::extend_market_data(&mut market_data, &infl_quote_bundle);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert(
         "disc".to_string(),
         cal_utils::quote_set_ids(&disc_quote_bundle),

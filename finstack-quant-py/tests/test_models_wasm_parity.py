@@ -523,7 +523,7 @@ def _correlation_cases() -> dict[str, Callable[[], Any]]:
             ),
             list(correlation.LatentMultiFactor.uncorrelated(2, [0.2, 0.3]).correlation_matrix),
         ],
-        "correlation.cholesky_decompose": lambda: list(correlation.cholesky_decompose([1.0, 0.5, 0.5, 1.0], 2)),
+        "correlation.cholesky_correlation": lambda: list(correlation.cholesky_correlation([1.0, 0.5, 0.5, 1.0], 2)),
         "correlation.simulate_portfolio_loss": lambda: [
             loss(correlation.simulate_portfolio_loss(exposures(), config())),
             loss(

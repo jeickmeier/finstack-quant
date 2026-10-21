@@ -57,14 +57,14 @@ const cubeFromArrays = new core.VolCube(
   'USD-SWAPTION',
   [1],
   [5],
-  [0.02, 0.5, 0, 0.3, Number.NaN],
+  [{ alpha: 0.02, beta: 0.5, rho: 0, nu: 0.3 }],
   [0.04]
 );
 const cubeFromTyped = new core.VolCube(
   'USD-SWAPTION-TYPED',
   new Float64Array([1]),
   new Float64Array([5]),
-  new Float64Array([0.02, 0.5, 0, 0.3, Number.NaN]),
+  [{ alpha: 0.02, beta: 0.5, rho: 0, nu: 0.3 }],
   new Float64Array([0.04])
 );
 

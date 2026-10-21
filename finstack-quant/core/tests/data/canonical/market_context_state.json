@@ -1,1 +1,1 @@
-{"collateral":{},"credit_indices":[],"curves":[],"dividends":[],"fx":null,"fx_delta_vol_surfaces":[],"hierarchy":{"roots":{"Rates":{"tags":{"desk":"rates","region":"us"}}}},"inflation_indices":[],"prices":{},"schema_version":1,"series":[],"surfaces":[],"vol_cubes":[]}
+{"credit_indices":[],"curves":[],"dividends":[],"fx":null,"fx_delta_vol_surfaces":[],"hierarchy":{"roots":{"Rates":{"tags":{"desk":"rates","region":"us"}}}},"inflation_indices":[],"prices":{},"schema_version":1,"series":[],"surfaces":[],"vol_cubes":[]}

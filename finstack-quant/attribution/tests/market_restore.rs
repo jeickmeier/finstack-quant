@@ -15,6 +15,7 @@ use finstack_quant_attribution::{
 };
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::SabrParameterData;
 use finstack_quant_core::market_data::surfaces::VolCube;
@@ -32,7 +33,6 @@ use finstack_quant_valuations::pricer::InstrumentType;
 use finstack_quant_valuations::results::ValuationResult;
 use std::sync::{Arc, OnceLock};
 use time::macros::date;
-use time::Date;
 
 const AS_OF_T0: Date = date!(2025 - 01 - 15);
 const AS_OF_T1: Date = date!(2025 - 01 - 16);
@@ -196,7 +196,7 @@ fn parametric_curve(beta0: f64) -> ParametricCurve {
 }
 
 fn vol_cube(alpha: f64) -> VolCube {
-    let params = SabrParameterData::new(alpha, 0.5, -0.2, 0.4).expect("valid SABR params");
+    let params = SabrParameterData::new(alpha, 0.5, 0.4, -0.2).expect("valid SABR params");
     VolCube::from_grid(
         "SWPT-CUBE",
         &[1.0, 2.0],
@@ -370,7 +370,9 @@ fn restore_market_moves_all_nine_curve_storage_families() {
     );
 
     let spread = restored
-        .get_basis_spread("BASIS-3M6M")
+        .curve("BASIS-3M6M")
+        .and_then(|c| c.basis_spread())
+        .cloned()
         .expect("basis spread curve present")
         .spread(1.0);
     assert!(
@@ -379,7 +381,9 @@ fn restore_market_moves_all_nine_curve_storage_families() {
     );
 
     let long_rate = match restored
-        .get_parametric("USD-NS")
+        .curve("USD-NS")
+        .and_then(|c| c.parametric())
+        .cloned()
         .expect("parametric curve present")
         .params()
     {

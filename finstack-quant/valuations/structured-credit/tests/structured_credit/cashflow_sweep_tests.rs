@@ -547,10 +547,7 @@ fn tranche_cashflows_returns_one_class_and_reports_unknown_ids() {
     let error = clo
         .tranche_cashflows("NOT_A_CLASS", &market, as_of())
         .expect_err("unknown tranche");
-    assert_eq!(
-        error.kind(),
-        finstack_quant_core::error::ErrorKind::NotFound
-    );
+    assert_eq!(error.kind(), finstack_quant_core::ErrorKind::NotFound);
     assert!(error.to_string().contains("NOT_A_CLASS"), "{error}");
 }
 

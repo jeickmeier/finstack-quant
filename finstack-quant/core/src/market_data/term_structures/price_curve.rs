@@ -82,16 +82,14 @@
 //!   35(3), 98-105. `docs/REFERENCES.md#whaley-2009-vix`
 //! - CBOE (2019). "VIX White Paper." CBOE Global Markets. `docs/REFERENCES.md#cboe-vix-white-paper`
 
-use super::common::{
-    roll_knots, triangular_weight, validate_pillars, year_fraction_to, InterpRollState,
-};
+use super::common::{roll_knots, InterpRollState};
 use crate::dates::DateExt;
 use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 use crate::{
     dates::{Date, DayCount},
     error::InputError,
-    math::interp::types::Interp,
+    math::interp::Interp,
     types::CurveId,
 };
 
@@ -196,7 +194,6 @@ struct RawPriceCurve {
     /// Curve identifier
     pub id: String,
     /// Base date
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub base: Date,
     /// Day count convention
@@ -303,10 +300,7 @@ impl PriceCurve {
         if t <= 0.0 {
             return self.spot_price;
         }
-        match &self.roll {
-            Some(state) => state.interp(&self.interp, t),
-            None => self.interp.interp(t),
-        }
+        InterpRollState::eval(self.roll.as_ref(), &self.interp, t)
     }
 
     /// Forward price on a specific calendar date.
@@ -320,10 +314,11 @@ impl PriceCurve {
                 date, self.base
             )));
         }
-        if date == self.base {
-            return Ok(self.spot_price);
-        }
-        let t = year_fraction_to(self.base, date, self.day_count)?;
+        let t = self.day_count.signed_year_fraction(
+            self.base,
+            date,
+            crate::dates::DayCountContext::default(),
+        )?;
         Ok(self.price(t))
     }
 
@@ -425,44 +420,6 @@ impl PriceCurve {
             .extrapolation(self.interp.extrapolation())
     }
 
-    /// Rebuild with level-shocked pillars.
-    ///
-    /// An unrolled curve takes `pillars` and `spot` as given. A rolled curve
-    /// shocks its source pillars with `map(time, price)` instead and reads its
-    /// current pillars and spot back from the shocked source, so the shocked
-    /// and base curves share one interpolation (off-pillar levels follow the
-    /// interpolation style, as they do on an unrolled curve).
-    fn rebuild_shocked(
-        &self,
-        new_id: impl Into<CurveId>,
-        spot: f64,
-        pillars: Vec<(f64, f64)>,
-        map: impl Fn(f64, f64) -> f64,
-    ) -> crate::Result<Self> {
-        let builder = self.metadata_builder(new_id);
-        match &self.roll {
-            Some(roll) => {
-                let (state, prices) = roll.bump(
-                    &self.interp,
-                    ValidationPolicy::AllowNegative,
-                    &self.knots,
-                    map,
-                )?;
-                let spot = self
-                    .knots
-                    .iter()
-                    .position(|&t| t == 0.0)
-                    .map_or(spot, |origin| prices[origin]);
-                builder
-                    .spot_price(spot)
-                    .knots(self.knots.iter().copied().zip(prices))
-                    .roll_transform(Some(state))
-                    .build()
-            }
-            None => builder.spot_price(spot).knots(pillars).build(),
-        }
-    }
-
     /// Rebuild this curve with replacement knots and spot while preserving
     /// its id, kind, base date, day count, interpolation and extrapolation.
     ///
@@ -488,20 +445,49 @@ impl PriceCurve {
             .build()
     }
 
-    /// Rebuild with every pillar mapped through `map` and the given spot.
+    /// Rebuild with every pillar mapped through `map(time, price)` and the given spot.
+    ///
+    /// An unrolled curve maps its pillars and takes `spot` as given. A rolled
+    /// curve shocks its source pillars with `map` instead and reads its
+    /// current pillars and spot back from the shocked source, so the shocked
+    /// and base curves share one interpolation (off-pillar levels follow the
+    /// interpolation style, as they do on an unrolled curve).
     fn shocked(
         &self,
         new_id: impl Into<CurveId>,
         spot: f64,
         map: impl Fn(f64, f64) -> f64,
     ) -> crate::Result<Self> {
-        let pillars: Vec<(f64, f64)> = self
-            .knots
-            .iter()
-            .zip(self.prices.iter())
-            .map(|(&t, &price)| (t, map(t, price)))
-            .collect();
-        self.rebuild_shocked(new_id, spot, pillars, map)
+        let builder = self.metadata_builder(new_id);
+        match &self.roll {
+            Some(roll) => {
+                let (state, prices) = roll.bump(
+                    &self.interp,
+                    ValidationPolicy::AllowNegative,
+                    &self.knots,
+                    map,
+                )?;
+                let spot = self
+                    .knots
+                    .iter()
+                    .position(|&t| t == 0.0)
+                    .map_or(spot, |origin| prices[origin]);
+                builder
+                    .spot_price(spot)
+                    .knots(self.knots.iter().copied().zip(prices))
+                    .roll_transform(Some(state))
+                    .build()
+            }
+            None => builder
+                .spot_price(spot)
+                .knots(
+                    self.knots
+                        .iter()
+                        .zip(self.prices.iter())
+                        .map(|(&t, &price)| (t, map(t, price))),
+                )
+                .build(),
+        }
     }
 
     /// Scale every pillar and the spot by `1 + pct`, preserving signed prices.
@@ -536,12 +522,16 @@ impl PriceCurve {
             return Ok(self.clone());
         }
         let new_base = self.base.add_days(days)?;
-        let dt_years = year_fraction_to(self.base, new_base, self.day_count)?;
+        let dt_years = self.day_count.signed_year_fraction(
+            self.base,
+            new_base,
+            crate::dates::DayCountContext::default(),
+        )?;
 
         let mut rolled_points = roll_knots(&self.knots, &self.prices, dt_years);
 
         if rolled_points.is_empty() {
-            return Err(crate::error::InputError::TooFewPoints.into());
+            return Err(crate::InputError::TooFewPoints.into());
         }
 
         // New spot is interpolated from old curve at dt_years
@@ -695,7 +685,7 @@ impl PriceCurveBuilder {
         }
 
         let (mut kvec, mut pvec): (Vec<f64>, Vec<f64>) = self.points.into_iter().unzip();
-        crate::math::interp::utils::validate_knots(&kvec)?;
+        crate::math::interp::validate_knots(&kvec)?;
 
         if pvec.iter().any(|price| !price.is_finite()) {
             return Err(crate::Error::Validation(
@@ -744,13 +734,14 @@ impl PriceCurveBuilder {
         let knots = kvec.into_boxed_slice();
         let prices = pvec.into_boxed_slice();
 
-        let mut interp = self.style.build_enum(
-            knots.clone(),
-            prices.clone(),
+        let interp = InterpRollState::build_source(
+            self.roll_transform.as_ref(),
+            self.style,
             self.extrapolation,
             ValidationPolicy::AllowNegative,
+            &knots,
+            &prices,
         )?;
-
         if let Some(state) = &self.roll_transform {
             if self.kind == PriceCurveKind::VolIndex {
                 let (source_knots, source_levels): (Vec<f64>, Vec<f64>) =
@@ -761,17 +752,6 @@ impl PriceCurveBuilder {
                     "Volatility index level",
                 )?;
             }
-            interp = state.restore(
-                self.style,
-                self.extrapolation,
-                ValidationPolicy::AllowNegative,
-            )?;
-            validate_pillars(
-                knots.iter().copied().zip(prices.iter().copied()),
-                false,
-                "rolled interpolation",
-                |t| state.interp(&interp, t),
-            )?;
         }
 
         Ok(PriceCurve {
@@ -819,11 +799,7 @@ impl Bumpable for PriceCurve {
                 }
                 .into()),
             },
-            BumpType::TriangularKeyRate {
-                prev_bucket,
-                target_bucket,
-                next_bucket,
-            } => match (spec.mode, spec.units) {
+            BumpType::TriangularKeyRate { .. } => match (spec.mode, spec.units) {
                 (BumpMode::Additive, BumpUnits::Fraction) => {
                     let bump = spec.value;
                     let new_id = crate::market_data::bumps::id_bump_bp(id, bump * 100.0);
@@ -837,9 +813,7 @@ impl Bumpable for PriceCurve {
                         if t <= 0.0 {
                             price
                         } else {
-                            price
-                                + bump
-                                    * triangular_weight(t, prev_bucket, target_bucket, next_bucket)
+                            price + bump * spec.bump_type.weight(t)
                         }
                     })
                 }
@@ -854,13 +828,7 @@ impl Bumpable for PriceCurve {
                             if time <= 0.0 {
                                 price
                             } else {
-                                let weight = triangular_weight(
-                                    time,
-                                    prev_bucket,
-                                    target_bucket,
-                                    next_bucket,
-                                );
-                                price * (1.0 + percentage * weight)
+                                price * (1.0 + percentage * spec.bump_type.weight(time))
                             }
                         },
                     )

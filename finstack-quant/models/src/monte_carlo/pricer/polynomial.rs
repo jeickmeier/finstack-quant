@@ -103,8 +103,9 @@ impl<const N: usize> StandardizedPolynomialPolicy<N> {
                     });
                 }
                 Ok(_) => {
-                    last_error = Some(Error::internal(
-                        "standardized polynomial regression returned non-finite coefficients",
+                    last_error = Some(Error::Internal(
+                        "standardized polynomial regression returned non-finite coefficients"
+                            .into(),
                     ));
                 }
                 Err(error) => last_error = Some(error),
@@ -112,8 +113,9 @@ impl<const N: usize> StandardizedPolynomialPolicy<N> {
         }
 
         Err(last_error.unwrap_or_else(|| {
-            Error::internal(
-                "standardized polynomial regression could not fit even an intercept-only policy",
+            Error::Internal(
+                "standardized polynomial regression could not fit even an intercept-only policy"
+                    .into(),
             )
         }))
     }
@@ -149,8 +151,8 @@ impl<const N: usize> StandardizedPolynomialPolicy<N> {
         if prediction.is_finite() {
             Ok(prediction)
         } else {
-            Err(Error::internal(
-                "standardized polynomial regression produced a non-finite prediction",
+            Err(Error::Internal(
+                "standardized polynomial regression produced a non-finite prediction".into(),
             ))
         }
     }

@@ -767,8 +767,16 @@ pub(crate) fn curve_node_effects(
                 &mut result,
                 &knots,
                 curve_id.as_str(),
-                |d, t| Ok(preview_key_rate_bumps(base_curve.as_ref(), &knots, d)?.zero(t)),
-                |t, bp| Ok(base_curve.zero(t) + bp * 1e-4),
+                |d, t| {
+                    Ok(preview_key_rate_bumps(base_curve.as_ref(), &knots, d)?
+                        .zero_rate(t, finstack_quant_core::math::Compounding::Continuous))
+                },
+                |t, bp| {
+                    Ok(
+                        base_curve.zero_rate(t, finstack_quant_core::math::Compounding::Continuous)
+                            + bp * 1e-4,
+                    )
+                },
             )?;
             Ok(node_market_bump_effects(
                 curve_id,
@@ -1229,7 +1237,7 @@ mod tests {
             .knots(vec![(0.0, 1.0), (1.0, 0.98), (5.0, 0.90), (10.0, 0.80)])
             .build()
             .expect("discount curve should build");
-        let base_zero = curve.zero(3.0);
+        let base_zero = curve.zero_rate(3.0, finstack_quant_core::math::Compounding::Continuous);
         let mut market = MarketContext::new().insert(curve);
         let mut model = FinancialModelSpec::new("test", vec![]);
         let ctx = ExecutionContext {
@@ -1278,7 +1286,8 @@ mod tests {
         let bumped = bumped_market
             .get_discount("USD-OIS")
             .expect("discount curve update");
-        let delta = bumped.zero(3.0) - base_zero;
+        let delta =
+            bumped.zero_rate(3.0, finstack_quant_core::math::Compounding::Continuous) - base_zero;
         assert!(
             (delta - 0.0025).abs() < 1e-10,
             "native interpolant should deliver +25 bp at 3Y: got {delta}"

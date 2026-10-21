@@ -11,7 +11,7 @@ use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     run_simulation, AssetPool, DealFees, DealType, FundingSource, IncentiveFeeSpec, PoolAsset,
     StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority, TrancheStructure,
@@ -117,13 +117,13 @@ fn clo(adjust: impl FnOnce(&mut DealFees)) -> StructuredCredit {
     deal
 }
 
-fn simulate(deal: &StructuredCredit) -> HashMap<String, TrancheCashflows> {
+fn simulate(deal: &StructuredCredit) -> FxHashMap<String, TrancheCashflows> {
     let close = d(CLOSE.0, CLOSE.1, CLOSE.2);
     run_simulation(deal, &market(close), close).expect("simulation")
 }
 
 /// Equity residual per payment date.
-fn residuals(results: &HashMap<String, TrancheCashflows>) -> Vec<(Date, f64)> {
+fn residuals(results: &FxHashMap<String, TrancheCashflows>) -> Vec<(Date, f64)> {
     let mut dates = std::collections::BTreeMap::new();
     for (date, amount) in &results["E"].interest_flows {
         *dates.entry(*date).or_insert(0.0) += amount.amount();

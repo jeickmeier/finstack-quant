@@ -3,13 +3,13 @@
 /// Default maximum encoded artifact size: 64 MiB.
 pub const DEFAULT_MAX_BYTES: usize = 64 * 1024 * 1024;
 /// Default maximum number of artifacts in one load operation.
-pub const DEFAULT_MAX_ARTIFACTS: usize = 100_000;
+const DEFAULT_MAX_ARTIFACTS: usize = 100_000;
 /// Default maximum number of portfolio positions in one artifact.
-pub const DEFAULT_MAX_POSITIONS: usize = 1_000_000;
+const DEFAULT_MAX_POSITIONS: usize = 1_000_000;
 /// Default maximum JSON nesting depth accepted by contract loaders.
-pub const DEFAULT_MAX_DEPTH: usize = 96;
+const DEFAULT_MAX_DEPTH: usize = 96;
 /// Default maximum number of diagnostics retained in a validation report.
-pub const DEFAULT_MAX_DIAGNOSTICS: usize = 256;
+const DEFAULT_MAX_DIAGNOSTICS: usize = 256;
 
 /// Resource limits applied while loading persisted artifacts.
 ///
@@ -45,30 +45,6 @@ impl LoadLimits {
     #[must_use]
     pub const fn with_max_bytes(mut self, max_bytes: usize) -> Self {
         self.max_bytes = max_bytes;
-        self
-    }
-
-    /// Set the maximum artifact count.
-    ///
-    /// # Arguments
-    ///
-    /// * `max_artifacts` - Maximum number of artifacts accepted in one load
-    ///   operation; zero permits only an empty collection.
-    #[must_use]
-    pub const fn with_max_artifacts(mut self, max_artifacts: usize) -> Self {
-        self.max_artifacts = max_artifacts;
-        self
-    }
-
-    /// Set the maximum portfolio-position count.
-    ///
-    /// # Arguments
-    ///
-    /// * `max_positions` - Maximum number of positions accepted in one
-    ///   persisted portfolio; zero permits only an empty portfolio.
-    #[must_use]
-    pub const fn with_max_positions(mut self, max_positions: usize) -> Self {
-        self.max_positions = max_positions;
         self
     }
 

@@ -107,7 +107,7 @@ fn zero_coupon_maturity_and_amortization_preserve_principal_without_income() {
     }
 }
 
-fn flat_disc(id: &str, as_of: time::Date, rate: f64) -> DiscountCurve {
+fn flat_disc(id: &str, as_of: finstack_quant_core::dates::Date, rate: f64) -> DiscountCurve {
     let tenors = [0.0, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0];
     let knots: Vec<(f64, f64)> = tenors.iter().map(|&t| (t, (-rate * t).exp())).collect();
     DiscountCurve::builder(id)
@@ -139,7 +139,7 @@ fn inter_coupon_window_coupon_income_is_accrued_and_roll_down_small() {
     let market = MarketContext::new().insert(flat_disc("USD-OIS", t0, 0.04));
 
     // Expected coupon earned = Δaccrued (accrued is curve-independent).
-    let accrued = |as_of: time::Date| -> f64 {
+    let accrued = |as_of: finstack_quant_core::dates::Date| -> f64 {
         instrument
             .price_with_metrics(
                 &market,

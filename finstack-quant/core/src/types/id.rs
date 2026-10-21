@@ -47,9 +47,9 @@
 //!
 //! ```rust
 //! use finstack_quant_core::types::CurveId;
-//! use finstack_quant_core::HashMap;
+//! use finstack_quant_core::FxHashMap;
 //!
-//! let mut curves = HashMap::default();
+//! let mut curves = FxHashMap::default();
 //! curves.insert(CurveId::from("USD-OIS"), 0.045);
 //! curves.insert(CurveId::from("EUR-OIS"), 0.035);
 //!
@@ -135,7 +135,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(transparent)]
-#[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "json-schema", schemars(transparent))]
 pub struct Id<T> {
     value: Arc<str>,
@@ -186,46 +185,6 @@ impl<T> Id<T> {
     /// ```
     pub fn as_str(&self) -> &str {
         &self.value
-    }
-
-    /// Check if this ID is empty.
-    ///
-    /// # Returns
-    ///
-    /// `true` if the ID contains an empty string, `false` otherwise.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::types::CurveId;
-    ///
-    /// let empty = CurveId::new("");
-    /// let non_empty = CurveId::new("USD-OIS");
-    ///
-    /// assert!(empty.is_empty());
-    /// assert!(!non_empty.is_empty());
-    /// ```
-    pub fn is_empty(&self) -> bool {
-        self.value.is_empty()
-    }
-
-    /// Get the length of the ID string in bytes.
-    ///
-    /// # Returns
-    ///
-    /// The number of bytes in the ID string (not the number of characters
-    /// for non-ASCII strings).
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::types::CurveId;
-    ///
-    /// let id = CurveId::new("USD-OIS");
-    /// assert_eq!(id.len(), 7);
-    /// ```
-    pub fn len(&self) -> usize {
-        self.value.len()
     }
 }
 
@@ -446,9 +405,9 @@ mod tests {
 
     #[test]
     fn id_hashing() {
-        use crate::HashMap;
+        use crate::FxHashMap;
 
-        let mut map = HashMap::default();
+        let mut map = FxHashMap::default();
         let id1 = Id::<User>::new("user123");
         let id2 = Id::<User>::new("user123");
 

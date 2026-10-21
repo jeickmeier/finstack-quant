@@ -57,7 +57,8 @@ fn cashflow_spec_json() -> String {
 fn market_context_json() -> String {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    let base = time::Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
+    let base = finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+        .unwrap();
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80)])
@@ -192,7 +193,8 @@ fn floating_market_context_json() -> String {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 
-    let base = time::Date::from_calendar_date(2025, time::Month::January, 15).unwrap();
+    let base = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 15)
+        .unwrap();
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80)])

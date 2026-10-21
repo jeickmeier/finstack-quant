@@ -80,7 +80,6 @@ pub struct FxTouchOption {
     /// Payout timing (at hit or at expiry)
     pub payout_timing: PayoutTiming,
     /// Option expiry date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -89,7 +88,6 @@ pub struct FxTouchOption {
     /// First date on which barrier monitoring is active. When set, a live
     /// valuation after this date requires `observed_barrier_breached`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")

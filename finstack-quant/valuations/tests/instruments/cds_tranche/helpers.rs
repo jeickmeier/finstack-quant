@@ -153,7 +153,7 @@ pub fn market_context_with_issuers(n: usize) -> MarketContext {
         .insert(Arc::clone(&index_curve))
         .insert(base_corr_curve.clone());
 
-    let mut issuer_curves = finstack_quant_core::HashMap::default();
+    let mut issuer_curves = finstack_quant_core::FxHashMap::default();
     for i in 0..n {
         let id = format!("ISSUER-{:03}", i + 1);
         let bump = (i as f64) * 0.001;

@@ -121,8 +121,8 @@ pub fn solve_discount_margin(
         }
     };
     let solver = BrentSolver::new()
-        .tolerance(1e-10)
-        .initial_bracket_size(Some(0.05));
+        .with_tolerance(1e-10)
+        .with_initial_bracket_size(Some(0.05));
     let solved = solver.solve(objective, guess);
     if let Some(err) = pricing_error.into_inner() {
         return Err(err);

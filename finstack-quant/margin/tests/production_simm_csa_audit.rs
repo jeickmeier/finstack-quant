@@ -1,7 +1,7 @@
 //! Independent historical SIMM v2.6 and Basel MAR21.93 regression vectors.
 //! ISDA source: September 2023 methodology, paragraphs 33, 39, 69, 74, 79.
 
-use finstack_quant_core::{currency::Currency, HashMap};
+use finstack_quant_core::{currency::Currency, FxHashMap};
 use finstack_quant_margin::regulatory::frtb::types::{
     CorrelationScenario, FrtbRiskClass, FrtbSensitivities,
 };
@@ -26,7 +26,7 @@ fn official_ir_weights_and_currency_concentration() {
         close(
             ir_delta(
                 &calculator,
-                &HashMap::from_iter([((currency, "5Y".to_owned()), 100.0)]),
+                &FxHashMap::from_iter([((currency, "5Y".to_owned()), 100.0)]),
             ),
             weight * 100.0,
         );
@@ -35,7 +35,7 @@ fn official_ir_weights_and_currency_concentration() {
     close(
         ir_delta(
             &calculator,
-            &HashMap::from_iter([((Currency::USD, "5Y".to_owned()), 1_320_000_000.0)]),
+            &FxHashMap::from_iter([((Currency::USD, "5Y".to_owned()), 1_320_000_000.0)]),
         ),
         1_320_000_000.0 * 60.0 * 2.0,
     );
@@ -48,7 +48,7 @@ fn credit_concentration_uses_raw_name_sensitivity() {
     close(
         credit_delta(
             &calculator,
-            &HashMap::from_iter([(
+            &FxHashMap::from_iter([(
                 (
                     SimmCreditSector::Financial,
                     "BANK".to_owned(),
@@ -68,14 +68,14 @@ fn fx_concentration_and_weights_use_percent_sensitivity_units() {
     close(
         fx_delta(
             &calculator,
-            &HashMap::from_iter([(Currency::EUR, 10_000_000.0)]),
+            &FxHashMap::from_iter([(Currency::EUR, 10_000_000.0)]),
         ),
         74_000_000.0,
     );
     close(
         fx_delta(
             &calculator,
-            &HashMap::from_iter([(Currency::BRL, 10_000_000.0)]),
+            &FxHashMap::from_iter([(Currency::BRL, 10_000_000.0)]),
         ),
         147_000_000.0,
     );
@@ -83,7 +83,7 @@ fn fx_concentration_and_weights_use_percent_sensitivity_units() {
     close(
         fx_delta(
             &calculator,
-            &HashMap::from_iter([(Currency::USD, 10_000_000.0)]),
+            &FxHashMap::from_iter([(Currency::USD, 10_000_000.0)]),
         ),
         0.0,
     );
@@ -170,7 +170,7 @@ fn vega_charge(
     component_charge(class, sens, scenario, "vega")
 }
 
-fn ir_delta(calc: &SimmCalculator, values: &HashMap<(Currency, String), f64>) -> f64 {
+fn ir_delta(calc: &SimmCalculator, values: &FxHashMap<(Currency, String), f64>) -> f64 {
     let mut sens = finstack_quant_margin::SimmSensitivities::new(Currency::USD);
     sens.ir_delta = values.clone();
     calc.calculate_from_sensitivities_parts(&sens, Currency::USD)
@@ -179,7 +179,7 @@ fn ir_delta(calc: &SimmCalculator, values: &HashMap<(Currency, String), f64>) ->
 }
 fn credit_delta(
     calc: &SimmCalculator,
-    values: &HashMap<(SimmCreditSector, String, String), f64>,
+    values: &FxHashMap<(SimmCreditSector, String, String), f64>,
 ) -> f64 {
     let mut sens = finstack_quant_margin::SimmSensitivities::new(Currency::USD);
     sens.credit_qualifying_delta = values.clone();
@@ -187,7 +187,7 @@ fn credit_delta(
         .expect("valid credit fixture")
         .0
 }
-fn fx_delta(calc: &SimmCalculator, values: &HashMap<Currency, f64>) -> f64 {
+fn fx_delta(calc: &SimmCalculator, values: &FxHashMap<Currency, f64>) -> f64 {
     let mut sens = finstack_quant_margin::SimmSensitivities::new(Currency::USD);
     sens.fx_delta = values.clone();
     calc.calculate_from_sensitivities_parts(&sens, Currency::USD)

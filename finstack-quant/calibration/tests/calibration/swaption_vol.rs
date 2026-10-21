@@ -22,9 +22,10 @@ use finstack_quant_core::dates::{
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::{OptionType, SettlementType, VolatilityModel};
 use finstack_quant_valuations_core::market::conventions::ids::SwaptionConventionId;
 use finstack_quant_valuations_rates::irs::{FixedLegSpec, FloatLegSpec};
@@ -159,7 +160,7 @@ fn swaption_vol_step_builds_and_inserts_surface() {
     let swpt_quotes = create_test_swaption_quotes();
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &swpt_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("swpt".to_string(), cal_utils::quote_set_ids(&swpt_quotes));
 
     let settings = CalibrationConfig {
@@ -250,7 +251,7 @@ fn calibrated_swaption_surface_is_not_silently_reused_as_strike_surface() {
     let swpt_quotes = create_test_swaption_quotes();
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &swpt_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("swpt".to_string(), cal_utils::quote_set_ids(&swpt_quotes));
 
     let plan = CalibrationPlan {
@@ -366,7 +367,7 @@ fn swaption_vol_out_of_bounds_targets_error_by_default() {
     let swpt_quotes = create_test_swaption_quotes();
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &swpt_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("swpt".to_string(), cal_utils::quote_set_ids(&swpt_quotes));
 
     let plan = CalibrationPlan {
@@ -422,7 +423,7 @@ fn swaption_vol_out_of_bounds_targets_can_clamp_when_configured() {
     let swpt_quotes = create_test_swaption_quotes();
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &swpt_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("swpt".to_string(), cal_utils::quote_set_ids(&swpt_quotes));
 
     let plan = CalibrationPlan {
@@ -510,7 +511,7 @@ fn swaption_vol_settlement_lag_uses_canonical_tenor_axis() {
         }
         let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
         cal_utils::extend_market_data(&mut market_data, &swpt_quotes);
-        let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+        let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
         quote_sets.insert("swpt".to_string(), cal_utils::quote_set_ids(&swpt_quotes));
         let plan = CalibrationPlan {
             id: "settled-tenor".to_string(),

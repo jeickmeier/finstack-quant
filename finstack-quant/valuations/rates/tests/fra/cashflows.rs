@@ -6,6 +6,7 @@
 
 use super::common::*;
 use finstack_quant_cashflows::CashflowProvider;
+use finstack_quant_core::market_data::traits::Discounting;
 use time::macros::date;
 
 #[test]

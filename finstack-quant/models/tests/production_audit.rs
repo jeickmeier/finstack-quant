@@ -174,7 +174,7 @@ fn b5_default_sabr_calibration_controls_relative_quote_error() {
 #[test]
 fn b2_black_lookup_rejects_normal_cube() {
     use finstack_quant_core::market_data::surfaces::{SabrParameterData, VolCube};
-    let p = SabrParameterData::new(0.008, 0.0, 0.0, 0.3).expect("params");
+    let p = SabrParameterData::new(0.008, 0.0, 0.3, 0.0).expect("params");
     let cube = VolCube::from_grid("NORMAL", &[1.0], &[5.0], &[p], &[0.02]).expect("cube");
     let source = VolSource::Cube(Arc::new(cube));
     assert!(source.get_vol(1.0, 5.0, 0.02).is_err());
@@ -184,7 +184,7 @@ fn b2_black_lookup_rejects_normal_cube() {
 fn b2_clamped_cube_preserves_small_valid_quote() {
     use finstack_quant_core::market_data::surfaces::{SabrParameterData, VolCube};
     use finstack_quant_models::volatility::{get_cube_vol, get_cube_vol_clamped};
-    let p = SabrParameterData::new(0.0001, 1.0, 0.0, 0.3).expect("params");
+    let p = SabrParameterData::new(0.0001, 1.0, 0.3, 0.0).expect("params");
     let cube = VolCube::from_grid("LOW", &[1.0], &[5.0], &[p], &[0.02]).expect("cube");
     let checked = get_cube_vol(&cube, 1.0, 5.0, 0.02).expect("quote");
     let clamped = get_cube_vol_clamped(&cube, 1.0, 5.0, 0.02);
@@ -198,7 +198,7 @@ fn b2_clamped_cube_preserves_small_valid_quote() {
 fn b2_clamped_cube_never_fabricates_volatility_for_invalid_black_rates() {
     use finstack_quant_core::market_data::surfaces::{SabrParameterData, VolCube};
     use finstack_quant_models::volatility::get_cube_vol_clamped;
-    let p = SabrParameterData::new(0.008, 0.5, 0.0, 0.3).expect("params");
+    let p = SabrParameterData::new(0.008, 0.5, 0.3, 0.0).expect("params");
     let cube = VolCube::from_grid("INVALID", &[1.0], &[5.0], &[p], &[-0.01]).expect("cube");
     assert!(get_cube_vol_clamped(&cube, 1.0, 5.0, -0.01).is_nan());
 }
@@ -207,7 +207,7 @@ fn b2_clamped_cube_never_fabricates_volatility_for_invalid_black_rates() {
 fn b4_normal_cube_uses_canonical_beta_snap() {
     use finstack_quant_core::market_data::surfaces::{SabrParameterData, VolCube};
     use finstack_quant_models::volatility::VolatilityConvention;
-    let p = SabrParameterData::new(0.008, 0.00005, -0.2, 0.3).expect("params");
+    let p = SabrParameterData::new(0.008, 0.00005, 0.3, -0.2).expect("params");
     let cube = VolCube::from_grid("NORMAL-SNAP", &[1.0], &[5.0], &[p], &[-0.01]).expect("cube");
     let source = VolSource::Cube(Arc::new(cube));
     assert_eq!(

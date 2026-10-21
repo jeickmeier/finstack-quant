@@ -145,7 +145,7 @@ impl TreeValuator for RateCallValuator {
     fn value_at_maturity(&self, state: &NodeState) -> Result<f64> {
         let rate = state
             .interest_rate()
-            .ok_or_else(|| Error::internal("rate-call node missing interest rate"))?;
+            .ok_or_else(|| Error::Internal("rate-call node missing interest rate".into()))?;
         Ok((rate - self.strike).max(0.0))
     }
 
@@ -1067,7 +1067,7 @@ impl TreeValuator for NodeProbeValuator {
     fn value_at_maturity(&self, state: &NodeState) -> Result<f64> {
         let rate = state
             .interest_rate()
-            .ok_or_else(|| Error::internal("probe node missing interest rate"))?;
+            .ok_or_else(|| Error::Internal("probe node missing interest rate".into()))?;
         let oas_bp = state.oas_bp;
         Ok((rate - 0.03).max(0.0) + oas_bp / 10_000.0)
     }

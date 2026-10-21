@@ -171,7 +171,7 @@ pub(super) fn debt_interest_due(
     // `senior_fee_accrual` kernel the waterfall pays with, so the measured and
     // paid amounts cannot drift.
     let senior_fee_accrual_amount = if needs_interest_due {
-        let mut tranche_index = finstack_quant_core::HashMap::default();
+        let mut tranche_index = finstack_quant_core::FxHashMap::default();
         for (i, tr) in state.tranches.tranches.iter().enumerate() {
             tranche_index.insert(tr.id.as_str(), i);
         }

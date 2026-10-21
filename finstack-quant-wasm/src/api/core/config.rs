@@ -4,7 +4,9 @@
 //! `ToleranceConfig` is plain data: it crosses the boundary as a plain object
 //! typed by the schema-generated `ToleranceConfig` type.
 
-use crate::utils::input::{from_js_json, js_json_value, js_opt_string, js_string, js_uint};
+use crate::utils::input::{
+    from_js_json, js_currency, js_json_value, js_opt_string, js_string, js_uint,
+};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::config::{FinstackConfig, RoundingMode, ToleranceConfig};
 use finstack_quant_core::currency::Currency;
@@ -17,7 +19,7 @@ use wasm_bindgen::prelude::*;
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
-/// core.RoundingMode.bankers().name; // "bankers"
+/// core.RoundingMode.bankers().toString(); // "bankers"
 /// core.RoundingMode.fromName("away_from_zero").toJson(); // "\"away_from_zero\""
 /// ```
 #[wasm_bindgen(js_name = RoundingMode)]
@@ -27,7 +29,7 @@ pub struct JsRoundingMode {
 }
 
 impl JsRoundingMode {
-    pub(crate) const fn wrap(inner: RoundingMode) -> Self {
+    pub(crate) const fn from_inner(inner: RoundingMode) -> Self {
         Self { inner }
     }
 }
@@ -39,7 +41,7 @@ impl JsRoundingMode {
     /// @returns The `bankers` mode (the Rust default).
     #[wasm_bindgen(js_name = bankers)]
     pub fn bankers() -> Self {
-        Self::wrap(RoundingMode::Bankers)
+        Self::from_inner(RoundingMode::Bankers)
     }
 
     /// Round half away from zero.
@@ -47,7 +49,7 @@ impl JsRoundingMode {
     /// @returns The `away_from_zero` mode.
     #[wasm_bindgen(js_name = awayFromZero)]
     pub fn away_from_zero() -> Self {
-        Self::wrap(RoundingMode::AwayFromZero)
+        Self::from_inner(RoundingMode::AwayFromZero)
     }
 
     /// Truncate toward zero.
@@ -55,7 +57,7 @@ impl JsRoundingMode {
     /// @returns The `toward_zero` mode.
     #[wasm_bindgen(js_name = towardZero)]
     pub fn toward_zero() -> Self {
-        Self::wrap(RoundingMode::TowardZero)
+        Self::from_inner(RoundingMode::TowardZero)
     }
 
     /// Round toward negative infinity.
@@ -63,7 +65,7 @@ impl JsRoundingMode {
     /// @returns The `floor` mode.
     #[wasm_bindgen(js_name = floor)]
     pub fn floor() -> Self {
-        Self::wrap(RoundingMode::Floor)
+        Self::from_inner(RoundingMode::Floor)
     }
 
     /// Round toward positive infinity.
@@ -71,7 +73,7 @@ impl JsRoundingMode {
     /// @returns The `ceil` mode.
     #[wasm_bindgen(js_name = ceil)]
     pub fn ceil() -> Self {
-        Self::wrap(RoundingMode::Ceil)
+        Self::from_inner(RoundingMode::Ceil)
     }
 
     /// Parse a rounding-mode name (Rust `RoundingMode::from_str`).
@@ -88,14 +90,8 @@ impl JsRoundingMode {
     pub fn from_name(name: JsValue) -> Result<JsRoundingMode, JsValue> {
         js_string(&name, "name")?
             .parse::<RoundingMode>()
-            .map(Self::wrap)
+            .map(Self::from_inner)
             .map_err(to_js_err)
-    }
-
-    /// Lowercase name of the mode, such as `"bankers"`.
-    #[wasm_bindgen(getter, js_name = name)]
-    pub fn name(&self) -> String {
-        self.inner.to_string()
     }
 
     /// Serialize to the canonical JSON wire form (a quoted lowercase name).
@@ -119,12 +115,10 @@ impl JsRoundingMode {
     /// `validation`) if it is not a quoted mode name.
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsRoundingMode, JsValue> {
-        serde_json::from_str(&js_string(&json, "json")?)
-            .map(Self::wrap)
-            .map_err(to_js_err)
+        from_js_json(&json, "json").map(Self::from_inner)
     }
 
-    /// Lowercase name of the mode (same as `name`).
+    /// Lowercase name of the mode, such as `"bankers"`.
     ///
     /// @returns The name accepted by `fromName`.
     #[wasm_bindgen(js_name = toString)]
@@ -132,11 +126,6 @@ impl JsRoundingMode {
     pub fn to_string(&self) -> String {
         self.inner.to_string()
     }
-}
-
-/// Parse a currency-code argument.
-fn currency_arg(value: &JsValue, label: &str) -> Result<Currency, JsValue> {
-    js_string(value, label)?.parse().map_err(to_js_err)
 }
 
 /// Currency-keyed scale overrides as a plain `{ code: scale }` object.
@@ -160,7 +149,7 @@ fn scale_overrides(overrides: &BTreeMap<Currency, u32>) -> Result<JsValue, JsVal
 /// config.outputScale("JPY"); // 2
 /// config.outputScale("USD"); // 2 (the ISO-4217 minor units)
 /// const copy = core.FinstackConfig.fromJson(config.toJson());
-/// copy.roundingMode.name; // "away_from_zero"
+/// copy.roundingMode.toString(); // "away_from_zero"
 /// ```
 #[wasm_bindgen(js_name = FinstackConfig)]
 #[derive(Clone, Debug)]
@@ -175,12 +164,11 @@ impl JsFinstackConfig {
     /// # Arguments
     ///
     /// * `rounding_mode` - Lowercase rounding-mode name (for example
-    ///   `"bankers"`, or `mode.name` of a `RoundingMode`); omitted uses the
+    ///   `"bankers"`, or `mode.toString()` of a `RoundingMode`); omitted uses the
     ///   Rust default, `"bankers"`.
     /// * `tolerances` - `ToleranceConfig` object or JSON text with the
-    ///   optional absolute tolerances `rate_epsilon` (default `1e-12`) and
-    ///   `generic_epsilon` (default `1e-10`), both finite and positive;
-    ///   omitted uses the defaults.
+    ///   optional absolute tolerance `generic_epsilon` (default `1e-10`),
+    ///   finite and positive; omitted uses the default.
     ///
     /// @returns A new `FinstackConfig`.
     /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
@@ -204,10 +192,10 @@ impl JsFinstackConfig {
     /// Active rounding mode as a `RoundingMode`.
     #[wasm_bindgen(getter, js_name = roundingMode)]
     pub fn rounding_mode(&self) -> JsRoundingMode {
-        JsRoundingMode::wrap(self.inner.rounding.mode)
+        JsRoundingMode::from_inner(self.inner.rounding.mode)
     }
 
-    /// Numeric tolerances as a plain `ToleranceConfig` object (`rate_epsilon`, `generic_epsilon`).
+    /// Numeric tolerances as a plain `ToleranceConfig` object (`generic_epsilon`).
     #[wasm_bindgen(getter, js_name = tolerances)]
     pub fn tolerances(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.tolerances)
@@ -225,9 +213,7 @@ impl JsFinstackConfig {
     /// (kind `validation`) if it is not a supported currency code.
     #[wasm_bindgen(js_name = outputScale)]
     pub fn output_scale(&self, currency: JsValue) -> Result<u32, JsValue> {
-        Ok(self
-            .inner
-            .output_scale(currency_arg(&currency, "currency")?))
+        Ok(self.inner.output_scale(js_currency(&currency, "currency")?))
     }
 
     /// Decimal places kept when amounts in a currency are ingested (Rust
@@ -243,9 +229,7 @@ impl JsFinstackConfig {
     /// (kind `validation`) if it is not a supported currency code.
     #[wasm_bindgen(js_name = ingestScale)]
     pub fn ingest_scale(&self, currency: JsValue) -> Result<u32, JsValue> {
-        Ok(self
-            .inner
-            .ingest_scale(currency_arg(&currency, "currency")?))
+        Ok(self.inner.ingest_scale(js_currency(&currency, "currency")?))
     }
 
     /// Override the output decimal places of one currency.
@@ -260,7 +244,7 @@ impl JsFinstackConfig {
     /// exceeds 28.
     #[wasm_bindgen(js_name = setOutputScale)]
     pub fn set_output_scale(&mut self, currency: JsValue, scale: JsValue) -> Result<(), JsValue> {
-        let currency = currency_arg(&currency, "currency")?;
+        let currency = js_currency(&currency, "currency")?;
         let scale: u32 = js_uint(&scale, "scale")?;
         self.inner
             .rounding
@@ -281,7 +265,7 @@ impl JsFinstackConfig {
     /// exceeds 28.
     #[wasm_bindgen(js_name = setIngestScale)]
     pub fn set_ingest_scale(&mut self, currency: JsValue, scale: JsValue) -> Result<(), JsValue> {
-        let currency = currency_arg(&currency, "currency")?;
+        let currency = js_currency(&currency, "currency")?;
         let scale: u32 = js_uint(&scale, "scale")?;
         self.inner
             .rounding

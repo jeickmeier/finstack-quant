@@ -128,7 +128,7 @@ fn instrument_opening_balance(
 /// Name the instrument and the remedy when its cashflows need market data the
 /// evaluation was not given. Other errors pass through unchanged.
 fn missing_market_data(instrument_id: &str, err: Error) -> Error {
-    if err.kind() == finstack_quant_core::error::ErrorKind::NotFound {
+    if err.kind() == finstack_quant_core::ErrorKind::NotFound {
         Error::missing_data(format!(
             "capital-structure instrument '{instrument_id}' needs market data to generate its \
              cashflows ({err}); supply it through Evaluator::evaluate_with_market"

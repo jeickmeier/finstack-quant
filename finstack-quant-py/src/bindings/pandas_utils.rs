@@ -225,18 +225,18 @@ where
     reindex_columns(py, frame, columns)
 }
 
-/// Convert a slice of `time::Date` into a Python list suitable for a DataFrame index.
+/// Convert a slice of `finstack_quant_core::dates::Date` into a Python list suitable for a DataFrame index.
 pub fn dates_to_pylist<'py>(
     py: Python<'py>,
-    dates: &[time::Date],
+    dates: &[finstack_quant_core::dates::Date],
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
     dates.iter().map(|&d| date_to_py(py, d)).collect()
 }
 
-/// Convert a slice of `time::Date` into a pandas `DatetimeIndex`.
+/// Convert a slice of `finstack_quant_core::dates::Date` into a pandas `DatetimeIndex`.
 pub fn dates_to_datetime_index<'py>(
     py: Python<'py>,
-    dates: &[time::Date],
+    dates: &[finstack_quant_core::dates::Date],
 ) -> PyResult<Bound<'py, PyAny>> {
     let dates = dates_to_pylist(py, dates)?;
     py.import("pandas")?

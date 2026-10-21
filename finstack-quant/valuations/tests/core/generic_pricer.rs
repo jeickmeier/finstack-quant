@@ -84,7 +84,7 @@ fn generic_pricer_attaches_instrument_and_model_context_to_failures() {
         .price_dyn(&bond, &MarketContext::new(), date!(2025 - 01 - 01))
         .expect_err("missing discount curve must fail")
         .into();
-    assert_eq!(core.kind(), finstack_quant_core::error::ErrorKind::NotFound);
+    assert_eq!(core.kind(), finstack_quant_core::ErrorKind::NotFound);
 }
 
 #[test]

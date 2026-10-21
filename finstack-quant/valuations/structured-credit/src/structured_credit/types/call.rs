@@ -48,7 +48,6 @@ pub enum CallScope {
 pub struct CallAssumption {
     /// Earliest redemption date; the call settles on the first payment date
     /// at or after it.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

@@ -26,7 +26,7 @@ use js_sys::{Array, Float64Array, Reflect};
 use wasm_bindgen::prelude::*;
 
 struct PanelInputs {
-    dates: Vec<time::Date>,
+    dates: Vec<finstack_quant_core::dates::Date>,
     values: Vec<Vec<f64>>,
     ticker_names: Vec<String>,
     frequency: PeriodKind,
@@ -72,7 +72,7 @@ fn resolve_optional_calendar(
         .map_err(to_js_err)
 }
 
-fn parse_dates(dates: JsValue) -> Result<Vec<time::Date>, JsValue> {
+fn parse_dates(dates: JsValue) -> Result<Vec<finstack_quant_core::dates::Date>, JsValue> {
     let strs = js_string_seq(&dates, "dates")?;
     parse_iso_dates(&strs)
 }
@@ -114,7 +114,7 @@ fn result_vec_f64_to_js(result: finstack_quant_core::Result<Vec<f64>>) -> Result
     Ok(vec_f64_to_js(&result.map_err(to_js_err)?))
 }
 
-fn dates_to_js_array(dates: &[time::Date]) -> Array {
+fn dates_to_js_array(dates: &[finstack_quant_core::dates::Date]) -> Array {
     let date_array = Array::new_with_length(dates.len() as u32);
     for (i, &d) in dates.iter().enumerate() {
         date_array.set(i as u32, JsValue::from(&date_to_iso(d)));

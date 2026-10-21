@@ -112,12 +112,11 @@ pub(super) struct ConditionalRate {
 
 impl ConditionalRate {
     pub(super) fn rate(&self, path: &[RatesCreditPathState]) -> Result<f64> {
-        let first_step = path
-            .first()
-            .map(|state| state.step)
-            .ok_or_else(|| Error::internal("bond hazard LSMC conditional rate path is empty"))?;
+        let first_step = path.first().map(|state| state.step).ok_or_else(|| {
+            Error::Internal("bond hazard LSMC conditional rate path is empty".into())
+        })?;
         let offset = self.observation_step.checked_sub(first_step).ok_or_else(|| {
-            Error::internal(format!(
+            Error::Internal(format!(
                 "bond hazard LSMC conditional rate step {} precedes sampled segment start {first_step}",
                 self.observation_step
             ))
@@ -126,8 +125,8 @@ impl ConditionalRate {
             .get(offset)
             .filter(|state| state.step == self.observation_step)
             .ok_or_else(|| {
-                Error::internal(
-                    "bond hazard LSMC conditional rate step is outside the sampled path",
+                Error::Internal(
+                    "bond hazard LSMC conditional rate step is outside the sampled path".into(),
                 )
             })?;
         let node_df = self
@@ -135,14 +134,14 @@ impl ConditionalRate {
             .get(state.rate_node)
             .copied()
             .ok_or_else(|| {
-                Error::internal(format!(
+                Error::Internal(format!(
                     "bond hazard LSMC rate node {} is outside conditional-forward slice {}",
                     state.rate_node, self.observation_step
                 ))
             })?;
         if !node_df.is_finite() || node_df <= 0.0 {
-            return Err(Error::internal(
-                "bond hazard LSMC conditional discount factor is not positive and finite",
+            return Err(Error::Internal(
+                "bond hazard LSMC conditional discount factor is not positive and finite".into(),
             ));
         }
         let node_forward = (1.0 / node_df - 1.0) / self.accrual;
@@ -150,8 +149,8 @@ impl ConditionalRate {
         if rate.is_finite() {
             Ok(rate)
         } else {
-            Err(Error::internal(
-                "bond hazard LSMC produced a non-finite conditional index rate",
+            Err(Error::Internal(
+                "bond hazard LSMC produced a non-finite conditional index rate".into(),
             ))
         }
     }
@@ -221,8 +220,8 @@ impl MakeWholeBasis {
         cash: &[f64],
     ) -> Result<f64> {
         if path.len() != cash.len() || path.len() != self.interval_adjustments.len() + 1 {
-            return Err(Error::internal(
-                "bond hazard LSMC make-whole replay does not match its reference grid",
+            return Err(Error::Internal(
+                "bond hazard LSMC make-whole replay does not match its reference grid".into(),
             ));
         }
         let terminal = path.len() - 1;
@@ -233,8 +232,8 @@ impl MakeWholeBasis {
         for step in (exercise_step..terminal).rev() {
             let discount = path[step].discount_to_next * self.interval_adjustments[step];
             if !discount.is_finite() || discount <= 0.0 {
-                return Err(Error::internal(
-                    "bond hazard LSMC make-whole reference discount is invalid",
+                return Err(Error::Internal(
+                    "bond hazard LSMC make-whole reference discount is invalid".into(),
                 ));
             }
             value *= discount;
@@ -245,8 +244,8 @@ impl MakeWholeBasis {
         if value.is_finite() && value >= 0.0 {
             Ok(value)
         } else {
-            Err(Error::internal(
-                "bond hazard LSMC make-whole reference value is invalid",
+            Err(Error::Internal(
+                "bond hazard LSMC make-whole reference value is invalid".into(),
             ))
         }
     }

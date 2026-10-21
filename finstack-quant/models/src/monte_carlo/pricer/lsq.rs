@@ -38,8 +38,8 @@ pub fn solve_least_squares(design: &[f64], y: &[f64], n: usize, k: usize) -> Res
     use nalgebra::{DMatrix, DVector};
 
     if n < k {
-        return Err(finstack_quant_core::Error::internal(
-            "LSMC regression requires at least as many observations as basis functions",
+        return Err(finstack_quant_core::Error::Internal(
+            "LSMC regression requires at least as many observations as basis functions".into(),
         ));
     }
 
@@ -60,8 +60,8 @@ pub fn solve_least_squares(design: &[f64], y: &[f64], n: usize, k: usize) -> Res
         Ok(beta) => Ok(beta.as_slice().to_vec()),
         Err(_) => {
             tracing::warn!("LSMC regression failed (singular matrix)");
-            Err(finstack_quant_core::Error::internal(
-                "LSMC regression SVD solve failed for the design matrix",
+            Err(finstack_quant_core::Error::Internal(
+                "LSMC regression SVD solve failed for the design matrix".into(),
             ))
         }
     }

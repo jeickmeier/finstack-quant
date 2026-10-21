@@ -269,7 +269,7 @@ where
 }
 
 fn label_bucket_tenor(
-    map: &finstack_quant_core::HashMap<(String, u8, String), f64>,
+    map: &finstack_quant_core::FxHashMap<(String, u8, String), f64>,
 ) -> Vec<LabelBucketTenor> {
     map.iter()
         .map(|((label, bucket, tenor), amount)| (label.clone(), *bucket, tenor.clone(), *amount))
@@ -286,7 +286,7 @@ fn sort_label_bucket_tenor(entries: &mut [LabelBucketTenor]) {
 }
 
 fn label_bucket_curvature(
-    map: &finstack_quant_core::HashMap<(String, u8), (f64, f64)>,
+    map: &finstack_quant_core::FxHashMap<(String, u8), (f64, f64)>,
 ) -> Vec<LabelBucketCurvature> {
     map.iter()
         .map(|((label, bucket), (up, down))| (label.clone(), *bucket, *up, *down))
@@ -298,7 +298,7 @@ fn sort_label_bucket_curvature(entries: &mut [LabelBucketCurvature]) {
 }
 
 fn extend_label_bucket_tenor(
-    map: &mut finstack_quant_core::HashMap<(String, u8, String), f64>,
+    map: &mut finstack_quant_core::FxHashMap<(String, u8, String), f64>,
     entries: Vec<LabelBucketTenor>,
 ) {
     for (label, bucket, tenor, amount) in entries {
@@ -307,7 +307,7 @@ fn extend_label_bucket_tenor(
 }
 
 fn extend_label_bucket_curvature(
-    map: &mut finstack_quant_core::HashMap<(String, u8), (f64, f64)>,
+    map: &mut finstack_quant_core::FxHashMap<(String, u8), (f64, f64)>,
     entries: Vec<LabelBucketCurvature>,
 ) {
     for (label, bucket, up, down) in entries {
@@ -316,7 +316,7 @@ fn extend_label_bucket_curvature(
 }
 
 fn label_bucket_basis(
-    map: &finstack_quant_core::HashMap<(String, u8, String, String), f64>,
+    map: &finstack_quant_core::FxHashMap<(String, u8, String, String), f64>,
 ) -> Vec<LabelBucketBasis> {
     let mut entries: Vec<_> = map
         .iter()
@@ -328,7 +328,7 @@ fn label_bucket_basis(
     entries
 }
 fn extend_label_bucket_basis(
-    map: &mut finstack_quant_core::HashMap<(String, u8, String, String), f64>,
+    map: &mut finstack_quant_core::FxHashMap<(String, u8, String, String), f64>,
     entries: Vec<LabelBucketBasis>,
 ) {
     for (name, bucket, tenor, basis, amount) in entries {

@@ -448,27 +448,19 @@ impl InterestRateSwap {
             }
         }
 
-        validation::validate_date_range_strict_with(
-            self.fixed_leg.start,
-            self.fixed_leg.end,
-            |start, end| {
-                format!(
-                    "Invalid fixed leg date range: end ({}) must be after start ({})",
-                    end, start
-                )
-            },
-        )?;
+        validation::require_with(self.fixed_leg.end > self.fixed_leg.start, || {
+            format!(
+                "Invalid fixed leg date range: end ({}) must be after start ({})",
+                self.fixed_leg.end, self.fixed_leg.start
+            )
+        })?;
 
-        validation::validate_date_range_strict_with(
-            self.float_leg.start,
-            self.float_leg.end,
-            |start, end| {
-                format!(
-                    "Invalid floating leg date range: end ({}) must be after start ({})",
-                    end, start
-                )
-            },
-        )?;
+        validation::require_with(self.float_leg.end > self.float_leg.start, || {
+            format!(
+                "Invalid floating leg date range: end ({}) must be after start ({})",
+                self.float_leg.end, self.float_leg.start
+            )
+        })?;
 
         // Only single-curve (CSA OIS) discounting is supported: both legs must
         // use the same discount curve. Dual-curve discounting is not implemented.
@@ -481,17 +473,18 @@ impl InterestRateSwap {
             )));
         }
 
-        validation::validate_money_gt_with(self.notional, NOTIONAL_EPSILON, |amount| {
+        validation::require_with(self.notional.amount() > NOTIONAL_EPSILON, || {
             format!(
                 "Invalid notional: {} must be positive (> {:.0e}). \
                  Negative notional is semantically ambiguous; use PayReceive to control direction.",
-                amount, NOTIONAL_EPSILON
+                self.notional.amount(),
+                NOTIONAL_EPSILON
             )
         })?;
 
         // Validate fixed rate is within reasonable bounds
         let rate_f64 = self.fixed_leg.rate.as_f64();
-        validation::validate_rate_magnitude(
+        crate::rate_validation::validate_rate_magnitude(
             rate_f64,
             MAX_RATE_MAGNITUDE,
             "fixed rate",

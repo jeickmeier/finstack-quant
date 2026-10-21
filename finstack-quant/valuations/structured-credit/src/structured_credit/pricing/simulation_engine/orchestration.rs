@@ -552,7 +552,7 @@ pub(crate) fn prepare_deal_simulation(
 #[derive(Debug, Clone)]
 pub struct SimulationRun {
     /// Detailed cashflow results per tranche id.
-    pub tranches: HashMap<String, TrancheCashflows>,
+    pub tranches: FxHashMap<String, TrancheCashflows>,
     /// Reserve, draw-funding and reserve-interest accounting.
     pub diagnostics: SimulationDiagnostics,
 }
@@ -769,7 +769,7 @@ pub(crate) fn simulate_instrument_pool(
             simulate_prepared(instrument, context, &prepared, &mut source)
         }
         None => Ok(SimulationRun {
-            tranches: HashMap::default(),
+            tranches: FxHashMap::default(),
             diagnostics: SimulationDiagnostics {
                 periods: Vec::new(),
                 reserve_balance_path: Vec::new(),
@@ -800,7 +800,7 @@ pub(crate) fn simulate_with_source<S: PoolFlowSource + ?Sized>(
         Some(prepared) => simulate_prepared(instrument, context, &prepared, source),
         // Exhausted pool: nothing to simulate, empty result.
         None => Ok(SimulationRun {
-            tranches: HashMap::default(),
+            tranches: FxHashMap::default(),
             diagnostics: SimulationDiagnostics {
                 periods: Vec::new(),
                 reserve_balance_path: Vec::new(),
@@ -853,7 +853,7 @@ fn drain_pending_recoveries_at_end(
 
 /// Aggregate tranche-level cashflows into one dated cashflow vector.
 pub(crate) fn aggregate_tranche_cashflows(
-    full_results: &HashMap<String, TrancheCashflows>,
+    full_results: &FxHashMap<String, TrancheCashflows>,
 ) -> Result<DatedFlows> {
     // Aggregate all tranche cashflows into a single schedule
     let estimated_dates = full_results
@@ -861,8 +861,8 @@ pub(crate) fn aggregate_tranche_cashflows(
         .next()
         .map(|r| r.cashflows.len())
         .unwrap_or(0);
-    let mut flow_map: HashMap<Date, Money> = {
-        let mut m = HashMap::default();
+    let mut flow_map: FxHashMap<Date, Money> = {
+        let mut m = FxHashMap::default();
         m.reserve(estimated_dates);
         m
     };

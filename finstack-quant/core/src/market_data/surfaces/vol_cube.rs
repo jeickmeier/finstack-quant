@@ -115,18 +115,6 @@ use super::validate_axis;
 // VolCube impl — construction and accessors
 
 impl VolCube {
-    /// Start building a new vol cube with identifier `id`.
-    #[must_use]
-    pub fn builder(id: impl Into<CurveId>) -> VolCubeBuilder {
-        VolCubeBuilder {
-            id: id.into(),
-            expiries: Vec::new(),
-            tenors: Vec::new(),
-            params: Vec::new(),
-            forwards: Vec::new(),
-        }
-    }
-
     /// Construct directly from axes and row-major parameter/forward arrays.
     ///
     /// # Errors
@@ -276,61 +264,5 @@ impl VolCube {
     pub fn with_interpolation_mode(mut self, mode: VolInterpolationMode) -> Self {
         self.interpolation_mode = mode;
         self
-    }
-}
-
-/// Incremental builder for [`VolCube`].
-///
-/// Nodes must be added in row-major order: for each expiry, add one node per
-/// tenor (in tenor order) before proceeding to the next expiry.
-pub struct VolCubeBuilder {
-    id: CurveId,
-    expiries: Vec<f64>,
-    tenors: Vec<f64>,
-    params: Vec<SabrParameterData>,
-    forwards: Vec<f64>,
-}
-
-impl VolCubeBuilder {
-    /// Set the option expiry axis (years).
-    pub fn expiries(mut self, exps: &[f64]) -> Self {
-        self.expiries.extend_from_slice(exps);
-        self
-    }
-
-    /// Set the underlying swap tenor axis (years).
-    pub fn tenors(mut self, tnrs: &[f64]) -> Self {
-        self.tenors.extend_from_slice(tnrs);
-        self
-    }
-
-    /// Append a grid node (SABR params + forward) in row-major order.
-    pub fn node(mut self, params: SabrParameterData, forward: f64) -> Self {
-        self.params.push(params);
-        self.forwards.push(forward);
-        self
-    }
-
-    /// Finalise and validate the cube.
-    ///
-    /// Nodes must supply exactly one `(SabrParameterData, forward)` pair for every
-    /// expiry-tenor combination, in the row-major order documented on
-    /// [`VolCubeBuilder`]. The default interpolation mode is pointwise SABR
-    /// volatility interpolation; change it on the returned cube when
-    /// total-variance interpolation across expiries is required.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same construction errors as [`VolCube::from_grid`]: empty,
-    /// non-finite, non-positive, or unsorted axes; incorrect node count;
-    /// non-finite forwards; or invalid SABR parameters and shifts.
-    pub fn build(self) -> crate::Result<VolCube> {
-        VolCube::from_grid(
-            self.id.as_str(),
-            &self.expiries,
-            &self.tenors,
-            &self.params,
-            &self.forwards,
-        )
     }
 }

@@ -20,15 +20,17 @@ wasm.DayCount.prototype.signedYearFraction = function signedYearFraction(
   return rawSignedYearFraction.call(this, start, end, dayCountContext(ctx));
 };
 
-// `FxMatrix.rate(base, quote, date, policy?)`: an omitted policy runs the
-// Rust default query (`FxQuery::new`), exposed raw as `rateWithDefaultPolicy`.
-const rateWithPolicy = wasm.FxMatrix.prototype.rate;
-const rateWithDefaultPolicy = wasm.FxMatrix.prototype.rateWithDefaultPolicy;
-delete wasm.FxMatrix.prototype.rateWithDefaultPolicy;
+// `FxMatrix.rate(base, quote, date, policy?)`: an omitted policy is the Rust
+// default (`new FxConversionPolicy()`, cashflow date), created once after
+// `init()` and only borrowed.
+let defaultFxConversionPolicy;
+const rawFxRate = wasm.FxMatrix.prototype.rate;
 wasm.FxMatrix.prototype.rate = function rate(base, quote, date, policy = undefined) {
-  return policy === undefined || policy === null
-    ? rateWithDefaultPolicy.call(this, base, quote, date)
-    : rateWithPolicy.call(this, base, quote, date, policy);
+  const resolved =
+    policy === undefined || policy === null
+      ? (defaultFxConversionPolicy ??= new wasm.FxConversionPolicy())
+      : policy;
+  return rawFxRate.call(this, base, quote, date, resolved);
 };
 
 // `MarketContext.insert(curve)` takes any of nine curve and surface classes.
@@ -85,7 +87,6 @@ chain(wasm.MarketContext, [
   'insertCreditIndex',
   'insertSeries',
   'insertInflationIndex',
-  'mapCollateral',
 ]);
 chain(wasm.ScheduleBuilder, [
   'frequency',
@@ -98,6 +99,16 @@ chain(wasm.ScheduleBuilder, [
   'imm',
   'errorPolicy',
 ]);
+
+// `sifmaSettlementDate(month, year, settlementClass?)`: wasm-bindgen cannot
+// take an optional borrowed handle, so an omitted class runs the raw
+// `sifmaSettlementDateDefaultClass`, which applies the Rust default
+// (`SifmaSettlementClass::default()`, Class A).
+function sifmaSettlementDate(month, year, settlementClass = undefined) {
+  return settlementClass === undefined || settlementClass === null
+    ? wasm.sifmaSettlementDateDefaultClass(month, year)
+    : wasm.sifmaSettlementDate(month, year, settlementClass);
+}
 
 export const core = {
   Currency: wasm.Currency,
@@ -115,7 +126,6 @@ export const core = {
   ratingScalesExtensionKey: wasm.ratingScalesExtensionKey,
   DayCount: wasm.DayCount,
   DayCountContext: wasm.DayCountContext,
-  Thirty360Convention: wasm.Thirty360Convention,
   days30360: wasm.days30360,
   days30e360Isda: wasm.days30e360Isda,
   Tenor: wasm.Tenor,
@@ -123,7 +133,6 @@ export const core = {
   createDate: wasm.createDate,
   dateFromEpochDays: wasm.dateFromEpochDays,
   daysSinceEpoch: wasm.daysSinceEpoch,
-  BusinessDayConvention: wasm.BusinessDayConvention,
   HolidayCalendar: wasm.HolidayCalendar,
   adjust: wasm.adjust,
   availableCalendars: wasm.availableCalendars,
@@ -140,8 +149,6 @@ export const core = {
   FiscalConfig: wasm.FiscalConfig,
   buildPeriods: wasm.buildPeriods,
   buildFiscalPeriods: wasm.buildFiscalPeriods,
-  StubKind: wasm.StubKind,
-  ScheduleErrorPolicy: wasm.ScheduleErrorPolicy,
   Schedule: wasm.Schedule,
   ScheduleBuilder: wasm.ScheduleBuilder,
   thirdWednesday: wasm.thirdWednesday,
@@ -157,9 +164,8 @@ export const core = {
   nextImmOptionExpiry: wasm.nextImmOptionExpiry,
   nextThirdFriday: wasm.nextThirdFriday,
   SifmaSettlementClass: wasm.SifmaSettlementClass,
-  sifmaSettlementDate: wasm.sifmaSettlementDate,
-  sifmaSettlementDateForClass: wasm.sifmaSettlementDateForClass,
-  estimatedSifmaSettlementDateForClass: wasm.estimatedSifmaSettlementDateForClass,
+  sifmaSettlementDate,
+  estimatedSifmaSettlementDate: wasm.estimatedSifmaSettlementDate,
   nextSifmaSettlement: wasm.nextSifmaSettlement,
   DiscountCurve: wasm.DiscountCurve,
   HazardCurve: wasm.HazardCurve,
@@ -175,6 +181,7 @@ export const core = {
   ScalarTimeSeries: wasm.ScalarTimeSeries,
   InflationIndex: wasm.InflationIndex,
   MarketContext: wasm.MarketContext,
+  ConvertedMoney: wasm.ConvertedMoney,
   FxConversionPolicy: wasm.FxConversionPolicy,
   FxRateResult: wasm.FxRateResult,
   FxMatrix: wasm.FxMatrix,

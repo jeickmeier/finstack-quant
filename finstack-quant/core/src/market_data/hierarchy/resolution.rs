@@ -5,7 +5,7 @@
 
 use super::{HierarchyNode, MarketDataHierarchy};
 use crate::types::CurveId;
-use crate::{HashMap, HashSet};
+use crate::{FxHashMap, FxHashSet};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -97,26 +97,6 @@ pub struct HierarchyTarget {
 }
 
 impl MarketDataHierarchy {
-    /// Resolve a hierarchy target to the set of `CurveId`s it covers.
-    ///
-    /// Walks to the node at `target.path`, then collects all `CurveId`s in that
-    /// subtree. If a `tag_filter` is provided, curves in the full subtree of any
-    /// matching node are included.
-    ///
-    /// The `mode` controls how matches at multiple tree depths combine:
-    ///
-    /// - [`ResolutionMode::MostSpecificWins`]: for each `CurveId`, only the
-    ///   matches from the deepest (most specific) matching node are returned.
-    ///   Parent-level matches are suppressed when a deeper match exists.
-    /// - [`ResolutionMode::Cumulative`]: all matching `CurveId`s from all
-    ///   matching nodes are returned, including duplicates across depths.
-    pub fn resolve(&self, target: &HierarchyTarget, mode: ResolutionMode) -> Vec<CurveId> {
-        self.resolve_matches(target, mode)
-            .into_iter()
-            .map(|matched| matched.curve_id)
-            .collect()
-    }
-
     /// Resolve a target while retaining matching-node depths and traversal order.
     ///
     /// # Arguments
@@ -142,7 +122,7 @@ impl MarketDataHierarchy {
         match mode {
             ResolutionMode::Cumulative => matches,
             ResolutionMode::MostSpecificWins => {
-                let mut max_depth: HashMap<CurveId, usize> = HashMap::default();
+                let mut max_depth: FxHashMap<CurveId, usize> = FxHashMap::default();
                 for matched in &matches {
                     max_depth
                         .entry(matched.curve_id.clone())
@@ -150,7 +130,7 @@ impl MarketDataHierarchy {
                         .or_insert(matched.matched_depth);
                 }
 
-                let mut emitted = HashSet::default();
+                let mut emitted = FxHashSet::default();
                 matches
                     .into_iter()
                     .filter(|matched| {

@@ -3,12 +3,11 @@
 use super::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, Tenor};
+use finstack_quant_core::math::stats::RealizedVarMethod;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
-use finstack_quant_valuations_equity::variance_swap::{
-    PayReceive, RealizedVarMethod, VarianceSwap,
-};
+use finstack_quant_valuations_equity::variance_swap::{PayReceive, VarianceSwap};
 
 #[test]
 fn test_builder_creates_valid_swap_with_all_required_fields() {

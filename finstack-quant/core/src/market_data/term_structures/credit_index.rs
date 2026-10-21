@@ -118,7 +118,7 @@ impl CreditIndexData {
 
     /// Check aggregate fields against the builder's invariants.
     fn validate(&self) -> Result<()> {
-        super::common::validate_unit_range(self.recovery_rate, "recovery_rate")?;
+        crate::validation::validate_f64_unit_interval(self.recovery_rate, "recovery_rate")?;
         if self.num_constituents == 0 {
             return Err(crate::Error::Validation(
                 "credit index num_constituents must be greater than zero".to_string(),
@@ -406,7 +406,10 @@ fn validate_issuer_recovery_rates(
                 "issuer_recovery_rates contains unknown issuer '{issuer}'"
             )));
         }
-        super::common::validate_unit_range(*recovery, &format!("issuer_recovery_rates[{issuer}]"))?;
+        crate::validation::validate_f64_unit_interval(
+            *recovery,
+            &format!("issuer_recovery_rates[{issuer}]"),
+        )?;
     }
 
     Ok(())
@@ -478,7 +481,8 @@ fn validate_issuer_weights(
 #[cfg(test)]
 mod production_credit_audit {
     use super::*;
-    use crate::dates::{Date, Month};
+    use crate::dates::Date;
+    use time::Month;
 
     #[test]
     fn issuer_curves_cover_every_constituent() {

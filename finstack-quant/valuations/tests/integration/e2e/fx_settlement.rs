@@ -74,12 +74,11 @@ fn test_usd_eur_spot_new_year_2024() {
     // Jan 1 is a joint closure.
     let spot = fx_spot_date(
         trade_date,
+        2,
         Currency::USD,
         Currency::EUR,
-        2,               // T+2
-        Some("nyse"),    // USD calendar
-        Some("target2"), // EUR calendar
-        Some("nyse"),    // USD side
+        Some("nyse"),
+        Some("target2"),
     )
     .expect("Valid calendars");
 
@@ -123,12 +122,11 @@ fn test_usd_eur_spot_christmas_2024() {
     // since the skipped days are TARGET2 (non-USD) closures.
     let spot = fx_spot_date(
         trade_date,
+        2,
         Currency::USD,
         Currency::EUR,
-        2,
         Some("nyse"),
         Some("target2"),
-        Some("nyse"),
     )
     .expect("Valid calendars");
 
@@ -246,12 +244,11 @@ fn test_usd_gbp_spot_july_4th_2025() {
     // CLS-consistent rule .
     let spot = fx_spot_date(
         trade_date,
+        2,
         Currency::USD,
         Currency::GBP,
-        2,
         Some("nyse"),
         Some("gblo"),
-        Some("nyse"),
     )
     .expect("Valid calendars");
 
@@ -325,12 +322,11 @@ fn test_usd_gbp_spot_mlk_day_2025() {
 
     let spot = fx_spot_date(
         trade_date,
+        2,
         Currency::USD,
         Currency::GBP,
-        2,
         Some("nyse"),
         Some("gblo"),
-        Some("nyse"),
     )
     .expect("Valid calendars");
 

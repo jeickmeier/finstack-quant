@@ -27,24 +27,26 @@
 //! For accurate day counting that respects holidays and business day conventions:
 //!
 //! ```
-//! use finstack_quant_core::dates::{Tenor, DayCount, DayCountContext, BusinessDayConvention};
-//! use finstack_quant_core::dates::calendar::TARGET2;
+//! use finstack_quant_core::dates::{
+//!     calendar_by_id_strict, BusinessDayConvention, DayCount, DayCountContext, Tenor,
+//! };
 //! use time::macros::date;
 //! # fn main() -> finstack_quant_core::Result<()> {
 //!
+//! let target2 = calendar_by_id_strict("target2")?;
 //! let as_of = date!(2025 - 01 - 31);
 //! let tenor = Tenor::parse("1M")?;
 //!
 //! // Calendar-aware: 1M from Jan 31 -> Feb 28 (end of month)
 //! let end_date = tenor.add_to_date(
 //!     as_of,
-//!     Some(&TARGET2),
+//!     Some(target2),
 //!     BusinessDayConvention::ModifiedFollowing,
 //! )?;
 //!
 //! let years = tenor.to_years_with_context(
 //!     as_of,
-//!     Some(&TARGET2),
+//!     Some(target2),
 //!     BusinessDayConvention::ModifiedFollowing,
 //!     DayCount::ActAct,
 //! )?;
@@ -56,7 +58,7 @@
 use crate::dates::{
     adjust, BusinessDayConvention, Date, DayCount, DayCountContext, HolidayCalendar,
 };
-use crate::error::InputError;
+use crate::InputError;
 
 const MAX_TENOR_YEARS: u32 = 200;
 const MAX_TENOR_DAYS: u32 = MAX_TENOR_YEARS * 366;
@@ -79,35 +81,9 @@ pub enum TenorUnit {
 }
 
 impl TenorUnit {
-    /// Parse a single character unit code.
-    ///
-    /// # Arguments
-    /// * `c` - Unit character: 'D', 'W', 'M', or 'Y' (case-insensitive)
-    ///
-    /// # Returns
-    /// The parsed `TenorUnit` or an error if the character is invalid.
-    ///
-    /// # Errors
-    ///
-    /// Returns `InputError::InvalidTenor` unless `c` is `D`, `W`, `M`, or `Y`,
-    /// case-insensitively.
-    pub fn from_char(c: char) -> crate::Result<Self> {
-        match c.to_ascii_uppercase() {
-            'D' => Ok(Self::Days),
-            'W' => Ok(Self::Weeks),
-            'M' => Ok(Self::Months),
-            'Y' => Ok(Self::Years),
-            _ => Err(InputError::InvalidTenor {
-                tenor: c.to_string(),
-                reason: "unknown unit; expected D, W, M, or Y".to_string(),
-            }
-            .into()),
-        }
-    }
-
     /// Single-character unit code: `'D'`, `'W'`, `'M'` or `'Y'`.
     ///
-    /// The inverse of `TenorUnit::from_char` and the unit suffix of the
+    /// The inverse of `TenorUnit`'s `FromStr` and the unit suffix of the
     /// tenor's `Display` form (`"3M"`).
     #[must_use]
     pub const fn designator(self) -> char {
@@ -123,10 +99,24 @@ impl TenorUnit {
 impl std::str::FromStr for TenorUnit {
     type Err = crate::Error;
 
+    /// Parses one unit character, `D`, `W`, `M` or `Y`, case-insensitively.
+    ///
+    /// An unknown character is `InputError::InvalidTenor`; anything other
+    /// than exactly one character is `Error::Validation`.
     fn from_str(s: &str) -> crate::Result<Self> {
         let mut chars = s.chars();
         match (chars.next(), chars.next()) {
-            (Some(c), None) => Self::from_char(c),
+            (Some(c), None) => match c.to_ascii_uppercase() {
+                'D' => Ok(Self::Days),
+                'W' => Ok(Self::Weeks),
+                'M' => Ok(Self::Months),
+                'Y' => Ok(Self::Years),
+                _ => Err(InputError::InvalidTenor {
+                    tenor: c.to_string(),
+                    reason: "unknown unit; expected D, W, M, or Y".to_string(),
+                }
+                .into()),
+            },
             _ => Err(crate::Error::Validation(format!(
                 "expected a single unit character D, W, M or Y, got {s:?}"
             ))),
@@ -225,12 +215,7 @@ impl Tenor {
             TenorUnit::Months => MAX_TENOR_MONTHS,
             TenorUnit::Years => MAX_TENOR_YEARS,
         };
-        let conversion_ok = match unit {
-            TenorUnit::Weeks => count.checked_mul(7).is_some(),
-            TenorUnit::Years => count.checked_mul(12).is_some(),
-            TenorUnit::Days | TenorUnit::Months => true,
-        };
-        if count == 0 || count > max_count || !conversion_ok {
+        if count == 0 || count > max_count {
             return Err(InputError::InvalidTenor {
                 tenor: format!("{count}{}", unit.designator()),
                 reason: if count == 0 {
@@ -590,34 +575,12 @@ impl Tenor {
     ) -> crate::Result<Date> {
         use crate::dates::date_extensions::DateExt;
 
+        // `new` bounds every count (at most 2,400 months), so the casts are exact.
         let raw_date: crate::Result<Date> = match self.unit {
             TenorUnit::Days => date.add_days(i64::from(self.count)),
             TenorUnit::Weeks => date.add_days(i64::from(self.count) * 7),
-            TenorUnit::Months => {
-                let count_i32 =
-                    i32::try_from(self.count).map_err(|_| InputError::InvalidTenor {
-                        tenor: self.to_string(),
-                        reason: format!("count {} exceeds i32::MAX", self.count),
-                    })?;
-                date.add_months(count_i32)
-            }
-            TenorUnit::Years => {
-                let count_i32 =
-                    i32::try_from(self.count).map_err(|_| InputError::InvalidTenor {
-                        tenor: self.to_string(),
-                        reason: format!("count {} exceeds i32::MAX", self.count),
-                    })?;
-                let months = count_i32
-                    .checked_mul(12)
-                    .ok_or_else(|| InputError::InvalidTenor {
-                        tenor: self.to_string(),
-                        reason: format!(
-                            "year tenor {} exceeds supported month range after conversion",
-                            self.count
-                        ),
-                    })?;
-                date.add_months(months)
-            }
+            TenorUnit::Months => date.add_months(self.count as i32),
+            TenorUnit::Years => date.add_months((self.count * 12) as i32),
         };
         let raw_date = raw_date?;
 
@@ -815,14 +778,20 @@ mod tests {
     use time::Month;
 
     #[test]
-    fn unit_designator_round_trips_from_char() {
+    fn unit_designator_round_trips_from_str() {
         for unit in [
             TenorUnit::Days,
             TenorUnit::Weeks,
             TenorUnit::Months,
             TenorUnit::Years,
         ] {
-            assert_eq!(TenorUnit::from_char(unit.designator()).expect("unit"), unit);
+            assert_eq!(
+                unit.designator()
+                    .to_string()
+                    .parse::<TenorUnit>()
+                    .expect("unit"),
+                unit
+            );
         }
         assert_eq!(Tenor::parse("3M").expect("3M").unit().designator(), 'M');
     }

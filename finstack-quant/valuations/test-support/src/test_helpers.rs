@@ -593,7 +593,7 @@ pub fn black_scholes_call(
     time: f64,
     div_yield: f64,
 ) -> f64 {
-    use finstack_quant_core::math::norm_cdf;
+    use finstack_quant_core::math::special_functions::norm_cdf;
 
     if time <= 0.0 {
         return (spot - strike).max(0.0);

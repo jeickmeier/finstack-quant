@@ -1,4 +1,4 @@
-//! WASM bindings for holiday calendars, business-day conventions and the
+//! WASM bindings for holiday calendars and the
 //! `DateExt` helpers from [`finstack_quant_core::dates`].
 //!
 //! Dates are **epoch days** (`i32`, days since 1970-01-01), the convention of
@@ -6,117 +6,12 @@
 
 use crate::api::core::periods::JsFiscalConfig;
 use crate::utils::input::{js_epoch_days, js_int, js_string};
-use crate::utils::{parse_iso_date, to_js_err, to_js_value};
+use crate::utils::wire::js_date;
+use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::{
-    calendar_by_id_strict, days_since_epoch as rust_days_since_epoch,
-    resolve_calendar as rust_resolve_calendar, BusinessDayConvention, DateExt, HolidayCalendar,
+    calendar_by_id_strict, days_since_epoch as rust_days_since_epoch, DateExt, HolidayCalendar,
 };
 use wasm_bindgen::prelude::*;
-
-/// Business-day adjustment convention (ISDA 2006 Definitions, Section 4.12).
-///
-/// Each static factory is one Rust `BusinessDayConvention` variant;
-/// `toString()` is the canonical snake_case name that `adjust`,
-/// `ScheduleBuilder.adjustWith` and the JSON wire format accept.
-///
-/// @example
-/// ```typescript
-/// import init, { core } from "finstack-quant-wasm";
-/// await init();
-/// const convention = core.BusinessDayConvention.modifiedFollowing();
-/// convention.toString(); // "modified_following"
-/// core.BusinessDayConvention.fromName("following").toString(); // "following"
-/// ```
-#[wasm_bindgen(js_name = BusinessDayConvention)]
-#[derive(Clone, Copy, Debug)]
-pub struct JsBusinessDayConvention {
-    pub(crate) inner: BusinessDayConvention,
-}
-
-impl JsBusinessDayConvention {
-    const fn wrap(inner: BusinessDayConvention) -> Self {
-        Self { inner }
-    }
-}
-
-#[wasm_bindgen(js_class = BusinessDayConvention)]
-impl JsBusinessDayConvention {
-    /// Leave the date unchanged even when it is not a business day.
-    ///
-    /// @returns The `unadjusted` convention.
-    #[wasm_bindgen(js_name = unadjusted)]
-    pub fn unadjusted() -> Self {
-        Self::wrap(BusinessDayConvention::Unadjusted)
-    }
-
-    /// Roll forward to the next business day.
-    ///
-    /// @returns The `following` convention.
-    #[wasm_bindgen(js_name = following)]
-    pub fn following() -> Self {
-        Self::wrap(BusinessDayConvention::Following)
-    }
-
-    /// Roll forward unless that crosses a month end, then roll backward.
-    ///
-    /// @returns The `modified_following` convention (the Rust default).
-    #[wasm_bindgen(js_name = modifiedFollowing)]
-    pub fn modified_following() -> Self {
-        Self::wrap(BusinessDayConvention::ModifiedFollowing)
-    }
-
-    /// Roll backward to the previous business day.
-    ///
-    /// @returns The `preceding` convention.
-    #[wasm_bindgen(js_name = preceding)]
-    pub fn preceding() -> Self {
-        Self::wrap(BusinessDayConvention::Preceding)
-    }
-
-    /// Roll backward unless that crosses a month start, then roll forward.
-    ///
-    /// @returns The `modified_preceding` convention.
-    #[wasm_bindgen(js_name = modifiedPreceding)]
-    pub fn modified_preceding() -> Self {
-        Self::wrap(BusinessDayConvention::ModifiedPreceding)
-    }
-
-    /// Roll to the nearest business day (forward on a tie).
-    ///
-    /// @returns The `nearest` convention.
-    #[wasm_bindgen(js_name = nearest)]
-    pub fn nearest() -> Self {
-        Self::wrap(BusinessDayConvention::Nearest)
-    }
-
-    /// Parse a convention name (Rust `BusinessDayConvention::from_str`).
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Convention name such as `"following"`,
-    ///   `"modified_following"` or `"preceding"`; case and `-`/space separators
-    ///   are normalised by the Rust parser.
-    ///
-    /// @returns The matching `BusinessDayConvention`.
-    /// @throws `TypeError` (kind `invalid_type`) if `name` is not a string;
-    /// `FinstackError` (kind `validation`) if no convention matches.
-    #[wasm_bindgen(js_name = fromName)]
-    pub fn from_name(name: JsValue) -> Result<JsBusinessDayConvention, JsValue> {
-        js_string(&name, "name")?
-            .parse::<BusinessDayConvention>()
-            .map(Self::wrap)
-            .map_err(to_js_err)
-    }
-
-    /// Canonical snake_case name of the convention.
-    ///
-    /// @returns The name accepted by `fromName` and the JSON wire format.
-    #[wasm_bindgen(js_name = toString)]
-    #[allow(clippy::inherent_to_string)]
-    pub fn to_string(&self) -> String {
-        self.inner.to_string()
-    }
-}
 
 /// Holiday calendar resolved from the built-in registry.
 ///
@@ -131,7 +26,7 @@ impl JsBusinessDayConvention {
 /// const calendar = new core.HolidayCalendar("nyse");
 /// calendar.isHoliday(core.createDate(2025, 1, 1)); // true
 /// calendar.isBusinessDay(core.createDate(2025, 1, 6)); // true
-/// calendar.code; // "nyse"
+/// calendar.toString(); // "nyse"
 /// ```
 #[wasm_bindgen(js_name = HolidayCalendar)]
 #[derive(Clone)]
@@ -215,8 +110,8 @@ impl JsHolidayCalendar {
 
     /// Calendar metadata, or `undefined` for union calendars.
     ///
-    /// A plain `CalendarMetadata` object with `id`, `name`,
-    /// `ignore_weekends` and `weekend_rule`.
+    /// A plain `CalendarMetadata` object with `id`, `name` and
+    /// `ignore_weekends`.
     #[wasm_bindgen(getter, js_name = metadata)]
     pub fn metadata(&self) -> Result<JsValue, JsValue> {
         match self.calendar.metadata() {
@@ -226,12 +121,6 @@ impl JsHolidayCalendar {
     }
 
     /// Canonical calendar id: the registry id, or the sorted `a+b` union form.
-    #[wasm_bindgen(getter, js_name = code)]
-    pub fn code(&self) -> String {
-        self.code.clone()
-    }
-
-    /// Canonical calendar id (same as `code`).
     ///
     /// @returns The id accepted by `new HolidayCalendar(code)`.
     #[wasm_bindgen(js_name = toString)]
@@ -242,9 +131,12 @@ impl JsHolidayCalendar {
 }
 
 /// Resolve a calendar code argument.
-fn calendar_arg(value: &JsValue, label: &str) -> Result<&'static dyn HolidayCalendar, JsValue> {
+pub(crate) fn calendar_arg(
+    value: &JsValue,
+    label: &str,
+) -> Result<&'static dyn HolidayCalendar, JsValue> {
     let code = js_string(value, label)?;
-    rust_resolve_calendar(Some(&code)).map_err(to_js_err)
+    calendar_by_id_strict(&code).map_err(to_js_err)
 }
 
 /// Convert an ISO-8601 date to epoch days (Rust `days_since_epoch`).
@@ -261,8 +153,7 @@ fn calendar_arg(value: &JsValue, label: &str) -> Result<&'static dyn HolidayCale
 /// `FinstackError` (kind `validation`) if it is not a valid ISO date.
 #[wasm_bindgen(js_name = daysSinceEpoch)]
 pub fn days_since_epoch(date: JsValue) -> Result<i32, JsValue> {
-    let date = parse_iso_date(&js_string(&date, "date")?)?;
-    Ok(rust_days_since_epoch(date))
+    Ok(rust_days_since_epoch(js_date(&date, "date")?))
 }
 
 /// Add business days on a holiday calendar (Rust `DateExt::add_business_days`).

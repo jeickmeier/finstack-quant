@@ -12,6 +12,7 @@ use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::types::Bond;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::{InputError, Result};
 use finstack_quant_models::credit::{AssetDynamics, MertonBarrierType, MertonModel};
 

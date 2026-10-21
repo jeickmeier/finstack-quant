@@ -8,7 +8,7 @@
 //! unrolled source interpolation. Discount and forward curves carry richer
 //! transforms (`CurveTransform`) and share only [`validate_pillars`].
 
-use crate::math::interp::types::Interp;
+use crate::math::interp::Interp;
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 
 /// Serialized source grid and time origin of a rolled curve.
@@ -27,6 +27,45 @@ impl InterpRollState {
     #[inline]
     pub(crate) fn interp(&self, source: &Interp, t: f64) -> f64 {
         source.interp(t + self.offset)
+    }
+
+    /// Value at `t` of a curve with source interpolation `source` and optional
+    /// roll state `roll` (unrolled curves evaluate `source` directly).
+    #[inline]
+    pub(crate) fn eval(roll: Option<&Self>, source: &Interp, t: f64) -> f64 {
+        match roll {
+            Some(state) => state.interp(source, t),
+            None => source.interp(t),
+        }
+    }
+
+    /// Build a curve's source interpolation from its current pillars and
+    /// optional roll state.
+    ///
+    /// The pillar interpolation is always built, so the pillars are validated
+    /// under `validation`. With a roll state the source interpolation is
+    /// restored from the source pillars instead and checked against the
+    /// current pillars with [`validate_pillars`].
+    pub(crate) fn build_source(
+        roll: Option<&Self>,
+        style: InterpStyle,
+        extrapolation: ExtrapolationPolicy,
+        validation: ValidationPolicy,
+        knots: &[f64],
+        values: &[f64],
+    ) -> crate::Result<Interp> {
+        let interp = style.build_enum(knots.into(), values.into(), extrapolation, validation)?;
+        let Some(state) = roll else {
+            return Ok(interp);
+        };
+        let source = state.restore(style, extrapolation, validation)?;
+        validate_pillars(
+            knots.iter().copied().zip(values.iter().copied()),
+            false,
+            "rolled interpolation",
+            |t| state.interp(&source, t),
+        )?;
+        Ok(source)
     }
 
     /// Roll state after a further `years` shift.
@@ -152,4 +191,23 @@ pub(crate) fn validate_pillars(
         }
     }
     Ok(())
+}
+
+/// Helper to shift knot times backward by `dt` and filter out expired points (t <= 0).
+///
+/// Used by the `roll_forward` implementations of every pillar-based curve.
+#[inline]
+pub(crate) fn roll_knots(knots: &[f64], values: &[f64], dt: f64) -> Vec<(f64, f64)> {
+    knots
+        .iter()
+        .zip(values.iter())
+        .filter_map(|(&t, &v)| {
+            let new_t = t - dt;
+            if new_t > 0.0 {
+                Some((new_t, v))
+            } else {
+                None
+            }
+        })
+        .collect()
 }

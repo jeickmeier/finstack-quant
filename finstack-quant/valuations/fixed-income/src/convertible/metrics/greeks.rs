@@ -35,7 +35,8 @@ fn tree_greek(context: &mut MetricContext, requested: MetricId) -> Result<f64> {
             context.computed.entry(id).or_insert(value);
         }
     }
-    result.ok_or_else(|| finstack_quant_core::Error::internal("unsupported convertible Greek"))
+    result
+        .ok_or_else(|| finstack_quant_core::Error::Internal("unsupported convertible Greek".into()))
 }
 
 pub(crate) struct DeltaCalculator;

@@ -9,7 +9,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_margin::{ImMethodology, NettingSetId, SimmSensitivities};
 use finstack_quant_portfolio::optimization::TradeUniverse;
 use finstack_quant_portfolio::{margin::NettingSetMargin, margin::PortfolioMarginResult};
@@ -100,7 +100,7 @@ fn margin_results_validate_against_their_wire_schemas() {
     .with_simm_breakdown(sensitivities, Default::default());
     assert_wire_matches_schema("NettingSetMargin", &margin);
 
-    let mut by_netting_set = HashMap::default();
+    let mut by_netting_set = FxHashMap::default();
     by_netting_set.insert(margin.netting_set_id.clone(), margin.clone());
     let result = PortfolioMarginResult {
         as_of: date!(2025 - 01 - 15),
@@ -109,7 +109,7 @@ fn margin_results_validate_against_their_wire_schemas() {
         total_variation_margin: margin.variation_margin,
         total_margin: margin.total_margin,
         by_netting_set,
-        by_csa: HashMap::default(),
+        by_csa: FxHashMap::default(),
         total_required_im_collateral: Money::from((0_i64, Currency::USD)),
         total_im_transfer: Money::from((0_i64, Currency::USD)),
         total_segregated_im: Money::from((0_i64, Currency::USD)),

@@ -10,7 +10,7 @@ use crate::Bond;
 use finstack_quant_cashflows::builder::{CashFlowSchedule, ScheduleParams};
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{
-    calendar_by_id_strict, BusinessDayConvention, Date, DayCount, HolidayCalendar, ScheduleBuilder,
+    calendar_by_id_strict, BusinessDayConvention, Date, DayCount, HolidayCalendar, Schedule,
     StubKind, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
@@ -234,7 +234,7 @@ pub(crate) fn asw_leg_schedule(
             "ASW schedule requires start before end: start={start}, end={end}"
         )));
     }
-    let dates = ScheduleBuilder::new(start, end)?
+    let dates = Schedule::builder(start, end)?
         .frequency(frequency)
         .stub_rule(stub)
         .build()?

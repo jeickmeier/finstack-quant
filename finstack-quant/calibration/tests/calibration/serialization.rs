@@ -28,7 +28,7 @@ use finstack_quant_core::market_data::term_structures::Seniority;
 use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::market::conventions::ids::{
     CdsConventionKey, CdsDocClause, SwaptionConventionId,
 };
@@ -63,7 +63,7 @@ fn envelope_v2_roundtrips() {
 
     let mut market_data: Vec<MarketDatum> = Vec::new();
     cal_utils::extend_market_data(&mut market_data, &rates_quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("rates".to_string(), cal_utils::quote_set_ids(&rates_quotes));
 
     let plan = CalibrationPlan {

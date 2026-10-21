@@ -257,7 +257,6 @@ pub struct ValuationResult {
     pub instrument_id: String,
 
     /// Valuation date (T+0) for the calculation.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

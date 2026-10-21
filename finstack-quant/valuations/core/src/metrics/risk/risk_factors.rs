@@ -9,7 +9,7 @@ use crate::metrics::sensitivities::config::STANDARD_BUCKETS_YEARS;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::HashSet;
+use finstack_quant_core::FxHashSet;
 use finstack_quant_core::Result;
 
 /// Risk factor categories for VaR calculation.
@@ -132,7 +132,7 @@ where
     I: Instrument,
 {
     let mut factors = Vec::new();
-    let mut seen = HashSet::default();
+    let mut seen = FxHashSet::default();
 
     let dependencies = instrument.market_dependencies()?;
     let curves = &dependencies.curves;
@@ -225,7 +225,7 @@ where
 
 fn push_factor(
     factors: &mut Vec<RiskFactorType>,
-    seen: &mut HashSet<String>,
+    seen: &mut FxHashSet<String>,
     factor: RiskFactorType,
 ) {
     let label = factor.label();
@@ -236,7 +236,7 @@ fn push_factor(
 
 fn extract_curve_factors<FExists, FMk>(
     factors: &mut Vec<RiskFactorType>,
-    seen: &mut HashSet<String>,
+    seen: &mut FxHashSet<String>,
     curve_ids: &[CurveId],
     market: &MarketContext,
     tenors: &[f64],

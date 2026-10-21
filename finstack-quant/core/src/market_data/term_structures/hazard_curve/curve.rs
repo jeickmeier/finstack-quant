@@ -368,10 +368,10 @@ impl HazardCurve {
     /// Helper: compute year fraction from base date to target date using the curve's day-count.
     #[inline]
     fn year_fraction_to(&self, date: Date) -> crate::Result<f64> {
-        crate::market_data::term_structures::common::year_fraction_to(
+        self.day_count.signed_year_fraction(
             self.base,
             date,
-            self.day_count,
+            crate::dates::DayCountContext::default(),
         )
     }
 
@@ -390,39 +390,27 @@ impl HazardCurve {
             return (lambda * (1.0 - self.recovery_rate) * 10_000.0).max(0.0);
         }
 
-        match method {
-            ParInterp::Linear => {
-                let strat = LinearStrategy;
-                strat.interp(
+        // Log-linear falls back to linear when the spreads cannot be logged.
+        if method == ParInterp::LogLinear {
+            if let Ok(strat) = LogLinearStrategy::from_raw(
+                &self.par_tenors,
+                &self.par_spreads_bp,
+                ExtrapolationPolicy::FlatForward,
+            ) {
+                return strat.interp(
                     t,
                     &self.par_tenors,
                     &self.par_spreads_bp,
                     ExtrapolationPolicy::FlatForward,
-                )
-            }
-            ParInterp::LogLinear => {
-                if let Ok(strat) = LogLinearStrategy::from_raw(
-                    &self.par_tenors,
-                    &self.par_spreads_bp,
-                    ExtrapolationPolicy::FlatForward,
-                ) {
-                    strat.interp(
-                        t,
-                        &self.par_tenors,
-                        &self.par_spreads_bp,
-                        ExtrapolationPolicy::FlatForward,
-                    )
-                } else {
-                    let strat = LinearStrategy;
-                    strat.interp(
-                        t,
-                        &self.par_tenors,
-                        &self.par_spreads_bp,
-                        ExtrapolationPolicy::FlatForward,
-                    )
-                }
+                );
             }
         }
+        LinearStrategy.interp(
+            t,
+            &self.par_tenors,
+            &self.par_spreads_bp,
+            ExtrapolationPolicy::FlatForward,
+        )
     }
 }
 

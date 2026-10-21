@@ -17,7 +17,7 @@ use finstack_quant_core::{
     math::interp::InterpStyle,
     money::Money,
     types::{CurveId, InstrumentId},
-    HashMap,
+    FxHashMap,
 };
 use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::{
@@ -112,7 +112,7 @@ pub fn calibrated_hazard_curve_from_spec(
             _ => unreachable!("fixture only builds CDS quotes"),
         })
         .collect();
-    let mut quote_sets = HashMap::default();
+    let mut quote_sets = FxHashMap::default();
     quote_sets.insert("credit".to_string(), quote_ids);
     let discount = spec
         .source_market

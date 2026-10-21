@@ -145,8 +145,6 @@ use rand_pcg::Pcg64;
 pub struct Pcg64Rng {
     inner: Pcg64,
     cached_normal: Option<f64>,
-    seed: u64,
-    stream: u64,
 }
 
 impl Pcg64Rng {
@@ -181,8 +179,6 @@ impl Pcg64Rng {
         Self {
             inner: Pcg64::seed_from_u64(seed),
             cached_normal: None,
-            seed,
-            stream: 0,
         }
     }
 
@@ -224,32 +220,7 @@ impl Pcg64Rng {
         Self {
             inner: Pcg64::new(state, ((stream as u128) << 1) | 1), // Unique odd increment per stream
             cached_normal: None,
-            seed,
-            stream,
         }
-    }
-
-    /// Get the current seed (for serialization/debugging).
-    ///
-    /// Note: This returns the original seed, not the current internal state.
-    /// For full state preservation, use serde serialization.
-    #[must_use]
-    pub fn seed(&self) -> u64 {
-        self.seed
-    }
-
-    /// Get the configured stream identifier.
-    #[must_use]
-    pub fn stream(&self) -> u64 {
-        self.stream
-    }
-}
-
-impl Pcg64Rng {
-    /// Next raw 64-bit output of the underlying PCG64 stream.
-    #[inline]
-    pub fn next_u64(&mut self) -> u64 {
-        self.inner.next_u64()
     }
 }
 
@@ -430,33 +401,6 @@ mod tests {
         for _ in 0..100 {
             assert_eq!(rng1.uniform(), rng2.uniform());
         }
-    }
-
-    #[test]
-    fn test_pcg64_next_u64_is_deterministic_and_seed_sensitive() {
-        let mut rng1 = Pcg64Rng::new(42);
-        let mut rng2 = Pcg64Rng::new(42);
-        let mut different_seed = Pcg64Rng::new(43);
-
-        let seq1: Vec<u64> = (0..8).map(|_| rng1.next_u64()).collect();
-        let seq2: Vec<u64> = (0..8).map(|_| rng2.next_u64()).collect();
-        let seq3: Vec<u64> = (0..8).map(|_| different_seed.next_u64()).collect();
-
-        assert_eq!(seq1, seq2);
-        assert_ne!(seq1, seq3);
-        assert!(seq1.iter().any(|&v| v != 0));
-        assert!(seq1.windows(2).any(|w| w[0] != w[1]));
-    }
-
-    #[test]
-    fn test_pcg64_rng_reports_seed_and_stream() {
-        let rng = Pcg64Rng::new(42);
-        assert_eq!(rng.seed(), 42);
-        assert_eq!(rng.stream(), 0);
-
-        let rng = Pcg64Rng::new_with_stream(7, 11);
-        assert_eq!(rng.seed(), 7);
-        assert_eq!(rng.stream(), 11);
     }
 
     #[test]

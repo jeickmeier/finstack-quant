@@ -88,87 +88,10 @@ pub(crate) fn easter_monday(year: i32) -> Option<Date> {
     easter_sunday.checked_add(Duration::days(1)) // Easter Monday = Sunday + 1
 }
 
-// Chinese New Year (generated lookup, 1970-2150)
-
-// The generated table provides `cny_date_for_year`.
+// Chinese New Year, lunar festivals and Japanese equinoxes (generated lookups,
+// 1970-2150): `cny_date` and one `*_date(year) -> Option<Date>` per festival.
 include!("../../generated/cny_generated.rs");
-
-/// Returns the Chinese New Year date for a given year, if available.
-///
-/// Chinese New Year (Spring Festival, 春节) is the most important traditional
-/// Chinese holiday, celebrated on the first day of the Chinese lunar calendar.
-///
-/// This function uses a pre-computed lookup table for years 1970-2150.
-///
-/// # Arguments
-///
-/// * `year` - Gregorian calendar year (supported: 1970-2150)
-///
-/// # Returns
-///
-/// `Some(Date)` with the Chinese New Year date for the given year, or `None`
-/// if the year is outside the supported range.
-///
-/// # References
-///
-/// - Dates computed from Chinese lunar calendar astronomical algorithms
-/// - Generated table covers 1970-2150 (standard financial system date range)
-#[inline]
-pub(crate) fn cny_date(year: i32) -> Option<Date> {
-    festival_date(year, cny_date_for_year(year))
-}
-
-// Dragon Boat / Mid-Autumn (generated lookup, 1970-2150)
-
-// The generated table provides one `*_date_for_year` helper per festival.
 include!("../../generated/festivals_generated.rs");
-
-/// Gregorian date of a tabulated `(month, day)` in `year`, if tabulated.
-fn festival_date(year: i32, month_day: Option<(u8, u8)>) -> Option<Date> {
-    month_day.and_then(|(m, d)| Date::from_calendar_date(year, Month::try_from(m).ok()?, d).ok())
-}
-
-/// Buddha's birthday (eighth day of the fourth lunar month), for 1970–2150.
-pub(crate) fn buddhas_birthday_date(year: i32) -> Option<Date> {
-    festival_date(year, buddhas_birthday_date_for_year(year))
-}
-
-/// Chung Yeung (ninth day of the ninth lunar month), for 1970–2150.
-pub(crate) fn chung_yeung_date(year: i32) -> Option<Date> {
-    festival_date(year, chung_yeung_date_for_year(year))
-}
-
-/// Ching Ming solar term in Hong Kong local time, for 1970–2150.
-pub(crate) fn qing_ming_date(year: i32) -> Option<Date> {
-    festival_date(year, qing_ming_date_for_year(year))
-}
-
-/// Vernal equinox in Japan local time, projected for 1970–2150.
-pub(crate) fn vernal_equinox_jp_date(year: i32) -> Option<Date> {
-    festival_date(year, vernal_equinox_jp_date_for_year(year))
-}
-
-/// Autumnal equinox in Japan local time, projected for 1970–2150.
-pub(crate) fn autumnal_equinox_jp_date(year: i32) -> Option<Date> {
-    festival_date(year, autumnal_equinox_jp_date_for_year(year))
-}
-
-/// Returns the Dragon Boat Festival (端午节) date for a given year, if available.
-///
-/// Celebrated on the 5th day of the 5th Chinese lunar month (typically late May
-/// to mid June). Uses a pre-computed lookup table for years 1970-2150.
-pub(crate) fn dragon_boat_date(year: i32) -> Option<Date> {
-    festival_date(year, dragon_boat_date_for_year(year))
-}
-
-/// Returns the Mid-Autumn Festival (中秋节) date for a given year, if available.
-///
-/// Celebrated on the 15th day of the 8th Chinese lunar month (typically mid
-/// September to early October). Uses a pre-computed lookup table for years
-/// 1970-2150.
-pub(crate) fn mid_autumn_date(year: i32) -> Option<Date> {
-    festival_date(year, mid_autumn_date_for_year(year))
-}
 
 // Nth weekday of month
 

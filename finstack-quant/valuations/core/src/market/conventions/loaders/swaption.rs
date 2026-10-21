@@ -4,7 +4,7 @@ use crate::market::conventions::defs::SwaptionConventions;
 use crate::market::conventions::ids::SwaptionConventionId;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
 use finstack_quant_core::Error;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -37,7 +37,8 @@ impl SwaptionConventionRecord {
 }
 
 /// Load the Swaption conventions from the embedded JSON registry.
-pub(crate) fn load_registry() -> Result<HashMap<SwaptionConventionId, SwaptionConventions>, Error> {
+pub(crate) fn load_registry() -> Result<FxHashMap<SwaptionConventionId, SwaptionConventions>, Error>
+{
     let json = include_str!("../../../../data/conventions/swaption_conventions.json");
     super::json::parse_and_rekey(
         json,

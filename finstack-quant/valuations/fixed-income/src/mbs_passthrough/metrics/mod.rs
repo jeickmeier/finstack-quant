@@ -209,10 +209,10 @@ mod tests {
         // Reference values computed directly.
         let target = quote / 100.0 * mbs.current_face.amount();
         let static_zspread = BrentSolver::new()
-            .tolerance(1e-8)
-            .max_iterations(100)
-            .bracket_bounds(-0.10, 0.20)
-            .initial_bracket_size(Some(0.05))
+            .with_tolerance(1e-8)
+            .with_max_iterations(100)
+            .with_bracket_bounds(-0.10, 0.20)
+            .with_initial_bracket_size(Some(0.05))
             .solve(
                 |spread| {
                     price_with_spread(&mbs, &market, as_of, spread).expect("static price") - target

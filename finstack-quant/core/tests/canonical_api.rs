@@ -14,8 +14,8 @@ use finstack_quant_core::cashflow::{irr, npv, xirr_with_daycount};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ValidationMode};
+use finstack_quant_core::math::integration::GaussHermiteQuadrature;
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
-use finstack_quant_core::math::GaussHermiteQuadrature;
 use finstack_quant_core::money::Money;
 use time::Month;
 

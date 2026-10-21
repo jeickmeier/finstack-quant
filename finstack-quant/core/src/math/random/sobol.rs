@@ -40,7 +40,7 @@
 //! - Owen, A. B. (1997). "Scrambled Net Variance for Integrals of Smooth Functions."
 //!   Annals of Statistics, 25(4), 1541-1562. `docs/REFERENCES.md#owen-1995-scrambling`
 
-use crate::math::special_functions::standard_normal_inv_cdf as inverse_normal_cdf;
+use crate::math::special_functions::standard_normal_inv_cdf;
 
 /// Maximum supported dimension for this Sobol implementation.
 ///
@@ -96,10 +96,9 @@ fn hash_combine(seed: u64, value: u64) -> u32 {
 /// let mut sobol = SobolRng::try_new(3, 12345).expect("valid dimension");
 ///
 /// // Generate 100 quasi-random points
-/// for _ in 0..100 {
-///     let point = sobol.next_point();
-///     assert!(point.iter().all(|&x| x >= 0.0 && x < 1.0));
-/// }
+/// let mut points = vec![0.0; 3 * 100];
+/// sobol.fill_u01(&mut points);
+/// assert!(points.iter().all(|&x| x > 0.0 && x < 1.0));
 /// ```
 #[derive(Clone, Debug)]
 pub struct SobolRng {
@@ -174,19 +173,6 @@ impl SobolRng {
         })
     }
 
-    /// Get the next point in the Sobol sequence.
-    ///
-    /// Returns a vector of `dimension` values in (0, 1): raw Sobol integers
-    /// `k ∈ [0, 2^32)` are mapped to `(k + 0.5) / 2^32` (grid-centred, same
-    /// as [`fill_std_normals`](Self::fill_std_normals)), so exactly 0.0 is
-    /// never emitted.
-    /// For allocation-free usage in tight loops, prefer [`fill_point`](Self::fill_point).
-    pub fn next_point(&mut self) -> Vec<f64> {
-        let mut point = vec![0.0; self.dimension];
-        self.fill_point(&mut point);
-        point
-    }
-
     /// Fill `buf` with the next Sobol point, avoiding per-call allocation.
     ///
     /// Writes `min(buf.len(), dimension)` values into `buf`. Advances the
@@ -195,7 +181,7 @@ impl SobolRng {
     /// # Arguments
     ///
     /// * `buf` - Caller-owned output buffer, which must have the documented minimum length.
-    pub fn fill_point(&mut self, buf: &mut [f64]) {
+    fn fill_point(&mut self, buf: &mut [f64]) {
         for (d, slot) in buf.iter_mut().enumerate().take(self.dimension) {
             let value = self.state[d];
             *slot = self.owen_scramble(value, d);
@@ -234,10 +220,7 @@ impl SobolRng {
     /// index 0 and repeats the sequence.
     fn advance(&mut self) {
         if self.index + 1 == SOBOL_PERIOD {
-            self.index = 0;
-            for slot in &mut self.state {
-                *slot = 0;
-            }
+            self.reset();
             return;
         }
         let c = (self.index + 1).trailing_zeros() as usize;
@@ -407,10 +390,10 @@ impl SobolRng {
             self.dimension
         );
         for chunk in out.chunks_mut(self.dimension) {
-            for (d, slot) in chunk.iter_mut().enumerate().take(self.dimension) {
-                *slot = inverse_normal_cdf(self.owen_scramble(self.state[d], d));
+            self.fill_point(chunk);
+            for slot in chunk.iter_mut() {
+                *slot = standard_normal_inv_cdf(*slot);
             }
-            self.advance();
         }
     }
 }
@@ -566,6 +549,13 @@ fn initialize_direction_numbers(max_dim: usize) -> Vec<Vec<u32>> {
 mod tests {
     use super::*;
 
+    /// Next Sobol point as an owned vector.
+    fn point(sobol: &mut SobolRng) -> Vec<f64> {
+        let mut out = vec![0.0; sobol.dimension];
+        sobol.fill_point(&mut out);
+        out
+    }
+
     #[test]
     fn test_try_new_rejects_invalid_dimension() {
         assert!(SobolRng::try_new(0, 0).is_err());
@@ -577,10 +567,10 @@ mod tests {
         let mut sobol = SobolRng::try_new(2, 0).expect("valid dimension");
 
         // First few points should be deterministic
-        let p1 = sobol.next_point();
+        let p1 = point(&mut sobol);
         assert_eq!(p1.len(), 2);
 
-        let p2 = sobol.next_point();
+        let p2 = point(&mut sobol);
         assert_eq!(p2.len(), 2);
 
         // Points should be different
@@ -592,7 +582,7 @@ mod tests {
         let mut sobol = SobolRng::try_new(3, 0).expect("valid dimension");
 
         for _ in 0..100 {
-            let point = sobol.next_point();
+            let point = point(&mut sobol);
             for &val in &point {
                 assert!((0.0..1.0).contains(&val));
             }
@@ -606,8 +596,8 @@ mod tests {
         sobol_fill.fill_u01(&mut out);
 
         let mut sobol_points = SobolRng::try_new(2, 123).expect("valid dimension");
-        let p1 = sobol_points.next_point();
-        let p2 = sobol_points.next_point();
+        let p1 = point(&mut sobol_points);
+        let p2 = point(&mut sobol_points);
 
         assert_eq!(out, vec![p1[0], p1[1], p2[0], p2[1]]);
         assert!(out.iter().all(|&u| (0.0..1.0).contains(&u)));
@@ -619,8 +609,8 @@ mod tests {
         let mut sobol_scrambled = SobolRng::try_new(2, 12345).expect("valid dimension");
 
         // Different scrambling should give different sequences
-        let p1 = sobol_no_scramble.next_point();
-        let p2 = sobol_scrambled.next_point();
+        let p1 = point(&mut sobol_no_scramble);
+        let p2 = point(&mut sobol_scrambled);
 
         assert_ne!(p1[0], p2[0]);
     }
@@ -632,21 +622,21 @@ mod tests {
         let mut different_seed = SobolRng::try_new(3, 54321).expect("valid dimension");
 
         for _ in 0..32 {
-            assert_eq!(sobol1.next_point(), sobol2.next_point());
+            assert_eq!(point(&mut sobol1), point(&mut sobol2));
         }
 
-        assert_ne!(sobol1.next_point(), different_seed.next_point());
+        assert_ne!(point(&mut sobol1), point(&mut different_seed));
     }
 
     #[test]
     fn test_sobol_reset_and_skip() {
         let mut sobol = SobolRng::try_new(2, 0).expect("valid dimension");
 
-        let p1_first = sobol.next_point();
-        let _p2 = sobol.next_point();
+        let p1_first = point(&mut sobol);
+        let _p2 = point(&mut sobol);
 
         sobol.reset();
-        let p1_after_reset = sobol.next_point();
+        let p1_after_reset = point(&mut sobol);
 
         // After reset, should get same first point
         assert_eq!(p1_first[0], p1_after_reset[0]);

@@ -4,6 +4,7 @@ use crate::instruments::swaption::common::*;
 use finstack_quant_core::dates::{
     BusinessDayConvention, DayCount, DayCountContext, StubKind, Tenor,
 };
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_valuations::instruments::rates::swaption::CashSettlementMethod;
 use finstack_quant_valuations::instruments::rates::swaption::Swaption;
 use finstack_quant_valuations::instruments::FixedLegSpec;
@@ -24,7 +25,7 @@ fn expected_discount_projected_par_rate(
 ) -> f64 {
     use finstack_quant_cashflows::builder::RollRule;
     use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
-    use finstack_quant_core::math::NeumaierAccumulator;
+    use finstack_quant_core::math::summation::NeumaierAccumulator;
 
     let disc = market.get_discount("USD_OIS").expect("discount curve");
     let fixed_annuity = swaption

@@ -152,7 +152,7 @@
 
 use super::volatility::{black_call, black_put};
 use crate::types::OptionType;
-use finstack_quant_core::math::NeumaierAccumulator;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::Result;
 
 /// Validate a discount factor supplied to a DF-first Asian pricer.

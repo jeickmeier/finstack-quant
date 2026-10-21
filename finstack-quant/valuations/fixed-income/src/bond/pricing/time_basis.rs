@@ -11,6 +11,7 @@ use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
 
 /// Payment dates and actual coupon boundaries for ACT/365L bond timing.
@@ -232,7 +233,7 @@ pub(crate) fn bond_model_schedule(bond: &Bond, as_of: Date) -> Result<BondModelS
 
 /// Constant continuously-compounded rate implied by the curve DF from `as_of` to `maturity`.
 ///
-/// Uses [`DiscountCurve::df_between_dates`] and `mat_years` on the bond model clock:
+/// Uses [`Discounting::df_between_dates`](finstack_quant_core::market_data::traits::Discounting::df_between_dates) and `mat_years` on the bond model clock:
 /// `r = -ln(DF) / mat_years`.
 pub(crate) fn implied_flat_discount_rate_from_curve(
     disc: &DiscountCurve,

@@ -1,8 +1,7 @@
 //! Tests for free calendar resolution APIs.
 
-use finstack_quant_core::dates::calendar::{GBLO, NYSE, TARGET2};
 use finstack_quant_core::dates::{
-    available_calendars, calendar_by_id_strict, CompositeCalendar, Date, HolidayCalendar,
+    available_calendars, calendar_by_id_strict, Date, HolidayCalendar,
 };
 use finstack_quant_core::types::CalendarId;
 use time::Month;
@@ -32,7 +31,7 @@ fn resolution_is_case_insensitive_and_unknown_is_none() {
 
 #[test]
 fn typed_id_resolves() {
-    let id = CalendarId::from(TARGET2.id);
+    let id = CalendarId::from("target2");
     let cal = calendar_by_id_strict(id.as_str()).expect("TARGET2 resolves");
     assert!(cal.is_holiday(make_date(2025, 1, 1)));
 }
@@ -40,9 +39,9 @@ fn typed_id_resolves() {
 #[test]
 fn strict_many_resolution_preserves_order_and_builds_composite() {
     let ids = [
-        CalendarId::from(GBLO.id),
-        CalendarId::from(TARGET2.id),
-        CalendarId::from(NYSE.id),
+        CalendarId::from("gblo"),
+        CalendarId::from("target2"),
+        CalendarId::from("nyse"),
     ];
     let calendars: Vec<&dyn HolidayCalendar> = ids
         .iter()
@@ -53,7 +52,7 @@ fn strict_many_resolution_preserves_order_and_builds_composite() {
     assert_eq!(calendars[1].metadata().expect("metadata").id, "target2");
     assert_eq!(calendars[2].metadata().expect("metadata").id, "nyse");
 
-    let composite = CompositeCalendar::new(&calendars[..2]);
+    let composite = calendar_by_id_strict("gblo+target2").expect("joint id resolves");
     assert!(composite.is_holiday(make_date(2025, 1, 1)));
     assert!(composite.is_holiday(make_date(2025, 5, 26)));
 }
@@ -61,9 +60,9 @@ fn strict_many_resolution_preserves_order_and_builds_composite() {
 #[test]
 fn strict_many_resolution_rejects_unknown_ids() {
     let ids = [
-        CalendarId::from(TARGET2.id),
+        CalendarId::from("target2"),
         CalendarId::from("unknown_calendar"),
-        CalendarId::from(GBLO.id),
+        CalendarId::from("gblo"),
     ];
     let error = ids
         .iter()

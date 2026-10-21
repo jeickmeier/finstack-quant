@@ -215,7 +215,7 @@ impl PoolState {
         }
 
         let mut unique_curves = Vec::new();
-        let mut curve_map = finstack_quant_core::HashMap::default();
+        let mut curve_map = finstack_quant_core::FxHashMap::default();
         let mut curve_indices = Vec::with_capacity(n);
 
         for id_opt in &index_ids {

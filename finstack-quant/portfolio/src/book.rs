@@ -20,16 +20,16 @@ pub(crate) const MAX_BOOK_DEPTH: usize = 512;
 /// membership, referential-integrity, and resource limits cannot diverge.
 pub(crate) fn validate_books<'a>(
     books: &'a IndexMap<BookId, Book>,
-    positions: &finstack_quant_core::HashSet<&PositionId>,
+    positions: &finstack_quant_core::FxHashSet<&PositionId>,
     mut emit: impl FnMut(finstack_quant_core::contract::Diagnostic),
-) -> finstack_quant_core::HashMap<&'a PositionId, &'a BookId> {
+) -> finstack_quant_core::FxHashMap<&'a PositionId, &'a BookId> {
     use finstack_quant_core::contract::{Diagnostic, LoadPhase, Severity};
-    use finstack_quant_core::{HashMap, HashSet};
+    use finstack_quant_core::{FxHashMap, FxHashSet};
 
     let issue = |code, message, pointer| {
         Diagnostic::new(code, LoadPhase::Semantic, Severity::Error, message).with_pointer(pointer)
     };
-    let mut memberships = HashMap::default();
+    let mut memberships = FxHashMap::default();
     if books.len() > MAX_BOOKS {
         emit(issue(
             "portfolio/book-limit",
@@ -41,7 +41,7 @@ pub(crate) fn validate_books<'a>(
         ));
         return memberships;
     }
-    let mut child_parents = HashMap::default();
+    let mut child_parents = FxHashMap::default();
     for (book_id, book) in books {
         if book_id != &book.id {
             emit(issue(
@@ -128,8 +128,8 @@ pub(crate) fn validate_books<'a>(
     }
 
     // Completed paths cache their depth; each parent edge is traversed once.
-    let mut depths: HashMap<&BookId, usize> = HashMap::default();
-    let mut visiting = HashSet::default();
+    let mut depths: FxHashMap<&BookId, usize> = FxHashMap::default();
+    let mut visiting = FxHashSet::default();
     for book_id in books.keys() {
         if depths.contains_key(book_id) {
             continue;

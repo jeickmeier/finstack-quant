@@ -623,12 +623,6 @@ export interface ToleranceConfig {
    * Used for general numerical comparisons where higher tolerance is acceptable.
    */
   generic_epsilon?: number;
-  /**
-   * Epsilon for rate comparisons (default: 1e-12).
-   *
-   * Used when comparing interest rates, yields, and other small ratios.
-   */
-  rate_epsilon?: number;
 }
 /**
  * Rich structured details attached to composite valuation results.
@@ -5686,9 +5680,9 @@ export interface StructuredCreditPricingMode1 {
 /**
  * Numerical tolerance configuration for floating-point comparisons.
  *
- * Provides configurable epsilon values for zero-checks in rate calculations
- * and generic floating-point comparisons. These defaults are chosen to balance
- * numerical stability with practical precision requirements.
+ * Provides the configurable epsilon for generic floating-point zero-checks.
+ * The default is chosen to balance numerical stability with practical
+ * precision requirements.
  *
  * This interface was referenced by `ValuationResult1`'s JSON-Schema
  * via the `definition` "ToleranceConfig".
@@ -5703,10 +5697,4 @@ export interface ToleranceConfig1 {
    * Used for general numerical comparisons where higher tolerance is acceptable.
    */
   generic_epsilon?: number;
-  /**
-   * Epsilon for rate comparisons (default: 1e-12).
-   *
-   * Used when comparing interest rates, yields, and other small ratios.
-   */
-  rate_epsilon?: number;
 }

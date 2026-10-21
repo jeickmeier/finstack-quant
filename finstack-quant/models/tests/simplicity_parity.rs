@@ -36,9 +36,10 @@ fn d(year: i32, month: u8, day: u8) -> Date {
 // Money formatting parity
 
 #[test]
-fn format_with_default_groups_digits() {
+fn format_with_default_matches_display() {
     let amt = Money::new(1_042_315.67, Currency::USD).expect("valid money fixture");
-    assert_eq!(amt.format_with(FormatOpts::default()), "USD 1,042,315.67");
+    assert_eq!(amt.format_with(FormatOpts::default()), "USD 1042315.67");
+    assert_eq!(amt.format_with(FormatOpts::default()), amt.to_string());
 }
 
 #[test]
@@ -64,7 +65,11 @@ fn format_with_controls_grouping_and_currency() {
 #[test]
 fn format_with_handles_negative_amounts() {
     let amt = Money::new(-1_234.5, Currency::USD).expect("valid money fixture");
-    assert_eq!(amt.format_with(FormatOpts::default()), "USD -1,234.50");
+    let grouped = FormatOpts {
+        group: Some(','),
+        ..FormatOpts::default()
+    };
+    assert_eq!(amt.format_with(grouped), "USD -1,234.50");
 }
 
 // DiscountCurveBuilder::validation parity

@@ -93,5 +93,3 @@ pub mod surfaces;
 pub mod term_structures;
 /// Traits for polymorphic discount curve code (`Discounting`).
 pub mod traits;
-pub use context::MarketContext;
-pub use dividends::{DividendEvent, DividendKind, DividendSchedule, DividendScheduleBuilder};

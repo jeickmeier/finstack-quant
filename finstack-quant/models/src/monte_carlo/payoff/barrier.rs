@@ -20,12 +20,12 @@
 use super::super::barriers::bridge::check_barrier_hit;
 use crate::monte_carlo::traits::PathState;
 use crate::monte_carlo::traits::Payoff;
-use crate::monte_carlo::TimeGrid;
 pub use crate::types::OptionType;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::BarrierDirection;
-pub use finstack_quant_core::types::BarrierType;
+use finstack_quant_core::types::BarrierType;
 
 /// Simulation-step representation of a barrier's monitoring contract.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -377,7 +377,7 @@ impl Payoff for BarrierOptionPayoff {
 mod tests {
     use super::*;
     use crate::monte_carlo::traits::state_keys;
-    use crate::monte_carlo::TimeGrid;
+    use finstack_quant_core::math::time_grid::TimeGrid;
 
     fn create_path_state(step: usize, time: f64, spot: f64, uniform_random: f64) -> PathState {
         let mut state = PathState::new(step, time);

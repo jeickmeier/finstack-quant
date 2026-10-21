@@ -4,6 +4,7 @@
 use crate::exotics::lookback_option::types::{LookbackOption, LookbackType};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
 use finstack_quant_valuations_core::pricer::{
@@ -100,7 +101,7 @@ impl LookbackOptionMcPricer {
                 let num_steps =
                     ((t * base_cfg.steps_per_year).round() as usize).max(base_cfg.min_steps);
                 (
-                    finstack_quant_models::monte_carlo::TimeGrid::uniform(t, num_steps)?,
+                    finstack_quant_core::math::time_grid::TimeGrid::uniform(t, num_steps)?,
                     McBarrierMonitoring::Continuous { start_step: 0 },
                 )
             }

@@ -4,7 +4,7 @@
 //! monotonicity checking used across all interpolation implementations.
 
 use super::types::ExtrapolationPolicy;
-use crate::error::InputError;
+use crate::InputError;
 
 /// Helper to check and apply extrapolation if x is out of bounds.
 ///

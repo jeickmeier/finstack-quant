@@ -4,6 +4,7 @@ use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::Bond;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::z_spread_discount_factor;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
@@ -251,8 +252,8 @@ impl MetricCalculator for ZSpreadCalculator {
             Z_SPREAD_MAX_BRACKET_BP,
         )?;
         let solver = BrentSolver::new()
-            .tolerance(Z_SPREAD_TOLERANCE)
-            .initial_bracket_size(Some(bracket));
+            .with_tolerance(Z_SPREAD_TOLERANCE)
+            .with_initial_bracket_size(Some(bracket));
         let z = solver.solve(objective, 0.0)?;
 
         // Surface any pricing error that occurred inside the objective instead

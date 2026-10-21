@@ -570,7 +570,7 @@ mod tests {
     use crate::types::NodeId;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::expr::{Expr, Function};
-    use finstack_quant_core::math::kahan_sum;
+    use finstack_quant_core::math::summation::kahan_sum;
     use finstack_quant_core::money::Money;
     use indexmap::IndexMap;
 
@@ -659,7 +659,7 @@ mod tests {
         let mut values = vec![1e16];
         values.extend(std::iter::repeat_n(1.0, 256));
 
-        let precise = finstack_quant_core::math::mean_or_nan(&values);
+        let precise = finstack_quant_core::math::stats::mean_or_nan(&values);
         let reference = kahan_sum(values.iter().copied()) / values.len() as f64;
         let naive = values.iter().sum::<f64>() / values.len() as f64;
 

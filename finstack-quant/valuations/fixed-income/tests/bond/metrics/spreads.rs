@@ -2,6 +2,7 @@
 
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, InputError};
 use finstack_quant_valuations_core::instruments::Instrument;
@@ -1665,7 +1666,8 @@ fn callable_i_spread_uses_par_rate_to_workout_and_round_trips() {
         date!(2026 - 07 - 15),
         date!(2027 - 01 - 15),
     ];
-    let df = |d: time::Date| (-r * (d - as_of).whole_days() as f64 / 365.0).exp();
+    let df =
+        |d: finstack_quant_core::dates::Date| (-r * (d - as_of).whole_days() as f64 / 365.0).exp();
     let annuity: f64 = pay_dates.iter().map(|&d| 0.5 * df(d)).sum();
     let par = (1.0 - df(pay_dates[3])) / annuity;
     let expected = 0.03 - par;

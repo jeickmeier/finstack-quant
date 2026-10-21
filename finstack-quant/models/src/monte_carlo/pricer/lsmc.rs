@@ -51,10 +51,10 @@ use crate::monte_carlo::pricer::basis::{build_lsmc_basis, BasisFunctions, BasisK
 use crate::monte_carlo::process::gbm::GbmProcess;
 use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::{Discretization, RandomStream};
-use crate::monte_carlo::OnlineStats;
-use crate::monte_carlo::TimeGrid;
 use crate::types::OptionType;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::math::stats::OnlineStats;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::Result;
 
 // Bound retained path storage to 512 MB of f64 values and the time/exercise

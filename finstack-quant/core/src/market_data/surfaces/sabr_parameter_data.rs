@@ -38,7 +38,7 @@ impl TryFrom<RawSabrParameterData> for SabrParameterData {
     type Error = crate::Error;
 
     fn try_from(raw: RawSabrParameterData) -> crate::Result<Self> {
-        Self::new_with_shift(raw.alpha, raw.beta, raw.rho, raw.nu, raw.shift)
+        Self::new_with_shift(raw.alpha, raw.beta, raw.nu, raw.rho, raw.shift)
     }
 }
 
@@ -49,15 +49,18 @@ impl SabrParameterData {
     ///
     /// * `alpha` - Strictly positive initial SABR volatility level.
     /// * `beta` - CEV exponent in the closed interval `[0, 1]`.
-    /// * `rho` - Forward-volatility correlation in the open interval `(-1, 1)`.
     /// * `nu` - Nonnegative volatility-of-volatility parameter; zero gives deterministic volatility.
+    /// * `rho` - Forward-volatility correlation in the open interval `(-1, 1)`.
+    ///
+    /// The argument order `(alpha, beta, nu, rho)` matches the models-crate
+    /// `SabrParameters` constructors.
     ///
     /// # Errors
     ///
     /// Returns [`crate::Error::Validation`] when any value is non-finite or
     /// outside its documented range.
-    pub fn new(alpha: f64, beta: f64, rho: f64, nu: f64) -> crate::Result<Self> {
-        Self::new_with_shift(alpha, beta, rho, nu, None)
+    pub fn new(alpha: f64, beta: f64, nu: f64, rho: f64) -> crate::Result<Self> {
+        Self::new_with_shift(alpha, beta, nu, rho, None)
     }
 
     /// Construct a validated data node with an optional displacement.
@@ -66,8 +69,8 @@ impl SabrParameterData {
     ///
     /// * `alpha` - Strictly positive initial SABR volatility level.
     /// * `beta` - CEV exponent in the closed interval `[0, 1]`.
-    /// * `rho` - Forward-volatility correlation in the open interval `(-1, 1)`.
     /// * `nu` - Nonnegative volatility-of-volatility parameter; zero gives deterministic volatility.
+    /// * `rho` - Forward-volatility correlation in the open interval `(-1, 1)`.
     /// * `shift` - Optional finite displacement in the same units as the
     ///   associated forwards and strikes.
     ///
@@ -78,8 +81,8 @@ impl SabrParameterData {
     pub fn new_with_shift(
         alpha: f64,
         beta: f64,
-        rho: f64,
         nu: f64,
+        rho: f64,
         shift: Option<f64>,
     ) -> crate::Result<Self> {
         if alpha <= 0.0 || !alpha.is_finite() {

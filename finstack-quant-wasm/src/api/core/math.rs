@@ -3,7 +3,7 @@
 
 use crate::utils::input::{js_f64, js_f64_seq, js_opt_f64, js_opt_string, js_uint};
 use crate::utils::to_js_err;
-use finstack_quant_core::math::{self, linalg, special_functions, stats, summation};
+use finstack_quant_core::math::{linalg, special_functions, stats, summation};
 use wasm_bindgen::prelude::*;
 
 /// Cholesky decomposition for a flat row-major matrix.
@@ -315,7 +315,7 @@ pub fn neumaier_sum(values: JsValue) -> Result<f64, JsValue> {
 #[wasm_bindgen(js_name = longestPositiveRun)]
 pub fn longest_positive_run(values: JsValue) -> Result<usize, JsValue> {
     let values: &[f64] = &js_f64_seq(&values, "values")?;
-    Ok(math::longest_positive_run(values))
+    Ok(stats::longest_positive_run(values))
 }
 /// Symmetric eigendecomposition of a flat row-major matrix (Rust `symmetric_eigen`).
 ///

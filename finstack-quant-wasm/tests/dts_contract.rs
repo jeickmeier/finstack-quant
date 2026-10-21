@@ -1317,12 +1317,16 @@ fn core_market_data_dts_exposes_data_only_vol_cube() {
     }
     let constructor = interface_block(&dts, "VolCubeConstructor");
     assert!(constructor.contains("interpolationMode?: string"));
-    for input in ["expiries", "tenors", "paramsFlat", "forwards"] {
+    for input in ["expiries", "tenors", "forwardsRowMajor"] {
         assert!(
             contains_ignoring_ws(constructor, &format!("{input}: NumericArray")),
             "VolCube constructor must accept NumericArray for {input}"
         );
     }
+    assert!(
+        contains_ignoring_ws(constructor, "paramsRowMajor: SabrParameterData[] | string"),
+        "VolCube constructor takes SABR node objects (or their JSON text)"
+    );
 }
 
 #[test]
@@ -1336,7 +1340,6 @@ fn core_market_data_dts_exposes_data_only_fx_surface_and_rate_result() {
         surface,
         "readonly expiries: Float64Array;"
     ));
-    assert!(contains_signature(surface, "readonly numExpiries: number;"));
     for removed_method in ["pillarVols(", "impliedVol("] {
         assert!(
             !surface.contains(removed_method),

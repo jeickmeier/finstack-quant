@@ -33,7 +33,7 @@
 //! # Numerical Dependencies
 //!
 //! - Standard-normal CDF Φ and inverse-CDF Φ⁻¹ are delegated to
-//!   [`finstack_quant_core::math::norm_cdf`] and `standard_normal_inv_cdf`, which
+//!   [`finstack_quant_core::math::special_functions::norm_cdf`] and `standard_normal_inv_cdf`, which
 //!   wrap the `statrs` crate's `Normal` distribution. No named approximation
 //!   such as Beasley-Springer-Moro or Acklam is used; tail accuracy is
 //!   determined by the underlying statrs implementation.
@@ -46,7 +46,7 @@
 //!
 
 use super::{default_quadrature, Copula, DEFAULT_QUADRATURE_ORDER};
-use finstack_quant_core::math::{norm_cdf, GaussHermiteQuadrature};
+use finstack_quant_core::math::{integration::GaussHermiteQuadrature, special_functions::norm_cdf};
 use std::sync::Arc;
 
 /// Lower valid asset-correlation boundary.
@@ -114,7 +114,7 @@ impl GaussianCopula {
     ///
     /// ```rust
     /// use finstack_quant_models::correlation::{Copula, GaussianCopula};
-    /// use finstack_quant_core::math::standard_normal_inv_cdf;
+    /// use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
     ///
     /// let copula = GaussianCopula::new();
     /// let threshold = standard_normal_inv_cdf(0.05);
@@ -214,7 +214,7 @@ impl Copula for GaussianCopula {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::math::standard_normal_inv_cdf;
+    use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
 
     #[test]
     fn test_gaussian_copula_creation() {

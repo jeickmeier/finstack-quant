@@ -262,7 +262,7 @@ impl PortfolioBuilder {
             self.entities.insert(dummy.id.clone(), dummy);
         }
 
-        let mut memberships: finstack_quant_core::HashMap<_, finstack_quant_core::HashSet<_>> =
+        let mut memberships: finstack_quant_core::FxHashMap<_, finstack_quant_core::FxHashSet<_>> =
             self.books
                 .iter()
                 .map(|(id, book)| (id.clone(), book.position_ids.iter().cloned().collect()))
@@ -292,7 +292,7 @@ impl PortfolioBuilder {
             as_of,
             entities: self.entities,
             positions: self.positions,
-            position_index: finstack_quant_core::HashMap::default(),
+            position_index: finstack_quant_core::FxHashMap::default(),
             dependency_index: crate::dependencies::DependencyIndex::default(),
             books: self.books,
             tags: self.tags,

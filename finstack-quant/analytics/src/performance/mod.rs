@@ -30,7 +30,8 @@ mod serialization;
 ///
 /// ```rust
 /// use finstack_quant_analytics::Performance;
-/// use finstack_quant_core::dates::{Date, Month, PeriodKind};
+/// use finstack_quant_core::dates::{Date, PeriodKind};
+/// use time::Month;
 ///
 /// let dates: Vec<Date> = (1..=6)
 ///     .map(|d| Date::from_calendar_date(2025, Month::January, d).unwrap())
@@ -113,8 +114,8 @@ fn invalid_return_series(
     ticker: impl Into<String>,
     index: usize,
     reason: impl Into<String>,
-) -> finstack_quant_core::error::InputError {
-    finstack_quant_core::error::InputError::InvalidReturnSeries {
+) -> finstack_quant_core::InputError {
+    finstack_quant_core::InputError::InvalidReturnSeries {
         ticker: ticker.into(),
         index,
         reason: reason.into(),
@@ -480,7 +481,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::error::InputError::InvalidReturnSeries`] when:
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when:
     ///
     /// * `prices` or `dates` is empty.
     /// * `ticker_names.len() != prices.len()` or ticker names are duplicated.
@@ -498,7 +499,8 @@ impl Performance {
     ///
     /// ```rust
     /// use finstack_quant_analytics::Performance;
-    /// use finstack_quant_core::dates::{Date, Month, PeriodKind};
+    /// use finstack_quant_core::dates::{Date, PeriodKind};
+    /// use time::Month;
     ///
     /// let dates: Vec<Date> = (1..=10)
     ///     .map(|d| Date::from_calendar_date(2025, Month::January, d).unwrap())
@@ -791,14 +793,14 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::error::InputError::NotFound`] when `ticker` is not
+    /// Returns [`finstack_quant_core::InputError::NotFound`] when `ticker` is not
     /// among the loaded ticker names.
     pub fn ticker_index(&self, ticker: &str) -> finstack_quant_core::Result<usize> {
         self.ticker_names
             .iter()
             .position(|name| name == ticker)
             .ok_or_else(|| {
-                finstack_quant_core::error::InputError::NotFound {
+                finstack_quant_core::InputError::NotFound {
                     id: format!("ticker '{ticker}' (loaded: {:?})", self.ticker_names),
                 }
                 .into()
@@ -881,7 +883,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::error::InputError::InvalidReturnSeries`] when
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
     /// `ticker_idx` is outside the loaded ticker columns.
     ///
     /// # Arguments
@@ -910,7 +912,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::error::InputError::InvalidReturnSeries`] when
+    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
     /// `ticker_idx` is outside the loaded ticker columns.
     ///
     /// # Arguments
@@ -945,7 +947,7 @@ impl Performance {
     }
 
     fn ann(&self) -> f64 {
-        self.frequency.annualization_factor()
+        f64::from(self.frequency.periods_per_year())
     }
 
     /// Map a per-ticker closure over all tickers in column order.

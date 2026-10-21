@@ -2,8 +2,9 @@
 //!
 //! This module tests edge cases and less commonly used code paths
 
-use finstack_quant_core::dates::Date;
-use finstack_quant_core::dates::{Direction, Observed, Rule};
+use super::algo;
+use super::rule::{Direction, Observed, Rule};
+use crate::dates::Date;
 use smallvec::SmallVec;
 use time::{Month, Weekday};
 
@@ -128,40 +129,24 @@ fn span_rule_cases() {
 
 #[test]
 fn equinox_rules() {
-    let vernal = Rule::VernalEquinoxJP;
-    assert_applies(&vernal, &[(2024, 3, 20)], &[(2024, 3, 19), (2024, 3, 22)]);
-
-    let autumnal = Rule::AutumnalEquinoxJP;
+    assert_eq!(
+        algo::vernal_equinox_jp_date(2024),
+        Some(make_date(2024, 3, 20))
+    );
     for year in 2020..2030 {
-        let eq_date = {
-            let out = materialize(&autumnal, year);
-            assert_eq!(out.len(), 1, "autumnal equinox should yield one date");
-            out[0]
-        };
-        assert!(autumnal.applies(eq_date), "autumnal {} should apply", year);
-        let prev = eq_date - time::Duration::days(1);
-        let next = eq_date + time::Duration::days(1);
-        assert!(!autumnal.applies(prev));
-        assert!(!autumnal.applies(next));
+        let eq_date = algo::autumnal_equinox_jp_date(year).unwrap();
+        assert_eq!(eq_date.month(), Month::September, "autumnal {year}");
     }
 }
 
 #[test]
 fn buddhas_birthday_rules() {
-    let rule = Rule::BuddhasBirthday;
     for year in 2020..2030 {
-        let out = materialize(&rule, year);
-        assert_eq!(out.len(), 1, "Buddha's Birthday should yield one date");
-        let date = out[0];
+        let date = algo::buddhas_birthday_date(year).unwrap();
         assert!(
             matches!(date.month(), Month::April | Month::May | Month::June),
             "Buddha's Birthday should be in Apr-Jun"
         );
-        assert!(rule.applies(date));
-        let prev = date - time::Duration::days(1);
-        let next = date + time::Duration::days(1);
-        assert!(!rule.applies(prev));
-        assert!(!rule.applies(next));
     }
 }
 
@@ -323,16 +308,8 @@ fn fixed_feb_29_rules() {
 
 #[test]
 fn equinox_rules_out_of_supported_range_do_not_fabricate_dates() {
-    let vernal = Rule::VernalEquinoxJP;
-    let autumnal = Rule::AutumnalEquinoxJP;
-
-    let vernal_out = materialize(&vernal, 1800);
-    let autumnal_out = materialize(&autumnal, 2201);
-
-    assert!(vernal_out.is_empty());
-    assert!(autumnal_out.is_empty());
-    assert!(!vernal.applies(make_date(1800, 3, 20)));
-    assert!(!autumnal.applies(make_date(2201, 9, 23)));
+    assert!(algo::vernal_equinox_jp_date(1800).is_none());
+    assert!(algo::autumnal_equinox_jp_date(2201).is_none());
 }
 
 #[test]

@@ -17,12 +17,13 @@ use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::money::fx::FxMatrix;
 use finstack_quant_core::money::fx::SimpleFxProvider;
 use finstack_quant_core::money::Money;
 use finstack_quant_scenarios::{
-    Compounding, CurveKind, ExecutionContext, HazardBumpMode, OperationSpec, RateBindingSpec,
-    ScenarioEngine, ScenarioSpec, TenorMatchMode,
+    CurveKind, ExecutionContext, HazardBumpMode, OperationSpec, RateBindingSpec, ScenarioEngine,
+    ScenarioSpec, TenorMatchMode,
 };
 use finstack_quant_statements::types::{AmountOrScalar, NodeSpec, NodeType};
 use finstack_quant_statements::FinancialModelSpec;

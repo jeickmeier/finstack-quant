@@ -127,9 +127,6 @@ def test_market_context_len_and_bool_count_fx_collateral_and_dividends() -> None
     assert (len(fx_only), fx_only.is_empty(), bool(fx_only)) == (1, False, True)
     assert (fx_only or MarketContext()) is fx_only
 
-    collateral_only = MarketContext().map_collateral("USD-CSA", "USD-OIS")
-    assert (len(collateral_only), collateral_only.is_empty(), bool(collateral_only)) == (1, False, True)
-
     state = json.loads(MarketContext().to_json())
     state["dividends"] = [{"id": "AAPL-DIV", "underlying": None, "events": [], "currency": None}]
     dividends_only = MarketContext.from_json(json.dumps(state))

@@ -627,17 +627,6 @@ export type MarketDatum =
        * second axis.
        */
       tenors: number[];
-    }
-  | {
-      /**
-       * Collateral / CSA currency.
-       */
-      csa_currency: valuations.Currency;
-      /**
-       * Trade-leg currency this CSA mapping applies to.
-       */
-      id: valuations.Currency;
-      kind: "collateral";
     };
 /**
  * A stable identifier for a market quote (e.g., "USD-OIS-SWAP-5Y").
@@ -1815,10 +1804,6 @@ export type PriorMarketObject =
        */
       calendar_id?: string | null;
       /**
-       * OIS cut-off (business days) the curve was calibrated under, if any.
-       */
-      calibration_ois_cutoff_days?: number | null;
-      /**
        * Day count convention for discount time basis
        */
       day_count: valuations.DayCount;
@@ -2518,10 +2503,6 @@ export type CurveState =
        * no calendar.
        */
       calendar_id?: string | null;
-      /**
-       * OIS cut-off (business days) the curve was calibrated under, if any.
-       */
-      calibration_ois_cutoff_days?: number | null;
       /**
        * Day count convention for discount time basis
        */
@@ -5679,9 +5660,9 @@ export interface RoundingContext {
 /**
  * Numerical tolerance configuration for floating-point comparisons.
  *
- * Provides configurable epsilon values for zero-checks in rate calculations
- * and generic floating-point comparisons. These defaults are chosen to balance
- * numerical stability with practical precision requirements.
+ * Provides the configurable epsilon for generic floating-point zero-checks.
+ * The default is chosen to balance numerical stability with practical
+ * precision requirements.
  */
 export interface ToleranceConfig {
   /**
@@ -5690,12 +5671,6 @@ export interface ToleranceConfig {
    * Used for general numerical comparisons where higher tolerance is acceptable.
    */
   generic_epsilon?: PositiveF64Wire;
-  /**
-   * Epsilon for rate comparisons (default: 1e-12).
-   *
-   * Used when comparing interest rates, yields, and other small ratios.
-   */
-  rate_epsilon?: PositiveF64Wire;
 }
 /**
  * Complete calibration result with market snapshot and diagnostics.
@@ -5727,12 +5702,6 @@ export interface CalibrationResult {
  * persisted to JSON and reconstructed deterministically.
  */
 export interface MarketContextState {
-  /**
-   * Collateral CSA mappings
-   */
-  collateral: {
-    [k: string]: string;
-  };
   /**
    * Credit index aggregates (references curves by ID)
    */

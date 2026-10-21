@@ -1129,7 +1129,6 @@ mod acceptance_tests {
                         final_residual_norm: score,
                         final_step_norm: 0.0,
                         lambda_final: 1.0,
-                        lambda_bound_hits: 0,
                     },
                 })
             },

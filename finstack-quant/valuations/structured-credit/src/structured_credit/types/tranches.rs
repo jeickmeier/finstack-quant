@@ -26,7 +26,7 @@ pub struct CoverageTrigger {
     /// Optional higher coverage ratio required to cure a breach.
     pub cure_level: Option<f64>,
     /// Date on which the breach was recorded, if one has occurred.
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -162,7 +162,6 @@ pub struct Tranche {
     pub non_deferrable: Option<bool>,
 
     /// Legal final maturity date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

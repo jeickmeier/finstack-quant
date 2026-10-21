@@ -1,6 +1,6 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use std::sync::Arc;
 
 use super::test_helpers::{sample_base_correlation_curve, sample_hazard_curve};
@@ -30,7 +30,7 @@ fn credit_index_builder_supports_issuer_curves() {
     let hazard = Arc::new(sample_hazard_curve("CDX"));
     let base_corr = Arc::new(sample_base_correlation_curve("CDX-BC"));
 
-    let mut issuers: HashMap<String, Arc<_>> = HashMap::default();
+    let mut issuers: FxHashMap<String, Arc<_>> = FxHashMap::default();
     issuers.insert(
         "IssuerA".to_string(),
         Arc::new(sample_hazard_curve("IssuerA")),
@@ -212,7 +212,7 @@ fn test_credit_index_issuer_recovery_rates() {
     // Test issuer-specific recovery rates
     let hazard = Arc::new(sample_hazard_curve("CDX"));
     let base_corr = Arc::new(sample_base_correlation_curve("CDX-BC"));
-    let mut issuer_curves = HashMap::default();
+    let mut issuer_curves = FxHashMap::default();
     issuer_curves.insert(
         "IssuerA".to_string(),
         Arc::new(sample_hazard_curve("IssuerA")),
@@ -222,7 +222,7 @@ fn test_credit_index_issuer_recovery_rates() {
         Arc::new(sample_hazard_curve("IssuerB")),
     );
 
-    let mut recovery_rates = HashMap::default();
+    let mut recovery_rates = FxHashMap::default();
     recovery_rates.insert("IssuerA".to_string(), 0.30);
     recovery_rates.insert("IssuerB".to_string(), 0.50);
 
@@ -249,7 +249,7 @@ fn test_credit_index_issuer_weights() {
     // Test issuer-specific weights
     let hazard = Arc::new(sample_hazard_curve("CDX"));
     let base_corr = Arc::new(sample_base_correlation_curve("CDX-BC"));
-    let mut issuer_curves = HashMap::default();
+    let mut issuer_curves = FxHashMap::default();
     issuer_curves.insert(
         "IssuerA".to_string(),
         Arc::new(sample_hazard_curve("IssuerA")),
@@ -259,7 +259,7 @@ fn test_credit_index_issuer_weights() {
         Arc::new(sample_hazard_curve("IssuerB")),
     );
 
-    let mut weights = HashMap::default();
+    let mut weights = FxHashMap::default();
     weights.insert("IssuerA".to_string(), 0.60);
     weights.insert("IssuerB".to_string(), 0.40);
 
@@ -323,7 +323,7 @@ fn test_credit_index_issuer_weights_require_curves() {
     let hazard = Arc::new(sample_hazard_curve("CDX"));
     let base_corr = Arc::new(sample_base_correlation_curve("CDX-BC"));
 
-    let mut weights = HashMap::default();
+    let mut weights = FxHashMap::default();
     weights.insert("IssuerA".to_string(), 1.0);
 
     let err = CreditIndexData::builder()
@@ -342,7 +342,7 @@ fn test_credit_index_issuer_weights_require_curves() {
 fn test_credit_index_issuer_weights_must_sum_to_one() {
     let hazard = Arc::new(sample_hazard_curve("CDX"));
     let base_corr = Arc::new(sample_base_correlation_curve("CDX-BC"));
-    let mut issuer_curves = HashMap::default();
+    let mut issuer_curves = FxHashMap::default();
     issuer_curves.insert(
         "IssuerA".to_string(),
         Arc::new(sample_hazard_curve("IssuerA")),
@@ -352,7 +352,7 @@ fn test_credit_index_issuer_weights_must_sum_to_one() {
         Arc::new(sample_hazard_curve("IssuerB")),
     );
 
-    let mut weights = HashMap::default();
+    let mut weights = FxHashMap::default();
     weights.insert("IssuerA".to_string(), 0.70);
     weights.insert("IssuerB".to_string(), 0.20);
 
@@ -373,13 +373,13 @@ fn test_credit_index_issuer_weights_must_sum_to_one() {
 fn test_credit_index_issuer_recovery_rates_reject_unknown_issuer() {
     let hazard = Arc::new(sample_hazard_curve("CDX"));
     let base_corr = Arc::new(sample_base_correlation_curve("CDX-BC"));
-    let mut issuer_curves = HashMap::default();
+    let mut issuer_curves = FxHashMap::default();
     issuer_curves.insert(
         "IssuerA".to_string(),
         Arc::new(sample_hazard_curve("IssuerA")),
     );
 
-    let mut recovery_rates = HashMap::default();
+    let mut recovery_rates = FxHashMap::default();
     recovery_rates.insert("IssuerB".to_string(), 0.30);
 
     let err = CreditIndexData::builder()

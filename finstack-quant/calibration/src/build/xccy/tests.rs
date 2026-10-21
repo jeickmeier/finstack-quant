@@ -10,7 +10,7 @@ use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::market::conventions::ids::XccyConventionId;
 
 fn xccy_build_ctx(as_of: Date) -> BuildCtx {
-    let mut curve_ids = finstack_quant_core::HashMap::default();
+    let mut curve_ids = finstack_quant_core::FxHashMap::default();
     curve_ids.insert("domestic_discount".to_string(), "USD-OIS".to_string());
     curve_ids.insert("foreign_discount".to_string(), "EUR-OIS".to_string());
     BuildCtx::new(as_of, 10_000_000.0, curve_ids)

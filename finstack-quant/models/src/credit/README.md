@@ -371,7 +371,7 @@ let black_cox = MertonModel::new_with_dynamics(
 assert!(black_cox.default_probability(5.0) >= model.default_probability(5.0));
 
 // Structural PD -> hazard curve for the reduced-form engines.
-let base_date = time::Date::from_calendar_date(2024, time::Month::January, 15).unwrap();
+let base_date = finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 15).unwrap();
 let hazard_curve = model.to_hazard_curve(
     "ISSUER_001",
     base_date,

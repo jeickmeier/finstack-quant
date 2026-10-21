@@ -13,7 +13,8 @@ use crate::pricer::PricingDispatch;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::{neumaier_sum, NeumaierAccumulator};
+use finstack_quant_core::math::stats::quantile_sorted;
+use finstack_quant_core::math::summation::{neumaier_sum, NeumaierAccumulator};
 use finstack_quant_core::money::fx::FxConversionPolicy;
 use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::money::Money;
@@ -224,7 +225,7 @@ impl VarResult {
         // losses are negative. Clamp to zero only when the tail quantile is
         // actually a gain (all-profit distributions).
         let p = 1.0 - confidence_level;
-        let var = type7_quantile(&pnl_distribution, p).min(0.0);
+        let var = quantile_sorted(&pnl_distribution, p.clamp(0.0, 1.0)).min(0.0);
         let expected_shortfall = tail_quantile_mean(&pnl_distribution, p).min(0.0);
 
         // Warn about statistical reliability for small sample sizes
@@ -254,39 +255,15 @@ impl VarResult {
     }
 }
 
-/// Evaluate the R type-7 / numpy-default linear-interpolated empirical
-/// quantile function `Q(u)` of an ascending-sorted sample.
-///
-/// For `n` observations the quantile at probability `u in [0, 1]` is found at
-/// fractional rank `h = (n - 1) * u`: linearly interpolating between order
-/// statistics `sorted[floor(h)]` and `sorted[floor(h) + 1]`. This is the
-/// estimator used by `numpy.quantile` (default) and R's `quantile(type = 7)`.
-///
-/// `sorted` must be non-empty and sorted ascending; `u` is clamped to `[0, 1]`.
-fn type7_quantile(sorted: &[f64], u: f64) -> f64 {
-    let n = sorted.len();
-    // Single observation: the quantile function is the constant `sorted[0]`.
-    if n <= 1 {
-        return sorted[0];
-    }
-    let n_minus_1 = (n - 1) as f64;
-    let h = (n_minus_1 * u.clamp(0.0, 1.0)).clamp(0.0, n_minus_1);
-    // `lo` indexes the lower bracketing order statistic; clamping to `n - 2`
-    // keeps `lo + 1` in range when `h` lands exactly on the last knot.
-    let lo = (h.floor() as usize).min(n - 2);
-    let frac = h - lo as f64;
-    sorted[lo] + frac * (sorted[lo + 1] - sorted[lo])
-}
-
 /// Mean of the type-7 quantile function over the tail `[0, p]` — the genuine
 /// Expected Shortfall of the empirical distribution at tail probability `p`.
 ///
 /// `ES = (1 / p) * integral over [0, p] of Q(u) du`, where `Q` is the
-/// piecewise-linear [`type7_quantile`] function. The integral is evaluated
+/// piecewise-linear [`quantile_sorted`] function. The integral is evaluated
 /// exactly by summing the trapezoidal area of each linear piece of `Q` that
 /// the interval `[0, p]` crosses (knots sit at `u = i / (n - 1)`).
 ///
-/// This integrates the SAME quantile function used by [`type7_quantile`], so
+/// This integrates the SAME quantile function used by [`quantile_sorted`], so
 /// VaR and ES are mutually consistent: ES is the average of `Q` over `[0, p]`
 /// and VaR is `Q(p)`, the least-extreme point of that interval. Since `Q` is
 /// non-decreasing, the tail average is at least as extreme as its endpoint,

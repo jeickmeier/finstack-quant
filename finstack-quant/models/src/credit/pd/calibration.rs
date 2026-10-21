@@ -13,7 +13,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use finstack_quant_core::math::{norm_cdf, standard_normal_inv_cdf};
+use finstack_quant_core::math::special_functions::{norm_cdf, standard_normal_inv_cdf};
 
 use super::error::PdCalibrationError;
 

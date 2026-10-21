@@ -37,8 +37,8 @@ pub(super) struct MetricsContext<'a> {
     pub(super) ccy: Currency,
     pub(super) market_deps: MarketDependencies,
     pub(super) rates_curve_ids: Vec<CurveId>,
-    pub(super) rate_keyrates: finstack_quant_core::HashMap<CurveId, Vec<(f64, f64, f64)>>,
-    pub(super) credit_keyrates: finstack_quant_core::HashMap<CurveId, Vec<CreditKeyRateBucket>>,
+    pub(super) rate_keyrates: finstack_quant_core::FxHashMap<CurveId, Vec<(f64, f64, f64)>>,
+    pub(super) credit_keyrates: finstack_quant_core::FxHashMap<CurveId, Vec<CreditKeyRateBucket>>,
     pub(super) shifts: MarketShifts,
 }
 
@@ -93,7 +93,7 @@ impl<'a> MetricsContext<'a> {
         });
         let mut rate_keyrates =
             extract_keyrate_per_curve(&val_t0.measures, &rates_curve_ids, "bucketed_dv01")?;
-        let mut paired_rate_keyrates = finstack_quant_core::HashMap::default();
+        let mut paired_rate_keyrates = finstack_quant_core::FxHashMap::default();
         for (curve_id, buckets) in rate_keyrates.drain() {
             let tenors: Vec<_> = buckets.iter().map(|(tenor, _)| *tenor).collect();
             let moves =

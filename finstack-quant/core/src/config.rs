@@ -345,38 +345,25 @@ pub struct RoundingPolicy {
 
 /// Numerical tolerance configuration for floating-point comparisons.
 ///
-/// Provides configurable epsilon values for zero-checks in rate calculations
-/// and generic floating-point comparisons. These defaults are chosen to balance
-/// numerical stability with practical precision requirements.
+/// Provides the configurable epsilon for generic floating-point zero-checks.
+/// The default is chosen to balance numerical stability with practical
+/// precision requirements.
 ///
 /// # Examples
 /// ```rust
 /// use finstack_quant_core::config::ToleranceConfig;
 ///
 /// let mut tol = ToleranceConfig::default();
-/// assert_eq!(tol.rate_epsilon, 1e-12);
+/// assert_eq!(tol.generic_epsilon, 1e-10);
 ///
-/// // Customize for stricter rate comparisons
-/// tol.rate_epsilon = 1e-14;
+/// // Customize for stricter comparisons
+/// tol.generic_epsilon = 1e-12;
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
 pub struct ToleranceConfig {
-    /// Epsilon for rate comparisons (default: 1e-12).
-    ///
-    /// Used when comparing interest rates, yields, and other small ratios.
-    #[serde(
-        default = "default_rate_epsilon",
-        serialize_with = "crate::wire::serialize_positive_f64",
-        deserialize_with = "crate::wire::deserialize_positive_f64"
-    )]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "crate::wire::PositiveF64Wire")
-    )]
-    pub rate_epsilon: f64,
     /// Epsilon for generic floating-point comparisons (default: 1e-10).
     ///
     /// Used for general numerical comparisons where higher tolerance is acceptable.
@@ -393,63 +380,37 @@ pub struct ToleranceConfig {
 }
 
 impl ToleranceConfig {
-    /// Create validated numerical tolerances for rate and generic comparisons.
+    /// Create a validated numerical tolerance for generic comparisons.
     ///
-    /// `rate_epsilon` is used for yields, discount factors, and similarly small
-    /// financial ratios; `generic_epsilon` applies to broader floating-point
-    /// computations. Both values are absolute, not relative, tolerances. Use
-    /// the defaults unless a documented numerical policy requires a different
-    /// threshold, because changing either alters zero tests and equality-like
-    /// decisions throughout downstream calculations.
+    /// # Arguments
+    ///
+    /// * `generic_epsilon` - Absolute (not relative) tolerance for generic
+    ///   floating-point zero-checks. Use the default unless a documented
+    ///   numerical policy requires a different threshold, because changing it
+    ///   alters zero tests and equality-like decisions throughout downstream
+    ///   calculations.
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] if either epsilon is `NaN`,
+    /// Returns [`crate::Error::Validation`] if `generic_epsilon` is `NaN`,
     /// infinite, zero, or negative. A successful configuration stores the
-    /// values without further normalization.
-    pub fn new(rate_epsilon: f64, generic_epsilon: f64) -> crate::Result<Self> {
-        for (name, value) in [
-            ("rate_epsilon", rate_epsilon),
-            ("generic_epsilon", generic_epsilon),
-        ] {
-            if !value.is_finite() || value <= 0.0 {
-                return Err(crate::Error::Validation(format!(
-                    "{name} must be finite and positive, got {value}"
-                )));
-            }
+    /// value without further normalization.
+    pub fn new(generic_epsilon: f64) -> crate::Result<Self> {
+        if !generic_epsilon.is_finite() || generic_epsilon <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "generic_epsilon must be finite and positive, got {generic_epsilon}"
+            )));
         }
-        Ok(Self {
-            rate_epsilon,
-            generic_epsilon,
-        })
+        Ok(Self { generic_epsilon })
     }
-}
-
-/// Default epsilon for rate comparisons: 1e-12.
-///
-/// # Rationale
-///
-/// This value is chosen to be:
-/// - Small enough to distinguish meaningful rate differences (1 bp = 0.0001)
-/// - Large enough to absorb floating-point accumulation errors in typical
-///   pricing calculations
-/// - Approximately sqrt(machine_epsilon) × typical_rate_magnitude, a standard
-///   choice for numerical tolerance (machine_epsilon ≈ 2.2e-16 for f64)
-///
-/// A rate difference of 1e-12 corresponds to ~0.0001 basis points, which is
-/// economically insignificant in all practical applications.
-fn default_rate_epsilon() -> f64 {
-    1e-12
 }
 
 /// Default epsilon for generic floating-point comparisons: 1e-10.
 ///
 /// # Rationale
 ///
-/// This is more permissive than [`default_rate_epsilon`] because:
-/// - Generic calculations may accumulate more rounding error
-/// - Used for quantities like prices, notionals, PVs where precision
-///   requirements are less strict than for rates
+/// - Generic calculations may accumulate rounding error
+/// - Used for quantities like prices, notionals and PVs
 /// - Still tight enough to catch actual numerical errors vs. expected values
 ///
 /// At 1e-10, a $1M notional would need to match within $0.0001 (0.01 cents),
@@ -461,7 +422,6 @@ fn default_generic_epsilon() -> f64 {
 impl Default for ToleranceConfig {
     fn default() -> Self {
         Self {
-            rate_epsilon: default_rate_epsilon(),
             generic_epsilon: default_generic_epsilon(),
         }
     }
@@ -506,14 +466,11 @@ pub struct RoundingContext {
 }
 
 /// Zero-kind classification for tolerance checks.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ZeroKind {
     /// Money-like magnitudes (use currency scale).
     Money(crate::currency::Currency),
-    /// Interest rates or small numeric ratios.
-    Rate,
     /// Generic floating-point comparisons.
     Generic,
 }
@@ -547,16 +504,6 @@ fn ingest_scale_from_map(
 }
 
 impl RoundingContext {
-    /// Borrow the validated ingest overrides captured by this rounding snapshot.
-    pub fn get_ingest_scale_by_currency(&self) -> &BTreeMap<crate::currency::Currency, u32> {
-        &self.ingest_scale_by_currency
-    }
-
-    /// Borrow the validated output overrides captured by this rounding snapshot.
-    pub fn get_output_scale_by_currency(&self) -> &BTreeMap<crate::currency::Currency, u32> {
-        &self.output_scale_by_currency
-    }
-
     /// Effective output scale for the provided currency within this context.
     #[inline]
     pub fn output_scale(&self, ccy: crate::currency::Currency) -> u32 {
@@ -574,14 +521,12 @@ impl RoundingContext {
     /// Returns true if a floating value is effectively zero for the specified kind.
     ///
     /// Uses tolerance values from the context's [`ToleranceConfig`]:
-    /// - Rate: uses [`ToleranceConfig::rate_epsilon`] (default: 1e-12)
     /// - Generic: uses [`ToleranceConfig::generic_epsilon`] (default: 1e-10)
     /// - Money: uses half ULP at the currency's configured output scale
     #[inline]
     pub fn is_effectively_zero(&self, x: f64, kind: ZeroKind) -> bool {
         match kind {
             ZeroKind::Money(ccy) => x.abs() <= self.money_epsilon(ccy),
-            ZeroKind::Rate => x.abs() <= self.tolerances.rate_epsilon,
             ZeroKind::Generic => x.abs() <= self.tolerances.generic_epsilon,
         }
     }
@@ -795,13 +740,13 @@ mod tests {
     #[test]
     fn tolerance_config_rejects_invalid_values_and_roundtrips() {
         for bad in [0.0, -1.0, f64::NAN, f64::INFINITY] {
-            assert!(ToleranceConfig::new(bad, 1e-10).is_err());
-            assert!(ToleranceConfig::new(1e-12, bad).is_err());
+            assert!(ToleranceConfig::new(bad).is_err());
         }
         for json in [
-            r#"{"rate_epsilon":0.0,"generic_epsilon":1e-10}"#,
-            r#"{"rate_epsilon":1e-12,"generic_epsilon":-1.0}"#,
-            r#"{"rate_epsilon":1e-12,"generic_epsilon":1e-10,"extra":true}"#,
+            r#"{"generic_epsilon":0.0}"#,
+            r#"{"generic_epsilon":-1.0}"#,
+            r#"{"rate_epsilon":1e-12,"generic_epsilon":1e-10}"#,
+            r#"{"generic_epsilon":1e-10,"extra":true}"#,
         ] {
             assert!(serde_json::from_str::<ToleranceConfig>(json).is_err());
         }
@@ -811,7 +756,7 @@ mod tests {
         assert_eq!(schema["additionalProperties"], false);
         assert_eq!(schema["$defs"]["PositiveF64Wire"]["exclusiveMinimum"], 0.0);
 
-        let valid = ToleranceConfig::new(1e-12, 1e-10).unwrap();
+        let valid = ToleranceConfig::new(1e-10).unwrap();
         let json = serde_json::to_string(&valid).unwrap();
         assert_eq!(
             serde_json::from_str::<ToleranceConfig>(&json).unwrap(),
@@ -819,8 +764,7 @@ mod tests {
         );
 
         let invalid_in_memory = ToleranceConfig {
-            rate_epsilon: 0.0,
-            generic_epsilon: 1e-10,
+            generic_epsilon: 0.0,
         };
         assert!(serde_json::to_value(invalid_in_memory).is_err());
     }
@@ -851,7 +795,7 @@ mod tests {
         let err = "BANKERS"
             .parse::<RoundingMode>()
             .expect_err("case-sensitive");
-        assert_eq!(err.kind(), crate::error::ErrorKind::Validation);
+        assert_eq!(err.kind(), crate::ErrorKind::Validation);
         assert!(err.to_string().contains("\"BANKERS\""), "{err}");
     }
 

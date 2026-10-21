@@ -9,7 +9,7 @@ use super::{
     types::{ExtrapolationPolicy, ValidationPolicy},
     utils::{validate_finite_series, validate_knots, validate_positive_series},
 };
-use crate::error::InputError;
+use crate::InputError;
 
 /// Generic interpolator with strategy pattern.
 ///

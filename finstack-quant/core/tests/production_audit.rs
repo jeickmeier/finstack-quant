@@ -1,6 +1,7 @@
 //! Public regressions for the September 2026 production audit.
 
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::market_data::bumps::{BumpSpec, Bumpable};
 use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxQuery, SimpleFxProvider};
@@ -105,15 +106,15 @@ fn m10_negative_rate_stress_keeps_mathematical_validation_and_roundtrips() {
         .build()
         .expect("positive-rate construction");
     let shocked = curve
-        .with_parallel_bump(-200.0)
+        .apply_bump(BumpSpec::parallel_bp(-200.0))
         .expect("negative-rate stress");
     assert!((shocked.df(2.0) - 0.02_f64.exp()).abs() < 1e-12);
     let roundtrip: DiscountCurve =
         serde_json::from_str(&serde_json::to_string(&shocked).expect("serialize"))
             .expect("stress roundtrip");
     assert_eq!(roundtrip.df(2.0), shocked.df(2.0));
-    assert!(curve.with_parallel_bump(f64::NAN).is_err());
-    assert!(curve.with_parallel_bump(-1e308).is_err());
+    assert!(curve.apply_bump(BumpSpec::parallel_bp(f64::NAN)).is_err());
+    assert!(curve.apply_bump(BumpSpec::parallel_bp(-1e308)).is_err());
     assert!((curve.df(2.0) - (-0.02_f64).exp()).abs() < 1e-12);
     assert!(DiscountCurve::builder("STRICT")
         .base_date(base)

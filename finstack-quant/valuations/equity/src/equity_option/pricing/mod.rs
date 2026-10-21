@@ -189,6 +189,7 @@ mod tests {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
     use finstack_quant_models::closed_form::vanilla::bs_greeks_unchecked;
     use finstack_quant_valuations_core::instruments::ThetaDayBasis;

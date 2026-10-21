@@ -36,13 +36,13 @@
 /// Generic interpolator container with strategy pattern.
 mod generic;
 /// Concrete strategy implementations.
-pub(crate) mod strategies;
+mod strategies;
 /// Traits for interpolation.
 mod traits;
 /// Types, public aliases, and factory for interpolation.
-pub(crate) mod types;
+mod types;
 /// Shared helpers (validation and search).
-pub(crate) mod utils;
+mod utils;
 
 pub use generic::Interpolator;
 pub use strategies::{
@@ -52,3 +52,6 @@ pub use strategies::{
 pub use traits::InterpolationStrategy;
 pub use types::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 pub use utils::interp_knots_flat;
+
+pub(crate) use types::Interp;
+pub(crate) use utils::{find_monotone_violation, validate_finite_series, validate_knots};

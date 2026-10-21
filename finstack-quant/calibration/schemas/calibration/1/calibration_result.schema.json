@@ -155,8 +155,7 @@
               "mode": "bankers",
               "output_scale_by_currency": {},
               "tolerances": {
-                "generic_epsilon": 1e-10,
-                "rate_epsilon": 1e-12
+                "generic_epsilon": 1e-10
               },
               "version": 1
             },
@@ -414,14 +413,6 @@
               "description": "Registered holiday calendar id of the business-day time axis (for\nexample `\"brbd\"` for a Bus/252 curve). Omitted when the day count needs\nno calendar.",
               "type": [
                 "string",
-                "null"
-              ]
-            },
-            "calibration_ois_cutoff_days": {
-              "description": "OIS cut-off (business days) the curve was calibrated under, if any.",
-              "format": "int32",
-              "type": [
-                "integer",
                 "null"
               ]
             },
@@ -1441,7 +1432,7 @@
     },
     "FxDeltaVolSurface": {
       "additionalProperties": false,
-      "description": "Delta-quoted FX volatility surface.\n\nStores market-standard FX vol quotes (ATM DNS, 25-delta risk-reversal,\n25-delta butterfly) across multiple expiries. Models-layer functions\nperform delta conversion and volatility evaluation.\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;\n\nlet surface = FxDeltaVolSurface::new(\n    \"EURUSD-DELTA-VOL\",\n    vec![0.25, 0.5, 1.0],\n    vec![0.08, 0.085, 0.09],\n    vec![0.01, 0.012, 0.015],\n    vec![0.005, 0.006, 0.007],\n    None,\n    None,\n).expect(\"surface should build\");\n\nassert_eq!(surface.num_expiries(), 3);\nassert!((surface.atm_vols()[0] - 0.08).abs() < 1e-12);\n```",
+      "description": "Delta-quoted FX volatility surface.\n\nStores market-standard FX vol quotes (ATM DNS, 25-delta risk-reversal,\n25-delta butterfly) across multiple expiries. Models-layer functions\nperform delta conversion and volatility evaluation.\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;\n\nlet surface = FxDeltaVolSurface::new(\n    \"EURUSD-DELTA-VOL\",\n    vec![0.25, 0.5, 1.0],\n    vec![0.08, 0.085, 0.09],\n    vec![0.01, 0.012, 0.015],\n    vec![0.005, 0.006, 0.007],\n    None,\n    None,\n).expect(\"surface should build\");\n\nassert_eq!(surface.expiries().len(), 3);\nassert!((surface.atm_vols()[0] - 0.08).abs() < 1e-12);\n```",
       "properties": {
         "atm_vols": {
           "description": "ATM delta-neutral straddle vols per expiry.",
@@ -1907,13 +1898,6 @@
       "additionalProperties": false,
       "description": "Complete serializable state of a MarketContext.\n\nProvides a stable, versioned snapshot of all market data that can be\npersisted to JSON and reconstructed deterministically.",
       "properties": {
-        "collateral": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Collateral CSA mappings",
-          "type": "object"
-        },
         "credit_indices": {
           "description": "Credit index aggregates (references curves by ID)",
           "items": {
@@ -2015,7 +1999,6 @@
         "credit_indices",
         "fx_delta_vol_surfaces",
         "vol_cubes",
-        "collateral",
         "hierarchy"
       ],
       "type": "object"
@@ -2776,8 +2759,7 @@
         "tolerances": {
           "$ref": "#/$defs/ToleranceConfig",
           "default": {
-            "generic_epsilon": 1e-10,
-            "rate_epsilon": 1e-12
+            "generic_epsilon": 1e-10
           },
           "description": "Tolerance settings snapshot for floating-point comparisons."
         },
@@ -3100,17 +3082,12 @@
     },
     "ToleranceConfig": {
       "additionalProperties": false,
-      "description": "Numerical tolerance configuration for floating-point comparisons.\n\nProvides configurable epsilon values for zero-checks in rate calculations\nand generic floating-point comparisons. These defaults are chosen to balance\nnumerical stability with practical precision requirements.\n\n# Examples\n```rust\nuse finstack_quant_core::config::ToleranceConfig;\n\nlet mut tol = ToleranceConfig::default();\nassert_eq!(tol.rate_epsilon, 1e-12);\n\n// Customize for stricter rate comparisons\ntol.rate_epsilon = 1e-14;\n```",
+      "description": "Numerical tolerance configuration for floating-point comparisons.\n\nProvides the configurable epsilon for generic floating-point zero-checks.\nThe default is chosen to balance numerical stability with practical\nprecision requirements.\n\n# Examples\n```rust\nuse finstack_quant_core::config::ToleranceConfig;\n\nlet mut tol = ToleranceConfig::default();\nassert_eq!(tol.generic_epsilon, 1e-10);\n\n// Customize for stricter comparisons\ntol.generic_epsilon = 1e-12;\n```",
       "properties": {
         "generic_epsilon": {
           "$ref": "#/$defs/PositiveF64Wire",
           "default": 1e-10,
           "description": "Epsilon for generic floating-point comparisons (default: 1e-10).\n\nUsed for general numerical comparisons where higher tolerance is acceptable."
-        },
-        "rate_epsilon": {
-          "$ref": "#/$defs/PositiveF64Wire",
-          "default": 1e-12,
-          "description": "Epsilon for rate comparisons (default: 1e-12).\n\nUsed when comparing interest rates, yields, and other small ratios."
         }
       },
       "type": "object"
@@ -3387,7 +3364,6 @@
     {
       "result": {
         "final_market": {
-          "collateral": {},
           "credit_indices": [],
           "curves": [],
           "dividends": [],
@@ -3426,8 +3402,7 @@
               "mode": "bankers",
               "output_scale_by_currency": {},
               "tolerances": {
-                "generic_epsilon": 1e-10,
-                "rate_epsilon": 1e-12
+                "generic_epsilon": 1e-10
               },
               "version": 1
             },
@@ -3451,8 +3426,7 @@
             "mode": "bankers",
             "output_scale_by_currency": {},
             "tolerances": {
-              "generic_epsilon": 1e-10,
-              "rate_epsilon": 1e-12
+              "generic_epsilon": 1e-10
             },
             "version": 1
           },

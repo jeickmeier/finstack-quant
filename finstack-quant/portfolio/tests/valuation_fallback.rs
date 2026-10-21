@@ -248,13 +248,8 @@ fn fallback_valuation_stamps_caller_config() {
         .expect("fallback result");
 
     assert_eq!(
-        result
-            .meta
-            .rounding
-            .get_output_scale_by_currency()
-            .get(&Currency::USD)
-            .copied(),
-        Some(4),
+        result.meta.rounding.output_scale(Currency::USD),
+        4,
         "PV-only fallback must stamp the caller's FinstackConfig",
     );
 }

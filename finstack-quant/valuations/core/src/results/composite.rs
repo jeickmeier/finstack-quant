@@ -129,7 +129,6 @@ pub struct CompositeExposureReport {
 #[serde(deny_unknown_fields)]
 pub struct CompositeValuationDetails {
     /// Effective date of the frozen holdings state used for pricing.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

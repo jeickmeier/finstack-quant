@@ -132,9 +132,9 @@ pub use sensitivities::vega::KeyRateVega;
 /// ```
 /// use finstack_quant_valuations_core::metrics::{metric_not_found, MetricId};
 /// use finstack_quant_core::Result;
-/// use finstack_quant_core::HashMap;
+/// use finstack_quant_core::FxHashMap;
 ///
-/// fn get_metric(id: MetricId, results: &HashMap<MetricId, f64>) -> Result<f64> {
+/// fn get_metric(id: MetricId, results: &FxHashMap<MetricId, f64>) -> Result<f64> {
 ///     results.get(&id).copied().ok_or_else(|| metric_not_found(id))
 /// }
 /// ```

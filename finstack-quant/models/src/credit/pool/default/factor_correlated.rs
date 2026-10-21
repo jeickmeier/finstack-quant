@@ -68,8 +68,10 @@ impl StochasticDefault for FactorCorrelatedDefault {
         // E[min(cap, b exp(sigma Z))] has an exact truncated-lognormal
         // expression. The shock sign does not affect its unconditional mean.
         let cutoff = (0.50 / base_mdr).ln() / sigma;
-        base_mdr * (0.5 * sigma * sigma).exp() * finstack_quant_core::math::norm_cdf(cutoff - sigma)
-            + 0.50 * finstack_quant_core::math::norm_cdf(-cutoff)
+        base_mdr
+            * (0.5 * sigma * sigma).exp()
+            * finstack_quant_core::math::special_functions::norm_cdf(cutoff - sigma)
+            + 0.50 * finstack_quant_core::math::special_functions::norm_cdf(-cutoff)
     }
 }
 

@@ -381,9 +381,8 @@ pub fn goal_seek(
     // the evaluator may produce NaN for non-positive inputs — same logic
     // applies symmetrically for strictly negative guesses. A zero guess
     // carries no sign information so we leave both sides at the default.
-    let mut solver = BrentSolver::new();
     let abs_guess = initial_guess.abs().max(1.0);
-    solver.initial_bracket_size = Some(abs_guess);
+    let mut solver = BrentSolver::new().with_initial_bracket_size(Some(abs_guess));
     if initial_guess > 0.0 {
         solver.bracket_min = 0.0;
     } else if initial_guess < 0.0 {
@@ -392,20 +391,17 @@ pub fn goal_seek(
 
     let solution = match solver.solve(objective, initial_guess) {
         Ok(solution) => solution,
-        Err(first_error) if initial_guess != 0.0 => {
-            let mut widened = BrentSolver::new();
-            widened.initial_bracket_size = Some(abs_guess);
-            widened
-                .solve(objective, initial_guess)
-                .map_err(|second_error| {
-                    describe_failure(format!(
-                        "Goal seek failed to find solution: target_node='{target_node}', \
+        Err(first_error) if initial_guess != 0.0 => BrentSolver::new()
+            .with_initial_bracket_size(Some(abs_guess))
+            .solve(objective, initial_guess)
+            .map_err(|second_error| {
+                describe_failure(format!(
+                    "Goal seek failed to find solution: target_node='{target_node}', \
                      target_value={target_value}, driver_node='{driver_node}'. \
                      Sign-constrained attempt failed with: {first_error}. \
                      Widened attempt failed with: {second_error}"
-                    ))
-                })?
-        }
+                ))
+            })?,
         Err(e) => {
             return Err(describe_failure(format!(
                 "Goal seek failed to find solution: target_node='{target_node}', \
@@ -507,7 +503,7 @@ where
     // Use Brent's method inside the user-supplied bracket; inverse quadratic
     // interpolation with safeguarded bisection converges super-linearly on
     // smooth objectives while retaining the robustness of bisection.
-    let solver = BrentSolver::new().tolerance(TOLERANCE);
+    let solver = BrentSolver::new().with_tolerance(TOLERANCE);
     solver
         .solve_in_bracket(f, lower, upper)
         .map_err(|e| Error::eval(format!("Goal seek failed within bounds: {}", e)))

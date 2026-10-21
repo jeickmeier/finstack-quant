@@ -5,7 +5,7 @@ use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::{recover_lock, HashMap};
+use crate::{recover_lock, FxHashMap};
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     recover_lock(mutex.lock())
@@ -28,7 +28,7 @@ const MAX_STATE_ATTEMPTS: usize = 3;
 struct Pair(Currency, Currency);
 
 /// Caller-pinned and provider-pinned quote stores for one date/policy scope.
-type ScopedSnapshotQuotes = (HashMap<Pair, f64>, HashMap<Pair, f64>);
+type ScopedSnapshotQuotes = (FxHashMap<Pair, f64>, FxHashMap<Pair, f64>);
 
 /// Query-sensitive key for the provider-observed quote cache.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -72,9 +72,9 @@ fn canonical_orientation(from: Currency, to: Currency) -> (Currency, Currency, b
 /// Resolve `from → to` through the stores in priority order, each with
 /// reciprocal fallback.
 fn effective_snapshot_rate(
-    global: &HashMap<Pair, f64>,
-    pinned: &HashMap<Pair, f64>,
-    observed: &HashMap<Pair, f64>,
+    global: &FxHashMap<Pair, f64>,
+    pinned: &FxHashMap<Pair, f64>,
+    observed: &FxHashMap<Pair, f64>,
     from: Currency,
     to: Currency,
 ) -> crate::Result<Option<f64>> {
@@ -118,10 +118,10 @@ pub struct FxMatrix {
     provider: Arc<dyn FxProvider>,
     /// Explicit, pair-global quotes inserted by callers or restored from
     /// serialized state. These are authoritative constant rates (e.g. pegged
-    /// currencies), so the store is a plain `HashMap` that **never evicts** — a
+    /// currencies), so the store is a plain `FxHashMap` that **never evicts** — a
     /// seeded peg must never be silently dropped under cache pressure and then
     /// re-derived from the provider (which would be a silent mispricing).
-    quotes: Mutex<HashMap<Pair, f64>>,
+    quotes: Mutex<FxHashMap<Pair, f64>>,
     /// Query-sensitive quotes observed from providers or triangulation. This is
     /// the only genuinely bounded cache (governed by `config.cache_capacity`).
     observed_quotes: Mutex<
@@ -130,7 +130,7 @@ pub struct FxMatrix {
     /// Authoritative date/policy-scoped quotes pinned via [`FxMatrix::set_quote_on`].
     /// Unlike `observed_quotes`, this map never evicts, so a pinned fixing is
     /// never silently replaced by the provider under cache pressure.
-    pinned_quotes: Mutex<HashMap<QueryKey, f64>>,
+    pinned_quotes: Mutex<FxHashMap<QueryKey, f64>>,
     config: FxConfig,
     quote_revision: AtomicU64,
 }
@@ -168,11 +168,11 @@ impl FxProvider for ResolvedPairProvider {
     fn snapshot_quotes(&self) -> Vec<(Currency, Currency, f64)> {
         let mut quotes = self.matrix.provider.snapshot_quotes();
         let global = lock(&self.matrix.quotes);
-        let provider: HashMap<Pair, f64> = quotes
+        let provider: FxHashMap<Pair, f64> = quotes
             .iter()
             .map(|&(from, to, rate)| (Pair(from, to), rate))
             .collect();
-        let empty = HashMap::default();
+        let empty = FxHashMap::default();
         let lookup = |from, to| -> crate::Result<Option<f64>> {
             if from == to {
                 Ok(Some(1.0))
@@ -209,14 +209,14 @@ impl FxProvider for ResolvedPairProvider {
         }
         let global = lock(&self.matrix.quotes);
         let pinned = lock(&self.matrix.pinned_quotes);
-        let provider: HashMap<Pair, f64> = self
+        let provider: FxHashMap<Pair, f64> = self
             .matrix
             .provider
             .snapshot_quotes()
             .into_iter()
             .map(|(from, to, rate)| (Pair(from, to), rate))
             .collect();
-        let mut scopes: HashMap<_, ScopedSnapshotQuotes> = HashMap::default();
+        let mut scopes: FxHashMap<_, ScopedSnapshotQuotes> = FxHashMap::default();
         for &(from, to, on, policy, rate) in &quotes {
             scopes
                 .entry((on, policy))
@@ -231,7 +231,7 @@ impl FxProvider for ResolvedPairProvider {
                 .0
                 .insert(Pair(key.from, key.to), rate);
         }
-        let empty = HashMap::default();
+        let empty = FxHashMap::default();
         let Pair(from, to) = self.pair;
         let pivot = self.matrix.config.pivot_currency;
         for ((on, policy), (pinned, provider_pinned)) in scopes {
@@ -259,6 +259,14 @@ impl FxProvider for ResolvedPairProvider {
             }
         }
         quotes
+    }
+}
+
+impl Default for FxMatrix {
+    /// An empty matrix over an empty [`SimpleFxProvider`](super::SimpleFxProvider) with the default
+    /// configuration: rates come only from quotes set on the matrix.
+    fn default() -> Self {
+        Self::new(Arc::new(super::SimpleFxProvider::new()))
     }
 }
 
@@ -301,6 +309,36 @@ impl FxMatrix {
         Self::with_capacity(provider, FxConfig::default(), DEFAULT_CACHE_CAPACITY)
     }
 
+    /// Build a matrix over an empty [`SimpleFxProvider`](super::SimpleFxProvider) holding `quotes` as
+    /// pair-global quotes.
+    ///
+    /// This is [`FxMatrix::default`] followed by [`set_quotes`](Self::set_quotes),
+    /// the construction both host bindings expose.
+    ///
+    /// # Arguments
+    ///
+    /// * `quotes` - `(base, quote, rate)` triples, where `rate` is the finite,
+    ///   strictly positive number of `quote` units per one `base` unit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any rate is non-finite or not strictly positive.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::money::fx::FxMatrix;
+    ///
+    /// let matrix = FxMatrix::from_quotes(&[(Currency::EUR, Currency::USD, 1.1)])?;
+    /// assert_eq!(matrix.get_serializable_state()?.quotes.len(), 1);
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn from_quotes(quotes: &[(Currency, Currency, f64)]) -> crate::Result<Self> {
+        let matrix = Self::default();
+        matrix.set_quotes(quotes)?;
+        Ok(matrix)
+    }
+
     /// Create a new [`FxMatrix`] with custom configuration, failing closed on invalid inputs.
     ///
     /// The provider remains the source of date-aware quotes. `cache_capacity`
@@ -336,17 +374,12 @@ impl FxMatrix {
         observed_quotes.resize(capacity);
         Self {
             provider,
-            quotes: Mutex::new(HashMap::default()),
+            quotes: Mutex::new(FxHashMap::default()),
             observed_quotes: Mutex::new(observed_quotes),
-            pinned_quotes: Mutex::new(HashMap::default()),
+            pinned_quotes: Mutex::new(FxHashMap::default()),
             config,
             quote_revision: AtomicU64::new(0),
         }
-    }
-
-    /// Access the underlying FX provider reference.
-    pub fn provider(&self) -> Arc<dyn FxProvider> {
-        Arc::clone(&self.provider)
     }
 
     /// Return the matrix configuration.
@@ -442,20 +475,14 @@ impl FxMatrix {
             return Ok(cached);
         }
 
-        // The provider remains direction-sensitive; only cache storage is canonical.
-        let revision = self.observation_revision();
-        match self.provider.rate(from, to, on, policy) {
-            Ok(rate) => {
-                let rate = validate_fx_rate(from, to, rate)?;
-                let rate = self.insert_observed_quote(query, rate, false, revision)?;
-                Ok(FxRateResult {
-                    rate,
-                    triangulated: false,
-                })
-            }
-            Err(error @ crate::Error::Input(crate::error::InputError::InvalidFxRate { .. })) => {
-                Err(error)
-            }
+        // Every error of the fetch tail after the provider call is
+        // `InvalidFxRate`, so it bypasses triangulation exactly as before.
+        match self.fetch_from_provider(query) {
+            Ok(rate) => Ok(FxRateResult {
+                rate,
+                triangulated: false,
+            }),
+            Err(error @ crate::Error::Input(crate::InputError::InvalidFxRate { .. })) => Err(error),
             Err(_) if self.config.enable_triangulation => {
                 // Try simple triangulation via pivot
                 let rate = self.triangulate_rate(from, to, on, policy)?;
@@ -893,7 +920,7 @@ impl FxMatrix {
         on: Date,
         policy: FxConversionPolicy,
     ) -> crate::Result<f64> {
-        use crate::error::InputError;
+        use crate::InputError;
 
         let revision = self.observation_revision();
         let pivot = self.config.pivot_currency;
@@ -1046,16 +1073,19 @@ impl FxMatrix {
         if let Some(cached) = self.read_cached_rate(from, to, on, policy)? {
             return Ok(cached.rate);
         }
-        // Fetch from the provider
+        self.fetch_from_provider(FxQuery::with_policy(from, to, on, policy))
+    }
+
+    /// Fetch `query` from the provider, validate the rate and record it as an
+    /// observed quote. The provider remains direction-sensitive; only cache
+    /// storage is canonical.
+    fn fetch_from_provider(&self, query: FxQuery) -> crate::Result<f64> {
         let revision = self.observation_revision();
-        let r = self.provider.rate(from, to, on, policy)?;
-        let r = validate_fx_rate(from, to, r)?;
-        self.insert_observed_quote(
-            FxQuery::with_policy(from, to, on, policy),
-            r,
-            false,
-            revision,
-        )
+        let rate = self
+            .provider
+            .rate(query.from, query.to, query.on, query.policy)?;
+        let rate = validate_fx_rate(query.from, query.to, rate)?;
+        self.insert_observed_quote(query, rate, false, revision)
     }
 
     /// Resolve cache source priority before pair orientation for every lookup path.

@@ -5,7 +5,7 @@ Provides term-structure curve types (discount, forward, hazard, price incl.
 volatility-index, inflation), volatility surfaces and cubes, the FX rate matrix,
 scalar series and the unified :class:`MarketContext` container.
 
-Every curve query (``df``, ``zero``, ``zero_rate``, ``rate``, ``sp``,
+Every curve query (``df``, ``zero_rate``, ``rate``, ``sp``,
 ``hazard_rate``, ``price``, ``cpi``) accepts either a year fraction (``float``)
 or a date (``datetime.date`` or ISO ``"YYYY-MM-DD"`` string); dates are
 converted with the curve's own day count by Rust. Constructor options after
@@ -34,6 +34,7 @@ from finstack_quant.core.money import Money
 
 __all__ = [
     "BaseCorrelationCurve",
+    "ConvertedMoney",
     "CreditIndexData",
     "DiscountCurve",
     "ForwardCurve",
@@ -363,28 +364,6 @@ class DiscountCurve:
             If a date precedes ``base_date`` or is not a valid ISO date.
         TypeError
             If ``t`` is neither a number nor date-like.
-        """
-        ...
-
-    def zero(self, t: TimeOrDate) -> float:
-        """
-        Continuously-compounded zero rate (decimal) at a year fraction or date.
-
-        Parameters
-        ----------
-        t : float, datetime.date or str
-            Year fraction from ``base_date``, or a date converted with the
-            curve day count.
-
-        Returns
-        -------
-        float
-            Zero rate as a decimal (``0.05`` is 5%); ``0.0`` at ``t = 0``.
-
-        Raises
-        ------
-        ValueError
-            If a date precedes ``base_date``.
         """
         ...
 
@@ -833,7 +812,8 @@ class ForwardCurve:
         ----------
         t : float, datetime.date or str
             Year fraction from ``base_date``, or a date converted with the
-            curve day count.
+            curve day count; dates on or before ``base_date`` read the rate at
+            curve time zero.
 
         Returns
         -------
@@ -843,7 +823,7 @@ class ForwardCurve:
         Raises
         ------
         ValueError
-            If a date precedes ``base_date``.
+            If the date's day-count fraction cannot be computed.
         """
         ...
 
@@ -3477,7 +3457,7 @@ class FxDeltaVolSurface:
     --------
     >>> from finstack_quant.core.market_data import FxDeltaVolSurface
     >>> surface = FxDeltaVolSurface("EURUSD", [0.25, 1.0], [0.08, 0.09], [0.01, 0.015], [0.005, 0.007])
-    >>> (surface.num_expiries, surface.rr_10d)
+    >>> (len(surface.expiries), surface.rr_10d)
     (2, None)
 
     """
@@ -3623,22 +3603,6 @@ class FxDeltaVolSurface:
         ...
 
     @property
-    def num_expiries(self) -> int:
-        """
-        How many expiries the surface carries.
-
-        Returns
-        -------
-        int
-            Count of expiry pillars; every quote list on the surface has this length.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
     def atm_vols(self) -> list[float]:
         """
         At-the-money volatility term structure.
@@ -3730,13 +3694,13 @@ class SabrParameterData:
     Examples
     --------
     >>> from finstack_quant.core.market_data import SabrParameterData
-    >>> p = SabrParameterData(0.02, 0.5, -0.2, 0.3)
+    >>> p = SabrParameterData(0.02, 0.5, 0.3, -0.2)
     >>> (p.alpha, p.beta, p.rho, p.nu, p.shift)
     (0.02, 0.5, -0.2, 0.3, None)
 
     """
 
-    def __init__(self, alpha: float, beta: float, rho: float, nu: float, shift: Optional[float] = None) -> None:
+    def __init__(self, alpha: float, beta: float, nu: float, rho: float, shift: Optional[float] = None) -> None:
         """
         Construct a validated SABR parameter node.
 
@@ -3746,10 +3710,10 @@ class SabrParameterData:
             Initial volatility level; strictly positive.
         beta : float
             CEV exponent in ``[0, 1]``.
-        rho : float
-            Forward/volatility correlation in ``(-1, 1)``.
         nu : float
             Volatility of volatility; nonnegative, with zero giving deterministic volatility.
+        rho : float
+            Forward/volatility correlation in ``(-1, 1)``.
         shift : float, optional
             Displacement added to forward and strike (decimal rate units).
 
@@ -3761,7 +3725,7 @@ class SabrParameterData:
         Examples
         --------
         >>> from finstack_quant.core.market_data import SabrParameterData
-        >>> SabrParameterData(0.02, 0.5, -0.2, 0.3, shift=0.03).shift
+        >>> SabrParameterData(0.02, 0.5, 0.3, -0.2, shift=0.03).shift
         0.03
 
         """
@@ -3789,7 +3753,7 @@ class SabrParameterData:
         Examples
         --------
         >>> from finstack_quant.core.market_data import SabrParameterData
-        >>> p = SabrParameterData(0.02, 0.5, -0.2, 0.3)
+        >>> p = SabrParameterData(0.02, 0.5, 0.3, -0.2)
         >>> SabrParameterData.from_json(p.to_json()) == p
         True
 
@@ -3906,7 +3870,7 @@ class VolCube:
     Examples
     --------
     >>> from finstack_quant.core.market_data import SabrParameterData, VolCube
-    >>> p = SabrParameterData(0.02, 0.5, -0.2, 0.3)
+    >>> p = SabrParameterData(0.02, 0.5, 0.3, -0.2)
     >>> cube = VolCube("USD-SWPT", [1.0, 2.0], [5.0], [p, p], [0.03, 0.032])
     >>> (cube.grid_shape, cube.forward_at(1, 0), cube.params_at(0, 0).alpha)
     ((2, 1), 0.032, 0.02)
@@ -4360,6 +4324,130 @@ class FxRateResult:
     def __repr__(self) -> str: ...
     def _repr_html_(self) -> Optional[str]: ...
 
+class ConvertedMoney:
+    """
+    Result of :meth:`MarketContext.convert_money`.
+
+    Immutable value type holding the converted amount and the FX rate lookup
+    it used. ``rate`` is ``None`` when the input was already in the target
+    currency; otherwise its ``triangulated`` flag records whether the rate was
+    derived through a pivot currency, so the applied FX policy can be stamped
+    on downstream results.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import FxMatrix, MarketContext
+    >>> from finstack_quant.core.money import Money
+    >>> fx = FxMatrix()
+    >>> fx.set_quote("EUR", "USD", 1.1)
+    >>> converted = MarketContext().insert_fx(fx).convert_money(Money(10.0, "EUR"), "USD", "2025-01-02")
+    >>> (converted.amount.currency.code, converted.rate.rate)
+    ('USD', 1.1)
+
+    """
+
+    @staticmethod
+    def from_json(json: str) -> ConvertedMoney:
+        """
+        Deserialize a conversion result from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON produced by :meth:`to_json` (strict field names ``amount`` and
+            ``rate``).
+
+        Returns
+        -------
+        ConvertedMoney
+            The reconstructed amount and rate lookup.
+
+        Raises
+        ------
+        ValueError
+            If the JSON is malformed or has unknown or missing fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import ConvertedMoney
+        >>> payload = '{"amount": {"amount": "5", "currency": "USD"}, "rate": null}'
+        >>> ConvertedMoney.from_json(payload).rate is None
+        True
+
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize this result to compact canonical JSON.
+
+        Returns
+        -------
+        str
+            ``{"amount": {...}, "rate": {...} | null}``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    @property
+    def amount(self) -> Money:
+        """
+        Amount in the target currency.
+
+        Returns
+        -------
+        Money
+            The converted amount.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def rate(self) -> Optional[FxRateResult]:
+        """
+        FX rate lookup behind the conversion.
+
+        Returns
+        -------
+        Optional[FxRateResult]
+            The applied rate and its ``triangulated`` flag, or ``None`` for a
+            same-currency input.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        Export as a single-row pandas DataFrame.
+
+        Returns
+        -------
+        pd.DataFrame
+            Columns ``amount`` (float), ``currency`` (ISO code), ``rate`` and
+            ``triangulated`` (``None`` for a same-currency input).
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized into a pandas object.
+        """
+        ...
+
+    def __eq__(self, other: object) -> bool: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __repr__(self) -> str: ...
+    def _repr_html_(self) -> Optional[str]: ...
+
 class FxQuoteConvention:
     """
     USD quotation style for a market FX pair.
@@ -4677,7 +4765,7 @@ class FxMatrix:
     >>> round(matrix.rate("EUR", "GBP", datetime.date(2025, 1, 1)).rate, 4)
     0.88
     >>> list(matrix.quotes()["base"])
-    ['EUR', 'GBP']
+    ['GBP', 'EUR']
 
     """
 
@@ -5780,29 +5868,6 @@ class MarketContext:
         """
         ...
 
-    def map_collateral(self, csa_code: str, discount_id: str) -> MarketContext:
-        """
-        Map a CSA code to a discount curve id for collateral discounting (fluent).
-
-        Parameters
-        ----------
-        csa_code : str
-            Collateral agreement identifier (e.g. ``"USD-CSA"``).
-        discount_id : str
-            Id of a discount curve in this context.
-
-        Returns
-        -------
-        MarketContext
-            ``self``, so mappings can be chained fluently.
-
-        Notes
-        -----
-        This method does not raise; the curve id is resolved lazily when the
-        mapping is used, and an existing mapping for ``csa_code`` is replaced.
-        """
-        ...
-
     def get_discount(self, id: str) -> DiscountCurve:
         """
         Retrieve a discount curve by identifier.
@@ -6146,7 +6211,7 @@ class MarketContext:
         amount: Money,
         target_currency: Union[Currency, str],
         as_of: DateLike,
-    ) -> Money:
+    ) -> ConvertedMoney:
         """
         Convert a monetary amount into another currency with the attached FX matrix.
 
@@ -6163,13 +6228,28 @@ class MarketContext:
 
         Returns
         -------
-        Money
-            Converted amount in ``target_currency``.
+        ConvertedMoney
+            The converted ``amount`` in ``target_currency`` and the applied FX
+            ``rate`` lookup (``None`` for a same-currency input), so the caller
+            can record whether the rate was triangulated.
 
         Raises
         ------
         KeyError
             If no FX matrix is attached or the pair cannot be resolved.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import FxMatrix, MarketContext
+        >>> from finstack_quant.core.money import Money
+        >>> fx = FxMatrix()
+        >>> fx.set_quote("EUR", "USD", 1.1)
+        >>> ctx = MarketContext().insert_fx(fx)
+        >>> converted = ctx.convert_money(Money(100.0, "EUR"), "USD", "2025-01-02")
+        >>> (round(converted.amount.amount, 6), converted.rate.triangulated)
+        (110.0, False)
+        >>> ctx.convert_money(Money(5.0, "USD"), "USD", "2025-01-02").rate is None
+        True
         """
         ...
 
@@ -6238,8 +6318,7 @@ class MarketContext:
             ``total_curves``, ``has_fx``, ``surface_count``,
             ``vol_cube_count``, ``price_count``, ``series_count``,
             ``inflation_index_count``, ``credit_index_count``,
-            ``dividend_schedule_count``, ``fx_delta_vol_surface_count`` and
-            ``collateral_mapping_count``.
+            ``dividend_schedule_count`` and ``fx_delta_vol_surface_count``.
 
         Raises
         ------

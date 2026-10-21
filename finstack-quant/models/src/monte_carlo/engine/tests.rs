@@ -6,8 +6,8 @@ use crate::monte_carlo::results::MonteCarloResult;
 use crate::monte_carlo::traits::{
     Discretization, PathState, Payoff, RandomStream, StochasticProcess,
 };
-use crate::monte_carlo::TimeGrid;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
 
 struct TestEngineBuilder {
@@ -724,7 +724,7 @@ fn test_engine_rejects_quasi_random_rng_even_in_serial_mode() {
         .expect("McEngine builder should succeed with valid test data");
 
     let rng =
-        crate::monte_carlo::rng::sobol::SobolRng::try_new(1, 0).expect("valid Sobol dimension");
+        finstack_quant_core::math::random::SobolRng::try_new(1, 0).expect("valid Sobol dimension");
     let process = DummyProcess;
     let disc = DummyDisc;
     let initial_state = vec![100.0];

@@ -124,7 +124,7 @@ impl Discretization<SchwartzSmithProcess> for ExactSchwartzSmith {
     fn prepare(
         &mut self,
         process: &SchwartzSmithProcess,
-        time_grid: &crate::monte_carlo::TimeGrid,
+        time_grid: &finstack_quant_core::math::time_grid::TimeGrid,
     ) {
         if time_grid.num_steps() == 0 {
             return;

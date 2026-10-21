@@ -400,8 +400,12 @@ mod tests {
             params: StepParams::Discount(DiscountCurveParams {
                 curve_id: CurveId::from("USD-OIS"),
                 currency: finstack_quant_core::currency::Currency::USD,
-                base_date: time::Date::from_calendar_date(2025, Month::January, 15)
-                    .expect("valid test date"),
+                base_date: finstack_quant_core::dates::Date::from_calendar_date(
+                    2025,
+                    Month::January,
+                    15,
+                )
+                .expect("valid test date"),
                 method: CalibrationMethod::Bootstrap,
                 interpolation: InterpStyle::Linear,
                 extrapolation: ExtrapolationPolicy::FlatZero,

@@ -1,6 +1,7 @@
 //! Vega metric for variance swaps (per 1% volatility move).
 
 use super::super::types::VarianceSwap;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 

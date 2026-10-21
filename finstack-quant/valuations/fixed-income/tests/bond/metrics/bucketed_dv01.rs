@@ -17,7 +17,7 @@ use finstack_quant_valuations_fixed_income::bond::Bond;
 use time::macros::date;
 
 /// Build a realistic multi-tenor discount curve for bucketed DV01 tests.
-fn build_multi_tenor_curve(as_of: time::Date) -> DiscountCurve {
+fn build_multi_tenor_curve(as_of: finstack_quant_core::dates::Date) -> DiscountCurve {
     DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([
@@ -36,7 +36,7 @@ fn build_multi_tenor_curve(as_of: time::Date) -> DiscountCurve {
 }
 
 /// A plain fixed-rate 10Y bond (no call/put schedule).
-fn build_plain_bond(as_of: time::Date) -> Bond {
+fn build_plain_bond(as_of: finstack_quant_core::dates::Date) -> Bond {
     Bond::fixed(
         "BDKR-PLAIN",
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),

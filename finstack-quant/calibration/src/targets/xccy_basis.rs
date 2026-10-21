@@ -41,6 +41,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
     BasisSpreadCurve, DiscountCurve, DiscountCurveBuilder, ValidationMode as CurveValidationMode,
 };
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
@@ -196,7 +197,7 @@ impl XccyBasisTarget {
         }
 
         if has_xccy {
-            let mut xccy_curve_ids = finstack_quant_core::HashMap::default();
+            let mut xccy_curve_ids = finstack_quant_core::FxHashMap::default();
             xccy_curve_ids.insert(
                 "foreign_discount".to_string(),
                 schema_params.curve_id.to_string(),

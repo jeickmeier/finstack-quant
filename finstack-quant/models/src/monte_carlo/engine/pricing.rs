@@ -7,9 +7,9 @@ use crate::monte_carlo::estimate::Estimate;
 use crate::monte_carlo::paths::{PathDataset, PathSamplingMethod, ProcessParams, SimulatedPath};
 use crate::monte_carlo::results::{MoneyEstimate, MonteCarloResult};
 use crate::monte_carlo::traits::{Discretization, Payoff, RandomStream, StochasticProcess};
-use crate::monte_carlo::OnlineStats;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::linalg::{cholesky_correlation, CorrelationFactor};
+use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::Result;
 
 use std::ops::Range;

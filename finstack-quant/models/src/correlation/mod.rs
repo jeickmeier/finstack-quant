@@ -25,7 +25,6 @@
 //! # Utilities
 //!
 //! - [`crate::correlation::validate_correlation_matrix`]: Validate correlation matrices
-//! - [`crate::correlation::cholesky_decompose`]: Cholesky decomposition for correlated factor generation
 //! - [`crate::correlation::correlation_bounds`]: Fréchet-Hoeffding bounds for correlated Bernoulli
 //!
 //! # Conventions
@@ -62,8 +61,7 @@ pub use finstack_quant_core::math::probability::{
     correlation_bounds, joint_probabilities, CorrelatedBernoulli,
 };
 pub use latent_factor::{
-    cholesky_decompose, LatentFactorKind, LatentFactorSpec, LatentMultiFactor, LatentSingleFactor,
-    LatentTwoFactor,
+    LatentFactorKind, LatentFactorSpec, LatentMultiFactor, LatentSingleFactor, LatentTwoFactor,
 };
 pub use portfolio_loss::{
     simulate_portfolio_loss, simulate_portfolio_loss_with_recovery, CreditExposure,

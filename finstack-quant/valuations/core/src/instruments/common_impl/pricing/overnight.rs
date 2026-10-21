@@ -11,6 +11,7 @@ use finstack_quant_core::dates::{
 };
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
 
 /// Curve source used to project future overnight fixings.
@@ -808,6 +809,7 @@ pub fn overnight_coupon_amount(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::market_data::bumps::{BumpSpec, Bumpable};
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use time::macros::date;
 
@@ -854,9 +856,11 @@ mod tests {
             // Sensitivities are to the contractual index rate. Convert the raw
             // curve bump so both clocks represent the same 0.01 bp index bump.
             let curve_bump_bp = 0.01 * curve_rate / 0.04;
-            let up = forward.with_parallel_bump(curve_bump_bp).expect("up curve");
+            let up = forward
+                .apply_bump(BumpSpec::parallel_bp(curve_bump_bp))
+                .expect("up curve");
             let down = forward
-                .with_parallel_bump(-curve_bump_bp)
+                .apply_bump(BumpSpec::parallel_bp(-curve_bump_bp))
                 .expect("down curve");
             let finite_difference = (project(&up).rate - project(&down).rate) / 2e-6;
             assert!((projection.parallel_forward_sensitivity - finite_difference).abs() < 1e-8);
@@ -1055,8 +1059,12 @@ mod tests {
             .knots([(0.0, 0.03), (0.2, 0.04), (0.5, 0.055), (1.0, 0.06)])
             .build()
             .expect("forward curve");
-        let up = forward.with_parallel_bump(0.01).expect("up bump");
-        let down = forward.with_parallel_bump(-0.01).expect("down bump");
+        let up = forward
+            .apply_bump(BumpSpec::parallel_bp(0.01))
+            .expect("up bump");
+        let down = forward
+            .apply_bump(BumpSpec::parallel_bp(-0.01))
+            .expect("down bump");
         let calendar =
             resolve_overnight_fixing_calendar(Some("usny"), Currency::USD, "test caplet")
                 .expect("USNY calendar");
@@ -1099,8 +1107,16 @@ mod tests {
              finite difference {finite_difference}"
         );
 
-        let second_up = project(&forward.with_parallel_bump(1.0).expect("second up bump"));
-        let second_down = project(&forward.with_parallel_bump(-1.0).expect("second down bump"));
+        let second_up = project(
+            &forward
+                .apply_bump(BumpSpec::parallel_bp(1.0))
+                .expect("second up bump"),
+        );
+        let second_down = project(
+            &forward
+                .apply_bump(BumpSpec::parallel_bp(-1.0))
+                .expect("second down bump"),
+        );
         let second_finite_difference =
             (second_up.rate - 2.0 * base.rate + second_down.rate) / 1.0e-8;
         assert!(

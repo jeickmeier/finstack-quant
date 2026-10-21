@@ -111,7 +111,7 @@ pub(crate) fn i_spread_par_rate(
     {
         return Ok(par_swap_rate);
     }
-    let dates: Vec<Date> = finstack_quant_core::dates::ScheduleBuilder::new(quote_date, horizon)?
+    let dates: Vec<Date> = finstack_quant_core::dates::Schedule::builder(quote_date, horizon)?
         .frequency(frequency)
         .stub_rule(StubKind::ShortFront)
         .build()?

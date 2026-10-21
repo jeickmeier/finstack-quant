@@ -2,7 +2,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_margin::{
     ImMethodology, NettingSetId, SimmCreditSector, SimmRiskClass, SimmSensitivities,
 };
@@ -32,14 +32,14 @@ where
 /// Assemble a USD portfolio result from base-currency netting-set margins the
 /// way `margin::portfolio_margin` does.
 fn portfolio_result(
-    as_of: time::Date,
+    as_of: finstack_quant_core::dates::Date,
     margins: impl IntoIterator<Item = NettingSetMargin>,
 ) -> PortfolioMarginResult {
     let mut total_initial_margin = 0.0;
     let mut total_variation_margin = 0.0;
     let mut total_margin = 0.0;
     let mut total_positions = 0;
-    let mut by_netting_set = HashMap::default();
+    let mut by_netting_set = FxHashMap::default();
     for margin in margins {
         total_initial_margin += margin.initial_margin.amount();
         total_variation_margin += margin.variation_margin.amount();
@@ -56,7 +56,7 @@ fn portfolio_result(
             .expect("valid money fixture"),
         total_margin: Money::new(total_margin, Currency::USD).expect("valid money fixture"),
         by_netting_set,
-        by_csa: HashMap::default(),
+        by_csa: FxHashMap::default(),
         total_required_im_collateral: Money::from((0_i64, Currency::USD)),
         total_im_transfer: Money::from((0_i64, Currency::USD)),
         total_segregated_im: Money::from((0_i64, Currency::USD)),
@@ -190,7 +190,7 @@ fn im_breakdown_serializes_in_sorted_order_across_reversed_insertions() {
         if reverse {
             entries.reverse();
         }
-        let mut breakdown = HashMap::default();
+        let mut breakdown = FxHashMap::default();
         for (name, amount) in entries {
             breakdown.insert(
                 name.to_string(),
@@ -406,7 +406,7 @@ fn portfolio_wire_round_trip_preserves_all_sensitivity_buckets() {
         ImMethodology::Simm,
     )
     .expect("valid new fixture")
-    .with_simm_breakdown(original.clone(), HashMap::default());
+    .with_simm_breakdown(original.clone(), FxHashMap::default());
 
     let text = serde_json::to_string(&margin).expect("netting set serializes");
     let restored: NettingSetMargin = serde_json::from_str(&text).expect("netting set deserializes");

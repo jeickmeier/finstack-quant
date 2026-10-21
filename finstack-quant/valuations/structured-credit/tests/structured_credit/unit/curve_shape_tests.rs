@@ -9,7 +9,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     calculate_tranche_wal, run_simulation, AssetPool, AssetType, DealType, DelinquencyModel,
     PoolAsset, StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority, TrancheStructure,
@@ -95,7 +95,7 @@ fn auto_abs(level_pay: bool) -> StructuredCredit {
     deal
 }
 
-fn simulate(deal: &StructuredCredit) -> HashMap<String, TrancheCashflows> {
+fn simulate(deal: &StructuredCredit) -> FxHashMap<String, TrancheCashflows> {
     run_simulation(deal, &market(), close()).expect("simulation")
 }
 
@@ -124,7 +124,7 @@ fn abs_speed_shortens_the_senior_wal_versus_a_constant_smm() {
 /// scheduled principal or recovery except the net loss, the senior note is
 /// paid in full, and the residual principal reaching equity is 1M minus the
 /// loss.
-fn realized_loss(results: &HashMap<String, TrancheCashflows>) -> f64 {
+fn realized_loss(results: &FxHashMap<String, TrancheCashflows>) -> f64 {
     let senior = results["A"].total_principal.amount();
     assert!(
         (senior - 9_000_000.0).abs() < 1.0,

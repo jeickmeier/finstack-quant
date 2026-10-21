@@ -83,14 +83,13 @@ impl std::str::FromStr for CashSettlementMethod {
 #[serde(deny_unknown_fields)]
 pub struct BermudanSchedule {
     /// Exercise dates (must be sorted, typically on swap coupon dates)
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
     )]
     pub exercise_dates: Vec<Date>,
     /// Lockout period end (no exercise before this date)
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")

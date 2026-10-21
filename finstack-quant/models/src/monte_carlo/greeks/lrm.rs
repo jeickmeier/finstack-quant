@@ -20,7 +20,7 @@
 
 use crate::monte_carlo::estimate::Estimate;
 use crate::monte_carlo::results::MoneyEstimate;
-use crate::monte_carlo::OnlineStats;
+use finstack_quant_core::math::stats::OnlineStats;
 use serde::{Deserialize, Serialize};
 
 /// Price with likelihood-ratio delta and vega, all estimated from one set of

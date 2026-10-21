@@ -75,6 +75,19 @@ fn invalid(message: impl Into<String>) -> crate::Error {
     crate::Error::Validation(format!("Invalid time grid: {}", message.into()))
 }
 
+/// Push the knots `0, dt, …, (num_steps - 1)·dt, t_max` of a uniform grid.
+///
+/// The final knot is pinned to `t_max` exactly: `num_steps * (t_max/num_steps)`
+/// can differ from `t_max` by 1 ulp, which would make
+/// `grid.time(num_steps) != grid.t_max()` and disagree with
+/// [`TimeGrid::from_times`] (which derives `t_max` from the last knot).
+fn push_uniform_knots(times: &mut Vec<f64>, t_max: f64, num_steps: usize) {
+    let dt = t_max / num_steps as f64;
+    times.push(0.0);
+    times.extend((1..num_steps).map(|i| i as f64 * dt));
+    times.push(t_max);
+}
+
 impl TimeGrid {
     /// Create a uniform time grid from 0 to T with N steps.
     ///
@@ -113,11 +126,6 @@ impl TimeGrid {
                     "uniform grid step count {num_steps} exceeds vector capacity"
                 ))
             })?;
-        if num_steps > max_f64_capacity {
-            return Err(invalid(format!(
-                "uniform grid step count {num_steps} exceeds vector capacity"
-            )));
-        }
 
         let mut times = Vec::new();
         times.try_reserve_exact(times_capacity).map_err(|error| {
@@ -132,19 +140,10 @@ impl TimeGrid {
             ))
         })?;
 
+        push_uniform_knots(&mut times, t_max, num_steps);
         let dt = t_max / num_steps as f64;
-        times.push(0.0);
-        for i in 1..num_steps {
-            times.push(i as f64 * dt);
-            dts.push(dt);
-        }
-        // Pin the final knot to t_max exactly: `num_steps * (t_max/num_steps)`
-        // can differ from t_max by 1 ulp, which would make
-        // `grid.time(num_steps) != grid.t_max()` and disagree with
-        // `from_times` (which derives t_max from the last knot).
-        let last_interior = times[num_steps - 1];
-        dts.push(t_max - last_interior);
-        times.push(t_max);
+        dts.extend(std::iter::repeat_n(dt, num_steps - 1));
+        dts.push(t_max - times[num_steps - 1]);
 
         Ok(Self { t_max, times, dts })
     }
@@ -175,27 +174,25 @@ impl TimeGrid {
         required_times: &[f64],
     ) -> Result<Self> {
         if !t_max.is_finite() || t_max <= 0.0 {
-            return Err(crate::Error::Validation(format!(
+            return Err(invalid(format!(
                 "uniform_with_required_times requires finite t_max > 0, got {t_max}"
             )));
         }
         if !steps_per_year.is_finite() || steps_per_year <= 0.0 {
-            return Err(crate::Error::Validation(format!(
+            return Err(invalid(format!(
                 "uniform_with_required_times requires finite steps_per_year > 0, got \
                  {steps_per_year}"
             )));
         }
         if min_steps == 0 {
-            return Err(crate::Error::Validation(
-                "uniform_with_required_times requires min_steps >= 1".to_string(),
+            return Err(invalid(
+                "uniform_with_required_times requires min_steps >= 1",
             ));
         }
 
         let requested_steps = t_max * steps_per_year;
         if !requested_steps.is_finite() {
-            return Err(crate::Error::Validation(
-                "uniform_with_required_times step count overflowed".to_string(),
-            ));
+            return Err(invalid("uniform_with_required_times step count overflowed"));
         }
         let rounded_steps = requested_steps.round();
         let max_f64_capacity = isize::MAX as usize / std::mem::size_of::<f64>();
@@ -222,13 +219,7 @@ impl TimeGrid {
                 "uniform_with_required_times could not reserve {capacity} knots: {error}"
             ))
         })?;
-        times.push(0.0);
-
-        let dt = t_max / num_steps as f64;
-        for i in 1..num_steps {
-            times.push(i as f64 * dt);
-        }
-        times.push(t_max);
+        push_uniform_knots(&mut times, t_max, num_steps);
 
         for &required_time in required_times {
             // Accept times a float-noise tolerance past t_max (day-count year
@@ -284,19 +275,12 @@ impl TimeGrid {
             )));
         }
 
-        const MIN_DT_THRESHOLD: f64 = 1e-12;
         for i in 1..times.len() {
             if !times[i].is_finite() {
                 return Err(invalid(format!("times[{i}] must be finite")));
             }
             if times[i] <= times[i - 1] {
-                return Err(crate::error::InputError::NonMonotonicKnots.into());
-            }
-            if (times[i] - times[i - 1]).abs() < MIN_DT_THRESHOLD {
-                return Err(invalid(format!(
-                    "time step between times[{}] and times[{i}] is below the 1e-12 minimum",
-                    i - 1
-                )));
+                return Err(crate::InputError::NonMonotonicKnots.into());
             }
         }
 
@@ -668,7 +652,7 @@ mod tests {
 
     #[test]
     fn map_date_to_step_uses_provided_day_count_context() {
-        use crate::dates::{Calendar, Tenor};
+        use crate::dates::{Tenor, WEEKENDS_ONLY};
 
         let base = date!(2024 - 01 - 01);
         let event = date!(2024 - 07 - 01);
@@ -683,9 +667,8 @@ mod tests {
             6
         );
 
-        let calendar = Calendar::new("test", "Test", false, &[]);
         let bus252 = DayCountContext {
-            calendar: Some(&calendar),
+            calendar: Some(&WEEKENDS_ONLY),
             ..Default::default()
         };
         let step = map_date_to_step(base, event, maturity, 12, DayCount::Bus252, bus252)

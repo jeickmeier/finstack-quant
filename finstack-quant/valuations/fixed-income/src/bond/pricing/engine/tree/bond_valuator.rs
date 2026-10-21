@@ -3,7 +3,7 @@
 use super::super::super::super::types::Bond;
 use super::TreePricer;
 use finstack_quant_core::dates::DateExt;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Duration};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_core::Result;
@@ -11,6 +11,7 @@ use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
 use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree;
 use finstack_quant_models::{NodeState, TreeDiscounting, TreeValuator};
 use finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::continuous_frp_weight;
+use time::Duration;
 
 /// Bond valuator for tree-based pricing of callable/putable bonds.
 ///
@@ -1114,8 +1115,8 @@ impl BondValuator {
             )));
         }
         if self.step_discount_factors.len() != self.time_steps.len() {
-            return Err(finstack_quant_core::Error::internal(
-                "BondValuator discount-factor and time grids differ in length",
+            return Err(finstack_quant_core::Error::Internal(
+                "BondValuator discount-factor and time grids differ in length".into(),
             ));
         }
 
@@ -1234,7 +1235,7 @@ mod tests {
     use finstack_quant_core::dates::{DayCount, DayCountContext, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_core::math::map_date_to_step;
+    use finstack_quant_core::math::time_grid::map_date_to_step;
     use finstack_quant_core::money::Money;
     use finstack_quant_models::trees::two_factor_rates_credit::{
         RatesCreditCalibrationTargets, RatesCreditConfig,

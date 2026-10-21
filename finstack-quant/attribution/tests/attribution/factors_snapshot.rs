@@ -502,7 +502,6 @@ fn test_restore_preserves_families_outside_the_snapshot_model() {
     use finstack_quant_core::market_data::surfaces::SabrParameterData;
     use finstack_quant_core::market_data::surfaces::VolCube;
     use finstack_quant_core::market_data::term_structures::{PriceCurve, PriceCurveKind};
-    use finstack_quant_core::types::CurveId;
 
     let as_of = date!(2025 - 01 - 15);
     let price_curve = PriceCurve::builder("WTI")
@@ -518,21 +517,15 @@ fn test_restore_preserves_families_outside_the_snapshot_model() {
         .knots([(0.0, 15.0), (1.0, 18.0)])
         .build()
         .unwrap();
-    let sabr = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
-    let cube = VolCube::builder("USD-SWAPTION")
-        .expiries(&[1.0])
-        .tenors(&[5.0])
-        .node(sabr, 0.03)
-        .build()
-        .unwrap();
+    let sabr = SabrParameterData::new(0.035, 0.5, 0.4, -0.2).unwrap();
+    let cube = VolCube::from_grid("USD-SWAPTION", &[1.0], &[5.0], &[sabr], &[0.03]).unwrap();
 
     let market_t1 = MarketContext::new()
         .insert(create_test_discount_curve("USD-OIS", as_of))
         .insert(create_test_hazard_curve("ACME-HAZ", as_of))
         .insert(price_curve)
         .insert(vol_index)
-        .insert_vol_cube(cube)
-        .map_collateral("CSA-USD", CurveId::new("USD-OIS"));
+        .insert_vol_cube(cube);
 
     let market_t0 = MarketContext::new().insert(create_test_discount_curve("USD-OIS", as_of));
 
@@ -553,10 +546,6 @@ fn test_restore_preserves_families_outside_the_snapshot_model() {
     assert!(
         restored.get_vol_cube("USD-SWAPTION").is_ok(),
         "SABR vol cube must survive a rates restore"
-    );
-    assert!(
-        restored.get_collateral("CSA-USD").is_ok(),
-        "collateral CSA mapping must survive a rates restore"
     );
 
     // A VOL-flagged restore replaces cubes wholesale: T0 has none, so the

@@ -9,8 +9,8 @@
 //! spec, while the process, discretization and RNG types remain Rust-only.
 
 use crate::utils::input::{
-    from_js_json, js_bool, js_f64, js_opt_bool, js_opt_f64, js_opt_string, js_opt_u64, js_opt_uint,
-    js_u64,
+    from_js_json, js_bool, js_f64, js_opt_bool, js_opt_currency, js_opt_f64, js_opt_string,
+    js_opt_u64, js_opt_uint, js_u64,
 };
 use std::str::FromStr;
 
@@ -239,14 +239,8 @@ fn gbm_inputs(
     })
 }
 
-fn js_opt_currency(currency: Option<&JsValue>) -> Result<Option<Currency>, JsValue> {
-    js_opt_string(currency, "currency")?
-        .map(|code| Currency::from_str(&code).map_err(to_js_err))
-        .transpose()
-}
-
 fn js_currency(currency: Option<&JsValue>) -> Result<Currency, JsValue> {
-    convenience::resolve_currency(js_opt_currency(currency)?).map_err(to_js_err)
+    convenience::resolve_currency(js_opt_currency(currency, "currency")?).map_err(to_js_err)
 }
 
 /// Whether Heston parameters satisfy the Feller condition `2 * kappa * theta >= volOfVol^2`.
@@ -357,7 +351,7 @@ fn fd_spec(
         num_steps: js_opt_uint(num_steps, "numSteps")?,
         bump_size: js_opt_f64(bump_size, "bumpSize")?,
         option_type: OptionType::from(js_bool(is_call, "isCall")?),
-        currency: js_opt_currency(currency)?,
+        currency: js_opt_currency(currency, "currency")?,
     })
 }
 

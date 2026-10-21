@@ -5,9 +5,11 @@
 //! Dates are ISO-8601 strings (`"YYYY-MM-DD"`), as for the curves.
 
 use crate::api::core::currency::JsCurrency;
-use crate::utils::input::{from_js_json, js_opt_f64_seq, js_opt_string, js_string, js_uint};
+use crate::utils::input::{
+    from_js_json, js_currency, js_opt_currency, js_opt_f64_seq, js_opt_string, js_string, js_uint,
+};
+use crate::utils::wire::js_date;
 use crate::utils::{date_to_iso, parse_iso_date, to_js_err, to_js_value};
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::scalars::{
     InflationIndex as RustInflationIndex, InflationLag, ScalarTimeSeries as RustScalarTimeSeries,
@@ -31,11 +33,6 @@ fn observations_value(observations: Vec<(Date, f64)>) -> Result<JsValue, JsValue
         .map(|(date, value)| (date_to_iso(date), value))
         .collect();
     to_js_value(&pairs)
-}
-
-/// Read an ISO-8601 date argument.
-fn date_arg(value: &JsValue, label: &str) -> Result<Date, JsValue> {
-    parse_iso_date(&js_string(value, label)?)
 }
 
 /// Dated scalar market series, such as an equity index level or a fixing history.
@@ -88,10 +85,7 @@ impl JsScalarTimeSeries {
     ) -> Result<JsScalarTimeSeries, JsValue> {
         let id = js_string(&id, "id")?;
         let observations = observations_arg(&observations)?;
-        let currency = js_opt_string(currency.as_ref(), "currency")?
-            .map(|code| code.parse::<Currency>())
-            .transpose()
-            .map_err(to_js_err)?;
+        let currency = js_opt_currency(currency.as_ref(), "currency")?;
         let interpolation = js_opt_string(interpolation.as_ref(), "interpolation")?
             .map(|name| name.parse::<SeriesInterpolation>())
             .transpose()
@@ -143,7 +137,7 @@ impl JsScalarTimeSeries {
     #[wasm_bindgen(js_name = valueOn)]
     pub fn value_on(&self, date: JsValue) -> Result<f64, JsValue> {
         self.inner
-            .value_on(date_arg(&date, "date")?)
+            .value_on(js_date(&date, "date")?)
             .map_err(to_js_err)
     }
 
@@ -160,7 +154,7 @@ impl JsScalarTimeSeries {
     #[wasm_bindgen(js_name = valueOnExact)]
     pub fn value_on_exact(&self, date: JsValue) -> Result<f64, JsValue> {
         self.inner
-            .value_on_exact(date_arg(&date, "date")?)
+            .value_on_exact(js_date(&date, "date")?)
             .map_err(to_js_err)
     }
 
@@ -269,9 +263,7 @@ impl JsInflationIndex {
     ) -> Result<JsInflationIndex, JsValue> {
         let id = js_string(&id, "id")?;
         let observations = observations_arg(&observations)?;
-        let currency: Currency = js_string(&currency, "currency")?
-            .parse()
-            .map_err(to_js_err)?;
+        let currency = js_currency(&currency, "currency")?;
         let interpolation = js_opt_string(interpolation.as_ref(), "interpolation")?
             .map(|name| name.parse::<SeriesInterpolation>())
             .transpose()
@@ -353,7 +345,7 @@ impl JsInflationIndex {
     #[wasm_bindgen(js_name = valueOn)]
     pub fn value_on(&self, date: JsValue) -> Result<f64, JsValue> {
         self.inner
-            .value_on(date_arg(&date, "date")?)
+            .value_on(js_date(&date, "date")?)
             .map_err(to_js_err)
     }
 
@@ -371,8 +363,8 @@ impl JsInflationIndex {
     pub fn ratio(&self, base_date: JsValue, settle_date: JsValue) -> Result<f64, JsValue> {
         self.inner
             .ratio(
-                date_arg(&base_date, "baseDate")?,
-                date_arg(&settle_date, "settleDate")?,
+                js_date(&base_date, "baseDate")?,
+                js_date(&settle_date, "settleDate")?,
             )
             .map_err(to_js_err)
     }
@@ -393,7 +385,7 @@ impl JsInflationIndex {
     #[wasm_bindgen(js_name = refCpiMonthsLag)]
     pub fn ref_cpi_months_lag(&self, date: JsValue, lag_months: JsValue) -> Result<f64, JsValue> {
         self.inner
-            .ref_cpi_months_lag(date_arg(&date, "date")?, js_uint(&lag_months, "lagMonths")?)
+            .ref_cpi_months_lag(js_date(&date, "date")?, js_uint(&lag_months, "lagMonths")?)
             .map_err(to_js_err)
     }
 
@@ -499,7 +491,7 @@ impl JsInflationIndex {
     pub fn get_publication_date(&self, reference_date: JsValue) -> Result<Option<String>, JsValue> {
         Ok(self
             .inner
-            .get_publication_date(date_arg(&reference_date, "referenceDate")?)
+            .get_publication_date(js_date(&reference_date, "referenceDate")?)
             .map(date_to_iso))
     }
 

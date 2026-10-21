@@ -16,7 +16,6 @@ use finstack_quant_valuations_core::instruments::{
 };
 use finstack_quant_valuations_core::market::conventions::{CdsConventionSpec, ConventionRegistry};
 use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
-use rust_decimal::Decimal;
 
 /// Resolved CDS dates used by both builders and calibration prepared quotes.
 #[derive(Debug, Clone, Copy)]
@@ -169,7 +168,7 @@ pub(crate) fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<C
         ),
     };
 
-    ProtectionLegSpec::validate_recovery_rate(recovery_rate)?;
+    finstack_quant_core::validation::validate_recovery_rate(recovery_rate)?;
 
     let conv = registry.resolve_cds(convention_key)?;
     let dates = resolve_cds_dates(ctx, conv, pillar)?;
@@ -204,12 +203,7 @@ pub(crate) fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<C
             business_day_convention: conv.business_day_convention,
             calendar_id: Some(conv.calendar_id.clone().into()),
             day_count: conv.day_count,
-            coupon_bp: Decimal::try_from(spread_bp).map_err(|e| {
-                finstack_quant_core::Error::Validation(format!(
-                    "premium.coupon_bp {} cannot be represented as Decimal: {}",
-                    spread_bp, e
-                ))
-            })?,
+            coupon_bp: finstack_quant_core::decimal::f64_to_decimal(spread_bp)?,
             discount_curve_id: CurveId::new(discount_id),
         },
         protection_leg: ProtectionLegSpec {
@@ -238,7 +232,7 @@ mod tests {
     use crate::quotes::ids::{Pillar, QuoteId};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
-    use finstack_quant_core::HashMap;
+    use finstack_quant_core::FxHashMap;
     use finstack_quant_valuations_core::market::conventions::ids::{
         CdsConventionKey, CdsDocClause,
     };
@@ -247,7 +241,7 @@ mod tests {
     fn cds_build_ctx() -> BuildCtx {
         let as_of =
             Date::from_calendar_date(2024, Month::January, 2).expect("valid CDS build date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("credit".to_string(), "ABC-CORP".to_string());
         BuildCtx::new(as_of, 10_000_000.0, curve_ids)
@@ -350,7 +344,7 @@ mod tests {
         for ((ty, tm, td), (ey, em, ed)) in cases {
             let as_of =
                 Date::from_calendar_date(ty, tm, td).expect("valid CDS trade-date test case");
-            let mut curve_ids = HashMap::default();
+            let mut curve_ids = FxHashMap::default();
             curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
             curve_ids.insert("credit".to_string(), "ABC-CORP".to_string());
             let ctx = BuildCtx::new(as_of, 10_000_000.0, curve_ids);
@@ -386,7 +380,7 @@ mod tests {
     fn test_cds_tenor_pillar_runs_from_spot_not_prior_imm_start() -> Result<()> {
         let as_of = Date::from_calendar_date(2026, Month::May, 2)
             .expect("valid CDS spot-date regression date");
-        let mut curve_ids = HashMap::default();
+        let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("credit".to_string(), "IBM-USD-SENIOR".to_string());
         let ctx = BuildCtx::new(as_of, 10_000_000.0, curve_ids);

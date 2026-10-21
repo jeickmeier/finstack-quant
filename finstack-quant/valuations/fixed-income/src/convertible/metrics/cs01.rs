@@ -276,7 +276,7 @@ mod tests {
 
         // Busted-convert setup (spot=50, conversion value=500 vs face=1000):
         // the cash component dominates, so the z-spread CS01 must be material.
-        let market = finstack_quant_core::market_data::MarketContext::new()
+        let market = finstack_quant_core::market_data::context::MarketContext::new()
             .insert(discount_curve)
             .insert_price("AAPL", MarketScalar::Unitless(50.0))
             .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))

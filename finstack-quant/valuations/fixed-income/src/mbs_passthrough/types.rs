@@ -315,7 +315,6 @@ pub struct AgencyMbsPassthrough {
     /// seasoning ramps is derived separately from `issue_date`.
     pub wam_months: u32,
     /// Issue date of the pool.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -327,14 +326,12 @@ pub struct AgencyMbsPassthrough {
     /// When omitted, pricing infers the latest paid period from the agency
     /// payment-delay rule and `as_of`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub last_paid_accrual_end: Option<Date>,
     /// Legal maturity date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

@@ -1050,13 +1050,13 @@ pub fn max_portfolio_loss_paths() -> usize {
 ///
 /// Throws a `validation` error if the length is not `n * n` or the matrix is
 /// not a valid positive-semidefinite correlation matrix.
-#[wasm_bindgen(js_name = choleskyDecompose)]
-pub fn cholesky_decompose(matrix: JsValue, n: JsValue) -> Result<Box<[f64]>, JsValue> {
+#[wasm_bindgen(js_name = choleskyCorrelation)]
+pub fn cholesky_correlation(matrix: JsValue, n: JsValue) -> Result<Box<[f64]>, JsValue> {
     let matrix = js_f64_seq(&matrix, "matrix")?;
     let n: usize = js_uint(&n, "n")?;
-    corr::cholesky_decompose(&matrix, n)
+    finstack_quant_core::math::linalg::cholesky_correlation(&matrix, n)
         .map(|factor| factor.factor_matrix().into())
-        .map_err(to_js_err)
+        .map_err(|e| to_js_err(corr::Error::from(e)))
 }
 
 /// Simulate the portfolio credit-loss distribution under a factor copula.

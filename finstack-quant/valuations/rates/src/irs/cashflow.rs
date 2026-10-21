@@ -503,7 +503,7 @@ pub(crate) fn fixed_leg_annuity(
     as_of: finstack_quant_core::dates::Date,
     paid_after: finstack_quant_core::dates::Date,
 ) -> Result<f64> {
-    let mut annuity = finstack_quant_core::math::NeumaierAccumulator::new();
+    let mut annuity = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     for period in periods {
         if period.payment_date <= paid_after {
             continue;

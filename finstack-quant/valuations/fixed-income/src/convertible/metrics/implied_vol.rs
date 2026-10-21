@@ -100,9 +100,9 @@ impl MetricCalculator for ImpliedVolCalculator {
             }
         };
         let solved = BrentSolver::new()
-            .tolerance(1e-12)
-            .max_iterations(100)
-            .bracket_bounds(lower, upper)
+            .with_tolerance(1e-12)
+            .with_max_iterations(100)
+            .with_bracket_bounds(lower, upper)
             .solve(objective, 0.25_f64.clamp(lower, upper));
         if let Some(error) = captured_err.take() {
             return Err(error);
@@ -152,6 +152,7 @@ fn admissible_lower_volatility(evaluate: &impl Fn(f64) -> Result<f64>, upper: f6
 
 #[cfg(test)]
 mod tests {
+    use finstack_quant_core::market_data::traits::Discounting;
     use std::sync::Arc;
 
     use crate::convertible::{
@@ -230,7 +231,7 @@ mod tests {
         }
     }
 
-    fn make_market(base_date: Date) -> finstack_quant_core::market_data::MarketContext {
+    fn make_market(base_date: Date) -> finstack_quant_core::market_data::context::MarketContext {
         // Identical market to the standard convertible pricer tests (notional=1000,
         // spot=150, ratio=10 → conversion value = 1500 > notional, deep ITM).
         // r ≈ 1% from knots [(0,1),(10,0.90)].  Setting div yield = r keeps
@@ -243,7 +244,7 @@ mod tests {
             .build()
             .expect("should succeed");
 
-        finstack_quant_core::market_data::MarketContext::new()
+        finstack_quant_core::market_data::context::MarketContext::new()
             .insert(discount_curve)
             .insert_price("AAPL", MarketScalar::Unitless(150.0))
             .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))

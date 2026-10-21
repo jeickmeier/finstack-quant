@@ -20,7 +20,11 @@ use finstack_quant_valuations_fixed_income::revolving_credit::{
 use time::macros::date;
 
 /// Build a flat discount curve for testing.
-fn build_flat_discount_curve(rate: f64, base_date: time::Date, curve_id: &str) -> DiscountCurve {
+fn build_flat_discount_curve(
+    rate: f64,
+    base_date: finstack_quant_core::dates::Date,
+    curve_id: &str,
+) -> DiscountCurve {
     DiscountCurve::builder(curve_id)
         .base_date(base_date)
         .day_count(DayCount::Act360)
@@ -32,7 +36,7 @@ fn build_flat_discount_curve(rate: f64, base_date: time::Date, curve_id: &str) -
 /// Build a flat forward curve for testing.
 fn build_flat_forward_curve(
     rate: f64,
-    base_date: time::Date,
+    base_date: finstack_quant_core::dates::Date,
     curve_id: &str,
     tenor_years: f64,
 ) -> ForwardCurve {
@@ -49,8 +53,8 @@ fn build_flat_forward_curve(
 /// issue_date is in the past relative to as_of, so some reset dates
 /// will fall before the valuation date.
 fn build_seasoned_floating_facility(
-    issue_date: time::Date,
-    maturity_date: time::Date,
+    issue_date: finstack_quant_core::dates::Date,
+    maturity_date: finstack_quant_core::dates::Date,
 ) -> RevolvingCredit {
     RevolvingCredit::builder()
         .id("RC-FIXING-TEST".into())

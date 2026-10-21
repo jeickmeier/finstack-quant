@@ -160,8 +160,7 @@ mod cases {
         let budget = Money::from_decimal(
             rust_decimal_macros::dec!(10557280.900008413701),
             Currency::USD,
-        )
-        .expect("decimal budget");
+        );
         let spent = recycle_reinvestment_principal(
             &mut state,
             budget,
@@ -447,13 +446,13 @@ mod cases {
         )
         .map(|run| run.tranches)
         .expect("funded spread");
-        let interest = |results: &HashMap<String, TrancheCashflows>| {
+        let interest = |results: &FxHashMap<String, TrancheCashflows>| {
             results
                 .values()
                 .map(|result| result.total_interest.amount())
                 .sum::<f64>()
         };
-        let principal = |results: &HashMap<String, TrancheCashflows>| {
+        let principal = |results: &FxHashMap<String, TrancheCashflows>| {
             results
                 .values()
                 .map(|result| result.total_principal.amount())
@@ -1008,7 +1007,7 @@ mod cases {
         eur.cashflows
             .push((pay_date, Money::from((50_i64, Currency::EUR))));
 
-        let mut results = HashMap::default();
+        let mut results = FxHashMap::default();
         results.insert(usd.tranche_id.clone(), usd);
         results.insert(eur.tranche_id.clone(), eur);
 
@@ -2960,7 +2959,7 @@ mod cases {
         // (b) Conservation against a lag-0 run: the recovery lag shifts cash
         // TIMING only — pool interest, defaults, and recoveries are identical
         // — so total cash distributed across the structure must match.
-        let total_cash = |res: &HashMap<String, TrancheCashflows>| -> f64 {
+        let total_cash = |res: &FxHashMap<String, TrancheCashflows>| -> f64 {
             res.values()
                 .flat_map(|r| r.cashflows.iter())
                 .map(|(_, m)| m.amount())

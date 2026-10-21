@@ -56,6 +56,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 
 use crate::calculators::im::simm::SimmCalculator;
 use crate::types::SimmSensitivities;
@@ -400,7 +401,7 @@ pub(crate) fn compute_mva_internal(
         let spread_mid = finstack_quant_core::math::interp::interp_knots_flat(
             funding_spread_curve,
             0.5 * (prev_t + t),
-        ) / 10_000.0;
+        ) / BASIS_POINTS_PER_UNIT;
 
         mva += spread_mid * im_mid * df_mid * sp_mid * dt;
         im_time_integral += im_mid * dt;

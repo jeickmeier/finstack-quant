@@ -289,7 +289,7 @@ fn single_currency_totals_are_converted_at_the_reporting_snapshot() {
             &self,
             from: Currency,
             to: Currency,
-            on: time::Date,
+            on: finstack_quant_core::dates::Date,
             policy: FxConversionPolicy,
         ) -> finstack_quant_core::Result<f64> {
             assert_eq!(
@@ -352,7 +352,7 @@ fn fx_pivot_does_not_choose_reporting_currency() {
             &self,
             _: Currency,
             _: Currency,
-            _: time::Date,
+            _: finstack_quant_core::dates::Date,
             _: FxConversionPolicy,
         ) -> finstack_quant_core::Result<f64> {
             Ok(1.2)

@@ -20,8 +20,8 @@
 //! - Qi, M. & Yang, X. (2009). "Loss Given Default of High Loan-to-Value
 //!   Residential Mortgages." Journal of Banking & Finance. `docs/REFERENCES.md#basel-ii-2006`
 
-use finstack_quant_core::error::{InputError, NonFiniteKind};
 use finstack_quant_core::Result;
+use finstack_quant_core::{InputError, NonFiniteKind};
 
 fn non_finite_kind(value: f64) -> NonFiniteKind {
     if value.is_nan() {

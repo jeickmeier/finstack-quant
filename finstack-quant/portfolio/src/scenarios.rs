@@ -9,7 +9,7 @@ use crate::types::PositionId;
 use crate::Portfolio;
 use crate::{dependencies::MarketFactorKey, evaluation::PositionInvalidation};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
-use finstack_quant_core::error::ErrorKind;
+use finstack_quant_core::ErrorKind;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_scenarios::{
@@ -751,11 +751,7 @@ mod tests {
                 .report
                 .meta
                 .as_ref()
-                .and_then(|meta| meta
-                    .rounding
-                    .get_output_scale_by_currency()
-                    .get(&Currency::USD))
-                .copied(),
+                .map(|meta| meta.rounding.output_scale(Currency::USD)),
             Some(4),
             "scenario provenance must use the caller's active configuration"
         );

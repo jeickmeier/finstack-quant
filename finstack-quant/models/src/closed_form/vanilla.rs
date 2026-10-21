@@ -225,8 +225,8 @@ pub fn bs_price_unchecked(
 
     let (d1, d2) = d1_d2(spot, strike, rate, vol, expiry, div_yield);
 
-    let cdf_d1 = finstack_quant_core::math::norm_cdf(d1);
-    let cdf_d2 = finstack_quant_core::math::norm_cdf(d2);
+    let cdf_d1 = finstack_quant_core::math::special_functions::norm_cdf(d1);
+    let cdf_d2 = finstack_quant_core::math::special_functions::norm_cdf(d2);
 
     let exp_q_t = (-div_yield * expiry).exp();
     let exp_r_t = (-rate * expiry).exp();
@@ -234,8 +234,8 @@ pub fn bs_price_unchecked(
     let raw_price = match option_type {
         OptionType::Call => spot * exp_q_t * cdf_d1 - strike * exp_r_t * cdf_d2,
         OptionType::Put => {
-            let cdf_m_d1 = finstack_quant_core::math::norm_cdf(-d1);
-            let cdf_m_d2 = finstack_quant_core::math::norm_cdf(-d2);
+            let cdf_m_d1 = finstack_quant_core::math::special_functions::norm_cdf(-d1);
+            let cdf_m_d2 = finstack_quant_core::math::special_functions::norm_cdf(-d2);
             strike * exp_r_t * cdf_m_d2 - spot * exp_q_t * cdf_m_d1
         }
     };
@@ -412,12 +412,12 @@ pub fn bs_greeks_unchecked(
     let exp_r_t = (-rate * expiry).exp();
     let sqrt_t = expiry.sqrt();
 
-    let pdf_d1 = finstack_quant_core::math::norm_pdf(d1);
+    let pdf_d1 = finstack_quant_core::math::special_functions::norm_pdf(d1);
 
-    let cdf_d1 = finstack_quant_core::math::norm_cdf(d1);
-    let cdf_d2 = finstack_quant_core::math::norm_cdf(d2);
-    let cdf_m_d1 = finstack_quant_core::math::norm_cdf(-d1);
-    let cdf_m_d2 = finstack_quant_core::math::norm_cdf(-d2);
+    let cdf_d1 = finstack_quant_core::math::special_functions::norm_cdf(d1);
+    let cdf_d2 = finstack_quant_core::math::special_functions::norm_cdf(d2);
+    let cdf_m_d1 = finstack_quant_core::math::special_functions::norm_cdf(-d1);
+    let cdf_m_d2 = finstack_quant_core::math::special_functions::norm_cdf(-d2);
 
     let delta = match option_type {
         OptionType::Call => exp_q_t * cdf_d1,

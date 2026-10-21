@@ -8,7 +8,8 @@
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::math::{norm_cdf, norm_pdf};
+use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::math::special_functions::{norm_cdf, norm_pdf};
 use finstack_quant_valuations::instruments::{
     CommodityFutureOption, EquityFutureOption, ExerciseStyle, FutureOptionModel,
     FutureOptionPremiumStyle, FutureOptionSettlement, FutureOptionTerms, FxFutureOption,

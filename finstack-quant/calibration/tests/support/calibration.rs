@@ -1,6 +1,6 @@
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::market_datum::{
-    CollateralEntry, DividendScheduleDatum, FxSpotDatum, MarketDatum, PriceDatum,
+    DividendScheduleDatum, FxSpotDatum, MarketDatum, PriceDatum,
 };
 use finstack_quant_calibration::api::prior_market::PriorMarketObject;
 use finstack_quant_calibration::api::schema::{
@@ -9,7 +9,6 @@ use finstack_quant_calibration::api::schema::{
 use finstack_quant_calibration::quotes::ids::QuoteId;
 use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::{CalibrationConfig, CalibrationReport};
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::{CurveState, MarketContext, MarketContextState};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::PricingOptions;
@@ -49,7 +48,7 @@ pub fn extend_market_data(market_data: &mut Vec<MarketDatum>, quotes: &[MarketQu
 
 pub(crate) fn split_market_context_state(
     state: MarketContextState,
-) -> Result<(Vec<PriorMarketObject>, Vec<MarketDatum>)> {
+) -> (Vec<PriorMarketObject>, Vec<MarketDatum>) {
     let mut prior = state
         .curves
         .into_iter()
@@ -117,29 +116,13 @@ pub(crate) fn split_market_context_state(
             .map(MarketDatum::FxVolSurface),
     );
     data.extend(state.vol_cubes.into_iter().map(MarketDatum::VolCube));
-    for (currency, csa_currency) in state.collateral {
-        data.push(MarketDatum::Collateral(CollateralEntry {
-            id: parse_snapshot_currency(&currency, "collateral currency")?,
-            csa_currency: parse_snapshot_currency(&csa_currency, "CSA currency")?,
-        }));
-    }
-    Ok((prior, data))
-}
-
-fn parse_snapshot_currency(value: &str, field: &str) -> Result<Currency> {
-    value
-        .parse()
-        .map_err(|err| finstack_quant_core::Error::Calibration {
-            message: format!("Invalid {field} in market context snapshot: '{value}' ({err})"),
-            category: "market_context_split".to_string(),
-        })
+    (prior, data)
 }
 
 /// Split a [`MarketContext`] into the canonical `(prior_market,
 /// market_data)` inputs used by calibration tests.
 pub fn split_market_context(ctx: &MarketContext) -> (Vec<PriorMarketObject>, Vec<MarketDatum>) {
     split_market_context_state(MarketContextState::try_from(ctx).expect("coherent market snapshot"))
-        .expect("valid market context snapshot")
 }
 
 /// Execute a single calibration step for tests/benchmarks without engaging the full plan engine.
@@ -149,12 +132,12 @@ pub fn execute_step(
     context: &MarketContext,
     global_config: &CalibrationConfig,
 ) -> Result<(MarketContext, CalibrationReport)> {
-    let (prior, mut data) = split_market_context_state(MarketContextState::try_from(context)?)?;
+    let (prior, mut data) = split_market_context_state(MarketContextState::try_from(context)?);
 
     let ids = quote_set_ids(quotes);
     extend_market_data(&mut data, quotes);
 
-    let mut quote_sets = finstack_quant_core::HashMap::default();
+    let mut quote_sets = finstack_quant_core::FxHashMap::default();
     quote_sets.insert("default".to_string(), ids);
 
     let plan = CalibrationPlan {

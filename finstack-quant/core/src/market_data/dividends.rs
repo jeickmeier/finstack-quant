@@ -89,7 +89,6 @@ pub enum DividendKind {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct DividendEvent {
     /// Ex-dividend date.
-    #[serde(with = "crate::wire::date")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub date: Date,
     /// Event kind.
@@ -208,7 +207,7 @@ impl DividendSchedule {
             match &ev.kind {
                 DividendKind::Cash(m) => {
                     if m.amount() < 0.0 {
-                        return Err(Error::Input(crate::error::InputError::NegativeValue));
+                        return Err(Error::Input(crate::InputError::NegativeValue));
                     }
                 }
                 DividendKind::Yield(y) => {
@@ -218,7 +217,7 @@ impl DividendSchedule {
                         ));
                     }
                     if *y < 0.0 {
-                        return Err(Error::Input(crate::error::InputError::NegativeValue));
+                        return Err(Error::Input(crate::InputError::NegativeValue));
                     }
                 }
                 DividendKind::Stock { ratio } => {
@@ -228,7 +227,7 @@ impl DividendSchedule {
                         ));
                     }
                     if *ratio < 0.0 {
-                        return Err(Error::Input(crate::error::InputError::NegativeValue));
+                        return Err(Error::Input(crate::InputError::NegativeValue));
                     }
                 }
             }

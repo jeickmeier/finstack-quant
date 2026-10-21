@@ -148,7 +148,7 @@ fn bench_margin_aggregation(c: &mut Criterion) {
     group.sample_size(10);
     let as_of = date!(2025 - 01 - 01);
     let market = MarketContext::new();
-    let collateral_balances = finstack_quant_core::HashMap::default();
+    let collateral_balances = finstack_quant_core::FxHashMap::default();
 
     for &n_positions in &[256_usize, 1_024] {
         let portfolio = margin_portfolio(n_positions, 4, as_of);

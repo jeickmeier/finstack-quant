@@ -11,7 +11,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_margin::types::SimmSensitivitiesJson;
 use finstack_quant_margin::{ImCollateralResult, ImMethodology, NettingSetId, SimmSensitivities};
 use std::collections::BTreeMap;
@@ -187,7 +187,7 @@ impl From<PortfolioMarginResultWire> for PortfolioMarginResult {
             .into_iter()
             .map(|d| (PositionId::new(d.position_id), d.message))
             .collect();
-        let by_netting_set: HashMap<NettingSetId, NettingSetMargin> = w
+        let by_netting_set: FxHashMap<NettingSetId, NettingSetMargin> = w
             .netting_sets
             .into_iter()
             .map(|wire| {

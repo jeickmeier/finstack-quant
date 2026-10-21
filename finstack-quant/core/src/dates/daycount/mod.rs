@@ -77,17 +77,16 @@
 //! This requires a holiday calendar to determine business days. Provide the calendar via `DayCountContext`.
 //!
 //! ```
-//! use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
-//! use finstack_quant_core::dates::calendar::TARGET2;
+//! use finstack_quant_core::dates::{calendar_by_id_strict, Date, DayCount, DayCountContext};
 //! use time::Month;
 //!
 //! let start = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
 //! let end   = Date::from_calendar_date(2025, Month::January, 31).expect("Valid date");
-//! let calendar = TARGET2;
+//! let calendar = calendar_by_id_strict("target2").expect("built-in calendar");
 //!
 //! // Calculate year fraction with a calendar in context
 //! let yf = DayCount::Bus252
-//!     .year_fraction(start, end, DayCountContext { calendar: Some(&calendar), ..DayCountContext::default() })
+//!     .year_fraction(start, end, DayCountContext { calendar: Some(calendar), ..DayCountContext::default() })
 //!     .expect("Year fraction calculation should succeed");
 //! ```
 //!
@@ -124,13 +123,12 @@ mod context;
 mod other;
 mod thirty360;
 
-pub use act_act::act_act_isma_year_fraction_with_reference_period;
 pub use context::{DayCountContext, DayCountContextState};
 pub use thirty360::{days_30_360, days_30e_360_isda, Thirty360Convention};
 
 use time::Date;
 
-use crate::error::InputError;
+use crate::InputError;
 use act_act::{
     year_fraction_act_act_afb, year_fraction_act_act_isda, year_fraction_act_act_isma_with_ctx,
 };
@@ -222,8 +220,7 @@ use crate::dates::Tenor;
 /// - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
 ///   frequency, take (actual days) / (actual days in coupon period) for each,
 ///   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-///   first/last coupons use
-///   [`act_act_isma_year_fraction_with_reference_period`].
+///   first/last coupons also supply the enclosing regular `coupon_period`.
 /// - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
 ///   **backwards from `end`** until the candidate is before `start`; each
 ///   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -255,8 +252,7 @@ use crate::dates::Tenor;
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::calendar::NYSE;
-/// use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+/// use finstack_quant_core::dates::{calendar_by_id_strict, Date, DayCount, DayCountContext, Tenor};
 /// use time::Month;
 ///
 /// let date = |y, m, d| Date::from_calendar_date(y, m, d).expect("Valid date");
@@ -315,7 +311,8 @@ use crate::dates::Tenor;
 /// // Business/252: Monday to next Monday is 4 business days, because the
 /// // NYSE was closed on January 9, 2025.
 /// let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
-/// let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
+/// let nyse = calendar_by_id_strict("nyse").expect("built-in calendar");
+/// let ctx = DayCountContext { calendar: Some(nyse), ..Default::default() };
 /// assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -507,17 +504,17 @@ impl DayCount {
     /// # Errors
     ///
     /// Returns an error when:
-    /// - [`InputError::InvalidDateRange`](crate::error::InputError::InvalidDateRange):
+    /// - [`InputError::InvalidDateRange`](crate::InputError::InvalidDateRange):
     ///   `start > end` (inverted date range)
-    /// - [`InputError::MissingCalendarForBus252`](crate::error::InputError::MissingCalendarForBus252):
+    /// - [`InputError::MissingCalendarForBus252`](crate::InputError::MissingCalendarForBus252):
     ///   Using `Bus252` without a calendar in `ctx`
-    /// - [`InputError::InvalidBusBasis`](crate::error::InputError::InvalidBusBasis):
+    /// - [`InputError::InvalidBusBasis`](crate::InputError::InvalidBusBasis):
     ///   Using `Bus252` with a zero basis
-    /// - [`InputError::MissingFrequencyForActActIsma`](crate::error::InputError::MissingFrequencyForActActIsma):
+    /// - [`InputError::MissingFrequencyForActActIsma`](crate::InputError::MissingFrequencyForActActIsma):
     ///   Using `ActActIsma` without a frequency in `ctx`
-    /// - [`InputError::MissingCouponPeriodForActActIsma`](crate::error::InputError::MissingCouponPeriodForActActIsma):
+    /// - [`InputError::MissingCouponPeriodForActActIsma`](crate::InputError::MissingCouponPeriodForActActIsma):
     ///   Using `ActActIsma` on an irregular coupon without `ctx.coupon_period`
-    /// - [`InputError::ActActIsmaUnsupportedFrequency`](crate::error::InputError::ActActIsmaUnsupportedFrequency):
+    /// - [`InputError::ActActIsmaUnsupportedFrequency`](crate::InputError::ActActIsmaUnsupportedFrequency):
     ///   Using `ActActIsma` with a Day or Week frequency
     /// - `Error::Validation`: using `Act365L` without frequency or an enclosing
     ///   `coupon_period`, or supplying accrual dates outside that coupon
@@ -645,41 +642,18 @@ impl DayCount {
         }
     }
 
-    /// Calendar days between two dates (signed: negative when `end < start`).
-    ///
-    /// This is a thin convenience wrapper around `(end - start).whole_days()`.
-    /// It counts raw calendar days without regard for any day-count convention,
-    /// business-day calendar, or holiday schedule.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{Date, DayCount};
-    /// use time::Month;
-    ///
-    /// let start = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
-    /// let end   = Date::from_calendar_date(2025, Month::February, 1).expect("Valid date");
-    /// assert_eq!(DayCount::calendar_days(start, end), 31);
-    ///
-    /// // Negative when end < start
-    /// assert_eq!(DayCount::calendar_days(end, start), -31);
-    /// ```
-    pub fn calendar_days(start: Date, end: Date) -> i64 {
-        (end - start).whole_days()
-    }
-
     /// Canonical snake_case names accepted by [`FromStr`](std::str::FromStr),
-    /// in declaration order.
-    pub const NAMES: &'static [&'static str] = &[
+    /// in declaration order (the `FromStr` error lists them).
+    const NAMES: &'static [&'static str] = &[
         "one_one",
         "act_360",
         "act_365f",
         "act_365l",
-        "nl_365",
         "30_360",
         "30e_360",
         "30e_360_isda",
         "30_360_it",
+        "nl_365",
         "act_act",
         "act_act_isma",
         "act_act_afb",
@@ -688,23 +662,9 @@ impl DayCount {
 }
 
 impl std::fmt::Display for DayCount {
+    /// Writes the serde label (`act_360`, `30e_360_isda`, ...).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let label = match self {
-            DayCount::OneOne => "one_one",
-            DayCount::Act360 => "act_360",
-            DayCount::Act365F => "act_365f",
-            DayCount::Act365L => "act_365l",
-            DayCount::Nl365 => "nl_365",
-            DayCount::Thirty360 => "30_360",
-            DayCount::ThirtyE360 => "30e_360",
-            DayCount::ThirtyE360Isda => "30e_360_isda",
-            DayCount::Thirty360It => "30_360_it",
-            DayCount::ActAct => "act_act",
-            DayCount::ActActIsma => "act_act_isma",
-            DayCount::ActActAfb => "act_act_afb",
-            DayCount::Bus252 => "bus_252",
-        };
-        f.write_str(label)
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
     }
 }
 
@@ -738,25 +698,12 @@ impl std::str::FromStr for DayCount {
             "30_360_it" | "30_360_italian" => "30_360_it",
             other => other,
         };
-        match canonical {
-            "one_one" => Ok(Self::OneOne),
-            "act_360" => Ok(Self::Act360),
-            "act_365f" => Ok(Self::Act365F),
-            "act_365l" => Ok(Self::Act365L),
-            "nl_365" => Ok(Self::Nl365),
-            "30_360" => Ok(Self::Thirty360),
-            "30e_360" => Ok(Self::ThirtyE360),
-            "30e_360_isda" => Ok(Self::ThirtyE360Isda),
-            "30_360_it" => Ok(Self::Thirty360It),
-            "act_act" => Ok(Self::ActAct),
-            "act_act_isma" => Ok(Self::ActActIsma),
-            "act_act_afb" => Ok(Self::ActActAfb),
-            "bus_252" => Ok(Self::Bus252),
-            _ => Err(crate::Error::Validation(format!(
+        crate::wire::serde_parse(canonical).map_err(|_| {
+            crate::Error::Validation(format!(
                 "unknown day-count convention: '{s}'; expected one of {}",
                 Self::NAMES.join(", ")
-            ))),
-        }
+            ))
+        })
     }
 }
 
@@ -801,7 +748,7 @@ mod parse_tests {
 }
 #[cfg(test)]
 mod tests {
-    use super::act_act_isma_year_fraction_with_reference_period;
+    use super::act_act::act_act_isma_year_fraction_with_reference_period;
     use time::macros::date;
 
     /// Per-year and bulk additions differ for a representative ISDA seed.

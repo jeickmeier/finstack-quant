@@ -58,8 +58,6 @@ pub enum MarketDatum {
     FxVolSurface(FxDeltaVolSurface),
     /// Generic vol cube.
     VolCube(VolCube),
-    /// Collateral / CSA mapping entry.
-    Collateral(CollateralEntry),
 }
 
 /// FX-spot quote payload for [`MarketDatum::FxSpot`].
@@ -97,17 +95,6 @@ pub struct DividendScheduleDatum {
     pub schedule: DividendSchedule,
 }
 
-/// Collateral / CSA mapping payload for [`MarketDatum::Collateral`].
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct CollateralEntry {
-    /// Trade-leg currency this CSA mapping applies to.
-    pub id: Currency,
-    /// Collateral / CSA currency.
-    pub csa_currency: Currency,
-}
-
 impl MarketDatum {
     /// Stable identifier for this datum, borrowed as a string slice.
     ///
@@ -129,7 +116,6 @@ impl MarketDatum {
             MarketDatum::CreditIndex(c) => c.id.as_str(),
             MarketDatum::FxVolSurface(s) => s.id().as_str(),
             MarketDatum::VolCube(c) => c.id().as_str(),
-            MarketDatum::Collateral(c) => c.id.as_ref(),
         }
     }
 
@@ -150,7 +136,6 @@ impl MarketDatum {
             MarketDatum::CreditIndex(_) => "credit_index",
             MarketDatum::FxVolSurface(_) => "fx_vol_surface",
             MarketDatum::VolCube(_) => "vol_cube",
-            MarketDatum::Collateral(_) => "collateral",
         }
     }
 
@@ -262,15 +247,5 @@ mod tests {
         assert_eq!(datum.id(), "EUR/USD");
         assert_eq!(datum.kind_name(), "fx_spot");
         assert!(datum.as_quote().is_none());
-    }
-
-    #[test]
-    fn collateral_id_returns_currency_string() {
-        let datum = MarketDatum::Collateral(CollateralEntry {
-            id: Currency::USD,
-            csa_currency: Currency::USD,
-        });
-        assert_eq!(datum.id(), "USD");
-        assert_eq!(datum.kind_name(), "collateral");
     }
 }

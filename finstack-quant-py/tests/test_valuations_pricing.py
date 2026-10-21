@@ -151,7 +151,6 @@ def _market_json(include_discount: bool = True) -> str:
         "credit_indices": [],
         "fx_delta_vol_surfaces": [],
         "vol_cubes": [],
-        "collateral": {},
         "hierarchy": None,
     })
 
@@ -193,7 +192,6 @@ def _tarn_market_json() -> str:
         "credit_indices": [],
         "fx_delta_vol_surfaces": [],
         "vol_cubes": [],
-        "collateral": {},
         "hierarchy": None,
     })
 
@@ -255,7 +253,6 @@ def _cms_spread_market_json() -> str:
         "credit_indices": [],
         "fx_delta_vol_surfaces": [],
         "vol_cubes": [],
-        "collateral": {},
         "hierarchy": None,
     })
 

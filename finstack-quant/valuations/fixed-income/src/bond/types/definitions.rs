@@ -55,14 +55,12 @@ pub struct Bond {
     /// Principal amount of the bond.
     pub notional: Money,
     /// Issue date of the bond.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub issue_date: Date,
     /// Maturity date of the bond.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -255,7 +253,6 @@ impl<'de> serde::Deserialize<'de> for Bond {
 #[serde(deny_unknown_fields)]
 pub struct CallPut {
     /// First date when the option can be exercised.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -264,7 +261,6 @@ pub struct CallPut {
     /// Last date when the option can be exercised, inclusive.
     ///
     /// Use the same value as `start` for one-day/discrete exercise.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

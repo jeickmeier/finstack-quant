@@ -56,7 +56,7 @@ pub fn panel_transform_result_get_column(
     let name = js_string(&name, "name")?;
     let column = result.get_column(&name).ok_or_else(|| {
         to_js_err(finstack_quant_core::Error::Input(
-            finstack_quant_core::error::InputError::NotFound {
+            finstack_quant_core::InputError::NotFound {
                 id: format!("panel transform column '{name}'"),
             },
         ))

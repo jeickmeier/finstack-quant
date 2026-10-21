@@ -10,6 +10,7 @@
 
 use crate::dividend01::dividend01_central_diff;
 use crate::equity_option::EquityOption;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};

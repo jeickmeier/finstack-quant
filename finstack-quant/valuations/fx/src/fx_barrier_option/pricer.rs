@@ -7,6 +7,7 @@ use crate::shared::{
 };
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::PayoutTiming;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
@@ -684,7 +685,7 @@ mod tests {
     fn mc_expiry_only_down_out_call_matches_vanilla() {
         let mut inst = FxBarrierOption::example().expect("example");
         let as_of = inst.monitoring_start_date.expect("example start");
-        inst.expiry = as_of + finstack_quant_core::dates::Duration::days(365);
+        inst.expiry = as_of + time::Duration::days(365);
         inst.monitoring_start_date = Some(inst.expiry);
         inst.barrier_type = BarrierType::DownAndOut;
         inst.instrument_pricing_overrides
@@ -770,8 +771,8 @@ mod tests {
         inst.instrument_pricing_overrides
             .market_quotes
             .implied_volatility = Some(0.15);
-        let before = inst.expiry - finstack_quant_core::dates::Duration::days(1);
-        let after = inst.expiry + finstack_quant_core::dates::Duration::days(1);
+        let before = inst.expiry - time::Duration::days(1);
+        let after = inst.expiry + time::Duration::days(1);
         let mut market =
             MarketContext::new().insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.25));
         for id in ["USD-OIS", "EUR-OIS"] {

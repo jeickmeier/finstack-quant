@@ -69,7 +69,6 @@ pub struct AsianOption {
     /// Averaging method (arithmetic or geometric)
     pub averaging_method: AveragingMethod,
     /// Option expiry date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -80,7 +79,6 @@ pub struct AsianOption {
     /// **Note**: These dates should be pre-adjusted for business day conventions.
     /// The pricer uses these dates directly without further adjustment.
     /// See struct-level documentation for business day convention guidance.
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
@@ -133,7 +131,6 @@ pub struct AsianOption {
     /// `fixing_dates` and are on or before the valuation date are considered.
     #[builder(default)]
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")

@@ -159,14 +159,12 @@ pub struct InflationLinkedBond {
     /// Day count convention
     pub day_count: DayCount,
     /// Issue date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub issue_date: Date,
     /// Maturity date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -175,7 +173,6 @@ pub struct InflationLinkedBond {
     /// Base CPI/index value at issue
     pub base_cpi: f64,
     /// Base date for index (may differ from issue date)
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -1000,7 +997,8 @@ mod tests {
                 .payment_index_ratio(payment, &market, as_of, true)
                 .expect("floor");
             // ATM lognormal ratio: E[max(X,1)] = 2 Phi(sigma/2).
-            let expected = 2.0 * finstack_quant_core::math::norm_cdf(sigma / 2.0);
+            let expected =
+                2.0 * finstack_quant_core::math::special_functions::norm_cdf(sigma / 2.0);
             assert!((ratio - expected).abs() < 1e-12, "{ratio} vs {expected}");
         }
     }

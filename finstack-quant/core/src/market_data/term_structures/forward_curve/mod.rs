@@ -72,7 +72,7 @@ use crate::{
     dates::{Date, DayCount},
     error::InputError,
     math::integration::simpson_rule,
-    math::interp::types::Interp,
+    math::interp::Interp,
     types::CurveId,
 };
 

@@ -5,10 +5,46 @@ use finstack_quant_core::market_data::hierarchy::{
 };
 use finstack_quant_core::types::CurveId;
 
+/// Curve ids a target resolves to, in traversal order.
+fn resolved_ids(
+    h: &MarketDataHierarchy,
+    target: &HierarchyTarget,
+    mode: ResolutionMode,
+) -> Vec<CurveId> {
+    h.resolve_matches(target, mode)
+        .into_iter()
+        .map(|matched| matched.curve_id)
+        .collect()
+}
+
+/// Root node names, read from the hierarchy's wire form.
+fn root_names(h: &MarketDataHierarchy) -> Vec<String> {
+    serde_json::to_value(h).unwrap()["roots"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .cloned()
+        .collect()
+}
+
+/// Every curve id in the hierarchy (the subtree of each root).
+fn all_ids(h: &MarketDataHierarchy) -> Vec<CurveId> {
+    root_names(h)
+        .into_iter()
+        .flat_map(|root| {
+            let target = HierarchyTarget {
+                path: vec![root],
+                tag_filter: None,
+            };
+            resolved_ids(h, &target, ResolutionMode::Cumulative)
+        })
+        .collect()
+}
+
 #[test]
 fn empty_hierarchy_has_no_roots() {
-    let h = MarketDataHierarchy::new();
-    assert!(h.roots().is_empty());
+    let h = MarketDataHierarchy::default();
+    assert!(root_names(&h).is_empty());
 }
 
 #[test]
@@ -34,9 +70,10 @@ fn builder_creates_hierarchy_with_slash_paths() {
         .build()
         .unwrap();
 
-    assert_eq!(h.roots().len(), 2);
-    assert!(h.roots().contains_key("Rates"));
-    assert!(h.roots().contains_key("Credit"));
+    let roots = root_names(&h);
+    assert_eq!(roots.len(), 2);
+    assert!(roots.contains(&"Rates".to_string()));
+    assert!(roots.contains(&"Credit".to_string()));
 
     let path: Vec<String> = vec!["Rates".into(), "USD".into(), "OIS".into()];
     let node = h.get_node(&path).unwrap();
@@ -92,7 +129,7 @@ fn builder_rejects_invalid_paths_without_panicking() {
 }
 
 #[test]
-fn all_curve_ids_collects_entire_tree() {
+fn root_resolution_collects_entire_tree() {
     let h = MarketDataHierarchy::builder()
         .add_node("Rates/USD/OIS")
         .curve_ids(&["USD-OIS"])
@@ -103,7 +140,7 @@ fn all_curve_ids_collects_entire_tree() {
         .build()
         .unwrap();
 
-    let all = h.all_curve_ids();
+    let all = all_ids(&h);
     assert_eq!(all.len(), 3);
 }
 
@@ -121,8 +158,8 @@ fn serde_round_trip() {
     let json = serde_json::to_string_pretty(&h).unwrap();
     let deserialized: MarketDataHierarchy = serde_json::from_str(&json).unwrap();
 
-    assert_eq!(deserialized.roots().len(), h.roots().len());
-    assert_eq!(deserialized.all_curve_ids().len(), h.all_curve_ids().len());
+    assert_eq!(root_names(&deserialized).len(), root_names(&h).len());
+    assert_eq!(all_ids(&deserialized).len(), all_ids(&h).len());
 
     let path: Vec<String> = vec![
         "Credit".into(),
@@ -166,7 +203,7 @@ fn resolve_most_specific_wins_deduplicates_by_depth() {
             }],
         }),
     };
-    let mut ids = h.resolve(&target, ResolutionMode::MostSpecificWins);
+    let mut ids = resolved_ids(&h, &target, ResolutionMode::MostSpecificWins);
     ids.sort();
 
     // `Credit` and `Credit/US` both match the filter, so inherited-subtree
@@ -194,7 +231,7 @@ fn resolve_cumulative_returns_all_occurrences() {
             }],
         }),
     };
-    let ids = h.resolve(&target, ResolutionMode::Cumulative);
+    let ids = resolved_ids(&h, &target, ResolutionMode::Cumulative);
 
     // `Credit` and `Credit/US` both match the filter, so JPM-5Y is collected
     // once from each matching subtree.
@@ -220,10 +257,8 @@ fn resolve_returns_empty_for_nonexistent_path() {
         path: vec!["Nonexistent".into()],
         tag_filter: None,
     };
-    assert!(h
-        .resolve(&target, ResolutionMode::MostSpecificWins)
-        .is_empty());
-    assert!(h.resolve(&target, ResolutionMode::Cumulative).is_empty());
+    assert!(resolved_ids(&h, &target, ResolutionMode::MostSpecificWins).is_empty());
+    assert!(resolved_ids(&h, &target, ResolutionMode::Cumulative).is_empty());
 }
 
 #[test]
@@ -250,7 +285,7 @@ fn resolve_with_tag_filter_finds_curves_where_node_tag_matches() {
         }),
     };
 
-    let mut ids = h.resolve(&target, ResolutionMode::MostSpecificWins);
+    let mut ids = resolved_ids(&h, &target, ResolutionMode::MostSpecificWins);
     ids.sort();
 
     assert_eq!(ids.len(), 2);
@@ -281,7 +316,7 @@ fn resolve_with_tag_filter_includes_descendant_curves_of_matching_parent() {
         }),
     };
 
-    let ids = h.resolve(&target, ResolutionMode::MostSpecificWins);
+    let ids = resolved_ids(&h, &target, ResolutionMode::MostSpecificWins);
     assert_eq!(ids, vec![CurveId::from("JPM-5Y")]);
 }
 
@@ -306,7 +341,7 @@ fn tag_predicate_equals_matches_exact_value_only() {
             }],
         }),
     };
-    let ids = h.resolve(&target, ResolutionMode::MostSpecificWins);
+    let ids = resolved_ids(&h, &target, ResolutionMode::MostSpecificWins);
     assert_eq!(ids.len(), 1);
     assert_eq!(ids[0], CurveId::from("JPM-5Y"));
 
@@ -320,9 +355,7 @@ fn tag_predicate_equals_matches_exact_value_only() {
             }],
         }),
     };
-    assert!(h
-        .resolve(&target_none, ResolutionMode::MostSpecificWins)
-        .is_empty());
+    assert!(resolved_ids(&h, &target_none, ResolutionMode::MostSpecificWins).is_empty());
 }
 
 #[test]
@@ -349,7 +382,7 @@ fn tag_predicate_in_matches_any_of_the_given_values() {
             }],
         }),
     };
-    let mut ids = h.resolve(&target, ResolutionMode::MostSpecificWins);
+    let mut ids = resolved_ids(&h, &target, ResolutionMode::MostSpecificWins);
     ids.sort();
 
     assert_eq!(ids.len(), 2);
@@ -381,7 +414,7 @@ fn tag_predicate_exists_matches_key_regardless_of_value() {
             }],
         }),
     };
-    let mut ids = h.resolve(&target, ResolutionMode::MostSpecificWins);
+    let mut ids = resolved_ids(&h, &target, ResolutionMode::MostSpecificWins);
     ids.sort();
 
     assert_eq!(ids.len(), 2);
@@ -406,9 +439,7 @@ fn tag_predicate_exists_returns_empty_when_key_absent_from_all_nodes() {
             }],
         }),
     };
-    assert!(h
-        .resolve(&target, ResolutionMode::MostSpecificWins)
-        .is_empty());
+    assert!(resolved_ids(&h, &target, ResolutionMode::MostSpecificWins).is_empty());
 }
 
 #[test]
@@ -448,7 +479,7 @@ fn resolve_cumulative_with_tag_filter_scopes_to_subtree() {
         path: vec!["USD".into()],
         tag_filter: Some(filter),
     };
-    let mut ids = h.resolve(&target, ResolutionMode::Cumulative);
+    let mut ids = resolved_ids(&h, &target, ResolutionMode::Cumulative);
     ids.sort();
 
     // Only USD/Rates curves should appear — EUR-ESTR is excluded (wrong path),
@@ -497,7 +528,7 @@ fn resolve_cumulative_with_tag_filter_includes_descendants_of_matching_parent() 
         tag_filter: Some(filter),
     };
 
-    let ids = h.resolve(&target, ResolutionMode::Cumulative);
+    let ids = resolved_ids(&h, &target, ResolutionMode::Cumulative);
     assert_eq!(ids, vec![CurveId::from("JPM-5Y")]);
 }
 
@@ -531,7 +562,7 @@ fn resolve_most_specific_wins_with_tag_filter() {
         path: vec!["Rates".into()],
         tag_filter: Some(filter),
     };
-    let mut ids = h.resolve(&target, ResolutionMode::MostSpecificWins);
+    let mut ids = resolved_ids(&h, &target, ResolutionMode::MostSpecificWins);
     ids.sort();
 
     // Rates and Rates/USD both match, so inherited-subtree matching sees both

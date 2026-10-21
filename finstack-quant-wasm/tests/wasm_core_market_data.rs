@@ -3,7 +3,8 @@
 #![cfg(target_arch = "wasm32")]
 
 use finstack_quant_wasm::api::core::dates::{create_date, JsDayCount, JsDayCountContext};
-use finstack_quant_wasm::api::core::market_data::{JsDiscountCurve, JsForwardCurve};
+use finstack_quant_wasm::api::core::market_discount::JsDiscountCurve;
+use finstack_quant_wasm::api::core::market_forward::JsForwardCurve;
 use finstack_quant_wasm::api::core::market_fx::*;
 use finstack_quant_wasm::api::core::market_fx::{JsFxConversionPolicy, JsFxMatrix};
 use finstack_quant_wasm::api::core::surfaces::{JsFxDeltaVolSurface, JsVolCube};
@@ -137,10 +138,11 @@ fn fx_matrix_rate_defaults_policy_to_cashflow_date() {
         .unwrap();
 
     let result = matrix
-        .rate_with_default_policy(
+        .rate(
             JsValue::from("GBP"),
             JsValue::from("USD"),
             JsValue::from("2024-01-02"),
+            &JsFxConversionPolicy::new(),
         )
         .unwrap();
 
@@ -194,7 +196,6 @@ fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
     .unwrap();
 
     assert_eq!(surface.id(), "EURUSD-DELTA-VOL");
-    assert_eq!(surface.num_expiries(), 3);
     assert_eq!(surface.expiries().as_ref(), [0.25, 0.5, 1.0]);
 
     let pillar = get_fx_delta_pillar_vols(&surface, JsValue::from(0)).unwrap();
@@ -252,7 +253,7 @@ fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
         JsValue::from("CEV"),
         JsValue::from([1.0].to_vec()),
         JsValue::from([2.0].to_vec()),
-        JsValue::from([0.01, 0.5, -0.2, 0.4, f64::NAN].to_vec()),
+        JsValue::from(r#"[{"alpha":0.01,"beta":0.5,"rho":-0.2,"nu":0.4}]"#),
         JsValue::from([-0.01].to_vec()),
         None,
     )
@@ -277,7 +278,7 @@ fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
         JsValue::from("NORMAL"),
         JsValue::from([1.0].to_vec()),
         JsValue::from([2.0].to_vec()),
-        JsValue::from([0.01, 0.0, -0.2, 0.4, f64::NAN].to_vec()),
+        JsValue::from(r#"[{"alpha":0.01,"beta":0.0,"rho":-0.2,"nu":0.4}]"#),
         JsValue::from([-0.01].to_vec()),
         None,
     )
@@ -384,7 +385,7 @@ fn discount_curve_new_and_accessors() {
     assert_eq!(curve.base_date(), "2024-01-15");
     assert!((curve.df(JsValue::from(0.5)).unwrap() - 0.99).abs() < 1e-6);
     assert!((curve.df(JsValue::from(1.0)).unwrap() - 0.98).abs() < 1e-6);
-    assert!(curve.zero(JsValue::from(1.0)).unwrap() > 0.0);
+    assert!(curve.zero_rate(JsValue::from(1.0), None).unwrap() > 0.0);
     let f = curve
         .forward(JsValue::from(0.5), JsValue::from(1.0))
         .expect("forward rate");
@@ -423,10 +424,11 @@ fn fx_matrix_quote_and_rate() {
     )
     .expect("set quote");
     let r = m
-        .rate_with_default_policy(
+        .rate(
             JsValue::from("USD"),
             JsValue::from("EUR"),
             JsValue::from("2024-01-15"),
+            &JsFxConversionPolicy::new(),
         )
         .expect("fx rate");
     assert!((r.rate() - 0.92).abs() < 1e-9);

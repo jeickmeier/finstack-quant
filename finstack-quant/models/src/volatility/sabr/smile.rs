@@ -242,7 +242,7 @@ impl SabrSmile {
         }
         let atm_vol = self.atm_vol()?;
         let std_dev = atm_vol * self.time_to_expiry.sqrt();
-        let z = finstack_quant_core::math::standard_normal_inv_cdf(delta);
+        let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(delta);
         let signed_z = if is_call { z } else { -z };
         if self.params.beta < super::model::BETA_SNAP_TOL {
             return Ok(self.forward - std_dev * signed_z);
@@ -697,8 +697,8 @@ mod smile_tests {
         let d2 = d1 - vol * t.sqrt(); // = -0.1
         let df = (-r * t).exp();
         let expected = df
-            * (f * finstack_quant_core::math::norm_cdf(d1)
-                - k * finstack_quant_core::math::norm_cdf(d2));
+            * (f * finstack_quant_core::math::special_functions::norm_cdf(d1)
+                - k * finstack_quant_core::math::special_functions::norm_cdf(d2));
 
         let params = SabrParameters::new(0.20, 0.5, 0.30, -0.20).expect("valid SABR params");
         let smile = SabrSmile::new(params, f, t);

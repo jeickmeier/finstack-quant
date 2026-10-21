@@ -12,6 +12,7 @@ use finstack_quant_core::dates::{
     calendar_by_id_strict, BusinessDayConvention, Date, DateExt, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use finstack_quant_core::Result;
@@ -92,14 +93,12 @@ pub struct CommoditySwap {
     #[serde(default = "default_pay_receive")]
     pub side: PayReceive,
     /// Start date of the swap.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start_date: Date,
     /// End date of the swap.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -133,7 +132,6 @@ pub struct CommoditySwap {
     /// after the valuation date project from the price curve.
     #[builder(default)]
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")

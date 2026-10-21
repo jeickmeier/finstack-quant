@@ -25,7 +25,8 @@
 //! # Example
 //!
 //! ```rust
-//! use finstack_quant_core::dates::{create_date, Month, Tenor};
+//! use finstack_quant_core::dates::{create_date, Tenor};
+//! use time::Month;
 //! use finstack_quant_covenants::{
 //!     Covenant, CovenantEngine, CovenantSpec, CovenantType, HashMapMetricSource,
 //! };

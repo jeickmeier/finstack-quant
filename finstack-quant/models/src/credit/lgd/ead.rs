@@ -10,7 +10,7 @@
 //! - Jacobs, M. (2010). "An Empirical Study of Exposure at Default."
 //!   Journal of Advanced Studies in Finance. `docs/REFERENCES.md#basel-ii-2006`
 
-use finstack_quant_core::error::InputError;
+use finstack_quant_core::InputError;
 use finstack_quant_core::Result;
 
 /// Credit Conversion Factor (CCF) for off-balance-sheet exposures.

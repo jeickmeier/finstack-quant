@@ -4,6 +4,7 @@
 //! metrics, and their registry hook.
 
 use super::types::FxVarianceSwap;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::GenericFdVega;
 use finstack_quant_valuations_core::metrics::MetricCalculator;

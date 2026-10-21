@@ -62,7 +62,6 @@ test('MarketContext inserts update the context in place and return it', () => {
   const curve = core.DiscountCurve.flat('USD-OIS', '2025-01-02', 0.04);
   assert.equal(market.insert(curve), market);
   assert.equal(market.insertPrice('SPX', 5900.0).insertPrice('SPOT', 185.25, 'USD'), market);
-  assert.equal(market.mapCollateral('USD-CSA', 'USD-OIS'), market);
   assert.equal(market.contains('USD-OIS'), true);
   assert.deepEqual(market.getPrice('SPX'), { unitless: 5900.0 });
   throwsKind(() => market.insertPrice(5, 1.0), 'invalid_type');

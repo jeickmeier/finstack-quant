@@ -313,8 +313,8 @@ impl Error {
     /// - Lookup misses (`InputError::{MissingCurve, NotFound, CalendarNotFound,
     ///   FxTriangulationFailed}`) → [`ErrorKind::NotFound`]
     /// - `Calibration`, `Internal`, `CircularDependency`, and
-    ///   `InputError::{SolverConvergenceFailed, VolatilityConversionFailed,
-    ///   TooLarge}` → [`ErrorKind::Computation`]
+    ///   `InputError::{SolverConvergenceFailed, VolatilityConversionFailed}`
+    ///   → [`ErrorKind::Computation`]
     /// - `MetricCalculationFailed` preserves its cause's category recursively
     /// - Everything else → [`ErrorKind::Validation`]
     #[must_use]
@@ -331,8 +331,7 @@ impl Error {
             | Error::CircularDependency { .. }
             | Error::Input(
                 InputError::SolverConvergenceFailed { .. }
-                | InputError::VolatilityConversionFailed { .. }
-                | InputError::TooLarge { .. },
+                | InputError::VolatilityConversionFailed { .. },
             ) => ErrorKind::Computation,
             Error::MetricCalculationFailed { cause, .. } => cause.kind(),
             _ => ErrorKind::Validation,
@@ -391,11 +390,6 @@ impl Error {
             requested: requested_str,
             suggestions,
         })
-    }
-
-    /// Create an internal error with invariant/debugging context.
-    pub fn internal(message: impl Into<String>) -> Self {
-        Self::Internal(message.into())
     }
 }
 
@@ -588,7 +582,7 @@ mod tests {
         let err4 = err3.clone();
         assert_eq!(err3, err4);
 
-        let cause = Error::internal("metric test failure");
+        let cause = Error::Internal("metric test failure".into());
         let err5 = Error::MetricCalculationFailed {
             metric_id: "test".to_string(),
             cause: Box::new(cause),

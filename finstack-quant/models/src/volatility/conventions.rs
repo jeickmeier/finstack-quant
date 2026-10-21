@@ -4,7 +4,7 @@
 //! volatility inputs and the forward-rate validation rules required before
 //! pricing or convention conversion.
 
-use finstack_quant_core::error::InputError;
+use finstack_quant_core::InputError;
 use finstack_quant_core::Result;
 
 /// Volatility quoting convention.

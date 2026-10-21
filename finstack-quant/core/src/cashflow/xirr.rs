@@ -38,9 +38,9 @@
 //! - Hull, J. C., *Options, Futures, and Other Derivatives*. `docs/REFERENCES.md#hull-options-futures`
 
 use crate::dates::{Date, DayCount, DayCountContext};
-use crate::error::InputError;
 use crate::math::solver::BrentSolver;
-use crate::math::NeumaierAccumulator;
+use crate::math::summation::NeumaierAccumulator;
+use crate::InputError;
 
 /// Absolute root tolerance in log-growth coordinates, `log(1 + r)`.
 const LOG_RATE_TOLERANCE: f64 = 1e-12;
@@ -368,8 +368,8 @@ where
     }
 
     let log_growth = BrentSolver::new()
-        .tolerance(LOG_RATE_TOLERANCE)
-        .max_iterations(DEFAULT_MAX_ITERATIONS)
+        .with_tolerance(LOG_RATE_TOLERANCE)
+        .with_max_iterations(DEFAULT_MAX_ITERATIONS)
         .solve_in_bracket(npv, lower, upper)?;
     let rate = log_growth.exp_m1();
     // Rounding expm1 back into the rate domain can lose meaningful accuracy

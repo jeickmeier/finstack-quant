@@ -327,7 +327,7 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
         for w in knots.windows(2) {
             let width = w[1] - w[0];
             if width <= 0.0 {
-                return Err(crate::error::InputError::NonMonotonicKnots.into());
+                return Err(crate::InputError::NonMonotonicKnots.into());
             }
             h.push(width);
         }

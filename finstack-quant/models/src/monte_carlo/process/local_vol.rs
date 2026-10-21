@@ -182,9 +182,9 @@ mod tests {
     use crate::monte_carlo::simulate::{
         simulate_paths, PathSimulationSpec, PathSummary, ProcessSpec, SchemeSpec, TimeGridSpec,
     };
-    use crate::monte_carlo::OnlineStats;
     use crate::volatility::implied_vol_black;
     use crate::volatility::local_vol::test_support::{forwards, linspace, SKEWED};
+    use finstack_quant_core::math::stats::OnlineStats;
 
     const SPOT: f64 = 100.0;
     const RATE: f64 = 0.03;

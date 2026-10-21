@@ -3,6 +3,7 @@
 use super::common::*;
 use finstack_quant_core::dates::Tenor;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::stats::realized_variance;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_equity::variance_swap::PayReceive;

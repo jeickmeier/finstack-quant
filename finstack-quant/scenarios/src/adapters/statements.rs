@@ -150,7 +150,10 @@ pub fn update_rate_from_binding(
             }
         }
 
-        let zero = curve.zero(tenor_years);
+        let zero = curve.zero_rate(
+            tenor_years,
+            finstack_quant_core::math::Compounding::Continuous,
+        );
         let output_years = tenor.to_years_with_context(
             curve.base_date(),
             calendar,

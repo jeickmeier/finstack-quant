@@ -76,7 +76,7 @@ reached through the standard metric registry.
   ("numéraire") currency. Option payoffs are quoted in domestic; notionals are
   in base unless a type says otherwise.
 - **Spot dates and standard tenors.** Leaves that derive settlement dates roll
-  through `instruments::fx_spot_date_for_pair`, which derives each currency's
+  through `finstack_quant_core::dates::fx::fx_spot_date`, which derives each currency's
   lag from its currency code and applies explicit pair minimums and holiday
   calendars. Signed business-day arithmetic uses `DateExt::add_business_days`;
   negative lags are not spot-settlement conventions. Forward, swap and NDF standard-maturity constructors then add a

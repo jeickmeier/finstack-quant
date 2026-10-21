@@ -2,8 +2,9 @@
 use finstack_quant_analytics::{
     max_drawdown, sharpe, sortino, volatility, CagrDayCount, Performance, ReturnKind,
 };
-use finstack_quant_core::dates::{Date, Duration, Month, PeriodKind};
+use finstack_quant_core::dates::{Date, PeriodKind};
 use serde_json::json;
+use time::{Duration, Month};
 
 fn dates(n: usize) -> Vec<Date> {
     let start = Date::from_calendar_date(2024, Month::January, 1).unwrap();

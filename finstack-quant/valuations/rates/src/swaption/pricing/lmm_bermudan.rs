@@ -29,6 +29,7 @@
 //!   Ch. 8, Springer. `docs/REFERENCES.md#glasserman-2004-monte-carlo`
 
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::discretization::lmm_predictor_corrector::LmmPredictorCorrector;
 use finstack_quant_models::monte_carlo::engine::MAX_NUM_PATHS;
@@ -37,7 +38,6 @@ use finstack_quant_models::monte_carlo::process::lmm::{LmmParams, LmmProcess};
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream, StochasticProcess};
-use finstack_quant_models::monte_carlo::TimeGrid;
 use finstack_quant_models::rates::hw1f::config::Hw1fMcConfig;
 use finstack_quant_models::rates::hw1f::mc::{build_event_aligned_grid, money_estimate_from_pairs};
 

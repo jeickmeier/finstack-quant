@@ -14,7 +14,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     execute_waterfall, run_simulation, AssetPool, CoverageTestSpec, DealType, HedgeSwap,
@@ -133,7 +133,7 @@ fn abs(hedged: bool) -> StructuredCredit {
     deal
 }
 
-fn simulate(deal: &StructuredCredit, forward: f64) -> HashMap<String, TrancheCashflows> {
+fn simulate(deal: &StructuredCredit, forward: f64) -> FxHashMap<String, TrancheCashflows> {
     run_simulation(deal, &market(forward), CLOSE).expect("simulation")
 }
 
@@ -173,7 +173,7 @@ fn balance_guaranteed_swap_keeps_the_floating_senior_note_current_under_a_rate_s
         base_hedged["A"].total_interest.amount()
     );
     let first = date!(2024 - 02 - 01);
-    let a_coupon = |run: &HashMap<String, TrancheCashflows>| {
+    let a_coupon = |run: &FxHashMap<String, TrancheCashflows>| {
         run["A"]
             .interest_flows
             .iter()

@@ -131,19 +131,6 @@ scenario_enum!(
     }
 );
 
-/// Accepted compounding labels, as parsed by core `Compounding::from_str`.
-pub(super) const COMPOUNDING_LABELS: &str =
-    "simple, continuous, annual, semi_annual, quarterly, monthly";
-
-/// Parse a compounding label via the canonical core `FromStr`.
-pub(super) fn parse_compounding(label: &str) -> PyResult<Compounding> {
-    label.parse::<Compounding>().map_err(|_| {
-        crate::errors::value_error(format!(
-            "Unknown Compounding label {label:?}; expected one of: {COMPOUNDING_LABELS}"
-        ))
-    })
-}
-
 /// Compounding convention for rate-extraction operations.
 ///
 /// Wraps the canonical core ``Compounding`` (the scenario wire form is
@@ -172,7 +159,7 @@ impl PyCompounding {
     #[new]
     fn new(label: &str) -> PyResult<Self> {
         Ok(Self {
-            inner: parse_compounding(label)?,
+            inner: label.parse().map_err(crate::errors::core_to_py)?,
         })
     }
 

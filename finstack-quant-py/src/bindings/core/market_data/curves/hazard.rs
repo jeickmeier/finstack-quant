@@ -5,27 +5,15 @@ use finstack_quant_core::wire::{serde_label, serde_parse};
 
 use std::sync::Arc;
 
+use finstack_quant_core::market_data::term_structures::Seniority;
 use pyo3::prelude::*;
 
-use super::helpers::{
-    columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods, parse_seniority, TimePoint,
-};
+use super::helpers::{columns_to_dataframe, extract_time_point, TimePoint};
 use crate::bindings::core::currency::{extract_currency, PyCurrency};
 use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::macros::impl_repr_html_via_dataframe;
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::errors::core_to_py;
-
-/// Options accepted by the ``HazardCurve`` constructor beyond the knots.
-struct HazardCurveOptions<'a> {
-    day_count: Option<&'a Bound<'a, PyAny>>,
-    par_spreads: Option<Vec<(f64, f64)>>,
-    par_interp: Option<&'a str>,
-    issuer: Option<&'a str>,
-    seniority: Option<&'a str>,
-    currency: Option<&'a Bound<'a, PyAny>>,
-    max_hazard_rate: Option<f64>,
-}
 
 /// Credit hazard-rate curve for default-probability modelling.
 ///
@@ -57,47 +45,6 @@ impl PyHazardCurve {
     /// Build from an existing `Arc<HazardCurve>`.
     pub(crate) fn from_inner(inner: Arc<HazardCurve>) -> Self {
         Self { inner }
-    }
-
-    fn wrap(curve: HazardCurve) -> Self {
-        Self {
-            inner: Arc::new(curve),
-        }
-    }
-
-    fn build(
-        id: &str,
-        base_date: &Bound<'_, PyAny>,
-        knots: Vec<(f64, f64)>,
-        recovery_rate: f64,
-        options: HazardCurveOptions<'_>,
-    ) -> PyResult<Self> {
-        let mut builder = HazardCurve::builder(id)
-            .base_date(py_to_date(base_date)?)
-            .knots(knots)
-            .recovery_rate(recovery_rate);
-        if let Some(day_count) = options.day_count {
-            builder = builder.day_count(extract_day_count(day_count)?);
-        }
-        if let Some(points) = options.par_spreads {
-            builder = builder.par_spreads(points);
-        }
-        if let Some(par_interp) = options.par_interp {
-            builder = builder.par_interp(serde_parse(par_interp).map_err(core_to_py)?);
-        }
-        if let Some(issuer) = options.issuer {
-            builder = builder.issuer(issuer);
-        }
-        if let Some(seniority) = options.seniority {
-            builder = builder.seniority(parse_seniority(seniority)?);
-        }
-        if let Some(currency) = options.currency {
-            builder = builder.currency(extract_currency(currency)?);
-        }
-        if let Some(max_hazard_rate) = options.max_hazard_rate {
-            builder = builder.max_hazard_rate(max_hazard_rate);
-        }
-        builder.build().map(Self::wrap).map_err(core_to_py)
     }
 }
 
@@ -164,21 +111,35 @@ impl PyHazardCurve {
         currency: Option<&Bound<'_, PyAny>>,
         max_hazard_rate: Option<f64>,
     ) -> PyResult<Self> {
-        Self::build(
-            id,
-            base_date,
-            knots,
-            recovery_rate,
-            HazardCurveOptions {
-                day_count,
-                par_spreads,
-                par_interp,
-                issuer,
-                seniority,
-                currency,
-                max_hazard_rate,
-            },
-        )
+        let mut builder = HazardCurve::builder(id)
+            .base_date(py_to_date(base_date)?)
+            .knots(knots)
+            .recovery_rate(recovery_rate);
+        if let Some(day_count) = day_count {
+            builder = builder.day_count(extract_day_count(day_count)?);
+        }
+        if let Some(points) = par_spreads {
+            builder = builder.par_spreads(points);
+        }
+        if let Some(par_interp) = par_interp {
+            builder = builder.par_interp(serde_parse(par_interp).map_err(core_to_py)?);
+        }
+        if let Some(issuer) = issuer {
+            builder = builder.issuer(issuer);
+        }
+        if let Some(seniority) = seniority {
+            builder = builder.seniority(seniority.parse::<Seniority>().map_err(core_to_py)?);
+        }
+        if let Some(currency) = currency {
+            builder = builder.currency(extract_currency(currency)?);
+        }
+        if let Some(max_hazard_rate) = max_hazard_rate {
+            builder = builder.max_hazard_rate(max_hazard_rate);
+        }
+        builder
+            .build()
+            .map(|curve| Self::from_inner(Arc::new(curve)))
+            .map_err(core_to_py)
     }
 
     /// Construct a flat (constant-intensity) hazard curve.
@@ -218,7 +179,7 @@ impl PyHazardCurve {
         recovery_rate: f64,
     ) -> PyResult<Self> {
         HazardCurve::flat(id, py_to_date(base_date)?, hazard_rate, recovery_rate)
-            .map(Self::wrap)
+            .map(|curve| Self::from_inner(Arc::new(curve)))
             .map_err(core_to_py)
     }
 
@@ -262,7 +223,7 @@ impl PyHazardCurve {
         recovery_rate: f64,
     ) -> PyResult<Self> {
         HazardCurve::from_survival_probs(id, py_to_date(base_date)?, &points, recovery_rate)
-            .map(Self::wrap)
+            .map(|curve| Self::from_inner(Arc::new(curve)))
             .map_err(core_to_py)
     }
 
@@ -408,7 +369,7 @@ impl PyHazardCurve {
     fn with_recovery_rate(&self, recovery_rate: f64) -> PyResult<Self> {
         self.inner
             .with_recovery_rate(recovery_rate)
-            .map(Self::wrap)
+            .map(|curve| Self::from_inner(Arc::new(curve)))
             .map_err(core_to_py)
     }
 
@@ -512,5 +473,5 @@ impl PyHazardCurve {
     }
 }
 
-impl_arc_serde_pymethods!(PyHazardCurve, HazardCurve, "HazardCurve");
+wire_methods!(PyHazardCurve, HazardCurve, "HazardCurve", arc);
 impl_repr_html_via_dataframe!(PyHazardCurve);

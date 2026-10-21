@@ -16,7 +16,7 @@ use crate::types::ImMethodology;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 use std::sync::Arc;
 
@@ -309,7 +309,7 @@ impl ImCalculator for ClearingHouseImCalculator {
             );
         }
 
-        let mut breakdown = HashMap::default();
+        let mut breakdown = FxHashMap::default();
         breakdown.insert(self.methodology.to_string(), im_amount);
 
         let mut result = ImResult::with_breakdown(

@@ -75,7 +75,7 @@ instrument_pricing_methods!(PyCdsOption);
 /// Optional date as ``datetime.date`` or ``None``.
 fn opt_date_to_py<'py>(
     py: Python<'py>,
-    date: Option<time::Date>,
+    date: Option<finstack_quant_core::dates::Date>,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
     date.map(|d| date_to_py(py, d)).transpose()
 }

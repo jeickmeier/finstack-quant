@@ -87,7 +87,7 @@ fn report(
     market: &MarketContext,
 ) -> finstack_quant_portfolio::Result<()> {
     // No IM collateral posted yet: every CSA balance is zero.
-    let collateral = finstack_quant_core::HashMap::default();
+    let collateral = finstack_quant_core::FxHashMap::default();
     let result = portfolio_margin(portfolio, market, date!(2025 - 01 - 15), &collateral)?;
 
     println!("Total IM: {}", result.total_initial_margin);

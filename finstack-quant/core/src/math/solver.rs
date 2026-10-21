@@ -135,21 +135,21 @@ impl BrentSolver {
 
     /// Set tolerance.
     #[must_use]
-    pub fn tolerance(mut self, tolerance: f64) -> Self {
+    pub fn with_tolerance(mut self, tolerance: f64) -> Self {
         self.tolerance = tolerance;
         self
     }
 
     /// Set initial bracket size. If None, will use adaptive sizing.
     #[must_use]
-    pub fn initial_bracket_size(mut self, size: Option<f64>) -> Self {
+    pub fn with_initial_bracket_size(mut self, size: Option<f64>) -> Self {
         self.initial_bracket_size = size;
         self
     }
 
     /// Set maximum iterations.
     #[must_use]
-    pub fn max_iterations(mut self, max_iterations: usize) -> Self {
+    pub fn with_max_iterations(mut self, max_iterations: usize) -> Self {
         self.max_iterations = max_iterations;
         self
     }
@@ -167,14 +167,14 @@ impl BrentSolver {
     ///
     /// // For a problem where the root must be positive
     /// let solver = BrentSolver::new()
-    ///     .bracket_bounds(0.0, 1e9);
+    ///     .with_bracket_bounds(0.0, 1e9);
     ///
     /// // For implied volatility (must be positive, typically < 5.0)
     /// let vol_solver = BrentSolver::new()
-    ///     .bracket_bounds(1e-6, 5.0);
+    ///     .with_bracket_bounds(1e-6, 5.0);
     /// ```
     #[must_use]
-    pub fn bracket_bounds(mut self, min: f64, max: f64) -> Self {
+    pub fn with_bracket_bounds(mut self, min: f64, max: f64) -> Self {
         self.bracket_min = min;
         self.bracket_max = max;
         self
@@ -188,7 +188,7 @@ impl BrentSolver {
     where
         Func: FnMut(f64) -> f64,
     {
-        use crate::error::InputError;
+        use crate::InputError;
 
         if !initial_guess.is_finite()
             || !self.bracket_min.is_finite()
@@ -314,9 +314,7 @@ impl BrentSolver {
         }
         .into())
     }
-}
 
-impl BrentSolver {
     /// Solve the equation `f(x) = 0` for `x`, searching for a bracket around
     /// `initial_guess`.
     ///
@@ -333,7 +331,7 @@ impl BrentSolver {
     ///
     /// # Errors
     ///
-    /// Returns [`InputError::SolverConvergenceFailed`](crate::error::InputError::SolverConvergenceFailed) when:
+    /// Returns [`InputError::SolverConvergenceFailed`](crate::InputError::SolverConvergenceFailed) when:
     /// - Maximum iterations are exceeded without convergence
     /// - The function returns non-finite values (NaN, infinity)
     /// - No bracketing interval is found within the bracket bounds
@@ -344,9 +342,7 @@ impl BrentSolver {
         let bracket = self.find_bracket(&mut f, initial_guess)?;
         self.brent_method(f, bracket)
     }
-}
 
-impl BrentSolver {
     /// Solve within a user-provided bracket `[a, b]` without running the
     /// bracket-expansion search.
     ///
@@ -380,9 +376,7 @@ impl BrentSolver {
         };
         self.brent_method(f, [(lo, flo), (hi, fhi)])
     }
-}
 
-impl BrentSolver {
     /// Core Brent's method implementation.
     ///
     /// Requirements: `f(lo)` and `f(hi)` must have opposite signs.
@@ -390,7 +384,7 @@ impl BrentSolver {
     where
         Func: FnMut(f64) -> f64,
     {
-        use crate::error::InputError;
+        use crate::InputError;
 
         let [(lo, flo), (hi, fhi)] = bracket;
         tracing::debug!(
@@ -586,7 +580,7 @@ mod tests {
         assert!((root - 100.0).abs() < 1e-6);
 
         // Test with configurable bracket size
-        let solver_custom = BrentSolver::new().initial_bracket_size(Some(5.0));
+        let solver_custom = BrentSolver::new().with_initial_bracket_size(Some(5.0));
         let root2 = solver_custom
             .solve(f, 95.0)
             .expect("Root finding should succeed in test");
@@ -666,7 +660,9 @@ mod tests {
 
     #[test]
     fn test_brent_max_iterations_returns_error() {
-        let solver = BrentSolver::new().max_iterations(2).tolerance(1e-15);
+        let solver = BrentSolver::new()
+            .with_max_iterations(2)
+            .with_tolerance(1e-15);
 
         // A function that converges slowly (root at x ≈ 1.3247)
         let f = |x: f64| x * x * x - x - 1.0;
@@ -680,7 +676,7 @@ mod tests {
 
         // Verify error contains useful information
         match result {
-            Err(crate::Error::Input(crate::error::InputError::SolverConvergenceFailed {
+            Err(crate::Error::Input(crate::InputError::SolverConvergenceFailed {
                 iterations,
                 reason,
                 ..
@@ -699,7 +695,7 @@ mod tests {
     #[test]
     fn test_brent_configurable_bracket_bounds() {
         // Test that bracket bounds can be configured
-        let solver = BrentSolver::new().bracket_bounds(0.0, 10.0);
+        let solver = BrentSolver::new().with_bracket_bounds(0.0, 10.0);
 
         // Function with root at x = 2
         let f = |x: f64| x - 2.0;
@@ -709,7 +705,7 @@ mod tests {
         assert!((root - 2.0).abs() < 1e-10);
 
         // Test that search fails when root is outside bounds
-        let solver_narrow = BrentSolver::new().bracket_bounds(5.0, 10.0);
+        let solver_narrow = BrentSolver::new().with_bracket_bounds(5.0, 10.0);
 
         // Root at x = 2 is outside [5, 10]
         let result = solver_narrow.solve(f, 7.0);
@@ -721,7 +717,7 @@ mod tests {
 
     #[test]
     fn test_brent_initial_bracket_respects_bounds() {
-        let solver = BrentSolver::new().bracket_bounds(0.0, 2.0);
+        let solver = BrentSolver::new().with_bracket_bounds(0.0, 2.0);
         for guess in [-1.0, 0.0, 2.0, 3.0] {
             let root = solver
                 .solve(
@@ -734,7 +730,7 @@ mod tests {
                 .expect("bounded root");
             assert!((root - 1.0).abs() < 1e-10);
         }
-        let solver = BrentSolver::new().bracket_bounds(0.0, 1.0);
+        let solver = BrentSolver::new().with_bracket_bounds(0.0, 1.0);
         assert!(solver.solve(|x| x - 1.005, 1.0).is_err());
         assert!(solver.solve(|x| x + 0.005, 0.0).is_err());
         for endpoint in [0.0, 1.0] {
@@ -756,7 +752,7 @@ mod tests {
             (1.0, 1.0, 1.0, 2.0),
         ] {
             let evaluations = std::cell::RefCell::new(Vec::new());
-            let result = BrentSolver::new().bracket_bounds(lo, hi).solve(
+            let result = BrentSolver::new().with_bracket_bounds(lo, hi).solve(
                 |x| {
                     let mut evaluated = evaluations.borrow_mut();
                     assert!(!evaluated.contains(&x), "duplicate evaluation at {x}");
@@ -783,7 +779,7 @@ mod tests {
             (0.0, 1.0, f64::INFINITY),
         ] {
             let evaluations = std::cell::Cell::new(0);
-            let result = BrentSolver::new().bracket_bounds(lo, hi).solve(
+            let result = BrentSolver::new().with_bracket_bounds(lo, hi).solve(
                 |x| {
                     evaluations.set(evaluations.get() + 1);
                     x - 0.5

@@ -144,7 +144,7 @@
 //! [`HullWhiteTree`]: super::hull_white_tree::HullWhiteTree
 
 use finstack_quant_cashflows::builder::{calculate_floating_rate, FloatingRateParams};
-use finstack_quant_core::math::BrentSolver;
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::{Error, Result};
 
 use crate::monte_carlo::rng::philox::PhiloxRng;
@@ -764,7 +764,7 @@ impl RatesCreditTree {
             .get(step)
             .and_then(|row| row.value(node))
             .ok_or_else(|| {
-                Error::internal(format!(
+                Error::Internal(format!(
                     "rates-credit tree rate node out of bounds: step={step}, node={node}"
                 ))
             })
@@ -779,7 +779,7 @@ impl RatesCreditTree {
             .get(step)
             .and_then(|row| row.value(node))
             .ok_or_else(|| {
-                Error::internal(format!(
+                Error::Internal(format!(
                     "rates-credit tree hazard node out of bounds: step={step}, node={node}"
                 ))
             })
@@ -792,8 +792,8 @@ impl RatesCreditTree {
     /// Returns an error when the tree has not been calibrated.
     pub fn time_grid(&self) -> Result<&[f64]> {
         if self.calibration_times.len() != self.config.steps + 1 {
-            return Err(Error::internal(
-                "rates-credit tree must be calibrated before reading its time grid",
+            return Err(Error::Internal(
+                "rates-credit tree must be calibrated before reading its time grid".into(),
             ));
         }
         Ok(&self.calibration_times)

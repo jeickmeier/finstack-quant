@@ -2,7 +2,7 @@
   "instrumentSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
   "instrumentSha256": "e9d9d5e91e3fa883e21c003bf92de64bf4bd5e0ed8af881b71bad9b2f1120c5e",
   "marketSource": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-  "marketSha256": "2a0ae212c09388e6984244bbb65d3875f32d44fa210e7a895ec50e9b31fb6f6c",
+  "marketSha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c",
   "asOf": "2024-01-01",
   "trancheId": "CLONOTES-A",
   "grid": {

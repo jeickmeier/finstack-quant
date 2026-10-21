@@ -11,6 +11,7 @@
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_valuations_rates::xccy_swap::{NotionalExchange, XccySwap};
 
 use super::fixtures::*;

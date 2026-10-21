@@ -54,27 +54,6 @@ fn rate_index_defaults(forward_curve_id: &CurveId) -> Option<RateIndexConvention
     registry.require_rate_index(&id).ok().cloned()
 }
 
-/// Convert an `f64` rate/margin into a `Decimal` for the `CashflowSpec`
-/// convenience constructors.
-///
-/// `Decimal::try_from` fails for non-finite input (`NaN`, `±inf`) or a
-/// magnitude outside `Decimal`'s range. Such a rate is a malformed input, so
-/// the conversion fails loudly with a validation error rather than being
-/// silently coerced to zero.
-///
-/// # Errors
-///
-/// Returns a validation error if `value` is not a finite, `Decimal`-representable
-/// rate.
-#[inline]
-fn decimal_from_finite_f64(value: f64, context: &str) -> finstack_quant_core::Result<Decimal> {
-    Decimal::try_from(value).map_err(|_| {
-        finstack_quant_core::Error::Validation(format!(
-            "{context}: rate must be a finite, representable number, got {value}"
-        ))
-    })
-}
-
 /// Thin facade over canonical builder coupon specs for bond cashflows.
 ///
 /// Wraps `FixedCouponSpec` and `FloatingCouponSpec` from the cashflow builder,
@@ -229,7 +208,7 @@ impl CashflowSpec {
         frequency: Tenor,
         day_count: DayCount,
     ) -> finstack_quant_core::Result<Self> {
-        let rate = decimal_from_finite_f64(coupon, "CashflowSpec::fixed coupon")?;
+        let rate = finstack_quant_core::decimal::f64_to_decimal(coupon)?;
         Ok(Self::Fixed(Self::fixed_spec(rate, frequency, day_count)))
     }
 
@@ -244,7 +223,7 @@ impl CashflowSpec {
         frequency: Tenor,
         day_count: DayCount,
     ) -> finstack_quant_core::Result<Self> {
-        let rate = decimal_from_finite_f64(coupon.as_decimal(), "CashflowSpec::fixed_rate coupon")?;
+        let rate = finstack_quant_core::decimal::f64_to_decimal(coupon.as_decimal())?;
         Ok(Self::Fixed(Self::fixed_spec(rate, frequency, day_count)))
     }
 
@@ -318,7 +297,7 @@ impl CashflowSpec {
         frequency: Tenor,
         day_count: DayCount,
     ) -> finstack_quant_core::Result<Self> {
-        let spread_bp = decimal_from_finite_f64(spread_bp, "CashflowSpec::floating spread_bp")?;
+        let spread_bp = finstack_quant_core::decimal::f64_to_decimal(spread_bp)?;
         Ok(Self::floating_spec(
             forward_curve_id.into(),
             spread_bp,
@@ -415,8 +394,7 @@ impl CashflowSpec {
         day_count: DayCount,
         reset_lag_days: i32,
     ) -> finstack_quant_core::Result<Self> {
-        let spread_bp =
-            decimal_from_finite_f64(spread_bp, "CashflowSpec::floating_with_reset_lag spread_bp")?;
+        let spread_bp = finstack_quant_core::decimal::f64_to_decimal(spread_bp)?;
         Ok(Self::floating_spec(
             forward_curve_id.into(),
             spread_bp,
@@ -470,15 +448,10 @@ impl CashflowSpec {
         frequency: Tenor,
         day_count: DayCount,
     ) -> finstack_quant_core::Result<Self> {
-        let initial = decimal_from_finite_f64(initial_rate, "CashflowSpec::step_up initial_rate")?;
+        let initial = finstack_quant_core::decimal::f64_to_decimal(initial_rate)?;
         let step_schedule: Vec<(finstack_quant_core::dates::Date, Decimal)> = steps
             .into_iter()
-            .map(|(d, r)| {
-                Ok((
-                    d,
-                    decimal_from_finite_f64(r, "CashflowSpec::step_up step rate")?,
-                ))
-            })
+            .map(|(d, r)| Ok((d, finstack_quant_core::decimal::f64_to_decimal(r)?)))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
         Ok(Self::StepUp(StepUpCouponSpec {

@@ -75,8 +75,8 @@ impl CreditScoringError {
     /// Every variant rejects a caller-supplied financial ratio or indicator,
     /// so the kind is always validation.
     #[must_use]
-    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
-        finstack_quant_core::error::ErrorKind::Validation
+    pub fn kind(&self) -> finstack_quant_core::ErrorKind {
+        finstack_quant_core::ErrorKind::Validation
     }
 }
 

@@ -34,7 +34,7 @@ use crate::metrics::{MetricContext, MetricId};
 
 use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::neumaier_sum;
+use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::types::CurveId;
 
 /// Reprice for a rate scenario. Instruments whose projected cashflows respond
@@ -493,7 +493,7 @@ impl UnifiedDv01Calculator {
 
 #[cfg(test)]
 mod tests {
-    use finstack_quant_core::math::neumaier_sum;
+    use finstack_quant_core::math::summation::neumaier_sum;
 
     /// Audit item #6: the cross-curve / cross-bucket DV01 totals must use
     /// compensated (Neumaier) summation, matching the per-curve key-rate path.

@@ -4,7 +4,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::{HashMap, HashSet};
+use finstack_quant_core::{FxHashMap, FxHashSet};
 
 use finstack_quant_margin::{
     ClearingHouseImCalculator, ImCalculator, ImMethodology, NettingSetId, ScheduleAssetClass,
@@ -58,7 +58,7 @@ pub fn portfolio_margin(
     portfolio: &Portfolio,
     market: &MarketContext,
     as_of: Date,
-    current_im_collateral: &HashMap<String, Money>,
+    current_im_collateral: &FxHashMap<String, Money>,
 ) -> Result<PortfolioMarginResult> {
     let run = MarginRun {
         market,
@@ -87,7 +87,7 @@ pub fn portfolio_margin(
     let position_sensitivities: Vec<(PositionId, NettingSetId, Result<SimmSensitivities>)> =
         members.iter().map(map_position).collect();
 
-    let mut aggregated: HashMap<NettingSetId, SimmSensitivities> = HashMap::default();
+    let mut aggregated: FxHashMap<NettingSetId, SimmSensitivities> = FxHashMap::default();
     for (position_id, ns_id, sens_result) in position_sensitivities {
         match sens_result {
             Ok(sensitivities) => {
@@ -117,11 +117,11 @@ pub fn portfolio_margin(
         result.add_netting_set(ns_margin)?;
     }
 
-    let tracked: HashSet<&str> = members
+    let tracked: FxHashSet<&str> = members
         .iter()
         .map(|(position, _)| position.position_id.as_str())
         .collect();
-    let degraded: HashSet<&str> = result
+    let degraded: FxHashSet<&str> = result
         .degraded_positions
         .iter()
         .map(|(id, _)| id.as_str())
@@ -140,7 +140,7 @@ pub fn portfolio_margin(
 }
 
 /// Netting sets of one run, keyed by their identifier.
-type NettingSets<'a> = HashMap<NettingSetId, NettingSet<'a>>;
+type NettingSets<'a> = FxHashMap<NettingSetId, NettingSet<'a>>;
 
 /// `(position, netting set)` membership pairs in portfolio order.
 type Members<'a> = Vec<(&'a Position, NettingSetId)>;
@@ -151,7 +151,7 @@ type Members<'a> = Vec<(&'a Position, NettingSetId)>;
 /// in portfolio order; the pairs drive the parallel sensitivity fan-out and
 /// fix the merge and degradation order.
 fn build_netting_sets(portfolio: &Portfolio) -> Result<(NettingSets<'_>, Members<'_>)> {
-    let mut netting_sets: NettingSets<'_> = HashMap::default();
+    let mut netting_sets: NettingSets<'_> = FxHashMap::default();
     let mut members = Vec::new();
     for position in &portfolio.positions {
         let Some(marginable) = position.instrument.as_marginable() else {
@@ -191,7 +191,7 @@ fn build_netting_sets(portfolio: &Portfolio) -> Result<(NettingSets<'_>, Members
         }
     }
 
-    let mut csa_owners = HashMap::default();
+    let mut csa_owners = FxHashMap::default();
     for ns in netting_sets.values() {
         if let Some(spec) = &ns.margin_spec {
             if let Some((owner, existing)) =
@@ -231,9 +231,9 @@ impl MarginRun<'_> {
         &self,
         netting_sets: &NettingSets<'_>,
         result: &mut PortfolioMarginResult,
-        current: &HashMap<String, Money>,
+        current: &FxHashMap<String, Money>,
     ) -> Result<()> {
-        let mut gross_by_csa = HashMap::default();
+        let mut gross_by_csa = FxHashMap::default();
         for ns in netting_sets.values() {
             let Some(spec) = &ns.margin_spec else {
                 continue;
@@ -818,7 +818,7 @@ mod tests {
                 );
             }
             let portfolio = builder.build().unwrap();
-            let current = HashMap::from_iter([(
+            let current = FxHashMap::from_iter([(
                 "shared-csa".to_owned(),
                 Money::new(current, Currency::USD).unwrap(),
             )]);
@@ -878,7 +878,7 @@ mod tests {
             &portfolio,
             &MarketContext::new(),
             as_of,
-            &finstack_quant_core::HashMap::default(),
+            &finstack_quant_core::FxHashMap::default(),
         )
         .unwrap();
         assert_eq!(
@@ -1070,7 +1070,7 @@ mod tests {
                 &portfolio,
                 &MarketContext::new(),
                 as_of,
-                &finstack_quant_core::HashMap::default(),
+                &finstack_quant_core::FxHashMap::default(),
             )
         };
         let first = run().expect("first margin run should succeed");
@@ -1117,7 +1117,7 @@ mod tests {
             &portfolio,
             &MarketContext::new(),
             as_of,
-            &finstack_quant_core::HashMap::default(),
+            &finstack_quant_core::FxHashMap::default(),
         )
         .expect("minor 18: portfolio-level margin should degrade the bad position");
         assert!(
@@ -1173,7 +1173,7 @@ mod tests {
             &portfolio,
             &MarketContext::new(),
             as_of,
-            &finstack_quant_core::HashMap::default(),
+            &finstack_quant_core::FxHashMap::default(),
         )
         .expect("M-13: CSA VM terms should calculate");
 
@@ -1222,7 +1222,7 @@ mod tests {
             &portfolio,
             &MarketContext::new(),
             as_of,
-            &finstack_quant_core::HashMap::default(),
+            &finstack_quant_core::FxHashMap::default(),
         )
         .expect("M-10: cleared IM should calculate from CCP exposure base");
         let netting_set = result

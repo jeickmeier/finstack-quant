@@ -23,11 +23,11 @@ use crate::monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
 use crate::monte_carlo::results::MoneyEstimate;
 use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::{Discretization, PathState, Payoff, RandomStream, StateKey};
-use crate::monte_carlo::OnlineStats;
-use crate::monte_carlo::TimeGrid;
 use crate::rates::hw1f::bank_account::bank_step_factor;
 use crate::rates::hw1f::config::{Hw1fMcConfig, SampleSplit};
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::math::stats::OnlineStats;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::Result;
 
 /// HW1F Monte Carlo pricer for path-dependent rate exotics without exercise.

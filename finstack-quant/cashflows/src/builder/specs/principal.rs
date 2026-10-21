@@ -57,14 +57,12 @@ impl PrincipalExchange {
 #[serde(deny_unknown_fields)]
 pub struct PrincipalEventSpec {
     /// Event date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub date: Date,
     /// Cash settlement date, independently adjusted from the economic event date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

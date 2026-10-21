@@ -16,7 +16,7 @@ export const correlation = {
   jointProbabilities: wasm.jointProbabilities,
   validateCorrelationMatrix: wasm.validateCorrelationMatrix,
   nearestCorrelation: wasm.nearestCorrelation,
-  choleskyDecompose: wasm.choleskyDecompose,
+  choleskyCorrelation: wasm.choleskyCorrelation,
   maxPortfolioLossPaths: wasm.maxPortfolioLossPaths,
   simulatePortfolioLoss: wasm.simulatePortfolioLoss,
 };

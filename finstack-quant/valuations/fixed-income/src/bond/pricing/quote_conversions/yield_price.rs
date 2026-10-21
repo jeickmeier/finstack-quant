@@ -11,7 +11,6 @@ use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
-use finstack_quant_core::math::Compounding;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::common_impl::pricing::coupon_period::icma_reference_period;
 use rust_decimal::prelude::ToPrimitive;
@@ -73,39 +72,15 @@ pub fn df_from_yield(
     }
 
     Ok(match comp {
-        YieldCompounding::Rate(Compounding::Simple) => {
-            let denom = 1.0 + ytm * t;
-            // Check for non-positive denominator which would give invalid discount factor
-            if denom <= 0.0 {
+        YieldCompounding::Rate(rate_comp) => {
+            let df = rate_comp.df_from_rate(ytm, t);
+            if !df.is_finite() {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "Simple interest denominator (1 + y*t) = {} is non-positive for ytm={}, t={}",
-                    denom, ytm, t
+                    "{rate_comp} compounding base is non-positive for ytm={ytm}, t={t}"
                 )));
             }
-            1.0 / denom
+            df
         }
-        YieldCompounding::Rate(Compounding::Annual) => {
-            let base = 1.0 + ytm;
-            if base <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Annual compounding base (1 + y) = {} is non-positive for ytm={}",
-                    base, ytm
-                )));
-            }
-            base.powf(-t)
-        }
-        YieldCompounding::Rate(Compounding::Periodic(m)) => {
-            let m = f64::from(m.get());
-            let base = 1.0 + ytm / m;
-            if base <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Periodic compounding base (1 + y/m) = {} is non-positive for ytm={}, m={}",
-                    base, ytm, m
-                )));
-            }
-            base.powf(-m * t)
-        }
-        YieldCompounding::Rate(Compounding::Continuous) => (-ytm * t).exp(),
         YieldCompounding::Street => {
             let m = periods_per_year(bond_frequency)?.max(1.0);
             let base = 1.0 + ytm / m;

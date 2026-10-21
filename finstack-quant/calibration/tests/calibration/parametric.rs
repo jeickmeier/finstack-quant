@@ -12,7 +12,7 @@ use finstack_quant_calibration::{CalibrationConfig, DiscountCurveSolveConfig};
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::term_structures::NsVariant;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use time::Month;
 
 use crate::calibration::calibration_support as cal_utils;
@@ -134,7 +134,7 @@ fn run_parametric_ns_with_config(
     let mut market_data: Vec<MarketDatum> = Vec::new();
     cal_utils::extend_market_data(&mut market_data, &quotes);
 
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("ns_quotes".to_string(), cal_utils::quote_set_ids(&quotes));
 
     // Do not throw on bad fit — return the report so we can inspect residuals.
@@ -432,7 +432,11 @@ fn parametric_delivered_models_reprice_short_end_deposits_analytically() {
         let report = &result.result.step_reports["ns"];
         assert!(report.success, "{}", report.convergence_reason);
         let context = MarketContext::try_from(result.result.final_market).expect("market");
-        let delivered = context.get_parametric("USD-NS").expect("delivered model");
+        let delivered = context
+            .curve("USD-NS")
+            .and_then(|c| c.parametric())
+            .cloned()
+            .expect("delivered model");
         for (id, start, end, accrual, rate) in contracts {
             // Independent deposit economics evaluated directly on the delivered
             // analytical object, without the calibration's DiscountCurve adapter.
@@ -619,7 +623,9 @@ fn parametric_delivered_curve_reprices_ois_with_payment_lag_analytically() {
     assert!(report.max_residual < 1e-8);
     let context = MarketContext::try_from(result.result.final_market).expect("market");
     let delivered = context
-        .get_parametric("USD-NS-OIS")
+        .curve("USD-NS-OIS")
+        .and_then(|c| c.parametric())
+        .cloned()
         .expect("delivered model");
     for (id, terms, par_rate) in contracts {
         let (floating, annuity) = legs_pv(delivered.as_ref(), &terms);
