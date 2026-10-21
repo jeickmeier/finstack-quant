@@ -3,7 +3,7 @@
 //! Handles payoffs that depend on the entire price path (Asians, barriers, lookbacks)
 //! with flexible event scheduling.
 
-use super::super::engine::{McEngine, McEngineConfig, PathCaptureConfig};
+use super::super::engine::{McEngine, McEngineConfig, PathCaptureConfig, PathInputs, PathScratch};
 use super::super::results::{MoneyEstimate, MonteCarloResult};
 use super::super::traits::Payoff;
 use crate::monte_carlo::discretization::exact::ExactGbm;
@@ -13,7 +13,7 @@ use crate::monte_carlo::payoff::asian::{default_fixing_steps, Asian, AveragingMe
 use crate::monte_carlo::process::gbm::GbmProcess;
 use crate::monte_carlo::process::metadata::ProcessMetadata;
 use crate::monte_carlo::rng::philox::PhiloxRng;
-use crate::monte_carlo::traits::{Discretization, RandomStream, StochasticProcess};
+use crate::monte_carlo::traits::{RandomStream, StochasticProcess};
 use finstack_quant_core::cashflow::flat_discount_factor;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::random::BrownianBridge;
@@ -417,18 +417,16 @@ impl PathDependentPricer {
             .use_brownian_bridge
             .then(|| BrownianBridge::new(num_steps));
 
-        let mut state = vec![0.0; process.dim()];
-        let mut work = vec![0.0; disc.work_size(process)];
-        let mut z_step = vec![0.0; num_factors];
-        let correlation = crate::monte_carlo::engine::build_correlation_factor(process, &disc)?;
-        let mut z_raw = vec![
-            0.0;
-            if correlation.is_some() {
-                num_factors
-            } else {
-                0
-            }
-        ];
+        let (disc, correlation) = engine.prepare_run(process, &disc)?;
+        let inputs = PathInputs {
+            process,
+            disc: &disc,
+            initial_state: &initial_state,
+            correlation: correlation.as_ref(),
+            currency,
+            discount_factor,
+        };
+        let mut scratch = PathScratch::new(inputs, payoff, false);
         let mut z_path = vec![0.0; sobol_dimension];
         let mut z_increments = vec![0.0; num_steps * num_factors];
         let mut w_path = vec![0.0; num_steps + 1];
@@ -441,7 +439,6 @@ impl PathDependentPricer {
         } else {
             Vec::new()
         };
-        let mut payoff_local = payoff.clone();
 
         // Randomized QMC: split the run into R independently scrambled
         // replicates. The reported mean and standard error come from the R
@@ -497,53 +494,12 @@ impl PathDependentPricer {
                     ),
                 );
 
-                payoff_local.reset();
-                payoff_local.on_path_start(&mut adapter);
-
-                let should_capture = capture_enabled
-                    && self
-                        .config
-                        .path_capture
-                        .should_capture(path_id, self.config.num_paths);
-
-                let payoff_value = if should_capture {
-                    let (value, path) = engine.simulate_path_with_capture(
-                        &mut adapter,
-                        process,
-                        &disc,
-                        &initial_state,
-                        &mut payoff_local,
-                        &mut state,
-                        &mut z_step,
-                        &mut z_raw,
-                        &mut work,
-                        correlation.as_ref(),
-                        path_id,
-                        discount_factor,
-                        currency,
-                    )?;
-                    captured_paths.push(path);
-                    value
-                } else {
-                    engine.simulate_path(
-                        &mut adapter,
-                        process,
-                        &disc,
-                        &initial_state,
-                        &mut payoff_local,
-                        &mut state,
-                        &mut z_step,
-                        &mut z_raw,
-                        &mut work,
-                        correlation.as_ref(),
-                        currency,
-                    )?
-                };
-
-                let discounted_value = crate::monte_carlo::engine::validate_discounted_payoff(
+                let discounted_value = engine.simulate_discounted(
+                    &mut adapter,
+                    inputs,
+                    &mut scratch,
                     path_id,
-                    payoff_value,
-                    discount_factor,
+                    capture_enabled.then_some(&mut captured_paths),
                 )?;
                 replicate_stats.update(discounted_value);
                 overall.update(discounted_value);
@@ -559,12 +515,14 @@ impl PathDependentPricer {
         // with RQMC standard error across the R independently scrambled replicate
         // means (`replicate_means.stderr()`). When `num_paths % replicates != 0`,
         // an unweighted mean of replicate means would overweight shorter replicates.
+        // The 95% half-width is the Student-t interval over the R replicate
+        // means (R - 1 degrees of freedom); `validate_runtime` guarantees
+        // `num_paths >= 2`, so R >= 2 and the interval is defined.
         let mean = overall.mean();
-        let stderr = replicate_means.stderr();
-        let half_width = 1.96 * stderr;
+        let half_width = replicate_means.ci_half_width();
         let estimate = Estimate::new(
             mean,
-            stderr,
+            replicate_means.stderr(),
             (mean - half_width, mean + half_width),
             overall.count(),
         )
