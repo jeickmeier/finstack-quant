@@ -2034,7 +2034,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/template_metadata.schema.json",
             "type_name": "TemplateMetadata",
             "kind": "output",
-            "bytes": 4822
+            "bytes": 4906
           }
         ]
       },
@@ -4521,7 +4521,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/template_metadata.schema.json",
             "type_name": "TemplateMetadata",
             "kind": "output",
-            "bytes": 4822
+            "bytes": 4906
           },
           {
             "domain": "statements",
