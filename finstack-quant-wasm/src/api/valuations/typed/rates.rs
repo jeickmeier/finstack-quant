@@ -14,17 +14,11 @@ instrument_class!(
     finstack_quant_valuations::instruments::InterestRateSwap
 );
 
-instrument_builder_entry!(
+instrument_surface!(
     JsInterestRateSwap,
     "InterestRateSwap",
     JsInterestRateSwapBuilder
 );
-
-instrument_to_dict!(JsInterestRateSwap, "InterestRateSwap");
-
-instrument_market_dependencies!(JsInterestRateSwap, "InterestRateSwap");
-
-instrument_pricing!(JsInterestRateSwap, "InterestRateSwap");
 
 getters!(JsInterestRateSwap, "InterestRateSwap", |i| {
         /// Notional shared by both legs.
@@ -51,22 +45,12 @@ getters!(JsInterestRateSwap, "InterestRateSwap", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"discounting"` or `"black76"`.
         default_model as defaultModel => text(Instrument::default_model(i)),
-        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
-        /// @returns The overrides plain object; `{}` when none is set.
-        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
-        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
-        /// @returns The overrides plain object; unset fields are `null` or omitted.
-        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
-        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
-        /// @returns The overrides plain object; `{}` when none is set.
-        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
-        /// Instrument attributes (tags and metadata) used for scenario selection.
-        /// @returns The attribute bag; empty when none were set.
-        attributes as attributes => json(i.attributes),
         /// Expiry date exposed by the Rust `Instrument` trait.
         /// @returns The expiry/maturity date, or `null` when the instrument type reports none.
         expiry as expiry => opt_date(Instrument::expiry(i)),
 });
+
+common_getters!(JsInterestRateSwap, "InterestRateSwap");
 
 factories!(JsInterestRateSwap, "InterestRateSwap", finstack_quant_valuations::instruments::InterestRateSwap, {
         /// Canonical 5-year USD pay-fixed swap (mirrors Rust `InterestRateSwap::example`): semi-annual 30/360 fixed vs quarterly ACT/360 `USD-SOFR-3M`, T-2 reset lag, `usny` calendar.
@@ -123,27 +107,9 @@ setters!(JsInterestRateSwapBuilder, "InterestRateSwapBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         margin_spec as marginSpec => json,
-        /// Set the instrument-owned pricing inputs.
-        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        instrument_pricing_overrides as instrumentPricingOverrides => json,
-        /// Set the metric-time pricing configuration stored on the instrument.
-        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        metric_pricing_overrides as metricPricingOverrides => json,
-        /// Set the scenario-only pricing adjustments.
-        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scenario_pricing_overrides as scenarioPricingOverrides => json,
-        /// Set instrument attributes (tags and metadata).
-        /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => json,
 });
+
+common_setters!(JsInterestRateSwapBuilder, "InterestRateSwapBuilder");
 
 handle_setters!(JsInterestRateSwapBuilder, "InterestRateSwapBuilder", {
         /// Set the notional shared by both legs.
@@ -160,13 +126,7 @@ instrument_class!(
     finstack_quant_valuations::instruments::Swaption
 );
 
-instrument_builder_entry!(JsSwaption, "Swaption", JsSwaptionBuilder);
-
-instrument_to_dict!(JsSwaption, "Swaption");
-
-instrument_market_dependencies!(JsSwaption, "Swaption");
-
-instrument_pricing!(JsSwaption, "Swaption");
+instrument_surface!(JsSwaption, "Swaption", JsSwaptionBuilder);
 
 getters!(JsSwaption, "Swaption", |i| {
         /// Option type of the swaption.
@@ -202,19 +162,9 @@ getters!(JsSwaption, "Swaption", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"discounting"` or `"black76"`.
         default_model as defaultModel => text(Instrument::default_model(i)),
-        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
-        /// @returns The overrides plain object; `{}` when none is set.
-        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
-        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
-        /// @returns The overrides plain object; unset fields are `null` or omitted.
-        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
-        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
-        /// @returns The overrides plain object; `{}` when none is set.
-        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
-        /// Instrument attributes (tags and metadata) used for scenario selection.
-        /// @returns The attribute bag; empty when none were set.
-        attributes as attributes => json(i.attributes),
 });
+
+common_getters!(JsSwaption, "Swaption");
 
 accessors!(JsSwaption, "Swaption", |i| {
         /// Fixed strike of the underlying swap (mirrors Rust `get_strike`).
@@ -307,27 +257,9 @@ setters!(JsSwaptionBuilder, "SwaptionBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         sabr_params as sabrParams => json,
-        /// Set the instrument-owned pricing inputs.
-        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        instrument_pricing_overrides as instrumentPricingOverrides => json,
-        /// Set the metric-time pricing configuration stored on the instrument.
-        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        metric_pricing_overrides as metricPricingOverrides => json,
-        /// Set the scenario-only pricing adjustments.
-        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scenario_pricing_overrides as scenarioPricingOverrides => json,
-        /// Set instrument attributes (tags and metadata).
-        /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => json,
 });
+
+common_setters!(JsSwaptionBuilder, "SwaptionBuilder");
 
 handle_setters!(JsSwaptionBuilder, "SwaptionBuilder", {
         /// Set the notional of the underlying swap.
@@ -344,13 +276,7 @@ instrument_class!(
     finstack_quant_valuations::instruments::CapFloor
 );
 
-instrument_builder_entry!(JsCapFloor, "CapFloor", JsCapFloorBuilder);
-
-instrument_to_dict!(JsCapFloor, "CapFloor");
-
-instrument_market_dependencies!(JsCapFloor, "CapFloor");
-
-instrument_pricing!(JsCapFloor, "CapFloor");
+instrument_surface!(JsCapFloor, "CapFloor", JsCapFloorBuilder);
 
 getters!(JsCapFloor, "CapFloor", |i| {
         /// Option type of the cap/floor.
@@ -416,22 +342,12 @@ getters!(JsCapFloor, "CapFloor", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"discounting"` or `"black76"`.
         default_model as defaultModel => text(Instrument::default_model(i)),
-        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
-        /// @returns The overrides plain object; `{}` when none is set.
-        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
-        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
-        /// @returns The overrides plain object; unset fields are `null` or omitted.
-        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
-        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
-        /// @returns The overrides plain object; `{}` when none is set.
-        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
-        /// Instrument attributes (tags and metadata) used for scenario selection.
-        /// @returns The attribute bag; empty when none were set.
-        attributes as attributes => json(i.attributes),
         /// Expiry date exposed by the Rust `Instrument` trait.
         /// @returns The expiry/maturity date, or `null` when the instrument type reports none.
         expiry as expiry => opt_date(Instrument::expiry(i)),
 });
+
+common_getters!(JsCapFloor, "CapFloor");
 
 factories!(JsCapFloor, "CapFloor", finstack_quant_valuations::instruments::CapFloor, {
         /// Canonical 5-year USD 3% cap (mirrors Rust `CapFloor::example`): quarterly ACT/360 on `USD-SOFR-3M` discounted on `USD-OIS` with vol surface `USD-CAPFLOOR-VOL`.
@@ -538,27 +454,9 @@ setters!(JsCapFloorBuilder, "CapFloorBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         overnight_coupon as overnightCoupon => json,
-        /// Set the instrument-owned pricing inputs.
-        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        instrument_pricing_overrides as instrumentPricingOverrides => json,
-        /// Set the metric-time pricing configuration stored on the instrument.
-        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        metric_pricing_overrides as metricPricingOverrides => json,
-        /// Set the scenario-only pricing adjustments.
-        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scenario_pricing_overrides as scenarioPricingOverrides => json,
-        /// Set instrument attributes (tags and metadata).
-        /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => json,
 });
+
+common_setters!(JsCapFloorBuilder, "CapFloorBuilder");
 
 handle_setters!(JsCapFloorBuilder, "CapFloorBuilder", {
         /// Set the notional amount.
@@ -630,23 +528,13 @@ impl JsInterestRateSwap {
     }
 }
 
-#[wasm_bindgen(js_class = CapFloorBuilder)]
-impl JsCapFloorBuilder {
+dated_money_setter!(
+    JsCapFloorBuilder,
+    "CapFloorBuilder",
     /// Set the option premium paid on a given date.
     /// @param payment_date - Premium payment date as an ISO-8601 string.
     /// @param amount - Premium amount; its currency must match the notional currency.
     /// @returns The builder, for chaining.
     /// @throws Error - Throws with kind `validation` if `paymentDate` is malformed or the builder was already consumed by `build()`, and kind `invalid_type` if `paymentDate` is not a string.
-    pub fn premium(
-        &self,
-        payment_date: JsValue,
-        amount: &JsMoney,
-    ) -> Result<JsCapFloorBuilder, JsValue> {
-        let premium = (
-            super::arg::date(&payment_date, "paymentDate")?,
-            amount.inner,
-        );
-        let inner = self.inner.apply(|b| b.premium(premium))?;
-        Ok(Self { inner })
-    }
-}
+    premium
+);

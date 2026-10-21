@@ -19,11 +19,10 @@
 use crate::api::core::currency::JsCurrency;
 use crate::api::core::dates::JsDayCount;
 use crate::api::core::money::JsMoney;
-use crate::api::valuations::pricing::{parse_market_json, standard_option_greeks_with_context};
+use crate::api::valuations::pricing::parse_market_json;
 use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, json_text};
-use crate::utils::{to_js_err, to_js_value};
+use crate::utils::to_js_err;
 use finstack_quant_valuations::instruments::Instrument;
-use indexmap::IndexMap;
 use wasm_bindgen::prelude::*;
 
 /// Convert a bare JS spec through the canonical Rust validating constructor.
@@ -38,31 +37,6 @@ where
     let instrument = finstack_quant_valuations::pricer::instrument_from_spec(type_tag, spec)
         .map_err(to_js_err)?;
     T::try_from(instrument).map_err(to_js_err)
-}
-
-/// Shared body for the `greeks` method emitted by the FX-option macro.
-///
-/// Prices the Rust-ordered subset of `STANDARD_OPTION_GREEKS` that applies to
-/// the instrument and returns a JS object whose keys keep that order.
-/// Non-finite Greeks are rejected by Rust rather than serialized.
-fn option_greeks_object(
-    instrument: Box<dyn finstack_quant_valuations::instruments::Instrument>,
-    market_json: &str,
-    as_of: &str,
-    model: Option<&str>,
-) -> Result<JsValue, JsValue> {
-    let instrument =
-        finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(instrument, None)
-            .map_err(to_js_err)?;
-    let market = parse_market_json(market_json)?;
-    let pairs = standard_option_greeks_with_context(
-        &instrument,
-        &market,
-        as_of,
-        model.unwrap_or("default"),
-    )?;
-    let ordered: IndexMap<&'static str, f64> = pairs.into_iter().collect();
-    to_js_value(&ordered)
 }
 
 macro_rules! fx_class {
@@ -91,15 +65,15 @@ macro_rules! fx_class {
 }
 
 /// Emit an FX option class: the `fx_class!` surface plus one method per
-/// applicable Greek and `greeks()`.
+/// applicable Greek (through `greek_methods!`) and `greeks()`.
 ///
-/// Each Greek entry is `(method, "jsName", "metric_id", "summary doc", "@returns doc")`. The
+/// Each Greek entry is `(method, jsName, "metric_id", "summary doc", "@returns doc")`. The
 /// method list is pinned against the Rust metric registry by
 /// `tests::option_greek_methods_match_the_metric_registry`.
 macro_rules! fx_option_class {
     (
         $rust_name:ident, $js_name:literal, $type_tag:literal, $rust_ty:ty, $instrument_type:ident,
-        [$(($method:ident, $js_method:literal, $metric:literal, $summary:literal, $returns:literal)),+ $(,)?]
+        [$(($method:ident, $js_method:ident, $metric:literal, $summary:literal, $returns:literal)),+ $(,)?]
     ) => {
         fx_class!($rust_name, $js_name, $type_tag, $rust_ty);
 
@@ -114,31 +88,28 @@ macro_rules! fx_option_class {
                 finstack_quant_valuations::pricer::InstrumentType::$instrument_type;
         }
 
-        #[wasm_bindgen(js_class = $js_name)]
-        impl $rust_name {
+        // Plain-string doc attributes, not `///`: a `///` line passed through a
+        // macro argument reaches wasm-bindgen as a raw string and keeps its
+        // `r"` prefix in the generated declarations.
+        greek_methods!($rust_name, $js_name, {
             $(
                 #[doc = $summary]
-                /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-                /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-                /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+                #[doc = " @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data."]
+                #[doc = " @param as_of - ISO-8601 valuation date used to resolve date-dependent market data."]
+                #[doc = " @param model - Optional pricing-model identifier; omit to use the instrument's default model."]
                 #[doc = $returns]
-                ///
-                /// # Errors
-                ///
-                /// Throws a JavaScript exception if the instrument or market JSON,
-                /// `asOf`, or `model` is invalid; required market data is missing;
-                /// pricing fails; or the Greek is not produced by the selected model.
-                #[wasm_bindgen(js_name = $js_method)]
-                pub fn $method(
-                    &self,
-                    market_json: JsValue,
-                    as_of: JsValue,
-                    model: Option<JsValue>,
-                ) -> Result<f64, JsValue> {
-                    super::metric_value(Box::new(self.inner.clone()), &market_json, &as_of, model.as_ref(), $metric)
-                }
+                #[doc = ""]
+                #[doc = " # Errors"]
+                #[doc = ""]
+                #[doc = " Throws a JavaScript exception if the instrument or market JSON,"]
+                #[doc = " `asOf`, or `model` is invalid; required market data is missing;"]
+                #[doc = " pricing fails; or the Greek is not produced by the selected model."]
+                $method as $js_method => $metric,
             )+
+        });
 
+        #[wasm_bindgen(js_class = $js_name)]
+        impl $rust_name {
             /// Compute every Greek that applies to this instrument as a JavaScript object.
             /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
             /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -159,12 +130,41 @@ macro_rules! fx_option_class {
                 as_of: JsValue,
                 model: Option<JsValue>,
             ) -> Result<JsValue, JsValue> {
-                let market_json: &str = &json_text(&market_json, "marketJson")?;
-                let as_of: &str = &js_string(&as_of, "asOf")?;
+                let market_json = json_text(&market_json, "marketJson")?;
+                let as_of = js_string(&as_of, "asOf")?;
                 let model = js_opt_string(model.as_ref(), "model")?;
-                option_greeks_object(Box::new(self.inner.clone()), market_json, as_of, model.as_deref())
+                super::option_greeks(
+                    Box::new(self.inner.clone()),
+                    &market_json,
+                    &as_of,
+                    model.as_deref(),
+                )
             }
         }
+    };
+}
+
+/// An FX option class whose Greek methods start with spot delta, gamma, vega,
+/// theta and domestic rho.
+///
+/// `$theta_returns` documents the class's theta; each `$extra` appends one
+/// more Greek entry in the `fx_option_class!` form.
+macro_rules! fx_option {
+    (
+        $rust_name:ident, $js_name:literal, $type_tag:literal, $rust_ty:ty, $instrument_type:ident,
+        $theta_returns:literal $(, $extra:tt)* $(,)?
+    ) => {
+        fx_option_class!(
+            $rust_name, $js_name, $type_tag, $rust_ty, $instrument_type,
+            [
+                (delta, delta, "delta", "Spot delta of the option.", "@returns Cash delta `dPV/dS`: PV change per unit move in the spot rate, including notional scaling."),
+                (gamma, gamma, "gamma", "Spot gamma of the option.", "@returns Cash gamma `d²PV/dS²`: PV per unit-spot squared, including notional scaling."),
+                (vega, vega, "vega", "Vega of the option.", "@returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility."),
+                (theta, theta, "theta", "Theta of the option.", $theta_returns),
+                (rho, rho, "rho", "Domestic rate rho of the option.", "@returns Domestic rho: PV change for a 1bp (0.0001) move in the domestic discount rate."),
+                $($extra),*
+            ]
+        );
     };
 }
 
@@ -186,20 +186,15 @@ fx_class!(
     instruments::FxVarianceSwap
 );
 
+/// An FX option class exposing every standard Greek: the `fx_option!` five
+/// plus foreign rho, vanna and volga.
 macro_rules! fx_option_with_all_greeks {
     ($rust_name:ident, $js_name:literal, $type_tag:literal, $rust_ty:ty, $instrument_type:ident, $theta_returns:literal) => {
-        fx_option_class!(
-            $rust_name, $js_name, $type_tag, $rust_ty, $instrument_type,
-            [
-                (delta, "delta", "delta", "Spot delta of the option.", "@returns Cash delta `dPV/dS`: PV change per unit move in the spot rate, including notional scaling."),
-                (gamma, "gamma", "gamma", "Spot gamma of the option.", "@returns Cash gamma `d²PV/dS²`: PV per unit-spot squared, including notional scaling."),
-                (vega, "vega", "vega", "Vega of the option.", "@returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility."),
-                (theta, "theta", "theta", "Theta of the option.", $theta_returns),
-                (rho, "rho", "rho", "Domestic rate rho of the option.", "@returns Domestic rho: PV change for a 1bp (0.0001) move in the domestic discount rate."),
-                (foreign_rho, "foreignRho", "foreign_rho", "Foreign rate rho of the option.", "@returns Foreign rho: PV change for a 1bp (0.0001) move in the foreign discount rate."),
-                (vanna, "vanna", "vanna", "Vanna of the option.", "@returns Vanna `d²PV/(dS dσ)`: PV per unit spot per vol point (0.01 absolute vol)."),
-                (volga, "volga", "volga", "Volga of the option.", "@returns Volga `d²PV/dσ²`: PV per vol-point squared (0.01 absolute vol)."),
-            ]
+        fx_option!(
+            $rust_name, $js_name, $type_tag, $rust_ty, $instrument_type, $theta_returns,
+            (foreign_rho, foreignRho, "foreign_rho", "Foreign rate rho of the option.", "@returns Foreign rho: PV change for a 1bp (0.0001) move in the foreign discount rate."),
+            (vanna, vanna, "vanna", "Vanna of the option.", "@returns Vanna `d²PV/(dS dσ)`: PV per unit spot per vol point (0.01 absolute vol)."),
+            (volga, volga, "volga", "Volga of the option.", "@returns Volga `d²PV/dσ²`: PV per vol-point squared (0.01 absolute vol)."),
         );
     };
 }
@@ -222,151 +217,31 @@ fx_option_with_all_greeks!(
     QuantoOption,
     "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized."
 );
-fx_option_class!(
+fx_option!(
     JsFxDigitalOption,
     "FxDigitalOption",
     "fx_digital_option",
     instruments::FxDigitalOption,
     FxDigitalOption,
-    [
-        (
-            delta,
-            "delta",
-            "delta",
-            "Spot delta of the option.",
-            "@returns Cash delta `dPV/dS`: PV change per unit move in the spot rate, including notional scaling."
-        ),
-        (
-            gamma,
-            "gamma",
-            "gamma",
-            "Spot gamma of the option.",
-            "@returns Cash gamma `d²PV/dS²`: PV per unit-spot squared, including notional scaling."
-        ),
-        (
-            vega,
-            "vega",
-            "vega",
-            "Vega of the option.",
-            "@returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility."
-        ),
-        (
-            theta,
-            "theta",
-            "theta",
-            "Theta of the option.",
-            "@returns Model theta per day on the `metric_pricing_overrides.theta_day_basis` day count (default 365 calendar days): analytic for cash-or-nothing payouts, a one-day finite-difference decay for asset-or-nothing; not annualized."
-        ),
-        (
-            rho,
-            "rho",
-            "rho",
-            "Domestic rate rho of the option.",
-            "@returns Domestic rho: PV change for a 1bp (0.0001) move in the domestic discount rate."
-        ),
-    ]
+    "@returns Model theta per day on the `metric_pricing_overrides.theta_day_basis` day count (default 365 calendar days): analytic for cash-or-nothing payouts, a one-day finite-difference decay for asset-or-nothing; not annualized."
 );
-fx_option_class!(
+fx_option!(
     JsFxTouchOption,
     "FxTouchOption",
     "fx_touch_option",
     instruments::FxTouchOption,
     FxTouchOption,
-    [
-        (
-            delta,
-            "delta",
-            "delta",
-            "Spot delta of the option.",
-            "@returns Cash delta `dPV/dS`: PV change per unit move in the spot rate, including notional scaling."
-        ),
-        (
-            gamma,
-            "gamma",
-            "gamma",
-            "Spot gamma of the option.",
-            "@returns Cash gamma `d²PV/dS²`: PV per unit-spot squared, including notional scaling."
-        ),
-        (
-            vega,
-            "vega",
-            "vega",
-            "Vega of the option.",
-            "@returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility."
-        ),
-        (
-            theta,
-            "theta",
-            "theta",
-            "Theta of the option.",
-            "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized."
-        ),
-        (
-            rho,
-            "rho",
-            "rho",
-            "Domestic rate rho of the option.",
-            "@returns Domestic rho: PV change for a 1bp (0.0001) move in the domestic discount rate."
-        ),
-    ]
+    "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized."
 );
-fx_option_class!(
+fx_option!(
     JsFxBarrierOption,
     "FxBarrierOption",
     "fx_barrier_option",
     instruments::FxBarrierOption,
     FxBarrierOption,
-    [
-        (
-            delta,
-            "delta",
-            "delta",
-            "Spot delta of the option.",
-            "@returns Cash delta `dPV/dS`: PV change per unit move in the spot rate, including notional scaling."
-        ),
-        (
-            gamma,
-            "gamma",
-            "gamma",
-            "Spot gamma of the option.",
-            "@returns Cash gamma `d²PV/dS²`: PV per unit-spot squared, including notional scaling."
-        ),
-        (
-            vega,
-            "vega",
-            "vega",
-            "Vega of the option.",
-            "@returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility."
-        ),
-        (
-            theta,
-            "theta",
-            "theta",
-            "Theta of the option.",
-            "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized."
-        ),
-        (
-            rho,
-            "rho",
-            "rho",
-            "Domestic rate rho of the option.",
-            "@returns Domestic rho: PV change for a 1bp (0.0001) move in the domestic discount rate."
-        ),
-        (
-            vanna,
-            "vanna",
-            "vanna",
-            "Vanna of the option.",
-            "@returns Vanna `d²PV/(dS dσ)`: PV per unit spot per vol point (0.01 absolute vol)."
-        ),
-        (
-            volga,
-            "volga",
-            "volga",
-            "Volga of the option.",
-            "@returns Volga `d²PV/dσ²`: PV per vol-point squared (0.01 absolute vol)."
-        ),
-    ]
+    "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized.",
+    (vanna, vanna, "vanna", "Vanna of the option.", "@returns Vanna `d²PV/(dS dσ)`: PV per unit spot per vol point (0.01 absolute vol)."),
+    (volga, volga, "volga", "Volga of the option.", "@returns Volga `d²PV/dσ²`: PV per vol-point squared (0.01 absolute vol)."),
 );
 
 fn parse_currency(
@@ -378,18 +253,6 @@ fn parse_currency(
 
 #[wasm_bindgen(js_class = FxForward)]
 impl JsFxForward {
-    /// Canonical example forward (mirrors Rust `FxForward::example`).
-    ///
-    /// A 6-month EUR/USD forward: EUR 1,000,000 at contract rate 1.12,
-    /// maturity 2025-06-15, curves `USD-OIS` / `EUR-OIS`.
-    /// @returns The example forward.
-    /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
-    pub fn example() -> Result<JsFxForward, JsValue> {
-        instruments::FxForward::example()
-            .map(|inner| JsFxForward { inner })
-            .map_err(to_js_err)
-    }
-
     /// Market-standard spot lag in business days for a currency pair.
     ///
     /// Mirrors Rust `FxForward::standard_settlement_days`: T+1 for USD/CAD,
@@ -506,28 +369,29 @@ impl JsFxForward {
             .map(|inner| JsFxForward { inner })
             .map_err(to_js_err)
     }
-
-    /// Covered-interest-parity forward rate implied by the market.
-    ///
-    /// Mirrors Rust `FxForward::market_forward_rate`:
-    /// `F = S × DF_foreign(T) / DF_domestic(T)` at the forward's maturity.
-    /// @param marketJson - Serialized `MarketContext` carrying both discount curves and the FX spot (or an explicit `quoted_spot` on the instrument).
-    /// @param asOf - Valuation date as an ISO-8601 string.
-    /// @returns Forward rate, quote currency per unit of base currency.
-    /// @throws Error - Throws with kind `not_found` if a discount curve or the FX spot is missing, and kind `validation` if the market JSON or `asOf` is malformed.
-    #[wasm_bindgen(js_name = marketForwardRate)]
-    pub fn market_forward_rate(
-        &self,
-        market_json: JsValue,
-        as_of: JsValue,
-    ) -> Result<f64, JsValue> {
-        let market = parse_market_json(&json_text(&market_json, "marketJson")?)?;
-        let as_of = crate::utils::parse_iso_date(&js_string(&as_of, "asOf")?)?;
-        self.inner
-            .market_forward_rate(&market, as_of)
-            .map_err(to_js_err)
-    }
 }
+
+market_metrics!(JsFxForward, "FxForward", {
+        /// Covered-interest-parity forward rate implied by the market.
+        ///
+        /// Mirrors Rust `FxForward::market_forward_rate`:
+        /// `F = S × DF_foreign(T) / DF_domestic(T)` at the forward's maturity.
+        /// @param marketJson - Serialized `MarketContext` carrying both discount curves and the FX spot (or an explicit `quoted_spot` on the instrument).
+        /// @param asOf - Valuation date as an ISO-8601 string.
+        /// @returns Forward rate, quote currency per unit of base currency.
+        /// @throws Error - Throws with kind `not_found` if a discount curve or the FX spot is missing, and kind `validation` if the market JSON or `asOf` is malformed.
+        market_forward_rate as marketForwardRate,
+});
+
+factories!(JsFxForward, "FxForward", instruments::FxForward, {
+        /// Canonical example forward (mirrors Rust `FxForward::example`).
+        ///
+        /// A 6-month EUR/USD forward: EUR 1,000,000 at contract rate 1.12,
+        /// maturity 2025-06-15, curves `USD-OIS` / `EUR-OIS`.
+        /// @returns The example forward.
+        /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+        example as example,
+});
 
 /// Optional arguments of `FxForward.fromTradeDate`; omitted fields take the
 /// Rust `FxForward::from_trade_date` defaults.
@@ -548,18 +412,6 @@ struct FromTradeDateOptions {
 
 #[wasm_bindgen(js_class = FxOption)]
 impl JsFxOption {
-    /// Canonical example option (mirrors Rust `FxOption::example`).
-    ///
-    /// A EUR/USD call, strike 1.12, EUR 1,000,000, forward-delta convention
-    /// with premium in USD; curves `USD-OIS` / `EUR-OIS`, surface `EURUSD-VOL`.
-    /// @returns The example option.
-    /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
-    pub fn example() -> Result<JsFxOption, JsValue> {
-        instruments::FxOption::example()
-            .map(|inner| JsFxOption { inner })
-            .map_err(to_js_err)
-    }
-
     /// Build a European FX option with currency-derived OIS curves.
     ///
     /// Mirrors Rust `FxOption::european`: discount curves are `<QUOTE>-OIS`
@@ -640,6 +492,16 @@ impl JsFxOption {
     }
 }
 
+factories!(JsFxOption, "FxOption", instruments::FxOption, {
+        /// Canonical example option (mirrors Rust `FxOption::example`).
+        ///
+        /// A EUR/USD call, strike 1.12, EUR 1,000,000, forward-delta convention
+        /// with premium in USD; curves `USD-OIS` / `EUR-OIS`, surface `EURUSD-VOL`.
+        /// @returns The example option.
+        /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+        example as example,
+});
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -653,7 +515,7 @@ mod tests {
                 .price("{}")
                 .is_err()
         );
-        assert!(option_greeks_object(
+        assert!(super::super::option_greeks(
             Box::new(instruments::FxOption::example().expect("example")),
             "not-market-json",
             "not-a-date",
@@ -707,28 +569,12 @@ mod tests {
     }
 }
 
-instrument_builder_entry!(JsFxForward, "FxForward", JsFxForwardBuilder);
-
-instrument_to_dict!(JsFxForward, "FxForward");
-
-instrument_market_dependencies!(JsFxForward, "FxForward");
+instrument_surface!(JsFxForward, "FxForward", JsFxForwardBuilder, unpriced);
 
 getters!(JsFxForward, "FxForward", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"hazard_rate"` or `"black76"`.
         default_model as defaultModel => text(Instrument::default_model(i)),
-        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
-        /// @returns The overrides plain object; `{}` when none is set.
-        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
-        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
-        /// @returns The overrides plain object; unset fields are `null` or omitted.
-        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
-        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
-        /// @returns The overrides plain object; `{}` when none is set.
-        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
-        /// Instrument attributes (tags and metadata) used for scenario selection.
-        /// @returns The attribute bag; empty when none were set.
-        attributes as attributes => json(i.attributes),
         /// Base (foreign) currency; the notional currency.
         /// @returns The base currency.
         base_currency as baseCurrency => currency(i.base_currency),
@@ -763,6 +609,8 @@ getters!(JsFxForward, "FxForward", |i| {
         /// @returns `null`: FX forwards carry no option expiry.
         expiry as expiry => opt_date(Instrument::expiry(i)),
 });
+
+common_getters!(JsFxForward, "FxForward");
 
 builder_class!(
     /// Fluent builder for `FxForward`; one setter per Rust `FinancialBuilder` setter.
@@ -817,27 +665,9 @@ setters!(JsFxForwardBuilder, "FxForwardBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         quote_calendar_id as quoteCalendarId => id,
-        /// Set the instrument-owned pricing inputs.
-        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        instrument_pricing_overrides as instrumentPricingOverrides => json,
-        /// Set the metric-time pricing configuration stored on the instrument.
-        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        metric_pricing_overrides as metricPricingOverrides => json,
-        /// Set the scenario-only pricing adjustments.
-        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scenario_pricing_overrides as scenarioPricingOverrides => json,
-        /// Set instrument attributes (tags and metadata).
-        /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => json,
 });
+
+common_setters!(JsFxForwardBuilder, "FxForwardBuilder");
 
 handle_setters!(JsFxForwardBuilder, "FxForwardBuilder", {
         /// Set the base currency (foreign currency, numerator of the pair).
@@ -857,28 +687,12 @@ handle_setters!(JsFxForwardBuilder, "FxForwardBuilder", {
         notional as notional => JsMoney,
 });
 
-instrument_builder_entry!(JsFxOption, "FxOption", JsFxOptionBuilder);
-
-instrument_to_dict!(JsFxOption, "FxOption");
-
-instrument_market_dependencies!(JsFxOption, "FxOption");
+instrument_surface!(JsFxOption, "FxOption", JsFxOptionBuilder, unpriced);
 
 getters!(JsFxOption, "FxOption", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"hazard_rate"` or `"black76"`.
         default_model as defaultModel => text(Instrument::default_model(i)),
-        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
-        /// @returns The overrides plain object; `{}` when none is set.
-        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
-        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
-        /// @returns The overrides plain object; unset fields are `null` or omitted.
-        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
-        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
-        /// @returns The overrides plain object; `{}` when none is set.
-        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
-        /// Instrument attributes (tags and metadata) used for scenario selection.
-        /// @returns The attribute bag; empty when none were set.
-        attributes as attributes => json(i.attributes),
         /// Base (foreign) currency; the notional currency.
         /// @returns The base currency.
         base_currency as baseCurrency => currency(i.base_currency),
@@ -913,6 +727,8 @@ getters!(JsFxOption, "FxOption", |i| {
         /// @returns The surface id.
         vol_surface_id as volSurfaceId => text(i.vol_surface_id),
 });
+
+common_getters!(JsFxOption, "FxOption");
 
 builder_class!(
     /// Fluent builder for `FxOption`; one setter per Rust `FinancialBuilder` setter.
@@ -962,27 +778,9 @@ setters!(JsFxOptionBuilder, "FxOptionBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         vol_surface_id as volSurfaceId => id,
-        /// Set the instrument-owned pricing inputs.
-        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        instrument_pricing_overrides as instrumentPricingOverrides => json,
-        /// Set the metric-time pricing configuration stored on the instrument.
-        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        metric_pricing_overrides as metricPricingOverrides => json,
-        /// Set the scenario-only pricing adjustments.
-        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scenario_pricing_overrides as scenarioPricingOverrides => json,
-        /// Set instrument attributes (tags and metadata).
-        /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => json,
 });
+
+common_setters!(JsFxOptionBuilder, "FxOptionBuilder");
 
 handle_setters!(JsFxOptionBuilder, "FxOptionBuilder", {
         /// Set the base currency (foreign currency).

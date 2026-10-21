@@ -53,44 +53,17 @@ macro_rules! instrument_class {
     };
 }
 
-/// `toDict` for a typed instrument class.
-macro_rules! instrument_to_dict {
-    ($ty:ident, $js:literal) => {
-        #[wasm_bindgen(js_class = $js)]
-        impl $ty {
-            /// The bare instrument spec as a plain object (no envelope).
-            ///
-            /// Mirrors Python `to_dict()`: the serde form of the Rust struct,
-            /// i.e. the `instrument.spec` payload of `toJson()`.
-            /// @returns Plain-object instrument spec.
-            /// @throws Error - Throws if the instrument cannot be serialized.
-            #[wasm_bindgen(js_name = toDict)]
-            pub fn to_dict(&self) -> Result<JsValue, JsValue> {
-                crate::utils::to_js_value(&self.inner)
-            }
-        }
-    };
-}
-
-/// `marketDependencies` for a typed instrument class.
-macro_rules! instrument_market_dependencies {
-    ($ty:ident, $js:literal) => {
-        #[wasm_bindgen(js_class = $js)]
-        impl $ty {
-            /// Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
-            /// @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
-            /// @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
-            #[wasm_bindgen(js_name = marketDependencies)]
-            pub fn market_dependencies(&self) -> Result<JsValue, JsValue> {
-                $crate::api::valuations::typed::market_dependencies(&self.inner)
-            }
-        }
-    };
-}
-
-/// The static `builder()` entry point of a typed instrument class.
-macro_rules! instrument_builder_entry {
+/// The shared surface of a typed instrument class: the static `builder()`
+/// entry point, `toDict`, `marketDependencies`, and `price` / `metric`.
+///
+/// The `unpriced` form omits `price` / `metric` for classes that already get
+/// them from another macro (the FX classes, through `fx_class!`).
+macro_rules! instrument_surface {
     ($ty:ident, $js:literal, $builder:ident) => {
+        instrument_surface!($ty, $js, $builder, unpriced);
+        instrument_pricing!($ty, $js);
+    };
+    ($ty:ident, $js:literal, $builder:ident, unpriced) => {
         #[wasm_bindgen(js_class = $js)]
         impl $ty {
             /// Create a fluent builder (mirrors the Rust `builder()`).
@@ -101,10 +74,28 @@ macro_rules! instrument_builder_entry {
             pub fn builder() -> $builder {
                 $builder::new()
             }
+
+            /// The bare instrument spec as a plain object (no envelope).
+            ///
+            /// Mirrors Python `to_dict()`: the serde form of the Rust struct,
+            /// i.e. the `instrument.spec` payload of `toJson()`.
+            /// @returns Plain-object instrument spec.
+            /// @throws Error - Throws if the instrument cannot be serialized.
+            #[wasm_bindgen(js_name = toDict)]
+            pub fn to_dict(&self) -> Result<JsValue, JsValue> {
+                crate::utils::to_js_value(&self.inner)
+            }
+
+            /// Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+            /// @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+            /// @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+            #[wasm_bindgen(js_name = marketDependencies)]
+            pub fn market_dependencies(&self) -> Result<JsValue, JsValue> {
+                $crate::api::valuations::typed::market_dependencies(&self.inner)
+            }
         }
     };
 }
-
 /// `price` and `metric` for a typed instrument class.
 macro_rules! instrument_pricing {
     ($ty:ident, $js:literal) => {
@@ -286,7 +277,9 @@ macro_rules! greek_methods {
 /// `$target` is the WASM class returned by `build()`; `|$b| $finish` turns
 /// the Rust builder into the validated Rust instrument.
 macro_rules! builder_class {
-    ($(#[$doc:meta])* $bty:ident, $bjs:literal, $inner:ty, $target:ident, |$b:ident| $finish:expr) => {
+    // The builder struct and its empty constructor, staging `$empty`; a
+    // builder whose `build()` is not a typed class writes `build` itself.
+    (@staged $(#[$doc:meta])* $bty:ident, $bjs:literal, $inner:ty, $empty:expr) => {
         $(#[$doc])*
         #[wasm_bindgen(js_name = $bjs)]
         pub struct $bty {
@@ -297,10 +290,13 @@ macro_rules! builder_class {
             /// An empty builder.
             pub(crate) fn new() -> Self {
                 Self {
-                    inner: $crate::api::valuations::typed::Staged::new(<$inner>::default()),
+                    inner: $crate::api::valuations::typed::Staged::new($empty),
                 }
             }
         }
+    };
+    ($(#[$doc:meta])* $bty:ident, $bjs:literal, $inner:ty, $target:ident, |$b:ident| $finish:expr) => {
+        builder_class!(@staged $(#[$doc])* $bty, $bjs, $inner, <$inner>::default());
 
         #[wasm_bindgen(js_class = $bjs)]
         impl $bty {
@@ -360,6 +356,100 @@ macro_rules! handle_setters {
                     Ok(Self { inner })
                 }
             )*
+        }
+    };
+}
+
+/// The pricing-override and attribute getters shared by the typed instrument
+/// classes.
+///
+/// The bare form emits both groups; `overrides` emits only the three
+/// `*PricingOverrides` getters and `attributes` only `attributes`, for classes
+/// whose other getter carries its own documentation or does not exist.
+macro_rules! common_getters {
+    ($ty:ident, $js:literal) => {
+        common_getters!($ty, $js, overrides);
+        common_getters!($ty, $js, attributes);
+    };
+    ($ty:ident, $js:literal, overrides) => {
+        getters!($ty, $js, |i| {
+            /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+            /// @returns The overrides plain object; `{}` when none is set.
+            instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
+            /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+            /// @returns The overrides plain object; unset fields are `null` or omitted.
+            metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
+            /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+            /// @returns The overrides plain object; `{}` when none is set.
+            scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
+        });
+    };
+    ($ty:ident, $js:literal, attributes) => {
+        getters!($ty, $js, |i| {
+            /// Instrument attributes (tags and metadata) used for scenario selection.
+            /// @returns The attribute bag; empty when none were set.
+            attributes as attributes => json(i.attributes),
+        });
+    };
+}
+
+/// The pricing-override and attribute setters shared by the typed instrument
+/// builders; the forms match `common_getters!`.
+macro_rules! common_setters {
+    ($bty:ident, $bjs:literal) => {
+        common_setters!($bty, $bjs, overrides);
+        common_setters!($bty, $bjs, attributes);
+    };
+    ($bty:ident, $bjs:literal, overrides) => {
+        setters!($bty, $bjs, {
+            /// Set the instrument-owned pricing inputs.
+            /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+            /// @returns The builder, for chaining.
+            /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+            instrument_pricing_overrides as instrumentPricingOverrides => json,
+            /// Set the metric-time pricing configuration stored on the instrument.
+            /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+            /// @returns The builder, for chaining.
+            /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+            metric_pricing_overrides as metricPricingOverrides => json,
+            /// Set the scenario-only pricing adjustments.
+            /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+            /// @returns The builder, for chaining.
+            /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+            scenario_pricing_overrides as scenarioPricingOverrides => json,
+        });
+    };
+    ($bty:ident, $bjs:literal, attributes) => {
+        setters!($bty, $bjs, {
+            /// Set instrument attributes (tags and metadata).
+            /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
+            /// @returns The builder, for chaining.
+            /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+            attributes as attributes => json,
+        });
+    };
+}
+
+/// A builder setter taking `(paymentDate, amount)`: an ISO-8601 date and a
+/// `Money` handle, passed as one `(Date, Money)` pair to the Rust setter of
+/// the same name.
+macro_rules! dated_money_setter {
+    ($bty:ident, $bjs:literal, $(#[$doc:meta])* $name:ident) => {
+        #[wasm_bindgen(js_class = $bjs)]
+        impl $bty {
+            $(#[$doc])*
+            pub fn $name(
+                &self,
+                payment_date: JsValue,
+                amount: &crate::api::core::money::JsMoney,
+            ) -> Result<$bty, JsValue> {
+                let value = (
+                    $crate::api::valuations::typed::arg::date(&payment_date, "paymentDate")?,
+                    amount.inner,
+                );
+                let inner = self.inner.apply(|b| b.$name(value))?;
+                Ok(Self { inner })
+            }
         }
     };
 }

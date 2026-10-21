@@ -93,22 +93,6 @@ pub(super) fn price_result_with_context(
     .map_err(to_js_err)
 }
 
-pub(super) fn standard_option_greeks_with_context(
-    instrument: &finstack_quant_valuations::pricer::ParsedInstrument,
-    market: &MarketContext,
-    as_of: &str,
-    model: &str,
-) -> Result<Vec<(&'static str, f64)>, JsValue> {
-    finstack_quant_valuations::pricer::present_standard_option_greeks(
-        instrument,
-        market,
-        as_of,
-        model,
-        finstack_quant_calibration::recalibration::pricing_options(),
-    )
-    .map_err(to_js_err)
-}
-
 /// Validate and serialize a `ValuationResult` object or JSON text to canonical JSON.
 ///
 /// The inverse of the structured `priceInstrument*` return: it accepts the
