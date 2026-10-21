@@ -1,15 +1,5 @@
 //! Common leg specification types for interest rate and credit instruments.
 
-/// Error for a swap float leg set to `simple_average`, which the swap
-/// projectors do not implement (they compound or take one term forward).
-pub fn simple_average_unsupported() -> finstack_quant_core::Error {
-    finstack_quant_core::Error::Validation(
-        "float_leg.compounding = simple_average is not supported on swap legs; \
-         use simple or a compounded_* variant"
-            .to_string(),
-    )
-}
-
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::types::CurveId;
 use rust_decimal::Decimal;
@@ -133,6 +123,17 @@ pub struct FixedLegSpec {
 }
 
 impl FixedLegSpec {
+    /// Accrual-schedule parameters for this leg, for the cashflow schedule builder.
+    ///
+    /// Copies the leg's dates, frequency, stub, business-day convention, end-of-month
+    /// flag, day count and payment lag. A missing `calendar_id` falls back to the
+    /// weekends-only calendar; fixed legs have no reset lag and no roll rule.
+    ///
+    /// # Arguments
+    ///
+    /// * `adjust_accrual_dates` - `true` to adjust accrual start/end boundaries with
+    ///   the business-day convention; `false` keeps the unadjusted schedule dates as
+    ///   the accrual boundaries.
     pub fn schedule_params(
         &self,
         adjust_accrual_dates: bool,
@@ -297,7 +298,7 @@ impl FloatLegSpec {
         if self.compounding
             == finstack_quant_cashflows::builder::FloatingLegCompounding::SimpleAverage
         {
-            return Err(simple_average_unsupported());
+            return Err(crate::instruments::common_impl::parameters::simple_average_unsupported());
         }
         finstack_quant_core::validation::validate_date_range_strict(
             self.start,

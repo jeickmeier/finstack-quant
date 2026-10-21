@@ -129,16 +129,10 @@
 #[macro_use]
 #[doc(hidden)]
 pub mod common_impl;
+mod legs;
 
 /// Shared pricing helpers used by this crate and `finstack-quant-calibration`.
-pub mod pricing {
-    pub use super::common_impl::pricing::heston_market;
-    pub use super::common_impl::pricing::hw1f_params;
-    pub use super::common_impl::pricing::overnight::default_rate_calendar_id;
-    pub use super::common_impl::pricing::overnight_conventions;
-    pub use super::common_impl::pricing::swap_legs;
-    pub use super::common_impl::pricing::term_fixings;
-}
+pub mod pricing;
 
 /// The persisted instrument-envelope contract: schema marker, size cap,
 /// load-error mapping.
@@ -173,13 +167,6 @@ pub use common_impl::parameters::conventions::BondConvention;
 pub use common_impl::parameters::conventions::NdfQuoteConvention;
 pub use common_impl::parameters::conventions::NotionalExchange;
 pub use common_impl::parameters::conventions::ResettingSide;
-pub use common_impl::parameters::legs::FinancingLegSpec;
-pub use common_impl::parameters::legs::FixedLegSpec;
-pub use common_impl::parameters::legs::FloatLegSpec;
-pub use common_impl::parameters::legs::PayReceive;
-pub use common_impl::parameters::legs::PremiumLegSpec;
-pub use common_impl::parameters::legs::ProtectionLegSpec;
-pub use common_impl::parameters::legs::TotalReturnLegSpec;
 pub use common_impl::parameters::market::CreditParams;
 pub use common_impl::parameters::market::SettlementType;
 pub use common_impl::parameters::monitoring::Monitoring;
@@ -189,6 +176,13 @@ pub use common_impl::parameters::underlying::EquityUnderlyingParams;
 pub use common_impl::parameters::underlying::FxUnderlyingParams;
 pub use common_impl::parameters::underlying::IndexUnderlyingParams;
 pub use common_impl::parameters::volatility::VolatilityModel;
+pub use legs::FinancingLegSpec;
+pub use legs::FixedLegSpec;
+pub use legs::FloatLegSpec;
+pub use legs::PayReceive;
+pub use legs::PremiumLegSpec;
+pub use legs::ProtectionLegSpec;
+pub use legs::TotalReturnLegSpec;
 
 pub use common_impl::parameters::bond_quote::BondQuoteInput;
 pub use common_impl::parameters::convertible::{

@@ -54,13 +54,20 @@
 // Internal submodules (organized by concern)
 
 mod aggregation;
+mod buckets;
 mod core;
+mod cross_factor_pair;
+pub(crate) mod period_cash;
 pub mod risk;
 #[doc(hidden)]
 pub mod sensitivities;
 
 // Core surface (supported)
 pub use aggregation::is_additive_metric;
+pub use buckets::{
+    format_bucket_label, format_bucket_label_cow, format_key_rate_label, parse_key_rate_label,
+    STANDARD_BUCKETS_YEARS, STANDARD_BUCKET_LABELS,
+};
 pub use core::finite_difference::bump_surface_vol_absolute;
 #[doc(hidden)]
 pub use core::ids::closest_metric_names;
@@ -69,13 +76,8 @@ pub use core::registry::{MetricRegistry, MetricRegistryError};
 pub use core::traits::{MetricCalculator, MetricContext};
 #[doc(hidden)]
 pub use core::universal::{register_universal_metrics, PricerPublishedMetric};
-/// Format a standard risk bucket (years) as a human-readable label.
-pub use sensitivities::config::{
-    format_bucket_label, format_key_rate_label, parse_key_rate_label, STANDARD_BUCKETS_YEARS,
-    STANDARD_BUCKET_LABELS,
-};
-pub use sensitivities::cross_factor::CrossFactorPair;
-pub use sensitivities::theta::{collect_cashflows_in_period, collect_period_cash, PeriodCash};
+pub use cross_factor_pair::CrossFactorPair;
+pub use period_cash::{collect_cashflows_in_period, collect_period_cash, PeriodCash};
 
 // Family-facing calculators and helpers.
 //

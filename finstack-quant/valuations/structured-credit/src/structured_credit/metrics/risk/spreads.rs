@@ -586,7 +586,7 @@ pub struct BucketedCs01Calculator;
 
 impl MetricCalculator for BucketedCs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        use finstack_quant_valuations_core::metrics::sensitivities::config::format_bucket_label_cow;
+        use finstack_quant_valuations_core::metrics::format_bucket_label_cow;
         use finstack_quant_valuations_core::metrics::STANDARD_BUCKETS_YEARS;
 
         let base_spread = context

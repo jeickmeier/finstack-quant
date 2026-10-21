@@ -180,7 +180,7 @@ impl HazardSpreadRiskBucket {
     ///   curve. Quotes sharing a formatted tenor gain their contractual date
     ///   and quote identifier so distinct risk coordinates remain distinct.
     pub fn get_metric_label(&self, buckets: &[Self]) -> String {
-        use crate::metrics::sensitivities::config::format_bucket_label_cow;
+        use crate::metrics::format_bucket_label_cow;
         let label = format_bucket_label_cow(self.pillar_time);
         if buckets
             .iter()

@@ -659,13 +659,13 @@ impl TrsEngine {
 
         let result = annuity.total() * notional.amount();
 
-        if result.abs() < super::swap_legs::ANNUITY_EPSILON {
+        if result.abs() < crate::instruments::pricing::swap_legs::ANNUITY_EPSILON {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Financing annuity ({:.2e}) is below minimum threshold ({:.2e}). \
                  This may indicate all periods have expired or extreme discounting scenarios. \
                  Cannot compute par spread with near-zero annuity.",
                 result,
-                super::swap_legs::ANNUITY_EPSILON
+                crate::instruments::pricing::swap_legs::ANNUITY_EPSILON
             )));
         }
 

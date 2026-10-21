@@ -28,7 +28,7 @@ use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::metrics::sensitivities::config::format_bucket_label_cow;
+use finstack_quant_valuations_core::metrics::format_bucket_label_cow;
 use finstack_quant_valuations_core::metrics::STANDARD_BUCKETS_YEARS;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use std::borrow::Cow;
