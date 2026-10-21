@@ -11,9 +11,9 @@
 use super::common::*;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::OptionType;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 

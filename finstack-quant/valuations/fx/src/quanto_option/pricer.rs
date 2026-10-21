@@ -10,7 +10,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
 };
@@ -177,12 +177,8 @@ impl Pricer for QuantoOptionAnalyticalPricer {
             let scale = payoff_scale(quanto)?;
             let strike = quanto.strike;
             let intrinsic_unit = match quanto.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
-                    (spot - strike).max(0.0)
-                }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
-                    (strike - spot).max(0.0)
-                }
+                finstack_quant_models::types::OptionType::Call => (spot - strike).max(0.0),
+                finstack_quant_models::types::OptionType::Put => (strike - spot).max(0.0),
             };
             return Ok(ValuationResult::stamped(
                 quanto.id(),
@@ -207,12 +203,8 @@ impl Pricer for QuantoOptionAnalyticalPricer {
             let scale = payoff_scale(quanto)?;
             let strike = quanto.strike;
             let intrinsic_unit = match quanto.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
-                    (spot - strike).max(0.0)
-                }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
-                    (strike - spot).max(0.0)
-                }
+                finstack_quant_models::types::OptionType::Call => (spot - strike).max(0.0),
+                finstack_quant_models::types::OptionType::Put => (strike - spot).max(0.0),
             };
             return Ok(ValuationResult::stamped(
                 quanto.id(),
@@ -227,7 +219,7 @@ impl Pricer for QuantoOptionAnalyticalPricer {
         }
 
         let price = match quanto.option_type {
-            finstack_quant_valuations_core::instruments::OptionType::Call => quanto_call(
+            finstack_quant_models::types::OptionType::Call => quanto_call(
                 spot,
                 quanto.strike,
                 t,
@@ -238,7 +230,7 @@ impl Pricer for QuantoOptionAnalyticalPricer {
                 sigma_fx,
                 quanto.correlation,
             ),
-            finstack_quant_valuations_core::instruments::OptionType::Put => quanto_put(
+            finstack_quant_models::types::OptionType::Put => quanto_put(
                 spot,
                 quanto.strike,
                 t,
@@ -273,8 +265,8 @@ mod tests {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
     use time::macros::date;
 
     /// Item 3 regression: `r_dom`/`r_for` must be recovered from *date-based*
@@ -340,7 +332,7 @@ mod tests {
             .id(InstrumentId::new("QUANTO-DISC"))
             .underlying_ticker("NKY".to_string())
             .strike(35_000.0)
-            .option_type(finstack_quant_valuations_core::instruments::OptionType::Call)
+            .option_type(finstack_quant_models::types::OptionType::Call)
             .expiry(expiry)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .base_currency(Currency::JPY)
@@ -444,7 +436,7 @@ mod tests {
             .id(InstrumentId::new("QUANTO-EXPIRY"))
             .underlying_ticker("NKY".to_string())
             .strike(35_000.0)
-            .option_type(finstack_quant_valuations_core::instruments::OptionType::Call)
+            .option_type(finstack_quant_models::types::OptionType::Call)
             .expiry(expiry)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .base_currency(Currency::JPY)
@@ -477,7 +469,7 @@ mod tests {
 
         // OTM put on the same fixture is worthless at expiry.
         let mut put = quanto;
-        put.option_type = finstack_quant_valuations_core::instruments::OptionType::Put;
+        put.option_type = finstack_quant_models::types::OptionType::Put;
         let put_result = QuantoOptionAnalyticalPricer::new()
             .price_dyn(&put, &market, as_of)
             .expect("expiry-day put valuation");
@@ -548,7 +540,7 @@ mod tests {
             .id(InstrumentId::new("QUANTO-ATM"))
             .underlying_ticker("AAPL".to_string())
             .strike(100.0)
-            .option_type(finstack_quant_valuations_core::instruments::OptionType::Call)
+            .option_type(finstack_quant_models::types::OptionType::Call)
             .expiry(expiry)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .base_currency(Currency::EUR)

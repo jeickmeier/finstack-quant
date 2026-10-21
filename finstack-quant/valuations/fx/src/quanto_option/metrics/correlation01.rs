@@ -9,7 +9,7 @@
 
 use crate::quanto_option::QuantoOption;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, CORRELATION_BUMP};
 
 /// Correlation01 calculator for quanto options.

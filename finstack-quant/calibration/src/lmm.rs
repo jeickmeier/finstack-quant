@@ -349,7 +349,7 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
-    use finstack_quant_valuations_core::instruments::OptionType;
+    use finstack_quant_models::types::OptionType;
     use finstack_quant_valuations_core::pricer::Pricer;
     use finstack_quant_valuations_rates::swaption::lmm_pricer::lmm_bermudan_mc_config;
     use finstack_quant_valuations_rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer;

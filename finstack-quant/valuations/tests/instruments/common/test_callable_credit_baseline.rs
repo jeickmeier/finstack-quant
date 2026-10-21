@@ -139,7 +139,7 @@ fn callable_credit_loan() -> TermLoan {
 /// The native bond path infers `rates_credit` when these joint-factor inputs
 /// are present.
 fn apply_baseline_regime(
-    overrides: &mut finstack_quant_valuations::instruments::InstrumentPricingOverrides,
+    overrides: &mut finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides,
 ) {
     overrides.model_config.hw1f_sigma = Some(BASELINE_RATE_VOL);
     overrides.model_config.hazard_sigma = Some(BASELINE_HAZARD_VOL);

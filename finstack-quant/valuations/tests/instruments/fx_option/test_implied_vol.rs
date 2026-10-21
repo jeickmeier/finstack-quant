@@ -15,12 +15,12 @@ fn bs_price(
     q: f64,
     sigma: f64,
     t: f64,
-    option_type: finstack_quant_valuations::instruments::OptionType,
+    option_type: finstack_quant_models::types::OptionType,
 ) -> f64 {
     if t <= 0.0 || sigma <= 0.0 {
         return match option_type {
-            finstack_quant_valuations::instruments::OptionType::Call => (spot - strike).max(0.0),
-            finstack_quant_valuations::instruments::OptionType::Put => (strike - spot).max(0.0),
+            finstack_quant_models::types::OptionType::Call => (spot - strike).max(0.0),
+            finstack_quant_models::types::OptionType::Put => (strike - spot).max(0.0),
         };
     }
     let sqrt_t = t.sqrt();
@@ -30,10 +30,10 @@ fn bs_price(
     let disc_r = (-r * t).exp();
 
     match option_type {
-        finstack_quant_valuations::instruments::OptionType::Call => {
+        finstack_quant_models::types::OptionType::Call => {
             spot * disc_q * norm_cdf(d1) - strike * disc_r * norm_cdf(d2)
         }
-        finstack_quant_valuations::instruments::OptionType::Put => {
+        finstack_quant_models::types::OptionType::Put => {
             strike * disc_r * norm_cdf(-d2) - spot * disc_q * norm_cdf(-d1)
         }
     }

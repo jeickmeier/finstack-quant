@@ -442,7 +442,7 @@ fn external_quantlib_parity_fx_forward_npv() {
         .domestic_discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
         .foreign_discount_curve_id(finstack_quant_core::types::CurveId::new("EUR-OIS"))
         .contract_rate_opt(Some(fixture.spec.strike))
-        .attributes(finstack_quant_valuations::instruments::Attributes::new())
+        .attributes(finstack_quant_core::types::Attributes::new())
         .build()
         .expect("FxForward::builder");
     let instrument: Arc<dyn Instrument> = Arc::new(forward);

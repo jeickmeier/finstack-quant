@@ -5,8 +5,8 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, InputError};
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_valuations_core::pricer::ModelKey;
 use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::price_from_oas;
@@ -1218,7 +1218,7 @@ fn test_z_spread_solver_convergence_across_spread_regimes() {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 01);
     let maturity_ig = date!(2028 - 01 - 01); // shorter IG

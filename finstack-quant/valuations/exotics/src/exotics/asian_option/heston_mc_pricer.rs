@@ -9,7 +9,7 @@ use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
 };
@@ -74,12 +74,8 @@ impl AsianOptionHestonMcPricer {
             };
 
             let intrinsic = match inst.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
-                    (average - inst.strike).max(0.0)
-                }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
-                    (inst.strike - average).max(0.0)
-                }
+                finstack_quant_models::types::OptionType::Call => (average - inst.strike).max(0.0),
+                finstack_quant_models::types::OptionType::Put => (inst.strike - average).max(0.0),
             };
             return Ok((Money::new(intrinsic * inst.quantity, inst.currency)?, 0.0));
         }

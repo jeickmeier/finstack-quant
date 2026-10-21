@@ -8,7 +8,6 @@
 //! under deterministic rates and martingale futures prices. Future-delivery
 //! American options use a multiplicative or additive recombining futures lattice.
 
-use crate::instruments::common_impl::parameters::{ExerciseStyle, OptionMarketParams, OptionType};
 use crate::instruments::Position;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
@@ -18,6 +17,7 @@ use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::closed_form::bachelier_price_with_annuity;
 use finstack_quant_models::trees::BinomialTree;
+use finstack_quant_models::types::{ExerciseStyle, OptionMarketParams, OptionType};
 use finstack_quant_models::volatility::d1_d2_black76;
 
 /// Official American lattice size when `tree_steps` is omitted on PV.

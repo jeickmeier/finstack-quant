@@ -367,7 +367,7 @@ pub fn central_diff_scalar_relative<I>(
     bump_pct: f64,
 ) -> finstack_quant_core::Result<f64>
 where
-    I: crate::instruments::common_impl::traits::Instrument + ?Sized,
+    I: crate::instruments::Instrument + ?Sized,
 {
     let scalar = market.get_price(scalar_id)?;
     let current = scalar_numeric_value(scalar);

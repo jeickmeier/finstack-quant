@@ -9,7 +9,7 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use crate::instruments::common_impl::traits::{
+use crate::instruments::{
     GreekBumps, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
     OptionGreeksRequest,
 };

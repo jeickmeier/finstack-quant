@@ -103,7 +103,7 @@ fn test_callable_exercise_coupon_always_paid() {
         )
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_hw1f_sigma(0.01)
                 .with_hw1f_mean_reversion(0.03),
         )
@@ -175,7 +175,7 @@ fn test_putable_bond_worth_more() {
         )
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_hw1f_sigma(0.01)
                 .with_hw1f_mean_reversion(0.03),
         )

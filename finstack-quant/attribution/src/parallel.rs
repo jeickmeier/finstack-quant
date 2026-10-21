@@ -740,13 +740,12 @@ mod tests {
             self
         }
 
-        fn attributes(&self) -> &finstack_quant_valuations::instruments::Attributes {
-            static ATTRS: OnceLock<finstack_quant_valuations::instruments::Attributes> =
-                OnceLock::new();
-            ATTRS.get_or_init(finstack_quant_valuations::instruments::Attributes::default)
+        fn attributes(&self) -> &finstack_quant_core::types::Attributes {
+            static ATTRS: OnceLock<finstack_quant_core::types::Attributes> = OnceLock::new();
+            ATTRS.get_or_init(finstack_quant_core::types::Attributes::default)
         }
 
-        fn attributes_mut(&mut self) -> &mut finstack_quant_valuations::instruments::Attributes {
+        fn attributes_mut(&mut self) -> &mut finstack_quant_core::types::Attributes {
             unreachable!("RatesCreditInteractionInstrument::attributes_mut should not be called")
         }
 

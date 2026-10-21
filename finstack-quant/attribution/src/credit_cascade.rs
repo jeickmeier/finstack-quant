@@ -721,6 +721,7 @@ mod tests {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::term_structures::HazardCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_factor::credit::hierarchy::{
         AdderVolSource, CreditCalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec,
         DateRange, FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
@@ -731,7 +732,6 @@ mod tests {
         MarketMapping, MatchingConfig,
     };
     use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-    use finstack_quant_valuations::instruments::Attributes;
     use finstack_quant_valuations::instruments::Instrument;
     use time::Month;
 

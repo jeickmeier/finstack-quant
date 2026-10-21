@@ -131,7 +131,7 @@ pub fn generate_three_factor_paths(
     ) = match &facility.rate {
         RateSpec::Fixed { rate } => (InterestRateSpec::Fixed { rate: *rate }, None, 0.0),
         RateSpec::Floating(spec) => {
-            let overnight = finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions::resolved_overnight_compounding(
+            let overnight = finstack_quant_valuations_core::instruments::pricing::overnight_conventions::resolved_overnight_compounding(
                 spec.forward_curve_id.as_str(),
                 spec.compounding.as_ref(),
             )?;

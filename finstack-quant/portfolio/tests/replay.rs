@@ -9,6 +9,7 @@ mod replay_tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_portfolio::position::{Position, PositionUnit};
     use finstack_quant_portfolio::replay::{
         ReplayConfig, ReplayErrorPolicy, ReplayMode, ReplayTimeline,
@@ -19,7 +20,7 @@ mod replay_tests {
         valuation::PortfolioValuationOptions, valuation::RequestedMetrics,
     };
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-    use finstack_quant_valuations::instruments::{Attributes, Instrument, PricingOptions};
+    use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
     use finstack_quant_valuations::metrics::MetricId;
     use finstack_quant_valuations::pricer::InstrumentType;
     use finstack_quant_valuations::results::ValuationResult;

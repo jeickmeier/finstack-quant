@@ -54,8 +54,8 @@ impl MetricCalculator for FraRateCurveDv01Calculator {
 }
 
 fn generic_fallback(context: &mut MetricContext) -> Result<f64> {
-    finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(
-        finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined(),
+    finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
+        finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined(),
     )
     .calculate(context)
 }

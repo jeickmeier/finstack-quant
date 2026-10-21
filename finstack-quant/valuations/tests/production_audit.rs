@@ -639,10 +639,11 @@ fn b3_shifted_swaption_prices_shifted_positive_rates() {
     use finstack_quant_core::dates::{BusinessDayConvention, StubKind, Tenor};
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_core::types::{CurveId, InstrumentId};
+    use finstack_quant_models::types::OptionType;
     use finstack_quant_models::volatility::sabr::SabrParameters;
     use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
     use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec};
-    use finstack_quant_valuations::instruments::{OptionType, SettlementType, VolatilityModel};
+    use finstack_quant_valuations::instruments::{SettlementType, VolatilityModel};
     use rust_decimal::Decimal;
     let as_of = date!(2024 - 01 - 02);
     let curve = DiscountCurve::builder("DISC")

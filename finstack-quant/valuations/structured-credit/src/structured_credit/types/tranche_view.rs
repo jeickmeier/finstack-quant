@@ -19,8 +19,9 @@ use finstack_quant_cashflows::{schedule_from_classified_flows, ScheduleBuildOpts
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::common_impl::traits::{Attributes, Instrument};
+use finstack_quant_core::types::Attributes;
 use finstack_quant_valuations_core::instruments::model_params::ModelParamsSnapshot;
+use finstack_quant_valuations_core::instruments::Instrument;
 
 /// A deal plus the identifier of the note the metrics are computed for.
 ///
@@ -125,9 +126,8 @@ impl Instrument for StructuredCreditTranche {
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
         self.deal.market_dependencies()
     }
 
@@ -171,37 +171,45 @@ impl Instrument for StructuredCreditTranche {
 
     fn get_instrument_pricing_overrides(
         &self,
-    ) -> Option<&finstack_quant_valuations_core::instruments::InstrumentPricingOverrides> {
+    ) -> Option<
+        &finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
+    > {
         Some(&self.deal.instrument_pricing_overrides)
     }
 
     fn get_instrument_pricing_overrides_mut(
         &mut self,
-    ) -> Option<&mut finstack_quant_valuations_core::instruments::InstrumentPricingOverrides> {
+    ) -> Option<&mut finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides>{
         Some(&mut self.deal.instrument_pricing_overrides)
     }
 
     fn get_metric_pricing_overrides(
         &self,
-    ) -> Option<&finstack_quant_valuations_core::instruments::MetricPricingOverrides> {
+    ) -> Option<
+        &finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
+    > {
         Some(&self.deal.metric_pricing_overrides)
     }
 
     fn get_metric_pricing_overrides_mut(
         &mut self,
-    ) -> Option<&mut finstack_quant_valuations_core::instruments::MetricPricingOverrides> {
+    ) -> Option<
+        &mut finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
+    > {
         Some(&mut self.deal.metric_pricing_overrides)
     }
 
     fn get_scenario_pricing_overrides(
         &self,
-    ) -> Option<&finstack_quant_valuations_core::instruments::ScenarioPricingOverrides> {
+    ) -> Option<
+        &finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
+    > {
         Some(&self.deal.scenario_pricing_overrides)
     }
 
     fn get_scenario_pricing_overrides_mut(
         &mut self,
-    ) -> Option<&mut finstack_quant_valuations_core::instruments::ScenarioPricingOverrides> {
+    ) -> Option<&mut finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides>{
         Some(&mut self.deal.scenario_pricing_overrides)
     }
 }

@@ -123,7 +123,7 @@ fn test_quote_engine_roundtrip_ytm_and_zspread_fixed_bond() {
 
 #[test]
 fn test_quote_engine_roundtrip_dm_for_frn() {
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 01);
     let maturity = date!(2030 - 01 - 01);
@@ -194,7 +194,7 @@ fn test_quote_engine_roundtrip_dm_for_frn() {
 
 #[test]
 fn test_quote_engine_roundtrip_oas_and_asw_market_fixed_bond() {
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 01);
     let bond = Bond::fixed(
@@ -296,7 +296,7 @@ fn test_quote_engine_roundtrip_oas_and_asw_market_fixed_bond() {
 
 #[test]
 fn test_quote_engine_roundtrip_i_spread_fixed_bond() {
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 01);
     let bond = Bond::fixed(

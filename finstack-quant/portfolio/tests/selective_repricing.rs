@@ -11,6 +11,7 @@ use finstack_quant_core::money::fx::{
     FxConversionPolicy, FxMatrix, FxProvider, FxQuery, SimpleFxProvider,
 };
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_portfolio::dependencies::MarketFactorKey;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
@@ -20,7 +21,7 @@ use finstack_quant_portfolio::valuation::{
 use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::{
-    Attributes, Instrument, MarketDependencies, PricingOptions, RatesCurveKind,
+    Instrument, MarketDependencies, PricingOptions, RatesCurveKind,
 };
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::InstrumentType;
@@ -462,7 +463,7 @@ fn selective_reprice_fx_change_reprices_native_non_base_positions() {
 /// Stub instrument whose `market_dependencies()` always fails.
 #[derive(Clone)]
 struct UnresolvableInstrument {
-    attributes: finstack_quant_valuations::instruments::Attributes,
+    attributes: finstack_quant_core::types::Attributes,
     fail_dependencies: bool,
 }
 
@@ -474,14 +475,14 @@ finstack_quant_valuations::impl_empty_cashflow_provider!(
 impl UnresolvableInstrument {
     fn new() -> Self {
         Self {
-            attributes: finstack_quant_valuations::instruments::Attributes::default(),
+            attributes: finstack_quant_core::types::Attributes::default(),
             fail_dependencies: true,
         }
     }
 
     fn with_empty_dependencies() -> Self {
         Self {
-            attributes: finstack_quant_valuations::instruments::Attributes::default(),
+            attributes: finstack_quant_core::types::Attributes::default(),
             fail_dependencies: false,
         }
     }
@@ -500,10 +501,10 @@ impl Instrument for UnresolvableInstrument {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
-    fn attributes(&self) -> &finstack_quant_valuations::instruments::Attributes {
+    fn attributes(&self) -> &finstack_quant_core::types::Attributes {
         &self.attributes
     }
-    fn attributes_mut(&mut self) -> &mut finstack_quant_valuations::instruments::Attributes {
+    fn attributes_mut(&mut self) -> &mut finstack_quant_core::types::Attributes {
         &mut self.attributes
     }
     fn clone_box(&self) -> Box<dyn Instrument> {

@@ -113,7 +113,7 @@ cashflow helpers used by `LeveredRealEstateEquity`.
 use finstack_quant_valuations::instruments::equity::real_estate::{
     RealEstateAsset, RealEstatePropertyType, RealEstateValuationMethod,
 };
-use finstack_quant_valuations::instruments::Attributes;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::types::InstrumentId;

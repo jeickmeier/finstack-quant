@@ -70,7 +70,7 @@ fn structured_credit_instrument_json() -> String {
         AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
     };
     use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations::results::structured_credit::TrancheSeniority;
     use time::Month;
 

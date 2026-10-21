@@ -25,7 +25,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
 };
@@ -55,11 +55,11 @@ impl CmsSwapPricer {
         let pv_funding = self.pv_funding_leg(inst, market, as_of)?;
 
         let npv = match inst.side {
-            finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay => {
+            finstack_quant_valuations_core::instruments::PayReceive::Pay => {
                 // Pay CMS, receive funding
                 pv_funding - pv_cms
             }
-            finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive => {
+            finstack_quant_valuations_core::instruments::PayReceive::Receive => {
                 // Receive CMS, pay funding
                 pv_cms - pv_funding
             }
@@ -115,8 +115,8 @@ impl CmsSwapPricer {
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
 
         let direction = match inst.side {
-            finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay => 1.0,
-            finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive => -1.0,
+            finstack_quant_valuations_core::instruments::PayReceive::Pay => 1.0,
+            finstack_quant_valuations_core::instruments::PayReceive::Receive => -1.0,
         };
         inst.funding_leg_flows(market, as_of, false)?
             .iter()
@@ -223,12 +223,8 @@ impl CmsSwapReplicationPricer {
         let pv_funding = CmsSwapPricer::new().pv_funding_leg(inst, market, as_of)?;
 
         let npv = match inst.side {
-            finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay => {
-                pv_funding - pv_cms
-            }
-            finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive => {
-                pv_cms - pv_funding
-            }
+            finstack_quant_valuations_core::instruments::PayReceive::Pay => pv_funding - pv_cms,
+            finstack_quant_valuations_core::instruments::PayReceive::Receive => pv_cms - pv_funding,
         };
 
         Money::new(npv, inst.notional.currency())
@@ -244,7 +240,7 @@ impl CmsSwapReplicationPricer {
         as_of: Date,
     ) -> Result<f64> {
         use crate::cms_option::replication_pricer::{replicated_cms_optionlet, CmsOptionletInputs};
-        use finstack_quant_valuations_core::instruments::OptionType;
+        use finstack_quant_models::types::OptionType;
 
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
         let vol_surface = market.get_surface(inst.vol_surface_id.as_str())?;
@@ -505,7 +501,7 @@ pub(super) fn apply_cms_cap_floor(
             cap_strike,
             vol_surface,
             time_to_fixing,
-            finstack_quant_valuations_core::instruments::OptionType::Call,
+            finstack_quant_models::types::OptionType::Call,
         )?;
         coupon_rate -= caplet;
     }
@@ -518,7 +514,7 @@ pub(super) fn apply_cms_cap_floor(
             floor_strike,
             vol_surface,
             time_to_fixing,
-            finstack_quant_valuations_core::instruments::OptionType::Put,
+            finstack_quant_models::types::OptionType::Put,
         )?;
         coupon_rate += floorlet;
     }
@@ -541,14 +537,14 @@ pub(super) fn cms_embedded_option_value(
     strike: f64,
     vol_surface: &finstack_quant_core::market_data::surfaces::VolSurface,
     time_to_fixing: f64,
-    option_type: finstack_quant_valuations_core::instruments::OptionType,
+    option_type: finstack_quant_models::types::OptionType,
 ) -> Result<f64> {
     use finstack_quant_models::closed_form::{black_call, black_put};
+    use finstack_quant_models::types::OptionType;
     use finstack_quant_models::volatility::VolatilityConvention;
     use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
         validate_sigma, ResolvedVolatility,
     };
-    use finstack_quant_valuations_core::instruments::OptionType;
     if time_to_fixing <= 0.0 {
         return Ok(match option_type {
             OptionType::Call => (adjusted_forward - strike).max(0.0),
@@ -601,7 +597,7 @@ mod tests {
     #[test]
     fn scheduled_funding_starts_at_accrual_start_not_cms_fixing() {
         use super::super::types::FundingLegSpec;
-        use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive;
+        use finstack_quant_valuations_core::instruments::PayReceive;
         let as_of = date(2025, 5, 19);
         let start = date(2025, 5, 20);
         let end = date(2025, 8, 20);
@@ -673,7 +669,7 @@ mod tests {
     #[test]
     fn scheduled_funding_keeps_unadjusted_boundaries_and_adjusted_payments() {
         use super::super::types::FundingLegSpec;
-        use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive;
+        use finstack_quant_valuations_core::instruments::PayReceive;
         let as_of = date(2025, 5, 1);
         let start = date(2025, 5, 31);
         let end = date(2025, 11, 30);
@@ -738,7 +734,7 @@ mod tests {
         CmsSwap::builder()
             .id(InstrumentId::new("CMS-FLOAT"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Receive)
             .cms_tenor(
                 Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
             )
@@ -843,7 +839,7 @@ mod tests {
             -0.005,
             &surface,
             1.0,
-            finstack_quant_valuations_core::instruments::OptionType::Call
+            finstack_quant_models::types::OptionType::Call
         )
         .is_err());
         assert!(cms_embedded_option_value(
@@ -851,7 +847,7 @@ mod tests {
             0.02,
             &surface,
             1.0,
-            finstack_quant_valuations_core::instruments::OptionType::Put
+            finstack_quant_models::types::OptionType::Put
         )
         .is_err());
     }
@@ -864,7 +860,7 @@ mod tests {
         let mut builder = CmsSwap::builder()
             .id(InstrumentId::new("CMS-CAPPED"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Receive)
             .cms_tenor(
                 Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
             )
@@ -973,7 +969,7 @@ mod tests {
         CmsSwap::builder()
             .id(InstrumentId::new("CMS-SEASONED"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Receive)
             .cms_tenor(
                 Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
             )
@@ -1050,7 +1046,7 @@ mod tests {
         let mut builder = CmsSwap::builder()
             .id(InstrumentId::new("CMS-FLOORED"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Receive)
             .cms_tenor(
                 Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
             )
@@ -1135,7 +1131,7 @@ mod tests {
         CmsSwap::builder()
             .id(InstrumentId::new("CMS-REPL"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Receive)
             .cms_tenor(
                 Tenor::new(
                     cms_tenor_years,

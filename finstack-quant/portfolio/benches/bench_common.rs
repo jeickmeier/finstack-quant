@@ -25,6 +25,8 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::math::stats::RealizedVarMethod;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
+use finstack_quant_models::types::{ExerciseStyle, OptionType};
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::Portfolio;
@@ -55,13 +57,12 @@ use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::rates::inflation_swap::InflationSwap;
 use finstack_quant_valuations::instruments::rates::repo::{CollateralSpec, CollateralType, Repo};
 use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
-use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::EquityUnderlyingParams;
+use finstack_quant_valuations::instruments::SettlementType;
 use finstack_quant_valuations::instruments::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
 };
-use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType, SettlementType};
 use finstack_quant_valuations::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
 use finstack_quant_valuations::market::conventions::{CdsConvention, CdsValuationConvention};
 use finstack_quant_valuations::results::structured_credit::TrancheSeniority;
@@ -919,7 +920,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
             .instrument_pricing_overrides(
-                finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_implied_volatility(0.25),
             )
             .attributes(Attributes::default())
@@ -1165,7 +1166,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
                     fixed_coupon,
                 ),
             instrument_pricing_overrides:
-                finstack_quant_valuations::instruments::InstrumentPricingOverrides::default(),
+                finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: Default::default(),

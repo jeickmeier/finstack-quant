@@ -7,10 +7,10 @@
 //! - Shared data structures and enums
 
 // Core instrument traits and metadata
-pub mod traits;
+pub(crate) mod traits;
 
 // Unified dependency representation
-pub mod dependencies;
+pub(crate) mod dependencies;
 
 /// Stable date constants for `example()` constructors. Defined once so all
 /// instrument examples can rotate forward together.
@@ -39,6 +39,3 @@ pub mod parameters;
 pub mod pricing;
 
 // Enriched per-flow cashflow export with DF/SP/PV columns.
-
-#[doc(hidden)]
-pub use pricing::GenericInstrumentPricer;

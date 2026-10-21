@@ -8,16 +8,16 @@ use finstack_quant_core::dates::{
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::InflationLag;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::CalendarId;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::instruments::MarketDependencies;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 
 /// Indexation method for inflation adjustment
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -214,26 +214,26 @@ pub struct InflationLinkedBond {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -735,9 +735,7 @@ impl InflationLinkedBond {
 }
 
 // Explicit Instrument trait implementation (replaces macro for better IDE visibility)
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for InflationLinkedBond
-{
+impl finstack_quant_valuations_core::instruments::Instrument for InflationLinkedBond {
     fn cashflow_export_terms(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -788,7 +786,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         deps.add_inflation_curve(self.inflation_index_id.clone());
         if let Some(id) = &self.floor_vol_surface_id {
             deps.add_volatility_dependency(
-                finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+                finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                     id.clone(),
                     None,
                     Some(1.0),
@@ -829,7 +827,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         false
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
@@ -1061,7 +1059,7 @@ mod tests {
             inflation_index_id: CurveId::new("US-CPI"),
             // par → real yield == coupon (4 % semi-annual)
             instrument_pricing_overrides:
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_quoted_clean_price_pct(100.0),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
@@ -1178,7 +1176,7 @@ mod tests {
             discount_curve_id: CurveId::new("USD-OIS"),
             inflation_index_id: CurveId::new("US-CPI"),
             instrument_pricing_overrides:
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_quoted_clean_price_pct(100.0),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
@@ -1274,7 +1272,7 @@ mod tests {
             let accrued = notional * 0.02 * accrued_fraction;
             let clean_price = (dirty_price - accrued) / notional * 100.0;
             bond.instrument_pricing_overrides =
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_quoted_clean_price_pct(clean_price);
 
             let schedule = bond

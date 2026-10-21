@@ -22,7 +22,7 @@
 //! exposure. Supply a `credit_curve_id` to obtain hazard-based CS01.
 //!
 //! [`RevolvingCreditPricer`]: crate::revolving_credit::pricing::RevolvingCreditPricer
-//! [`GenericParallelCs01`]: finstack_quant_valuations_core::metrics::GenericParallelCs01
+//! [`GenericParallelCs01`]: finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericParallelCs01
 //! [`ZSpreadParallelCs01`]: finstack_quant_valuations_core::metrics::ZSpreadParallelCs01
 //! [`ZSpreadBucketedCs01`]: finstack_quant_valuations_core::metrics::ZSpreadBucketedCs01
 

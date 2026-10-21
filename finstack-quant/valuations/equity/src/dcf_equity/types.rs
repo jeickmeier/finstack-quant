@@ -9,11 +9,12 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::Error as CoreError;
-use finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::{Attributes, Instrument};
+use finstack_quant_valuations_core::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::MarketDependencies;
 use finstack_quant_valuations_core::pricer::InstrumentType;
 
 /// Spread `WACC − g` below which Gordon Growth is near-singular: the terminal
@@ -296,26 +297,26 @@ pub struct DiscountedCashFlow {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -391,14 +392,15 @@ struct DiscountedCashFlowUnchecked {
     /// Instrument-owned pricing inputs.
     #[serde(default)]
     instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[serde(default)]
-    metric_pricing_overrides: finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[serde(default)]
     scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     attributes: Attributes,
 }
@@ -1101,7 +1103,7 @@ impl Instrument for DiscountedCashFlow {
         self.valuation_date
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 impl finstack_quant_cashflows::CashflowScheduleSource for DiscountedCashFlow {
     /// Projected cash-flow schedule containing only the explicit `flows` on

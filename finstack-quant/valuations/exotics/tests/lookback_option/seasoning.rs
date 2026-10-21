@@ -19,7 +19,7 @@ fn get_base_builder(as_of: Date) -> LookbackOptionBuilder {
         .id(InstrumentId::new("TEST-LOOKBACK"))
         .underlying_ticker("SPX".to_string())
         .strike_opt(Some(100.0))
-        .option_type(finstack_quant_valuations_core::instruments::OptionType::Call)
+        .option_type(finstack_quant_models::types::OptionType::Call)
         .lookback_type(LookbackType::FixedStrike)
         .expiry(expiry)
         .quantity(1.0)
@@ -30,9 +30,9 @@ fn get_base_builder(as_of: Date) -> LookbackOptionBuilder {
         .vol_surface_id(CurveId::new("SPX-VOL"))
         .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default(),
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
         )
-        .attributes(finstack_quant_valuations_core::instruments::Attributes::new())
+        .attributes(finstack_quant_core::types::Attributes::new())
 }
 
 fn create_test_market(as_of: Date) -> MarketContext {
@@ -142,7 +142,7 @@ fn test_floating_strike_put_seasoning() {
     let unseasoned = get_base_builder(as_of)
         .id(InstrumentId::new("TEST-LOOKBACK-FLOAT-PUT"))
         .strike_opt(None) // Floating strike
-        .option_type(finstack_quant_valuations_core::instruments::OptionType::Put)
+        .option_type(finstack_quant_models::types::OptionType::Put)
         .lookback_type(LookbackType::FloatingStrike)
         .observed_max_opt(None)
         .build()
@@ -155,7 +155,7 @@ fn test_floating_strike_put_seasoning() {
     let seasoned_high = get_base_builder(as_of)
         .id(InstrumentId::new("TEST-LOOKBACK-FLOAT-PUT"))
         .strike_opt(None) // Floating strike
-        .option_type(finstack_quant_valuations_core::instruments::OptionType::Put)
+        .option_type(finstack_quant_models::types::OptionType::Put)
         .lookback_type(LookbackType::FloatingStrike)
         .observed_max_opt(Some(120.0))
         .build()
@@ -176,7 +176,7 @@ fn test_fixed_strike_put_seasoning() {
     // 1. Unseasoned (Min = Spot = 100)
     let unseasoned = get_base_builder(as_of)
         .id(InstrumentId::new("TEST-LOOKBACK-FIXED-PUT"))
-        .option_type(finstack_quant_valuations_core::instruments::OptionType::Put)
+        .option_type(finstack_quant_models::types::OptionType::Put)
         .observed_min_opt(None)
         .build()
         .unwrap();
@@ -188,7 +188,7 @@ fn test_fixed_strike_put_seasoning() {
     // Should be higher value.
     let seasoned_low = get_base_builder(as_of)
         .id(InstrumentId::new("TEST-LOOKBACK-FIXED-PUT"))
-        .option_type(finstack_quant_valuations_core::instruments::OptionType::Put)
+        .option_type(finstack_quant_models::types::OptionType::Put)
         .observed_min_opt(Some(80.0))
         .build()
         .unwrap();
@@ -204,7 +204,7 @@ fn test_fixed_strike_put_seasoning() {
     // Should be equal to unseasoned.
     let seasoned_high = get_base_builder(as_of)
         .id(InstrumentId::new("TEST-LOOKBACK-FIXED-PUT"))
-        .option_type(finstack_quant_valuations_core::instruments::OptionType::Put)
+        .option_type(finstack_quant_models::types::OptionType::Put)
         .observed_min_opt(Some(120.0))
         .build()
         .unwrap();
@@ -230,7 +230,7 @@ fn test_expired_fixed_strike_call_returns_realized_payoff() {
         .id(InstrumentId::new("TEST-LOOKBACK-EXPIRED"))
         .underlying_ticker("SPX".to_string())
         .strike_opt(Some(100.0))
-        .option_type(finstack_quant_valuations_core::instruments::OptionType::Call)
+        .option_type(finstack_quant_models::types::OptionType::Call)
         .lookback_type(LookbackType::FixedStrike)
         .expiry(as_of)
         .quantity(1.0)
@@ -241,11 +241,11 @@ fn test_expired_fixed_strike_call_returns_realized_payoff() {
         .vol_surface_id(CurveId::new("SPX-VOL"))
         .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default(),
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
         )
         .observed_min_opt(None)
         .observed_max_opt(Some(130.0))
-        .attributes(finstack_quant_valuations_core::instruments::Attributes::new())
+        .attributes(finstack_quant_core::types::Attributes::new())
         .build()
         .unwrap();
 

@@ -15,10 +15,11 @@ use finstack_quant_core::market_data::term_structures::{
     DiscountCurve, HazardCurve, ParInterp, Seniority,
 };
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::{Attributes, Instrument, MarketDependencies};
+use finstack_quant_valuations::instruments::{Instrument, MarketDependencies};
 use finstack_quant_valuations::market::conventions::ids::CdsConventionKey;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::results::ValuationResult;

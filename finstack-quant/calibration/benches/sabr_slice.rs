@@ -9,7 +9,7 @@ use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_valuations_core::instruments::OptionType;
+use finstack_quant_models::types::OptionType;
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
 #[path = "../tests/support/calibration.rs"]
 mod calibration_support;

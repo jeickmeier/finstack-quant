@@ -95,7 +95,7 @@
 //! # See Also
 //!
 //! - [`crate::swaption::Swaption`] for swaption instrument struct
-//! - [`finstack_quant_valuations_core::instruments::ExerciseStyle`] for exercise style specification
+//! - [`finstack_quant_models::types::ExerciseStyle`] for exercise style specification
 //! - [`finstack_quant_valuations_core::instruments::SettlementType`] for settlement type
 //! - swaption metrics module for risk metrics
 //! - [`crate::swaption::SimpleSwaptionBlackPricer`] for Black-76 pricing

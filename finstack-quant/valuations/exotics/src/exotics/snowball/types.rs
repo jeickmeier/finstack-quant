@@ -2,10 +2,10 @@
 
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::validation;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::BermudanCallProvision;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
@@ -109,24 +109,24 @@ pub struct Snowball {
     /// Instrument-owned pricing inputs.
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes.
     pub attributes: Attributes,
 }
@@ -309,7 +309,7 @@ impl Snowball {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for Snowball {
+impl finstack_quant_valuations_core::instruments::Instrument for Snowball {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Snowball,
         crate::exotics::EXOTICS
@@ -338,15 +338,14 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_forward_curve(self.forward_curve_id.clone());
         if let Some(vol_surface_id) = &self.vol_surface_id {
             deps.add_volatility_dependency(
-                finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+                finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                     vol_surface_id.clone(),
                     None,
                     None,
@@ -369,7 +368,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         ))
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 finstack_quant_valuations_core::impl_empty_cashflow_provider!(
@@ -423,7 +422,7 @@ mod tests {
 
     #[test]
     fn inverse_floater_defaults_to_mc_to_capture_floor_optionality() {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
         use finstack_quant_valuations_core::pricer::ModelKey;
         // A floored/capped inverse floater carries floorlet/caplet optionality,
         // so the default model must be the HW1F MC pricer (which prices the
@@ -487,7 +486,7 @@ mod tests {
 
     #[test]
     fn snowball_instrument_trait() {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
         let s = Snowball::example().expect("example");
         assert_eq!(s.id(), "SNOWBALL-USD-3Y");
         assert_eq!(
@@ -508,7 +507,7 @@ mod tests {
     #[test]
     fn value_requires_explicit_pricer() {
         use finstack_quant_core::market_data::context::MarketContext;
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
         use time::macros::date;
 
         let snowball = Snowball::example().expect("example");

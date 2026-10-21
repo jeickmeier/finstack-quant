@@ -861,11 +861,10 @@ fn seasoned_fi_trs(
     use finstack_quant_cashflows::builder::ScheduleParams;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
     use finstack_quant_valuations::instruments::TrsScheduleSpec;
-    use finstack_quant_valuations::instruments::{
-        Attributes, FinancingLegSpec, IndexUnderlyingParams,
-    };
+    use finstack_quant_valuations::instruments::{FinancingLegSpec, IndexUnderlyingParams};
 
     let trs = FiIndexTotalReturnSwap::builder()
         .id("SEASONED-FI-TRS".into())

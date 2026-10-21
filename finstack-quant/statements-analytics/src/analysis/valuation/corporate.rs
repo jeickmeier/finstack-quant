@@ -10,6 +10,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_statements::evaluator::{Evaluator, StatementResult};
 use finstack_quant_statements::types::{FinancialModelSpec, NodeValueType};
@@ -17,7 +18,7 @@ use finstack_quant_statements::{Error, Result};
 use finstack_quant_valuations::instruments::equity::dcf_equity::{
     DiscountedCashFlow, EquityBridge, TerminalValueSpec, ValuationDiscounts,
 };
-use finstack_quant_valuations::instruments::{Attributes, Instrument};
+use finstack_quant_valuations::instruments::Instrument;
 
 /// Corporate valuation result containing DCF outputs.
 ///

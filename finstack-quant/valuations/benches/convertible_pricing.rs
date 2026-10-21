@@ -136,7 +136,7 @@ fn create_standard_convertible() -> ConvertibleBond {
         settlement_days: None,
         recovery_rate: None,
         instrument_pricing_overrides:
-            finstack_quant_valuations::instruments::InstrumentPricingOverrides::default(),
+            finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
@@ -187,7 +187,7 @@ fn create_zero_coupon_convertible() -> ConvertibleBond {
         settlement_days: None,
         recovery_rate: None,
         instrument_pricing_overrides:
-            finstack_quant_valuations::instruments::InstrumentPricingOverrides::default(),
+            finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),

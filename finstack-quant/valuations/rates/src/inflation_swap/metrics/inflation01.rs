@@ -46,7 +46,7 @@ use crate::inflation_swap::InflationSwap;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Calculates Inflation01 (1bp inflation rate sensitivity) for zero-coupon
@@ -93,7 +93,7 @@ mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::PricingOptions;
     use finstack_quant_valuations_core::metrics::MetricId;
     use time::macros::date;
@@ -145,9 +145,9 @@ mod tests {
             .inflation_index_id(CurveId::new("US-CPI"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .lag(InflationLag::None)
-            .attributes(finstack_quant_valuations_core::instruments::common_impl::traits::Attributes::new())
+            .attributes(finstack_quant_core::types::Attributes::new())
             .build()
             .expect("swap")
     }

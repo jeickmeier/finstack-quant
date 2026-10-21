@@ -5,8 +5,9 @@
 //! otherwise they are stored as metadata attributes for downstream processing.
 
 use crate::warning::Warning;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
-use finstack_quant_valuations::instruments::{Attributes, Instrument};
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::pricer::InstrumentType;
 
 /// Result of applying one instrument shock.

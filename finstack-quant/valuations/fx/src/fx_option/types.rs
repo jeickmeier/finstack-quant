@@ -43,16 +43,16 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
-use finstack_quant_valuations_core::instruments::common_impl::parameters::FxUnderlyingParams;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
-use finstack_quant_valuations_core::instruments::OptionType;
+use finstack_quant_core::types::Attributes;
+use finstack_quant_models::types::OptionType;
+use finstack_quant_valuations_core::instruments::FxUnderlyingParams;
 // Pricing/greeks live in pricing engine; keep types minimal.
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
 
 use super::pricer;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 
 fn default_fx_underlying(base_currency: Currency, quote_currency: Currency) -> FxUnderlyingParams {
     // Fall back to currency-aware OIS curves instead of hardwiring USD legs.
@@ -197,26 +197,26 @@ pub struct FxOption {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping
     pub attributes: Attributes,
 }
@@ -420,7 +420,7 @@ impl FxOption {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for FxOption {
+impl finstack_quant_valuations_core::instruments::Instrument for FxOption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::FxOption,
         crate::FX
@@ -442,14 +442,13 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.domestic_discount_curve_id.clone());
         deps.add_discount_curve(self.foreign_discount_curve_id.clone());
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 None,
                 Some(self.strike),
@@ -495,25 +494,20 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         )
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeksProvider
-    for FxOption
-{
+impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxOption {
     // Batch the six standard greeks through one canonical pricer call; the
     // metric layer's caching then makes follow-up greek requests free.
     fn option_greeks(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        request: &finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeksRequest,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeks,
-    > {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::{
-            OptionGreekKind, OptionGreeks,
-        };
+        request: &finstack_quant_valuations_core::instruments::OptionGreeksRequest,
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::OptionGreeks>
+    {
+        use finstack_quant_valuations_core::instruments::{OptionGreekKind, OptionGreeks};
 
         match request.greek {
             OptionGreekKind::Delta
@@ -554,7 +548,7 @@ impl FxOption {
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         let t = self
             .day_count
@@ -616,7 +610,7 @@ impl FxOption {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
         _base_pv: f64,
-        bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         let t = self
             .day_count

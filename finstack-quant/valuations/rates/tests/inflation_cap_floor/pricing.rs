@@ -7,9 +7,9 @@ use finstack_quant_core::dates::{
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::InflationLag;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations_core::instruments::Attributes;
-use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations_core::pricer::ModelKey;
 use finstack_quant_valuations_rates::cap_floor::RateOptionType;
 use finstack_quant_valuations_rates::inflation_cap_floor::InflationCapFloor;

@@ -6,7 +6,7 @@
 use super::types::FxVarianceSwap;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::metrics::GenericFdVega;
+use finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
@@ -21,8 +21,8 @@ pub(crate) fn register_fx_variance_swap_metrics(
         instrument: InstrumentType::FxVarianceSwap,
         metrics: [
             (Vega, VegaCalculator),
-            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             (VarianceVega, VarianceVegaCalculator),
             (ExpectedVariance, ExpectedVarianceCalculator),
             (RealizedVariance, RealizedVarianceCalculator),
@@ -141,10 +141,9 @@ mod expected_variance_tests {
     use finstack_quant_core::math::stats::RealizedVarMethod;
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations_core::instruments::common_impl::traits::{
-        Attributes, Instrument,
-    };
+    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
     use std::sync::Arc;
     use time::macros::date;

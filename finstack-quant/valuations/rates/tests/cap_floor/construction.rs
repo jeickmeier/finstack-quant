@@ -6,7 +6,8 @@ use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::{ExerciseStyle, Instrument, SettlementType};
+use finstack_quant_models::types::ExerciseStyle;
+use finstack_quant_valuations_core::instruments::{Instrument, SettlementType};
 use finstack_quant_valuations_rates::cap_floor::{
     CapFloor, OvernightCouponConvention, OvernightSpreadCompounding, RateOptionType,
 };

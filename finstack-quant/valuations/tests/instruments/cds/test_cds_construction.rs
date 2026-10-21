@@ -123,9 +123,9 @@ fn test_convention_custom_defaults() {
 
 #[test]
 fn test_builder_pattern() {
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
-    use finstack_quant_valuations::instruments::Attributes;
-    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations::instruments::{PremiumLegSpec, ProtectionLegSpec};
 
     let start = test_date(2025, Month::January, 1);

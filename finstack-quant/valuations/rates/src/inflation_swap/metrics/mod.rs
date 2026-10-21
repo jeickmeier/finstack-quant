@@ -19,7 +19,7 @@ use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
@@ -67,8 +67,8 @@ pub(crate) fn register_inflation_swap_metrics(
         instrument: InstrumentType::InflationSwap,
         metrics: [
             (ParRate, ParRateCalculator),
-            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
 
@@ -76,8 +76,8 @@ pub(crate) fn register_inflation_swap_metrics(
         registry: registry,
         instrument: InstrumentType::YoYInflationSwap,
         metrics: [
-            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             (Inflation01, YoYInflation01Calculator),
         ]
     }
@@ -186,7 +186,7 @@ mod yoy_inflation01_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::PricingOptions;
     use finstack_quant_valuations_core::metrics::MetricId;
     use time::macros::date;
@@ -240,9 +240,9 @@ mod yoy_inflation01_tests {
             .inflation_index_id(CurveId::new("US-CPI"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .lag(InflationLag::None)
-            .attributes(finstack_quant_valuations_core::instruments::common_impl::traits::Attributes::new())
+            .attributes(finstack_quant_core::types::Attributes::new())
             .build()
             .expect("yoy swap")
     }

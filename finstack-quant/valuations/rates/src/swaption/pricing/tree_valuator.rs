@@ -324,7 +324,7 @@ mod tests {
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
     use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
-    use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
+    use finstack_quant_models::types::OptionType;
     use time::Month;
 
     fn test_discount_curve() -> DiscountCurve {

@@ -19,10 +19,10 @@ use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::impl_instrument_base;
 use rust_decimal::Decimal;
 
 /// CMS (Constant Maturity Swap) swap instrument.
@@ -53,8 +53,7 @@ pub struct CmsSwap {
     /// Notional amount.
     pub notional: Money,
     /// Pay direction: `Pay` means pay CMS leg, receive funding leg.
-    pub side:
-        finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive,
+    pub side: finstack_quant_valuations_core::instruments::PayReceive,
 
     // ── CMS Leg ──────────────────────────────────────────────────────────
     /// Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based.
@@ -123,26 +122,26 @@ pub struct CmsSwap {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping.
     #[serde(default)]
     #[builder(default)]
@@ -333,7 +332,7 @@ impl CmsSwap {
         notional: Money,
         day_count: DayCount,
         index_id: IndexId,
-        side: finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive,
+        side: finstack_quant_valuations_core::instruments::PayReceive,
         discount_curve_id: impl Into<CurveId>,
         forward_curve_id: impl Into<CurveId>,
         vol_surface_id: impl Into<CurveId>,
@@ -471,7 +470,7 @@ impl CmsSwap {
         CmsSwap::builder()
             .id(InstrumentId::new("CMSSWAP-10Y-USD"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .cms_tenor(Tenor::new(
                 10,
                 finstack_quant_core::dates::TenorUnit::Years,
@@ -531,10 +530,10 @@ impl CmsSwap {
                 1.0,
             )?;
             let signed_amount = match self.side {
-                finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay => {
+                finstack_quant_valuations_core::instruments::PayReceive::Pay => {
                     -coupon_rate * accrual_fraction * self.notional.amount()
                 }
-                finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive => {
+                finstack_quant_valuations_core::instruments::PayReceive::Receive => {
                     coupon_rate * accrual_fraction * self.notional.amount()
                 }
             };
@@ -619,8 +618,8 @@ impl CmsSwap {
             };
             let unsigned = rate * period.accrual_year_fraction * self.notional.amount();
             let signed = match self.side {
-                finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay => unsigned,
-                finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive => -unsigned,
+                finstack_quant_valuations_core::instruments::PayReceive::Pay => unsigned,
+                finstack_quant_valuations_core::instruments::PayReceive::Receive => -unsigned,
             };
             flows.push(
                 CashFlow::new(
@@ -666,7 +665,7 @@ pub enum FundingLegSpec {
     },
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for CmsSwap {
+impl finstack_quant_valuations_core::instruments::Instrument for CmsSwap {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CmsSwap,
         crate::RATES
@@ -708,14 +707,13 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_forward_curve(self.forward_curve_id.clone());
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 None,
                 None,
@@ -723,7 +721,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         );
         for strike in [self.cms_cap, self.cms_floor].into_iter().flatten() {
             deps.add_volatility_dependency(
-                finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+                finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                     self.vol_surface_id.clone(),
                     None,
                     Some(strike),
@@ -748,7 +746,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Ok(deps)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
@@ -955,7 +953,7 @@ mod tests {
             .id(InstrumentId::new("CMS-RECON"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             // Receive CMS so base_value = pv_cms − pv_funding
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Receive)
             .cms_tenor(
                 Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
             )
@@ -1027,7 +1025,7 @@ mod tests {
     /// discount, so that any curve-interpolation details cancel exactly.
     #[test]
     fn cms_leg_flows_reconcile_with_base_value_capped() {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let as_of = date(2025, 1, 1);
         let market = recon_market(as_of);
@@ -1077,7 +1075,7 @@ mod tests {
     /// option) causes this test to FAIL.
     #[test]
     fn cms_leg_flows_reconcile_with_base_value_floored() {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let as_of = date(2025, 1, 1);
         let market = recon_market(as_of);
@@ -1122,7 +1120,7 @@ mod tests {
         let swap = CmsSwap::builder()
             .id(InstrumentId::new("CMS-SEASONED-FLOWS"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Receive)
             .cms_tenor(
                 Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
             )
@@ -1182,7 +1180,7 @@ mod tests {
         let swap = CmsSwap::builder()
             .id(InstrumentId::new("CMS-FUNDING-SEASONED"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .cms_tenor(
                 Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
             )
@@ -1227,7 +1225,7 @@ mod tests {
         let result = CmsSwap::builder()
             .id(InstrumentId::new("CMSSWAP-BAD-CMS"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .cms_tenor(
                 Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
             )
@@ -1259,7 +1257,7 @@ mod tests {
         let result = CmsSwap::builder()
             .id(InstrumentId::new("CMSSWAP-BAD-FUNDING"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .side(finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay)
+            .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .cms_tenor(
                 Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
             )

@@ -523,7 +523,8 @@ mod tests {
     use crate::types::DUMMY_ENTITY_ID;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::{Attributes, Instrument, PricingOptions};
+    use finstack_quant_core::types::Attributes;
+    use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
     use finstack_quant_valuations::pricer::InstrumentType;
     use finstack_quant_valuations::results::ValuationResult;
     use std::any::Any;

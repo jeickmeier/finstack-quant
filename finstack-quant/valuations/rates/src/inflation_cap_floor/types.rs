@@ -48,11 +48,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::InflationLag;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::validation;
 use finstack_quant_models::volatility::VolatilityConvention;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
     resolve_volatility, ResolvedVolatility, VolatilityRequest,
 };
@@ -137,26 +137,26 @@ pub struct InflationCapFloor {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Contractual CPI observation lag; when `None` the index lag, then the
     /// curve's indexation lag, applies.
     pub lag: Option<InflationLag>,
@@ -519,9 +519,7 @@ impl InflationCapFloor {
 
 impl InflationCapFloorBuilder {}
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for InflationCapFloor
-{
+impl finstack_quant_valuations_core::instruments::Instrument for InflationCapFloor {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::InflationCapFloor,
         crate::RATES
@@ -537,14 +535,13 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_inflation_curve(self.inflation_index_id.clone());
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 None,
                 Some(self.strike_f64()),
@@ -592,7 +589,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         ))
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 finstack_quant_valuations_core::impl_empty_cashflow_provider!(

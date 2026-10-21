@@ -294,7 +294,7 @@ pub fn bond_tree_config(
     bond: &Bond,
     market: &MarketContext,
 ) -> finstack_quant_core::Result<TreePricerConfig> {
-    use finstack_quant_valuations_core::instruments::ShortRateTreeModel;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::ShortRateTreeModel;
 
     let model = &bond.instrument_pricing_overrides.model_config;
     let selected = model.tree_model.unwrap_or(ShortRateTreeModel::HullWhite);
@@ -457,7 +457,7 @@ mod tests {
     use crate::bond::{CallPut, CallPutSchedule, ReturnFloorSpec};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations_core::instruments::ShortRateTreeModel;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::ShortRateTreeModel;
     use time::macros::date;
 
     #[test]

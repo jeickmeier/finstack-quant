@@ -4,7 +4,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::OptionType;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_credit::cds_option::{CdsOptionParams, CdsOptionStrike};
 use rust_decimal::Decimal;
 use time::macros::date;

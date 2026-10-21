@@ -391,7 +391,7 @@ where
     Ok(total)
 }
 
-use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::Instrument;
 use crate::metrics::MetricCalculator;
 
 /// Outcome of resolving an instrument's CS01 curve dependencies.

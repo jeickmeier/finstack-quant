@@ -12,14 +12,14 @@ use crate::equity_option::types::EquityOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
 use finstack_quant_models::pde::{CraigSneydStepper, Grid1D, Grid2D, HestonPde, Solver2D};
-use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
+use finstack_quant_models::types::OptionType;
 
 /// Reject an unstable PDE result rather than returning an arbitrage-violating
 /// European option value. Only floating-point roundoff at a bound is removed.
@@ -81,7 +81,7 @@ impl EquityOptionHestonPdePricer {
         }
         if !matches!(
             inst.exercise_style,
-            finstack_quant_valuations_core::instruments::ExerciseStyle::European
+            finstack_quant_models::types::ExerciseStyle::European
         ) {
             return Err(PricingError::model_failure_with_context(
                 "Heston PDE supports European exercise only",
@@ -283,11 +283,10 @@ mod tests {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations_core::instruments::common_impl::parameters::{
-        ExerciseStyle, OptionType,
-    };
-    use finstack_quant_valuations_core::instruments::{Attributes, SettlementType};
+    use finstack_quant_models::types::{ExerciseStyle, OptionType};
+    use finstack_quant_valuations_core::instruments::SettlementType;
     use time::Month;
 
     fn date(year: i32, month: u8, day: u8) -> Date {

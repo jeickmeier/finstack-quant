@@ -2,7 +2,7 @@
 
 use super::instrument::CompositeInstrument;
 use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-use crate::instruments::MetricPricingOverrides;
+use crate::instruments::pricing_overrides::MetricPricingOverrides;
 use crate::results::composite::{CompositeExposureReport, PrimitiveAggregate, PrimitiveExposure};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;

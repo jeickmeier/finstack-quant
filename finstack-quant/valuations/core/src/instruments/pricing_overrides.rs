@@ -119,7 +119,7 @@ fn check_finite_fields(fields: &[(Option<f64>, bool)]) -> finstack_quant_core::R
 /// # Price-driving fields
 ///
 /// The following fields, when set, override the model PV returned by
-/// [`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)
+/// [`Instrument::base_value`](crate::instruments::Instrument::base_value)
 /// for bonds. At most one may be set at a time — [`Self::validate`] enforces this.
 /// Precedence (applied top-to-bottom inside `Bond::base_value`):
 ///
@@ -407,15 +407,13 @@ impl BumpConfig {
 /// Merton Monte Carlo configuration stored on the bond for registry-based pricing.
 ///
 /// This is a wrapper around
-/// [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
+/// [`crate::instruments::MertonMcConfig`]
 /// that allows the pricer registry to access the MC configuration from
 /// [`InstrumentPricingOverrides`].
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(transparent)]
-pub struct MertonMcOverride(
-    pub crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig,
-);
+pub struct MertonMcOverride(pub crate::instruments::MertonMcConfig);
 
 /// Model selection and tree pricing parameters.
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -912,10 +910,7 @@ impl InstrumentPricingOverrides {
     }
 
     /// Set the Merton Monte Carlo configuration.
-    pub fn with_merton_mc_config(
-        mut self,
-        config: crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig,
-    ) -> Self {
+    pub fn with_merton_mc_config(mut self, config: crate::instruments::MertonMcConfig) -> Self {
         self.model_config.merton_mc_config = Some(MertonMcOverride(config));
         self
     }
@@ -1095,7 +1090,7 @@ pub enum BondRiskBasis {
 #[serde(rename_all = "snake_case")]
 pub enum ThetaDayBasis {
     /// Calendar-day theta: annual theta divided by
-    /// [`crate::constants::DEFAULT_THETA_DAYS_PER_YEAR`] (365).
+    /// [`finstack_quant_models::closed_form::vanilla::DEFAULT_THETA_DAYS_PER_YEAR`] (365).
     #[default]
     #[serde(rename = "calendar_365")]
     Calendar365,
@@ -1110,7 +1105,9 @@ impl ThetaDayBasis {
     #[must_use]
     pub const fn days_per_year(self) -> f64 {
         match self {
-            Self::Calendar365 => crate::constants::DEFAULT_THETA_DAYS_PER_YEAR,
+            Self::Calendar365 => {
+                finstack_quant_models::closed_form::vanilla::DEFAULT_THETA_DAYS_PER_YEAR
+            }
             Self::Trading252 => crate::constants::TRADING_DAYS_PER_YEAR,
         }
     }
@@ -1141,7 +1138,7 @@ pub struct MetricPricingOverrides {
     pub theta_day_basis: Option<ThetaDayBasis>,
     /// Historical VaR / Expected Shortfall configuration override.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub var_config: Option<crate::metrics::risk::VarConfig>,
+    pub var_config: Option<crate::metrics::risk::var_calculator::VarConfig>,
 }
 
 impl MetricPricingOverrides {
@@ -1298,7 +1295,7 @@ pub struct ScenarioPricingOverrides {
     /// for bonds without embedded options, without an assigned credit curve, and
     /// without a price-pinning quote override other than `quoted_z_spread`
     /// (where the shock is additive on the quoted spread). See
-    /// [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+    /// [`Instrument::scenario_spread_shock_supported`](crate::instruments::Instrument::scenario_spread_shock_supported).
     ///
     /// Setting this on an unsupported configuration produces a validation error
     /// at pricing time rather than a silent no-op. For hazard-priced (credit

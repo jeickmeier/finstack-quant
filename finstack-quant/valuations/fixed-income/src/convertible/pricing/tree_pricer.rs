@@ -3,7 +3,7 @@
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations_core::pricer::expect_inst;
 
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 
 use super::engine::price_convertible_bond;
 

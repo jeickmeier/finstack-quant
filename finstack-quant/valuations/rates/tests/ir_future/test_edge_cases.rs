@@ -257,17 +257,16 @@ fn test_zero_contracts_are_rejected() {
     let (_, start, _) = standard_dates();
 
     // A listed position must hold a positive number of contracts.
-    let err =
-        finstack_quant_valuations_core::instruments::common_impl::listed::ListedFutureTerms::new(
-            0.0,
-            2_500.0,
-            finstack_quant_core::currency::Currency::USD,
-            97.50,
-            start,
-            start,
-            Position::Long,
-        )
-        .expect_err("zero contracts is not a valid listed position");
+    let err = finstack_quant_valuations_core::instruments::ListedFutureTerms::new(
+        0.0,
+        2_500.0,
+        finstack_quant_core::currency::Currency::USD,
+        97.50,
+        start,
+        start,
+        Position::Long,
+    )
+    .expect_err("zero contracts is not a valid listed position");
     assert!(err.to_string().contains("contracts"));
 }
 

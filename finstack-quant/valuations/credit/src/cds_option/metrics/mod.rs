@@ -23,7 +23,7 @@ use crate::cds_option::pricer::synthetic_underlying_cds;
 use crate::cds_option::CdsOption;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
@@ -109,7 +109,7 @@ pub(crate) fn register_cds_option_metrics(
             (Theta, ThetaCalculator),
             (ParSpread, ParSpreadCalculator),
             (ImpliedVol, ImpliedVolCalculator),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             // Recovery01 (custom metric - recovery rate sensitivity)
             (Recovery01, recovery01::Recovery01Calculator),
         ]

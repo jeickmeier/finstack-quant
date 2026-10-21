@@ -354,7 +354,8 @@ mod tests {
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::fx::{FxMatrix, FxQuery, SimpleFxProvider};
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::{Attributes, MarketDependencies};
+    use finstack_quant_core::types::Attributes;
+    use finstack_quant_valuations::instruments::MarketDependencies;
     use finstack_quant_valuations::pricer::InstrumentType;
     use std::any::Any;
     use std::sync::{

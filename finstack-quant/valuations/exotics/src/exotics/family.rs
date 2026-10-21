@@ -3,8 +3,9 @@
 
 use finstack_quant_valuations_core::metrics::{MetricRegistry, MetricRegistryError};
 use finstack_quant_valuations_core::pricer::{
-    register_generic, Family, InstrumentType, ModelKey, PricerRegistry, PricingError,
+    Family, InstrumentType, ModelKey, PricerRegistry, PricingError,
 };
+use finstack_quant_valuations_core::register_generic;
 
 /// Registration unit for the exotic and commodity instruments.
 pub static EXOTICS: Family = Family::new("exotics", register_pricers, register_metrics);

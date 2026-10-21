@@ -12,7 +12,7 @@
 //! the instrument and resolves its effective valuation date before invoking it;
 //! direct callers are responsible for both preconditions.
 
-use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::Instrument;
 use crate::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };

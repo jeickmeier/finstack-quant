@@ -140,7 +140,7 @@ fn test_dm_solver_convergence_across_spread_regimes() {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_core::math::interp::InterpStyle;
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 01);
     let maturity_ig = date!(2027 - 01 - 01); // short IG
@@ -325,7 +325,7 @@ fn solve_dm_at_clean_price(
     spread_bp: i32,
     clean_px: f64,
 ) -> f64 {
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     let mut bond = flat_market_frn(as_of, date!(2027 - 01 - 01), spread_bp);
     bond.instrument_pricing_overrides =
         InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_px);
@@ -405,7 +405,7 @@ fn test_dm_monotone_residual_does_not_break_valid_solve() {
     use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 01);
     let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
@@ -477,7 +477,7 @@ fn test_dm_monotone_residual_does_not_break_valid_solve() {
 #[test]
 fn test_dm_amortizing_frn_is_supported() {
     use finstack_quant_cashflows::builder::AmortizationSpec;
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations_fixed_income::bond::CashflowSpec;
 
     let as_of = date!(2025 - 01 - 01);

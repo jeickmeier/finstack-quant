@@ -278,9 +278,9 @@ mod tests {
         use finstack_quant_core::dates::BusinessDayConvention;
         use finstack_quant_core::market_data::context::MarketContext;
         use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
-        use finstack_quant_valuations_core::instruments::{
-            Attributes, Instrument, InstrumentPricingOverrides, PricingOptions,
-        };
+        use finstack_quant_core::types::Attributes;
+        use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+        use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
         use finstack_quant_valuations_core::metrics::MetricId;
         use time::macros::date;
 

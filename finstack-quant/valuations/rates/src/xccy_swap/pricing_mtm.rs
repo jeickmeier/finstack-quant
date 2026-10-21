@@ -26,7 +26,7 @@ use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::ResettingSide;
+use finstack_quant_valuations_core::instruments::ResettingSide;
 
 fn require_positive_finite(value: f64, id: &str, label: &str) -> Result<()> {
     if !value.is_finite() || value <= 0.0 {

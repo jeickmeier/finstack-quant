@@ -10,6 +10,7 @@ use finstack_quant_core::dates::{create_date, DayCount};
 use finstack_quant_core::market_data::context::{CurveState, MarketContextState};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, IssuerId};
 use finstack_quant_factor::credit::hierarchy::{
     AdderVolSource, CreditCalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec,
@@ -20,7 +21,6 @@ use finstack_quant_factor::credit::hierarchy::{
 use finstack_quant_factor::{FactorCovarianceMatrix, FactorModelConfig, MatchingConfig};
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
-use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use std::collections::BTreeMap;
 use time::Month;

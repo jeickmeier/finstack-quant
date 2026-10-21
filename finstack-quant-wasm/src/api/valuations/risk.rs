@@ -1,13 +1,14 @@
 //! Portfolio historical VaR / expected shortfall by full revaluation.
 //!
 //! Mirrors `finstack-quant-py/src/bindings/valuations/var.rs`: binds
-//! `finstack_quant_valuations::metrics::risk::calculate_var`,
+//! `finstack_quant_valuations::metrics::risk::var_calculator::calculate_var`,
 //! returning the `VarResult` plain object.
 
 use super::pricing::parse_market_json;
 use crate::utils::input::{from_js_json, js_opt_string, js_string, json_text};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
-use finstack_quant_valuations::metrics::risk::{MarketHistory, VarConfig};
+use finstack_quant_valuations::metrics::risk::var_calculator::VarConfig;
+use finstack_quant_valuations::metrics::risk::MarketHistory;
 use finstack_quant_valuations::pricer::PricingDispatch;
 use wasm_bindgen::prelude::*;
 
@@ -55,7 +56,7 @@ pub fn calculate_var(
     )
     .map_err(to_js_err)?;
     let refs: Vec<_> = parsed.iter().map(|p| p.as_ref()).collect();
-    let result = finstack_quant_valuations::metrics::risk::calculate_var(
+    let result = finstack_quant_valuations::metrics::risk::var_calculator::calculate_var(
         &refs,
         &market,
         &history,

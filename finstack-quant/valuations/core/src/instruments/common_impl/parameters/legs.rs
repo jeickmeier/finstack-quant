@@ -447,12 +447,15 @@ impl FinancingLegSpec {
         day_count: DayCount,
     ) -> Self {
         let forward_curve_id: CurveId = forward_curve_id.into();
-        let compounding = match crate::instruments::common_impl::pricing::overnight_conventions::compounding_from_index_id(
-            forward_curve_id.as_str(),
-        ) {
-            Ok(Some(registered)) => registered,
-            Ok(None) | Err(_) => finstack_quant_cashflows::builder::FloatingLegCompounding::Simple,
-        };
+        let compounding =
+            match crate::instruments::pricing::overnight_conventions::compounding_from_index_id(
+                forward_curve_id.as_str(),
+            ) {
+                Ok(Some(registered)) => registered,
+                Ok(None) | Err(_) => {
+                    finstack_quant_cashflows::builder::FloatingLegCompounding::Simple
+                }
+            };
         Self {
             discount_curve_id: discount_curve_id.into(),
             forward_curve_id,
@@ -500,7 +503,7 @@ impl FinancingLegSpec {
                  use simple or a compounded_* variant"
             )));
         }
-        crate::instruments::common_impl::pricing::overnight_conventions::reject_simple_overnight(
+        crate::instruments::pricing::overnight_conventions::reject_simple_overnight(
             self.forward_curve_id.as_str(),
             &self.compounding,
         )?;

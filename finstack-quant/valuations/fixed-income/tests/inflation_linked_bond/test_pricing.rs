@@ -507,8 +507,8 @@ fn test_pv_matches_projected_index_ratio_times_nominal_df() {
     use finstack_quant_core::market_data::scalars::InflationLag;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations_core::instruments::Attributes;
     use finstack_quant_valuations_fixed_income::inflation_linked_bond::{
         DeflationProtection, IndexationMethod, InflationLinkedBond,
     };

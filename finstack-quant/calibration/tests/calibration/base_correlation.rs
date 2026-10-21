@@ -20,7 +20,8 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::{Attributes, PayReceive};
+use finstack_quant_core::types::Attributes;
+use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 use finstack_quant_valuations_credit::cds_tranche::{CdsTranche, CdsTranchePricer};

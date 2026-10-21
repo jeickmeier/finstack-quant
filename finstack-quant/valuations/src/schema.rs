@@ -517,7 +517,7 @@ use crate::instruments::json_loader::instrument_registry;
 #[cfg(feature = "json-schema")]
 use crate::instruments::json_loader::InstrumentEnvelope;
 #[cfg(feature = "json-schema")]
-use crate::instruments::{
+use crate::instruments::pricing_overrides::{
     InstrumentPricingOverrides, MetricPricingOverrides, ScenarioPricingOverrides,
 };
 #[cfg(feature = "json-schema")]
@@ -740,7 +740,8 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         SwaptionConventions, XccyConventions,
     };
     use crate::market::listed::ListedProductCoverage;
-    use crate::metrics::risk::{MarketHistory, VarResult};
+    use crate::metrics::risk::var_calculator::VarResult;
+    use crate::metrics::risk::MarketHistory;
     use crate::pricer::MetricMetadata;
     use crate::results::ValuationResult;
     use finstack_quant_core::contract::{Diagnostic, ValidationReport};

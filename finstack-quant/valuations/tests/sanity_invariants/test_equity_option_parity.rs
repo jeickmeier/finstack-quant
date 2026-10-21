@@ -16,9 +16,10 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::types::Attributes;
+use finstack_quant_models::types::{ExerciseStyle, OptionType};
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
-use finstack_quant_valuations::instruments::{Attributes, Instrument, SettlementType};
-use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType};
+use finstack_quant_valuations::instruments::{Instrument, SettlementType};
 use finstack_quant_valuations::metrics::MetricId;
 use time::Month;
 

@@ -12,9 +12,8 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule};
-use finstack_quant_valuations::instruments::{
-    Instrument, InstrumentPricingOverrides, PricingOptions,
-};
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::ModelKey;
 use time::macros::date;

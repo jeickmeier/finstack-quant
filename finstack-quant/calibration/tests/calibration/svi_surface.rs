@@ -39,8 +39,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::types::UnderlyingId;
 use finstack_quant_core::FxHashMap;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::svi::SviParams;
-use finstack_quant_valuations_core::instruments::OptionType;
 use time::Month;
 
 use crate::calibration::calibration_support as cal_utils;

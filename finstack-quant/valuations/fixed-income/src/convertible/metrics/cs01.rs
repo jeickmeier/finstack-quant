@@ -27,10 +27,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
-use finstack_quant_valuations_core::metrics::sensitivities::config::{
-    format_bucket_label_cow, STANDARD_BUCKETS_YEARS,
-};
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::sensitivities::config::format_bucket_label_cow;
+use finstack_quant_valuations_core::metrics::STANDARD_BUCKETS_YEARS;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use std::borrow::Cow;
 
@@ -113,7 +112,7 @@ impl MetricCalculator for Cs01Calculator {
         let bond: &ConvertibleBond = context.instrument_as()?;
         let as_of = context.as_of;
         if bond.credit_curve_id.is_some() {
-            return finstack_quant_valuations_core::metrics::GenericParallelCs01.calculate(context);
+            return finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericParallelCs01.calculate(context);
         }
 
         cs01_setup(bond, context.curves.as_ref())?.cs01(as_of, BumpSpec::parallel_bp)
@@ -168,7 +167,7 @@ impl MetricCalculator for BucketedCs01Calculator {
         let bond: ConvertibleBond = context.instrument_as::<ConvertibleBond>()?.clone();
 
         if bond.credit_curve_id.is_some() {
-            return finstack_quant_valuations_core::metrics::GenericBucketedCs01.calculate(context);
+            return finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericBucketedCs01.calculate(context);
         }
 
         let series_key = bond
@@ -209,7 +208,7 @@ mod tests {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::{
         AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
     };

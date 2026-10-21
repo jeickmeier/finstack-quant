@@ -17,7 +17,8 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations_core::instruments::{Instrument, InstrumentPricingOverrides};
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_fixed_income::bond::{
     Bond, CallPut, CallPutSchedule, ProtectionWindow, ReturnFloorSpec,
 };

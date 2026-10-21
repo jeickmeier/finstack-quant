@@ -29,7 +29,7 @@
 
 use crate::repo::Repo;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{
     central_diff_by_half_bump, replace_scalar_value, scalar_numeric_value, MetricCalculator,
     MetricContext,

@@ -10,7 +10,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::PayoutTiming;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::Monitoring;
 use finstack_quant_valuations_core::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
@@ -211,7 +211,7 @@ impl Pricer for FxBarrierOptionMcPricer {
 
     fn price_dyn(
         &self,
-        instrument: &dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument,
+        instrument: &dyn finstack_quant_valuations_core::instruments::Instrument,
         market: &MarketContext,
         as_of: Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
@@ -300,12 +300,8 @@ fn expired_barrier_value_per_unit(
 
     let intrinsic = if activated {
         match inst.option_type {
-            finstack_quant_valuations_core::instruments::OptionType::Call => {
-                (spot - strike).max(0.0)
-            }
-            finstack_quant_valuations_core::instruments::OptionType::Put => {
-                (strike - spot).max(0.0)
-            }
+            finstack_quant_models::types::OptionType::Call => (spot - strike).max(0.0),
+            finstack_quant_models::types::OptionType::Put => (strike - spot).max(0.0),
         }
     } else {
         0.0
@@ -628,8 +624,8 @@ mod tests {
     use finstack_quant_core::types::BarrierType;
     use finstack_quant_core::types::PayoutTiming;
     use finstack_quant_models::closed_form::barrier::barrier_rebate;
+    use finstack_quant_models::types::OptionType;
     use finstack_quant_valuations_core::instruments::Instrument;
-    use finstack_quant_valuations_core::instruments::OptionType;
     use std::sync::Arc;
     use time::Month;
 
@@ -923,7 +919,7 @@ mod tests {
             .foreign_discount_curve_id("EUR-OIS".into())
             .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
             .vol_surface_id("EURUSD-VOL".into())
-            .attributes(finstack_quant_valuations_core::instruments::Attributes::new())
+            .attributes(finstack_quant_core::types::Attributes::new())
             .build()
             .expect("fx barrier option");
 
@@ -992,7 +988,7 @@ mod tests {
                 .foreign_discount_curve_id("EUR-OIS".into())
                 .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
                 .vol_surface_id("EURUSD-VOL".into())
-                .attributes(finstack_quant_valuations_core::instruments::Attributes::new())
+                .attributes(finstack_quant_core::types::Attributes::new())
                 .build()
                 .expect("finite-vol FX barrier option")
         };
@@ -1195,9 +1191,7 @@ mod tests {
             .foreign_discount_curve_id("EUR-OIS".into())
             .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
             .vol_surface_id("EURUSD-VOL".into())
-            .attributes(
-                finstack_quant_valuations_core::instruments::common_impl::traits::Attributes::new(),
-            )
+            .attributes(finstack_quant_core::types::Attributes::new())
             .build()
             .expect("mc put option");
 
@@ -1220,9 +1214,7 @@ mod tests {
             .foreign_discount_curve_id("EUR-OIS".into())
             .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
             .vol_surface_id("EURUSD-VOL".into())
-            .attributes(
-                finstack_quant_valuations_core::instruments::common_impl::traits::Attributes::new(),
-            )
+            .attributes(finstack_quant_core::types::Attributes::new())
             .build()
             .expect("analytical put option");
 
@@ -1253,7 +1245,7 @@ mod tests {
             )
             .insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.10));
 
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let mc_pv = mc_option
             .value(&market, as_of)
@@ -1341,9 +1333,7 @@ mod tests {
             .foreign_discount_curve_id("EUR-OIS".into())
             .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
             .vol_surface_id("EURUSD-VOL".into())
-            .attributes(
-                finstack_quant_valuations_core::instruments::common_impl::traits::Attributes::new(),
-            )
+            .attributes(finstack_quant_core::types::Attributes::new())
             .build()
             .expect("fx barrier option");
 

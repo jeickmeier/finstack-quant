@@ -320,7 +320,7 @@ fn bump_curve_id(bump: &MarketBump) -> Option<CurveId> {
 /// use the flat half-triangle constructors rather than 0.0/∞ sentinels,
 /// which break the Σwᵢ(t)=1 invariant (and ∞ produces NaN weights).
 fn find_triangular_neighbors(tenor: f64) -> (Option<f64>, Option<f64>) {
-    let buckets = &crate::metrics::sensitivities::config::STANDARD_BUCKETS_YEARS;
+    let buckets = &crate::metrics::STANDARD_BUCKETS_YEARS;
 
     // Absolute tolerance for exact-tenor matching. `f64::EPSILON` (~2.2e-16)
     // is too tight: a tenor like `0.5` that has been serde round-tripped can
@@ -480,7 +480,7 @@ mod tests {
     fn triangular_neighbors_wings_have_no_sentinels() {
         // First standard bucket: no left neighbour (flat half triangle), the
         // next standard bucket on the right.
-        let buckets = &crate::metrics::sensitivities::config::STANDARD_BUCKETS_YEARS;
+        let buckets = &crate::metrics::STANDARD_BUCKETS_YEARS;
         let (prev, next) = find_triangular_neighbors(buckets[0]);
         assert_eq!(prev, None);
         assert_eq!(next, Some(buckets[1]));

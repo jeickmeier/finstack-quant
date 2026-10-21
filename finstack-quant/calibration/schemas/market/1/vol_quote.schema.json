@@ -22,7 +22,7 @@
       "type": "string"
     },
     "SwaptionConventionId": {
-      "description": "Identifier for Swaption market conventions (e.g., \"USD\", \"EUR\").\n\nUsed to look up [`SwaptionConventions`](crate::market::conventions::defs::SwaptionConventions)\nfrom the convention registry.",
+      "description": "Identifier for Swaption market conventions (e.g., \"USD\", \"EUR\").\n\nUsed to look up [`SwaptionConventions`](crate::market::conventions::SwaptionConventions)\nfrom the convention registry.",
       "type": "string"
     },
     "VolQuoteType": {

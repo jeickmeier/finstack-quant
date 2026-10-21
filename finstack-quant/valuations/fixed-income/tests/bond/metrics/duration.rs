@@ -3,7 +3,8 @@
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::{Instrument, InstrumentPricingOverrides};
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_fixed_income::bond::{
     Bond, CallPut, CallPutSchedule, ProtectionWindow, ReturnFloorSpec,
@@ -214,7 +215,7 @@ fn test_convexity_matches_numerical_second_derivative() {
 }
 
 fn callable_risk_bond(as_of: finstack_quant_core::dates::Date) -> Bond {
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     let mut bond = Bond::fixed(
         "CALLABLE-RISK",
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -319,7 +320,7 @@ fn test_callable_quoted_bond_defaults_to_workout_risk_basis() {
 
 #[test]
 fn test_callable_quoted_bond_can_request_callable_oas_risk_basis() {
-    use finstack_quant_valuations_core::instruments::BondRiskBasis;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::BondRiskBasis;
 
     let as_of = date!(2025 - 01 - 01);
     let bullet_basis = callable_risk_bond(as_of);
@@ -369,7 +370,7 @@ fn test_callable_quoted_bond_can_request_callable_oas_risk_basis() {
 
 #[test]
 fn test_floor_only_bond_uses_workout_schedule_and_option_aware_risk() {
-    use finstack_quant_valuations_core::instruments::BondRiskBasis;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::BondRiskBasis;
 
     let as_of = date!(2025 - 01 - 01);
     let floor = floor_only_risk_bond(as_of);
@@ -500,7 +501,7 @@ fn test_callable_no_quote_default_basis_dv01_is_yield_basis() {
 
 #[test]
 fn test_callable_workout_duration_uses_workout_yield_denominator() {
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 01);
     let mut callable = callable_risk_bond(as_of);

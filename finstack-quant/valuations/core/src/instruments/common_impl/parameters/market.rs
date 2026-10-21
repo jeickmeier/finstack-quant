@@ -1,7 +1,6 @@
 //! Market parameter types for instrument pricing.
 
 use finstack_quant_core::types::CurveId;
-pub use finstack_quant_models::types::{ExerciseStyle, OptionType};
 use serde::{Deserialize, Serialize};
 
 /// Settlement type for options
@@ -107,6 +106,7 @@ impl CreditParams {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_models::types::{ExerciseStyle, OptionType};
 
     #[test]
     fn enum_parsing_and_display_use_canonical_values() {

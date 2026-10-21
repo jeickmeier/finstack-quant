@@ -11,9 +11,12 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive;
 use finstack_quant_valuations_core::instruments::common_impl::pricing::{
-    FinancingLegFlows, PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
+    FinancingLegFlows, PeriodReturnInputs,
+};
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::instruments::{
+    TotalReturnLegParams, TrsEngine, TrsReturnModel,
 };
 
 /// Extracts spot price and dividend yield from market data.

@@ -6,7 +6,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::types::{CurveId, PriceId};
-use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
 /// Return whether an FX contractual event is complete under the end-of-day policy.
 ///

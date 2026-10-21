@@ -10,7 +10,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use time::Month;
 fn create_test_bond() -> Bond {
     use crate::bond::CashflowSpec;
@@ -120,7 +120,7 @@ fn test_bond_valuator_creation() {
 /// Price `bond` on its own tree configuration at `oas_bp`, quote the result
 /// as a clean price, and solve it back through the production OAS metric.
 fn oas_metric_round_trip_bp(bond: &Bond, oas_bp: f64) -> f64 {
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::metrics::MetricId;
 
     let market = create_test_market_context();
@@ -483,7 +483,7 @@ fn bdt_tree_accepts_more_than_one_thousand_steps() {
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default();
     bond.instrument_pricing_overrides.model_config.bdt_sigma = Some(0.20);
     bond.instrument_pricing_overrides.model_config.tree_model =
-        Some(finstack_quant_valuations_core::instruments::ShortRateTreeModel::BlackDermanToy);
+        Some(finstack_quant_valuations_core::instruments::pricing_overrides::ShortRateTreeModel::BlackDermanToy);
     let mut config = super::bond_tree_config(&bond, &create_test_market_context()).expect("config");
     config.tree_steps = 1200;
     let market = create_test_market_context();
@@ -653,7 +653,7 @@ fn bond_bdt_tree_reads_bdt_sigma() {
         .instrument_pricing_overrides
         .model_config
         .tree_model =
-        Some(finstack_quant_valuations_core::instruments::ShortRateTreeModel::BlackDermanToy);
+        Some(finstack_quant_valuations_core::instruments::pricing_overrides::ShortRateTreeModel::BlackDermanToy);
     option_vol_only
         .instrument_pricing_overrides
         .market_quotes
@@ -817,17 +817,17 @@ fn risk_free_floating_callable_prices_on_deterministic_hull_white_tree() {
 
 #[test]
 fn bond_tree_model_selector_rejects_retired_vol_model_key() {
-    let hull_white: finstack_quant_valuations_core::instruments::ModelConfig =
+    let hull_white: finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig =
         serde_json::from_value(serde_json::json!({ "tree_model": "hull_white" }))
             .expect("tree_model is a model_config field");
     assert_eq!(
         hull_white.tree_model,
-        Some(finstack_quant_valuations_core::instruments::ShortRateTreeModel::HullWhite)
+        Some(finstack_quant_valuations_core::instruments::pricing_overrides::ShortRateTreeModel::HullWhite)
     );
     // schema-rejection-test: `vol_model` is now `tree_model`
     let retired = serde_json::json!({ "vol_model": "black", "bdt_sigma": 0.20 });
-    assert!(
-        serde_json::from_value::<finstack_quant_valuations_core::instruments::ModelConfig>(retired)
-            .is_err()
-    );
+    assert!(serde_json::from_value::<
+        finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig,
+    >(retired)
+    .is_err());
 }

@@ -81,10 +81,10 @@ fn positive_time_greeks_match_frozen_annuity_formulas_and_bumps() {
     use finstack_quant_models::closed_form::{
         bachelier_call, bachelier_put, black_call, black_put,
     };
+    use finstack_quant_models::types::OptionType;
     use finstack_quant_models::volatility::sabr::SabrParameters;
-    use finstack_quant_valuations::instruments::{
-        InstrumentPricingOverrides, OptionType, VolatilityModel,
-    };
+    use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+    use finstack_quant_valuations::instruments::VolatilityModel;
     use rust_decimal::Decimal;
     use time::macros::date;
 
@@ -190,9 +190,9 @@ fn positive_time_greeks_match_frozen_annuity_formulas_and_bumps() {
 
 #[test]
 fn zero_volatility_and_expired_greeks_have_explicit_finite_limits() {
-    use finstack_quant_valuations::instruments::{
-        InstrumentPricingOverrides, OptionType, VolatilityModel,
-    };
+    use finstack_quant_models::types::OptionType;
+    use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+    use finstack_quant_valuations::instruments::VolatilityModel;
     use rust_decimal::Decimal;
     use time::macros::date;
     let as_of = date!(2025 - 01 - 02);

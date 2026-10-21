@@ -49,8 +49,7 @@
 //! - [`crate::metrics`]: risk metric identifiers, calculators, and registries.
 //! - [`crate::results`]: valuation result envelopes and metadata.
 //! - [`crate::constants`]: shared numerical constants.
-//! - [`crate::error`]: valuation error types; [`crate::Error`] and [`crate::Result`] are also
-//!   available at the crate root.
+//! - [`crate::Error`] and [`crate::Result`]: valuation error types, at the crate root.
 //!
 //! # Example
 //!
@@ -66,7 +65,7 @@ pub mod constants;
 #[doc(hidden)]
 pub mod contract_specs;
 /// Error types for pricing and valuation workflows.
-pub mod error;
+pub(crate) mod error;
 /// Market quotes and conventions
 pub mod market;
 /// Pricing dispatch and registry infrastructure.

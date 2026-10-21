@@ -393,10 +393,10 @@ impl BasketCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::traits::Attributes;
     use crate::instruments::exotics::basket::types::{
         BasketAssetType, BasketConstituent, ConstituentReference,
     };
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{InstrumentId, PriceId};
 
     fn weight_based_basket(weights: &[f64]) -> Basket {

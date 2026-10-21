@@ -1,6 +1,7 @@
 //! Equity total-return swap contract.
 
 use finstack_quant_cashflows::builder::ScheduleParams;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::{
     currency::Currency,
     dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor},
@@ -10,12 +11,10 @@ use finstack_quant_core::{
     Result,
 };
 use finstack_quant_margin::types::OtcMarginSpec;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::{
-    legs::FinancingLegSpec, legs::PayReceive, trs_common::TrsScheduleSpec,
-    underlying::EquityUnderlyingParams,
+use finstack_quant_valuations_core::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::{
+    EquityUnderlyingParams, FinancingLegSpec, PayReceive, TrsScheduleSpec,
 };
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::Attributes;
 use rust_decimal::Decimal;
 use time::macros::date;
 
@@ -44,7 +43,8 @@ pub enum TrsDividendSettlement {
 ///     currency::Currency, dates::DayCount, money::Money, types::InstrumentId,
 /// };
 /// use finstack_quant_cashflows::builder::ScheduleParams;
-/// use finstack_quant_valuations_core::instruments::{Attributes, EquityUnderlyingParams, FinancingLegSpec, PayReceive};
+/// use finstack_quant_valuations_core::instruments::{EquityUnderlyingParams, FinancingLegSpec, PayReceive};
+/// use finstack_quant_core::types::Attributes;
 /// use finstack_quant_valuations_equity::equity_trs::{EquityTotalReturnSwap, TrsDividendSettlement};
 /// use finstack_quant_valuations_core::instruments::TrsScheduleSpec;
 /// use rust_decimal::Decimal;
@@ -162,26 +162,26 @@ pub struct EquityTotalReturnSwap {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -260,14 +260,15 @@ struct EquityTotalReturnSwapUnchecked {
     /// Instrument-owned pricing inputs.
     #[serde(default)]
     instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[serde(default)]
-    metric_pricing_overrides: finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[serde(default)]
     scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     attributes: Attributes,
 }
@@ -522,7 +523,7 @@ impl EquityTotalReturnSwap {
 
     /// Calculates the present value of the financing leg.
     ///
-    /// Delegates to [`TrsEngine::pv_financing_leg`](finstack_quant_valuations_core::instruments::common_impl::pricing::TrsEngine)
+    /// Delegates to [`TrsEngine::pv_financing_leg`](finstack_quant_valuations_core::instruments::TrsEngine)
     /// — the same engine the par-spread and annuity metrics use — so
     /// `financing.compounding` (term-rate vs SOFR-style overnight-compounded)
     /// is honored and the reported par spread reprices `base_value` to ~0.
@@ -538,7 +539,7 @@ impl EquityTotalReturnSwap {
     /// Present value of the financing leg in the instrument's currency.
     pub fn pv_financing_leg(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
         self.validate()?;
-        use finstack_quant_valuations_core::instruments::common_impl::pricing::TrsEngine;
+        use finstack_quant_valuations_core::instruments::TrsEngine;
         TrsEngine::pv_financing_leg(
             &self.financing_leg,
             &self.schedule,
@@ -558,7 +559,7 @@ impl EquityTotalReturnSwap {
     /// Financing annuity (sum of discounted year fractions × notional).
     pub fn financing_annuity(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         self.validate()?;
-        use finstack_quant_valuations_core::instruments::common_impl::pricing::TrsEngine;
+        use finstack_quant_valuations_core::instruments::TrsEngine;
         TrsEngine::financing_annuity(
             &self.financing_leg,
             &self.schedule,
@@ -569,9 +570,7 @@ impl EquityTotalReturnSwap {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for EquityTotalReturnSwap
-{
+impl finstack_quant_valuations_core::instruments::Instrument for EquityTotalReturnSwap {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::EquityTotalReturnSwap,
         crate::EQUITY
@@ -583,10 +582,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.financing_leg.discount_curve_id.clone());
         deps.add_forward_curve(self.financing_leg.forward_curve_id.clone());
         deps.add_market_scalar_id(self.underlying.spot_id.as_str());
@@ -620,7 +618,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Some(self.schedule.end)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap {

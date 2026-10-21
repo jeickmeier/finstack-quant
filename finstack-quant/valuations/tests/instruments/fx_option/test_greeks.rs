@@ -270,7 +270,7 @@ fn test_theta_day_basis_scales_analytic_theta() {
     let calendar = build_call_option(as_of, expiry, 1.20, 1_000_000.0);
     let mut trading = calendar.clone();
     trading.metric_pricing_overrides.theta_day_basis =
-        Some(finstack_quant_valuations::instruments::ThetaDayBasis::Trading252);
+        Some(finstack_quant_valuations::instruments::pricing_overrides::ThetaDayBasis::Trading252);
     let market = build_market_context(as_of, MarketParams::atm());
 
     let calendar_theta = compute_greeks(&calendar, &market, as_of).theta;

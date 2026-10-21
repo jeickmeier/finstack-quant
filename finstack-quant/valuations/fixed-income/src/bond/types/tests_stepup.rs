@@ -8,8 +8,9 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::common_impl::traits::{Attributes, Instrument};
-use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+use finstack_quant_core::types::Attributes;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::instruments::Instrument;
 use rust_decimal::Decimal;
 use time::Month;
 
@@ -270,7 +271,7 @@ fn bond_price_merton_mc_api() {
         finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid test rate"),
         time::macros::date!(2024 - 01 - 15),
         time::macros::date!(2034 - 01 - 15),
-        finstack_quant_valuations_core::instruments::common_impl::parameters::BondConvention::UsCorporate,
+        finstack_quant_valuations_core::instruments::BondConvention::UsCorporate,
         "USD-OIS",
     )
     .expect("valid corporate bond");
@@ -317,7 +318,7 @@ fn bond_price_merton_mc_rejects_amortizing() {
         .cashflow_spec(CashflowSpec::amortizing(base, amort))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default(),
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
         )
         .attributes(Attributes::new())
         .build()
@@ -359,7 +360,7 @@ fn build_step_up_bond_schedule(
         )
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default(),
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
         )
         .attributes(Attributes::new())
         .build()
@@ -403,7 +404,7 @@ fn step_up_no_steps_equals_fixed_rate() {
         )
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default(),
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
         )
         .attributes(Attributes::new())
         .build()
@@ -580,7 +581,7 @@ fn step_up_serde_roundtrip() {
         .cashflow_spec(spec)
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default(),
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
         )
         .attributes(Attributes::new())
         .build()

@@ -3,7 +3,8 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::types::{CurveId, PriceId};
-use finstack_quant_valuations_core::instruments::{ExerciseStyle, OptionType, SettlementType};
+use finstack_quant_models::types::{ExerciseStyle, OptionType};
+use finstack_quant_valuations_core::instruments::SettlementType;
 
 /// Equity option specific parameters.
 ///

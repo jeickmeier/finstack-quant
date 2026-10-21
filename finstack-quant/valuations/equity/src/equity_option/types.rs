@@ -65,15 +65,16 @@
 // pricing formulas are implemented in the pricing engine; keep this module free of direct math imports
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-use finstack_quant_valuations_core::instruments::common_impl::parameters::underlying::EquityUnderlyingParams;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
-use finstack_quant_valuations_core::instruments::{ExerciseStyle, OptionType, SettlementType};
+use finstack_quant_models::types::{ExerciseStyle, OptionType};
+use finstack_quant_valuations_core::instruments::EquityUnderlyingParams;
+use finstack_quant_valuations_core::instruments::SettlementType;
 use time::macros::date;
 
 use super::parameters::{EquityOptionMarketData, EquityOptionParams};
 use finstack_quant_core::validation;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 
 /// Observed exercise or expiry state for an equity option.
 ///
@@ -240,26 +241,26 @@ pub struct EquityOption {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping
     pub attributes: Attributes,
 }
@@ -606,12 +607,10 @@ impl EquityOption {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeksProvider
-    for EquityOption
-{
+impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for EquityOption {
     fn selected_model_greek(
         &self,
-        kind: finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind,
+        kind: finstack_quant_valuations_core::instruments::OptionGreekKind,
         context: &mut finstack_quant_valuations_core::metrics::MetricContext,
     ) -> finstack_quant_core::Result<Option<f64>> {
         super::metrics::selected_model::selected_equity_greek(kind, context).map(Some)
@@ -621,37 +620,34 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::OptionGre
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        request: &finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeksRequest,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeks,
-    > {
-        let mut greeks =
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeks::default(
-            );
+        request: &finstack_quant_valuations_core::instruments::OptionGreeksRequest,
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::OptionGreeks>
+    {
+        let mut greeks = finstack_quant_valuations_core::instruments::OptionGreeks::default();
         match request.greek {
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Delta => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Delta => {
                 greeks.delta = self.option_delta(market, as_of, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Gamma => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Gamma => {
                 greeks.gamma = self.option_gamma(market, as_of, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Vega => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Vega => {
                 greeks.vega = self.option_vega(market, as_of, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Theta => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Theta => {
                 greeks.theta = self.option_theta(market, as_of, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Rho => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Rho => {
                 greeks.rho_bp = self.option_rho_bp(market, as_of, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Vanna => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Vanna => {
                 greeks.vanna = self.option_vanna(market, as_of, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Volga => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Volga => {
                 greeks.volga =
                     self.option_volga(market, as_of, request.require_base_pv()?, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::ForeignRho => {}
+            finstack_quant_valuations_core::instruments::OptionGreekKind::ForeignRho => {}
         }
         Ok(greeks)
     }
@@ -661,7 +657,7 @@ impl EquityOption {
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        _bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(self.greeks(market, as_of)?.delta))
     }
@@ -669,7 +665,7 @@ impl EquityOption {
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        _bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(self.greeks(market, as_of)?.gamma))
     }
@@ -677,7 +673,7 @@ impl EquityOption {
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        _bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(self.greeks(market, as_of)?.vega))
     }
@@ -685,7 +681,7 @@ impl EquityOption {
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        _bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(self.greeks(market, as_of)?.theta))
     }
@@ -693,7 +689,7 @@ impl EquityOption {
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        _bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(self.greeks(market, as_of)?.rho))
     }
@@ -701,9 +697,9 @@ impl EquityOption {
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         // Spot bump: ±`spot_bump_decimal` (relative, on the spot scalar).
         // Vol bump: ±`vol_bump_decimal` (absolute, parallel surface bump).
@@ -798,9 +794,9 @@ impl EquityOption {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
         base_pv: f64,
-        bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let vol_bump_abs = self
             .instrument_pricing_overrides
@@ -836,7 +832,7 @@ impl EquityOption {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for EquityOption {
+impl finstack_quant_valuations_core::instruments::Instrument for EquityOption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::EquityOption,
         crate::EQUITY
@@ -852,14 +848,13 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_market_scalar_id(self.spot_id.as_str());
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 Some(self.spot_id.clone()),
                 Some(self.strike),
@@ -884,7 +879,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Some(self.expiry)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 finstack_quant_valuations_core::impl_empty_cashflow_provider!(
@@ -901,6 +896,7 @@ mod tests {
 
     use super::*;
     use crate::equity_option::pricing;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::{
         currency::Currency,
         dates::{Date, DayCount},
@@ -911,12 +907,11 @@ mod tests {
         types::{CurveId, InstrumentId},
     };
     use finstack_quant_models::closed_form::vanilla::bs_price_unchecked;
-    use finstack_quant_valuations_core::instruments::common_impl::{
-        helpers::year_fraction, traits::Instrument,
-    };
-    use finstack_quant_valuations_core::instruments::{
-        Attributes, ExerciseStyle, InstrumentPricingOverrides, OptionType, SettlementType,
-    };
+    use finstack_quant_models::types::{ExerciseStyle, OptionType};
+    use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::Instrument;
+    use finstack_quant_valuations_core::instruments::SettlementType;
 
     #[test]
     fn canonical_dependencies_preserve_equity_surface_context() {

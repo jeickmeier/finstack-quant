@@ -16,7 +16,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-use finstack_quant_valuations::instruments::{
+use finstack_quant_valuations::instruments::pricing_overrides::{
     InstrumentPricingOverrides, ScenarioPricingOverrides,
 };
 use finstack_quant_valuations::metrics::MetricId;

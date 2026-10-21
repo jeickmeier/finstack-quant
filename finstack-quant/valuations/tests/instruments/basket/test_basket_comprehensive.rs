@@ -14,12 +14,13 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_valuations::instruments::exotics::basket::BasketCalculator;
 use finstack_quant_valuations::instruments::exotics::basket::{
     Basket, BasketAssetType, BasketConstituent, BasketPricingConfig, ConstituentReference,
 };
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::instruments::{Attributes, Instrument};
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
 use std::sync::Arc;
 use time::Month;

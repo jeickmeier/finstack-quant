@@ -12,7 +12,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations_fixed_income::revolving_credit::{
     CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit, RevolvingCreditFees,
     StochasticUtilizationSpec, UtilizationProcess,

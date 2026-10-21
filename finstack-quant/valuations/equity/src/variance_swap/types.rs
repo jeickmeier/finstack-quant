@@ -11,10 +11,9 @@ use finstack_quant_core::{
 use time::macros::date;
 
 use super::pricer;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::{
-    common_impl::traits::Attributes, MarketDependencies,
-};
+use finstack_quant_core::types::Attributes;
+use finstack_quant_valuations_core::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::MarketDependencies;
 
 pub(crate) use finstack_quant_valuations_core::instruments::PayReceive;
 
@@ -182,26 +181,26 @@ pub struct VarianceSwap {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -523,7 +522,7 @@ impl VarianceSwap {
 }
 
 // Use the macro to implement Instrument with pricing
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for VarianceSwap {
+impl finstack_quant_valuations_core::instruments::Instrument for VarianceSwap {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::VarianceSwap,
         crate::EQUITY
@@ -545,7 +544,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         self.effective_settlement_date().ok()
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         let mut deps = MarketDependencies::new();
@@ -555,7 +554,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
             deps.add_market_scalar_id(div_yield_id);
         }
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 Some(self.spot_id.clone()),
                 None,

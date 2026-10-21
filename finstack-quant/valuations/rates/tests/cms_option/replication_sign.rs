@@ -9,7 +9,7 @@ use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations_core::instruments::OptionType;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::pricer::Pricer;
 use finstack_quant_valuations_rates::cms_option::replication_pricer::CmsReplicationPricer;
 use finstack_quant_valuations_rates::cms_option::CmsOption;

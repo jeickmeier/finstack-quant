@@ -19,7 +19,7 @@ use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use finstack_quant_core::types::{IndexId, UnderlyingId};
 use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::instruments::OptionType;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::market::conventions::ids::{
     CdsConventionKey, CdsDocClause, InflationSwapConventionId, IrFutureContractId,
     SwaptionConventionId, XccyConventionId,

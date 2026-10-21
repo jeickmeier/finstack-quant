@@ -11,15 +11,15 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::fx::FxMatrix;
 use finstack_quant_core::money::fx::SimpleFxProvider;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_models::types::OptionType;
 use finstack_quant_test_utils::assert::approx_eq;
 pub use finstack_quant_test_utils::assert::in_range;
 use finstack_quant_valuations::instruments::fx::fx_option::{
     FxDeltaConvention, FxDeltaConventionKind, FxOption,
 };
-use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::OptionType;
 use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;
 

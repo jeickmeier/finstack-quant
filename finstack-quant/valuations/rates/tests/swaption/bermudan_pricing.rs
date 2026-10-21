@@ -11,8 +11,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::instruments::{OptionType, PricingOptions};
+use finstack_quant_valuations_core::instruments::PricingOptions;
 use finstack_quant_valuations_core::pricer::Pricer;
 use finstack_quant_valuations_rates::swaption::BermudanSwaptionTreeValuator;
 use finstack_quant_valuations_rates::swaption::{

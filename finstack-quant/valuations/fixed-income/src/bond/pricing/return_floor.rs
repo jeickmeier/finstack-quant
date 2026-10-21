@@ -775,7 +775,7 @@ mod tests {
         use finstack_quant_core::market_data::context::MarketContext;
         use finstack_quant_core::market_data::term_structures::DiscountCurve;
         use finstack_quant_core::math::interp::InterpStyle;
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let as_of = date!(2024 - 01 - 15);
 
@@ -799,7 +799,7 @@ mod tests {
 
         let mut floored = fixed_10pct_bullet().min_moic(1.25);
         floored.instrument_pricing_overrides =
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_hw1f_sigma(0.01)
                 .with_hw1f_mean_reversion(0.03);
         let price_floored = floored.base_value(&market, as_of).unwrap();

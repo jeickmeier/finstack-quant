@@ -22,7 +22,7 @@ use finstack_quant_core::market_data::term_structures::HazardCurve;
 
 use super::config as sens_config;
 use super::cs01::{cs01_reval, reprice_with_hazard, sensitivity_central_diff};
-use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::Instrument;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 
 /// Parallel hazard-rate bump CS01.

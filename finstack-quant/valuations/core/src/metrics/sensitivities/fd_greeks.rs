@@ -18,10 +18,8 @@
 
 use std::marker::PhantomData;
 
-use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::common_impl::{
-    dependencies::MarketDependencies, dependencies::VolatilityDependency,
-};
+use crate::instruments::Instrument;
+use crate::instruments::{MarketDependencies, VolatilityDependency};
 use crate::metrics::core::finite_difference::{
     apply_parallel_surface_bumps_in_place, bumped_volatility_override, revert_scratch_bumps,
     scalar_numeric_value, volatility_override,
@@ -825,15 +823,15 @@ where
 mod tests {
     use super::*;
 
-    use crate::instruments::common_impl::dependencies::{MarketDependencies, VolatilityDependency};
-    use crate::instruments::common_impl::traits::Attributes;
-    use crate::instruments::MetricPricingOverrides;
+    use crate::instruments::pricing_overrides::MetricPricingOverrides;
+    use crate::instruments::{MarketDependencies, VolatilityDependency};
     use crate::metrics::{MetricContext, MetricId, MetricRegistry};
     use crate::pricer::InstrumentType;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::PriceId;
     use std::sync::Arc;
     use time::macros::date;
@@ -845,7 +843,7 @@ mod tests {
         expiry: Date,
         spot_id: PriceId,
         overrides: MetricPricingOverrides,
-        instrument_overrides: crate::instruments::InstrumentPricingOverrides,
+        instrument_overrides: crate::instruments::pricing_overrides::InstrumentPricingOverrides,
         attributes: Attributes,
     }
 
@@ -869,7 +867,7 @@ mod tests {
         expiry: Date,
         spot_id: PriceId,
         overrides: MetricPricingOverrides,
-        instrument_overrides: crate::instruments::InstrumentPricingOverrides,
+        instrument_overrides: crate::instruments::pricing_overrides::InstrumentPricingOverrides,
         attributes: Attributes,
     }
 
@@ -904,7 +902,7 @@ mod tests {
         }
     }
 
-    impl crate::instruments::common_impl::traits::Instrument for TestFdInstrument {
+    impl crate::instruments::Instrument for TestFdInstrument {
         fn expiry(&self) -> Option<Date> {
             Some(self.expiry)
         }
@@ -930,7 +928,7 @@ mod tests {
             self
         }
 
-        fn clone_box(&self) -> Box<dyn crate::instruments::common_impl::traits::Instrument> {
+        fn clone_box(&self) -> Box<dyn crate::instruments::Instrument> {
             Box::new(self.clone())
         }
 
@@ -944,25 +942,26 @@ mod tests {
 
         fn get_instrument_pricing_overrides(
             &self,
-        ) -> Option<&crate::instruments::InstrumentPricingOverrides> {
+        ) -> Option<&crate::instruments::pricing_overrides::InstrumentPricingOverrides> {
             Some(&self.instrument_overrides)
         }
 
         fn get_instrument_pricing_overrides_mut(
             &mut self,
-        ) -> Option<&mut crate::instruments::InstrumentPricingOverrides> {
+        ) -> Option<&mut crate::instruments::pricing_overrides::InstrumentPricingOverrides>
+        {
             Some(&mut self.instrument_overrides)
         }
 
         fn get_metric_pricing_overrides(
             &self,
-        ) -> Option<&crate::instruments::MetricPricingOverrides> {
+        ) -> Option<&crate::instruments::pricing_overrides::MetricPricingOverrides> {
             Some(&self.overrides)
         }
 
         fn get_metric_pricing_overrides_mut(
             &mut self,
-        ) -> Option<&mut crate::instruments::MetricPricingOverrides> {
+        ) -> Option<&mut crate::instruments::pricing_overrides::MetricPricingOverrides> {
             Some(&mut self.overrides)
         }
 
@@ -988,7 +987,7 @@ mod tests {
             market: &MarketContext,
             as_of: Date,
             metrics: &[MetricId],
-            options: crate::instruments::common_impl::traits::PricingOptions,
+            options: crate::instruments::PricingOptions,
         ) -> crate::Result<crate::results::ValuationResult> {
             let base_value = self.value(market, as_of)?;
             Ok(
@@ -1007,7 +1006,7 @@ mod tests {
         }
     }
 
-    impl crate::instruments::common_impl::traits::Instrument for RoundingSensitiveInstrument {
+    impl crate::instruments::Instrument for RoundingSensitiveInstrument {
         fn expiry(&self) -> Option<Date> {
             Some(self.expiry)
         }
@@ -1033,7 +1032,7 @@ mod tests {
             self
         }
 
-        fn clone_box(&self) -> Box<dyn crate::instruments::common_impl::traits::Instrument> {
+        fn clone_box(&self) -> Box<dyn crate::instruments::Instrument> {
             Box::new(self.clone())
         }
 
@@ -1047,25 +1046,26 @@ mod tests {
 
         fn get_instrument_pricing_overrides(
             &self,
-        ) -> Option<&crate::instruments::InstrumentPricingOverrides> {
+        ) -> Option<&crate::instruments::pricing_overrides::InstrumentPricingOverrides> {
             Some(&self.instrument_overrides)
         }
 
         fn get_instrument_pricing_overrides_mut(
             &mut self,
-        ) -> Option<&mut crate::instruments::InstrumentPricingOverrides> {
+        ) -> Option<&mut crate::instruments::pricing_overrides::InstrumentPricingOverrides>
+        {
             Some(&mut self.instrument_overrides)
         }
 
         fn get_metric_pricing_overrides(
             &self,
-        ) -> Option<&crate::instruments::MetricPricingOverrides> {
+        ) -> Option<&crate::instruments::pricing_overrides::MetricPricingOverrides> {
             Some(&self.overrides)
         }
 
         fn get_metric_pricing_overrides_mut(
             &mut self,
-        ) -> Option<&mut crate::instruments::MetricPricingOverrides> {
+        ) -> Option<&mut crate::instruments::pricing_overrides::MetricPricingOverrides> {
             Some(&mut self.overrides)
         }
 
@@ -1092,7 +1092,7 @@ mod tests {
             market: &MarketContext,
             as_of: Date,
             metrics: &[MetricId],
-            options: crate::instruments::common_impl::traits::PricingOptions,
+            options: crate::instruments::PricingOptions,
         ) -> crate::Result<crate::results::ValuationResult> {
             let base_value = self.value(market, as_of)?;
             Ok(
@@ -1113,7 +1113,7 @@ mod tests {
 
     fn registry_for_test<I>() -> MetricRegistry
     where
-        I: crate::instruments::common_impl::traits::Instrument + Clone + 'static,
+        I: crate::instruments::Instrument + Clone + 'static,
     {
         let mut registry = MetricRegistry::new();
         registry
@@ -1403,7 +1403,7 @@ mod tests {
         surface_terms: Vec<(String, f64)>,
         multiply_by_spot: bool,
         overrides: MetricPricingOverrides,
-        instrument_overrides: crate::instruments::InstrumentPricingOverrides,
+        instrument_overrides: crate::instruments::pricing_overrides::InstrumentPricingOverrides,
         attributes: Attributes,
     }
 
@@ -1474,7 +1474,7 @@ mod tests {
         }
     }
 
-    impl crate::instruments::common_impl::traits::Instrument for VolLinearInstrument {
+    impl crate::instruments::Instrument for VolLinearInstrument {
         fn expiry(&self) -> Option<Date> {
             Some(self.expiry)
         }
@@ -1507,7 +1507,7 @@ mod tests {
             self
         }
 
-        fn clone_box(&self) -> Box<dyn crate::instruments::common_impl::traits::Instrument> {
+        fn clone_box(&self) -> Box<dyn crate::instruments::Instrument> {
             Box::new(self.clone())
         }
 
@@ -1521,25 +1521,26 @@ mod tests {
 
         fn get_instrument_pricing_overrides(
             &self,
-        ) -> Option<&crate::instruments::InstrumentPricingOverrides> {
+        ) -> Option<&crate::instruments::pricing_overrides::InstrumentPricingOverrides> {
             Some(&self.instrument_overrides)
         }
 
         fn get_instrument_pricing_overrides_mut(
             &mut self,
-        ) -> Option<&mut crate::instruments::InstrumentPricingOverrides> {
+        ) -> Option<&mut crate::instruments::pricing_overrides::InstrumentPricingOverrides>
+        {
             Some(&mut self.instrument_overrides)
         }
 
         fn get_metric_pricing_overrides(
             &self,
-        ) -> Option<&crate::instruments::MetricPricingOverrides> {
+        ) -> Option<&crate::instruments::pricing_overrides::MetricPricingOverrides> {
             Some(&self.overrides)
         }
 
         fn get_metric_pricing_overrides_mut(
             &mut self,
-        ) -> Option<&mut crate::instruments::MetricPricingOverrides> {
+        ) -> Option<&mut crate::instruments::pricing_overrides::MetricPricingOverrides> {
             Some(&mut self.overrides)
         }
 
@@ -1564,7 +1565,7 @@ mod tests {
             market: &MarketContext,
             as_of: Date,
             metrics: &[MetricId],
-            options: crate::instruments::common_impl::traits::PricingOptions,
+            options: crate::instruments::PricingOptions,
         ) -> crate::Result<crate::results::ValuationResult> {
             let base_value = self.value(market, as_of)?;
             Ok(

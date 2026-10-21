@@ -10,10 +10,9 @@ use finstack_quant_models::rates::hull_white::{
     hw1f_delayed_coupon_adjustment, HullWhiteCalibrationParams,
 };
 use finstack_quant_models::trees::HullWhiteTree;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::{
-    FixedLegSpec, FloatLegSpec, OptionType,
-};
+use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::SettlementType;
+use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec};
 
 pub(crate) struct HwSwaptionCashflows {
     fixed: Vec<(f64, f64)>,

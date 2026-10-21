@@ -7,14 +7,13 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::Portfolio;
 use finstack_quant_scenarios::{CurveKind, OperationSpec, ScenarioSpec};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-use finstack_quant_valuations::instruments::{
-    Attributes, Instrument, MarketDependencies, PricingOptions,
-};
+use finstack_quant_valuations::instruments::{Instrument, MarketDependencies, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::InstrumentType;
 use finstack_quant_valuations::results::ValuationResult;

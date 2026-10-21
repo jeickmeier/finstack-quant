@@ -33,6 +33,6 @@
 pub mod conventions;
 /// Exchange-listed product-family coverage and valuation routes.
 pub mod listed;
-pub mod volatility;
+pub(crate) mod volatility;
 
 pub use volatility::resolve_vol_source;

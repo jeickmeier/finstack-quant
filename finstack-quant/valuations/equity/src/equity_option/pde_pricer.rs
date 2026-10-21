@@ -10,15 +10,15 @@ use crate::equity_option::types::EquityOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
-use finstack_quant_valuations_core::instruments::ExerciseStyle;
+use finstack_quant_models::types::ExerciseStyle;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
 use finstack_quant_models::pde::{BlackScholesPde, Grid1D, Solver1D};
-use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
+use finstack_quant_models::types::OptionType;
 
 /// Equity option pricer using 1D PDE (Crank-Nicolson) with Black-Scholes dynamics.
 ///

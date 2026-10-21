@@ -2,7 +2,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use finstack_quant_valuations::instruments::OptionType;
+use finstack_quant_models::types::OptionType;
 
 use crate::instruments::swaption::common::*;
 use finstack_quant_core::currency::Currency;

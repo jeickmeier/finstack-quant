@@ -118,7 +118,7 @@ mod tests {
                 },
             )))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_mc_paths(100),
             )
             .discount_curve_id("USD-OIS".into())

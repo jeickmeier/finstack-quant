@@ -140,7 +140,7 @@ mod tests {
                 create_zero_vol_stochastic(0.5), // 50% utilization
             ))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_mc_paths(1_000),
             )
             .discount_curve_id("USD-OIS".into())
@@ -243,7 +243,7 @@ mod tests {
             .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
             .draw_repay_spec(DrawRepaySpec::Stochastic(create_zero_vol_stochastic(0.5)))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_mc_paths(1_000),
             )
             .discount_curve_id("USD-OIS".into())
@@ -311,7 +311,7 @@ mod tests {
             .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
             .draw_repay_spec(DrawRepaySpec::Stochastic(create_zero_vol_stochastic(0.5)))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_mc_paths(1_000),
             )
             .discount_curve_id("USD-OIS".into())
@@ -426,7 +426,7 @@ mod tests {
                     utilization,
                 )))
                 .instrument_pricing_overrides(
-                    finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                    finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                         .with_mc_paths(1_000),
                 )
                 .discount_curve_id("USD-OIS".into())
@@ -513,7 +513,7 @@ mod tests {
             .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
             .draw_repay_spec(DrawRepaySpec::Stochastic(create_zero_vol_stochastic(0.45)))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_mc_paths(1_000),
             )
             .discount_curve_id("USD-OIS".into())
@@ -593,7 +593,7 @@ mod tests {
                 .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
                 .draw_repay_spec(DrawRepaySpec::Stochastic(create_zero_vol_stochastic(0.5)))
                 .instrument_pricing_overrides(
-                    finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                    finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                         .with_mc_paths(1_000),
                 )
                 .discount_curve_id("USD-OIS".into())

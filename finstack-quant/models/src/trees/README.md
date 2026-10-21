@@ -86,7 +86,7 @@ Two variants share the `price_recombining_tree` engine:
 | Leisen-Reimer | `LeisenReimer` | O(1/N²) | Peizer-Pratt inversion; use odd step counts |
 
 ```rust
-use finstack_quant_valuations::instruments::{OptionMarketParams, OptionType};
+use finstack_quant_models::types::{OptionMarketParams, OptionType};
 use finstack_quant_models::trees::BinomialTree;
 
 let params = OptionMarketParams::new(

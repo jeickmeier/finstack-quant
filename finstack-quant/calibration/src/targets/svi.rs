@@ -357,7 +357,7 @@ mod tests {
     use crate::quotes::MarketQuote;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::types::UnderlyingId;
-    use finstack_quant_valuations_core::instruments::OptionType;
+    use finstack_quant_models::types::OptionType;
     use time::Month;
 
     fn base_date() -> Date {

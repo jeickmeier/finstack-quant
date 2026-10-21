@@ -1,13 +1,13 @@
 //! Trait implementations for Bond (Instrument and Monte Carlo).
 
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 
 use super::definitions::Bond;
 use super::CashflowSpec;
 
 // Explicit Instrument trait implementation (replaces macro for better IDE visibility)
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for Bond {
+impl finstack_quant_valuations_core::instruments::Instrument for Bond {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Bond,
         crate::FIXED_INCOME
@@ -74,10 +74,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         if let Some(credit_curve_id) = &self.credit_curve_id {
             deps.add_credit_curve(credit_curve_id.clone());
@@ -125,7 +124,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Ok(deps)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 
     fn scenario_spread_shock_supported(&self) -> bool {
         // Mirrors the guards in `base_value`: the shock is exact only for
@@ -181,7 +180,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn metrics_equivalent(
         &self,
-    ) -> Box<dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument> {
+    ) -> Box<dyn finstack_quant_valuations_core::instruments::Instrument> {
         let mut clone = self.clone();
         clone.cashflow_spec.make_cash_pay();
         clone

@@ -5,7 +5,7 @@
 //! it through `Instrument::as_marginable`; the repricing, tenor-bucketing,
 //! reference-entity and netting-set helpers they share live here.
 
-use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::Instrument;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;

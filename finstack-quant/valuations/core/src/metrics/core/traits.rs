@@ -4,7 +4,7 @@
 //! metrics. The `MetricCalculator` trait enables custom metric implementations,
 //! while `MetricContext` provides the execution environment with caching.
 
-use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::Instrument;
 use crate::metrics::risk::MarketHistory;
 use crate::metrics::MetricId;
 use crate::pricer::PricingDispatch;
@@ -143,7 +143,7 @@ pub struct MetricPricingInputs {
     /// Base present value.
     pub base_value: Money,
     /// Metric-only risk overrides.
-    metric_pricing_overrides: Option<crate::instruments::MetricPricingOverrides>,
+    metric_pricing_overrides: Option<crate::instruments::pricing_overrides::MetricPricingOverrides>,
     /// Shared numerical and reporting configuration.
     finstack_config: Arc<FinstackConfig>,
 }
@@ -325,7 +325,7 @@ impl MetricContext {
     #[inline]
     pub fn get_metric_pricing_overrides(
         &self,
-    ) -> Option<&crate::instruments::MetricPricingOverrides> {
+    ) -> Option<&crate::instruments::pricing_overrides::MetricPricingOverrides> {
         self.metric_pricing_overrides.as_ref()
     }
 
@@ -474,7 +474,7 @@ impl MetricContext {
     /// Set metric-only overrides used by downstream calculators.
     pub fn set_metric_pricing_overrides(
         &mut self,
-        overrides: Option<crate::instruments::MetricPricingOverrides>,
+        overrides: Option<crate::instruments::pricing_overrides::MetricPricingOverrides>,
     ) {
         self.inputs.metric_pricing_overrides = overrides;
     }

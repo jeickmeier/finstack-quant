@@ -4,7 +4,7 @@
 //! downcast helper used by all pricer implementations.
 
 use super::{InstrumentType, ModelKey, PricerKey, PricingError, PricingErrorContext};
-use crate::instruments::common_impl::traits::Instrument as Priceable;
+use crate::instruments::Instrument as Priceable;
 use finstack_quant_core::config::{results_meta, FinstackConfig};
 use finstack_quant_core::market_data::context::MarketContext as Market;
 use std::collections::BTreeMap;
@@ -659,16 +659,11 @@ mod tests {
         /// Test mock: reads no market data.
         fn market_dependencies(
             &self,
-        ) -> finstack_quant_core::Result<
-            crate::instruments::common_impl::dependencies::MarketDependencies,
-        > {
-            Ok(crate::instruments::common_impl::dependencies::MarketDependencies::new())
+        ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
+            Ok(crate::instruments::MarketDependencies::new())
         }
 
-        crate::instruments::common_impl::traits::impl_instrument_base!(
-            InstrumentType::Bond,
-            *crate::pricer::Family::unregistered()
-        );
+        crate::impl_instrument_base!(InstrumentType::Bond, *crate::pricer::Family::unregistered());
 
         fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
             Err(finstack_quant_core::Error::Validation(
@@ -705,7 +700,7 @@ mod tests {
         raw_value: f64,
         effective_as_of: finstack_quant_core::dates::Date,
         raw_calls: Arc<AtomicUsize>,
-        scenario: crate::instruments::ScenarioPricingOverrides,
+        scenario: crate::instruments::pricing_overrides::ScenarioPricingOverrides,
     }
 
     crate::impl_empty_cashflow_provider!(
@@ -717,16 +712,11 @@ mod tests {
         /// Test mock: reads no market data.
         fn market_dependencies(
             &self,
-        ) -> finstack_quant_core::Result<
-            crate::instruments::common_impl::dependencies::MarketDependencies,
-        > {
-            Ok(crate::instruments::common_impl::dependencies::MarketDependencies::new())
+        ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
+            Ok(crate::instruments::MarketDependencies::new())
         }
 
-        crate::instruments::common_impl::traits::impl_instrument_base!(
-            InstrumentType::Bond,
-            *crate::pricer::Family::unregistered()
-        );
+        crate::impl_instrument_base!(InstrumentType::Bond, *crate::pricer::Family::unregistered());
 
         fn resolve_pricing_as_of(
             &self,
@@ -771,7 +761,7 @@ mod tests {
 
         fn get_scenario_pricing_overrides(
             &self,
-        ) -> Option<&crate::instruments::ScenarioPricingOverrides> {
+        ) -> Option<&crate::instruments::pricing_overrides::ScenarioPricingOverrides> {
             Some(&self.scenario)
         }
     }
@@ -928,15 +918,17 @@ mod tests {
             raw_value,
             effective_as_of,
             raw_calls: Arc::clone(&raw_calls),
-            scenario: crate::instruments::ScenarioPricingOverrides::default()
+            scenario: crate::instruments::pricing_overrides::ScenarioPricingOverrides::default()
                 .with_scenario_price_shock_decimal(-0.10),
         };
         let market = Market::new();
         let mut registry = PricerRegistry::new();
         registry
-            .register(crate::instruments::common_impl::GenericInstrumentPricer::<
-                RawLifecycleInstrument,
-            >::discounting(InstrumentType::Bond))
+            .register(
+                crate::instruments::common_impl::pricing::GenericInstrumentPricer::<
+                    RawLifecycleInstrument,
+                >::discounting(InstrumentType::Bond),
+            )
             .expect("unique test pricer registration");
 
         let base_raw = instrument

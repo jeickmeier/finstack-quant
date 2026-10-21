@@ -19,7 +19,8 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
 use finstack_quant_valuations::instruments::fx::fx_swap::FxSwap;
 use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-use finstack_quant_valuations::instruments::{Instrument, ScenarioPricingOverrides};
+use finstack_quant_valuations::instruments::pricing_overrides::ScenarioPricingOverrides;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::pricer::ModelKey;
 use std::sync::Arc;
 use time::Month;

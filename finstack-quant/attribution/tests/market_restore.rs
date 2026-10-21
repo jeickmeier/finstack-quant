@@ -24,10 +24,11 @@ use finstack_quant_core::market_data::term_structures::{
     NelsonSiegelModel, ParametricCurve, PriceCurve, PriceCurveKind,
 };
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_models::volatility::get_cube_vol_clamped;
-use finstack_quant_valuations::instruments::{Attributes, Instrument, MarketDependencies};
+use finstack_quant_valuations::instruments::{Instrument, MarketDependencies};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::InstrumentType;
 use finstack_quant_valuations::results::ValuationResult;

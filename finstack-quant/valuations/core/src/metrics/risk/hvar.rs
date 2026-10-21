@@ -5,7 +5,7 @@
 //! risk metrics like DV01, Theta, etc.
 
 use crate::metrics::core::traits::{MetricCalculator, MetricContext};
-use crate::metrics::risk::{calculate_var, VarConfig, VarResult};
+use crate::metrics::risk::var_calculator::{calculate_var, VarConfig, VarResult};
 use crate::metrics::MetricId;
 use finstack_quant_core::Result;
 
@@ -43,7 +43,7 @@ fn cache_var_diagnostics(context: &mut MetricContext, result: &VarResult) {
 ///
 /// This calculator integrates Historical VaR into the standard metrics
 /// framework. It requires a `MarketHistory` to be provided at the pricing
-/// boundary (see [`crate::instruments::common_impl::traits::Instrument::price_with_metrics`]).
+/// boundary (see [`crate::instruments::Instrument::price_with_metrics`]).
 ///
 /// # Examples
 ///

@@ -21,8 +21,8 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::closed_form::heston::heston_price;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_models::types::OptionType;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::expect_inst;
 use finstack_quant_valuations_core::pricer::PricingError;
 
@@ -59,7 +59,7 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionHestonFourie
     )]
     fn price_dyn(
         &self,
-        instrument: &dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument,
+        instrument: &dyn finstack_quant_valuations_core::instruments::Instrument,
         market: &MarketContext,
         as_of: Date,
     ) -> std::result::Result<finstack_quant_valuations_core::results::ValuationResult, PricingError>
@@ -190,10 +190,12 @@ mod tests {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::market_data::traits::Discounting;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
     use finstack_quant_models::closed_form::vanilla::bs_greeks_unchecked;
-    use finstack_quant_valuations_core::instruments::ThetaDayBasis;
-    use finstack_quant_valuations_core::instruments::{Attributes, ExerciseStyle, SettlementType};
+    use finstack_quant_models::types::ExerciseStyle;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::ThetaDayBasis;
+    use finstack_quant_valuations_core::instruments::SettlementType;
     use finstack_quant_valuations_core::pricer::{ModelKey, Pricer};
     use time::Month;
 
@@ -606,7 +608,7 @@ mod tests {
             sigma,
             t_vol: t,
         } = collect_inputs(&european, &curves, as_of).expect("inputs");
-        let mut params = finstack_quant_valuations_core::instruments::common_impl::parameters::OptionMarketParams::call(
+        let mut params = finstack_quant_models::types::OptionMarketParams::call(
             spot,
             european.strike,
             rate,
@@ -655,19 +657,20 @@ mod tests {
         let expiry = date(2026, 1, 1);
         let curves = market(as_of, 100.0, 0.20, 0.03, 0.0);
         let option = option(expiry, OptionType::Call, ExerciseStyle::European);
-        let theta = finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeksProvider::option_greeks(
-            &option,
-            &curves,
-            as_of,
-            &finstack_quant_valuations_core::instruments::OptionGreeksRequest {
-                greek: finstack_quant_valuations_core::instruments::OptionGreekKind::Theta,
-                base_pv: None,
-                bumps: finstack_quant_valuations_core::instruments::GreekBumps::default(),
-            },
-        )
-        .map(|greeks| greeks.theta)
-        .expect("theta")
-        .expect("supported");
+        let theta =
+            finstack_quant_valuations_core::instruments::OptionGreeksProvider::option_greeks(
+                &option,
+                &curves,
+                as_of,
+                &finstack_quant_valuations_core::instruments::OptionGreeksRequest {
+                    greek: finstack_quant_valuations_core::instruments::OptionGreekKind::Theta,
+                    base_pv: None,
+                    bumps: finstack_quant_valuations_core::instruments::GreekBumps::default(),
+                },
+            )
+            .map(|greeks| greeks.theta)
+            .expect("theta")
+            .expect("supported");
         let inputs = collect_inputs(&option, &curves, as_of).expect("inputs");
         let expected = bs_greeks_unchecked(
             inputs.spot,

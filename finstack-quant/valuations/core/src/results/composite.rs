@@ -8,7 +8,8 @@
 
 use std::sync::Arc;
 
-use crate::instruments::{Instrument, MetricPricingOverrides};
+use crate::instruments::pricing_overrides::MetricPricingOverrides;
+use crate::instruments::Instrument;
 use crate::metrics::MetricId;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;

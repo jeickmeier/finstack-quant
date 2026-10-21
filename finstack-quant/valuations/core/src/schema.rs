@@ -12,19 +12,19 @@ use serde_json::Value;
 const PRICING_OVERRIDE_SCHEMA_DEFINITIONS:
     &[finstack_quant_core::schema::ExternalSchemaDefinition] = &[
     finstack_quant_core::schema::ExternalSchemaDefinition::new::<
-        crate::instruments::InstrumentPricingOverrides,
+        crate::instruments::pricing_overrides::InstrumentPricingOverrides,
     >(
         "InstrumentPricingOverrides",
         "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     ),
     finstack_quant_core::schema::ExternalSchemaDefinition::new::<
-        crate::instruments::MetricPricingOverrides,
+        crate::instruments::pricing_overrides::MetricPricingOverrides,
     >(
         "MetricPricingOverrides",
         "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     ),
     finstack_quant_core::schema::ExternalSchemaDefinition::new::<
-        crate::instruments::ScenarioPricingOverrides,
+        crate::instruments::pricing_overrides::ScenarioPricingOverrides,
     >(
         "ScenarioPricingOverrides",
         "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",

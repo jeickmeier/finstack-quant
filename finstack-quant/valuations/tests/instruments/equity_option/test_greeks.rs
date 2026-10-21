@@ -735,8 +735,8 @@ fn test_all_greeks_computed_together() {
 /// closed form, so the golden's own 1e-7 absolute tolerance applies.
 #[test]
 fn equity_option_rho_accessor_is_per_bp() {
+    use finstack_quant_models::types::ExerciseStyle;
     use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
-    use finstack_quant_valuations::instruments::ExerciseStyle;
 
     let fixture: serde_json::Value = serde_json::from_str(include_str!(
         "../../golden/data/pricing/quantlib/equity_option/spx_atm_call_1y_quantlib.json"

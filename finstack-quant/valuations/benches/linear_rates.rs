@@ -13,6 +13,7 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_models::types::ExerciseStyle;
 use finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;
 use finstack_quant_valuations::instruments::rates::cap_floor::{CapFloor, RateOptionType};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
@@ -23,9 +24,7 @@ use finstack_quant_valuations::instruments::rates::ir_future::{
 use finstack_quant_valuations::instruments::rates::repo::{CollateralSpec, Repo};
 use finstack_quant_valuations::instruments::FloatLegSpec;
 use finstack_quant_valuations::instruments::PricingOptions;
-use finstack_quant_valuations::instruments::{
-    ExerciseStyle, Instrument, PayReceive, SettlementType,
-};
+use finstack_quant_valuations::instruments::{Instrument, PayReceive, SettlementType};
 use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
 use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;

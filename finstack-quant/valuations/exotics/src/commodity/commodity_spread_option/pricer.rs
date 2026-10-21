@@ -32,7 +32,7 @@ use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::closed_form::{black_call, black_put};
-use finstack_quant_valuations_core::instruments::OptionType;
+use finstack_quant_models::types::OptionType;
 
 /// Minimum denominator for Kirk's approximation (F2 + K).
 /// When `k_adj = F2 + K <= KIRK_DENOM_EPSILON` (zero or negative), the
@@ -168,7 +168,7 @@ mod tests {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
 
     /// Helper to build a flat vol surface at a given level.
     fn flat_vol_surface(id: &str, vol: f64) -> VolSurface {

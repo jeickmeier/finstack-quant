@@ -25,8 +25,8 @@ use finstack_quant_core::math::integration::gauss_legendre_integrate_adaptive;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::{black_call, black_put};
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
-use finstack_quant_valuations_core::instruments::OptionType;
+use finstack_quant_models::types::OptionType;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
 };

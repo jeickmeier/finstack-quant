@@ -2,7 +2,7 @@
 //!
 //! Benchmarks LSMC Bermudan swaption pricing via the public pricer API.
 
-use finstack_quant_valuations::instruments::OptionType;
+use finstack_quant_models::types::OptionType;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use finstack_quant_core::currency::Currency;

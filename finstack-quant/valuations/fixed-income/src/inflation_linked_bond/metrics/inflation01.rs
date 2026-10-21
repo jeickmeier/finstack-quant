@@ -31,7 +31,7 @@ use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Inflation01 calculator for inflation-linked bonds.
@@ -98,7 +98,7 @@ mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::PricingOptions;
     use finstack_quant_valuations_core::metrics::MetricId;
     use time::macros::date;

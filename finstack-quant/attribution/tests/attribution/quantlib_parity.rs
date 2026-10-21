@@ -551,8 +551,8 @@ const FX_FWD_FACTOR_TOLERANCE_USD: f64 = 5.0;
 
 #[test]
 fn quantlib_parity_metrics_based_fx_forward_attribution() {
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
-    use finstack_quant_valuations::instruments::Attributes;
 
     let fixture: FxForwardFixture = load_fixture("fx_forward_1y_eurusd.json");
     assert_eq!(fixture.instrument, "FxForward");

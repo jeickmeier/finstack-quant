@@ -199,10 +199,9 @@ mod tests {
             &self,
             market: &finstack_quant_core::market_data::context::MarketContext,
             as_of: finstack_quant_core::dates::Date,
-            request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
-        ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::OptionGreeks>
-        {
-            let mut greeks = crate::instruments::common_impl::traits::OptionGreeks::default();
+            request: &crate::instruments::OptionGreeksRequest,
+        ) -> finstack_quant_core::Result<crate::instruments::OptionGreeks> {
+            let mut greeks = crate::instruments::OptionGreeks::default();
             if request.greek == OptionGreekKind::Delta {
                 greeks.delta = self.option_delta(market, as_of, request.bumps)?;
             }

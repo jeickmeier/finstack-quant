@@ -8,6 +8,7 @@ use finstack_quant_core::canonical::{content_hash, to_canonical_bytes};
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_portfolio::materialization::{
     InstrumentArtifact, InstrumentArtifactCache, MaterializedPosition, PortfolioHeader,
     PortfolioMaterializationEnvelope,
@@ -18,7 +19,7 @@ use finstack_quant_portfolio::{Error, Portfolio};
 use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::{
-    Attributes, Instrument, MarketDependencies, VolatilityDependency,
+    Instrument, MarketDependencies, VolatilityDependency,
 };
 use finstack_quant_valuations::pricer::InstrumentType;
 use indexmap::IndexMap;

@@ -21,7 +21,7 @@ mod haircut01;
 mod implied_collateral_return;
 
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricId;
@@ -44,12 +44,12 @@ pub(crate) fn register_repo_metrics(
             (RequiredCollateral, RequiredCollateralCalculator),
             (CollateralCoverage, CollateralCoverageCalculator),
             (RepoInterest, RepoInterestCalculator),
-            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (FundingRisk, FundingRiskCalculator),
             (EffectiveRate, EffectiveRateCalculator),
             (TimeToMaturity, TimeToMaturityCalculator),
             (ImpliedCollateralReturn, implied_collateral_return::ImpliedCollateralReturnCalculator),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             // Repo-specific risk metrics (custom metrics)
             (CollateralHaircut01, haircut01::Haircut01Calculator),
             (CollateralPrice01, collateral_price01::CollateralPrice01Calculator),

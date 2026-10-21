@@ -2,7 +2,7 @@
 
 use super::DiscountedCashFlow;
 use finstack_quant_core::{dates::Date, market_data::context::MarketContext, money::Money};
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -113,7 +113,7 @@ mod tests {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::types::InstrumentId;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::Month;
 
     fn build_simple_dcf() -> DiscountedCashFlow {
@@ -140,7 +140,7 @@ mod tests {
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
-            attributes: finstack_quant_valuations_core::instruments::common_impl::traits::Attributes::default(),
+            attributes: finstack_quant_core::types::Attributes::default(),
         }
     }
 

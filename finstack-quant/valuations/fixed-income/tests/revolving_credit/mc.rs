@@ -53,7 +53,7 @@ fn test_mc_pricer_stochastic_utilization() {
             },
         )))
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_mc_paths(10_000),
         )
         .discount_curve_id("USD-OIS".into())
@@ -143,7 +143,7 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
             },
         )))
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_mc_paths(5_000),
         )
         .discount_curve_id("USD-OIS".into())
@@ -187,7 +187,7 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
             },
         )))
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_mc_paths(5_000),
         )
         .discount_curve_id("USD-OIS".into())
@@ -230,7 +230,7 @@ fn test_mc_pricer_deterministic_reproducibility() {
             },
         )))
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_mc_paths(1_000),
         )
         .discount_curve_id("USD-OIS".into())
@@ -290,7 +290,7 @@ fn test_mc_pricer_convergence() {
                 },
             )))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_mc_paths(num_paths),
             )
             .discount_curve_id("USD-OIS".into())
@@ -346,7 +346,7 @@ fn test_mc_utilization_mean_reversion() {
             },
         )))
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_mc_paths(5_000),
         )
         .discount_curve_id("USD-OIS".into())
@@ -386,7 +386,7 @@ fn test_mc_utilization_mean_reversion() {
             },
         )))
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_mc_paths(5_000),
         )
         .discount_curve_id("USD-OIS".into())
@@ -494,7 +494,7 @@ fn test_mc_stochastic_floating_rate_index_cap() {
                 },
             )))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_mc_paths(1_000),
             )
             .discount_curve_id("USD-OIS".into())
@@ -621,7 +621,7 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
                 },
             )))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_mc_paths(64),
             )
             .discount_curve_id("USD-OIS".into())

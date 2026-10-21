@@ -13,7 +13,7 @@ use finstack_quant_valuations_core::metrics::MetricRegistry;
 pub(crate) fn register_fx_option_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::{
+    use finstack_quant_valuations_core::metrics::sensitivities::cross_factor::{
         make_fx_bumper, make_rates_bumper, make_vol_bumper, CrossFactorCalculator,
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
@@ -23,19 +23,19 @@ pub(crate) fn register_fx_option_metrics(
         registry: registry,
         instrument: InstrumentType::FxOption,
         metrics: [
-            (Delta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::fx_option::FxOption>::delta()),
-            (Gamma, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::fx_option::FxOption>::gamma()),
-            (Vega, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::fx_option::FxOption>::vega()),
-            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (Delta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::fx_option::FxOption>::delta()),
+            (Gamma, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::fx_option::FxOption>::gamma()),
+            (Vega, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::fx_option::FxOption>::vega()),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             // Override universal theta (carry) with model theta for FX options.
-            (Theta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::fx_option::FxOption>::theta()),
+            (Theta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::fx_option::FxOption>::theta()),
             (ImpliedVol, ImpliedVolCalculator),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
-            (Vanna, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::fx_option::FxOption>::vanna()),
-            (Volga, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::fx_option::FxOption>::volga()),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+            (Vanna, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::fx_option::FxOption>::vanna()),
+            (Volga, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::fx_option::FxOption>::volga()),
             // Standard metrics for rho split by domestic/foreign.
-            (Rho, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::fx_option::FxOption>::rho()),
-            (ForeignRho, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::fx_option::FxOption>::foreign_rho()),
+            (Rho, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::fx_option::FxOption>::rho()),
+            (ForeignRho, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::fx_option::FxOption>::foreign_rho()),
             (DeltaForward, delta_conventions::DeltaForwardCalculator),
             (DeltaPremiumAdjustedSpot, delta_conventions::DeltaPremiumAdjustedSpotCalculator),
             (DeltaPremiumAdjustedForward, delta_conventions::DeltaPremiumAdjustedForwardCalculator),

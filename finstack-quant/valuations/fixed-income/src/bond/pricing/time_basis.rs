@@ -326,7 +326,7 @@ mod tests {
             .maturity(date!(2025 - 04 - 15))
             .cashflow_spec(spec)
             .discount_curve_id("USD-OIS".into())
-            .attributes(finstack_quant_valuations_core::instruments::Attributes::new())
+            .attributes(finstack_quant_core::types::Attributes::new())
             .build()
             .expect("bond");
         let as_of = date!(2023 - 12 - 15);
@@ -450,7 +450,7 @@ mod tests {
                 .expect("spec"),
             )
             .discount_curve_id("USD-OIS".into())
-            .attributes(finstack_quant_valuations_core::instruments::Attributes::new())
+            .attributes(finstack_quant_core::types::Attributes::new())
             .build()
             .expect("bond");
         let y_365 = bond_model_schedule(&bond_365, as_of)
@@ -471,7 +471,7 @@ mod tests {
                 .expect("spec"),
             )
             .discount_curve_id("USD-OIS".into())
-            .attributes(finstack_quant_valuations_core::instruments::Attributes::new())
+            .attributes(finstack_quant_core::types::Attributes::new())
             .build()
             .expect("bond");
         let y_360 = bond_model_schedule(&bond_360, as_of)

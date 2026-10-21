@@ -1,7 +1,7 @@
 //! Instrument implementation used by the traits subsystem.
 //!
-use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::model_params::ModelParamsSnapshot;
+use crate::instruments::MarketDependencies;
 use crate::metrics::MetricId;
 use crate::pricer::{Family, InstrumentType, ModelKey};
 use finstack_quant_cashflows::CashflowProvider;
@@ -470,7 +470,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// to attach to this instrument's [`ValuationResult`](crate::results::ValuationResult).
     ///
     /// The generic instrument pricer
-    /// ([`GenericInstrumentPricer`](crate::instruments::common_impl::GenericInstrumentPricer))
+    /// ([`GenericInstrumentPricer`](crate::instruments::common_impl::pricing::GenericInstrumentPricer))
     /// calls this after computing PV and, when `Some`, attaches the returned
     /// details via [`ValuationResult::with_details`](crate::results::ValuationResult::with_details).
     /// FX-bearing instruments (`FxForward`, `FxOption`, `QuantoOption`) use
@@ -490,7 +490,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// Compute the scenario-adjusted present value.
     ///
     /// Default implementation invokes [`Instrument::base_value`] and applies any
-    /// active [`crate::instruments::ScenarioPricingOverrides`] exactly once. Instruments should not
+    /// active [`crate::instruments::pricing_overrides::ScenarioPricingOverrides`] exactly once. Instruments should not
     /// override this method; implement pricing logic in `base_value` instead.
     ///
     /// # Arguments
