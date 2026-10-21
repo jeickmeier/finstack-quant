@@ -359,7 +359,7 @@ string routes through the registry instead.
 For per-path detail use the pricer directly:
 
 ```rust
-use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer;
+use finstack_quant_valuations::instruments::fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer;
 
 // Requires DrawRepaySpec::Stochastic; a deterministic spec is a validation error.
 let enhanced = RevolvingCreditPricer::price_with_paths(&facility, &market, as_of)?;

@@ -5,7 +5,7 @@
 //! OAS once so every bump holds that OAS fixed.
 
 use super::oas::oas_decimal_from_quote_overrides;
-use crate::TermLoan;
+use crate::term_loan::TermLoan;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
 use finstack_quant_valuations_core::metrics::{
     quoted_z_spread, Dv01CalculatorConfig, GenericBucketedCs01, GenericParallelCs01,

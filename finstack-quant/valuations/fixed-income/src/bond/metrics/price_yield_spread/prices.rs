@@ -2,7 +2,7 @@
 
 use crate::bond::pricing::quote_conversions::settlement_dirty_from_quote_overrides;
 use crate::bond::pricing::settlement::{model_dirty_at_quote_date, QuoteDateContext};
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 
 /// Calculates the full settlement dirty price in currency units.

@@ -2,7 +2,7 @@
 //!
 use crate::bond::pricing::quote_conversions::periods_per_year;
 use crate::bond::pricing::settlement::QuoteDateContext;
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, StubKind, Tenor};
 use finstack_quant_core::market_data::term_structures::{
     DiscountCurve, RateCalibrationPillar, RateCalibrationQuote,

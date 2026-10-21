@@ -6,10 +6,9 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
+use finstack_quant_valuations::contract_specs::BondFutureSpecs;
 use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
-use finstack_quant_valuations::instruments::fixed_income::bond_future::{
-    BondFuture, BondFutureSpecs,
-};
+use finstack_quant_valuations::instruments::fixed_income::bond_future::BondFuture;
 use finstack_quant_valuations::instruments::{
     CommodityUnderlyingParams, CompositeLegSpec, CompositeSpec, InstrumentEnvelope, InstrumentJson,
     RebalanceRule, WeightingMethod,

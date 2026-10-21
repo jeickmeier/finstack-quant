@@ -11,7 +11,7 @@ use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
+use finstack_quant_valuations::instruments::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DilutionEvent, DividendAdjustment,
     PriceTrigger,
 };

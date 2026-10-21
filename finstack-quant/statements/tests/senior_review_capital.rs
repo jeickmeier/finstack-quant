@@ -24,8 +24,9 @@ use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::FinancialStatementInstrument;
 use finstack_quant_statements::types::{AmountOrScalar, NodeId};
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::DrawEvent;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    CommitmentFeeBase, DdtlSpec, DrawEvent, OidPolicy, TermLoan,
+    CommitmentFeeBase, DdtlSpec, OidPolicy, TermLoan,
 };
 use finstack_quant_valuations::instruments::PayReceive;
 use indexmap::IndexMap;

@@ -1,6 +1,6 @@
 //! Dollar roll instrument module.
 //!
-//! This module provides the [`DollarRoll`] instrument for modeling
+//! This module provides the [`DollarRoll`](crate::dollar_roll::DollarRoll) instrument for modeling
 //! simultaneous sale and purchase of TBAs for different settlement months.
 //!
 //! # Overview

@@ -42,7 +42,7 @@
 //!
 //! # See Also
 //!
-//! - [`ConvertibleBond`] for instrument struct
+//! - [`ConvertibleBond`](crate::convertible::ConvertibleBond) for instrument struct
 //! - `ConversionSpec` for conversion terms
 //! - `AntiDilutionPolicy` for adjustment policies
 
@@ -51,10 +51,6 @@ pub(crate) mod metrics;
 pub(crate) mod pricing;
 mod types;
 
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::convertible::{
-    AntiDilutionPolicy, ConversionEvent, ConversionPolicy, ConversionSpec, DilutionEvent,
-    DividendAdjustment, PriceTrigger,
-};
 pub use types::{
     ConvertibleBond, ConvertibleBondBuilder, ConvertibleGreeks, ConvertibleSettlement,
 };

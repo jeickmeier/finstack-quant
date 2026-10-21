@@ -157,13 +157,12 @@ fn test_time_mapping_with_quarterly_coupons() {
     let issue = dates::issue();
     let maturity = dates::maturity_1y();
 
-    let conversion_spec = finstack_quant_valuations::instruments::fixed_income::convertible::ConversionSpec {
+    let conversion_spec = finstack_quant_valuations::instruments::ConversionSpec {
         ratio: Some(bond_params::CONVERSION_RATIO),
         price: None,
-        policy: finstack_quant_valuations::instruments::fixed_income::convertible::ConversionPolicy::Voluntary,
-        anti_dilution: finstack_quant_valuations::instruments::fixed_income::convertible::AntiDilutionPolicy::None,
-        dividend_adjustment:
-            finstack_quant_valuations::instruments::fixed_income::convertible::DividendAdjustment::None,
+        policy: finstack_quant_valuations::instruments::ConversionPolicy::Voluntary,
+        anti_dilution: finstack_quant_valuations::instruments::AntiDilutionPolicy::None,
+        dividend_adjustment: finstack_quant_valuations::instruments::DividendAdjustment::None,
         dilution_events: Vec::new(),
     };
 
@@ -229,7 +228,7 @@ fn test_time_mapping_with_quarterly_coupons() {
 
 #[test]
 fn test_narrow_conversion_window_with_few_steps() {
-    use finstack_quant_valuations::instruments::fixed_income::convertible::ConversionPolicy;
+    use finstack_quant_valuations::instruments::ConversionPolicy;
 
     let window_start = Date::from_calendar_date(2027, Month::June, 1).unwrap();
     let window_end = Date::from_calendar_date(2027, Month::July, 1).unwrap();
@@ -368,19 +367,15 @@ fn test_call_put_after_maturity() {
 
 #[test]
 fn test_zero_conversion_ratio() {
-    use finstack_quant_valuations::instruments::fixed_income::convertible::{
-        ConversionPolicy, ConversionSpec,
-    };
+    use finstack_quant_valuations::instruments::{ConversionPolicy, ConversionSpec};
 
     let mut bond = create_standard_convertible();
     bond.conversion = ConversionSpec {
         ratio: Some(0.0),
         price: None,
         policy: ConversionPolicy::Voluntary,
-        anti_dilution:
-            finstack_quant_valuations::instruments::fixed_income::convertible::AntiDilutionPolicy::None,
-        dividend_adjustment:
-            finstack_quant_valuations::instruments::fixed_income::convertible::DividendAdjustment::None,
+        anti_dilution: finstack_quant_valuations::instruments::AntiDilutionPolicy::None,
+        dividend_adjustment: finstack_quant_valuations::instruments::DividendAdjustment::None,
         dilution_events: Vec::new(),
     };
 
@@ -393,19 +388,15 @@ fn test_zero_conversion_ratio() {
 
 #[test]
 fn test_very_high_conversion_ratio() {
-    use finstack_quant_valuations::instruments::fixed_income::convertible::{
-        ConversionPolicy, ConversionSpec,
-    };
+    use finstack_quant_valuations::instruments::{ConversionPolicy, ConversionSpec};
 
     let mut bond = create_standard_convertible();
     bond.conversion = ConversionSpec {
         ratio: Some(1000.0), // Very high conversion ratio
         price: None,
         policy: ConversionPolicy::Voluntary,
-        anti_dilution:
-            finstack_quant_valuations::instruments::fixed_income::convertible::AntiDilutionPolicy::None,
-        dividend_adjustment:
-            finstack_quant_valuations::instruments::fixed_income::convertible::DividendAdjustment::None,
+        anti_dilution: finstack_quant_valuations::instruments::AntiDilutionPolicy::None,
+        dividend_adjustment: finstack_quant_valuations::instruments::DividendAdjustment::None,
         dilution_events: Vec::new(),
     };
 

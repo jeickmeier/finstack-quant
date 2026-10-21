@@ -102,17 +102,17 @@
 //!
 //! # Examples
 //!
-//! See [`Bond`] for construction examples.
+//! See [`Bond`](crate::bond::Bond) for construction examples.
 //!
 //! # See Also
 //!
-//! - [`Bond`] for the main bond struct and factory methods
+//! - [`Bond`](crate::bond::Bond) for the main bond struct and factory methods
 //! - `CallPutSchedule` for embedded option schedules
 //! - `CashflowSpec` for fixed/floating/amortizing specifications
 //! - `AmortizationSpec` for amortizing bonds
 //! - bond metrics module for bond-specific risk metrics
 
-pub mod cashflow_spec;
+mod cashflow_spec;
 pub mod cashflows;
 pub(crate) mod metrics;
 /// Bond pricing engines including tree-based and analytical methods.

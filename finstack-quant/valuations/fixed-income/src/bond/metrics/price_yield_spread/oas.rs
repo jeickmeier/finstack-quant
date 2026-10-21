@@ -1,6 +1,6 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use std::cell::RefCell;

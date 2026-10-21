@@ -7,9 +7,8 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve, HazardCurve};
 use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    price_convertible_bond, ConversionPolicy,
-};
+use finstack_quant_valuations::instruments::fixed_income::convertible::price_convertible_bond;
+use finstack_quant_valuations::instruments::ConversionPolicy;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;

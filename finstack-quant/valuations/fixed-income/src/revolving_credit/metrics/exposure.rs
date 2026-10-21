@@ -2,7 +2,7 @@
 //! exposure at default and the expected loss embedded in the valuation.
 
 use crate::revolving_credit::types::{CreditSpreadProcessSpec, DrawRepaySpec};
-use crate::RevolvingCredit;
+use crate::revolving_credit::RevolvingCredit;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 

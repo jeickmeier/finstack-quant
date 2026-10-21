@@ -18,7 +18,7 @@ fn adjusted_final_payment_remains_live_after_raw_maturity() {
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
-    use finstack_quant_valuations_fixed_income::InflationLinkedBond;
+    use finstack_quant_valuations_fixed_income::inflation_linked_bond::InflationLinkedBond;
     use rust_decimal::Decimal;
 
     let base = d(2025, 1, 1);

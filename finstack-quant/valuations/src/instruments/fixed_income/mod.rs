@@ -24,7 +24,7 @@
 //! # Quick Example
 //!
 //! ```rust
-//! use finstack_quant_valuations::instruments::fixed_income::Bond;
+//! use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::types::Rate;

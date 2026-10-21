@@ -1,6 +1,6 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_valuations_core::instruments::BondRiskBasis;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use std::borrow::Cow;

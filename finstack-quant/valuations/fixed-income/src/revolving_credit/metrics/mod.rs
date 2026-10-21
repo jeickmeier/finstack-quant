@@ -14,7 +14,7 @@ pub(crate) use weighted_average_cost::ApproxWeightedAverageCostCalculator;
 
 use crate::revolving_credit::pricing::RevolvingCreditPricer;
 use crate::revolving_credit::types::DrawRepaySpec;
-use crate::RevolvingCredit;
+use crate::revolving_credit::RevolvingCredit;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
@@ -54,10 +54,10 @@ pub(crate) fn register_revolving_credit_metrics(
             // is 1.0, so fall back to the market-standard z-spread bump. See
             // `metrics::sensitivities::cs01_z_spread`.
             (Cs01, finstack_quant_valuations_core::metrics::ZSpreadParallelCs01::<
-                crate::RevolvingCredit,
+                crate::revolving_credit::RevolvingCredit,
             >::hazard_when_credit_curve()),
             (BucketedCs01, finstack_quant_valuations_core::metrics::ZSpreadBucketedCs01::<
-                crate::RevolvingCredit,
+                crate::revolving_credit::RevolvingCredit,
             >::hazard_when_credit_curve()),
             // Theta is now registered universally in crate::FIXED_INCOME.metrics()
             (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),

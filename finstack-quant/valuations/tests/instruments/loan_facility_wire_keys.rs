@@ -631,7 +631,7 @@ fn retired_utilization_keys_are_rejected() {
 #[test]
 // schema-rejection-test: ConvertibleBond `fixed_coupon`, `floating_coupon`; ConversionEvent price_trigger `threshold`, `lookback_days`
 fn retired_convertible_keys_are_rejected() {
-    use finstack_quant_valuations::instruments::fixed_income::convertible::ConversionEvent;
+    use finstack_quant_valuations::instruments::ConversionEvent;
     use finstack_quant_valuations::instruments::ConvertibleBond;
     use serde_json::json;
     let cb = ConvertibleBond::example().expect("convertible");

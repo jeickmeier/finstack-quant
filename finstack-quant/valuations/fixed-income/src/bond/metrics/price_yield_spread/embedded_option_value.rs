@@ -51,7 +51,7 @@
 //! ```
 
 use crate::bond::pricing::quote_conversions::clear_price_driving_overrides;
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 
 fn price_bond_with_context_model(

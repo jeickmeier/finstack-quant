@@ -4,9 +4,6 @@ use super::{
     ConvertibleBondValuator, DEFAULT_CONVERTIBLE_TREE_STEPS,
 };
 use crate::convertible::ConvertibleBond;
-use crate::convertible::{
-    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
-};
 use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -16,6 +13,9 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::GreekBumps;
+use finstack_quant_valuations_core::instruments::{
+    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
+};
 use time::Month;
 
 /// Clone `bond` with `instrument_pricing_overrides.model_config.tree_steps` set.
@@ -483,7 +483,7 @@ fn test_mandatory_conversion_forced_at_loss() {
 #[test]
 fn call_branch_does_not_force_disallowed_conversion() {
     use crate::bond::{CallPut, CallPutSchedule};
-    use crate::convertible::ConversionEvent;
+    use finstack_quant_valuations_core::instruments::ConversionEvent;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
@@ -557,8 +557,8 @@ fn test_thirty_360_day_count_corporate_convention() {
         ratio: Some(10.0),
         price: None,
         policy: ConversionPolicy::Voluntary,
-        anti_dilution: super::super::AntiDilutionPolicy::None,
-        dividend_adjustment: super::super::DividendAdjustment::None,
+        anti_dilution: finstack_quant_valuations_core::instruments::AntiDilutionPolicy::None,
+        dividend_adjustment: finstack_quant_valuations_core::instruments::DividendAdjustment::None,
         dilution_events: Vec::new(),
     };
 

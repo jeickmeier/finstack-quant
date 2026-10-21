@@ -173,8 +173,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::{cashflow::CFKind, currency::Currency, money::Money};
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::DrawEvent;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    CommitmentFeeBase, DdtlSpec, DrawEvent, TermLoan,
+    CommitmentFeeBase, DdtlSpec, TermLoan,
 };
 use finstack_quant_valuations::instruments::Bond;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
@@ -330,7 +331,7 @@ fn b12_dm_inversion_applies_settlement_once() {
     let dirty = price_from_dm(&bond, &market, as_of, target).expect("DM price");
     let quotes = finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::compute_quotes(
         &bond, &market, as_of,
-        finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::BondQuoteInput::DiscountMargin(target),
+        finstack_quant_valuations::instruments::BondQuoteInput::DiscountMargin(target),
         PricingOptions::default()).expect("DM quote normalization");
     assert!((quotes.dirty_price_currency - dirty).abs() < 1e-8);
     assert!(quotes.asw_par.is_none() && quotes.asw_market.is_none());

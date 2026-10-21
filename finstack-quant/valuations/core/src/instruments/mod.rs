@@ -178,6 +178,15 @@ pub use common_impl::parameters::{
     ResettingSide, SettlementType, TotalReturnLegSpec, VolatilityModel,
 };
 
+pub use common_impl::parameters::bond_quote::BondQuoteInput;
+pub use common_impl::parameters::convertible::{
+    AntiDilutionPolicy, ConversionEvent, ConversionPolicy, ConversionSpec, DilutionEvent,
+    DividendAdjustment, PriceTrigger,
+};
+pub use common_impl::parameters::merton_mc::{
+    BarrierCrossing, CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, PikMode,
+    PikSchedule,
+};
 pub use common_impl::parameters::trs_common::TrsScheduleSpec;
 
 pub use common_impl::listed::{

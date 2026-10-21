@@ -1,7 +1,7 @@
 //! Moosmüller yield-to-maturity calculator.
 //!
 use crate::bond::pricing::settlement::QuoteDateContext;
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 

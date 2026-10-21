@@ -5,7 +5,6 @@ use super::types::BondQuoteSet;
 use super::yield_price::{
     clean_price_from_japanese_simple_yield, price_from_i_spread, price_from_ytm, price_from_ytw,
 };
-use super::BondQuoteInput;
 use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::{Bond, CashflowSpec};
 use finstack_quant_core::dates::Date;
@@ -13,6 +12,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::BondQuoteInput;
 use finstack_quant_valuations_core::instruments::PricingOptions;
 use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
 use finstack_quant_valuations_core::pricer::{ModelKey, PricingDispatch};
@@ -70,7 +70,8 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 ///
 /// ```
 /// use finstack_quant_valuations_fixed_income::bond::Bond;
-/// use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::{compute_quotes, BondQuoteInput};
+/// use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::compute_quotes;
+/// use finstack_quant_valuations_core::instruments::BondQuoteInput;
 /// use finstack_quant_core::market_data::context::MarketContext;
 /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
 /// use finstack_quant_core::dates::Date;

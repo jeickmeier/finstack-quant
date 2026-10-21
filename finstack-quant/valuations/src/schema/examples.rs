@@ -97,7 +97,7 @@ pub(super) fn composite_history_row() -> Result<Vec<Value>> {
 
 /// A 10,000-path revolver valuation with per-path detail omitted.
 pub(super) fn enhanced_monte_carlo_result() -> Result<Vec<Value>> {
-    example_from_json::<crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult>(
+    example_from_json::<crate::instruments::fixed_income::revolving_credit::pricing::unified::EnhancedMonteCarloResult>(
         json!({
             "mc_result": {
                 "estimate": {

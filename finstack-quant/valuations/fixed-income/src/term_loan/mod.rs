@@ -25,9 +25,8 @@
 //! # Quick Example
 //!
 //! ```
-//! use finstack_quant_valuations_fixed_income::term_loan::{
-//!     AmortizationSpec, RateSpec, TermLoan,
-//! };
+//! use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
+//! use finstack_quant_valuations_fixed_income::term_loan::TermLoan;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::dates::{DayCount, Tenor};
 //! use finstack_quant_core::money::Money;
@@ -54,8 +53,8 @@
 //!
 //! # See Also
 //!
-//! - [`crate::term_loan::spec`] for the term-sheet component types (DDTL, covenants, amortization, calls)
-//! - [`TermLoan`] for the instrument type
+//! - the term-sheet component types re-exported here (DDTL, covenants, amortization, calls)
+//! - [`TermLoan`](crate::term_loan::TermLoan) for the instrument type
 //! - term loan cashflows module for cashflow generation details
 //! - term loan pricing module for valuation methodology
 //! - term loan metrics module for available metrics
@@ -63,13 +62,12 @@
 pub(crate) mod cashflows;
 pub(crate) mod metrics;
 pub(crate) mod pricing;
-pub mod spec;
+mod spec;
 pub(crate) mod types;
 
-pub use super::loan_terms::{CommitmentStep, MarginStep, OidEirSpec};
 pub use spec::{
-    CashSweepEvent, CommitmentFeeBase, DdtlSpec, DrawEvent, LoanCall, LoanCallSchedule,
-    LoanCallType, MakeWholeSpec, OidPolicy, PikToggle, TermLoanCovenantEvents,
+    CashSweepEvent, CommitmentFeeBase, DdtlSpec, LoanCall, LoanCallSchedule, LoanCallType,
+    OidPolicy, PikToggle, TermLoanCovenantEvents,
 };
 pub use types::{TermLoan, TermLoanBuilder};
 

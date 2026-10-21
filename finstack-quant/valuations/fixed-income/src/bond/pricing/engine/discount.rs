@@ -35,7 +35,7 @@ use super::super::super::types::Bond;
 /// Bond pricing is performed via the [`Instrument`] trait or the pricer registry:
 ///
 /// ```
-/// use finstack_quant_valuations_fixed_income::Bond;
+/// use finstack_quant_valuations_fixed_income::bond::Bond;
 /// use finstack_quant_valuations_core::instruments::Instrument;
 /// use finstack_quant_core::market_data::context::MarketContext;
 /// use finstack_quant_core::market_data::term_structures::DiscountCurve;

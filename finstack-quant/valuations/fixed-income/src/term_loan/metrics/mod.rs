@@ -81,7 +81,7 @@ use self::irr_helpers::cached_full_schedule;
 use self::irr_helpers::exercisable_call_candidates;
 use self::irr_helpers::solve_irr_to_exercise;
 use self::irr_helpers::target_price_from_quote_or_model;
-use crate::TermLoan;
+use crate::term_loan::TermLoan;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricId;

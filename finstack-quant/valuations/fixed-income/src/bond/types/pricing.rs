@@ -414,7 +414,7 @@ impl Bond {
     /// # Example
     ///
     /// ```
-    /// use finstack_quant_valuations_fixed_income::Bond;
+    /// use finstack_quant_valuations_fixed_income::bond::Bond;
     ///
     /// # fn main() -> finstack_quant_core::Result<()> {
     /// let bond = Bond::example()?;

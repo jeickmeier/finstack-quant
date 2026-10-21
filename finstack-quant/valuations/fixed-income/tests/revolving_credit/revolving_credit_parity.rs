@@ -18,7 +18,7 @@ mod tests {
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_fixed_income::loan_terms::UpfrontFee;
-    use finstack_quant_valuations_fixed_income::revolving_credit::RevolvingCreditPricer;
+    use finstack_quant_valuations_fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer;
     use finstack_quant_valuations_fixed_income::revolving_credit::{
         DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
         StochasticUtilizationSpec, UtilizationProcess,

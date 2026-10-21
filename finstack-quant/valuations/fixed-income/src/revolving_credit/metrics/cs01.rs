@@ -28,7 +28,7 @@
 
 use crate::revolving_credit::cashflow_engine::CashflowEngine;
 use crate::revolving_credit::types::DrawRepaySpec;
-use crate::RevolvingCredit;
+use crate::revolving_credit::RevolvingCredit;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;

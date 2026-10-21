@@ -17,7 +17,7 @@ pub(crate) struct ImpliedFinancingRateCalculator;
 
 impl MetricCalculator for ImpliedFinancingRateCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let roll: &crate::DollarRoll = context.instrument_as()?;
+        let roll: &crate::dollar_roll::DollarRoll = context.instrument_as()?;
         let result = super::carry::implied_financing_rate(roll)?;
         Ok(result.implied_rate)
     }
@@ -34,7 +34,7 @@ pub(crate) struct RollSpecialnessCalculator;
 
 impl MetricCalculator for RollSpecialnessCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let roll: &crate::DollarRoll = context.instrument_as()?;
+        let roll: &crate::dollar_roll::DollarRoll = context.instrument_as()?;
         let front = roll.effective_front_settlement_date()?;
         let back = roll.effective_back_settlement_date()?;
         let accrual = finstack_quant_core::dates::DayCount::Act360.year_fraction(
@@ -91,7 +91,7 @@ mod production_mortgage_audit {
     #[test]
     fn specialness_resolves_the_supplied_repo_curve() {
         let as_of = date!(2026 - 03 - 01);
-        let mut roll = crate::DollarRoll::example().expect("roll");
+        let mut roll = crate::dollar_roll::DollarRoll::example().expect("roll");
         roll.front_settlement_date = Some(date!(2026 - 03 - 11));
         roll.back_settlement_date = Some(date!(2026 - 04 - 11));
         roll.repo_curve_id = Some("REPO".into());
@@ -147,8 +147,9 @@ mod production_mortgage_audit {
 #[cfg(test)]
 mod rate_risk_rebuild_tests {
     use crate::dollar_roll::pricer::price_dollar_roll;
+    use crate::dollar_roll::DollarRoll;
     use crate::tba::pricer::{create_assumed_pool, price_tba};
-    use crate::{AgencyTba, DollarRoll};
+    use crate::tba::AgencyTba;
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};

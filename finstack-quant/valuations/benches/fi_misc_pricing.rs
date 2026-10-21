@@ -22,7 +22,6 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::cmo::AgencyCmo;
 use finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;
 use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
-use finstack_quant_valuations::instruments::fixed_income::fi_trs::TrsScheduleSpec;
 use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
@@ -30,6 +29,7 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
 use finstack_quant_valuations::instruments::fixed_income::tba::AgencyTba;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::TrsScheduleSpec;
 use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;

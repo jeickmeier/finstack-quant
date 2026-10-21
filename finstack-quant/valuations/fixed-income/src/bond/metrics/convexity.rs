@@ -1,7 +1,7 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
 use crate::bond::pricing::settlement::QuoteDateContext;
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_core::math::ZERO_TOLERANCE;

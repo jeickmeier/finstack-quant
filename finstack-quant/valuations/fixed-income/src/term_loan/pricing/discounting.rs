@@ -742,7 +742,7 @@ mod tests {
         let as_of = date(2025, 4, 15);
         let mut loan = floating_loan_for_fixings();
         loan.covenants = Some(crate::term_loan::TermLoanCovenantEvents {
-            margin_steps: vec![crate::term_loan::MarginStep {
+            margin_steps: vec![crate::loan_terms::MarginStep {
                 date: date(2025, 1, 1),
                 delta_bp: rust_decimal::Decimal::from(200),
             }],
