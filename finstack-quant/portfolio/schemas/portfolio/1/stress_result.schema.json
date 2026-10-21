@@ -59,10 +59,6 @@
       ],
       "type": "object"
     },
-    "PositionId": {
-      "description": "Position identifier.",
-      "type": "string"
-    },
     "PositionResidualContribution": {
       "description": "Annualized residual variance contributed by a single position.\n\n`residual_variance` is reported in variance units (not vol) so that\nper-position residuals add linearly into a portfolio-level total. Callers\nthat want per-position residual *vol* should take the square root of this\nfield after summing the relevant subset.",
       "properties": {
@@ -286,7 +282,7 @@
         "minItems": 2,
         "prefixItems": [
           {
-            "$ref": "#/$defs/PositionId"
+            "$ref": "#/$defs/Id"
           },
           {
             "format": "double",

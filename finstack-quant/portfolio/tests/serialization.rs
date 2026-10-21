@@ -4,10 +4,10 @@ use crate::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::book::{Book, BookId};
-use finstack_quant_portfolio::portfolio::PortfolioSpec;
 use finstack_quant_portfolio::position::{Position, PositionSpec, PositionUnit};
 use finstack_quant_portfolio::types::{AttributeValue, Entity};
 use finstack_quant_portfolio::Portfolio;
+use finstack_quant_portfolio::PortfolioSpec;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::InstrumentJson;
@@ -40,8 +40,8 @@ fn test_position_spec_roundtrip() {
         PositionUnit::Units,
     )
     .unwrap()
-    .with_text_attribute("rating", "AAA")
-    .with_text_attribute("sector", "Banking");
+    .with_attribute("rating", "AAA")
+    .with_attribute("sector", "Banking");
 
     // Convert to spec
     let spec = position.to_spec();
@@ -99,7 +99,7 @@ fn test_portfolio_spec_serialization() {
         PositionUnit::Units,
     )
     .unwrap()
-    .with_text_attribute("rating", "AAA");
+    .with_attribute("rating", "AAA");
 
     let pos2 = Position::new(
         "POS_002",
@@ -110,7 +110,7 @@ fn test_portfolio_spec_serialization() {
         PositionUnit::Units,
     )
     .unwrap()
-    .with_text_attribute("rating", "AA");
+    .with_attribute("rating", "AA");
 
     let portfolio = Portfolio::builder("TEST_PORTFOLIO")
         .name("Test Portfolio")
@@ -179,7 +179,7 @@ fn test_portfolio_spec_json_roundtrip() {
     let json = serde_json::to_string(&spec).expect("Serialization should succeed");
 
     // Deserialize back
-    let spec_roundtrip: finstack_quant_portfolio::portfolio::PortfolioSpec =
+    let spec_roundtrip: finstack_quant_portfolio::PortfolioSpec =
         serde_json::from_str(&json).expect("Deserialization should succeed");
 
     // Verify roundtrip preserved data
@@ -311,7 +311,6 @@ fn test_portfolio_spec_json_deserializes_multiple_instrument_specs() {
                 "quantity": 1.0,
                 "unit": "units",
                 "book_id": null,
-                "tags": {},
                 "meta": {}
             },
             {
@@ -325,7 +324,6 @@ fn test_portfolio_spec_json_deserializes_multiple_instrument_specs() {
                 "quantity": 2.0,
                 "unit": "units",
                 "book_id": null,
-                "tags": {},
                 "meta": {}
             }
         ],
@@ -346,4 +344,109 @@ fn test_portfolio_spec_json_deserializes_multiple_instrument_specs() {
         spec.positions[1].instrument_spec,
         Some(InstrumentJson::Deposit(_))
     ));
+}
+
+/// Serializes `value`, adds an unknown top-level field and asserts that
+/// deserializing it back is rejected, while the clean payload still parses.
+fn assert_rejects_unknown_field<T>(value: &T)
+where
+    T: serde::Serialize + serde::de::DeserializeOwned,
+{
+    let type_name = std::any::type_name::<T>();
+    let mut payload = serde_json::to_value(value).expect("serialize inbound spec");
+    serde_json::from_value::<T>(payload.clone())
+        .unwrap_or_else(|error| panic!("{type_name}: clean payload must parse: {error}"));
+    payload
+        .as_object_mut()
+        .expect("inbound spec serializes as an object")
+        .insert("unexpected_field".to_string(), json!(1));
+    let error = serde_json::from_value::<T>(payload)
+        .err()
+        .unwrap_or_else(|| panic!("{type_name}: unknown field must be rejected"));
+    assert!(
+        error.to_string().contains("unexpected_field"),
+        "{type_name}: error must name the field, got: {error}"
+    );
+}
+
+#[test]
+fn inbound_specs_reject_unknown_fields() {
+    use finstack_quant_portfolio::brinson::{BrinsonPeriodResult, SectorEffect, SectorPeriod};
+    use finstack_quant_portfolio::cashflows::CashflowAggregationOptions;
+    use finstack_quant_portfolio::optimization::{
+        MetricExpr, MissingMetricPolicy, Objective, PerPositionMetric, PortfolioOptimizationSpec,
+        WeightingScheme,
+    };
+    use finstack_quant_portfolio::performance::DatedCashflow;
+    use finstack_quant_portfolio::valuation::PortfolioValuationOptions;
+    use finstack_quant_valuations::metrics::MetricId;
+
+    let as_of = time::macros::date!(2025 - 01 - 01);
+    let position = PositionSpec {
+        position_id: "POS-1".into(),
+        entity_id: "FUND".into(),
+        instrument_id: "DEP-1".to_string(),
+        instrument_spec: None,
+        quantity: 1.0,
+        unit: PositionUnit::Units,
+        book_id: None,
+        attributes: IndexMap::new(),
+        meta: IndexMap::new(),
+    };
+    let portfolio = PortfolioSpec {
+        id: "BOOK".to_string(),
+        name: None,
+        base_currency: Currency::USD,
+        as_of,
+        entities: IndexMap::new(),
+        positions: vec![position.clone()],
+        books: IndexMap::new(),
+        tags: IndexMap::new(),
+        meta: IndexMap::new(),
+    };
+    let sector_effect = SectorEffect {
+        sector: "rates".to_string(),
+        allocation: 0.01,
+        selection: 0.02,
+        interaction: 0.0,
+        total: 0.03,
+    };
+
+    assert_rejects_unknown_field(&portfolio);
+    assert_rejects_unknown_field(&position);
+    assert_rejects_unknown_field(&PortfolioValuationOptions::default());
+    assert_rejects_unknown_field(&CashflowAggregationOptions::default());
+    assert_rejects_unknown_field(&PortfolioOptimizationSpec {
+        portfolio,
+        objective: Objective::Maximize(MetricExpr::ValueWeightedAverage {
+            metric: PerPositionMetric::Metric(MetricId::Ytm),
+            filter: None,
+        }),
+        constraints: Vec::new(),
+        weighting: WeightingScheme::ValueWeight,
+        missing_metric_policy: MissingMetricPolicy::default(),
+        label: None,
+        trade_universe: None,
+    });
+    assert_rejects_unknown_field(&SectorPeriod {
+        sector: "rates".to_string(),
+        portfolio_weight: 0.6,
+        benchmark_weight: 0.5,
+        portfolio_return: 0.02,
+        benchmark_return: 0.01,
+    });
+    assert_rejects_unknown_field(&sector_effect);
+    assert_rejects_unknown_field(&BrinsonPeriodResult {
+        sectors: vec![sector_effect],
+        total_allocation: 0.01,
+        total_selection: 0.02,
+        total_interaction: 0.0,
+        portfolio_return: 0.04,
+        benchmark_return: 0.01,
+        total_excess_return: 0.03,
+    });
+    assert_rejects_unknown_field(&DatedCashflow {
+        date: as_of,
+        amount: 100.0,
+    });
 }

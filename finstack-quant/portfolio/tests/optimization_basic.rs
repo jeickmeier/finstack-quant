@@ -11,6 +11,7 @@ use finstack_quant_portfolio::optimization::{
     PortfolioOptimizationProblem, PositionFilter, TradeUniverse, WeightingScheme,
 };
 use finstack_quant_portfolio::position::{Position, PositionUnit};
+use finstack_quant_portfolio::types::AttributeValue;
 use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
@@ -254,7 +255,7 @@ fn build_bond_portfolio() -> finstack_quant_portfolio::Portfolio {
         PositionUnit::FaceValue,
     )
     .expect("AAA position should build")
-    .with_text_attribute("rating", "AAA");
+    .with_attribute("rating", "AAA");
 
     let pos_bbb = Position::new(
         "POS_BBB",
@@ -265,7 +266,7 @@ fn build_bond_portfolio() -> finstack_quant_portfolio::Portfolio {
         PositionUnit::FaceValue,
     )
     .expect("BBB position should build")
-    .with_text_attribute("rating", "BBB");
+    .with_attribute("rating", "BBB");
 
     let pos_ccc = Position::new(
         "POS_CCC",
@@ -276,7 +277,7 @@ fn build_bond_portfolio() -> finstack_quant_portfolio::Portfolio {
         PositionUnit::FaceValue,
     )
     .expect("CCC position should build")
-    .with_text_attribute("rating", "CCC");
+    .with_attribute("rating", "CCC");
 
     Portfolio::builder("BOND_FUND")
         .base_currency(Currency::USD)
@@ -333,11 +334,11 @@ fn optimize_max_yield_with_ccc_limit() {
     }
 
     // Check CCC exposure constraint directly from weights and tags.
-    let portfolio_ref = &result.problem.portfolio;
+    let portfolio_ref = &problem.portfolio;
     let mut ccc_weight = 0.0_f64;
     for (pos_id, &w) in &result.optimal_weights {
         if let Some(position) = portfolio_ref.get_position(pos_id.as_str()) {
-            if position.attributes.get("rating").and_then(|v| v.as_text()) == Some("CCC") {
+            if position.attributes.get("rating") == Some(&AttributeValue::from("CCC")) {
                 ccc_weight += w;
             }
         }

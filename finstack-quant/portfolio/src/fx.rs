@@ -54,6 +54,9 @@ pub fn convert_to_base(
     market: &MarketContext,
     base_currency: Currency,
 ) -> Result<Money> {
+    if amount.currency() == base_currency {
+        return Ok(amount);
+    }
     let rate = spot_rate_to_base(amount.currency(), as_of, market, base_currency)?;
     Ok(Money::new(amount.amount() * rate, base_currency)?)
 }
@@ -212,6 +215,41 @@ fn discount_factor(
     Ok(df)
 }
 
+/// Price an instrument in its native currency, then convert on `market` at `as_of`.
+///
+/// Factor-stress, delta and full-reprice endpoints all use this path so FX
+/// factors flow through the bumped market's spot matrix rather than an
+/// implied PV ratio. Same-currency amounts short-circuit inside
+/// the portfolio spot FX helper. Non-finite native PVs are returned
+/// unchanged so callers can emit their position-specific validation error
+/// without constructing `Money`. Missing FX for a cross-currency position
+/// fails the same way NAV does.
+///
+/// # Arguments
+///
+/// * `instrument` - Instrument to price in its native currency.
+/// * `market` - Market used for both native pricing and the spot FX lookup.
+///   Callers must pass the **bumped** market when computing a shocked PV.
+/// * `as_of` - Valuation date for pricing and the FX matrix query.
+/// * `base_currency` - Reporting currency; same-currency amounts are identity.
+///
+/// # Errors
+///
+/// Propagates instrument pricing failures and portfolio spot FX conversion
+/// errors (missing FX matrix or missing pair).
+pub(crate) fn raw_pv_in_base(
+    instrument: &dyn finstack_quant_valuations::instruments::Instrument,
+    market: &MarketContext,
+    as_of: Date,
+    base_currency: Currency,
+) -> Result<f64> {
+    let (amount, currency) = instrument.value_raw_with_currency(market, as_of)?;
+    if !amount.is_finite() {
+        return Ok(amount);
+    }
+    Ok(convert_to_base(Money::new(amount, currency)?, as_of, market, base_currency)?.amount())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -228,6 +266,23 @@ mod tests {
             .interp(InterpStyle::Linear)
             .build()
             .expect("test discount curve should build")
+    }
+
+    #[test]
+    fn convert_to_base_returns_same_currency_amount_unchanged() {
+        // 17 significant digits do not survive a Decimal -> f64 -> Decimal trip.
+        let amount = Money::from_decimal_str("123456789012.34567", Currency::USD)
+            .expect("exact decimal amount");
+
+        let converted = convert_to_base(
+            amount,
+            date!(2025 - 01 - 01),
+            &MarketContext::new(),
+            Currency::USD,
+        )
+        .expect("same-currency conversion needs no market data");
+
+        assert_eq!(converted.amount_decimal(), amount.amount_decimal());
     }
 
     #[test]

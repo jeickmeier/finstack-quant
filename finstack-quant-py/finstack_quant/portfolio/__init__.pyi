@@ -19,6 +19,7 @@ import numpy.typing as npt
 import pandas as pd
 
 from finstack_quant.attribution import PnlAttribution
+from finstack_quant.core import FinstackError
 from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
@@ -48,8 +49,6 @@ __all__ = [
     "FactorPnlProfile",
     "FiAttributionResult",
     "FiCarinoLinkedResult",
-    "FiReconciliationReport",
-    "FinstackError",
     "GridAttributionResult",
     "GridCarinoLinkedResult",
     "Inequality",
@@ -70,7 +69,6 @@ __all__ = [
     "PortfolioBuilder",
     "PortfolioCashflows",
     "PortfolioError",
-    "PortfolioMarginAggregator",
     "PortfolioMarginResult",
     "PortfolioMetrics",
     "PortfolioOptimizationResult",
@@ -101,22 +99,17 @@ __all__ = [
     "aggregate_full_cashflows",
     "aggregate_metrics",
     "allocate_weights",
-    "allocate_weights_json",
     "apply_scenario_and_revalue",
     "attribute_portfolio_pnl",
     "brinson_fachler",
     "build_credit_vol_report",
     "campisi_attribution",
     "campisi_carino_link",
-    "campisi_carino_link_from_snapshots",
-    "campisi_reconciliation_check",
     "carino_link",
-    "carino_link_from_sector_periods",
     "cell_returns_from_curves",
     "cell_returns_from_reference",
     "compute_factor_sensitivities",
     "compute_pnl_profiles",
-    "decompose_factor_risk",
     "excess_returns",
     "factor_brinson_attribution",
     "grid_attribution",
@@ -125,44 +118,17 @@ __all__ = [
     "net_in_currency_by_date",
     "optimize_portfolio",
     "parse_portfolio_spec_json",
+    "portfolio_margin",
     "primitive_exposures",
     "rebalance_from_spec",
     "replay_portfolio",
-    "replay_portfolio_json",
     "scenario_pnl",
     "scenario_pnl_batch",
-    "scenario_pnl_batch_json",
     "schema",
     "twrr_linked",
     "twrr_modified_dietz",
-    "validate_allocation_json",
     "value_portfolio",
 ]
-
-class FinstackError(ValueError):
-    """
-    Base class for the library's named exceptions.
-
-    Catch this in a single ``except FinstackError`` clause to handle any error
-    the library raises through one of its own exception classes, rather than
-    enumerating them.
-
-    It derives from ``ValueError``, so every subclass keeps ``ValueError`` in
-    its MRO and existing ``except ValueError`` clauses are unaffected. Bare
-    ``ValueError`` / ``KeyError`` raised by the lower-level mapping helpers are
-    deliberately not reparented and are *not* caught by this class.
-
-    Its canonical home is ``finstack_quant.core``; it is re-exported here
-    alongside the portfolio exception family.
-
-    Examples
-    --------
-    >>> from finstack_quant.portfolio import FinstackError, PortfolioError
-    >>> issubclass(PortfolioError, FinstackError)
-    True
-    >>> issubclass(FinstackError, ValueError)
-    True
-    """
 
 class PortfolioError(FinstackError):
     """
@@ -1014,7 +980,12 @@ class PositionValue:
 
 class ReconciliationReport:
     """
-    Reconciliation of portfolio factor buckets against ``total_pnl``.
+    Reconciliation of an attribution's effect buckets against its total.
+
+    Returned by :meth:`PortfolioAttribution.reconciliation_check` (factor
+    buckets plus FX translation against ``total_pnl``, in the portfolio base
+    currency) and by :meth:`FiAttributionResult.reconciliation_check` (the five
+    Campisi effect totals against ``active_return``, in return units).
 
     Examples
     --------
@@ -1027,12 +998,13 @@ class ReconciliationReport:
     @property
     def total_residual(self) -> float:
         """
-        Unexplained base-currency amount after all buckets are summed.
+        Unexplained amount after all buckets are summed.
 
         Returns
         -------
         float
-            Residual in the portfolio base currency.
+            Residual in the portfolio base currency (P&L attribution) or in
+            return units (Campisi attribution).
 
         Notes
         -----
@@ -1048,7 +1020,8 @@ class ReconciliationReport:
         Returns
         -------
         bool
-            ``False`` when attribution was flagged invalid, regardless of residual.
+            ``False`` when a P&L attribution was flagged invalid, regardless
+            of residual.
 
         Notes
         -----
@@ -1059,12 +1032,12 @@ class ReconciliationReport:
     @property
     def tolerance(self) -> float:
         """
-        Absolute base-currency tolerance used for the check.
+        Absolute tolerance used for the check.
 
         Returns
         -------
         float
-            Tolerance in base-currency units.
+            Tolerance in the units of ``total_residual``.
 
         Notes
         -----
@@ -1646,19 +1619,28 @@ class PortfolioAttribution:
         """
         Export per-position native-currency attributions, one row per position.
 
+        Each row is ``position_id`` followed by the canonical Rust wide row of
+        that position's attribution, the same columns as
+        :meth:`finstack_quant.attribution.PnlAttribution.to_dataframe`.
+
         Returns
         -------
         pd.DataFrame
-            Columns ``position_id``, ``currency``, ``total_pnl``, ``carry``,
+            Columns ``position_id``, ``instrument_id``, ``method``, ``t0``,
+            ``t1``, ``currency`` (native), ``total_pnl``,
+            ``mark_to_market_pnl``, ``pv_t0``, ``pv_t1``, ``carry``,
             ``rates_curves_pnl``, ``credit_curves_pnl``,
             ``inflation_curves_pnl``, ``correlations_pnl``, ``fx_pnl``,
-            ``cross_factor_pnl``, ``vol_pnl``, ``model_params_pnl``,
-            ``market_scalars_pnl``, ``residual``, ``result_invalid``.
+            ``fx_translation_pnl``, ``vol_pnl``, ``cross_factor_pnl``,
+            ``model_params_pnl``, ``market_scalars_pnl``, ``residual``,
+            ``residual_pct``, ``num_repricings`` (int64) and
+            ``result_invalid`` (bool). Amounts are float64; optional
+            amounts are ``NaN`` when the method did not record them.
 
         Raises
         ------
         ValueError
-            If the frame cannot be built.
+            If a position attribution mixes currencies across its factors.
         """
         ...
 
@@ -1950,6 +1932,7 @@ class PortfolioValuation:
     ...     "position_values": {},
     ...     "total_base_currency": {"amount": "0", "currency": "USD"},
     ...     "by_entity": {},
+    ...     "fx_collapse_policy": "cashflow_date",
     ... }
     >>> PortfolioValuation.from_json(json.dumps(doc)).total_value
     0.0
@@ -1985,6 +1968,7 @@ class PortfolioValuation:
         ...     "position_values": {},
         ...     "total_base_currency": {"amount": "0", "currency": "USD"},
         ...     "by_entity": {},
+        ...     "fx_collapse_policy": "cashflow_date",
         ... }
         >>> valuation = PortfolioValuation.from_json(json.dumps(doc))
         >>> (valuation.total_value, valuation.base_currency)
@@ -2122,22 +2106,6 @@ class PortfolioValuation:
         """
         ...
 
-    @property
-    def has_degraded_risk(self) -> bool:
-        """
-        Whether any position carries incomplete risk metrics.
-
-        Returns
-        -------
-        bool
-            ``True`` when ``degraded_positions`` is non-empty.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the derived value.
-        """
-        ...
-
     def get_position_value(self, position_id: str) -> PositionValue:
         """
         Look up one position's valuation.
@@ -2185,8 +2153,10 @@ class PortfolioValuation:
         Export per-position values via Arrow (zero-copy for consumers).
 
         Columns: ``position_id``, ``entity_id``, ``value_native``,
-        ``value_base``, ``currency_native``, ``currency_base``, ``risk_metrics_complete``, ``risk_error`` (see
-        ``finstack_quant_portfolio::positions_to_table``).
+        ``value_base``, ``currency_native``, ``currency_base``, ``fx_rate``
+        (float64, null for same-currency rows) and ``risk_error`` (string, null
+        unless the position degraded to PV-only) (see
+        ``finstack_quant_portfolio::dataframe::positions_to_table``).
 
         Returns
         -------
@@ -2205,7 +2175,7 @@ class PortfolioValuation:
 
         One row per entry of ``position_values``. Built from the same
         ``positions_to_table`` envelope that backs :meth:`to_arrow_positions`,
-        plus the per-position FX and risk diagnostics.
+        plus the two boolean risk diagnostics the Arrow table cannot carry.
 
         Columns: ``position_id``, ``entity_id``, ``value_native``,
         ``value_base``, ``currency_native``, ``currency_base``, ``fx_rate``
@@ -2258,9 +2228,9 @@ class PortfolioCashflows:
     --------
     >>> from finstack_quant.portfolio import PortfolioCashflows
     >>> cashflows = PortfolioCashflows.from_json(
-    ...     '{"events":[],"by_position":{},"by_date":{},"position_summaries":{},"issues":[]}'
+    ...     '{"events":[],"by_position":{},"by_date":{},"position_summaries":{},"issues":[],"fx_collapse_policy":"cip_forward"}'
     ... )
-    >>> (cashflows.num_positions, cashflows.num_issues)
+    >>> (len(cashflows.by_position), len(cashflows.issues))
     (0, 0)
     """
 
@@ -2289,9 +2259,9 @@ class PortfolioCashflows:
         --------
         >>> from finstack_quant.portfolio import PortfolioCashflows
         >>> cashflows = PortfolioCashflows.from_json(
-        ...     '{"events":[],"by_position":{},"by_date":{},"position_summaries":{},"issues":[]}'
+        ...     '{"events":[],"by_position":{},"by_date":{},"position_summaries":{},"issues":[],"fx_collapse_policy":"cip_forward"}'
         ... )
-        >>> (cashflows.num_positions, cashflows.num_issues)
+        >>> (len(cashflows.by_position), len(cashflows.issues))
         (0, 0)
         """
         ...
@@ -2381,36 +2351,6 @@ class PortfolioCashflows:
         ...
 
     @property
-    def num_positions(self) -> int:
-        """
-        Number of positions represented in the ladder.
-        Returns
-        -------
-        int
-            Number of positions with schedule entries, including empty schedules.
-
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    @property
-    def num_issues(self) -> int:
-        """
-        Number of diagnostic issues recorded on the ladder.
-        Returns
-        -------
-        int
-            Number of cashflow-schedule extraction issues recorded in the ladder.
-
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    @property
     def events(self) -> list[dict[str, Any]]:
         """
         Flat position-scaled events in payment-date order.
@@ -2470,7 +2410,7 @@ class PortfolioCashflows:
         -------
         list[dict[str, Any]]
             Entries with ``position_id``, ``instrument_id``,
-            ``instrument_type``, ``kind`` and ``message``.
+            ``instrument_type`` and ``message``.
 
         Notes
         -----
@@ -2502,7 +2442,7 @@ class PortfolioCashflows:
         -------
         pd.DataFrame
             Columns ``position_id``, ``instrument_id``, ``instrument_type``,
-            ``kind``, ``message``; zero rows when there are no issues.
+            ``message``; zero rows when there are no issues.
 
         Raises
         ------
@@ -2933,16 +2873,16 @@ class PortfolioMarginResult:
     """
     Portfolio-wide margin results in the portfolio base currency.
 
-    Returned by :meth:`PortfolioMarginAggregator.calculate`. Totals are sums of
+    Returned by :func:`portfolio_margin`. Totals are sums of
     the per-netting-set results in :attr:`by_netting_set`; one-way IM
     collateral accounts are reported per CSA in :attr:`by_csa`.
 
     Examples
     --------
     >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import Portfolio, PortfolioMarginAggregator, PortfolioMarginResult
+    >>> from finstack_quant.portfolio import Portfolio, portfolio_margin
     >>> book = Portfolio.builder("book", "USD", "2025-01-01").build()
-    >>> result = PortfolioMarginAggregator.from_portfolio(book).calculate(book, MarketContext(), "2025-01-01")
+    >>> result = portfolio_margin(book, MarketContext(), "2025-01-01")
     >>> (result.base_currency, result.total_initial_margin.amount, len(result.by_netting_set))
     ('USD', 0.0, 0)
     >>> PortfolioMarginResult.from_json(result.to_json()).total_positions
@@ -3234,9 +3174,9 @@ class PortfolioMarginResult:
         Examples
         --------
         >>> from finstack_quant.core.market_data import MarketContext
-        >>> from finstack_quant.portfolio import Portfolio, PortfolioMarginAggregator
+        >>> from finstack_quant.portfolio import Portfolio, portfolio_margin
         >>> book = Portfolio.builder("book", "USD", "2025-01-01").build()
-        >>> result = PortfolioMarginAggregator.from_portfolio(book).calculate(book, MarketContext(), "2025-01-01")
+        >>> result = portfolio_margin(book, MarketContext(), "2025-01-01")
         >>> list(result.to_dataframe().columns)[:4]
         ['netting_set_id', 'csa_id', 'is_cleared', 'initial_margin']
         """
@@ -3246,115 +3186,72 @@ class PortfolioMarginResult:
         """Return the as-of date, totals and netting-set count."""
         ...
 
-class PortfolioMarginAggregator:
+def portfolio_margin(
+    portfolio: Portfolio | str,
+    market: MarketContext | str,
+    as_of: datetime.date | str,
+    current_im_collateral: dict[str, Money] | None = None,
+) -> PortfolioMarginResult:
     """
-    Aggregates margin requirements across a portfolio by netting set.
+    Calculate portfolio margin requirements by netting set.
 
-    Build one with :meth:`from_portfolio`, then call :meth:`calculate` for each
-    market snapshot. Positions are grouped by the netting set named on their
-    instrument's margin specification; initial margin is computed per netting
-    set from netted sensitivities and variation margin from netted
-    mark-to-market, both reported in the portfolio base currency.
+    Positions are grouped by the netting set named on their instrument's
+    margin specification; initial margin is computed per netting set from
+    netted sensitivities and variation margin from netted mark-to-market, both
+    reported in the portfolio base currency. Positions without margin metadata
+    are counted in ``positions_without_margin``.
+
+    Parameters
+    ----------
+    portfolio : Portfolio or str
+        A :class:`Portfolio` object, or a JSON-serialized ``PortfolioSpec``.
+        Its positions that carry margin metadata form the netting sets and its
+        base currency is the reporting currency.
+    market : MarketContext or str
+        Market data (object or JSON) for VM and SIMM sensitivity extraction,
+        including the FX matrix needed to report netting sets in the base
+        currency.
+    as_of : datetime.date or str
+        Valuation date of the margin run (date-like or ISO ``YYYY-MM-DD``).
+    current_im_collateral : dict[str, Money] or None, default None
+        One-way IM balances already held, keyed by CSA id, each in that CSA's
+        currency. ``None`` or a missing key means zero. Excludes VM and the
+        other party's segregated IM account.
+
+    Returns
+    -------
+    PortfolioMarginResult
+        Per-netting-set and portfolio-level margin in the base currency.
+
+    Raises
+    ------
+    PortfolioError
+        If positions in one netting set carry conflicting margin
+        specifications, ``current_im_collateral`` names an unknown CSA id, or a
+        required FX rate is unavailable.
+    TypeError
+        If ``as_of`` is neither a string nor date-like.
+    ValueError
+        If ``portfolio`` is a string that is not a valid ``PortfolioSpec``, or
+        ``as_of`` is a string that is not an ISO date.
 
     Examples
     --------
     >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import Portfolio, PortfolioMarginAggregator
+    >>> from finstack_quant.portfolio import Portfolio, portfolio_margin
     >>> book = Portfolio.builder("book", "USD", "2025-01-01").build()
-    >>> aggregator = PortfolioMarginAggregator.from_portfolio(book)
-    >>> result = aggregator.calculate(book, MarketContext(), "2025-01-01")
+    >>> result = portfolio_margin(book, MarketContext(), "2025-01-01")
     >>> (result.total_positions, result.positions_without_margin)
     (0, 0)
     """
-
-    @staticmethod
-    def from_portfolio(portfolio: Portfolio | str) -> PortfolioMarginAggregator:
-        """
-        Create an aggregator from a portfolio.
-
-        Parameters
-        ----------
-        portfolio : Portfolio or str
-            A :class:`Portfolio` object, or a JSON-serialized ``PortfolioSpec``.
-            Its positions that carry margin metadata seed the netting sets and
-            its base currency is the reporting currency.
-
-        Returns
-        -------
-        PortfolioMarginAggregator
-            Aggregator pre-populated with the portfolio's netting sets.
-
-        Raises
-        ------
-        PortfolioError
-            If positions in one netting set carry conflicting margin
-            specifications.
-        ValueError
-            If ``portfolio`` is a string that is not a valid ``PortfolioSpec``.
-
-        Examples
-        --------
-        >>> from finstack_quant.portfolio import Portfolio, PortfolioMarginAggregator
-        >>> book = Portfolio.builder("book", "USD", "2025-01-01").build()
-        >>> type(PortfolioMarginAggregator.from_portfolio(book)).__name__
-        'PortfolioMarginAggregator'
-        """
-        ...
-
-    def calculate(
-        self,
-        portfolio: Portfolio | str,
-        market: MarketContext | str,
-        as_of: datetime.date | str,
-        current_im_collateral: dict[str, Money] | None = None,
-    ) -> PortfolioMarginResult:
-        """
-        Calculate margin requirements for the portfolio.
-
-        Parameters
-        ----------
-        portfolio : Portfolio or str
-            Portfolio used for mark-to-market and sensitivity lookups; normally
-            the one passed to :meth:`from_portfolio`. A registered position
-            missing from it is reported in ``degraded_positions``.
-        market : MarketContext or str
-            Market data (object or JSON) for VM and SIMM sensitivity
-            extraction, including the FX matrix needed to report netting sets
-            in the base currency.
-        as_of : datetime.date or str
-            Valuation date of the margin run (date-like or ISO ``YYYY-MM-DD``).
-        current_im_collateral : dict[str, Money] or None, default None
-            One-way IM balances already held, keyed by CSA id, each in that
-            CSA's currency. ``None`` or a missing key means zero. Excludes VM
-            and the other party's segregated IM account.
-
-        Returns
-        -------
-        PortfolioMarginResult
-            Per-netting-set and portfolio-level margin in the base currency.
-
-        Raises
-        ------
-        PortfolioError
-            If ``current_im_collateral`` names an unknown CSA id, or a required
-            FX rate is unavailable.
-        TypeError
-            If ``as_of`` is neither a string nor date-like.
-        ValueError
-            If ``as_of`` is a string that is not an ISO date.
-        """
-        ...
-
-    def __repr__(self) -> str:
-        """Return a constant placeholder representation."""
-        ...
+    ...
 
 class PortfolioResult:
     """
     Typed wrapper around a ``PortfolioResult`` envelope.
 
-    Use the scalar accessors (``total_value``, ``get_metric``) to read single
-    values without re-parsing the JSON envelope.
+    Read scalars through its components: ``result.valuation.total_value`` and
+    ``result.metrics.get_total(metric_id)`` / ``require_total(metric_id)``.
 
     Examples
     --------
@@ -3365,6 +3262,7 @@ class PortfolioResult:
     ...     "position_values": {},
     ...     "total_base_currency": {"amount": "0", "currency": "USD"},
     ...     "by_entity": {},
+    ...     "fx_collapse_policy": "cashflow_date",
     ... }
     >>> rounding = {
     ...     "mode": "bankers",
@@ -3379,7 +3277,7 @@ class PortfolioResult:
     ...     "metrics": {"aggregated": {}, "by_position": {}},
     ...     "meta": {"numeric_mode": "f64", "rounding": rounding},
     ... }
-    >>> PortfolioResult.from_json(json.dumps(doc)).total_value
+    >>> PortfolioResult.from_json(json.dumps(doc)).valuation.total_value
     0.0
     """
 
@@ -3426,11 +3324,12 @@ class PortfolioResult:
         ...         "position_values": {},
         ...         "total_base_currency": {"amount": "0", "currency": "USD"},
         ...         "by_entity": {},
+        ...         "fx_collapse_policy": "cashflow_date",
         ...     })
         ... )
         >>> metrics = PortfolioMetrics.from_json('{"aggregated": {}, "by_position": {}}')
         >>> result = PortfolioResult(valuation, metrics)
-        >>> (result.total_value, result.meta["fx_policy_applied"], "timestamp" in result.meta)
+        >>> (result.valuation.total_value, result.meta["fx_policy_applied"], "timestamp" in result.meta)
         (0.0, 'cashflow_date', False)
         >>> result.to_json() == PortfolioResult(valuation, metrics).to_json()
         True
@@ -3518,6 +3417,7 @@ class PortfolioResult:
         ...     "position_values": {},
         ...     "total_base_currency": {"amount": "0", "currency": "USD"},
         ...     "by_entity": {},
+        ...     "fx_collapse_policy": "cashflow_date",
         ... }
         >>> rounding = {
         ...     "mode": "bankers",
@@ -3532,7 +3432,7 @@ class PortfolioResult:
         ...     "metrics": {"aggregated": {}, "by_position": {}},
         ...     "meta": {"numeric_mode": "f64", "rounding": rounding},
         ... }
-        >>> PortfolioResult.from_json(json.dumps(doc)).total_value
+        >>> PortfolioResult.from_json(json.dumps(doc)).valuation.total_value
         0.0
         """
         ...
@@ -3549,64 +3449,6 @@ class PortfolioResult:
         ------
         ValueError
             If the value cannot be serialized to JSON.
-        """
-        ...
-
-    @property
-    def total_value(self) -> float:
-        """
-        Total value stored in the result envelope.
-
-        Returns
-        -------
-        float
-            Total value stored in the result envelope.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    def get_metric(self, metric_id: str) -> float | None:
-        """
-        Return a metric value, or ``None`` when it is absent.
-
-        Parameters
-        ----------
-        metric_id : str
-            Fully qualified metric key, such as ``"pv01::usd_ois"``.
-
-        Returns
-        -------
-        float | None
-            Aggregated scalar stored under ``metric_id``, or ``None`` when the
-            result contains no matching metric.
-
-        Notes
-        -----
-        This method does not raise; a missing result is ``None`` rather than an exception.
-        """
-        ...
-
-    def require_metric(self, metric_id: str) -> float:
-        """
-        Return a metric value, raising ``KeyError`` when it is absent.
-
-        Parameters
-        ----------
-        metric_id : str
-            Fully qualified metric key that must be present in the result.
-
-        Returns
-        -------
-        float
-            Aggregated scalar stored under the fully qualified ``metric_id``.
-
-        Raises
-        ------
-        KeyError
-            If ``metric_id`` is absent from the result.
         """
         ...
 
@@ -3856,24 +3698,41 @@ class PortfolioMetrics:
         """
         ...
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def require_total(self, metric_id: str) -> float:
         """
-        Primary ``DataFrame`` view: the aggregated metrics table.
+        Portfolio total of one aggregated metric, raising when it is absent.
+
+        Binds the Rust method ``PortfolioMetrics::require_total``.
+
+        Parameters
+        ----------
+        metric_id : str
+            Fully qualified metric key (for example ``"dv01"`` or
+            ``"bucketed_dv01::USD-OIS::10y"``).
 
         Returns
         -------
-        pd.DataFrame
-            Columns ``metric_id``, ``total`` (delegates to
-            :meth:`to_aggregated_dataframe`).
+        float
+            Sum across positions in the portfolio base currency.
 
         Raises
         ------
-        ValueError
-            If the frame cannot be built.
+        KeyError
+            If no aggregate was produced for ``metric_id``.
+
+        Examples
+        --------
+        >>> from finstack_quant.portfolio import PortfolioMetrics
+        >>> metrics = PortfolioMetrics.from_json('{"aggregated":{},"by_position":{}}')
+        >>> try:
+        ...     metrics.require_total("dv01")
+        ... except KeyError:
+        ...     print("missing")
+        missing
         """
         ...
 
-    def to_aggregated_dataframe(self) -> pd.DataFrame:
+    def to_dataframe(self) -> pd.DataFrame:
         """
         Export the portfolio-wide aggregated metrics as a pandas DataFrame.
 
@@ -3883,17 +3742,16 @@ class PortfolioMetrics:
         from the Rust table export. The per-entity breakdown is not
         flattened here — reach it through :meth:`metric_series`.
 
-        Columns: ``metric_id``, ``total`` (sum across positions; only summable
-        metrics are aggregated).
-
         Returns
         -------
         pd.DataFrame
-            One row per aggregated metric.
+            One row per aggregated metric; columns ``metric_id``, ``total``
+            (sum across positions; only summable metrics are aggregated).
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If the frame cannot be built.
         """
         ...
 
@@ -3929,8 +3787,9 @@ class ScenarioPnl:
     """
     Scenario-attributable profit and loss, in the portfolio base currency.
 
-    Returned by :func:`scenario_pnl` alongside the scenario
-    :class:`~finstack_quant.scenarios.ApplicationReport`. Positions added or
+    Held as ``pnl`` by the :class:`ScenarioPnlBatchItem` that
+    :func:`scenario_pnl` and :func:`scenario_pnl_batch` return, beside the
+    scenario :class:`~finstack_quant.scenarios.ApplicationReport`. Positions added or
     removed by the scenario are zero-filled against the missing side, so
     :attr:`by_position` always sums to :attr:`total`.
 
@@ -4266,26 +4125,23 @@ def parse_portfolio_spec_json(json_str: str) -> str:
 
 def aggregate_metrics(
     valuation: PortfolioValuation | str,
-    base_currency: Currency | str,
     market: MarketContext | str,
-    as_of: datetime.date | str,
 ) -> PortfolioMetrics:
     """
     Aggregate portfolio metrics from a valuation.
 
     Accepts a typed :class:`PortfolioValuation` (fast path) or a JSON string.
+    Metrics are aggregated in the valuation's base currency, with FX spots
+    read at the valuation's ``as_of``.
 
     Parameters
     ----------
     valuation : PortfolioValuation or str
-        Typed valuation or canonical valuation JSON to aggregate.
-    base_currency : Currency | str
-        ISO base-currency code in which aggregate values and metrics are stated.
+        Typed valuation or canonical valuation JSON to aggregate; its base
+        currency and ``as_of`` set the aggregation currency and FX date.
     market : MarketContext or str
-        Market context object or JSON supplying conversion and market inputs.
-    as_of : datetime.date | str
-        Valuation date used to resolve date-dependent market data, either a
-        date-like object or an ISO 8601 string.
+        Market context object or JSON supplying the FX spots that convert
+        out-of-base metrics.
 
     Returns
     -------
@@ -4299,10 +4155,7 @@ def aggregate_metrics(
     TypeError
         If ``valuation`` or ``market`` is neither its typed wrapper nor a JSON string.
     ValueError
-        If supplied JSON, ``base_currency``, or ``as_of`` is invalid.
-    PortfolioError
-        If the valuation base currency or date is inconsistent with the
-        requested aggregation context.
+        If supplied JSON is invalid.
     KeyError
         If an FX rate required for base-currency aggregation is unavailable.
 
@@ -4313,7 +4166,7 @@ def aggregate_metrics(
     >>> from finstack_quant.portfolio import Portfolio, aggregate_metrics, value_portfolio
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> valuation = value_portfolio(Portfolio.from_spec(spec), MarketContext())
-    >>> aggregate_metrics(valuation, "USD", MarketContext(), "2025-01-01").aggregated
+    >>> aggregate_metrics(valuation, MarketContext()).aggregated
     {}
     """
     ...
@@ -4434,7 +4287,7 @@ def aggregate_full_cashflows(
     >>> from finstack_quant.portfolio import Portfolio, aggregate_full_cashflows
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> cashflows = aggregate_full_cashflows(Portfolio.from_spec(spec), MarketContext())
-    >>> (cashflows.num_positions, cashflows.num_issues)
+    >>> (len(cashflows.by_position), len(cashflows.issues))
     (0, 0)
     """
     ...
@@ -4537,7 +4390,7 @@ def scenario_pnl(
     portfolio: Portfolio | str,
     scenario: ScenarioSpec | str,
     market: MarketContext | str,
-) -> tuple[ScenarioPnl, ApplicationReport]:
+) -> ScenarioPnlBatchItem:
     """
     Compute the profit and loss attributable to a scenario.
 
@@ -4562,11 +4415,13 @@ def scenario_pnl(
 
     Returns
     -------
-    tuple[ScenarioPnl, ApplicationReport]
-        The P&L ladder (base-currency ``total`` and ``by_position`` amounts)
-        and the scenario application report carrying which operations were
-        applied. :class:`ScenarioPnl` offers ``to_dataframe()`` and
-        ``to_series()``; call ``.to_json()`` on either for its wire form.
+    ScenarioPnlBatchItem
+        The scenario's ``scenario_id``, its P&L ladder ``pnl``
+        (:class:`ScenarioPnl`, base-currency ``total`` and ``by_position``
+        amounts) and the scenario application ``report`` carrying which
+        operations were applied; the same item type
+        :func:`scenario_pnl_batch` returns per scenario. ``to_json()`` gives
+        its wire form.
 
     Raises
     ------
@@ -4583,9 +4438,9 @@ def scenario_pnl(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.portfolio import Portfolio, scenario_pnl
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> pnl, report = scenario_pnl(Portfolio.from_spec(spec), '{"id":"s","name":"S","operations":[]}', MarketContext())
-    >>> (pnl.total, pnl.currency, pnl.by_position)
-    (0.0, 'USD', {})
+    >>> item = scenario_pnl(Portfolio.from_spec(spec), '{"id":"s","name":"S","operations":[]}', MarketContext())
+    >>> (item.scenario_id, item.pnl.total, item.pnl.currency, item.pnl.by_position)
+    ('s', 0.0, 'USD', {})
     """
     ...
 
@@ -4641,54 +4496,6 @@ def scenario_pnl_batch(
     >>> from finstack_quant.portfolio import Portfolio, scenario_pnl_batch
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> scenario_pnl_batch(Portfolio.from_spec(spec), "[]", MarketContext())
-    []
-    """
-    ...
-
-def scenario_pnl_batch_json(
-    portfolio: Portfolio | str,
-    scenarios: list[ScenarioSpec | str] | str,
-    market: MarketContext | str,
-) -> str:
-    """
-    Compute ordered batch scenario P&L and return wire JSON.
-
-    Wire twin of :func:`scenario_pnl_batch`: same inputs and validation,
-    returning the canonical JSON array string instead of typed items.
-
-    Parameters
-    ----------
-    portfolio : Portfolio or str
-        Built portfolio or canonical ``PortfolioSpec`` JSON.
-    scenarios : list[ScenarioSpec | str] | str
-        Ordered scenarios (typed objects, JSON strings, or one JSON array
-        string); order is preserved.
-    market : MarketContext or str
-        Unshocked market context or canonical market JSON.
-
-    Returns
-    -------
-    str
-        Canonical JSON array. Each item has ``scenario_id``, ``pnl`` (the
-        same base-currency ``ScenarioPnl`` shape returned by
-        :func:`scenario_pnl`), and ``report``. ``"[]"`` in, ``"[]"`` out.
-
-    Raises
-    ------
-    ValueError
-        If ``scenarios`` cannot deserialize to an ordered array of
-        valid ``ScenarioSpec`` values.
-    PortfolioError
-        If scenario application, valuation, or base-currency P&L
-        differencing fails.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import Portfolio, scenario_pnl_batch_json
-    >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> json.loads(scenario_pnl_batch_json(Portfolio.from_spec(spec), "[]", MarketContext()))
     []
     """
     ...
@@ -4907,8 +4714,8 @@ def allocate_weights(spec_json: str | dict[str, Any] | list[Any] | pd.DataFrame)
     -------
     WeightAllocationResult
         Typed result with ``scheme``, ``allocations`` and ``diagnostics``
-        getters plus ``to_dataframe()``; use :func:`allocate_weights_json`
-        serialize with ``to_json()`` for the wire string.
+        getters plus ``to_dataframe()``; serialize with ``to_json()`` for the
+        wire string. A spec that allocates without error is valid.
 
     Raises
     ------
@@ -4926,80 +4733,6 @@ def allocate_weights(spec_json: str | dict[str, Any] | list[Any] | pd.DataFrame)
     >>> spec = '{"scheme":"equal","total_capital":1000.0,"strategies":[{"id":"a"},{"id":"b"}]}'
     >>> [entry["weight"] for entry in allocate_weights(spec).allocations]
     [0.5, 0.5]
-    """
-    ...
-
-def allocate_weights_json(spec_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> str:
-    """
-    Allocate strategy weights from a JSON specification as wire JSON.
-
-    Wire twin of :func:`allocate_weights`: same signed-capital, largest-remainder
-    rounding and validation, returning the canonical JSON string instead of the
-    typed wrapper.
-
-    Parameters
-    ----------
-    spec_json : str | dict | list | pandas.DataFrame
-        JSON-serialized ``WeightAllocationSpec`` selecting the scheme,
-        finite signed total capital, strategy inputs, and any covariance data.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``WeightAllocationResult`` wire document.
-
-    Raises
-    ------
-    ValueError
-        If the JSON is malformed, required fields are missing, the scheme is
-        unsupported, or the selected scheme cannot be evaluated.
-    PortfolioError
-        If scheme invariants fail or capital cannot be represented at the
-        requested rounding precision.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import allocate_weights_json
-    >>> spec = '{"scheme":"equal","total_capital":1000.0,"strategies":[{"id":"a"},{"id":"b"}]}'
-    >>> [entry["weight"] for entry in json.loads(allocate_weights_json(spec))["allocations"]]
-    [0.5, 0.5]
-    """
-    ...
-
-def validate_allocation_json(spec_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> str:
-    """
-    Validate a strategy allocation JSON specification.
-
-    Performs the same Rust-side parse and semantic validation used by
-    :func:`allocate_weights`, including allocation and capital rounding, then
-    discards the allocation result.
-
-    Parameters
-    ----------
-    spec_json : str | dict | list | pandas.DataFrame
-        JSON-serialized allocation specification.
-
-    Returns
-    -------
-    str
-        Canonical compact JSON of the accepted specification.
-
-    Raises
-    ------
-    ValueError
-        If the specification is malformed or invalid.
-    PortfolioError
-        If scheme invariants fail or capital cannot be represented at the
-        requested rounding precision.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import validate_allocation_json
-    >>> spec = '{"scheme":"equal","total_capital":1000.0,"strategies":[{"id":"a"},{"id":"b"}]}'
-    >>> json.loads(validate_allocation_json(spec))["scheme"]
-    'equal'
     """
     ...
 
@@ -5042,7 +4775,7 @@ class ReplayResult:
         Parameters
         ----------
         json : str
-            JSON produced by :meth:`to_json` or :func:`replay_portfolio_json`.
+            JSON produced by :meth:`to_json`.
 
         Returns
         -------
@@ -5177,8 +4910,8 @@ def replay_portfolio(
     -------
     ReplayResult
         Typed result with ``steps``, ``summary`` and ``skipped_dates``
-        getters plus ``to_dataframe()``; use :func:`replay_portfolio_json`
-        serialize with ``to_json()`` for the wire string.
+        getters plus ``to_dataframe()``; serialize with ``to_json()`` for the
+        wire string.
 
     Raises
     ------
@@ -5194,51 +4927,6 @@ def replay_portfolio(
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> try:
     ...     replay_portfolio(spec, [], {"mode": "pv_only"})
-    ... except ValueError as exc:
-    ...     print("must be non-empty" in str(exc))
-    True
-    """
-    ...
-
-def replay_portfolio_json(
-    portfolio: Portfolio | str,
-    snapshots: list[tuple[datetime.date | str, MarketContext | str]] | list[dict[str, Any]] | str,
-    config: dict[str, Any] | str,
-) -> str:
-    """
-    Replay a portfolio through dated market snapshots and return wire JSON.
-
-    Wire twin of :func:`replay_portfolio`: same inputs and validation,
-    returning the canonical JSON string instead of the typed wrapper.
-
-    Parameters
-    ----------
-    portfolio : Portfolio or str
-        Typed :class:`Portfolio` or JSON ``PortfolioSpec``.
-    snapshots : list[tuple[date, MarketContext | str]] | list[dict] | str
-        Dated market snapshots (see :func:`replay_portfolio`).
-    config : dict | str
-        ``ReplayConfig`` as a dict or JSON string (see
-        :func:`replay_portfolio`).
-
-    Returns
-    -------
-    str
-        JSON-serialized ``ReplayResult`` wire document.
-
-    Raises
-    ------
-    ValueError
-        If an input is malformed (including a config without ``mode``).
-    PortfolioError
-        If a snapshot valuation fails under a strict error policy.
-
-    Examples
-    --------
-    >>> from finstack_quant.portfolio import replay_portfolio_json
-    >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> try:
-    ...     replay_portfolio_json(spec, "[]", '{"mode":"pv_only"}')
     ... except ValueError as exc:
     ...     print("must be non-empty" in str(exc))
     True
@@ -5453,14 +5141,13 @@ class CarinoLinkedAttribution:
     """
     Carino-linked multi-period Brinson attribution result.
 
-    Returned by :func:`carino_link` and
-    :func:`carino_link_from_sector_periods`. The linked per-sector effects sum
-    to the geometrically compounded active return exactly.
+    Returned by :func:`carino_link`. The linked per-sector effects sum to the
+    geometrically compounded active return exactly.
 
     Examples
     --------
     >>> import json
-    >>> from finstack_quant.portfolio import carino_link_from_sector_periods
+    >>> from finstack_quant.portfolio import brinson_fachler, carino_link
     >>> period = [
     ...     {
     ...         "sector": "A",
@@ -5470,7 +5157,7 @@ class CarinoLinkedAttribution:
     ...         "benchmark_return": 0.01,
     ...     }
     ... ]
-    >>> result = carino_link_from_sector_periods(json.dumps([period, period]))
+    >>> result = carino_link([brinson_fachler(json.dumps(p)) for p in [period, period]])
     >>> round(result.linked_selection, 4)
     0.0203
     """
@@ -5707,9 +5394,9 @@ def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -
     Carino-link already-computed single-period Brinson-Fachler results.
 
     Binds Rust ``carino_link``, like :func:`campisi_carino_link` and
-    :func:`grid_carino_link`; use :func:`carino_link_from_sector_periods` to
-    link raw sector inputs instead. The same input the WASM ``carinoLink``
-    takes.
+    :func:`grid_carino_link`. To link raw sector inputs, attribute each period
+    first: ``carino_link([brinson_fachler(p) for p in periods])``. The same
+    input the WASM ``carinoLink`` takes.
 
     Parameters
     ----------
@@ -5753,60 +5440,6 @@ def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -
     >>> result = json.loads(brinson_fachler(json.dumps(period)).to_json())
     >>> linked = carino_link(json.dumps([result, result]))
     >>> round(linked.linked_selection, 4)
-    0.0203
-    """
-    ...
-
-def carino_link_from_sector_periods(
-    periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-) -> CarinoLinkedAttribution:
-    """
-    Compute Carino-linked multi-period Brinson attribution from raw sector periods.
-
-    Binds Rust ``carino_link_from_sector_periods``: runs
-    :func:`brinson_fachler` on each period, then Carino-links the results.
-    The same input the WASM ``carinoLinkFromSectorPeriods`` takes.
-
-    Parameters
-    ----------
-    periods_json : str | dict | list | pandas.DataFrame
-        JSON array of periods, where each period is an array of ``SectorPeriod``
-        objects (same schema as :func:`brinson_fachler`).
-
-    Returns
-    -------
-    CarinoLinkedAttribution
-        Typed result with linked per-sector effects and compounded returns;
-        use serialize with ``to_json()`` for the wire string.
-
-    Raises
-    ------
-    PortfolioError
-        If any period fails Brinson validation, the sequence is empty or
-        changes sector ordering, or a period return is non-finite or at most
-        ``-1``.
-    ValueError
-        If ``periods_json`` is malformed.
-
-    Sources
-    -------
-    See ``docs/REFERENCES.md#carino-1999``.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import carino_link_from_sector_periods
-    >>> period = [
-    ...     {
-    ...         "sector": "A",
-    ...         "portfolio_weight": 1.0,
-    ...         "benchmark_weight": 1.0,
-    ...         "portfolio_return": 0.02,
-    ...         "benchmark_return": 0.01,
-    ...     }
-    ... ]
-    >>> result = carino_link_from_sector_periods(json.dumps([period, period]))
-    >>> round(result.linked_selection, 4)
     0.0203
     """
     ...
@@ -6035,14 +5668,14 @@ class FiAttributionResult:
         """
         ...
 
-    def reconciliation_check(self, tolerance: float) -> FiReconciliationReport:
+    def reconciliation_check(self, tolerance: float) -> ReconciliationReport:
         """
         Reconcile the five Campisi effect totals against the active return.
 
         Binds the Rust method
-        ``finstack_quant_portfolio::FiAttributionResult::reconciliation_check``;
-        :func:`campisi_reconciliation_check` is the free-function form that
-        also accepts the JSON wire shape.
+        ``finstack_quant_portfolio::FiAttributionResult::reconciliation_check``.
+        For a result held as JSON, rebuild it first with
+        :meth:`FiAttributionResult.from_json`.
 
         Parameters
         ----------
@@ -6052,9 +5685,9 @@ class FiAttributionResult:
 
         Returns
         -------
-        FiReconciliationReport
+        ReconciliationReport
             Typed report with ``total_residual``, ``is_reconciled`` and
-            ``tolerance``.
+            ``tolerance`` (residual and tolerance in return units).
 
         Notes
         -----
@@ -6135,8 +5768,7 @@ class FiCarinoLinkedResult:
     """
     Multi-period Carino-linked Campisi attribution result.
 
-    Returned by :func:`campisi_carino_link` and
-    :func:`campisi_carino_link_from_snapshots`. The five linked totals sum to
+    Returned by :func:`campisi_carino_link`. The five linked totals sum to
     the geometrically compounded active return.
 
     Examples
@@ -6364,137 +5996,6 @@ class FiCarinoLinkedResult:
         """
         ...
 
-class FiReconciliationReport:
-    """
-    Reconciliation report for the five Campisi effect totals.
-
-    Returned by :func:`campisi_reconciliation_check`. A floating-point sanity
-    gate, not a model check: the Campisi decomposition reconciles by
-    construction because selection is the residual.
-
-    Examples
-    --------
-    >>> from finstack_quant.portfolio import FiReconciliationReport
-    >>> doc = '{"total_residual": 0.0, "is_reconciled": true, "tolerance": 1e-10}'
-    >>> FiReconciliationReport.from_json(doc).is_reconciled
-    True
-    """
-
-    @property
-    def total_residual(self) -> float:
-        """
-        Active return minus the sum of the five effect totals.
-
-        Returns
-        -------
-        float
-            The stored value from the canonical Rust result.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    @property
-    def is_reconciled(self) -> bool:
-        """
-        Whether the residual is within tolerance.
-
-        Returns
-        -------
-        bool
-            The stored flag from the canonical Rust result.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    @property
-    def tolerance(self) -> float:
-        """
-        Absolute tolerance that was applied, in return units.
-
-        Returns
-        -------
-        float
-            The stored value from the canonical Rust result.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    def to_dataframe(self) -> pd.DataFrame:
-        """
-        Single-row pandas DataFrame view of the report.
-
-        Columns: ``total_residual``, ``is_reconciled``, ``tolerance``. The schema is pinned, so an empty result keeps the
-        same dtypes as a populated one.
-
-        Returns
-        -------
-        pd.DataFrame
-            One row per entry, with the pinned column schema above.
-
-        Raises
-        ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
-        """
-        ...
-
-    def to_json(self) -> str:
-        """
-        Serialize this result to canonical JSON.
-
-        Returns
-        -------
-        str
-            Canonical JSON representation, suitable for a matching
-            :meth:`from_json` call.
-
-        Raises
-        ------
-        ValueError
-            If the value cannot be serialized to JSON.
-        """
-        ...
-
-    @staticmethod
-    def from_json(json: str) -> FiReconciliationReport:
-        """
-        Deserialize a ``FiReconciliationReport`` from canonical JSON.
-
-        Parameters
-        ----------
-        json : str
-            Canonical payload produced by :meth:`to_json` or the paired
-            ``*_json`` wire function.
-
-        Returns
-        -------
-        FiReconciliationReport
-            Validated instance reconstructed from the canonical JSON payload.
-
-        Raises
-        ------
-        ValueError
-            If the payload is malformed or does not match the serialized
-            ``FiReconciliationReport`` schema.
-
-        Examples
-        --------
-        >>> from finstack_quant.portfolio import FiReconciliationReport
-        >>> doc = '{"total_residual": 0.0, "is_reconciled": true, "tolerance": 1e-10}'
-        >>> FiReconciliationReport.from_json(doc).is_reconciled
-        True
-        """
-        ...
-
 def campisi_attribution(
     portfolio_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
     benchmark_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
@@ -6597,19 +6098,17 @@ def campisi_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.Data
 
     Each period result already carries its own applied ``period_years``, so
     periods of *different* lengths link correctly here (e.g. act/365 calendar
-    months: 31/365, 28/365, 31/365). Use this entry point for real day counts;
-    :func:`campisi_carino_link_from_snapshots` applies one shared
-    ``period_years`` to every period and is only correct for equal-length
-    periods.
+    months: 31/365, 28/365, 31/365). Attribute each period with
+    :func:`campisi_attribution` first:
+    ``campisi_carino_link([campisi_attribution(p, b, c) for p, b, c in periods])``.
 
     Parameters
     ----------
-    periods_json : str | dict | list | pandas.DataFrame
+    periods_json : list[FiAttributionResult] | str | list[dict]
         Chronological list of typed ``FiAttributionResult`` objects (as
-        returned by :func:`campisi_attribution`) or their JSON form, each the
-        parsed output of :func:`campisi_attribution` (or
-        ``FiAttributionResult.to_json()``). Every period
-        must carry the same sector ordering. Unknown fields are rejected.
+        returned by :func:`campisi_attribution`) or their JSON form
+        (``FiAttributionResult.to_json()``). Every period must carry the same
+        sector ordering. Unknown fields are rejected.
 
     Returns
     -------
@@ -6668,172 +6167,10 @@ def campisi_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.Data
     ...         "delta_spread": 0.0,
     ...     }
     ... ]
-    >>> period = json.loads(
-    ...     campisi_attribution(json.dumps(portfolio), json.dumps(benchmark), '{"period_years":0.25}').to_json()
-    ... )
-    >>> linked = campisi_carino_link(json.dumps([period, period]))
+    >>> period = campisi_attribution(json.dumps(portfolio), json.dumps(benchmark), '{"period_years":0.25}')
+    >>> linked = campisi_carino_link([period, period])
     >>> round(linked.linked_selection, 6)
     0.013195
-    """
-    ...
-
-def campisi_carino_link_from_snapshots(
-    periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    config_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-) -> FiCarinoLinkedResult:
-    """
-    Compute Carino-linked multi-period Campisi attribution from period JSON.
-
-    Binds Rust ``finstack_quant_portfolio::campisi_carino_link_from_snapshots``.
-
-    One ``config_json`` — and therefore one ``period_years`` — is applied to
-    every period, so this entry point is only correct when all periods have the
-    same length. For mixed-length periods (real day counts), compute each
-    period with :func:`campisi_attribution` and link the results with
-    :func:`campisi_carino_link`.
-
-    Parameters
-    ----------
-    periods_json : str | dict | list | pandas.DataFrame
-        JSON array of period objects, each with ``portfolio`` and
-        ``benchmark`` arrays of ``FiPositionSnapshot`` (same schema as
-        :func:`campisi_attribution`).
-    config_json : str | dict | list | pandas.DataFrame
-        JSON ``FiAttributionConfig`` shared across periods; ``period_years`` is
-        its only field and is required (no default).
-
-    Returns
-    -------
-    FiCarinoLinkedResult
-        Typed result whose five linked totals sum to the geometrically
-        compounded active return; use
-        serialize with ``to_json()`` for the wire string.
-
-    Raises
-    ------
-    PortfolioError
-        If ``periods_json`` is empty, any period fails Campisi validation, or
-        sector orderings differ across periods.
-    ValueError
-        If any JSON argument is malformed.
-
-    Sources
-    -------
-    See ``docs/REFERENCES.md#carino-1999``.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import campisi_carino_link_from_snapshots
-    >>> portfolio = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.02,
-    ...         "yield_annual": 0.04,
-    ...         "modified_duration": 5.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> benchmark = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.01,
-    ...         "yield_annual": 0.03,
-    ...         "modified_duration": 4.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> periods = json.dumps([{"portfolio": portfolio, "benchmark": benchmark}])
-    >>> result = campisi_carino_link_from_snapshots(periods, '{"period_years":0.25}')
-    >>> round(result.linked_selection, 4)
-    0.0065
-    """
-    ...
-
-def campisi_reconciliation_check(
-    result_json: FiAttributionResult | str | dict[str, Any] | list[Any] | pd.DataFrame, tolerance: float
-) -> FiReconciliationReport:
-    """
-    Reconcile the five Campisi effect totals against the active return.
-
-    Binds the Rust method
-    ``finstack_quant_portfolio::FiAttributionResult::reconciliation_check``
-    (a method in Rust, exposed here as a JSON function on the namespace).
-
-    The Campisi decomposition reconciles by construction because selection is
-    the residual, so this is a floating-point sanity gate rather than a model
-    check. Without it callers must re-sum ``total_allocation``,
-    ``total_active_carry``, ``total_active_treasury``, ``total_active_spread``
-    and ``total_selection`` by hand.
-
-    Parameters
-    ----------
-    result_json : FiAttributionResult | str | dict | list | pandas.DataFrame
-        Typed ``FiAttributionResult`` (as returned by
-        :func:`campisi_attribution`) or its JSON form, as returned by
-        :func:`campisi_attribution` (or
-        ``FiAttributionResult.to_json()``). Unknown fields are rejected.
-    tolerance : float
-        Absolute tolerance in return units; ``1e-10`` is appropriate for
-        return-space values.
-
-    Returns
-    -------
-    FiReconciliationReport
-        Typed report with ``total_residual`` (``active_return`` minus the
-        five totals), ``is_reconciled`` and the applied ``tolerance``; use
-        serialize with ``to_json()`` for the wire string.
-
-    Raises
-    ------
-    ValueError
-        If ``result_json`` is malformed or carries unknown fields.
-
-    Sources
-    -------
-    See ``docs/REFERENCES.md#campisi-2000``.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import campisi_attribution, campisi_reconciliation_check
-    >>> portfolio = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.02,
-    ...         "yield_annual": 0.04,
-    ...         "modified_duration": 5.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> benchmark = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.01,
-    ...         "yield_annual": 0.03,
-    ...         "modified_duration": 4.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> result = campisi_attribution(json.dumps(portfolio), json.dumps(benchmark), '{"period_years":0.25}').to_json()
-    >>> campisi_reconciliation_check(result, 1e-10).is_reconciled
-    True
     """
     ...
 
@@ -8411,13 +7748,13 @@ class FactorContributionDelta:
     """
 
     @classmethod
-    def from_json(cls, json_str: str) -> FactorContributionDelta:
+    def from_json(cls, json: str) -> FactorContributionDelta:
         """
         Deserialize a factor contribution delta from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized baseline-to-scenario factor delta, normally
             produced by ``FactorContributionDelta.to_json``.
 
@@ -8527,13 +7864,13 @@ class WhatIfResult:
     """
 
     @classmethod
-    def from_json(cls, json_str: str) -> WhatIfResult:
+    def from_json(cls, json: str) -> WhatIfResult:
         """
         Deserialize a what-if result from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized before-and-after risk result, normally
             produced by ``WhatIfResult.to_json``.
 
@@ -8661,13 +7998,13 @@ class StressResult:
     """
 
     @classmethod
-    def from_json(cls, json_str: str) -> StressResult:
+    def from_json(cls, json: str) -> StressResult:
         """
         Deserialize a stress result from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized stressed P&L and decomposition result, normally
             produced by ``StressResult.to_json``.
 
@@ -8800,13 +8137,13 @@ class StressPnl:
     """
 
     @classmethod
-    def from_json(cls, json_str: str) -> StressPnl:
+    def from_json(cls, json: str) -> StressPnl:
         """
         Deserialize a stress P&L result from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical ``{"total_pnl", "position_pnl"}`` JSON, normally produced
             by ``StressPnl.to_json``.
 
@@ -9391,13 +8728,13 @@ class PositionAssignment:
     """
 
     @classmethod
-    def from_json(cls, json_str: str) -> PositionAssignment:
+    def from_json(cls, json: str) -> PositionAssignment:
         """
         Deserialize a position assignment from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized factor assignment for one position, normally
             produced by ``PositionAssignment.to_json``.
 
@@ -9517,13 +8854,13 @@ class UnmatchedEntry:
     """
 
     @classmethod
-    def from_json(cls, json_str: str) -> UnmatchedEntry:
+    def from_json(cls, json: str) -> UnmatchedEntry:
         """
         Deserialize an unmatched dependency entry from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized unmatched-factor diagnostic, normally produced
             by ``UnmatchedEntry.to_json``.
 
@@ -9614,13 +8951,13 @@ class FactorAssignmentReport:
     """
 
     @classmethod
-    def from_json(cls, json_str: str) -> FactorAssignmentReport:
+    def from_json(cls, json: str) -> FactorAssignmentReport:
         """
         Deserialize a factor assignment report from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized factor-model assignment report, normally
             produced by ``FactorAssignmentReport.to_json``.
 
@@ -9925,7 +9262,7 @@ class CreditVolReport:
             JSON emitted by :meth:`to_json`, or the object the WASM
             ``buildCreditVolReport`` returns, serialized: ``total``,
             ``measure``, ``generic``, ``by_level``, ``idiosyncratic_total``
-            and ``by_position_optional``.
+            and ``by_position``.
 
         Returns
         -------
@@ -9942,7 +9279,7 @@ class CreditVolReport:
         >>> from finstack_quant.portfolio import CreditVolReport
         >>> report = CreditVolReport.from_json(
         ...     '{"total":1.0,"measure":"variance","generic":0.25,"by_level":[],'
-        ...     '"idiosyncratic_total":0.75,"by_position_optional":null}'
+        ...     '"idiosyncratic_total":0.75,"by_position":null}'
         ... )
         >>> (report.total, report.generic, report.by_position)
         (1.0, 0.25, None)
@@ -9957,7 +9294,7 @@ class CreditVolReport:
         -------
         str
             Compact JSON with ``total``, ``measure``, ``generic``,
-            ``by_level``, ``idiosyncratic_total`` and ``by_position_optional``;
+            ``by_level``, ``idiosyncratic_total`` and ``by_position``;
             the same shape the WASM ``buildCreditVolReport`` returns.
 
         Raises
@@ -9984,18 +9321,20 @@ class CreditVolReport:
         ...
 
     @property
-    def measure_json(self) -> str:
+    def measure(self) -> str | dict[str, Any]:
         """
-        Risk measure specification as JSON.
+        Risk measure of the source decomposition, as its canonical Python value.
 
         Returns
         -------
-        str
-            Risk measure specification as JSON.
+        str | dict[str, Any]
+            ``"variance"``, ``"volatility"``, ``{"var": {"confidence": c}}`` or
+            ``{"expected_shortfall": {"confidence": c}}`` — the same shape as
+            ``RiskDecomposition.measure``.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored or derived value.
+        This accessor does not raise; it returns the stored value.
         """
         ...
 
@@ -10090,7 +9429,7 @@ class CreditVolReport:
         on ``LevelVolContribution.by_bucket``, which is already a plain dict.
 
         Columns: ``level_name``, ``total`` (level contribution in the units of
-        :attr:`measure_json`).
+        :attr:`measure`).
 
         Returns
         -------
@@ -10115,7 +9454,7 @@ class CreditVolReport:
 
         Columns: ``position_id``, ``factor_total`` (systematic),
         ``idiosyncratic`` (issuer-specific), ``total`` (their sum) — all in
-        the units of :attr:`measure_json`.
+        the units of :attr:`measure`.
 
         Returns
         -------
@@ -10249,9 +9588,14 @@ def build_credit_vol_report(
         CreditVolReport with total, generic, level, idiosyncratic, and optional
         position-level volatility contribution fields.
 
-    Notes
-    -----
-    This helper does not raise; it aggregates the supplied decomposition in-process.
+    Raises
+    ------
+    TypeError
+        If ``decomposition`` or ``model`` is not the expected wrapper type.
+    PortfolioError
+        A ``ValueError`` subclass raised when a factor contribution is neither
+        the generic credit factor nor a bucket of one of ``model``'s hierarchy
+        levels, so its risk could not be reported.
 
     Examples
     --------
@@ -11803,10 +11147,11 @@ class Constraint:
         Constraint
             Inclusive ``[min, max]`` weight interval for positions matching ``filter``.
 
-        Raises
-        ------
-        PortfolioError
-            If ``min`` is greater than ``max``.
+        Notes
+        -----
+        This method does not raise; it builds the constraint as given.
+        The interval is checked when the problem is optimized:
+        :func:`optimize_portfolio` raises ``PortfolioError`` for a non-finite bound or ``min > max``.
 
         Examples
         --------
@@ -11837,10 +11182,11 @@ class Constraint:
         Constraint
             Bound enforcing ``sum(abs(w_new - w_current)) <= max_turnover``.
 
-        Raises
-        ------
-        PortfolioError
-            If ``max_turnover`` is negative.
+        Notes
+        -----
+        This method does not raise; it builds the constraint as given.
+        The cap is checked when the problem is optimized:
+        :func:`optimize_portfolio` raises ``PortfolioError`` for a negative or non-finite ``max_turnover``.
 
         Examples
         --------
@@ -11866,10 +11212,11 @@ class Constraint:
         Constraint
             Normalization constraint enforcing ``sum(w_i) == rhs``.
 
-        Raises
-        ------
-        PortfolioError
-            If ``rhs`` is non-finite or negative.
+        Notes
+        -----
+        This method does not raise; it builds the constraint as given.
+        ``rhs`` is checked when the problem is optimized:
+        :func:`optimize_portfolio` raises ``PortfolioError`` for a negative or non-finite ``rhs``.
 
         Examples
         --------
@@ -12541,28 +11888,6 @@ class OptimizationStatus:
         ...
 
     @classmethod
-    def feasible_but_suboptimal(cls) -> OptimizationStatus:
-        """
-        Feasible solution that did not prove optimality.
-
-        Returns
-        -------
-        OptimizationStatus
-            Usable status indicating feasibility without proven optimality.
-
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
-
-        Examples
-        --------
-        >>> from finstack_quant.portfolio import OptimizationStatus
-        >>> OptimizationStatus.feasible_but_suboptimal().kind
-        'feasible_but_suboptimal'
-        """
-        ...
-
-    @classmethod
     def unbounded(cls) -> OptimizationStatus:
         """
         Optimization problem is unbounded.
@@ -12585,19 +11910,17 @@ class OptimizationStatus:
         ...
 
     @classmethod
-    def infeasible(cls, conflicting_constraints: list[str]) -> OptimizationStatus:
+    def infeasible(cls) -> OptimizationStatus:
         """
-        Create an infeasible status with the listed conflicting constraints.
+        No feasible solution exists.
 
-        Parameters
-        ----------
-        conflicting_constraints : list[str]
-            Constraint labels implicated in the infeasibility diagnosis.
+        The LP backend does not expose an irreducible infeasible subset, so the
+        status names no conflicting constraints.
 
         Returns
         -------
         OptimizationStatus
-            Non-feasible status retaining the conflicting constraint labels.
+            Non-feasible status for an infeasible problem.
 
         Notes
         -----
@@ -12606,9 +11929,9 @@ class OptimizationStatus:
         Examples
         --------
         >>> from finstack_quant.portfolio import OptimizationStatus
-        >>> status = OptimizationStatus.infeasible(["budget"])
-        >>> status.conflicting_constraints
-        ['budget']
+        >>> status = OptimizationStatus.infeasible()
+        >>> (status.kind, status.is_feasible)
+        ('infeasible', False)
         """
         ...
 
@@ -12663,9 +11986,9 @@ class OptimizationStatus:
         Examples
         --------
         >>> from finstack_quant.portfolio import OptimizationStatus
-        >>> original = OptimizationStatus.infeasible(["budget"])
-        >>> OptimizationStatus.from_json(original.to_json()).conflicting_constraints
-        ['budget']
+        >>> original = OptimizationStatus.error("solver failed")
+        >>> OptimizationStatus.from_json(original.to_json()).message
+        'solver failed'
         """
         ...
 
@@ -12707,27 +12030,11 @@ class OptimizationStatus:
         Returns
         -------
         bool
-            Whether feasible holds for this `OptimizationStatus`.
+            ``True`` only for ``optimal``.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def conflicting_constraints(self) -> list[str]:
-        """
-        Constraint labels implicated in infeasibility.
-
-        Returns
-        -------
-        list[str]
-            Constraint labels implicated in infeasibility.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
+        This accessor does not raise; it is derived from the variant.
         """
         ...
 
@@ -13115,7 +12422,8 @@ class PortfolioOptimizationSpec:
         ----------
         constraint : Constraint
             Constraint to append to the current optimization specification. An explicit
-            budget replaces the implicit sum-of-weights budget of one when solving.
+            budget replaces the implicit sum-of-weights budget of one when solving;
+            ``unit_scaling`` weighting has no implicit budget and requires one.
 
         Returns
         -------
@@ -13455,11 +12763,11 @@ class PortfolioOptimizationResult:
         Returns
         -------
         bool
-            Whether feasible holds for this `PortfolioOptimizationResult`.
+            ``status.is_feasible``; derived from :attr:`status`, never stored.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
+        This accessor does not raise.
         """
         ...
 
@@ -13539,22 +12847,6 @@ class PortfolioOptimizationResult:
             points for ``percentage``. Held existing positions retain their exact
             current quantity under every weighting scheme, including zero-PV
             holdings.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def metric_values(self) -> dict[str, float]:
-        """
-        Portfolio metric values at the solution.
-
-        Returns
-        -------
-        dict[str, float]
-            Portfolio metric values at the solution.
 
         Notes
         -----
@@ -13677,9 +12969,14 @@ class PortfolioOptimizationResult:
     def binding_constraints(self) -> list[tuple[str, float]]:
         """
         Return constraints with near-zero slack as ``(label, slack)`` pairs.
+
+        Reads the stored ``binding_constraints`` names of the JSON wire form and
+        looks each slack up in :attr:`constraint_slacks`.
+
         Returns
         -------
         list[tuple[str, float]]
+            Binding constraints in slack order; empty for an infeasible solve.
 
         Notes
         -----
@@ -13721,9 +13018,12 @@ def optimize_portfolio(
     ValueError
         If supplied market JSON is malformed or schema-incompatible.
     PortfolioError
-        If the embedded portfolio specification cannot be constructed, candidate
-        IDs collide with existing positions or one another, or an operational
-        optimization failure occurs before a result is available.
+        If the embedded portfolio specification cannot be constructed, a
+        constraint is invalid (non-finite inputs, a negative budget or turnover
+        cap, ``min > max`` weight bounds), ``unit_scaling`` weighting has no
+        explicit budget, candidate IDs collide with existing positions or one
+        another, or an operational optimization failure occurs before a result
+        is available.
     KeyError
         If a required position metric cannot be valued for lack of market
         data, or a required base-currency conversion is unavailable.
@@ -13799,9 +13099,9 @@ def rebalance_from_spec(
     >>> portfolio = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> spec = PortfolioOptimizationSpec.new(portfolio, objective)
     >>> foreign = PortfolioOptimizationResult.from_json(
-    ...     '{"meta":{"numeric_mode":"f64","rounding":{"mode":"bankers","ingest_scale_by_currency":{},"output_scale_by_currency":{},"version":1}},"schema_version":1,"status":"optimal","status_label":"optimal","is_feasible":true,'
+    ...     '{"meta":{"numeric_mode":"f64","rounding":{"mode":"bankers","ingest_scale_by_currency":{},"output_scale_by_currency":{},"version":1}},"schema_version":1,"status":"optimal",'
     ...     '"objective_value":0.0,"turnover":0.0,"optimal_weights":{"X":1.0},"current_weights":{},'
-    ...     '"weight_deltas":{},"implied_quantities":{"X":1.0},"metric_values":{},"trades":[],'
+    ...     '"weight_deltas":{},"implied_quantities":{"X":1.0},"trades":[],'
     ...     '"constraint_slacks":{},"binding_constraints":[]}'
     ... )
     >>> try:
@@ -13831,8 +13131,9 @@ class SensitivityMatrix:
     Examples
     --------
     >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import compute_factor_sensitivities
-    >>> matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), "2025-01-15", "USD")
+    >>> from finstack_quant.portfolio import Portfolio, compute_factor_sensitivities
+    >>> book = Portfolio.builder("book", "USD", "2025-01-15").build()
+    >>> matrix = compute_factor_sensitivities(book, "[]", MarketContext(), "2025-01-15")
     >>> (matrix.n_positions, matrix.n_factors)
     (0, 0)
     """
@@ -13861,7 +13162,7 @@ class SensitivityMatrix:
         The wire object is ``{base_currency, position_ids, factor_ids, data}``
         with ``data`` as one row per position (``data[position][factor]``):
         the JSON :meth:`to_json` emits, the WASM
-        ``computeFactorSensitivities`` returns and ``decomposeFactorRisk``
+        ``computeFactorSensitivities`` returns and ``models.factor.risk.decomposeFactors``
         accepts.
 
         Parameters
@@ -13906,7 +13207,7 @@ class SensitivityMatrix:
         -------
         str
             Canonical monetary matrix JSON with nested rows, accepted by
-            :meth:`from_json` and WASM ``decomposeFactorRisk``; also backs
+            :meth:`from_json` and WASM ``models.factor.risk.decomposeFactors``; also backs
             ``pickle``. The derived ``n_factors`` count is omitted.
 
         Notes
@@ -14238,88 +13539,100 @@ class FactorPnlProfile:
         ...
 
 def compute_factor_sensitivities(
-    positions_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    factors_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    portfolio: Portfolio | str,
+    factors: str | list[Any] | pd.DataFrame,
     market: MarketContext | str,
     as_of: datetime.date | str,
-    base_currency: str,
-    bump_config_json: str | None = None,
+    bump_config: str | dict[str, Any] | None = None,
 ) -> SensitivityMatrix:
     """
-        Compute first-order factor sensitivities using central finite differences.
+    Compute the position-by-factor sensitivity matrix of a portfolio.
 
-        Parameters
-        ----------
-        positions_json : str
-            JSON array of position objects, each with ``id`` (str),
-    ``instrument`` (canonical v1 instrument envelope), and ``weight`` (float).
-        factors_json : str
-            JSON array of ``FactorDefinition`` objects.
-        market : MarketContext or str
-            ``MarketContext`` instance or JSON string.
-        as_of : datetime.date | str
-            Valuation date, either a date-like object or an ISO 8601 string.
-        base_currency : str
-            ISO reporting currency for every sensitivity or P&L amount. Missing FX raises KeyError.
-        bump_config_json : str, optional
-            Optional JSON-serialized ``BumpSizeConfig``.
-            Defaults to 1 bp / 1 % per factor type.
+    Each cell is the central difference of the position's base-currency PV
+    under an up and a down bump of the factor, weighted by the position's
+    scale factor (``quantity``, or ``quantity / 100`` for percentage
+    positions). Rows follow portfolio position order, columns follow
+    ``factors``, and every value is in ``portfolio.base_currency``, converted
+    with spot FX on each bumped market.
 
-        Returns
-        -------
-        SensitivityMatrix
-            Positions-by-factors delta matrix.
+    Parameters
+    ----------
+    portfolio : Portfolio | str
+        Built ``Portfolio`` or ``PortfolioSpec`` JSON. Its positions are the
+        rows and its ``base_currency`` is the reporting currency.
+    factors : str | list | pandas.DataFrame
+        ``FactorDefinition`` array as JSON text, a list of dicts or a records
+        ``DataFrame``. Every factor must map to market data; credit hierarchy
+        factors (``Credit`` with an empty ``curve_ids`` list) are rejected, use
+        :meth:`FactorModel.compute_sensitivities` for them.
+    market : MarketContext | str
+        Market to bump, including the FX needed for cross-currency positions.
+    as_of : datetime.date | str
+        Valuation date for pricing and spot FX.
+    bump_config : str | dict, optional
+        ``BumpSizeConfig`` as JSON text or a dict. Defaults to 1 bp / 1 % per
+        factor type.
 
-        Raises
-        ------
-        TypeError
-            If ``market`` is neither a ``MarketContext`` nor a JSON string.
-        ValueError
-            If position, factor, market, bump-configuration, or date input is
-            malformed or invalid, or a factor cannot be bumped or priced.
-        KeyError
-            If repricing requires market data that is absent from ``market``.
+    Returns
+    -------
+    SensitivityMatrix
+        Positions-by-factors delta matrix in ``portfolio.base_currency``.
 
-        Examples
-        --------
-        >>> from finstack_quant.core.market_data import MarketContext
-        >>> from finstack_quant.portfolio import compute_factor_sensitivities
-        >>> matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), "2025-01-15", "USD")
-        >>> matrix.to_dataframe().shape
-        (0, 0)
+    Raises
+    ------
+    TypeError
+        If ``portfolio`` or ``market`` is neither a handle nor a JSON string.
+    ValueError
+        If the portfolio spec, factors, bump configuration or date is malformed,
+        a factor is a credit hierarchy factor, or a factor cannot be bumped or
+        priced.
+    KeyError
+        If repricing requires market data or FX that is absent from ``market``.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import MarketContext
+    >>> from finstack_quant.portfolio import Portfolio, compute_factor_sensitivities
+    >>> book = Portfolio.builder("book", "USD", "2025-01-15").build()
+    >>> matrix = compute_factor_sensitivities(book, "[]", MarketContext(), "2025-01-15")
+    >>> matrix.to_dataframe().shape
+    (0, 0)
     """
     ...
 
 def compute_pnl_profiles(
-    positions_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    factors_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    portfolio: Portfolio | str,
+    factors: str | list[Any] | pd.DataFrame,
     market: MarketContext | str,
     as_of: datetime.date | str,
-    base_currency: str,
-    bump_config_json: str | None = None,
-    n_scenario_points: int = 5,
+    bump_config: str | dict[str, Any] | None = None,
+    n_points: int | None = None,
 ) -> list[FactorPnlProfile]:
     """
-    Compute scenario P&L profiles via full repricing across a factor grid.
+    Compute full-repricing scenario P&L profiles of a portfolio, one per factor.
+
+    Each factor is shifted across a symmetric grid of multiples of its bump
+    size. A profile row holds every position's scale-factor-weighted P&L in
+    ``portfolio.base_currency``.
 
     Parameters
     ----------
-    positions_json : str | dict | list | pandas.DataFrame
-        JSON array of position objects (same schema as
+    portfolio : Portfolio | str
+        Built ``Portfolio`` or ``PortfolioSpec`` JSON. Its positions are the
+        profile columns and its ``base_currency`` is the reporting currency.
+    factors : str | list | pandas.DataFrame
+        ``FactorDefinition`` array, in returned profile order (same accepted
+        forms and credit-hierarchy restriction as
         :func:`compute_factor_sensitivities`).
-    factors_json : str | dict | list | pandas.DataFrame
-        JSON array of ``FactorDefinition`` objects.
-    market : MarketContext or str
-        ``MarketContext`` instance or JSON string.
+    market : MarketContext | str
+        Market reused by every scenario.
     as_of : datetime.date | str
-        Valuation date, either a date-like object or an ISO 8601 string.
-    base_currency : str
-        ISO reporting currency for every P&L amount; missing FX raises KeyError.
-    bump_config_json : str, optional
-        Optional JSON-serialized ``BumpSizeConfig``.
-    n_scenario_points : int, default 5
-        Odd number of scenario grid points in ``3..=1001``
-        (default 5 produces shifts ``[-2, -1, 0, 1, 2]``).
+        Valuation date for pricing and spot FX.
+    bump_config : str | dict, optional
+        ``BumpSizeConfig`` as JSON text or a dict.
+    n_points : int, optional
+        Odd number of scenario grid points in ``3..=1001``; ``None`` selects 5
+        (shifts ``[-2, -1, 0, 1, 2]``).
 
     Returns
     -------
@@ -14329,68 +13642,20 @@ def compute_pnl_profiles(
     Raises
     ------
     TypeError
-        If ``market`` is neither a ``MarketContext`` nor a JSON string.
+        If ``portfolio`` or ``market`` is neither a handle nor a JSON string.
     ValueError
-        If position, factor, market, bump-configuration, or date input is
-        malformed or invalid; if ``n_scenario_points`` is less than ``3``,
-        greater than ``1001`` or even; or if a factor cannot be bumped or priced.
+        If the portfolio spec, factors, bump configuration or date is malformed;
+        a factor is a credit hierarchy factor; ``n_points`` is less than ``3``,
+        greater than ``1001`` or even; or a factor cannot be bumped or priced.
     KeyError
-        If repricing requires market data that is absent from ``market``.
+        If repricing requires market data or FX that is absent from ``market``.
 
     Examples
     --------
     >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import compute_pnl_profiles
-    >>> compute_pnl_profiles("[]", "[]", MarketContext(), "2025-01-15", "USD")
+    >>> from finstack_quant.portfolio import Portfolio, compute_pnl_profiles
+    >>> book = Portfolio.builder("book", "USD", "2025-01-15").build()
+    >>> compute_pnl_profiles(book, "[]", MarketContext(), "2025-01-15")
     []
-    """
-    ...
-
-# Risk Decomposition
-
-def decompose_factor_risk(
-    sensitivities: SensitivityMatrix,
-    covariance_json: str,
-    risk_measure: str | dict[str, Any] | None = None,
-) -> RiskDecomposition:
-    """
-    Decompose portfolio risk into factor and position contributions.
-
-    Uses the parametric (covariance-based) Euler decomposition to attribute
-    forecasted portfolio risk across factors and individual positions.
-
-    Parameters
-    ----------
-    sensitivities : SensitivityMatrix
-        Weighted position x factor sensitivity matrix, as
-        returned by :func:`compute_factor_sensitivities`.
-    covariance_json : str
-        JSON-serialized ``FactorCovarianceMatrix``.  Must use
-        the same factor IDs and ordering as the sensitivity matrix.
-    risk_measure : str or dict[str, Any] or None, optional
-        Risk measure.  Defaults to ``"variance"``.
-        Accepts Python strings (``"variance"``, ``"volatility"``) or dicts
-        (``{"var": {"confidence": 0.99}}``,
-        ``{"expected_shortfall": {"confidence": 0.975}}``).
-
-    Returns
-    -------
-    finstack_quant.models.factor.risk.RiskDecomposition
-        Portfolio-level risk decomposition with factor and position detail.
-
-    Raises
-    ------
-    ValueError
-        If factor axes do not match or the covariance matrix is
-        invalid.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import compute_factor_sensitivities, decompose_factor_risk
-    >>> matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), "2025-01-15", "USD")
-    >>> result = decompose_factor_risk(matrix, '{"factor_ids":[],"n":0,"data":[]}', "volatility")
-    >>> (result.total_risk, result.to_factor_dataframe().shape)
-    (0.0, (0, 4))
     """
     ...
