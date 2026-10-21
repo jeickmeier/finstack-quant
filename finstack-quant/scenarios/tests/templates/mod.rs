@@ -130,3 +130,59 @@ fn embedded_registry_built_scenario_roundtrips_through_serde_and_validation() {
     assert_eq!(roundtrip.id, "ltcm_1998");
     assert_eq!(roundtrip.operations.len(), scenario.operations.len());
 }
+
+/// Everything the built-in registry exposes, in registry order: metadata,
+/// the composite scenario, and every component scenario.
+fn built_registry_snapshot() -> serde_json::Value {
+    let registry = TemplateRegistry::embedded_builtins()
+        .unwrap_or_else(|error| panic!("failed to load embedded templates: {error}"));
+    let templates = registry
+        .list()
+        .into_iter()
+        .map(|metadata| {
+            let id = metadata.id.as_str();
+            let scenario = registry
+                .build(id)
+                .unwrap_or_else(|error| panic!("build {id}: {error}"));
+            let components = registry
+                .component_ids(id)
+                .unwrap_or_else(|error| panic!("components of {id}: {error}"))
+                .into_iter()
+                .map(|component_id| {
+                    registry
+                        .build_component(id, component_id)
+                        .unwrap_or_else(|error| panic!("component {component_id}: {error}"))
+                })
+                .collect::<Vec<_>>();
+            serde_json::json!({
+                "metadata": metadata,
+                "scenario": scenario,
+                "components": components,
+            })
+        })
+        .collect::<Vec<_>>();
+    serde_json::Value::Array(templates)
+}
+
+/// Pins what the built-in templates produce, so a change to the embedded
+/// document format or the loader cannot change a host-visible scenario.
+/// Regenerate with `FQ_UPDATE_CANONICAL_GOLDENS=1` after an intended change.
+#[test]
+fn embedded_registry_output_matches_golden() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/templates_built.json"
+    );
+    let rendered = serde_json::to_string_pretty(&built_registry_snapshot())
+        .unwrap_or_else(|error| panic!("serialize snapshot: {error}"))
+        + "\n";
+    if std::env::var_os("FQ_UPDATE_CANONICAL_GOLDENS").is_some() {
+        std::fs::write(path, &rendered).unwrap_or_else(|error| panic!("write {path}: {error}"));
+    }
+    let golden =
+        std::fs::read_to_string(path).unwrap_or_else(|error| panic!("read {path}: {error}"));
+    assert_eq!(
+        rendered, golden,
+        "built-in template output drifted from {path}"
+    );
+}

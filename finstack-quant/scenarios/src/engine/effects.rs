@@ -10,7 +10,7 @@ use crate::adapters::curves::CurveApplyCtx;
 use crate::error::Result;
 use crate::spec::{CurveKind, OperationSpec};
 use crate::warning::Warning;
-use finstack_quant_core::market_data::bumps::{BumpSpec, BumpType, MarketBump};
+use finstack_quant_core::market_data::bumps::{BumpType, MarketBump};
 use finstack_quant_core::market_data::context::CurveStorage;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::types::{CurveId, PriceId};
@@ -32,13 +32,6 @@ pub(crate) enum ScenarioEffect {
         id: CurveId,
         /// Percentage change; `10.0` increases the price by ten percent.
         pct: f64,
-    },
-    /// Volatility-surface bump, qualified by its market collection.
-    SurfaceBump {
-        /// Volatility-surface identifier.
-        id: CurveId,
-        /// Canonical surface bump specification.
-        spec: BumpSpec,
     },
     /// Structured warning recorded on the application report.
     Warning(Warning),
@@ -98,14 +91,21 @@ fn generate_effects(
             nodes,
             match_mode,
         } => adapters::curves::vol_index_node_effects(curve_id, nodes, *match_mode, ctx),
-        OperationSpec::BaseCorrParallelPts { surface_id, points } => Ok(
-            adapters::basecorr::base_corr_parallel_effects(surface_id, *points, ctx),
-        ),
+        OperationSpec::BaseCorrParallelPts { surface_id, points } => {
+            Ok(adapters::basecorr::base_corr_effects(
+                "BaseCorrParallelPts",
+                surface_id,
+                None,
+                *points,
+                ctx,
+            ))
+        }
         OperationSpec::BaseCorrBucketPts {
             surface_id,
             detachment_bp,
             points,
-        } => Ok(adapters::basecorr::base_corr_bucket_effects(
+        } => Ok(adapters::basecorr::base_corr_effects(
+            "BaseCorrBucketPts",
             surface_id,
             detachment_bp.as_deref(),
             *points,
@@ -114,19 +114,18 @@ fn generate_effects(
         OperationSpec::VolSurfaceParallelPct {
             vol_surface_id,
             pct,
-            ..
-        } => adapters::vol::vol_parallel_effects(vol_surface_id, *pct, ctx),
+        } => adapters::vol::vol_effects(vol_surface_id, None, None, *pct, false, ctx),
         OperationSpec::VolSurfaceBucketPct {
             vol_surface_id,
             tenors,
             strikes,
             pct,
-            ..
-        } => adapters::vol::vol_bucket_effects(
+        } => adapters::vol::vol_effects(
             vol_surface_id,
             tenors.as_deref(),
             strikes.as_deref(),
             *pct,
+            true,
             ctx,
         ),
         OperationSpec::StmtForecastPercent { .. }
@@ -516,16 +515,6 @@ pub(super) fn apply_generated_effects(
                     before
                         .zip(after)
                         .map(|(before, after)| LevelChange { before, after }),
-                );
-                *sink.applied += 1;
-            }
-            ScenarioEffect::SurfaceBump { id, spec } => {
-                flush_pending_bumps(sink.pending_bumps, ctx.market)?;
-                ctx.market.apply_surface_bump_in_place(id.as_str(), spec)?;
-                sink.record_market_shock(
-                    ScenarioMarketTarget::VolSurface { vol_surface_id: id },
-                    requested_shock(op),
-                    None,
                 );
                 *sink.applied += 1;
             }

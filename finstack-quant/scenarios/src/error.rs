@@ -9,7 +9,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 ///
 /// # Examples
 /// ```rust
-/// use finstack_quant_scenarios::error::Error;
+/// use finstack_quant_scenarios::Error;
 ///
 /// fn classify(err: Error) -> &'static str {
 ///     match err {

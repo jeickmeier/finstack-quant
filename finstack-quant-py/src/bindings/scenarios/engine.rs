@@ -8,7 +8,7 @@ use crate::bindings::pandas_utils::{
 };
 use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::errors::{display_to_py, scenarios_to_py};
-use finstack_quant_scenarios::engine::{ApplicationEnvelope, ApplicationReport};
+use finstack_quant_scenarios::{ApplicationEnvelope, ApplicationReport};
 use finstack_quant_valuations::instruments::Instrument;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
@@ -284,7 +284,7 @@ impl PyApplicationResult {
         self.instruments
             .as_ref()
             .map(|inventory| {
-                finstack_quant_scenarios::engine::instrument_envelopes(inventory)
+                finstack_quant_scenarios::instrument_envelopes(inventory)
                     .map_err(display_to_py)?
                     .iter()
                     .map(|envelope| serde_json::to_string(envelope).map_err(display_to_py))

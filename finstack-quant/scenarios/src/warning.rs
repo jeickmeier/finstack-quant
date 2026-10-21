@@ -192,7 +192,7 @@ pub enum Warning {
     HierarchyNoMatch {
         /// Hierarchy path the operation targeted, joined with `/`.
         target_path: String,
-        /// Operation kind name (e.g., `"HierarchyCurveParallelBp"`).
+        /// Operation `kind` tag (e.g., `"hierarchy_curve_parallel_bp"`).
         op_kind: String,
     },
 
@@ -204,7 +204,7 @@ pub enum Warning {
     HierarchyResolvedIdSkipped {
         /// The resolved identifier that was skipped.
         curve_id: String,
-        /// Operation kind name (e.g., `"HierarchyCurveParallelBp"`).
+        /// Operation `kind` tag (e.g., `"hierarchy_curve_parallel_bp"`).
         op_kind: String,
     },
 

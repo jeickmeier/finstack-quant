@@ -10,7 +10,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::Portfolio;
-use finstack_quant_scenarios::spec::{CurveKind, OperationSpec, ScenarioSpec};
+use finstack_quant_scenarios::{CurveKind, OperationSpec, ScenarioSpec};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::{
     Attributes, Instrument, MarketDependencies, PricingOptions,

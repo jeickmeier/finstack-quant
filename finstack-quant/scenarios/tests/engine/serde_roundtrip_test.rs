@@ -2,7 +2,7 @@
 
 use finstack_quant_core::contract::{ContractError, LoadLimits};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_scenarios::engine::ScenarioMarketTarget;
+use finstack_quant_scenarios::ScenarioMarketTarget;
 use finstack_quant_scenarios::{
     CurveKind, OperationSpec, ScenarioEnvelope, ScenarioSpec, TenorMatchMode, TimeRollMode,
 };

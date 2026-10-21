@@ -743,10 +743,12 @@ fn scenarios_dts_matches_structured_surface() {
         "applyScenario(scenarioJson: JsonInput, marketJson: JsonInput, asOf: string, modelJson?: JsonInput, instrumentsJson?: JsonInput, configJson?: JsonInput): ApplicationEnvelope;",
     ));
     assert!(!dts.contains("buildScenarioSpec("));
-    // Free-function twins of the Python OperationSpec / HorizonResult members:
-    // the omitted trailing arguments resolve to the Rust defaults.
+    // Free-function twins of the Python OperationSpec / HorizonResult members
+    // that compute in Rust: the omitted trailing arguments resolve to the Rust
+    // defaults. Variant constructors are TypeScript literals, not functions.
+    assert!(!dts.contains("operationSpecCurveParallelBp("));
     for signature in [
-        "operationSpecCurveParallelBp(curveKind: CurveKind, curveId: string, bp: number, discountCurveId?: string): OperationSpec;",
+        "parallelBpMany(curveKind: CurveKind, curveIds: string[], bp: number, discountCurveId?: string): OperationSpec[];",
         "operationSpecTimeRollForward(period: string, applyShocks?: boolean, rollMode?: TimeRollMode): OperationSpec;",
         "horizonResultExplainText(result: HorizonReport | HorizonResult | string): string;",
         "horizonResultFactorContribution(result: HorizonReport | HorizonResult | string, factor: AttributionFactor): number;",

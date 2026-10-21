@@ -115,10 +115,8 @@ pub(crate) fn compute_horizon_return<'py>(
     // Run analysis with the GIL released: horizon attribution revalues the
     // instrument multiple times (potentially rayon-parallel) and can run for
     // seconds on large books.
-    let mut analyzer = finstack_quant_scenarios::horizon::HorizonAnalysis::new(
-        attribution_method,
-        finstack_config,
-    );
+    let mut analyzer =
+        finstack_quant_scenarios::HorizonAnalysis::new(attribution_method, finstack_config);
     if let Some(id) = calendar_id {
         analyzer = analyzer.with_calendar_id(id);
     }
@@ -143,7 +141,7 @@ pub(crate) fn compute_horizon_return<'py>(
 )]
 #[derive(Clone)]
 pub(crate) struct PyHorizonResult {
-    inner: finstack_quant_scenarios::horizon::HorizonResult,
+    inner: finstack_quant_scenarios::HorizonResult,
 }
 
 const HORIZON_COLUMNS: [&str; 11] = [
@@ -258,7 +256,7 @@ impl PyHorizonResult {
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_scenarios::horizon::HorizonResult =
+        let inner: finstack_quant_scenarios::HorizonResult =
             serde_json::from_str(json).map_err(display_to_py)?;
         Ok(Self { inner })
     }

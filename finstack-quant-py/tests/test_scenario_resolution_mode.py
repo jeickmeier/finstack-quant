@@ -134,3 +134,15 @@ def test_time_roll_period_is_validated_eagerly() -> None:
         bad.validate()
     with pytest.raises(ValueError, match="Operation 0"):
         ScenarioSpec("bad-roll", [bad])
+
+
+def test_node_shock_match_mode_defaults_to_interpolate() -> None:
+    curve_default = OperationSpec.curve_node_bp("discount", "USD-OIS", [("5Y", 10.0)])
+    vol_default = OperationSpec.vol_index_node_pts("VIX", [("1M", 2.0)])
+
+    assert '"match_mode":"interpolate"' in curve_default.to_json()
+    assert '"match_mode":"interpolate"' in vol_default.to_json()
+    assert curve_default == OperationSpec.curve_node_bp("discount", "USD-OIS", [("5Y", 10.0)], match_mode="interpolate")
+    assert vol_default == OperationSpec.vol_index_node_pts("VIX", [("1M", 2.0)], match_mode="interpolate")
+    assert 'defaults to ``"interpolate"``' in (OperationSpec.curve_node_bp.__doc__ or "")
+    assert 'defaults to ``"interpolate"``' in (OperationSpec.vol_index_node_pts.__doc__ or "")

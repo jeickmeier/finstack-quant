@@ -1,6 +1,6 @@
 //! JSON Schema contract tests for scenario envelopes.
 
-use finstack_quant_scenarios::InstrumentType;
+use finstack_quant_valuations::pricer::InstrumentType;
 use serde_json::{json, Value};
 
 /// Render through the registry: only that path applies the packager, the

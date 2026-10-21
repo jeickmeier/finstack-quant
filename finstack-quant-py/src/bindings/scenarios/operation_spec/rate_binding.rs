@@ -3,7 +3,7 @@
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::errors::{display_to_py, scenarios_to_py};
 use finstack_quant_core::types::CurveId;
-use finstack_quant_scenarios::spec::RateBindingSpec;
+use finstack_quant_scenarios::RateBindingSpec;
 use finstack_quant_statements::types::NodeId;
 use pyo3::prelude::*;
 

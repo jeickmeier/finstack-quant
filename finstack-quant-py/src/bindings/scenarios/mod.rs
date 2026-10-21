@@ -150,7 +150,7 @@ fn validate_scenario_spec(py: Python<'_>, scenario: &Bound<'_, PyAny>) -> PyResu
 /// Returns
 /// -------
 /// list[str]
-///     Template identifiers, e.g. ``"rates_parallel_up_100bp"``.
+///     Template identifiers, e.g. ``"gfc_2008"``.
 ///
 /// See Also
 /// --------

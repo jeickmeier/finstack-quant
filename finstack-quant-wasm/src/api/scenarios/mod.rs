@@ -342,8 +342,7 @@ pub fn compute_horizon_return(
 
     let date = parse_iso_date(as_of)?;
 
-    let mut analyzer =
-        finstack_quant_scenarios::horizon::HorizonAnalysis::new(attribution_method, config);
+    let mut analyzer = finstack_quant_scenarios::HorizonAnalysis::new(attribution_method, config);
     if let Some(id) = calendar_id.as_deref() {
         analyzer = analyzer.with_calendar_id(id);
     }

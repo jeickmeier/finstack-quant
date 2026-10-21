@@ -11,7 +11,7 @@ use finstack_quant_core::market_data::term_structures::{
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::PriceId;
-use finstack_quant_scenarios::engine::ScenarioMarketTarget;
+use finstack_quant_scenarios::ScenarioMarketTarget;
 use finstack_quant_scenarios::{
     ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec, TenorMatchMode,
 };

@@ -3,7 +3,7 @@
   "metadata": {
     "id": "gfc_2008",
     "name": "Global Financial Crisis 2008",
-    "description": "Lehman Brothers collapse and ensuing global credit crisis. Severe flight-to-quality in rates, massive credit spread widening, equity crash, and volatility spike. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; override them via ScenarioSpecBuilder::override_curve to match your market data.",
+    "description": "Lehman Brothers collapse and ensuing global credit crisis. Severe flight-to-quality in rates, massive credit spread widening, equity crash, and volatility spike. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; to match your market data, build the template (or one of its components) and edit the market-data identifiers in the resulting spec's operations before applying it.",
     "event_date": "2008-09-15",
     "asset_classes": [
       "rates",
@@ -27,8 +27,8 @@
       "gfc_2008_fx"
     ]
   },
-  "components": {
-    "gfc_2008_rates": {
+  "components": [
+    {
       "id": "gfc_2008_rates",
       "name": "GFC 2008 - Rates",
       "operations": [
@@ -65,7 +65,7 @@
       ],
       "priority": 0
     },
-    "gfc_2008_credit": {
+    {
       "id": "gfc_2008_credit",
       "name": "GFC 2008 - Credit",
       "operations": [
@@ -84,7 +84,7 @@
       ],
       "priority": 1
     },
-    "gfc_2008_equity": {
+    {
       "id": "gfc_2008_equity",
       "name": "GFC 2008 - Equity",
       "operations": [
@@ -105,7 +105,7 @@
       ],
       "priority": 2
     },
-    "gfc_2008_vol": {
+    {
       "id": "gfc_2008_vol",
       "name": "GFC 2008 - Volatility",
       "operations": [
@@ -117,7 +117,7 @@
       ],
       "priority": 3
     },
-    "gfc_2008_fx": {
+    {
       "id": "gfc_2008_fx",
       "name": "GFC 2008 - FX",
       "operations": [
@@ -136,18 +136,9 @@
       ],
       "priority": 4
     }
-  },
+  ],
   "composite": {
-    "id": "gfc_2008",
-    "name": "Global Financial Crisis 2008",
     "description": "Lehman collapse - rates rally, credit blowout, equity crash, vol spike",
-    "priority": 0,
-    "component_ids": [
-      "gfc_2008_rates",
-      "gfc_2008_credit",
-      "gfc_2008_equity",
-      "gfc_2008_vol",
-      "gfc_2008_fx"
-    ]
+    "priority": 0
   }
 }
