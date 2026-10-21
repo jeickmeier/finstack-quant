@@ -11317,48 +11317,27 @@ export interface CorrelationNamespace {
  */
 export interface EuropeanPricer extends WasmOwned {
   /**
-   * Price a European call under GBM.
+   * Price a European option under GBM.
    * @param spot - Spot level at time 0.
    * @param strike - Exercise price in the same units as `spot`.
    * @param rate - Continuously compounded risk-free rate (decimal, annualized).
    * @param divYield - Continuous dividend yield (decimal, annualized).
    * @param vol - Annualized GBM volatility (decimal).
    * @param expiry - Time to expiry in years.
+   * @param isCall - Whether to value a call (`true`) or put (`false`).
    * @param numSteps - Optional time-grid steps; omitted uses the registry default.
    * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
    * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
    * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
    */
-  priceCall(
+  priceGbm(
     spot: number,
     strike: number,
     rate: number,
     divYield: number,
     vol: number,
     expiry: number,
-    numSteps?: number,
-    currency?: string
-  ): MoneyEstimate;
-  /**
-   * Price a European put under GBM.
-   * @param spot - Spot level at time 0.
-   * @param strike - Exercise price in the same units as `spot`.
-   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
-   * @param divYield - Continuous dividend yield (decimal, annualized).
-   * @param vol - Annualized GBM volatility (decimal).
-   * @param expiry - Time to expiry in years.
-   * @param numSteps - Optional time-grid steps; omitted uses the registry default.
-   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
-   * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-   * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
-   */
-  pricePut(
-    spot: number,
-    strike: number,
-    rate: number,
-    divYield: number,
-    vol: number,
-    expiry: number,
+    isCall: boolean,
     numSteps?: number,
     currency?: string
   ): MoneyEstimate;
@@ -11383,7 +11362,7 @@ export interface EuropeanPricer extends WasmOwned {
  * import init, { models } from "finstack-quant-wasm";
  * await init();
  * const pricer = new models.monteCarlo.EuropeanPricer(10000, 42);
- * const call = pricer.priceCall(100, 100, 0.05, 0.0, 0.2, 1.0);
+ * const call = pricer.priceGbm(100, 100, 0.05, 0.0, 0.2, 1.0, true);
  * console.log(call.mean.amount, call.stderr);
  * pricer.free();
  * ```
@@ -11672,20 +11651,20 @@ export interface PathDependentPricerConstructor {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const est = models.monteCarlo.priceHestonCall(
- *   100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, 5000, 42n,
+ * const est = models.monteCarlo.priceHeston(
+ *   100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, true, 5000, 42n,
  * );
  * console.log(est.mean.amount, est.mean.currency);
  * // Path count and seed default to the Rust registry values.
- * const byDefault = models.monteCarlo.priceHestonCall(
- *   100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0,
+ * const byDefault = models.monteCarlo.priceHeston(
+ *   100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, false,
  * );
  * console.log(byDefault.num_paths); // 100000
  * ```
  */
 export interface MonteCarloNamespace {
   /**
-   * Price a European call under Heston stochastic volatility.
+   * Price a European option under Heston stochastic volatility.
    * @param spot - Current spot price or exchange rate in the same units as the strike.
    * @param strike - Option strike price in the same price units as the underlying.
    * @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -11696,6 +11675,7 @@ export interface MonteCarloNamespace {
    * @param rho - Instantaneous correlation between the asset and variance shocks.
    * @param v0 - Initial instantaneous variance in the Heston stochastic-volatility model.
    * @param expiry - Time to option expiry in years on the model's annual time basis.
+   * @param isCall - Whether to value a call (`true`) or put (`false`).
    * @param numPaths - Integer number of independent path estimators in [2, 10000000]; each antithetic pair counts once. Omitted or `null` uses the Rust registry European-pricer default (100 000).
    * @param seed - Deterministic random-number seed (number or BigInt); omitted or `null` uses the Rust registry default seed, so results stay reproducible.
    * @param numSteps - Optional positive integer number of time steps per simulated path; omitted uses the Rust registry default.
@@ -11703,7 +11683,7 @@ export interface MonteCarloNamespace {
    * @returns The Rust `MoneyEstimate` serde object: `mean` and `ci_95` as `{amount, currency}` money, plus `stderr`, `num_paths`, `num_simulated_paths` and the optional statistics (`null` when not captured).
    * @throws Error - Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite; `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive; `rho` is outside `[-1, 1]`; a count is fractional or exceeds the wasm32 integer range; the expiry, step count, path count, or computed discount factor fails validation; a simulated discounted payoff is non-finite; or the result cannot be serialized.
    */
-  priceHestonCall(
+  priceHeston(
     spot: number,
     strike: number,
     rate: number,
@@ -11714,41 +11694,7 @@ export interface MonteCarloNamespace {
     rho: number,
     v0: number,
     expiry: number,
-    numPaths?: number | null,
-    seed?: bigint | number | null,
-    numSteps?: number | null,
-    currency?: string | null
-  ): MoneyEstimate;
-  /**
-   * Price a European put under Heston stochastic volatility.
-   * @param spot - Current spot price or exchange rate in the same units as the strike.
-   * @param strike - Option strike price in the same price units as the underlying.
-   * @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
-   * @param divYield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
-   * @param kappa - Mean-reversion speed of variance in the Heston stochastic-volatility model.
-   * @param theta - Long-run variance level in the Heston stochastic-volatility model.
-   * @param volOfVol - Annualized volatility of variance in the Heston stochastic-volatility model.
-   * @param rho - Instantaneous correlation between the asset and variance shocks.
-   * @param v0 - Initial instantaneous variance in the Heston stochastic-volatility model.
-   * @param expiry - Time to option expiry in years on the model's annual time basis.
-   * @param numPaths - Integer number of independent path estimators in [2, 10000000]; each antithetic pair counts once. Omitted or `null` uses the Rust registry European-pricer default (100 000).
-   * @param seed - Deterministic random-number seed (number or BigInt); omitted or `null` uses the Rust registry default seed, so results stay reproducible.
-   * @param numSteps - Optional positive integer number of time steps per simulated path; omitted uses the Rust registry default.
-   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the Rust registry default currency.
-   * @returns The Rust `MoneyEstimate` serde object: `mean` and `ci_95` as `{amount, currency}` money, plus `stderr`, `num_paths`, `num_simulated_paths` and the optional statistics (`null` when not captured).
-   * @throws Error - Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite; `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive; `rho` is outside `[-1, 1]`; a count is fractional or exceeds the wasm32 integer range; the expiry, step count, path count, or computed discount factor fails validation; a simulated discounted payoff is non-finite; or the result cannot be serialized.
-   */
-  priceHestonPut(
-    spot: number,
-    strike: number,
-    rate: number,
-    divYield: number,
-    kappa: number,
-    theta: number,
-    volOfVol: number,
-    rho: number,
-    v0: number,
-    expiry: number,
+    isCall: boolean,
     numPaths?: number | null,
     seed?: bigint | number | null,
     numSteps?: number | null,
@@ -29999,11 +29945,11 @@ export interface ModelsNamespace {
     shift: number
   ): number;
   /**
-   * Reiner-Rubinstein continuous-monitoring barrier call price.
+   * Reiner-Rubinstein continuous-monitoring barrier option price.
    *
    * `direction` is `"up"` or `"down"`, `knock` is `"in"` or `"out"`.
    * Reiner-Rubinstein (1991): see docs/REFERENCES.md#reiner-rubinstein-1991.
-   * @returns Discounted barrier-call price in the same units as `spot`.
+   * @returns Discounted barrier option price in the same units as `spot`.
    * @param spot - Current spot price or exchange rate in the same units as the strike.
    * @param strike - Option strike price in the same price units as the underlying.
    * @param barrier - Continuously monitored barrier level in the same price units as spot.
@@ -30013,9 +29959,10 @@ export interface ModelsNamespace {
    * @param expiry - Time to expiry in years.
    * @param direction - Barrier direction: `"up"` for an upper barrier or `"down"` for a lower barrier.
    * @param knock - Barrier activation: `"in"` for knock-in or `"out"` for knock-out.
+   * @param isCall - Whether to value a call (`true`, default) or put (`false`).
    * @throws Error - Throws a JavaScript exception if `direction` or `knock` is unsupported, or the supplied model inputs produce a non-finite barrier price.
    */
-  barrierCall(
+  barrierOptionPrice(
     spot: number,
     strike: number,
     barrier: number,
@@ -30024,35 +29971,8 @@ export interface ModelsNamespace {
     vol: number,
     expiry: number,
     direction: 'up' | 'down',
-    knock: 'in' | 'out'
-  ): number;
-  /**
-   * Reiner-Rubinstein continuous-monitoring barrier put price.
-   *
-   * `direction` is `"up"` or `"down"`, `knock` is `"in"` or `"out"`.
-   * Reiner-Rubinstein (1991): see docs/REFERENCES.md#reiner-rubinstein-1991.
-   * @returns Discounted barrier-put price in the same units as `spot`.
-   * @param spot - Current spot price or exchange rate in the same units as the strike.
-   * @param strike - Option strike price in the same price units as the underlying.
-   * @param barrier - Continuously monitored barrier level in the same price units as spot.
-   * @param rate - Continuously compounded risk-free rate, expressed as a decimal.
-   * @param divYield - Continuous dividend yield or foreign rate, expressed as a decimal.
-   * @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
-   * @param expiry - Time to expiry in years.
-   * @param direction - Barrier direction: `"up"` for an upper barrier or `"down"` for a lower barrier.
-   * @param knock - Barrier activation: `"in"` for knock-in or `"out"` for knock-out.
-   * @throws Error - Throws a JavaScript exception if `direction` or `knock` is unsupported, or the supplied model inputs produce a non-finite barrier price.
-   */
-  barrierPut(
-    spot: number,
-    strike: number,
-    barrier: number,
-    rate: number,
-    divYield: number,
-    vol: number,
-    expiry: number,
-    direction: 'up' | 'down',
-    knock: 'in' | 'out'
+    knock: 'in' | 'out',
+    isCall?: boolean
   ): number;
   /**
    * Arithmetic (Turnbull-Wakeman) or geometric (Kemna-Vorst) Asian option.

@@ -609,8 +609,8 @@ def _monte_carlo_cases() -> dict[str, Callable[[], Any]]:
     fd = {"num_paths": 2000, "seed": 42}
     return {
         "monte_carlo.european": lambda: [
-            _money(european().price_call(*GBM)),
-            _money(european().price_put(*GBM, 16, "EUR")),
+            _money(european().price_gbm(*GBM, True)),
+            _money(european().price_gbm(*GBM, False, 16, "EUR")),
         ],
         "monte_carlo.asian": lambda: [
             _money(asian().price_asian(*GBM, True, 12)),
@@ -643,8 +643,8 @@ def _monte_carlo_cases() -> dict[str, Callable[[], Any]]:
             monte_carlo.heston_satisfies_feller(0.5, 0.04, 0.5),
         ],
         "monte_carlo.relative_stderr": lambda: [
-            european().price_call(*GBM).relative_stderr(),
-            european().price_call(*GBM).stderr / abs(european().price_call(*GBM).mean.amount),
+            european().price_gbm(*GBM, True).relative_stderr(),
+            european().price_gbm(*GBM, True).stderr / abs(european().price_gbm(*GBM, True).mean.amount),
         ],
     }
 
@@ -767,8 +767,8 @@ def _analytic_cases() -> dict[str, Callable[[], Any]]:
             _json(models.bachelier_greeks(-0.002, 0.001, 0.0075, 2.0, False)),
             models.black_shifted_vega(-0.002, 0.001, 0.3, 2.0, 0.03),
         ],
-        "closed_form.barrier_call": lambda: [
-            models.barrier_call(100.0, 100.0, barrier, 0.05, 0.01, 0.2, 1.0, direction, knock)
+        "closed_form.barrier_option_price": lambda: [
+            models.barrier_option_price(100.0, 100.0, barrier, 0.05, 0.01, 0.2, 1.0, direction, knock)
             for barrier, direction in ((120.0, "up"), (85.0, "down"))
             for knock in ("in", "out")
         ],

@@ -407,16 +407,19 @@ test('Monte Carlo pricers take their defaults from the Rust registry', () => {
   assert.equal(explicit.numPaths, 500);
   assert.equal(explicit.seed, 7n);
   // The default currency and step count come from the registry too.
-  const call = explicit.priceCall(100, 100, 0.05, 0, 0.2, 1);
+  const call = explicit.priceGbm(100, 100, 0.05, 0, 0.2, 1, true);
   assert.equal(typeof call.mean.currency, 'string');
   assert.equal(call.num_paths, 500);
   assert.equal(
-    explicit.priceCall(100, 100, 0.05, 0, 0.2, 1, undefined, 'EUR').mean.currency,
+    explicit.priceGbm(100, 100, 0.05, 0, 0.2, 1, true, undefined, 'EUR').mean.currency,
     'EUR'
   );
   assert.throws(() => new monteCarlo.EuropeanPricer(0), kind('validation'));
   assert.throws(() => new monteCarlo.EuropeanPricer('100'), invalidType);
-  assert.throws(() => explicit.priceCall(100, 100, 0.05, 0, 0.2, 1, 4, 'ZZZZ'), kind('validation'));
+  assert.throws(
+    () => explicit.priceGbm(100, 100, 0.05, 0, 0.2, 1, true, 4, 'ZZZZ'),
+    kind('validation')
+  );
 
   const asian = new monteCarlo.PathDependentPricer(500, 7, false, true);
   assert.equal(asian.antithetic, true);

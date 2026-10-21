@@ -608,7 +608,10 @@ const CASES = {
 
   'monte_carlo.european': () => {
     const european = new monteCarlo.EuropeanPricer(2000, 42, false);
-    return [money(european.priceCall(...GBM)), money(european.pricePut(...GBM, 16, 'EUR'))];
+    return [
+      money(european.priceGbm(...GBM, true)),
+      money(european.priceGbm(...GBM, false, 16, 'EUR')),
+    ];
   },
   'monte_carlo.asian': () => {
     const asian = new monteCarlo.PathDependentPricer(2000, 42, false);
@@ -647,7 +650,7 @@ const CASES = {
     monteCarlo.hestonSatisfiesFeller(0.5, 0.04, 0.5),
   ],
   'monte_carlo.relative_stderr': () => {
-    const estimate = new monteCarlo.EuropeanPricer(2000, 42, false).priceCall(...GBM);
+    const estimate = new monteCarlo.EuropeanPricer(2000, 42, false).priceGbm(...GBM, true);
     return [
       monteCarlo.relativeStderr(estimate),
       estimate.stderr / Math.abs(Number(estimate.mean.amount)),
@@ -791,13 +794,13 @@ const CASES = {
     models.bachelierGreeks(-0.002, 0.001, 0.0075, 2.0, false),
     models.blackShiftedVega(-0.002, 0.001, 0.3, 2.0, 0.03),
   ],
-  'closed_form.barrier_call': () =>
+  'closed_form.barrier_option_price': () =>
     [
       [120.0, 'up'],
       [85.0, 'down'],
     ].flatMap(([barrier, direction]) =>
       ['in', 'out'].map((knock) =>
-        models.barrierCall(100.0, 100.0, barrier, 0.05, 0.01, 0.2, 1.0, direction, knock)
+        models.barrierOptionPrice(100.0, 100.0, barrier, 0.05, 0.01, 0.2, 1.0, direction, knock)
       )
     ),
   'closed_form.asian': () => [

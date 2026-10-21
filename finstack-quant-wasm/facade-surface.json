@@ -2428,8 +2428,7 @@
       "asianOptionPrice",
       "bachelierGreeks",
       "bachelierPrice",
-      "barrierCall",
-      "barrierPut",
+      "barrierOptionPrice",
       "black76Greeks",
       "black76ImpliedVol",
       "black76Price",
@@ -3144,8 +3143,7 @@
       "finiteDiffDelta",
       "finiteDiffGamma",
       "hestonSatisfiesFeller",
-      "priceHestonCall",
-      "priceHestonPut",
+      "priceHeston",
       "relativeStderr",
       "simulatePaths"
     ]
@@ -3153,7 +3151,7 @@
   "models.monteCarlo.EuropeanPricer": {
     "kind": "class",
     "statics": [],
-    "methods": ["free", "priceCall", "pricePut"],
+    "methods": ["free", "priceGbm"],
     "getters": ["numPaths", "seed", "useParallel"]
   },
   "models.monteCarlo.PathDependentPricer": {
@@ -3168,10 +3166,7 @@
     "methods": ["free", "priceAmerican", "priceAmericanUnbiased"],
     "getters": ["antithetic", "basis", "basisDegree", "numPaths", "seed", "useParallel"]
   },
-  "models.monteCarlo.priceHestonCall": {
-    "kind": "function"
-  },
-  "models.monteCarlo.priceHestonPut": {
+  "models.monteCarlo.priceHeston": {
     "kind": "function"
   },
   "models.monteCarlo.hestonSatisfiesFeller": {
@@ -3479,10 +3474,7 @@
   "models.blackShiftedVega": {
     "kind": "function"
   },
-  "models.barrierCall": {
-    "kind": "function"
-  },
-  "models.barrierPut": {
+  "models.barrierOptionPrice": {
     "kind": "function"
   },
   "models.asianOptionPrice": {

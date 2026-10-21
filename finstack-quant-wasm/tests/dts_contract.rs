@@ -1220,21 +1220,19 @@ fn models_monte_carlo_dts_matches_pricing_surface() {
     // Black-Scholes references live at `models.bsPrice`, not here.
     assert!(!monte_carlo.contains("blackScholesCall("));
     assert!(!monte_carlo.contains("blackScholesPut("));
-    for name in ["priceHestonCall(", "priceHestonPut("] {
-        assert!(
-            monte_carlo.contains(name),
-            "MonteCarloNamespace is missing `{name}`"
-        );
-    }
+    assert!(
+        monte_carlo.contains("priceHeston("),
+        "MonteCarloNamespace is missing `priceHeston`"
+    );
     // Path count and seed are optional: the Rust registry owns their defaults.
-    assert_eq!(monte_carlo.matches("numPaths?: number | null,").count(), 2);
+    assert_eq!(monte_carlo.matches("numPaths?: number | null,").count(), 1);
     assert_eq!(
         monte_carlo
             .matches("seed?: bigint | number | null,")
             .count(),
-        2
+        1
     );
-    assert_eq!(monte_carlo.matches("): MoneyEstimate;").count(), 2);
+    assert_eq!(monte_carlo.matches("): MoneyEstimate;").count(), 1);
     assert!(declares_type(&dts, "MoneyEstimate"));
     assert!(!dts.contains("MonteCarloEstimateJson"));
     let models = interface_block(&dts, "ModelsNamespace");

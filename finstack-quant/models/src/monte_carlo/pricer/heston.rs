@@ -2,7 +2,7 @@
 //!
 //! These free functions own the `TimeGrid` + engine + QE-process + payoff
 //! composition that the Python and WASM bindings expose as
-//! `price_heston_call` / `price_heston_put`, so the pipeline — including its
+//! `price_heston` (Python) / `priceHeston` (WASM), so the pipeline — including its
 //! registry-backed defaults for path count, seed, step count, currency, and
 //! parallelism — is defined once, in Rust. Both hosts are thin delegations.
 //!

@@ -359,11 +359,11 @@ Both hosts (Python `finstack_quant.models`, WASM `models` namespace) bind
 `bs_price`, `vanilla_expiry_payoff`, `bs_greeks` (default
 `DEFAULT_THETA_DAYS_PER_YEAR`), `bs_implied_vol`, `black76_implied_vol`,
 `black76_price`, `black76_greeks`, `bachelier_price`, `bachelier_greeks`,
-`black_shifted_price`, `black_shifted_vega`, `barrier_call`, `barrier_put`,
+`black_shifted_price`, `black_shifted_vega`, `barrier_option_price`,
 `asian_option_price`, `lookback_option_price`, `quanto_option_price` and
 `heston_price` under the same names (camelCase in WASM). Each binding converts
-`is_call` to `OptionType` and makes one call. Lookback and Asian put/`_df`/`_times`
-variants are Rust-only.
+`is_call` to `OptionType` and makes one call. The Asian `_times` variants are
+Rust-only.
 
 ## Verification
 

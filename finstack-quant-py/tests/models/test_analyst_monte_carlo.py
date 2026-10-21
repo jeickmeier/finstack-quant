@@ -16,7 +16,7 @@ import pytest
 
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.core.money import Money
-from finstack_quant.models import asian_option_price, barrier_call, bs_price
+from finstack_quant.models import asian_option_price, barrier_option_price, bs_price
 from finstack_quant.models.monte_carlo import (
     EuropeanPricer,
     LsmcPricer,
@@ -41,8 +41,8 @@ def _gbm_spot_paths(num_steps: int, num_paths: int, seed: int) -> np.ndarray:
 def test_european_serial_parallel_and_seed_replay_are_identical() -> None:
     """Both runtime paths return the same estimate, interval, and sample counts."""
     estimates = [
-        EuropeanPricer(num_paths=4096, seed=17, use_parallel=parallel).price_call(
-            100.0, 100.0, 0.05, 0.0, 0.2, 1.0, num_steps=1
+        EuropeanPricer(num_paths=4096, seed=17, use_parallel=parallel).price_gbm(
+            100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True, num_steps=1
         )
         for parallel in (False, True, False)
     ]
@@ -140,7 +140,7 @@ def test_nested_barrier_monitoring_on_identical_paths_has_pathwise_order() -> No
     assert np.all(monitored[0] >= monitored[1])
     assert np.all(monitored[1] >= monitored[2])
     assert monitored[0].mean() > monitored[2].mean()
-    continuous = barrier_call(100, 100, 120, 0.05, 0.0, 0.2, 1.0, "up", "out")
+    continuous = barrier_option_price(100, 100, 120, 0.05, 0.0, 0.2, 1.0, "up", "out")
     assert 0 < continuous < bs_price(100, 100, 0.05, 0.0, 0.2, 1.0, True)
     fine_se = monitored[-1].std(ddof=1) / math.sqrt(len(paths))
     # Continuous <= discrete is an expectation ordering; allow sampling error.
@@ -153,7 +153,7 @@ def test_asian_exact_one_fixing_and_geometric_benchmark() -> None:
     vanilla = bs_price(*args, True)
     for convention in ("arithmetic", "geometric"):
         assert asian_option_price(*args, 1, convention, True) == pytest.approx(vanilla, abs=1e-12)
-    european = EuropeanPricer(4096, 17, False).price_call(*args, num_steps=1)
+    european = EuropeanPricer(4096, 17, False).price_gbm(*args, is_call=True, num_steps=1)
     asian = PathDependentPricer(4096, 17, False, False).price_asian(*args, True, num_steps=1)
     assert asian.mean.amount == european.mean.amount
     # The two payoff reducers may round their sample variance one ulp apart.

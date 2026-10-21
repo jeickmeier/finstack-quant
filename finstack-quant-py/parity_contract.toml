@@ -505,12 +505,12 @@ rates        = { python = "finstack_quant.models.rates", status = "exists", note
 # (`forward.rs`, `dispatch.rs`, `heston_price`). Host defaults come from Rust
 # constants: `theta_days_per_year` = `DEFAULT_THETA_DAYS_PER_YEAR`, `averaging` =
 # `DEFAULT_ASIAN_AVERAGING`, `strike_type` = `DEFAULT_LOOKBACK_STRIKE_TYPE`. The
-# optional `is_call` of `asian_option_price` / `lookback_option_price` /
-# `quanto_option_price` / `heston_price` defaults to a call in both hosts (a
+# optional `is_call` of `barrier_option_price` / `asian_option_price` /
+# `lookback_option_price` / `quanto_option_price` / `heston_price` defaults to a call in both hosts (a
 # host signature default mapped to `OptionType::Call`). Rust-only closed-form
 # items, deliberately not bound: `bs_price_unchecked` / `bs_greeks_unchecked`,
 # `barrier_rebate` / `PayoutTiming` /
-# `BarrierParams` / `barrier_touch_probability`, `quanto_call` / `quanto_put` /
+# `BarrierParams` / `barrier_touch_probability`, `quanto_price` /
 # `quanto_drift_adjustment` (use `quanto_option_price`),
 # `HestonStripPricer` / `HestonFourierSettings` /
 # `heston_*_prices_fourier` strips, `OptionMarketParams`, `ExerciseStyle`,
@@ -522,8 +522,7 @@ public = [
     "asian_option_price",
     "bachelier_greeks",
     "bachelier_price",
-    "barrier_call",
-    "barrier_put",
+    "barrier_option_price",
     "black76_greeks",
     "black76_implied_vol",
     "black76_price",
@@ -570,8 +569,7 @@ public = [
     "finite_diff_delta",
     "finite_diff_gamma",
     "heston_satisfies_feller",
-    "price_heston_call",
-    "price_heston_put",
+    "price_heston",
     "simulate_paths",
 ]
 
@@ -1889,8 +1887,6 @@ backlog_ceiling = { modules = 0, members = 0 }
 # Python paths; values say what the host reads in Rust. An entry that becomes a
 # Rust name must be removed.
 [parity.rust_names]
-"finstack_quant.models.barrier_call" = "Rust `closed_form::barrier_option_price(.., OptionType::Call)`; merged in slice B3"
-"finstack_quant.models.barrier_put" = "Rust `closed_form::barrier_option_price(.., OptionType::Put)`; merged in slice B3"
 "finstack_quant.models.correlation.cholesky_decompose" = "binds core `math::linalg::cholesky_correlation`; the host name was kept when the models re-export was removed"
 "finstack_quant.models.credit.DynamicRecoverySpec.kind" = "serde tag of the Rust `model()` enum variant"
 "finstack_quant.models.credit.EndogenousHazardSpec.kind" = "serde tag of the Rust `leverage_hazard_map()` enum variant"
@@ -1927,10 +1923,6 @@ backlog_ceiling = { modules = 0, members = 0 }
 "finstack_quant.models.monte_carlo.Estimate.ci_upper" = "second element of the Rust `ci_95` tuple"
 "finstack_quant.models.monte_carlo.MoneyEstimate.ci_lower" = "first element of the Rust `ci_95` tuple"
 "finstack_quant.models.monte_carlo.MoneyEstimate.ci_upper" = "second element of the Rust `ci_95` tuple"
-"finstack_quant.models.monte_carlo.EuropeanPricer.price_call" = "Rust `price_gbm(OptionType::Call, ..)`; the host call/put pair is merged in slice B3"
-"finstack_quant.models.monte_carlo.EuropeanPricer.price_put" = "Rust `price_gbm(OptionType::Put, ..)`; the host call/put pair is merged in slice B3"
-"finstack_quant.models.monte_carlo.price_heston_call" = "Rust `pricer::heston::price_heston(OptionType::Call, ..)`; merged in slice B3"
-"finstack_quant.models.monte_carlo.price_heston_put" = "Rust `pricer::heston::price_heston(OptionType::Put, ..)`; merged in slice B3"
 "finstack_quant.models.monte_carlo.LsmcPricer.antithetic" = "Rust `LsmcConfig::antithetic` of the pricer's config"
 "finstack_quant.models.monte_carlo.LsmcPricer.basis" = "Rust `LsmcConvenience::basis` (default regression basis)"
 "finstack_quant.models.monte_carlo.LsmcPricer.basis_degree" = "Rust `LsmcConvenience::basis_degree`"

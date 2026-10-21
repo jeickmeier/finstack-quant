@@ -491,13 +491,13 @@ via `max_event_step()` so grid mismatches are caught up front.
 
 - **Python** — `finstack_quant.models.monte_carlo` exposes `McEngine`, `TimeGrid`,
   `EuropeanPricer`, `PathDependentPricer`, `LsmcPricer`, `MoneyEstimate`,
-  `Estimate`, `PathSummary`, `simulate_paths`, `price_heston_call` /
-  `price_heston_put`, `heston_satisfies_feller`, `black_scholes_call` /
+  `Estimate`, `PathSummary`, `simulate_paths`, `price_heston`,
+  `heston_satisfies_feller`, `black_scholes_call` /
   `black_scholes_put`, and the four finite-difference Greek functions.
 - **WASM** — the `models.monteCarlo` namespace in
   [`exports/models/monteCarlo.js`](../../finstack-quant-wasm/exports/models/monteCarlo.js)
-  exposes `simulatePaths` and the convenience pricers: `priceEuropeanCall/Put`,
-  `priceHestonCall/Put`, `priceAsian`, `priceAmerican`,
+  exposes `simulatePaths` and the convenience pricers: `EuropeanPricer.priceGbm`,
+  `priceHeston`, `priceAsian`, `priceAmerican`,
   `priceAmericanUnbiased`, and `blackScholesCall/Put`.
 
 Neither binding exposes the generic trait surface: `simulate_paths` selects among

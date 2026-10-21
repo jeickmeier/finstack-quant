@@ -76,13 +76,26 @@ impl PyEuropeanPricer {
         self.inner.use_parallel()
     }
 
-    /// Price a European call option under GBM.
+    /// Price a European option under GBM.
     ///
     /// Releases the GIL during the Monte Carlo run so other Python threads
     /// can make progress.
+    ///
+    /// Parameters
+    /// ----------
+    /// spot, strike, rate, div_yield, vol, expiry : float
+    ///     GBM market inputs; ``rate`` / ``div_yield`` are continuously
+    ///     compounded decimals, ``vol`` is a positive decimal, ``expiry`` is in
+    ///     years.
+    /// is_call : bool
+    ///     ``True`` for a call payoff, ``False`` for a put.
+    /// num_steps : int, optional
+    ///     Uniform time steps to expiry; defaults to the registry value.
+    /// currency : Currency or str, optional
+    ///     Currency stamped on the estimate; defaults to the registry value.
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, num_steps=None, currency=None))]
-    fn price_call(
+    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, is_call, num_steps=None, currency=None))]
+    fn price_gbm(
         &self,
         py: Python<'_>,
         spot: f64,
@@ -91,6 +104,7 @@ impl PyEuropeanPricer {
         div_yield: f64,
         vol: f64,
         expiry: f64,
+        is_call: bool,
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMoneyEstimate> {
@@ -99,45 +113,7 @@ impl PyEuropeanPricer {
         let pricer = &self.inner;
         py.detach(|| {
             pricer.price_gbm(
-                OptionType::Call,
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
-                num_steps,
-                ccy,
-            )
-        })
-        .map(PyMoneyEstimate::from_inner)
-        .map_err(core_to_py)
-    }
-
-    /// Price a European put option under GBM.
-    ///
-    /// Releases the GIL during the Monte Carlo run so other Python threads
-    /// can make progress.
-    #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, num_steps=None, currency=None))]
-    fn price_put(
-        &self,
-        py: Python<'_>,
-        spot: f64,
-        strike: f64,
-        rate: f64,
-        div_yield: f64,
-        vol: f64,
-        expiry: f64,
-        num_steps: Option<usize>,
-        currency: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyMoneyEstimate> {
-        let ccy = resolve_currency(currency)?;
-        let num_steps = convenience::european_num_steps(num_steps).map_err(core_to_py)?;
-        let pricer = &self.inner;
-        py.detach(|| {
-            pricer.price_gbm(
-                OptionType::Put,
+                OptionType::from(is_call),
                 spot,
                 strike,
                 rate,
