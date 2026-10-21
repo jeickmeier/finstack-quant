@@ -135,15 +135,15 @@
 //! # See Also
 //!
 //! - [`bs_price`] / [`bs_greeks`] for Black-Scholes pricing and Greeks (delta, gamma, vega, theta, rho)
-//! - [`geometric_asian_call`] / [`arithmetic_asian_call_tw`] for Asian option pricing
+//! - [`geometric_asian_price`] / [`arithmetic_asian_tw_price`] for Asian option pricing
 //! - [`barrier_price`] for barrier option pricing
 //! - [`fixed_strike_lookback_call`] / [`floating_strike_lookback_call`] for lookback option pricing
-//! - [`quanto_call`] for quanto option pricing
+//! - [`quanto_price`] for quanto option pricing
 //! - [`heston_price`] for stochastic volatility pricing
 //! - [`black76_price`] / [`bachelier_price`] for checked Black-76 / Bachelier / shifted-Black
 //!   prices and [`ForwardGreeks`]
 //! - [`black_call`] / [`bachelier_call`] for the unchecked unit-annuity Black-76 / Bachelier kernels
-//! - [`asian_option_price`] / [`barrier_call`] for the string-selected exotic closed forms
+//! - [`asian_option_price`] / [`barrier_option_price`] for the string-selected exotic closed forms
 
 mod asian;
 mod bachelier;
@@ -158,8 +158,8 @@ mod quanto;
 mod vanilla;
 
 pub use asian::{
-    arithmetic_asian_call_tw, arithmetic_asian_put_tw, arithmetic_asian_tw_price_times,
-    geometric_asian_call, geometric_asian_price_times, geometric_asian_put,
+    arithmetic_asian_tw_price, arithmetic_asian_tw_price_times, geometric_asian_price,
+    geometric_asian_price_times,
 };
 pub use bachelier::{
     bachelier_call, bachelier_delta_call, bachelier_delta_put, bachelier_gamma,
@@ -171,7 +171,7 @@ pub use black::{
     d1_d2_black76,
 };
 pub use dispatch::{
-    asian_option_price, barrier_call, barrier_put, lookback_option_price, quanto_option_price,
+    asian_option_price, barrier_option_price, lookback_option_price, quanto_option_price,
     DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE,
 };
 pub use forward::{
@@ -188,7 +188,7 @@ pub use lookback::{
     fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
     floating_strike_lookback_put,
 };
-pub use quanto::{quanto_call, quanto_put};
+pub use quanto::quanto_price;
 pub use vanilla::{
     bs_greeks, bs_greeks_unchecked, bs_price, bs_price_unchecked, checked_closed_form_value,
     vanilla_expiry_payoff, BsGreeks, DEFAULT_THETA_DAYS_PER_YEAR, ONE_PERCENT,

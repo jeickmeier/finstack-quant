@@ -211,10 +211,7 @@ impl AmericanExercise {
     /// * `spot` - Simulated underlying level in the strike's units.
     #[must_use]
     pub fn exercise_value(&self, spot: f64) -> f64 {
-        match self.option_type {
-            OptionType::Call => (spot - self.strike).max(0.0),
-            OptionType::Put => (self.strike - spot).max(0.0),
-        }
+        self.option_type.intrinsic(spot, self.strike)
     }
 }
 

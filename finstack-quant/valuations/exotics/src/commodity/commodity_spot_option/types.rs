@@ -531,7 +531,7 @@ impl CommoditySpotOption {
         use finstack_quant_core::math::time_grid::TimeGrid;
         use finstack_quant_models::monte_carlo::discretization::schwartz_smith::ExactSchwartzSmith;
         use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
-        use finstack_quant_models::monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
+        use finstack_quant_models::monte_carlo::payoff::vanilla::European;
         use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithProcess;
         use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 
@@ -599,34 +599,16 @@ impl CommoditySpotOption {
         let initial_state = process.initial_state().to_vec();
         let maturity_step = mc_params.num_steps;
 
-        // Dispatch on option type (EuropeanCall / EuropeanPut are
-        // distinct concrete types, so we branch here).
-        let estimate = match self.option_type {
-            OptionType::Call => {
-                let payoff = EuropeanCall::new(self.strike, 1.0, maturity_step);
-                engine.price(
-                    &rng,
-                    &process,
-                    &disc_scheme,
-                    &initial_state,
-                    &payoff,
-                    self.underlying.currency,
-                    df,
-                )?
-            }
-            OptionType::Put => {
-                let payoff = EuropeanPut::new(self.strike, 1.0, maturity_step);
-                engine.price(
-                    &rng,
-                    &process,
-                    &disc_scheme,
-                    &initial_state,
-                    &payoff,
-                    self.underlying.currency,
-                    df,
-                )?
-            }
-        };
+        let payoff = European::new(self.option_type, self.strike, 1.0, maturity_step);
+        let estimate = engine.price(
+            &rng,
+            &process,
+            &disc_scheme,
+            &initial_state,
+            &payoff,
+            self.underlying.currency,
+            df,
+        )?;
 
         let scale = self.quantity * self.multiplier;
         Ok((

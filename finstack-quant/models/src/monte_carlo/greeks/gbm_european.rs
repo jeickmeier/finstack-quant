@@ -11,7 +11,7 @@ use crate::monte_carlo::estimate::Estimate;
 use crate::monte_carlo::greeks::finite_diff::{
     finite_diff_delta_from_inputs, finite_diff_gamma_from_inputs, FiniteDiffInputs,
 };
-use crate::monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
+use crate::monte_carlo::payoff::vanilla::European;
 use crate::monte_carlo::process::gbm::GbmProcess;
 use crate::monte_carlo::registry;
 use crate::monte_carlo::rng::philox::PhiloxRng;
@@ -139,39 +139,19 @@ fn run_gbm_fd(spec: GbmEuropeanFdSpec, kind: FdKind) -> Result<Estimate> {
     let disc = ExactGbm::new();
     let discount_factor = flat_discount_factor(spec.rate, spec.expiry)?;
 
-    let (value, stderr) = match spec.option_type {
-        OptionType::Call => {
-            let payoff = EuropeanCall::new(spec.strike, 1.0, num_steps);
-            let inputs = FiniteDiffInputs {
-                engine: &engine,
-                rng: &rng,
-                process: &gbm,
-                disc: &disc,
-                payoff: &payoff,
-                currency,
-                discount_factor,
-            };
-            match kind {
-                FdKind::Delta => finite_diff_delta_from_inputs(&inputs, spec.spot, bump_size)?,
-                FdKind::Gamma => finite_diff_gamma_from_inputs(&inputs, spec.spot, bump_size)?,
-            }
-        }
-        OptionType::Put => {
-            let payoff = EuropeanPut::new(spec.strike, 1.0, num_steps);
-            let inputs = FiniteDiffInputs {
-                engine: &engine,
-                rng: &rng,
-                process: &gbm,
-                disc: &disc,
-                payoff: &payoff,
-                currency,
-                discount_factor,
-            };
-            match kind {
-                FdKind::Delta => finite_diff_delta_from_inputs(&inputs, spec.spot, bump_size)?,
-                FdKind::Gamma => finite_diff_gamma_from_inputs(&inputs, spec.spot, bump_size)?,
-            }
-        }
+    let payoff = European::new(spec.option_type, spec.strike, 1.0, num_steps);
+    let inputs = FiniteDiffInputs {
+        engine: &engine,
+        rng: &rng,
+        process: &gbm,
+        disc: &disc,
+        payoff: &payoff,
+        currency,
+        discount_factor,
+    };
+    let (value, stderr) = match kind {
+        FdKind::Delta => finite_diff_delta_from_inputs(&inputs, spec.spot, bump_size)?,
+        FdKind::Gamma => finite_diff_gamma_from_inputs(&inputs, spec.spot, bump_size)?,
     };
 
     let half_width = CI_95_Z * stderr;

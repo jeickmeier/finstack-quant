@@ -967,10 +967,11 @@ fn test_price_rejects_zero_chunk_size() {
 #[test]
 fn captured_rough_heston_paths_reset_history_and_match_streaming_prices() {
     use crate::monte_carlo::discretization::rough_heston::RoughHestonHybrid;
-    use crate::monte_carlo::payoff::vanilla::EuropeanCall;
+    use crate::monte_carlo::payoff::vanilla::European;
     use crate::monte_carlo::process::rough_heston::{RoughHestonParams, RoughHestonProcess};
     use crate::monte_carlo::rng::philox::PhiloxRng;
     use crate::monte_carlo::traits::ProcessMetadata;
+    use crate::types::OptionType;
     use finstack_quant_core::math::fractional::HurstExponent;
 
     let process = RoughHestonProcess::new(
@@ -989,7 +990,7 @@ fn captured_rough_heston_paths_reset_history_and_match_streaming_prices() {
     );
     let time_grid = TimeGrid::uniform(1.0, 3).unwrap();
     let disc = RoughHestonHybrid::new(time_grid.times(), 0.1).unwrap();
-    let payoff = EuropeanCall::new(100.0, 1.0, 3);
+    let payoff = European::new(OptionType::Call, 100.0, 1.0, 3);
     let rng = PhiloxRng::new(42);
     for parallel in [false, true] {
         // Two paths per chunk require the captured loop to reset a used
@@ -1411,13 +1412,14 @@ fn test_estimate_serde_requires_canonical_path_counts() {
 #[test]
 fn test_engine_antithetic_records_simulated_path_count() {
     use crate::monte_carlo::discretization::exact::ExactGbm;
-    use crate::monte_carlo::payoff::vanilla::EuropeanCall;
+    use crate::monte_carlo::payoff::vanilla::European;
     use crate::monte_carlo::process::gbm::GbmProcess;
     use crate::monte_carlo::rng::philox::PhiloxRng;
+    use crate::types::OptionType;
 
     let requested = 1024usize;
     let grid = TimeGrid::uniform(0.5, 16).expect("valid grid");
-    let payoff = EuropeanCall::new(100.0, 0.5, 16);
+    let payoff = European::new(OptionType::Call, 100.0, 0.5, 16);
     let process = GbmProcess::with_params(0.05, 0.0, 0.2).expect("valid gbm");
     let disc = ExactGbm::new();
     let discount = (-0.05_f64 * 0.5).exp();
@@ -1474,10 +1476,11 @@ mod correlation_regression {
     use super::*;
     use crate::monte_carlo::discretization::euler::EulerMaruyama;
     use crate::monte_carlo::discretization::qe_heston::QeHeston;
-    use crate::monte_carlo::payoff::vanilla::EuropeanCall;
+    use crate::monte_carlo::payoff::vanilla::European;
     use crate::monte_carlo::process::gbm::{GbmParams, MultiGbmProcess};
     use crate::monte_carlo::process::heston::HestonProcess;
     use crate::monte_carlo::rng::philox::PhiloxRng;
+    use crate::types::OptionType;
 
     fn uniform_grid(t: f64, n: usize) -> TimeGrid {
         TimeGrid::uniform(t, n).expect("valid grid")
@@ -1497,7 +1500,7 @@ mod correlation_regression {
 
         let rng = PhiloxRng::new(42);
         let strike = 110.0; // OTM call (S0 = 100)
-        let payoff = EuropeanCall::new(strike, 1.0, 50);
+        let payoff = European::new(OptionType::Call, strike, 1.0, 50);
         let disc = EulerMaruyama::new();
         let discount = (-0.03_f64).exp();
 
@@ -1551,7 +1554,7 @@ mod correlation_regression {
             .build()
             .expect("valid config");
         let rng = PhiloxRng::new(7);
-        let payoff = EuropeanCall::new(100.0, 1.0, 100);
+        let payoff = European::new(OptionType::Call, 100.0, 1.0, 100);
         let discount = (-0.03_f64).exp();
 
         let h0 = HestonProcess::with_params(0.03, 0.0, 2.0, 0.04, 0.3, 0.0, 0.04).expect("valid");

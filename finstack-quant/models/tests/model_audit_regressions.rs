@@ -49,7 +49,7 @@ fn cos_requires_a_nonempty_expansion_and_reconciles_to_black_scholes() {
         rate: 0.05,
         div_yield: 0.0,
         expiry: 1.0,
-        is_call: true,
+        option_type: OptionType::Call,
         n_terms: Some(0),
     };
     assert!(bs_cos_price(market, 0.2).is_err());

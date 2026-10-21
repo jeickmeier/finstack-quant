@@ -1281,8 +1281,9 @@ mod tests {
     use crate::monte_carlo::engine::PathCaptureConfig;
     use crate::monte_carlo::paths::PathSamplingMethod;
     use crate::monte_carlo::payoff::asian::{Asian, AveragingMethod};
-    use crate::monte_carlo::payoff::vanilla::EuropeanCall;
+    use crate::monte_carlo::payoff::vanilla::European;
     use crate::monte_carlo::process::gbm::{GbmParams, GbmProcess};
+    use crate::types::OptionType;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::math::random::MAX_SOBOL_DIMENSION;
     use finstack_quant_core::math::time_grid::TimeGrid;
@@ -1308,7 +1309,7 @@ mod tests {
                     .with_antithetic(false)
                     .with_sobol(true),
             );
-            let payoff = EuropeanCall::new(100.0, 1.0, maturity_step);
+            let payoff = European::new(OptionType::Call, 100.0, 1.0, maturity_step);
             let error = pricer
                 .price(&gbm, 100.0, 1.0, 1, &payoff, Currency::USD, discount_factor)
                 .expect_err("specialized Sobol pricing must preserve engine validation");
@@ -1441,7 +1442,7 @@ mod tests {
     #[test]
     fn grid_entry_points_preserve_estimates_and_capture_contracts() {
         let gbm = GbmProcess::with_params(0.05, 0.0, 0.2).expect("valid GBM");
-        let call = EuropeanCall::new(100.0, 1.0, 4);
+        let call = European::new(OptionType::Call, 100.0, 1.0, 4);
         for sobol in [false, true] {
             let config = PathDependentPricerConfig::new(32)
                 .with_seed(17)
@@ -1512,7 +1513,7 @@ mod tests {
         config.path_capture = PathCaptureConfig::sample(32, 17);
         let pricer = PathDependentPricer::new(config);
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.02, 0.2).expect("valid GBM parameters"));
-        let call = EuropeanCall::new(100.0, 1.0, 4);
+        let call = European::new(OptionType::Call, 100.0, 1.0, 4);
 
         let result = pricer
             .price_with_paths_and_grid(
@@ -1748,7 +1749,7 @@ mod tests {
             .with_sobol(true);
         let pricer = PathDependentPricer::new(config);
         let gbm = GbmProcess::new(GbmParams::new(r, q, sigma).unwrap());
-        let payoff = EuropeanCall::new(k, 1.0, num_steps);
+        let payoff = European::new(OptionType::Call, k, 1.0, num_steps);
         let df = (-r * t).exp();
 
         let result = pricer

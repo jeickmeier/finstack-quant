@@ -448,48 +448,25 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughBergomi
                 finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
             })?;
 
-        let (mean_pv, stderr_undisc) = match equity_option.option_type {
-            OptionType::Call => {
-                let payoff = finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall::new(
-                    equity_option.strike,
-                    equity_option.quantity,
-                    self.num_steps,
-                );
-                simulate_rbergomi(
-                    num_paths,
-                    &mut rng,
-                    &time_grid,
-                    &process,
-                    &disc,
-                    &initial_state,
-                    &payoff,
-                    ccy,
-                    &fbm_gen,
-                    self.num_steps,
-                    err_ctx,
-                )?
-            }
-            OptionType::Put => {
-                let payoff = finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanPut::new(
-                    equity_option.strike,
-                    equity_option.quantity,
-                    self.num_steps,
-                );
-                simulate_rbergomi(
-                    num_paths,
-                    &mut rng,
-                    &time_grid,
-                    &process,
-                    &disc,
-                    &initial_state,
-                    &payoff,
-                    ccy,
-                    &fbm_gen,
-                    self.num_steps,
-                    err_ctx,
-                )?
-            }
-        };
+        let payoff = finstack_quant_models::monte_carlo::payoff::vanilla::European::new(
+            equity_option.option_type,
+            equity_option.strike,
+            equity_option.quantity,
+            self.num_steps,
+        );
+        let (mean_pv, stderr_undisc) = simulate_rbergomi(
+            num_paths,
+            &mut rng,
+            &time_grid,
+            &process,
+            &disc,
+            &initial_state,
+            &payoff,
+            ccy,
+            &fbm_gen,
+            self.num_steps,
+            err_ctx,
+        )?;
 
         // Vanilla payoffs from `simulate_path_fractional` are undiscounted
         // terminal payoffs; discount the path mean (and stderr) to present

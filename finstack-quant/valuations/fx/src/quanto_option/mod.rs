@@ -56,7 +56,7 @@
 //! # See Also
 //!
 //! - [`QuantoOption`] for instrument struct
-//! - [`models::closed_form::quanto_call`](finstack_quant_models::closed_form::quanto_call) for formulas
+//! - [`models::closed_form::quanto_price`](finstack_quant_models::closed_form::quanto_price) for formulas
 
 pub(crate) mod metrics;
 pub(crate) mod pricer;

@@ -384,10 +384,7 @@ impl Payoff for BarrierOptionPayoff {
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
         if self.is_active() {
-            let intrinsic = match self.option_type {
-                OptionType::Call => (self.terminal_spot - self.strike).max(0.0),
-                OptionType::Put => (self.strike - self.terminal_spot).max(0.0),
-            };
+            let intrinsic = self.option_type.intrinsic(self.terminal_spot, self.strike);
             Money::new(intrinsic * self.notional, currency)
         } else {
             // Rebate payment. With at-hit timing configured and an actual

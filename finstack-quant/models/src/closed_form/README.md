@@ -88,13 +88,13 @@ References: Black & Scholes (1973); Merton (1973); Garman & Kohlhagen (1983).
 
 | Item | Notes |
 |------|-------|
-| `geometric_asian_call` / `_put` | Exact under geometric averaging (Kemna-Vorst) |
-| `arithmetic_asian_call_tw` / `_put_tw` | Turnbull-Wakeman two-moment lognormal match |
+| `geometric_asian_price` | Exact under geometric averaging (Kemna-Vorst) |
+| `arithmetic_asian_tw_price` | Turnbull-Wakeman two-moment lognormal match |
 | `geometric_asian_price_times` | Arbitrary (unequally spaced) fixing schedule, `-> Result<f64>` |
 | `arithmetic_asian_tw_price_times` | Same, Turnbull-Wakeman |
 
 Equal-spacing entry points take `(spot, strike, time, rate, div_yield, vol,
-num_fixings)`. `num_fixings == 0` selects the continuous-monitoring limit for
+num_fixings, option_type)`; the `_times` variants also end in `option_type`. `num_fixings == 0` selects the continuous-monitoring limit for
 the geometric forms; for the arithmetic forms it returns `0.0` (no average can
 be formed).
 
@@ -210,8 +210,8 @@ C        = e^(-r_dom·T) · [F_adj·N(d₁) - K·N(d₂)]
 ```
 
 `quanto_drift_adjustment(correlation, vol_asset, vol_fx)` returns `-ρ·σ_S·σ_X`.
-`quanto_call` / `quanto_put` take `(spot, strike, time, rate_domestic,
-rate_foreign, div_yield, vol_asset, vol_fx, correlation)` and return the price
+`quanto_price` takes `(spot, strike, time, rate_domestic, rate_foreign,
+div_yield, vol_asset, vol_fx, correlation, option_type)` and returns the price
 in domestic currency per unit of foreign notional.
 
 References: Garman & Kohlhagen (1983); Derman, Karasinski & Wecker (1990);
@@ -286,7 +286,7 @@ vol, expiry, ...)`, matching `bs_price`.
 
 | Function | Selectors |
 |----------|-----------|
-| `barrier_call` / `barrier_put` | `direction ∈ {"up","down"}`, `knock ∈ {"in","out"}` |
+| `barrier_option_price` | `direction ∈ {"up","down"}`, `knock ∈ {"in","out"}` |
 | `asian_option_price` | `averaging ∈ {"arithmetic","geometric"}`; hosts default to `DEFAULT_ASIAN_AVERAGING` (`"arithmetic"`) |
 | `lookback_option_price` | `strike_type ∈ {"fixed","floating"}`; hosts default to `DEFAULT_LOOKBACK_STRIKE_TYPE` (`"fixed"`) |
 | `quanto_option_price` | call/put only |

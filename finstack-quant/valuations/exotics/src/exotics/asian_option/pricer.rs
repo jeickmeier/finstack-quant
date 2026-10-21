@@ -897,10 +897,6 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
             // equal-spacing-over-[0, t] assumption misstates the average's
             // variance.
             let future_times = fixing_year_fractions(asian, as_of)?;
-            let is_call = matches!(
-                asian.option_type,
-                finstack_quant_valuations_core::instruments::OptionType::Call
-            );
             let unscaled = arithmetic_asian_tw_price_times(
                 spot,
                 k_eff,
@@ -909,7 +905,7 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
                 q,
                 sigma,
                 &future_times,
-                is_call,
+                asian.option_type,
             )?;
             unscaled * scale
         };
@@ -935,7 +931,7 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-    use finstack_quant_models::closed_form::{geometric_asian_call, geometric_asian_put};
+    use finstack_quant_models::closed_form::geometric_asian_price;
     use finstack_quant_valuations_core::instruments::OptionType;
     use time::Month;
 
@@ -1064,11 +1060,20 @@ mod tests {
             div_yield,
             vol,
             &times,
-            true,
+            OptionType::Call,
         )
         .expect("valid schedule");
         // And it must stay close to the uniform-grid Kemna-Vorst benchmark.
-        let kv = geometric_asian_call(spot, strike, t, rate, div_yield, vol, fixing_dates.len());
+        let kv = geometric_asian_price(
+            spot,
+            strike,
+            t,
+            rate,
+            div_yield,
+            vol,
+            fixing_dates.len(),
+            OptionType::Call,
+        );
         let expected_money = Money::new(expected, Currency::USD)
             .expect("valid money fixture")
             .amount();
@@ -1138,7 +1143,7 @@ mod tests {
             0.0,
             vol,
             &times,
-            true,
+            OptionType::Call,
         )
         .expect("valid schedule");
 
@@ -1199,10 +1204,19 @@ mod tests {
             div_yield,
             vol,
             &times,
-            false,
+            OptionType::Put,
         )
         .expect("valid schedule");
-        let kv = geometric_asian_put(spot, strike, t, rate, div_yield, vol, fixing_dates.len());
+        let kv = geometric_asian_price(
+            spot,
+            strike,
+            t,
+            rate,
+            div_yield,
+            vol,
+            fixing_dates.len(),
+            OptionType::Put,
+        );
         let expected_money = Money::new(expected, Currency::USD)
             .expect("valid money fixture")
             .amount();
@@ -1738,7 +1752,7 @@ mod tests {
             None,
             None,
         );
-        let kv_call = geometric_asian_call(spot, strike, t, r, q, sigma, n);
+        let kv_call = geometric_asian_price(spot, strike, t, r, q, sigma, n, OptionType::Call);
         assert!(
             (seasoned_call - kv_call).abs() < 1e-9,
             "unseasoned seasoned-control call {seasoned_call} must equal \
@@ -1759,7 +1773,7 @@ mod tests {
             None,
             None,
         );
-        let kv_put = geometric_asian_put(spot, strike, t, r, q, sigma, n);
+        let kv_put = geometric_asian_price(spot, strike, t, r, q, sigma, n, OptionType::Put);
         assert!(
             (seasoned_put - kv_put).abs() < 1e-9,
             "unseasoned seasoned-control put {seasoned_put} must equal \

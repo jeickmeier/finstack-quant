@@ -13,6 +13,36 @@ pub enum OptionType {
     Put,
 }
 
+impl OptionType {
+    /// Undiscounted exercise value of the payoff at `spot`.
+    ///
+    /// Returns `max(spot - strike, 0)` for a call and `max(strike - spot, 0)`
+    /// for a put.
+    ///
+    /// # Arguments
+    ///
+    /// * `spot` - Underlying level at exercise (spot, forward or average),
+    ///   in the same price units as `strike`.
+    /// * `strike` - Exercise price in the same units as `spot`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_models::types::OptionType;
+    ///
+    /// assert_eq!(OptionType::Call.intrinsic(110.0, 100.0), 10.0);
+    /// assert_eq!(OptionType::Put.intrinsic(110.0, 100.0), 0.0);
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn intrinsic(self, spot: f64, strike: f64) -> f64 {
+        match self {
+            Self::Call => (spot - strike).max(0.0),
+            Self::Put => (strike - spot).max(0.0),
+        }
+    }
+}
+
 impl From<bool> for OptionType {
     fn from(is_call: bool) -> Self {
         if is_call {

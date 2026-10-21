@@ -59,7 +59,8 @@
 //!
 //! ```
 //! use finstack_quant_core::currency::Currency;
-//! use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+//! use finstack_quant_models::monte_carlo::payoff::vanilla::European;
+//! use finstack_quant_models::types::OptionType;
 //! use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
 //! use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 //!
@@ -68,7 +69,7 @@
 //!     .with_seed(19)
 //!     .with_parallel(false);
 //! let process = GbmProcess::with_params(0.03, 0.01, 0.20).unwrap();
-//! let payoff = EuropeanCall::new(100.0, 1.0, 252);
+//! let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 //! let result = pricer
 //!     .price(&process, 100.0, 1.0, 252, &payoff, Currency::USD, (-0.03_f64).exp())
 //!     .expect("pricing should succeed");

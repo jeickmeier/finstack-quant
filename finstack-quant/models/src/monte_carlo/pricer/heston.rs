@@ -28,7 +28,7 @@
 
 use crate::monte_carlo::discretization::qe_heston::QeHeston;
 use crate::monte_carlo::engine::{McEngine, McEngineConfig};
-use crate::monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
+use crate::monte_carlo::payoff::vanilla::European;
 use crate::monte_carlo::process::heston::HestonProcess;
 use crate::monte_carlo::registry;
 use crate::monte_carlo::results::MoneyEstimate;
@@ -124,32 +124,16 @@ pub fn price_heston(
     let initial_state = [spot, v0];
     let discount_factor = flat_discount_factor(rate, expiry)?;
 
-    match option_type {
-        crate::types::OptionType::Call => {
-            let payoff = EuropeanCall::new(strike, 1.0, num_steps);
-            engine.price(
-                &rng,
-                &process,
-                &disc,
-                &initial_state,
-                &payoff,
-                currency,
-                discount_factor,
-            )
-        }
-        crate::types::OptionType::Put => {
-            let payoff = EuropeanPut::new(strike, 1.0, num_steps);
-            engine.price(
-                &rng,
-                &process,
-                &disc,
-                &initial_state,
-                &payoff,
-                currency,
-                discount_factor,
-            )
-        }
-    }
+    let payoff = European::new(option_type, strike, 1.0, num_steps);
+    engine.price(
+        &rng,
+        &process,
+        &disc,
+        &initial_state,
+        &payoff,
+        currency,
+        discount_factor,
+    )
 }
 
 #[cfg(test)]

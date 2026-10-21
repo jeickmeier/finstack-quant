@@ -106,7 +106,8 @@
 //! ## Geometric Average Asian Call
 //!
 //! ```
-//! use finstack_quant_models::closed_form::geometric_asian_call;
+//! use finstack_quant_models::closed_form::geometric_asian_price;
+//! use finstack_quant_models::types::OptionType;
 //!
 //! let spot = 100.0;
 //! let strike = 100.0;
@@ -116,8 +117,15 @@
 //! let vol = 0.20;
 //! let num_fixings = 252;  // Daily fixings
 //!
-//! let price = geometric_asian_call(
-//!     spot, strike, time, rate, div_yield, vol, num_fixings
+//! let price = geometric_asian_price(
+//!     spot,
+//!     strike,
+//!     time,
+//!     rate,
+//!     div_yield,
+//!     vol,
+//!     num_fixings,
+//!     OptionType::Call,
 //! );
 //!
 //! // Geometric Asian cheaper than vanilla due to averaging
@@ -128,7 +136,8 @@
 //! ## Arithmetic Average Asian Put (Approximation)
 //!
 //! ```
-//! use finstack_quant_models::closed_form::arithmetic_asian_put_tw;
+//! use finstack_quant_models::closed_form::arithmetic_asian_tw_price;
+//! use finstack_quant_models::types::OptionType;
 //!
 //! let spot = 100.0;
 //! let strike = 100.0;
@@ -139,8 +148,15 @@
 //! let num_fixings = 126;  // ~Daily fixings
 //!
 //! // Turnbull-Wakeman approximation
-//! let price = arithmetic_asian_put_tw(
-//!     spot, strike, time, rate, div_yield, vol, num_fixings
+//! let price = arithmetic_asian_tw_price(
+//!     spot,
+//!     strike,
+//!     time,
+//!     rate,
+//!     div_yield,
+//!     vol,
+//!     num_fixings,
+//!     OptionType::Put,
 //! );
 //!
 //! assert!(price > 0.0);
@@ -172,7 +188,7 @@ fn validate_discount_factor(df: f64) -> Result<()> {
     Ok(())
 }
 
-/// Price a geometric average Asian call option (closed-form).
+/// Price a geometric average Asian option (closed-form).
 ///
 /// # Arguments
 ///
@@ -185,6 +201,7 @@ fn validate_discount_factor(df: f64) -> Result<()> {
 /// * `vol` - Annualized lognormal volatility as a decimal.
 /// * `num_fixings` - Number of equally spaced observations; `0` selects the
 ///   continuous-monitoring limit.
+/// * `option_type` - Call or put payoff on the geometric average.
 ///
 /// # Returns
 ///
@@ -199,31 +216,8 @@ fn validate_discount_factor(df: f64) -> Result<()> {
 /// For discrete monitoring with n fixings:
 /// - σ_G = σ √[(2n + 1) / (6(n + 1))]
 /// - μ_G = (r - q) / 2 - σ² / 2 * [(2n + 1) / (6(n + 1))]
-pub fn geometric_asian_call(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    num_fixings: usize,
-) -> f64 {
-    geometric_asian_core(
-        OptionType::Call,
-        spot,
-        strike,
-        time,
-        rate,
-        div_yield,
-        vol,
-        num_fixings,
-    )
-}
-
-/// Shared core for the geometric Asian call and put.
 #[allow(clippy::too_many_arguments)]
-fn geometric_asian_core(
-    option_type: OptionType,
+pub fn geometric_asian_price(
     spot: f64,
     strike: f64,
     time: f64,
@@ -231,12 +225,10 @@ fn geometric_asian_core(
     div_yield: f64,
     vol: f64,
     num_fixings: usize,
+    option_type: OptionType,
 ) -> f64 {
     if time <= 0.0 {
-        return match option_type {
-            OptionType::Call => (spot - strike).max(0.0),
-            OptionType::Put => (strike - spot).max(0.0),
-        };
+        return option_type.intrinsic(spot, strike);
     }
 
     // Zero-vol degenerate case: the geometric average is deterministic, so the
@@ -246,11 +238,7 @@ fn geometric_asian_core(
     if vol <= 0.0 {
         let df = (-rate * time).exp();
         let forward = deterministic_geometric_forward(spot, time, rate, div_yield, num_fixings);
-        return df
-            * match option_type {
-                OptionType::Call => (forward - strike).max(0.0),
-                OptionType::Put => (strike - forward).max(0.0),
-            };
+        return df * option_type.intrinsic(forward, strike);
     }
 
     let n = num_fixings as f64;
@@ -296,55 +284,7 @@ fn geometric_asian_core(
     )
 }
 
-/// Price a geometric average Asian put option (closed-form).
-///
-/// Uses same parameter adjustments as geometric call.
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option's price units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `time` - Remaining time to maturity in years.
-/// * `rate` - Continuously compounded risk-free rate as a decimal.
-/// * `div_yield` - Continuously compounded dividend yield or carry as a
-///   decimal annual rate.
-/// * `vol` - Annualized lognormal volatility as a decimal.
-/// * `num_fixings` - Number of equally spaced observations; `0` selects the
-///   continuous-monitoring limit.
-pub fn geometric_asian_put(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    num_fixings: usize,
-) -> f64 {
-    geometric_asian_core(
-        OptionType::Put,
-        spot,
-        strike,
-        time,
-        rate,
-        div_yield,
-        vol,
-        num_fixings,
-    )
-}
-
-/// Price an arithmetic average Asian call option using Turnbull-Wakeman approximation.
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option's price units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `time` - Remaining time to maturity in years.
-/// * `rate` - Continuously compounded risk-free rate as a decimal.
-/// * `div_yield` - Continuously compounded dividend yield or carry as a
-///   decimal annual rate.
-/// * `vol` - Annualized lognormal volatility as a decimal.
-/// * `num_fixings` - Number of equally spaced arithmetic-average observations;
-///   zero returns zero because no average can be formed.
+/// Price an arithmetic average Asian option using Turnbull-Wakeman approximation.
 ///
 /// # Returns
 ///
@@ -370,7 +310,8 @@ pub fn geometric_asian_put(
 /// - d1 = (μ* - ln(K) + σ*²) / σ*
 /// - d2 = d1 - σ*
 ///
-/// Price = df * (m1 * N(d1) - K * N(d2))
+/// Call price = df * (m1 * N(d1) - K * N(d2)); the put uses the Black put on
+/// the same lognormal.
 ///
 /// # Arguments
 ///
@@ -383,31 +324,9 @@ pub fn geometric_asian_put(
 /// * `vol` - Annualized lognormal volatility as a decimal.
 /// * `num_fixings` - Number of equally spaced arithmetic-average
 ///   observations; zero has no valid average and returns zero.
-pub fn arithmetic_asian_call_tw(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    num_fixings: usize,
-) -> f64 {
-    arithmetic_asian_tw_core(
-        OptionType::Call,
-        spot,
-        strike,
-        time,
-        rate,
-        div_yield,
-        vol,
-        num_fixings,
-    )
-}
-
-/// Shared core for the Turnbull-Wakeman arithmetic Asian call and put.
+/// * `option_type` - Call or put payoff on the arithmetic average.
 #[allow(clippy::too_many_arguments)]
-fn arithmetic_asian_tw_core(
-    option_type: OptionType,
+pub fn arithmetic_asian_tw_price(
     spot: f64,
     strike: f64,
     time: f64,
@@ -415,12 +334,10 @@ fn arithmetic_asian_tw_core(
     div_yield: f64,
     vol: f64,
     num_fixings: usize,
+    option_type: OptionType,
 ) -> f64 {
     if time <= 0.0 {
-        return match option_type {
-            OptionType::Call => (spot - strike).max(0.0),
-            OptionType::Put => (strike - spot).max(0.0),
-        };
+        return option_type.intrinsic(spot, strike);
     }
     if num_fixings == 0 {
         return 0.0; // Need at least one fixing
@@ -436,9 +353,10 @@ fn arithmetic_asian_tw_core(
     // Turnbull-Wakeman lognormal moment-matching is only an approximation and
     // can overshoot these bounds for deep-ITM / high-vol inputs, so the return
     // paths below are capped.
-    let (forward_intrinsic, upper_bound) = match option_type {
-        OptionType::Call => (df * (m1 - strike).max(0.0), df * m1),
-        OptionType::Put => (df * (strike - m1).max(0.0), df * strike),
+    let forward_intrinsic = df * option_type.intrinsic(m1, strike);
+    let upper_bound = match option_type {
+        OptionType::Call => df * m1,
+        OptionType::Put => df * strike,
     };
 
     // Zero-vol degenerate: arithmetic average is deterministic, so the option
@@ -483,49 +401,13 @@ fn arithmetic_asian_tw_core(
     price.max(0.0).min(upper_bound)
 }
 
-/// Price an arithmetic average Asian put option using Turnbull-Wakeman approximation.
-///
-/// See [`arithmetic_asian_call_tw`] for formula details.
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option's price units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `time` - Remaining time to maturity in years.
-/// * `rate` - Continuously compounded risk-free rate as a decimal.
-/// * `div_yield` - Continuously compounded dividend yield or carry as a
-///   decimal annual rate.
-/// * `vol` - Annualized lognormal volatility as a decimal.
-/// * `num_fixings` - Number of equally spaced arithmetic-average observations;
-///   zero returns zero because no average can be formed.
-pub fn arithmetic_asian_put_tw(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    num_fixings: usize,
-) -> f64 {
-    arithmetic_asian_tw_core(
-        OptionType::Put,
-        spot,
-        strike,
-        time,
-        rate,
-        div_yield,
-        vol,
-        num_fixings,
-    )
-}
-
 // GENERAL FIXING-TIME VARIANTS
 //
 // The `*_times` functions below take the actual fixing times instead of
 // assuming `n` equally-spaced fixings over `[0, T]`. They are the canonical
 // entry points for instrument pricers, whose fixing schedules (weekly windows
 // near expiry, seasoned remainders, business-day calendars) are generally NOT
-// equally spaced; the equal-spacing wrappers above remain for callers that
+// equally spaced; the equal-spacing pricers above remain for callers that
 // genuinely have a uniform grid.
 
 /// Validate scalar domain inputs for the general fixing-time Asian pricers.
@@ -593,7 +475,7 @@ fn validate_fixing_times(fixing_times: &[f64]) -> Result<()> {
 /// * `Var[ln G] = σ² · ΣᵢΣⱼ min(tᵢ, tⱼ) / N²`
 ///
 /// so the option prices as a Black call/put on the lognormal `G`. Reduces to
-/// [`geometric_asian_call`] / [`geometric_asian_put`] when the times are
+/// [`geometric_asian_price`] when the times are
 /// `i·T/n`. Discounting uses the supplied `df` (date-based curve lookup);
 /// the moment drift uses `r = −ln(df)/t_expiry` for consistency.
 ///
@@ -614,7 +496,7 @@ fn validate_fixing_times(fixing_times: &[f64]) -> Result<()> {
 /// * `vol` - Annualized lognormal volatility as a decimal.
 /// * `fixing_times` - Strictly increasing fixing times in years, defining the
 ///   geometric-average observation schedule.
-/// * `is_call` - `true` for a call payoff and `false` for a put payoff.
+/// * `option_type` - Call or put payoff on the average.
 // Closed-form pricer: the flat scalar argument list mirrors the sibling
 // equal-spacing pricers and the textbook formula inputs.
 #[allow(clippy::too_many_arguments)]
@@ -626,16 +508,11 @@ pub fn geometric_asian_price_times(
     div_yield: f64,
     vol: f64,
     fixing_times: &[f64],
-    is_call: bool,
+    option_type: OptionType,
 ) -> Result<f64> {
     validate_asian_times_inputs(spot, strike, t_expiry, div_yield, vol)?;
     if t_expiry == 0.0 {
-        let intrinsic = if is_call {
-            spot - strike
-        } else {
-            strike - spot
-        };
-        return Ok(intrinsic.max(0.0));
+        return Ok(option_type.intrinsic(spot, strike));
     }
     validate_discount_factor(df)?;
     validate_fixing_times(fixing_times)?;
@@ -662,19 +539,17 @@ pub fn geometric_asian_price_times(
 
     if var_ln_g <= 0.0 {
         let g = mu.exp();
-        let intrinsic = if is_call { g - strike } else { strike - g };
         return super::vanilla::checked_closed_form_value(
-            df * intrinsic.max(0.0),
+            df * option_type.intrinsic(g, strike),
             "geometric Asian price",
         );
     }
 
     let std = var_ln_g.sqrt();
     let expected_g = (mu + 0.5 * var_ln_g).exp();
-    let price = if is_call {
-        black_call(expected_g, strike, std, 1.0)
-    } else {
-        black_put(expected_g, strike, std, 1.0)
+    let price = match option_type {
+        OptionType::Call => black_call(expected_g, strike, std, 1.0),
+        OptionType::Put => black_put(expected_g, strike, std, 1.0),
     };
     super::vanilla::checked_closed_form_value(df * price, "geometric Asian price")
         .map(|p| p.max(0.0))
@@ -683,8 +558,7 @@ pub fn geometric_asian_price_times(
 /// Turnbull-Wakeman arithmetic-average Asian option on an arbitrary fixing
 /// schedule.
 ///
-/// Same lognormal moment-matching as [`arithmetic_asian_call_tw`] /
-/// [`arithmetic_asian_put_tw`], with the first and second moments of the
+/// Same lognormal moment-matching as [`arithmetic_asian_tw_price`], with the first and second moments of the
 /// average evaluated on the actual fixing times instead of an equal-spacing
 /// grid. Discounting uses the supplied `df`; the moment drift uses
 /// `r = −ln(df)/t_expiry`.
@@ -706,7 +580,7 @@ pub fn geometric_asian_price_times(
 /// * `vol` - Annualized lognormal volatility as a decimal.
 /// * `fixing_times` - Strictly increasing fixing times in years, defining the
 ///   arithmetic-average observation schedule.
-/// * `is_call` - `true` for a call payoff and `false` for a put payoff.
+/// * `option_type` - Call or put payoff on the average.
 // Closed-form pricer: the flat scalar argument list mirrors the sibling
 // equal-spacing pricers and the textbook formula inputs.
 #[allow(clippy::too_many_arguments)]
@@ -718,16 +592,11 @@ pub fn arithmetic_asian_tw_price_times(
     div_yield: f64,
     vol: f64,
     fixing_times: &[f64],
-    is_call: bool,
+    option_type: OptionType,
 ) -> Result<f64> {
     validate_asian_times_inputs(spot, strike, t_expiry, div_yield, vol)?;
     if t_expiry == 0.0 {
-        let intrinsic = if is_call {
-            spot - strike
-        } else {
-            strike - spot
-        };
-        return Ok(intrinsic.max(0.0));
+        return Ok(option_type.intrinsic(spot, strike));
     }
     validate_discount_factor(df)?;
     validate_fixing_times(fixing_times)?;
@@ -735,11 +604,11 @@ pub fn arithmetic_asian_tw_price_times(
 
     let m1 = arithmetic_mean_first_moment_times(spot, rate, div_yield, fixing_times);
     super::vanilla::checked_closed_form_value(m1, "arithmetic Asian first moment")?;
-    let upper_bound = if is_call { df * m1 } else { df * strike };
-    let degenerate = |m1: f64| -> f64 {
-        let intrinsic = if is_call { m1 - strike } else { strike - m1 };
-        (df * intrinsic.max(0.0)).min(upper_bound)
+    let upper_bound = match option_type {
+        OptionType::Call => df * m1,
+        OptionType::Put => df * strike,
     };
+    let degenerate = |m1: f64| -> f64 { (df * option_type.intrinsic(m1, strike)).min(upper_bound) };
 
     if vol <= 0.0 {
         return Ok(degenerate(m1));
@@ -756,10 +625,9 @@ pub fn arithmetic_asian_tw_price_times(
     }
 
     let sigma_star = var.sqrt();
-    let price = if is_call {
-        df * black_call(m1, strike, sigma_star, 1.0)
-    } else {
-        df * black_put(m1, strike, sigma_star, 1.0)
+    let price = match option_type {
+        OptionType::Call => df * black_call(m1, strike, sigma_star, 1.0),
+        OptionType::Put => df * black_put(m1, strike, sigma_star, 1.0),
     };
     super::vanilla::checked_closed_form_value(price, "arithmetic Asian price")
         .map(|p| p.max(0.0).min(upper_bound))
@@ -920,7 +788,7 @@ mod tests {
 
     #[test]
     fn test_geometric_asian_call_positive() {
-        let price = geometric_asian_call(100.0, 100.0, 1.0, 0.05, 0.02, 0.2, 12);
+        let price = geometric_asian_price(100.0, 100.0, 1.0, 0.05, 0.02, 0.2, 12, OptionType::Call);
         assert!(price > 0.0);
         assert!(price < 100.0); // Reasonable bound
     }
@@ -936,7 +804,16 @@ mod tests {
         let div_yield = 0.02;
         let vol = 0.2;
 
-        let geo_asian = geometric_asian_call(spot, strike, time, rate, div_yield, vol, 12);
+        let geo_asian = geometric_asian_price(
+            spot,
+            strike,
+            time,
+            rate,
+            div_yield,
+            vol,
+            12,
+            OptionType::Call,
+        );
         let vanilla = crate::closed_form::bs_price_unchecked(
             spot,
             strike,
@@ -957,7 +834,8 @@ mod tests {
 
     #[test]
     fn test_arithmetic_asian_tw_positive() {
-        let price = arithmetic_asian_call_tw(100.0, 100.0, 1.0, 0.05, 0.02, 0.2, 12);
+        let price =
+            arithmetic_asian_tw_price(100.0, 100.0, 1.0, 0.05, 0.02, 0.2, 12, OptionType::Call);
         assert!(price > 0.0);
         assert!(price < 100.0);
     }
@@ -974,8 +852,26 @@ mod tests {
         let vol = 0.2;
         let num_fixings = 12;
 
-        let arith = arithmetic_asian_call_tw(spot, strike, time, rate, div_yield, vol, num_fixings);
-        let geo = geometric_asian_call(spot, strike, time, rate, div_yield, vol, num_fixings);
+        let arith = arithmetic_asian_tw_price(
+            spot,
+            strike,
+            time,
+            rate,
+            div_yield,
+            vol,
+            num_fixings,
+            OptionType::Call,
+        );
+        let geo = geometric_asian_price(
+            spot,
+            strike,
+            time,
+            rate,
+            div_yield,
+            vol,
+            num_fixings,
+            OptionType::Call,
+        );
 
         assert!(
             arith >= geo - 0.01,
@@ -996,9 +892,28 @@ mod tests {
         // for S=K=100, T=1, r=5%, q=2%, σ=20%.
         let (spot, strike, time, rate, div_yield, vol) = (100.0, 100.0, 1.0, 0.05, 0.02, 0.2);
 
-        let call_cont = geometric_asian_call(spot, strike, time, rate, div_yield, vol, 0);
-        let put_cont = geometric_asian_put(spot, strike, time, rate, div_yield, vol, 0);
-        let call_disc = geometric_asian_call(spot, strike, time, rate, div_yield, vol, 1_000_000);
+        let call_cont = geometric_asian_price(
+            spot,
+            strike,
+            time,
+            rate,
+            div_yield,
+            vol,
+            0,
+            OptionType::Call,
+        );
+        let put_cont =
+            geometric_asian_price(spot, strike, time, rate, div_yield, vol, 0, OptionType::Put);
+        let call_disc = geometric_asian_price(
+            spot,
+            strike,
+            time,
+            rate,
+            div_yield,
+            vol,
+            1_000_000,
+            OptionType::Call,
+        );
 
         assert!(
             (call_cont - 4.985_759_827_210_38).abs() < 1e-6,
@@ -1027,8 +942,26 @@ mod tests {
         let vol = 0.2;
         let num_fixings = 12;
 
-        let call = geometric_asian_call(spot, strike, time, rate, div_yield, vol, num_fixings);
-        let put = geometric_asian_put(spot, strike, time, rate, div_yield, vol, num_fixings);
+        let call = geometric_asian_price(
+            spot,
+            strike,
+            time,
+            rate,
+            div_yield,
+            vol,
+            num_fixings,
+            OptionType::Call,
+        );
+        let put = geometric_asian_price(
+            spot,
+            strike,
+            time,
+            rate,
+            div_yield,
+            vol,
+            num_fixings,
+            OptionType::Put,
+        );
 
         let n = num_fixings as f64;
         let drift_factor = (n + 1.0) / (2.0 * n);
@@ -1059,7 +992,16 @@ mod tests {
     fn test_tw_call_non_negative() {
         for strike in [80.0, 100.0, 120.0] {
             for vol in [0.1, 0.2, 0.3, 0.5] {
-                let price = arithmetic_asian_call_tw(100.0, strike, 1.0, 0.05, 0.02, vol, 12);
+                let price = arithmetic_asian_tw_price(
+                    100.0,
+                    strike,
+                    1.0,
+                    0.05,
+                    0.02,
+                    vol,
+                    12,
+                    OptionType::Call,
+                );
                 assert!(
                     price >= 0.0,
                     "Negative call price {} for K={}, vol={}",
@@ -1075,7 +1017,16 @@ mod tests {
     fn test_tw_put_non_negative() {
         for strike in [80.0, 100.0, 120.0] {
             for vol in [0.1, 0.2, 0.3, 0.5] {
-                let price = arithmetic_asian_put_tw(100.0, strike, 1.0, 0.05, 0.02, vol, 12);
+                let price = arithmetic_asian_tw_price(
+                    100.0,
+                    strike,
+                    1.0,
+                    0.05,
+                    0.02,
+                    vol,
+                    12,
+                    OptionType::Put,
+                );
                 assert!(
                     price >= 0.0,
                     "Negative put price {} for K={}, vol={}",
@@ -1097,10 +1048,26 @@ mod tests {
         let div_yield = 0.02;
         let num_fixings = 12;
 
-        let price_low_vol =
-            arithmetic_asian_call_tw(spot, strike, time, rate, div_yield, 0.15, num_fixings);
-        let price_high_vol =
-            arithmetic_asian_call_tw(spot, strike, time, rate, div_yield, 0.35, num_fixings);
+        let price_low_vol = arithmetic_asian_tw_price(
+            spot,
+            strike,
+            time,
+            rate,
+            div_yield,
+            0.15,
+            num_fixings,
+            OptionType::Call,
+        );
+        let price_high_vol = arithmetic_asian_tw_price(
+            spot,
+            strike,
+            time,
+            rate,
+            div_yield,
+            0.35,
+            num_fixings,
+            OptionType::Call,
+        );
 
         assert!(
             price_high_vol >= price_low_vol - 0.01,
@@ -1122,7 +1089,16 @@ mod tests {
         let vol = 0.0; // Zero vol
         let num_fixings = 12;
 
-        let price = arithmetic_asian_call_tw(spot, strike, time, rate, div_yield, vol, num_fixings);
+        let price = arithmetic_asian_tw_price(
+            spot,
+            strike,
+            time,
+            rate,
+            div_yield,
+            vol,
+            num_fixings,
+            OptionType::Call,
+        );
 
         // m1 ≈ forward ≈ spot * exp((r-q)*T) for average of forwards
         // At zero vol, m2 = m1^2, so we hit the degenerate branch
@@ -1146,8 +1122,26 @@ mod tests {
         let vol = 0.2;
         let num_fixings = 12;
 
-        let call = arithmetic_asian_call_tw(spot, strike, time, rate, div_yield, vol, num_fixings);
-        let put = arithmetic_asian_put_tw(spot, strike, time, rate, div_yield, vol, num_fixings);
+        let call = arithmetic_asian_tw_price(
+            spot,
+            strike,
+            time,
+            rate,
+            div_yield,
+            vol,
+            num_fixings,
+            OptionType::Call,
+        );
+        let put = arithmetic_asian_tw_price(
+            spot,
+            strike,
+            time,
+            rate,
+            div_yield,
+            vol,
+            num_fixings,
+            OptionType::Put,
+        );
 
         // When r ≈ q, forward ≈ spot, so ATM call and put should be similar
         let ratio = call / put;
@@ -1170,7 +1164,16 @@ mod tests {
         let num_fixings = 12;
         let df = (-rate * time).exp();
 
-        let price = arithmetic_asian_call_tw(spot, strike, time, rate, div_yield, vol, num_fixings);
+        let price = arithmetic_asian_tw_price(
+            spot,
+            strike,
+            time,
+            rate,
+            div_yield,
+            vol,
+            num_fixings,
+            OptionType::Call,
+        );
         let m1 = compute_arithmetic_mean_first_moment(spot, time, rate, div_yield, num_fixings);
         let intrinsic = df * (m1 - strike);
 
@@ -1284,7 +1287,7 @@ mod tests {
                         num_fixings,
                     );
                     let upper = df * m1;
-                    let call = arithmetic_asian_call_tw(
+                    let call = arithmetic_asian_tw_price(
                         spot,
                         strike,
                         time,
@@ -1292,6 +1295,7 @@ mod tests {
                         div_yield,
                         vol,
                         num_fixings,
+                        OptionType::Call,
                     );
                     // Allow a tiny relative slack for f64 rounding only.
                     assert!(
@@ -1318,7 +1322,7 @@ mod tests {
             for &vol in &[0.6, 0.9, 1.2, 1.5] {
                 for &num_fixings in &[4_usize, 12, 52] {
                     let upper = df * strike;
-                    let put = arithmetic_asian_put_tw(
+                    let put = arithmetic_asian_tw_price(
                         spot,
                         strike,
                         time,
@@ -1326,6 +1330,7 @@ mod tests {
                         div_yield,
                         vol,
                         num_fixings,
+                        OptionType::Put,
                     );
                     assert!(
                         put <= upper * (1.0 + 1e-12),
@@ -1356,21 +1361,53 @@ mod tests {
             .map(|i| time * i as f64 / num_fixings as f64)
             .collect();
 
-        let geo_uniform =
-            geometric_asian_call(spot, strike, time, rate, div_yield, vol, num_fixings);
-        let geo_times =
-            geometric_asian_price_times(spot, strike, time, df, div_yield, vol, &uniform, true)
-                .expect("valid schedule");
+        let geo_uniform = geometric_asian_price(
+            spot,
+            strike,
+            time,
+            rate,
+            div_yield,
+            vol,
+            num_fixings,
+            OptionType::Call,
+        );
+        let geo_times = geometric_asian_price_times(
+            spot,
+            strike,
+            time,
+            df,
+            div_yield,
+            vol,
+            &uniform,
+            OptionType::Call,
+        )
+        .expect("valid schedule");
         assert!(
             (geo_uniform - geo_times).abs() < 1e-10,
             "geometric times-variant {geo_times} must match equal-spacing {geo_uniform}"
         );
 
-        let tw_uniform =
-            arithmetic_asian_call_tw(spot, strike, time, rate, div_yield, vol, num_fixings);
-        let tw_times =
-            arithmetic_asian_tw_price_times(spot, strike, time, df, div_yield, vol, &uniform, true)
-                .expect("valid schedule");
+        let tw_uniform = arithmetic_asian_tw_price(
+            spot,
+            strike,
+            time,
+            rate,
+            div_yield,
+            vol,
+            num_fixings,
+            OptionType::Call,
+        );
+        let tw_times = arithmetic_asian_tw_price_times(
+            spot,
+            strike,
+            time,
+            df,
+            div_yield,
+            vol,
+            &uniform,
+            OptionType::Call,
+        )
+        .expect("valid schedule");
         assert!(
             (tw_uniform - tw_times).abs() < 1e-10,
             "TW times-variant {tw_times} must match equal-spacing {tw_uniform}"
@@ -1392,21 +1429,37 @@ mod tests {
             div_yield,
             vol,
             &front_loaded,
-            true,
+            OptionType::Call,
         )
         .expect("valid schedule");
-        let geo_back =
-            geometric_asian_price_times(spot, strike, time, df, div_yield, vol, &back_loaded, true)
-                .expect("valid schedule");
+        let geo_back = geometric_asian_price_times(
+            spot,
+            strike,
+            time,
+            df,
+            div_yield,
+            vol,
+            &back_loaded,
+            OptionType::Call,
+        )
+        .expect("valid schedule");
         assert!(
             geo_back > geo_front,
             "back-loaded schedule {geo_back} must exceed front-loaded {geo_front}"
         );
 
         // Schedule validation.
-        assert!(
-            geometric_asian_price_times(spot, strike, time, df, div_yield, vol, &[], true).is_err()
-        );
+        assert!(geometric_asian_price_times(
+            spot,
+            strike,
+            time,
+            df,
+            div_yield,
+            vol,
+            &[],
+            OptionType::Call
+        )
+        .is_err());
         assert!(arithmetic_asian_tw_price_times(
             spot,
             strike,
@@ -1415,7 +1468,7 @@ mod tests {
             div_yield,
             vol,
             &[0.5, 0.25],
-            true
+            OptionType::Call,
         )
         .is_err());
     }
@@ -1488,14 +1541,26 @@ mod tests {
             (50.0, 1.0, 5.0, 0.08, 0.0, 1.5),
         ] {
             for num_fixings in [0, 1, 12, 252] {
-                for price in [
-                    geometric_asian_call,
-                    geometric_asian_put,
-                    arithmetic_asian_call_tw,
-                    arithmetic_asian_put_tw,
+                for (price, option_type) in [
+                    (
+                        geometric_asian_price as fn(_, _, _, _, _, _, _, _) -> f64,
+                        OptionType::Call,
+                    ),
+                    (geometric_asian_price, OptionType::Put),
+                    (arithmetic_asian_tw_price, OptionType::Call),
+                    (arithmetic_asian_tw_price, OptionType::Put),
                 ] {
-                    let bits =
-                        price(spot, strike, time, rate, div_yield, vol, num_fixings).to_bits();
+                    let bits = price(
+                        spot,
+                        strike,
+                        time,
+                        rate,
+                        div_yield,
+                        vol,
+                        num_fixings,
+                        option_type,
+                    )
+                    .to_bits();
                     actual = (actual ^ bits).wrapping_mul(0x0000_0100_0000_01b3);
                 }
             }

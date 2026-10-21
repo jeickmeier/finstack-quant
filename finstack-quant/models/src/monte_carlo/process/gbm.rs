@@ -91,7 +91,8 @@
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
 //! use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
-//! use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+//! use finstack_quant_models::monte_carlo::payoff::vanilla::European;
+//! use finstack_quant_models::types::OptionType;
 //! use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 //! use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 //!
@@ -108,7 +109,7 @@
 //!     0.20,  // sigma = 20% volatility
 //! ).unwrap();
 //! let disc = ExactGbm::new();
-//! let payoff = EuropeanCall::new(100.0, 1.0, 252);
+//! let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 //! let result = engine
 //!     .price(
 //!         &rng,

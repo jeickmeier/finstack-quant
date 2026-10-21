@@ -398,9 +398,10 @@ mod tests {
     use super::super::super::engine::McEngineConfig;
     use super::*;
     use crate::monte_carlo::discretization::exact::ExactGbm;
-    use crate::monte_carlo::payoff::vanilla::EuropeanCall;
+    use crate::monte_carlo::payoff::vanilla::European;
     use crate::monte_carlo::process::gbm::{GbmParams, GbmProcess};
     use crate::monte_carlo::rng::philox::PhiloxRng;
+    use crate::types::OptionType;
     use finstack_quant_core::math::time_grid::TimeGrid;
     use finstack_quant_core::math::{norm_cdf, norm_pdf};
 
@@ -524,7 +525,7 @@ mod tests {
             GbmParams::new(RATE, DIVIDEND_YIELD, VOLATILITY).expect("valid GBM parameters"),
         );
         let disc = ExactGbm::new();
-        let call = EuropeanCall::new(STRIKE, EXPIRY, 1);
+        let call = European::new(OptionType::Call, STRIKE, EXPIRY, 1);
         let discount_factor = (-RATE * EXPIRY).exp();
         let bump_size = 0.01;
         let (reference_delta, reference_gamma) = deterministic_stencil(bump_size);
@@ -591,7 +592,7 @@ mod tests {
             GbmParams::new(RATE, DIVIDEND_YIELD, VOLATILITY).expect("valid GBM parameters"),
         );
         let disc = ExactGbm::new();
-        let call = EuropeanCall::new(STRIKE, EXPIRY, 1);
+        let call = European::new(OptionType::Call, STRIKE, EXPIRY, 1);
         let discount_factor = (-RATE * EXPIRY).exp();
         let inputs = FiniteDiffInputs {
             engine: &engine,
@@ -639,7 +640,7 @@ mod tests {
             (8, 1, -1.0, "discount_factor"),
         ] {
             let engine = test_engine(paths);
-            let payoff = EuropeanCall::new(STRIKE, 1.0, maturity_step);
+            let payoff = European::new(OptionType::Call, STRIKE, 1.0, maturity_step);
             let inputs = FiniteDiffInputs {
                 engine: &engine,
                 rng: &rng,
@@ -667,7 +668,7 @@ mod tests {
         let rng = PhiloxRng::new(42);
         let process = GbmWithDividends::with_params(RATE, 0.0, VOLATILITY, vec![]).unwrap();
         let disc = EulerMaruyama::new();
-        let payoff = EuropeanCall::new(STRIKE, 1.0, 1);
+        let payoff = European::new(OptionType::Call, STRIKE, 1.0, 1);
         let inputs = FiniteDiffInputs {
             engine: &engine,
             rng: &rng,
@@ -694,7 +695,7 @@ mod tests {
         let rng = PhiloxRng::new(42);
         let process = GbmProcess::with_params(RATE, DIVIDEND_YIELD, VOLATILITY).unwrap();
         let disc = ExactGbm::new();
-        let payoff = EuropeanCall::new(STRIKE, 1.0, 1);
+        let payoff = European::new(OptionType::Call, STRIKE, 1.0, 1);
         let inputs = FiniteDiffInputs {
             engine: &engine,
             rng: &rng,

@@ -132,7 +132,8 @@ reduction, optional serial early stopping, and optional path capture.
 use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
-use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+use finstack_quant_models::monte_carlo::payoff::vanilla::European;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 
@@ -145,7 +146,7 @@ let engine = McEngine::new(
 let rng = PhiloxRng::new(11);
 let process = GbmProcess::with_params(0.03, 0.01, 0.20).expect("valid GBM parameters");
 let disc = ExactGbm::new();
-let payoff = EuropeanCall::new(100.0, 1.0, 252);
+let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 let discount_factor = (-0.03_f64).exp();
 
 let result = engine
@@ -182,7 +183,8 @@ use finstack_quant_models::monte_carlo::engine::{
     McEngine, McEngineConfig, PathCaptureConfig,
 };
 use finstack_quant_models::monte_carlo::paths::ProcessParams;
-use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+use finstack_quant_models::monte_carlo::payoff::vanilla::European;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 
@@ -196,7 +198,7 @@ let engine = McEngine::new(
 let rng = PhiloxRng::new(11);
 let process = GbmProcess::with_params(0.03, 0.01, 0.20).expect("valid GBM parameters");
 let disc = ExactGbm::new();
-let payoff = EuropeanCall::new(100.0, 1.0, 12);
+let payoff = European::new(OptionType::Call, 100.0, 1.0, 12);
 let process_params = ProcessParams::new("GBM").with_factors(vec!["spot".to_string()]);
 
 let result = engine
@@ -287,7 +289,8 @@ use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::greeks::finite_diff::{
     finite_diff_delta_from_inputs, FiniteDiffInputs,
 };
-use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+use finstack_quant_models::monte_carlo::payoff::vanilla::European;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 
@@ -299,7 +302,7 @@ let engine = McEngine::new(
 let rng = PhiloxRng::new(42);
 let gbm = GbmProcess::with_params(0.05, 0.0, 0.2).expect("valid GBM parameters");
 let disc = ExactGbm::new();
-let call = EuropeanCall::new(100.0, 1.0, 50);
+let call = European::new(OptionType::Call, 100.0, 1.0, 50);
 
 let inputs = FiniteDiffInputs {
     engine: &engine,
@@ -328,7 +331,8 @@ For GBM European contracts specifically, host bindings must go through
 
 ```rust
 use finstack_quant_core::currency::Currency;
-use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+use finstack_quant_models::monte_carlo::payoff::vanilla::European;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 
@@ -337,7 +341,7 @@ let pricer = EuropeanPricer::new(25_000)
     .with_seed(19)
     .with_parallel(false);
 let process = GbmProcess::with_params(0.03, 0.01, 0.20).expect("valid GBM parameters");
-let payoff = EuropeanCall::new(100.0, 1.0, 252);
+let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 
 let result = pricer
     .price(&process, 100.0, 1.0, 252, &payoff, Currency::USD, (-0.03_f64).exp())

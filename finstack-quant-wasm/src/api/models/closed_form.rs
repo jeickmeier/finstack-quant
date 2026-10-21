@@ -20,11 +20,11 @@ use crate::utils::input::{
 use crate::utils::to_js_err;
 use finstack_quant_models::closed_form::{
     asian_option_price as asian_option_price_core, bachelier_greeks as bachelier_greeks_core,
-    bachelier_price as bachelier_price_core, barrier_call as barrier_call_core,
-    barrier_put as barrier_put_core, black76_greeks as black76_greeks_core,
-    black76_implied_vol as black76_implied_vol_core, black76_price as black76_price_core,
-    black_shifted_price as black_shifted_price_core, black_shifted_vega as black_shifted_vega_core,
-    bs_greeks as bs_greeks_core, bs_implied_vol as bs_implied_vol_core, bs_price as bs_price_core,
+    bachelier_price as bachelier_price_core, barrier_option_price as barrier_option_price_core,
+    black76_greeks as black76_greeks_core, black76_implied_vol as black76_implied_vol_core,
+    black76_price as black76_price_core, black_shifted_price as black_shifted_price_core,
+    black_shifted_vega as black_shifted_vega_core, bs_greeks as bs_greeks_core,
+    bs_implied_vol as bs_implied_vol_core, bs_price as bs_price_core,
     heston_price as heston_price_core, lookback_option_price as lookback_option_price_core,
     quanto_option_price as quanto_option_price_core,
     vanilla_expiry_payoff as vanilla_expiry_payoff_core, HestonPricingParams,
@@ -546,8 +546,17 @@ pub fn barrier_call(
     let expiry = js_f64(&expiry, "expiry")?;
     let direction: &str = &js_string(&direction, "direction")?;
     let knock: &str = &js_string(&knock, "knock")?;
-    barrier_call_core(
-        spot, strike, barrier, rate, div_yield, vol, expiry, direction, knock,
+    barrier_option_price_core(
+        spot,
+        strike,
+        barrier,
+        rate,
+        div_yield,
+        vol,
+        expiry,
+        direction,
+        knock,
+        OptionType::Call,
     )
     .map_err(to_js_err)
 }
@@ -592,8 +601,17 @@ pub fn barrier_put(
     let expiry = js_f64(&expiry, "expiry")?;
     let direction: &str = &js_string(&direction, "direction")?;
     let knock: &str = &js_string(&knock, "knock")?;
-    barrier_put_core(
-        spot, strike, barrier, rate, div_yield, vol, expiry, direction, knock,
+    barrier_option_price_core(
+        spot,
+        strike,
+        barrier,
+        rate,
+        div_yield,
+        vol,
+        expiry,
+        direction,
+        knock,
+        OptionType::Put,
     )
     .map_err(to_js_err)
 }

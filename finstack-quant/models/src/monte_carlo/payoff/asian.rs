@@ -344,10 +344,7 @@ impl Payoff for Asian {
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
         let average = self.compute_average();
-        let intrinsic = match self.option_type {
-            OptionType::Call => (average - self.strike).max(0.0),
-            OptionType::Put => (self.strike - average).max(0.0),
-        };
+        let intrinsic = self.option_type.intrinsic(average, self.strike);
         Money::new(intrinsic * self.notional, currency)
     }
 
@@ -576,8 +573,16 @@ mod tests {
 
     #[test]
     fn test_geometric_asian_closed_form() {
-        let price =
-            crate::closed_form::geometric_asian_call(100.0, 100.0, 1.0, 0.05, 0.02, 0.2, 12);
+        let price = crate::closed_form::geometric_asian_price(
+            100.0,
+            100.0,
+            1.0,
+            0.05,
+            0.02,
+            0.2,
+            12,
+            OptionType::Call,
+        );
 
         assert!(price > 0.0);
         assert!(price < 10.0);

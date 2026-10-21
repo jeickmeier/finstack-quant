@@ -153,14 +153,7 @@ pub fn vanilla_expiry_payoff(spot: f64, strike: f64, option_type: OptionType) ->
             "vanilla expiry payoff strike must be finite and positive, got {strike}"
         )));
     }
-    Ok(vanilla_expiry_payoff_unchecked(spot, strike, option_type))
-}
-
-fn vanilla_expiry_payoff_unchecked(spot: f64, strike: f64, option_type: OptionType) -> f64 {
-    match option_type {
-        OptionType::Call => (spot - strike).max(0.0),
-        OptionType::Put => (strike - spot).max(0.0),
-    }
+    Ok(option_type.intrinsic(spot, strike))
 }
 
 /// Return a closed-form value when finite, otherwise report a validation error.
@@ -212,15 +205,12 @@ pub fn bs_price_unchecked(
     option_type: OptionType,
 ) -> f64 {
     if expiry <= 0.0 {
-        return vanilla_expiry_payoff_unchecked(spot, strike, option_type);
+        return option_type.intrinsic(spot, strike);
     }
     if vol <= 0.0 {
         let discounted_spot = spot * (-div_yield * expiry).exp();
         let discounted_strike = strike * (-rate * expiry).exp();
-        return match option_type {
-            OptionType::Call => (discounted_spot - discounted_strike).max(0.0),
-            OptionType::Put => (discounted_strike - discounted_spot).max(0.0),
-        };
+        return option_type.intrinsic(discounted_spot, discounted_strike);
     }
 
     let (d1, d2) = d1_d2(spot, strike, rate, vol, expiry, div_yield);

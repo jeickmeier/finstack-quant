@@ -387,7 +387,8 @@ impl McEngine {
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
     /// use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
-    /// use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+    /// use finstack_quant_models::monte_carlo::payoff::vanilla::European;
+    /// use finstack_quant_models::types::OptionType;
     /// use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
     /// use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
     ///
@@ -399,7 +400,7 @@ impl McEngine {
     /// let rng = PhiloxRng::new(11);
     /// let process = GbmProcess::with_params(0.03, 0.01, 0.20).unwrap();
     /// let disc = ExactGbm::new();
-    /// let payoff = EuropeanCall::new(100.0, 1.0, 252);
+    /// let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
     /// let discount_factor = (-0.03_f64).exp();
     ///
     /// let result = engine
@@ -508,7 +509,8 @@ impl McEngine {
     ///     McEngine, McEngineConfig, PathCaptureConfig,
     /// };
     /// use finstack_quant_models::monte_carlo::paths::ProcessParams;
-    /// use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+    /// use finstack_quant_models::monte_carlo::payoff::vanilla::European;
+    /// use finstack_quant_models::types::OptionType;
     /// use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
     /// use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
     ///
@@ -521,7 +523,7 @@ impl McEngine {
     /// let rng = PhiloxRng::new(5);
     /// let process = GbmProcess::with_params(0.03, 0.01, 0.20).unwrap();
     /// let disc = ExactGbm::new();
-    /// let payoff = EuropeanCall::new(100.0, 1.0, 12);
+    /// let payoff = European::new(OptionType::Call, 100.0, 1.0, 12);
     /// let discount_factor = (-0.03_f64).exp();
     /// let process_params = ProcessParams::new("GBM").with_factors(vec!["spot".to_string()]);
     ///

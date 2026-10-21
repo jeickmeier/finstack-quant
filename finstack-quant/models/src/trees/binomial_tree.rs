@@ -71,11 +71,9 @@ impl OptionValuator {
 
 impl TreeValuator for OptionValuator {
     fn value_at_maturity(&self, state: &NodeState) -> Result<f64> {
-        Ok(intrinsic(
-            self.option_type,
-            self.ex_spot(state)?,
-            self.strike,
-        ))
+        Ok(self
+            .option_type
+            .intrinsic(self.ex_spot(state)?, self.strike))
     }
 
     fn value_at_node(&self, state: &NodeState, continuation_value: f64, _dt: f64) -> Result<f64> {
@@ -84,19 +82,15 @@ impl TreeValuator for OptionValuator {
             .as_ref()
             .is_some_and(|steps| steps.contains(&state.step))
         {
-            let ex_exercise = intrinsic(self.option_type, self.ex_spot(state)?, self.strike);
-            let cum_exercise = intrinsic(self.option_type, self.cum_spot(state)?, self.strike);
+            let ex_exercise = self
+                .option_type
+                .intrinsic(self.ex_spot(state)?, self.strike);
+            let cum_exercise = self
+                .option_type
+                .intrinsic(self.cum_spot(state)?, self.strike);
             return Ok(continuation_value.max(ex_exercise).max(cum_exercise));
         }
         Ok(continuation_value)
-    }
-}
-
-#[inline]
-fn intrinsic(option_type: OptionType, spot: f64, strike: f64) -> f64 {
-    match option_type {
-        OptionType::Call => (spot - strike).max(0.0),
-        OptionType::Put => (strike - spot).max(0.0),
     }
 }
 
@@ -546,7 +540,7 @@ mod tests {
                     let carry = params.rate - params.dividend_yield;
                     let terminal_spot = params.spot * carry.exp() - 2.0 * (carry * 0.5).exp();
                     let expected =
-                        intrinsic(option_type, terminal_spot, params.strike) * (-params.rate).exp();
+                        option_type.intrinsic(terminal_spot, params.strike) * (-params.rate).exp();
                     assert!(
                         (actual - expected).abs() < 1e-10,
                         "yield={yield_rate}, side={option_type}: {actual} vs {expected}"

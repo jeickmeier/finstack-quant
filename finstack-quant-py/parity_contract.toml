@@ -1889,6 +1889,8 @@ backlog_ceiling = { modules = 0, members = 0 }
 # Python paths; values say what the host reads in Rust. An entry that becomes a
 # Rust name must be removed.
 [parity.rust_names]
+"finstack_quant.models.barrier_call" = "Rust `closed_form::barrier_option_price(.., OptionType::Call)`; merged in slice B3"
+"finstack_quant.models.barrier_put" = "Rust `closed_form::barrier_option_price(.., OptionType::Put)`; merged in slice B3"
 "finstack_quant.models.correlation.cholesky_decompose" = "binds core `math::linalg::cholesky_correlation`; the host name was kept when the models re-export was removed"
 "finstack_quant.models.credit.DynamicRecoverySpec.kind" = "serde tag of the Rust `model()` enum variant"
 "finstack_quant.models.credit.EndogenousHazardSpec.kind" = "serde tag of the Rust `leverage_hazard_map()` enum variant"

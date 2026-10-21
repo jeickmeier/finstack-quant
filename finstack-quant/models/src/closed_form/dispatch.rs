@@ -15,12 +15,16 @@
 //! ```rust
 //! use finstack_quant_models::types::OptionType;
 //! use finstack_quant_models::closed_form::{
-//!     asian_option_price, barrier_call, barrier_put,
+//!     asian_option_price, barrier_option_price,
 //! };
 //!
-//! let barrier = barrier_call(100.0, 100.0, 90.0, 0.05, 0.02, 0.20, 1.0, "down", "out")?;
-//! assert!(barrier > 0.0);
-//! let barrier_put = barrier_put(100.0, 100.0, 90.0, 0.05, 0.02, 0.20, 1.0, "down", "out")?;
+//! let barrier_call = barrier_option_price(
+//!     100.0, 100.0, 90.0, 0.05, 0.02, 0.20, 1.0, "down", "out", OptionType::Call,
+//! )?;
+//! assert!(barrier_call > 0.0);
+//! let barrier_put = barrier_option_price(
+//!     100.0, 100.0, 90.0, 0.05, 0.02, 0.20, 1.0, "down", "out", OptionType::Put,
+//! )?;
 //! assert!(barrier_put >= 0.0);
 //!
 //! let asian = asian_option_price(
@@ -32,15 +36,13 @@
 
 use finstack_quant_core::{Error, Result};
 
-use super::asian::{
-    arithmetic_asian_call_tw, arithmetic_asian_put_tw, geometric_asian_call, geometric_asian_put,
-};
+use super::asian::{arithmetic_asian_tw_price, geometric_asian_price};
 use super::barrier::{barrier_price, BarrierParams};
 use super::lookback::{
     fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
     floating_strike_lookback_put,
 };
-use super::quanto::{quanto_call, quanto_put};
+use super::quanto::quanto_price;
 use super::vanilla::checked_closed_form_value;
 use crate::types::OptionType;
 use finstack_quant_core::types::BarrierType;
@@ -109,10 +111,10 @@ fn parse_barrier_type(direction: &str, knock: &str) -> Result<BarrierType> {
     }
 }
 
-/// Reiner-Rubinstein continuous-monitoring barrier call, selected by strings.
+/// Reiner-Rubinstein continuous-monitoring barrier option, selected by strings.
 ///
 /// Parses the `(direction, knock)` pair into a [`BarrierType`] and calls
-/// [`barrier_price`] with [`OptionType::Call`].
+/// [`barrier_price`].
 ///
 /// # Arguments
 ///
@@ -125,6 +127,7 @@ fn parse_barrier_type(direction: &str, knock: &str) -> Result<BarrierType> {
 /// * `expiry` - Time to expiry in years.
 /// * `direction` - `"up"` for an upper barrier or `"down"` for a lower barrier.
 /// * `knock` - `"in"` for knock-in or `"out"` for knock-out.
+/// * `option_type` - Call or put payoff convention.
 ///
 /// # Errors
 ///
@@ -132,7 +135,7 @@ fn parse_barrier_type(direction: &str, knock: &str) -> Result<BarrierType> {
 /// pair, if any input is outside its valid domain, or if the resulting
 /// barrier price is non-finite.
 #[allow(clippy::too_many_arguments)]
-pub fn barrier_call(
+pub fn barrier_option_price(
     spot: f64,
     strike: f64,
     barrier: f64,
@@ -142,65 +145,22 @@ pub fn barrier_call(
     expiry: f64,
     direction: &str,
     knock: &str,
+    option_type: OptionType,
 ) -> Result<f64> {
     let barrier_type = parse_barrier_type(direction, knock)?;
     validate_exotic_common("barrier", spot, rate, div_yield, vol, expiry)?;
     validate_positive_finite("barrier", "strike", strike)?;
     validate_positive_finite("barrier", "barrier", barrier)?;
     let params = BarrierParams::new(spot, strike, barrier, expiry, rate, div_yield, vol);
-    let value = barrier_price(&params, barrier_type, OptionType::Call);
-    checked_closed_form_value(value, "barrier price")
-}
-
-/// Reiner-Rubinstein continuous-monitoring barrier put, selected by strings.
-///
-/// Parses the `(direction, knock)` pair into a [`BarrierType`] and calls
-/// [`barrier_price`] with [`OptionType::Put`], mirroring [`barrier_call`].
-///
-/// # Arguments
-///
-/// * `spot` - Current spot price of the underlying.
-/// * `strike` - Option strike price in the same units as `spot`.
-/// * `barrier` - Continuously monitored barrier level in the same units as `spot`.
-/// * `rate` - Risk-free rate, continuously compounded decimal.
-/// * `div_yield` - Continuous dividend yield (or foreign rate for FX), decimal.
-/// * `vol` - Annualized volatility, decimal.
-/// * `expiry` - Time to expiry in years.
-/// * `direction` - `"up"` for an upper barrier or `"down"` for a lower barrier.
-/// * `knock` - `"in"` for knock-in or `"out"` for knock-out.
-///
-/// # Errors
-///
-/// Returns `Error::Validation` if `(direction, knock)` is not a supported
-/// pair, if any input is outside its valid domain, or if the resulting
-/// barrier price is non-finite.
-#[allow(clippy::too_many_arguments)]
-pub fn barrier_put(
-    spot: f64,
-    strike: f64,
-    barrier: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
-    direction: &str,
-    knock: &str,
-) -> Result<f64> {
-    let barrier_type = parse_barrier_type(direction, knock)?;
-    validate_exotic_common("barrier", spot, rate, div_yield, vol, expiry)?;
-    validate_positive_finite("barrier", "strike", strike)?;
-    validate_positive_finite("barrier", "barrier", barrier)?;
-    let params = BarrierParams::new(spot, strike, barrier, expiry, rate, div_yield, vol);
-    let value = barrier_price(&params, barrier_type, OptionType::Put);
+    let value = barrier_price(&params, barrier_type, option_type);
     checked_closed_form_value(value, "barrier price")
 }
 
 /// Asian option price, selected by averaging convention.
 ///
 /// Routes to the Turnbull-Wakeman arithmetic approximation
-/// ([`arithmetic_asian_call_tw`] / [`arithmetic_asian_put_tw`]) or the exact
-/// Kemna-Vorst geometric closed form ([`geometric_asian_call`] /
-/// [`geometric_asian_put`]).
+/// ([`arithmetic_asian_tw_price`]) or the exact Kemna-Vorst geometric closed
+/// form ([`geometric_asian_price`]).
 ///
 /// # Arguments
 ///
@@ -238,19 +198,27 @@ pub fn asian_option_price(
     }
     validate_exotic_common("asian option", spot, rate, div_yield, vol, expiry)?;
     validate_positive_finite("asian option", "strike", strike)?;
-    let value = match (averaging, option_type) {
-        ("arithmetic", OptionType::Call) => {
-            arithmetic_asian_call_tw(spot, strike, expiry, rate, div_yield, vol, num_fixings)
-        }
-        ("arithmetic", OptionType::Put) => {
-            arithmetic_asian_put_tw(spot, strike, expiry, rate, div_yield, vol, num_fixings)
-        }
-        ("geometric", OptionType::Call) => {
-            geometric_asian_call(spot, strike, expiry, rate, div_yield, vol, num_fixings)
-        }
-        ("geometric", OptionType::Put) => {
-            geometric_asian_put(spot, strike, expiry, rate, div_yield, vol, num_fixings)
-        }
+    let value = match averaging {
+        "arithmetic" => arithmetic_asian_tw_price(
+            spot,
+            strike,
+            expiry,
+            rate,
+            div_yield,
+            vol,
+            num_fixings,
+            option_type,
+        ),
+        "geometric" => geometric_asian_price(
+            spot,
+            strike,
+            expiry,
+            rate,
+            div_yield,
+            vol,
+            num_fixings,
+            option_type,
+        ),
         _ => {
             return Err(Error::Validation(format!(
                 "unknown averaging '{averaging}'; expected 'arithmetic' or 'geometric'"
@@ -333,8 +301,8 @@ pub fn lookback_option_price(
 
 /// Quanto option price in domestic currency, finiteness-checked.
 ///
-/// Routes to [`quanto_call`] or [`quanto_put`] and rejects non-finite
-/// results, so host bindings share one call/put branch and one guard.
+/// Validates the inputs, calls [`quanto_price`] and rejects non-finite
+/// results, so host bindings share one guard.
 ///
 /// # Arguments
 ///
@@ -390,30 +358,18 @@ pub fn quanto_option_price(
             "quanto option correlation must be in [-1, 1], got {correlation}"
         )));
     }
-    let value = match option_type {
-        OptionType::Call => quanto_call(
-            spot,
-            strike,
-            expiry,
-            rate_domestic,
-            rate_foreign,
-            div_yield,
-            vol_asset,
-            vol_fx,
-            correlation,
-        ),
-        OptionType::Put => quanto_put(
-            spot,
-            strike,
-            expiry,
-            rate_domestic,
-            rate_foreign,
-            div_yield,
-            vol_asset,
-            vol_fx,
-            correlation,
-        ),
-    };
+    let value = quanto_price(
+        spot,
+        strike,
+        expiry,
+        rate_domestic,
+        rate_foreign,
+        div_yield,
+        vol_asset,
+        vol_fx,
+        correlation,
+        option_type,
+    );
     checked_closed_form_value(value, "quanto option price")
 }
 
@@ -425,7 +381,7 @@ mod tests {
     fn barrier_dispatch_matches_leaf_functions() {
         let (s, k, b, t, r, q, sigma) = (100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.20);
         assert_eq!(
-            barrier_call(s, k, b, r, q, sigma, t, "down", "out").unwrap(),
+            barrier_option_price(s, k, b, r, q, sigma, t, "down", "out", OptionType::Call).unwrap(),
             barrier_price(
                 &BarrierParams::new(s, k, b, t, r, q, sigma),
                 BarrierType::DownAndOut,
@@ -433,7 +389,7 @@ mod tests {
             )
         );
         assert_eq!(
-            barrier_call(s, k, b, r, q, sigma, t, "down", "in").unwrap(),
+            barrier_option_price(s, k, b, r, q, sigma, t, "down", "in", OptionType::Call).unwrap(),
             barrier_price(
                 &BarrierParams::new(s, k, b, t, r, q, sigma),
                 BarrierType::DownAndIn,
@@ -442,7 +398,8 @@ mod tests {
         );
         let b_up = 120.0;
         assert_eq!(
-            barrier_call(s, k, b_up, r, q, sigma, t, "up", "out").unwrap(),
+            barrier_option_price(s, k, b_up, r, q, sigma, t, "up", "out", OptionType::Call)
+                .unwrap(),
             barrier_price(
                 &BarrierParams::new(s, k, b_up, t, r, q, sigma),
                 BarrierType::UpAndOut,
@@ -450,7 +407,7 @@ mod tests {
             )
         );
         assert_eq!(
-            barrier_call(s, k, b_up, r, q, sigma, t, "up", "in").unwrap(),
+            barrier_option_price(s, k, b_up, r, q, sigma, t, "up", "in", OptionType::Call).unwrap(),
             barrier_price(
                 &BarrierParams::new(s, k, b_up, t, r, q, sigma),
                 BarrierType::UpAndIn,
@@ -463,7 +420,7 @@ mod tests {
     fn barrier_put_dispatch_matches_leaf_functions() {
         let (s, k, b, t, r, q, sigma) = (100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.20);
         assert_eq!(
-            barrier_put(s, k, b, r, q, sigma, t, "down", "out").unwrap(),
+            barrier_option_price(s, k, b, r, q, sigma, t, "down", "out", OptionType::Put).unwrap(),
             barrier_price(
                 &BarrierParams::new(s, k, b, t, r, q, sigma),
                 BarrierType::DownAndOut,
@@ -471,7 +428,7 @@ mod tests {
             )
         );
         assert_eq!(
-            barrier_put(s, k, b, r, q, sigma, t, "down", "in").unwrap(),
+            barrier_option_price(s, k, b, r, q, sigma, t, "down", "in", OptionType::Put).unwrap(),
             barrier_price(
                 &BarrierParams::new(s, k, b, t, r, q, sigma),
                 BarrierType::DownAndIn,
@@ -480,7 +437,7 @@ mod tests {
         );
         let b_up = 120.0;
         assert_eq!(
-            barrier_put(s, k, b_up, r, q, sigma, t, "up", "out").unwrap(),
+            barrier_option_price(s, k, b_up, r, q, sigma, t, "up", "out", OptionType::Put).unwrap(),
             barrier_price(
                 &BarrierParams::new(s, k, b_up, t, r, q, sigma),
                 BarrierType::UpAndOut,
@@ -488,20 +445,34 @@ mod tests {
             )
         );
         assert_eq!(
-            barrier_put(s, k, b_up, r, q, sigma, t, "up", "in").unwrap(),
+            barrier_option_price(s, k, b_up, r, q, sigma, t, "up", "in", OptionType::Put).unwrap(),
             barrier_price(
                 &BarrierParams::new(s, k, b_up, t, r, q, sigma),
                 BarrierType::UpAndIn,
                 OptionType::Put
             )
         );
-        assert!(barrier_put(s, k, b, r, q, sigma, t, "sideways", "out").is_err());
+        assert!(
+            barrier_option_price(s, k, b, r, q, sigma, t, "sideways", "out", OptionType::Put)
+                .is_err()
+        );
     }
 
     #[test]
     fn barrier_dispatch_rejects_unknown_selector() {
-        let err =
-            barrier_call(100.0, 100.0, 90.0, 0.05, 0.02, 0.20, 1.0, "sideways", "out").unwrap_err();
+        let err = barrier_option_price(
+            100.0,
+            100.0,
+            90.0,
+            0.05,
+            0.02,
+            0.20,
+            1.0,
+            "sideways",
+            "out",
+            OptionType::Call,
+        )
+        .unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("unknown barrier spec"), "message: {msg}");
         assert!(msg.contains("direction='sideways'"), "message: {msg}");
@@ -512,11 +483,11 @@ mod tests {
         let (s, k, t, r, q, sigma, n) = (100.0, 100.0, 1.0, 0.05, 0.02, 0.20, 12);
         assert_eq!(
             asian_option_price(s, k, r, q, sigma, t, n, "arithmetic", OptionType::Call).unwrap(),
-            arithmetic_asian_call_tw(s, k, t, r, q, sigma, n)
+            arithmetic_asian_tw_price(s, k, t, r, q, sigma, n, OptionType::Call)
         );
         assert_eq!(
             asian_option_price(s, k, r, q, sigma, t, n, "geometric", OptionType::Put).unwrap(),
-            geometric_asian_put(s, k, t, r, q, sigma, n)
+            geometric_asian_price(s, k, t, r, q, sigma, n, OptionType::Put)
         );
     }
 
@@ -603,7 +574,18 @@ mod tests {
         .unwrap();
         assert_eq!(
             price,
-            quanto_call(100.0, 100.0, 1.0, 0.03, 0.01, 0.0, 0.20, 0.10, 0.3)
+            quanto_price(
+                100.0,
+                100.0,
+                1.0,
+                0.03,
+                0.01,
+                0.0,
+                0.20,
+                0.10,
+                0.3,
+                OptionType::Call
+            )
         );
         // Degenerate maturity with a negative domestic rate drives the price
         // non-finite; the dispatcher must reject it.

@@ -25,7 +25,7 @@ use finstack_quant_models::monte_carlo::payoff::asian::{
 };
 use finstack_quant_models::monte_carlo::payoff::barrier::{BarrierMonitoring, BarrierOptionPayoff};
 use finstack_quant_models::monte_carlo::payoff::lookback::Lookback;
-use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+use finstack_quant_models::monte_carlo::payoff::vanilla::European;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
     PathDependentPricer, PathDependentPricerConfig,
 };
@@ -72,8 +72,8 @@ pub fn schwartz_smith() -> SchwartzSmithProcess {
     SchwartzSmithProcess::new(params, 0.0, SPOT.ln())
 }
 
-pub fn european_call(num_steps: usize) -> EuropeanCall {
-    EuropeanCall::new(STRIKE, 1.0, num_steps)
+pub fn european_call(num_steps: usize) -> European {
+    European::new(OptionType::Call, STRIKE, 1.0, num_steps)
 }
 
 pub fn asian_call(num_steps: usize) -> Asian {
