@@ -15664,7 +15664,15 @@ export interface CommodityAsianOption {
  * - K = Contract price (entry price). If None, treated as at-market (K = F)
  * - Q = Quantity
  * - M = Contract multiplier
- * - DF(T) = Discount factor to settlement date
+ * - DF(T_pay) = Discount factor to the payment date (see below)
+ *
+ * # Settlement
+ *
+ * The forward fixes on `maturity` (the last pricing date) and pays
+ * [`CommodityForward::payment_date`]: `maturity` plus the effective settlement
+ * lag in business days on the effective settlement calendar, adjusted by the
+ * effective business-day convention (for example T+2 on the CME calendar for
+ * WTI). The value is zero once the payment date is before `as_of`.
  *
  * # At-Market vs Off-Market
  *

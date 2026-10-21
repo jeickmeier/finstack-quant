@@ -322,16 +322,29 @@ impl CommodityConvention {
         }
     }
 
-    /// Calendar identifier for this commodity market.
+    /// Registered holiday calendar for this commodity market.
     ///
-    /// Returns the standard exchange calendar for business day adjustments.
+    /// | Market | Exchange | Calendar |
+    /// |--------|----------|----------|
+    /// | WTI, natural gas | NYMEX | `cme` |
+    /// | Gold, silver | COMEX | `cme` |
+    /// | Agricultural | CBOT | `cme` |
+    /// | Brent | ICE Futures Europe | `gblo` |
+    /// | Copper | LME | `gblo` |
+    /// | Power | NERC | `nerc` |
+    ///
+    /// NYMEX, COMEX and CBOT are CME Group exchanges and share its holiday
+    /// calendar; ICE Futures Europe and the LME close on UK bank holidays;
+    /// power uses the NERC off-peak holidays. Every id resolves through
+    /// [`finstack_quant_core::dates::calendar_by_id_strict`].
     pub fn calendar_id(&self) -> &'static str {
         match self {
-            CommodityConvention::WtiCrude | CommodityConvention::NaturalGas => "nymex",
-            CommodityConvention::BrentCrude => "ice",
-            CommodityConvention::Gold | CommodityConvention::Silver => "comex",
-            CommodityConvention::Copper => "lme",
-            CommodityConvention::Agricultural => "cbot",
+            CommodityConvention::WtiCrude
+            | CommodityConvention::NaturalGas
+            | CommodityConvention::Gold
+            | CommodityConvention::Silver
+            | CommodityConvention::Agricultural => "cme",
+            CommodityConvention::BrentCrude | CommodityConvention::Copper => "gblo",
             CommodityConvention::Power => "nerc",
         }
     }
@@ -714,14 +727,23 @@ mod tests {
 
     #[test]
     fn commodity_convention_calendar_ids() {
-        assert_eq!(CommodityConvention::WtiCrude.calendar_id(), "nymex");
-        assert_eq!(CommodityConvention::NaturalGas.calendar_id(), "nymex");
-        assert_eq!(CommodityConvention::BrentCrude.calendar_id(), "ice");
-        assert_eq!(CommodityConvention::Gold.calendar_id(), "comex");
-        assert_eq!(CommodityConvention::Silver.calendar_id(), "comex");
-        assert_eq!(CommodityConvention::Copper.calendar_id(), "lme");
-        assert_eq!(CommodityConvention::Agricultural.calendar_id(), "cbot");
-        assert_eq!(CommodityConvention::Power.calendar_id(), "nerc");
+        use CommodityConvention::*;
+        for (convention, id) in [
+            (WtiCrude, "cme"),
+            (NaturalGas, "cme"),
+            (BrentCrude, "gblo"),
+            (Gold, "cme"),
+            (Silver, "cme"),
+            (Copper, "gblo"),
+            (Agricultural, "cme"),
+            (Power, "nerc"),
+        ] {
+            assert_eq!(convention.calendar_id(), id);
+            assert!(
+                finstack_quant_core::dates::calendar_by_id_strict(id).is_ok(),
+                "{id}"
+            );
+        }
     }
 
     #[test]

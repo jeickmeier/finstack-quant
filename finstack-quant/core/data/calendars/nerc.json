@@ -1,0 +1,14 @@
+{
+  "id": "nerc",
+  "name": "NERC (North American Electric Reliability Corporation) Holidays",
+  "ignore_weekends": false,
+  "notes": "NERC holidays: the six additional off-peak days of North American power markets. A holiday falling on Sunday is observed the following Monday; a holiday falling on Saturday is not moved. Source: NERC Operating Committee, 'Additional Off-Peak Days' (NERC holiday schedule), as adopted for wholesale power peak/off-peak definitions in NAESB WEQ business practice standards.",
+  "rules": [
+    { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "mon_if_sun" },
+    { "type": "nth_weekday", "name": "Memorial Day", "n": -1, "weekday": "monday", "month": "may" },
+    { "type": "fixed", "name": "Independence Day", "month": "july", "day": 4, "observed": "mon_if_sun" },
+    { "type": "nth_weekday", "name": "Labor Day", "n": 1, "weekday": "monday", "month": "september" },
+    { "type": "nth_weekday", "name": "Thanksgiving Day", "n": 4, "weekday": "thursday", "month": "november" },
+    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "mon_if_sun" }
+  ]
+}

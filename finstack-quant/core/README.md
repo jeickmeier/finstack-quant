@@ -53,7 +53,7 @@ Full item documentation is in the rustdoc (`cargo doc -p finstack-quant-core
 | `dates::{create_date, parse_iso_date}` | Fallible constructors (no `unwrap` on `from_calendar_date`). |
 | `dates::DayCount` | Day-count conventions, plus `DayCountContext` for conventions (Act/Act ICMA, Bus/252) that need a coupon period or calendar. |
 | `dates::{adjust, BusinessDayConvention, HolidayCalendar, CalendarMetadata}` | Business-day rolling. |
-| `dates::{calendar_by_id, calendars_by_ids, available_calendars, WEEKENDS_ONLY}` | Calendar registry; the 27 built-in calendars are generated from `data/calendars/*.json` at build time. |
+| `dates::{calendar_by_id, calendars_by_ids, available_calendars, WEEKENDS_ONLY}` | Calendar registry; the 28 built-in calendars are generated from `data/calendars/*.json` at build time. |
 | `dates::{Rule, Direction, Observed}` | Declarative holiday-rule primitives (fixed dates, nth weekday, Easter, lunar festivals, spans). |
 | `dates::{CompositeCalendar, CompositeMode}` | Union and intersection of calendars. |
 | `dates::{Schedule, ScheduleBuilder, ScheduleSpec, StubKind, ScheduleWarning, ScheduleErrorPolicy}` | Schedule generation with stub handling and EOM rules. |
@@ -251,7 +251,7 @@ editing the input changes the next build:
 
 | Input | Generated into `OUT_DIR` | Included by |
 |-------|--------------------------|-------------|
-| `data/calendars/*.json` (27 calendars) | `calendars.rs` — per-calendar `Rule` tables and the registry, evaluated at runtime (there are no precomputed holiday bitsets) | `src/dates/calendar/mod.rs` |
+| `data/calendars/*.json` (28 calendars) | `calendars.rs` — per-calendar `Rule` tables and the registry, evaluated at runtime (there are no precomputed holiday bitsets) | `src/dates/calendar/mod.rs` |
 | `data/sifma_settlements.csv` | `sifma_settlements_generated.rs` | `src/dates/imm.rs` |
 
 **Committed under `src/generated/`.** `build.rs` does not derive these from the
