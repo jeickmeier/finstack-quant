@@ -1,32 +1,32 @@
 //! Calibration target construction and shared input validation.
 //!
+use crate::CalibrationReport;
 use crate::api::schema::DiscountCurveParams;
 use crate::build::prepared::PreparedQuote;
 use crate::config::{CalibrationConfig, CalibrationMethod};
 use crate::constants::*;
-use crate::quotes::rates::RateQuote;
 use crate::quotes::ExtractQuotes;
 use crate::quotes::MarketQuote;
+use crate::quotes::rates::RateQuote;
 use crate::solver::bootstrap::SequentialBootstrapper;
 use crate::solver::global::GlobalFitOptimizer;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
-use crate::targets::rate_recipe::recipe_ois_compounding;
+use crate::targets::rate_recipe::rate_calibration_recipe;
 use crate::targets::util::{
-    discount_and_forward_curve_ids, prepare_rate_calibration_quotes, pv01_residual_weight,
-    sorted_knot_grid, validate_global_knot_grid, ContextScratch,
+    ContextScratch, discount_and_forward_curve_ids, prepare_rate_calibration_quotes,
+    pv01_residual_weight, sorted_knot_grid, validate_global_knot_grid,
 };
 use crate::validation::RateBoundsPolicy;
-use crate::CalibrationReport;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
-    DiscountCurve, DiscountCurveBuilder, RateCalibrationCurveRole, RateCalibrationRecipe,
+    DiscountCurve, DiscountCurveBuilder, RateCalibrationCurveRole,
     ValidationMode as CurveValidationMode,
 };
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 
 /// Parameters for constructing a [`DiscountCurveTarget`].
 ///
@@ -340,10 +340,14 @@ impl DiscountCurveTarget {
             .pricing_forward_id
             .as_ref()
             .unwrap_or(&params.curve_id);
-        let rate_calibration = Self::rate_calibration(
-            params,
+        let rate_calibration = rate_calibration_recipe(
+            params.currency,
+            &params.method,
             curve_day_count,
-            forward_id.clone(),
+            params.conventions.ois_compounding.as_ref(),
+            RateCalibrationCurveRole::Discount {
+                projection_curve_id: forward_id.clone(),
+            },
             &raw_rates_quotes,
         )?;
 

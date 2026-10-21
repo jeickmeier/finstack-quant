@@ -4,12 +4,12 @@
 //! and common `PnlAttribution` assembly. Currency conversion itself lives on
 //! [`MarketContext::convert_money`] — call sites here use it directly.
 
-use super::types::{
+use crate::factors::MarketRestoreFlags;
+use crate::AttributionRequest;
+use crate::{
     AttributionFactor, AttributionMethod, CarryDetail, ExecutionPolicy, MoveUnit, PnlAttribution,
     SensitivityBucket, SensitivityStep, SourceLine,
 };
-use crate::AttributionRequest;
-use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -23,6 +23,7 @@ use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::{
     df_from_yield, YieldCompounding,
 };
+use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations::instruments::Bond;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::MarketDependencies;
@@ -37,70 +38,96 @@ use std::sync::Arc;
 /// stay snapshot-gated. A failed dependency lookup fails open (treat every
 /// family as used) so a missing declaration cannot drop a live factor.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct InstrumentFactorUse {
-    pub rates: bool,
-    pub credit: bool,
-    pub inflation: bool,
-    pub fx: bool,
-    pub volatility: bool,
-    pub scalars: bool,
-}
+pub(crate) struct InstrumentFactorUse(MarketRestoreFlags);
 
 impl InstrumentFactorUse {
-    pub(crate) const fn all() -> Self {
-        Self {
-            rates: true,
-            credit: true,
-            inflation: true,
-            fx: true,
-            volatility: true,
-            scalars: true,
-        }
-    }
-
     pub(crate) fn of(instrument: &dyn Instrument) -> Self {
         match instrument.market_dependencies() {
             Ok(deps) => Self::from_deps(&deps, instrument),
-            Err(_) => Self::all(),
+            Err(_) => Self(MarketRestoreFlags::all()),
         }
     }
 
-    pub(crate) fn from_deps(deps: &MarketDependencies, instrument: &dyn Instrument) -> Self {
-        let rates =
-            !deps.curves.discount_curves.is_empty() || !deps.curves.forward_curves.is_empty();
-        let credit = !deps.curves.credit_curves.is_empty();
-        let inflation = !deps.curves.inflation_curves.is_empty();
-        let fx = !deps.fx_pairs.is_empty() || instrument.fx_exposure().is_some();
-        let volatility = !deps.volatility_dependencies.is_empty();
-        let scalars = !deps.market_scalar_ids.is_empty();
+    fn from_deps(deps: &MarketDependencies, instrument: &dyn Instrument) -> Self {
+        let families = [
+            (
+                !deps.curves.discount_curves.is_empty() || !deps.curves.forward_curves.is_empty(),
+                MarketRestoreFlags::RATES,
+            ),
+            (
+                !deps.curves.credit_curves.is_empty(),
+                MarketRestoreFlags::HAZARD,
+            ),
+            (
+                !deps.curves.inflation_curves.is_empty(),
+                MarketRestoreFlags::INFLATION,
+            ),
+            (
+                !deps.fx_pairs.is_empty() || instrument.fx_exposure().is_some(),
+                MarketRestoreFlags::FX,
+            ),
+            (
+                !deps.volatility_dependencies.is_empty(),
+                MarketRestoreFlags::VOL,
+            ),
+            (
+                !deps.market_scalar_ids.is_empty(),
+                MarketRestoreFlags::SCALARS,
+            ),
+        ];
         // An empty dependency set is "undeclared", not "uses nothing". Test
         // stubs and some custom instruments omit the declaration; fail open
         // so a live FX/scalar/credit factor is not dropped into residual.
-        if !rates && !credit && !inflation && !fx && !volatility && !scalars {
-            return Self::all();
+        if families.iter().all(|(used, _)| !used) {
+            return Self(MarketRestoreFlags::all());
         }
-        Self {
-            rates,
-            credit,
-            inflation,
-            fx,
-            volatility,
-            scalars,
-        }
+        // Correlations are not declared as dependencies, so they always count.
+        Self(
+            families
+                .into_iter()
+                .filter(|(used, _)| *used)
+                .fold(MarketRestoreFlags::CORRELATION, |all, (_, family)| {
+                    all | family
+                }),
+        )
     }
 
     pub(crate) fn uses_attribution_factor(self, factor: &AttributionFactor) -> bool {
-        match factor {
-            AttributionFactor::Carry
-            | AttributionFactor::ModelParameters
-            | AttributionFactor::Correlations => true,
-            AttributionFactor::RatesCurves => self.rates,
-            AttributionFactor::CreditCurves => self.credit,
-            AttributionFactor::InflationCurves => self.inflation,
-            AttributionFactor::Fx => self.fx,
-            AttributionFactor::Volatility => self.volatility,
-            AttributionFactor::MarketScalars => self.scalars,
-        }
+        MarketRestoreFlags::for_factor(factor).is_none_or(|family| self.0.contains(family))
+    }
+}
+
+/// Map `items` with the infallible `f`; see [`try_map_policy`].
+pub(crate) fn map_policy<T, R, F>(policy: ExecutionPolicy, items: &[T], f: F) -> Vec<R>
+where
+    T: Sync,
+    R: Send,
+    F: Fn(&T) -> R + Sync + Send,
+{
+    let Ok(mapped) = try_map_policy(policy, items, |item| {
+        Ok::<R, std::convert::Infallible>(f(item))
+    });
+    mapped
+}
+
+/// Fallible map of `items` with `f`, using Rayon only on native `Parallel`.
+///
+/// Both policies report the error of the lowest-index failing item, so a
+/// parallel run names the same failure as a serial (or wasm32) run.
+pub(crate) fn try_map_policy<T, R, E, F>(
+    policy: ExecutionPolicy,
+    items: &[T],
+    f: F,
+) -> std::result::Result<Vec<R>, E>
+where
+    T: Sync,
+    R: Send,
+    E: Send,
+    F: Fn(&T) -> std::result::Result<R, E> + Sync + Send,
+{
+    match policy {
+        ExecutionPolicy::Parallel => finstack_quant_core::parallel::try_map_ordered(items, f),
+        ExecutionPolicy::Serial => items.iter().map(f).collect(),
     }
 }
 
@@ -204,6 +231,24 @@ pub(crate) fn compute_pnl_with_fx(
     val_t1_converted.checked_sub(val_t0_converted)
 }
 
+/// The instrument carrying the opening model parameters.
+///
+/// `None`, or a snapshot without parameters, reuses `instrument` itself;
+/// otherwise a clone is built with the snapshot applied.
+///
+/// # Errors
+///
+/// Returns an error when the snapshot belongs to a different instrument type.
+pub(crate) fn instrument_at_t0(
+    instrument: &Arc<dyn Instrument>,
+    model_params_t0: Option<&ModelParamsSnapshot>,
+) -> Result<Arc<dyn Instrument>> {
+    match model_params_t0 {
+        None | Some(ModelParamsSnapshot::None) => Ok(Arc::clone(instrument)),
+        Some(params) => instrument.with_model_params(params).map(Arc::from),
+    }
+}
+
 /// Price both endpoints of a repricing request.
 ///
 /// Returns the T₀-parameter instrument with the unscaled `(T₀, T₁)` values.
@@ -211,10 +256,7 @@ pub(crate) fn compute_pnl_with_fx(
 pub(crate) fn endpoint_values(
     request: &AttributionRequest<'_>,
 ) -> Result<(Arc<dyn Instrument>, Money, Money)> {
-    let instrument_t0 = match request.model_params_t0 {
-        Some(params) => crate::model_params::with_model_params(request.instrument, params)?,
-        None => Arc::clone(request.instrument),
-    };
+    let instrument_t0 = instrument_at_t0(request.instrument, request.model_params_t0)?;
     let (val_t0, val_t1) = match request.prepared_endpoints {
         Some(endpoints) => endpoints,
         None => (
@@ -245,33 +287,18 @@ pub(crate) fn seed_attribution(
         request.as_of_t0,
         request.as_of_t1,
     )?;
-    let mut attribution = init_attribution(
+    let mut attribution = PnlAttribution::new(
         total_pnl,
         request.instrument.id(),
         request.as_of_t0,
         request.as_of_t1,
         method,
-        Some(request.config),
     );
+    attribution.meta.rounding = finstack_quant_core::config::RoundingContext::from(request.config);
     stamp_endpoints(&mut attribution, val_t0, val_t1);
     // Policy-visibility invariant: results carry the parallel flag.
     attribution.meta.execution_policy = Some(execution_policy);
     Ok(attribution)
-}
-
-pub(crate) fn init_attribution(
-    total_pnl: Money,
-    instrument_id: &str,
-    as_of_t0: Date,
-    as_of_t1: Date,
-    method: AttributionMethod,
-    config: Option<&FinstackConfig>,
-) -> PnlAttribution {
-    let mut attribution = PnlAttribution::new(total_pnl, instrument_id, as_of_t0, as_of_t1, method);
-    if let Some(config) = config {
-        attribution.meta.rounding = finstack_quant_core::config::RoundingContext::from(config);
-    }
-    attribution
 }
 
 /// Record the endpoint present values the attribution was computed from.
@@ -646,22 +673,6 @@ pub(crate) fn stamp_fx_policy(
     });
 }
 
-pub(crate) fn note_warning(
-    attribution: &mut PnlAttribution,
-    message: impl Into<String>,
-    instrument_id: &str,
-    factor: &str,
-) {
-    let message = message.into();
-    tracing::warn!(
-        instrument_id = %instrument_id,
-        factor,
-        detail = %message,
-        "Attribution soft warning"
-    );
-    attribution.meta.notes.push(message);
-}
-
 pub(crate) fn finalize_attribution(
     attribution: &mut PnlAttribution,
     instrument_id: &str,
@@ -816,44 +827,6 @@ pub(crate) fn sensitivity_step(
     step
 }
 
-/// Append a second-order-only row: `gamma_pnl` from a convexity/gamma metric
-/// applied to `market_move` (in `unit`); the first-order amount is zero.
-pub(crate) fn push_second_order_step(
-    attribution: &mut PnlAttribution,
-    factor: &str,
-    unit: MoveUnit,
-    market_move: f64,
-    gamma_pnl: f64,
-) {
-    let currency = attribution.total_pnl.currency();
-    let step = sensitivity_step(
-        factor,
-        FactorWorking::SecondOrder { unit, market_move },
-        Money::from((0_i64, currency)),
-        Some(money_or_zero(gamma_pnl, currency)),
-        &mut attribution.meta.notes,
-    );
-    attribution.sensitivity_steps.push(step);
-}
-
-/// Append a first-order row for `factor` whose P&L is `explained_pnl`.
-pub(crate) fn push_first_order_step(
-    attribution: &mut PnlAttribution,
-    factor: &str,
-    working: FactorWorking,
-    explained_pnl: f64,
-) {
-    let currency = attribution.total_pnl.currency();
-    let step = sensitivity_step(
-        factor,
-        working,
-        money_or_zero(explained_pnl, currency),
-        None,
-        &mut attribution.meta.notes,
-    );
-    attribution.sensitivity_steps.push(step);
-}
-
 /// `Money` for a row component whose non-finite case is already flagged
 /// through the factor total it belongs to; falls back to zero without a note.
 pub(crate) fn money_or_zero(amount: f64, currency: Currency) -> Money {
@@ -879,6 +852,7 @@ pub(crate) fn validate_attribution_period(as_of_t0: Date, as_of_t1: Date) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
     use finstack_quant_core::Error;
     use std::sync::Arc;
@@ -1171,22 +1145,29 @@ mod tests {
         )
         .expect("bond");
         let factor_use = InstrumentFactorUse::of(&bond);
-        assert!(factor_use.rates);
-        assert!(!factor_use.credit);
-        assert!(!factor_use.inflation);
-        assert!(!factor_use.fx);
-        assert!(!factor_use.volatility);
-        assert!(!factor_use.scalars);
         assert!(factor_use.uses_attribution_factor(&AttributionFactor::RatesCurves));
-        assert!(!factor_use.uses_attribution_factor(&AttributionFactor::CreditCurves));
+        for unused in [
+            AttributionFactor::CreditCurves,
+            AttributionFactor::InflationCurves,
+            AttributionFactor::Fx,
+            AttributionFactor::Volatility,
+            AttributionFactor::MarketScalars,
+        ] {
+            assert!(!factor_use.uses_attribution_factor(&unused), "{unused:?}");
+        }
         assert!(factor_use.uses_attribution_factor(&AttributionFactor::Correlations));
         assert!(factor_use.uses_attribution_factor(&AttributionFactor::Carry));
+        assert!(factor_use.uses_attribution_factor(&AttributionFactor::ModelParameters));
 
         // Empty declarations are undeclared, not "uses nothing".
         let undeclared = InstrumentFactorUse::from_deps(&MarketDependencies::new(), &bond);
-        assert!(undeclared.fx);
-        assert!(undeclared.credit);
-        assert!(undeclared.scalars);
+        for factor in [
+            AttributionFactor::Fx,
+            AttributionFactor::CreditCurves,
+            AttributionFactor::MarketScalars,
+        ] {
+            assert!(undeclared.uses_attribution_factor(&factor), "{factor:?}");
+        }
     }
 
     /// Flat-YTM window curve must invert Street compounding at the bond's
@@ -1403,5 +1384,67 @@ mod tests {
         // FX translation: 1000 EUR @ 1.2 - 1000 EUR @ 1.1 = 1200 - 1100 = 100 USD
         assert_eq!(pnl.amount(), 100.0);
         assert_eq!(pnl.currency(), Currency::USD);
+    }
+
+    #[test]
+    fn instrument_at_t0_without_params_reuses_the_instrument() {
+        let instrument: Arc<dyn Instrument> = Arc::new(
+            Bond::fixed(
+                "PLAIN-BOND-002",
+                Money::from((1_000_000_i64, Currency::USD)),
+                finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
+                finstack_quant_core::dates::create_date(2024, time::Month::January, 1)
+                    .expect("valid issue date"),
+                finstack_quant_core::dates::create_date(2029, time::Month::January, 1)
+                    .expect("valid maturity date"),
+                finstack_quant_core::dates::StubKind::ShortFront,
+                "USD-OIS",
+            )
+            .expect("valid fixed bond"),
+        );
+        for params in [None, Some(&ModelParamsSnapshot::None)] {
+            let unchanged = instrument_at_t0(&instrument, params).expect("no-op parameters");
+            assert!(Arc::ptr_eq(&instrument, &unchanged));
+        }
+    }
+
+    #[test]
+    fn instrument_at_t0_rejects_parameters_of_another_instrument_type() {
+        use finstack_quant_valuations::instruments::fixed_income::convertible::{
+            AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
+        };
+        use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
+
+        let instrument: Arc<dyn Instrument> =
+            Arc::new(StructuredCredit::example().expect("example"));
+        let params = ModelParamsSnapshot::Convertible {
+            conversion_spec: ConversionSpec {
+                ratio: Some(10.0),
+                price: None,
+                policy: ConversionPolicy::Voluntary,
+                anti_dilution: AntiDilutionPolicy::None,
+                dividend_adjustment: DividendAdjustment::None,
+                dilution_events: Vec::new(),
+            },
+        };
+
+        let Err(error) = instrument_at_t0(&instrument, Some(&params)) else {
+            panic!("mismatched model parameter snapshot should fail")
+        };
+        assert!(error.to_string().contains("StructuredCredit"));
+    }
+
+    #[test]
+    fn parallel_policy_reports_the_serial_first_error() {
+        let items: Vec<usize> = (0..256).collect();
+        let fails = |i: &usize| if i % 9 == 4 { Err(*i) } else { Ok(*i) };
+        let serial = try_map_policy(ExecutionPolicy::Serial, &items, fails);
+        assert_eq!(serial, Err(4));
+        for _ in 0..30 {
+            assert_eq!(
+                try_map_policy(ExecutionPolicy::Parallel, &items, fails),
+                serial
+            );
+        }
     }
 }

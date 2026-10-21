@@ -157,11 +157,13 @@ impl VolQuote {
 
     /// Validate the quote before calibration or bumping.
     pub fn validate(&self) -> Result<()> {
-        use super::validate;
+        use finstack_quant_core::validation::{
+            validate_f64_finite, validate_f64_non_negative, validate_f64_positive,
+        };
         match self {
             Self::OptionVol { strike, vol, .. } => {
-                validate::positive(*strike, "strike")?;
-                validate::non_negative(*vol, "vol")
+                validate_f64_positive(*strike, "strike")?;
+                validate_f64_non_negative(*vol, "vol")
             }
             Self::SwaptionVol {
                 expiry,
@@ -175,12 +177,12 @@ impl VolQuote {
                         "swaption volatility maturity must be after expiry".to_string(),
                     ));
                 }
-                validate::finite(*strike, "strike")?;
-                validate::non_negative(*vol, "vol")
+                validate_f64_finite(*strike, "strike")?;
+                validate_f64_non_negative(*vol, "vol")
             }
             Self::CapFloorVol { strike, vol, .. } => {
-                validate::finite(*strike, "strike")?;
-                validate::non_negative(*vol, "vol")
+                validate_f64_finite(*strike, "strike")?;
+                validate_f64_non_negative(*vol, "vol")
             }
         }
     }

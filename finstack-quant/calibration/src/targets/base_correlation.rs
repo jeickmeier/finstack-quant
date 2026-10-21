@@ -4,7 +4,6 @@ use crate::api::schema::BaseCorrelationParams;
 use crate::build::cds::resolve_cds_tenor_maturity;
 use crate::build::cds_tranche::{build_cds_tranche_instrument, CdsTrancheBuildOverrides};
 use crate::build::context::BuildCtx;
-use crate::build::prepared::PreparedQuote;
 use crate::config::CalibrationConfig;
 use crate::quotes::cds_tranche::CdsTrancheQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
@@ -13,7 +12,7 @@ use crate::solver::traits::BootstrapTarget;
 use crate::targets::util::ContextScratch;
 use crate::CalibrationReport;
 use finstack_quant_cashflows::builder::RollRule;
-use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Tenor, TenorUnit};
+use finstack_quant_core::dates::{Date, DateExt, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
 use finstack_quant_core::FxHashMap;
@@ -25,7 +24,8 @@ use std::sync::Arc;
 /// Prepared CDS tranche quote paired with its normalized detachment percentage.
 #[derive(Debug, Clone)]
 pub(crate) struct CdsTrancheCalibrationQuote {
-    pub(crate) prepared: PreparedQuote<CdsTrancheQuote>,
+    pub(crate) quote: CdsTrancheQuote,
+    pub(crate) tranche: finstack_quant_valuations_credit::cds_tranche::CdsTranche,
     pub(crate) detachment_pct: f64,
 }
 
@@ -201,7 +201,6 @@ impl BaseCorrelationTarget {
         quote: &CdsTrancheQuote,
         build_ctx: &BuildCtx,
         overrides: &CdsTrancheBuildOverrides,
-        time_day_count: DayCount,
     ) -> Result<CdsTrancheCalibrationQuote> {
         // Retain the contractual upfront so pricing discounts it to settlement
         // using the same cashflow rules as the instrument exposed to callers.
@@ -212,23 +211,10 @@ impl BaseCorrelationTarget {
                 ))
             })?;
 
-        let pillar_time = time_day_count.year_fraction(
-            self.params.base_date,
-            quote.maturity,
-            DayCountContext::default(),
-        )?;
-
-        let prepared_quote = PreparedQuote::new(
-            Arc::new(quote.clone()),
-            Arc::new(instrument),
-            quote.maturity,
-            pillar_time,
-        );
-
-        let detachment_pct = normalize_pct(quote.detachment);
         Ok(CdsTrancheCalibrationQuote {
-            prepared: prepared_quote,
-            detachment_pct,
+            quote: quote.clone(),
+            tranche: instrument,
+            detachment_pct: normalize_pct(quote.detachment),
         })
     }
 
@@ -241,7 +227,6 @@ impl BaseCorrelationTarget {
         }
 
         let expected_detachments = self.normalized_expected_detachments();
-        let time_day_count = self.params.day_count.unwrap_or(DayCount::Act365F);
         let build_ctx = self.build_ctx();
         let overrides = self.build_overrides();
 
@@ -267,8 +252,7 @@ impl BaseCorrelationTarget {
                 self.params.roll_rule,
             )?;
 
-            let calib_quote =
-                self.build_calibration_quote(&q, &build_ctx, &overrides, time_day_count)?;
+            let calib_quote = self.build_calibration_quote(&q, &build_ctx, &overrides)?;
             seen_detachments.push(detachment_pct);
             prepared.push(calib_quote);
         }
@@ -343,11 +327,11 @@ impl BootstrapTarget for BaseCorrelationTarget {
     type Curve = BaseCorrelationCurve;
 
     fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
-        Some(quote.prepared.quote.upfront_pct)
+        Some(quote.quote.upfront_pct)
     }
 
     fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
-        quote.prepared.quote.id.as_str().to_string()
+        quote.quote.id.as_str().to_string()
     }
 
     /// Base-correlation calibration opts into best-effort knots: the objective
@@ -418,17 +402,7 @@ impl BootstrapTarget for BaseCorrelationTarget {
     }
 
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
-        let pq = &quote.prepared;
-
-        let tranche = pq
-            .instrument
-            .as_any()
-            .downcast_ref::<finstack_quant_valuations_credit::cds_tranche::CdsTranche>()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(
-                    "Base correlation calibration requires a CdsTranche instrument".to_string(),
-                )
-            })?;
+        let tranche = &quote.tranche;
         let index_id = self.params.index_id.as_str();
         self.scratch.with_curve_then(
             curve,
@@ -538,7 +512,7 @@ mod tests {
             currency: Currency::USD,
             notional: 1_000_000.0,
             frequency: None,
-            day_count: Some(DayCount::Act365F),
+            day_count: Some(finstack_quant_core::dates::DayCount::Act365F),
             business_day_convention: Some(BusinessDayConvention::Following),
             calendar_id: None,
             detachment_points: vec![3.0, 7.0],

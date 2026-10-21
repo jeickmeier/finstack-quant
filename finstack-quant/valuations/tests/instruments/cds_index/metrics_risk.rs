@@ -427,12 +427,16 @@ fn bucketed_cs01_quote_constituents_use_each_off_grid_replay_quote_once() {
 
     assert_eq!(hz1_buckets.len(), expected_per_curve);
     assert_eq!(hz2_buckets.len(), expected_per_curve);
-    assert!(hz1_buckets
-        .iter()
-        .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ1::4y"));
-    assert!(hz2_buckets
-        .iter()
-        .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ2::4y"));
+    assert!(
+        hz1_buckets
+            .iter()
+            .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ1::4y")
+    );
+    assert!(
+        hz2_buckets
+            .iter()
+            .any(|(key, _)| key.as_str() == "bucketed_cs01::HZ2::4y")
+    );
     relative_eq(
         bucket_sum,
         result.measures[MetricId::Cs01.as_str()],
@@ -661,7 +665,7 @@ fn test_recovery01_scales_with_notional() {
 fn metric(
     idx: &finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex,
     ctx: &MarketContext,
-    as_of: finstack_quant_core::dates::Date,
+    as_of: time::Date,
     id: MetricId,
     options: finstack_quant_valuations::instruments::PricingOptions,
 ) -> f64 {

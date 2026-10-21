@@ -2,20 +2,20 @@
 
 use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::{
+    Result,
     currency::Currency,
     dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor},
     market_data::context::MarketContext,
     money::Money,
     types::{InstrumentId, PriceId},
-    Result,
 };
 use finstack_quant_margin::types::OtcMarginSpec;
+use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::{
     legs::FinancingLegSpec, legs::PayReceive, trs_common::TrsScheduleSpec,
     underlying::EquityUnderlyingParams,
 };
 use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::Attributes;
 use rust_decimal::Decimal;
 use time::macros::date;
 
@@ -453,7 +453,10 @@ impl EquityTotalReturnSwap {
             if !amount.is_finite() || *amount < 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "EquityTRS '{}' discrete_dividends[{}] amount = {} on {} must be finite and non-negative",
-                    self.id.as_str(), i, amount, date
+                    self.id.as_str(),
+                    i,
+                    amount,
+                    date
                 )));
             }
         }

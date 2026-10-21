@@ -33,7 +33,7 @@ use finstack_quant_calibration::api::validate as validate_api;
 use pyo3::create_exception;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::PyList;
 
 create_exception!(
     finstack_quant.calibration,
@@ -51,26 +51,20 @@ pub(crate) fn execute_error_to_py(py: Python<'_>, err: ExecuteError) -> PyErr {
     let details_json = details.to_json();
     let exc = CalibrationEnvelopeError::new_err(details.cause.clone());
     let value = exc.value(py);
-    let diagnostics = match strict_load_diagnostics_to_py(py, &details.diagnostics) {
-        Ok(list) => list,
+    use crate::bindings::pandas_utils::serde_to_py;
+    let converted = serde_to_py(py, &details.diagnostics).and_then(|diagnostics| {
+        let solver = details
+            .solver_diagnostics
+            .as_ref()
+            .map(|solver| serde_to_py(py, solver))
+            .transpose()?;
+        Ok((diagnostics, solver))
+    });
+    let (diagnostics, solver_diagnostics) = match converted {
+        Ok(converted) => converted,
         Err(convert_err) => {
             return PyRuntimeError::new_err(format!(
                 "failed to convert calibration diagnostics ({}): underlying calibration error: {}",
-                convert_err.value(py),
-                details.cause
-            ))
-        }
-    };
-    let solver_diagnostics = match details
-        .solver_diagnostics
-        .as_ref()
-        .map(|diagnostics| crate::bindings::pandas_utils::serde_to_py(py, diagnostics))
-        .transpose()
-    {
-        Ok(dict) => dict,
-        Err(convert_err) => {
-            return PyRuntimeError::new_err(format!(
-                "failed to convert calibration solver diagnostics ({}): underlying calibration error: {}",
                 convert_err.value(py),
                 details.cause
             ))
@@ -98,27 +92,6 @@ pub(crate) fn execute_error_to_py(py: Python<'_>, err: ExecuteError) -> PyErr {
         }
     }
     exc
-}
-
-/// Render strict-load diagnostics as a list of plain dicts.
-fn strict_load_diagnostics_to_py<'py>(
-    py: Python<'py>,
-    diagnostics: &[finstack_quant_calibration::api::errors::StrictLoadDiagnostic],
-) -> PyResult<Bound<'py, PyList>> {
-    let list = PyList::empty(py);
-    for diagnostic in diagnostics {
-        let item = PyDict::new(py);
-        item.set_item("code", &diagnostic.code)?;
-        item.set_item("phase", &diagnostic.phase)?;
-        item.set_item("severity", &diagnostic.severity)?;
-        item.set_item("pointer", diagnostic.pointer.as_deref())?;
-        item.set_item("message", &diagnostic.message)?;
-        item.set_item("contract", diagnostic.contract.as_deref())?;
-        item.set_item("expected_version", diagnostic.expected_version)?;
-        item.set_item("actual_version", diagnostic.actual_version)?;
-        list.append(item)?;
-    }
-    Ok(list)
 }
 
 /// Map an envelope-level error into `CalibrationEnvelopeError`.
@@ -202,7 +175,8 @@ fn validate_calibration(
     envelope: &Bound<'_, PyAny>,
 ) -> PyResult<PyCalibrationEnvelope> {
     let envelope = extract_envelope(py, envelope)?;
-    validate_api::validate_fail_fast(&envelope).map_err(|error| envelope_error_to_py(py, error))?;
+    validate_api::validate_calibration(&envelope)
+        .map_err(|error| envelope_error_to_py(py, error))?;
     Ok(PyCalibrationEnvelope::from_inner(envelope))
 }
 
@@ -268,7 +242,7 @@ fn dry_run_json(py: Python<'_>, envelope: &Bound<'_, PyAny>) -> PyResult<String>
 ///
 /// Returns
 /// -------
-/// CalibrationResult
+/// CalibrationResultEnvelope
 ///     Calibrated market, plan-level report, per-step reports and residuals.
 ///
 /// Raises
@@ -406,7 +380,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "CalibrationEnvelopeError",
                 "CalibrationPlan",
                 "CalibrationReport",
-                "CalibrationResult",
+                "CalibrationResultEnvelope",
                 "CalibrationStep",
                 "CalibrationValidationReport",
                 "CdsQuote",

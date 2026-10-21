@@ -1,15 +1,13 @@
 //! Calibration target construction and shared input validation.
 //!
-use crate::api::schema::{
-    SabrInterpolationMethod, SurfaceExtrapolationPolicy, SwaptionVolConvention, SwaptionVolParams,
-};
+use crate::api::schema::{SurfaceExtrapolationPolicy, SwaptionVolConvention, SwaptionVolParams};
 use crate::config::CalibrationConfig;
 use crate::quotes::vol::VolQuote;
 use crate::quotes::MarketQuote;
 use crate::CalibrationReport;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::{
-    adjust, BusinessDayConvention, DateExt, DayCount, DayCountContext, StubKind, Tenor,
+    BusinessDayConvention, DateExt, DayCount, DayCountContext, StubKind, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::SabrParameterData;
@@ -379,18 +377,14 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
                 };
 
                 let p = sabr_params.get(&key).cloned().or_else(|| {
-                    let p = match params.sabr_interpolation {
-                        SabrInterpolationMethod::Bilinear => {
-                            Self::interpolate_sabr_params_bilinear(
-                                texp,
-                                tten,
-                                &sabr_params,
-                                (&expiries_axis, &tenors_axis),
-                                extrap_policy,
-                                allow_missing,
-                            )
-                        }
-                    };
+                    let p = Self::interpolate_sabr_params_bilinear(
+                        texp,
+                        tten,
+                        &sabr_params,
+                        (&expiries_axis, &tenors_axis),
+                        extrap_policy,
+                        allow_missing,
+                    );
                     if p.is_some() {
                         interpolated_points += 1;
                     }
@@ -649,12 +643,11 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
         expiry: finstack_quant_core::dates::Date,
         conventions: &SwaptionLegConventions<'_>,
     ) -> Result<finstack_quant_core::dates::Date> {
-        let calendar = finstack_quant_core::dates::calendar_by_id_strict(conventions.calendar_id)?;
-        let unadjusted_start = expiry.add_business_days(conventions.settlement_days, calendar)?;
-        adjust(
-            unadjusted_start,
+        crate::build::helpers::resolve_spot_date(
+            expiry,
+            conventions.calendar_id,
+            conventions.settlement_days,
             conventions.fixed_business_day_convention,
-            calendar,
         )
     }
 
@@ -1155,7 +1148,6 @@ mod tests {
             sabr_beta: 0.5,
             target_expiries: vec![1.0, 2.0],
             target_tenors: vec![5.0, 10.0],
-            sabr_interpolation: crate::api::schema::SabrInterpolationMethod::Bilinear,
             calendar_id: None,
             fixed_day_count: Some(DayCount::Act365F),
             swap_index: Some("USD-SOFR-3M".into()),

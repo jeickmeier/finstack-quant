@@ -4,8 +4,8 @@
 //! zero-coupon inflation swaps (ZCIS) and year-on-year (YoY) inflation swaps.
 
 use super::ids::QuoteId;
-use super::validate;
 use finstack_quant_core::dates::{Date, Tenor};
+use finstack_quant_core::validation::validate_f64_finite;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::market::conventions::ids::InflationSwapConventionId;
 
@@ -160,7 +160,7 @@ impl InflationQuote {
 
     /// Validate that the quoted inflation rate is finite.
     pub fn validate(&self) -> Result<()> {
-        validate::finite(self.rate(), "rate")
+        validate_f64_finite(self.rate(), "rate")
     }
 }
 

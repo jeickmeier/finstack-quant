@@ -90,7 +90,7 @@ fn explain_uses_stamped_rounding_context() {
     attr.compute_residual()
         .expect("Residual computation should succeed");
 
-    let explanation = attr.explain();
+    let explanation = attr.explain(false);
     assert!(explanation.contains("FX Translation"));
     assert!(
         explanation.contains("Total P&L"),

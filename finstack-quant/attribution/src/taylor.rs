@@ -24,13 +24,11 @@
 //! factor-level explained/unexplained decomposition without sequential market
 //! state construction.
 
-use super::factors::{MarketRestoreFlags, MarketSnapshot};
-use super::helpers::*;
-use super::metrics_based::{extract_credit_keyrates, CreditKeyRateBucket};
-use super::model_params;
-use super::types::*;
-use crate::policy_map::map_policy;
+use crate::factors::{MarketRestoreFlags, MarketSnapshot};
+use crate::helpers::*;
+use crate::metrics_based::shifts::{extract_credit_keyrates, CreditKeyRateBucket};
 use crate::AttributionRequest;
+use crate::{AttributionFactor, AttributionMethod, MoveUnit, PnlAttribution};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
@@ -42,7 +40,7 @@ use finstack_quant_core::Result;
 use finstack_quant_models::volatility::measure_vol_surface_shift;
 use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::bump_surface_vol_absolute;
+use finstack_quant_valuations::metrics::{bump_surface_vol_absolute, STANDARD_BUCKETS_YEARS};
 use finstack_quant_valuations::recalibration::{
     HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump, RecalibrationProvider,
 };
@@ -137,16 +135,7 @@ impl TaylorAttributionConfig {
     }
 }
 
-/// Factors, repricing count and diagnostics accumulated across a Taylor run.
-#[derive(Default)]
-struct TaylorAccumulator {
-    factors: Vec<TaylorFactorResult>,
-    num_repricings: usize,
-    notes: Vec<String>,
-    result_invalid: bool,
-}
-
-impl TaylorAccumulator {
+impl TaylorAttributionResult {
     /// Record a Taylor factor result and its attempted pricing calls, including
     /// calls that returned an error before the factor completed.
     ///
@@ -158,7 +147,7 @@ impl TaylorAccumulator {
     fn record(
         &mut self,
         factor_kind: &str,
-        factor_id: &CurveId,
+        factor_id: &str,
         result: Result<TaylorFactorResult>,
         repricings: usize,
     ) {
@@ -168,7 +157,7 @@ impl TaylorAccumulator {
             Err(e) => {
                 tracing::warn!(
                     factor_kind = factor_kind,
-                    curve_id = %factor_id,
+                    factor_id,
                     error = %e,
                     "Taylor attribution: factor computation failed"
                 );
@@ -183,7 +172,7 @@ impl TaylorAccumulator {
 
 /// One Taylor factor's first-order and optional second-order P&L.
 #[derive(Debug, Clone)]
-pub(crate) struct TaylorFactorResult {
+struct TaylorFactorResult {
     /// Attribution bucket the factor's P&L lands in (`Carry` for theta).
     pub factor: AttributionFactor,
     /// Diagnostic factor label, including its curve or volatility input ID.
@@ -202,7 +191,7 @@ pub(crate) struct TaylorFactorResult {
 
 /// Complete result of Taylor-based attribution.
 #[derive(Debug, Clone)]
-pub(crate) struct TaylorAttributionResult {
+struct TaylorAttributionResult {
     /// Per-factor breakdown.
     pub factors: Vec<TaylorFactorResult>,
     /// Number of repricings performed (bump-and-reprice calls).
@@ -215,9 +204,9 @@ pub(crate) struct TaylorAttributionResult {
     /// `None` when theta computation failed; otherwise lets `attribute_pnl_taylor`
     /// split theta into PV-only and coupon components without re-collecting
     /// cashflows.
-    pub theta_coupon_income: Option<f64>,
+    pub theta_coupon_income: Option<Money>,
     /// All realized period receipts, including returned principal.
-    pub theta_cash_paid: Option<f64>,
+    pub theta_cash_paid: Option<Money>,
     /// Diagnostic notes accumulated during factor computation (failed factors,
     /// surface-averaged vol moves, missing T0 FX). Threaded into
     /// `PnlAttribution::meta.notes` by `attribute_pnl_taylor`.
@@ -258,16 +247,21 @@ fn compute_taylor_result(
         model_params_t0,
         ..
     } = *request;
-    validate_attribution_period(as_of_t0, as_of_t1)?;
     let (instrument_t0, pv_t0, pv_t1) = endpoint_values(request)?;
     // Decimal-exact difference: subtracting two large `.amount()` f64s loses
     // precision at high notionals, and `checked_sub` also rejects a currency
     // mismatch instead of silently differencing across currencies.
     pv_t1.checked_sub(pv_t0)?;
 
-    let mut acc = TaylorAccumulator {
+    let mut acc = TaylorAttributionResult {
+        factors: Vec::new(),
         num_repricings: 2,
-        ..TaylorAccumulator::default()
+        pv_t0,
+        pv_t1,
+        theta_coupon_income: None,
+        theta_cash_paid: None,
+        notes: Vec::new(),
+        result_invalid: false,
     };
 
     // Rate sensitivities (key-rate DV01 per discount curve)
@@ -307,7 +301,7 @@ fn compute_taylor_result(
             (curve_id.clone(), result, repricings)
         };
         for (curve_id, result, repricings) in map_policy(execution_policy, curve_ids, compute) {
-            acc.record(factor_kind, &curve_id, result, repricings);
+            acc.record(factor_kind, curve_id.as_str(), result, repricings);
         }
     }
 
@@ -379,7 +373,7 @@ fn compute_taylor_result(
     };
     let credit_results = map_policy(execution_policy, credit_curves, compute_credit);
     for (curve_id, result, repricings) in credit_results {
-        acc.record("credit", &curve_id, result, repricings);
+        acc.record("credit", curve_id.as_str(), result, repricings);
     }
 
     // Volatility sensitivities (vega) — one factor per vol-surface dependency.
@@ -428,7 +422,7 @@ fn compute_taylor_result(
         };
     let vol_results = map_policy(execution_policy, &surface_dependencies, compute_vol);
     for (vol_surface_id, result, repricings) in vol_results {
-        acc.record("vol", &vol_surface_id, result, repricings);
+        acc.record("vol", vol_surface_id.as_str(), result, repricings);
     }
 
     let scalar_vol_t0 =
@@ -450,7 +444,7 @@ fn compute_taylor_result(
             "Vol:scalars",
             &mut repricings,
         );
-        acc.record("vol", &CurveId::new("Vol:scalars"), result, repricings);
+        acc.record("vol", "Vol:scalars", result, repricings);
     }
 
     // FX-exposure factor: pricing impact of FX-rate changes on cross-currency
@@ -535,19 +529,12 @@ fn compute_taylor_result(
             &params_t0,
             &mut acc.num_repricings,
         );
-        acc.record(
-            "model-parameter",
-            &CurveId::new("ModelParameters"),
-            result,
-            0,
-        );
+        acc.record("model-parameter", "ModelParameters", result, 0);
     }
 
     // Theta (time decay): reprice at T1 date with T0 market. The outcome
     // also carries `coupon_income` so `attribute_pnl_taylor` can split theta
     // into PV-only and coupon components without re-collecting cashflows.
-    let mut theta_coupon_income: Option<f64> = None;
-    let mut theta_cash_paid: Option<f64> = None;
     match compute_theta_factor(
         &instrument_t0,
         market_t0,
@@ -563,8 +550,8 @@ fn compute_taylor_result(
                 cash_paid,
             } = outcome;
 
-            theta_coupon_income = Some(coupon_income);
-            theta_cash_paid = Some(cash_paid);
+            acc.theta_coupon_income = Some(coupon_income);
+            acc.theta_cash_paid = Some(cash_paid);
             acc.factors.push(result);
         }
         Err(e) => {
@@ -579,16 +566,7 @@ fn compute_taylor_result(
         }
     }
 
-    Ok(TaylorAttributionResult {
-        factors: acc.factors,
-        num_repricings: acc.num_repricings,
-        pv_t0,
-        pv_t1,
-        theta_coupon_income,
-        theta_cash_paid,
-        notes: acc.notes,
-        result_invalid: acc.result_invalid,
-    })
+    Ok(acc)
 }
 
 /// Compute Taylor-based P&L attribution.
@@ -687,40 +665,26 @@ pub(crate) fn attribute_pnl_taylor(
         // Route accumulation through Money::checked_add so a currency
         // mismatch surfaces as an error instead of being silently coerced into
         // `ccy`.
-        let bucket = match factor.factor {
-            AttributionFactor::RatesCurves => &mut attribution.rates_curves_pnl,
-            AttributionFactor::CreditCurves => &mut attribution.credit_curves_pnl,
-            AttributionFactor::InflationCurves => &mut attribution.inflation_curves_pnl,
-            AttributionFactor::Correlations => &mut attribution.correlations_pnl,
-            AttributionFactor::Fx => &mut attribution.fx_pnl,
-            AttributionFactor::Volatility => &mut attribution.vol_pnl,
-            AttributionFactor::MarketScalars => &mut attribution.market_scalars_pnl,
-            AttributionFactor::ModelParameters => &mut attribution.model_params_pnl,
-            AttributionFactor::Carry => {
-                // Taylor theta already includes cashflows from compute_theta_factor.
-                let ci = factor_money_or_invalid(
-                    taylor.theta_coupon_income.unwrap_or(0.0),
-                    ccy,
-                    "Theta coupon income",
-                    &mut attribution.meta.notes,
-                    &mut non_finite_detected,
-                );
-                let cash_paid = Money::new(taylor.theta_cash_paid.unwrap_or(0.0), ccy)?;
-                let theta_only = Money::new(factor_money.amount() - cash_paid.amount(), ccy)?;
-                // Taylor path: delta_accrued and flat_window_diff are unavailable (no repricing).
-                let carry_inputs = TotalReturnCarryInputs {
-                    cash_paid,
-                    income_cash_paid: ci,
-                    delta_accrued: None,
-                    flat_window_diff: None,
-                    funding_cost: None,
-                    num_repricings: 0,
-                    warnings: Vec::new(),
-                };
-                apply_total_return_carry(&mut attribution, theta_only, carry_inputs)?;
-                continue;
-            }
-        };
+        if factor.factor == AttributionFactor::Carry {
+            // Taylor theta already includes cashflows from compute_theta_factor.
+            let zero = Money::from((0_i64, ccy));
+            let ci = taylor.theta_coupon_income.unwrap_or(zero);
+            let cash_paid = taylor.theta_cash_paid.unwrap_or(zero);
+            let theta_only = Money::new(factor_money.amount() - cash_paid.amount(), ccy)?;
+            // Taylor path: delta_accrued and flat_window_diff are unavailable (no repricing).
+            let carry_inputs = TotalReturnCarryInputs {
+                cash_paid,
+                income_cash_paid: ci,
+                delta_accrued: None,
+                flat_window_diff: None,
+                funding_cost: None,
+                num_repricings: 0,
+                warnings: Vec::new(),
+            };
+            apply_total_return_carry(&mut attribution, theta_only, carry_inputs)?;
+            continue;
+        }
+        let bucket = attribution.factor_pnl_mut(&factor.factor);
         *bucket = bucket.checked_add(factor_money)?;
         if factor.factor == AttributionFactor::Fx {
             stamp_fx_policy(
@@ -760,11 +724,6 @@ pub(crate) fn attribute_pnl_taylor(
     Ok(attribution)
 }
 
-/// Standard key-rate bucket grid (years) used for key-rate-aware rate / forward
-/// curve attribution. Matches the DV01 calculator's standard bucket grid.
-const KEY_RATE_BUCKETS_YEARS: [f64; 11] =
-    [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0];
-
 /// One key-rate bucket's contribution to a rate/forward factor: the per-bucket
 /// DV01 (from a triangular bump) paired with the realized per-tenor curve move.
 struct KeyRateBucket {
@@ -800,7 +759,7 @@ fn directional_gamma_pnl(
     Ok(0.5 * (up.amount() - 2.0 * pv_t0.amount() + down.amount()) / scale.powi(2))
 }
 
-/// Triangular key-rate bump spec for bucket `i` of `KEY_RATE_BUCKETS_YEARS`.
+/// Triangular key-rate bump spec for bucket `i` of the tenor grid `tenors`.
 ///
 /// The wing buckets use the dedicated half-triangle constructors so the
 /// `Σ wᵢ(t) = 1.0` partition-of-unity invariant holds across the whole curve
@@ -809,10 +768,6 @@ fn directional_gamma_pnl(
 /// sub-3M DV01), and the last bucket is flat at 1.0 beyond 30Y (passing
 /// `next = ∞` instead produces a NaN weight for any knot past 30Y and aborts
 /// the whole factor).
-fn key_rate_bump_spec(i: usize, bump_bp: f64) -> BumpSpec {
-    key_rate_bump_on_grid(&KEY_RATE_BUCKETS_YEARS, i, bump_bp)
-}
-
 fn key_rate_bump_on_grid(tenors: &[f64], i: usize, bump_bp: f64) -> BumpSpec {
     if tenors.len() == 1 {
         return BumpSpec::parallel_bp(bump_bp);
@@ -887,7 +842,7 @@ fn compute_curve_factor(
                 market_t0.get_discount(curve_id.as_str())?,
                 market_t1.get_discount(curve_id.as_str())?,
             );
-            KEY_RATE_BUCKETS_YEARS
+            STANDARD_BUCKETS_YEARS
                 .iter()
                 .map(|&t| {
                     (curve_t1.zero_rate(t, finstack_quant_core::math::Compounding::Continuous)
@@ -901,25 +856,25 @@ fn compute_curve_factor(
                 market_t0.get_forward(curve_id.as_str())?,
                 market_t1.get_forward(curve_id.as_str())?,
             );
-            KEY_RATE_BUCKETS_YEARS
+            STANDARD_BUCKETS_YEARS
                 .iter()
                 .map(|&t| (curve_t1.rate(t) - curve_t0.rate(t)) * 10_000.0)
                 .collect()
         }
     };
 
-    let mut buckets: Vec<KeyRateBucket> = Vec::with_capacity(KEY_RATE_BUCKETS_YEARS.len());
+    let mut buckets: Vec<KeyRateBucket> = Vec::with_capacity(STANDARD_BUCKETS_YEARS.len());
     for (i, &move_bp) in per_tenor_move_bp.iter().enumerate() {
         let up = market_t0.bump([MarketBump::Curve {
             id: curve_id.clone(),
-            spec: key_rate_bump_spec(i, config.rate_bump_bp),
+            spec: key_rate_bump_on_grid(&STANDARD_BUCKETS_YEARS, i, config.rate_bump_bp),
         }])?;
         *repricings += 1;
         let pv_up = instrument.value(&up, as_of_t0)?;
 
         let down = market_t0.bump([MarketBump::Curve {
             id: curve_id.clone(),
-            spec: key_rate_bump_spec(i, -config.rate_bump_bp),
+            spec: key_rate_bump_on_grid(&STANDARD_BUCKETS_YEARS, i, -config.rate_bump_bp),
         }])?;
         *repricings += 1;
         let pv_down = instrument.value(&down, as_of_t0)?;
@@ -944,7 +899,7 @@ fn compute_curve_factor(
                 bump_curve_direction(
                     market_t0,
                     curve_id,
-                    &KEY_RATE_BUCKETS_YEARS,
+                    &STANDARD_BUCKETS_YEARS,
                     &per_tenor_move_bp,
                     scale,
                 )
@@ -966,12 +921,31 @@ fn compute_curve_factor(
         gamma_pnl,
         working: FactorWorking::KeyRate {
             unit: MoveUnit::BasisPoint,
-            buckets: KEY_RATE_BUCKETS_YEARS
+            buckets: STANDARD_BUCKETS_YEARS
                 .iter()
                 .zip(&buckets)
                 .map(|(&tenor_years, bucket)| (tenor_years, bucket.dv01, bucket.move_bp))
                 .collect(),
         },
+    })
+}
+
+/// Replay parameters of a calibrated hazard curve.
+///
+/// `operation` names the Taylor step in the error raised for a curve built
+/// without a calibration recipe.
+fn hazard_replay_params(
+    hazard: &finstack_quant_core::market_data::term_structures::HazardCurve,
+    operation: &str,
+) -> Result<finstack_quant_calibration::api::schema::HazardCurveParams> {
+    let recipe = hazard.hazard_calibration().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "{operation} requires a calibration recipe for '{}'",
+            hazard.id()
+        ))
+    })?;
+    serde_json::from_value(recipe.hazard_params().clone()).map_err(|error| {
+        finstack_quant_core::Error::Validation(format!("invalid hazard replay parameters: {error}"))
     })
 }
 
@@ -985,17 +959,7 @@ fn bump_credit_market(
     provider: &dyn RecalibrationProvider,
 ) -> Result<MarketContext> {
     if let Ok(hazard) = market.get_hazard(curve_id.as_str()) {
-        let recipe = hazard.hazard_calibration().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "Taylor quote-space credit risk requires a calibration recipe for '{curve_id}'"
-            ))
-        })?;
-        let params: finstack_quant_calibration::api::schema::HazardCurveParams =
-            serde_json::from_value(recipe.hazard_params().clone()).map_err(|error| {
-                finstack_quant_core::Error::Validation(format!(
-                    "invalid hazard replay parameters: {error}"
-                ))
-            })?;
+        let params = hazard_replay_params(&hazard, "Taylor quote-space credit risk")?;
         let source = Arc::new(market.clone());
         let bumped = provider.rebuild_hazard_curve(&HazardRecalibrationRequest {
             hazard,
@@ -1025,17 +989,7 @@ fn bump_credit_keyrates(
     provider: &dyn RecalibrationProvider,
 ) -> Result<MarketContext> {
     if let Ok(hazard) = market.get_hazard(curve_id.as_str()) {
-        let recipe = hazard.hazard_calibration().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "Taylor credit gamma requires a replay recipe for '{curve_id}'"
-            ))
-        })?;
-        let params: finstack_quant_calibration::api::schema::HazardCurveParams =
-            serde_json::from_value(recipe.hazard_params().clone()).map_err(|error| {
-                finstack_quant_core::Error::Validation(format!(
-                    "invalid hazard parameters: {error}"
-                ))
-            })?;
+        let params = hazard_replay_params(&hazard, "Taylor credit gamma")?;
         let mut bumped = market.clone();
         for bucket in buckets {
             let quote_index = bucket.quote_index.ok_or_else(|| {
@@ -1303,7 +1257,7 @@ fn restored_family_factor(
 
 /// Run a restore-and-reprice family when either market carries that family.
 fn record_restored_family_factor(
-    acc: &mut TaylorAccumulator,
+    acc: &mut TaylorAttributionResult,
     request: &AttributionRequest<'_>,
     dependencies: &finstack_quant_valuations::instruments::MarketDependencies,
     pv_t1: Money,
@@ -1326,7 +1280,7 @@ fn record_restored_family_factor(
         factor_name,
         &mut repricings,
     );
-    acc.record(factor_kind, &CurveId::new(factor_name), result, repricings);
+    acc.record(factor_kind, factor_name, result, repricings);
 }
 
 /// Isolate T₀ vs T₁ model-parameter P&L by repricing the T₁ market with the
@@ -1339,7 +1293,7 @@ fn compute_model_params_factor(
     params_t0: &ModelParamsSnapshot,
     repricings: &mut usize,
 ) -> Result<TaylorFactorResult> {
-    let instrument_t0 = model_params::with_model_params(instrument, params_t0)?;
+    let instrument_t0 = instrument_at_t0(instrument, Some(params_t0))?;
     *repricings += 1;
     let pv_with_t0 = instrument_t0.value(market_t1, as_of_t1)?;
     let explained = pv_t1.amount() - pv_with_t0.amount();
@@ -1360,8 +1314,8 @@ fn compute_model_params_factor(
 /// is non-deterministic).
 struct ThetaFactorOutcome {
     factor: TaylorFactorResult,
-    coupon_income: f64,
-    cash_paid: f64,
+    coupon_income: Money,
+    cash_paid: Money,
 }
 
 /// Compute theta (time decay + realized cashflows) by repricing at T1 date
@@ -1388,9 +1342,7 @@ fn compute_theta_factor(
         pv_t0.currency(),
     )?;
 
-    let coupon_income = cash.income.amount();
-    let cash_paid = cash.total.amount();
-    let theta_pnl = pv_diff + cash_paid;
+    let theta_pnl = pv_diff + cash.total.amount();
     Ok(ThetaFactorOutcome {
         factor: TaylorFactorResult {
             factor: AttributionFactor::Carry,
@@ -1399,8 +1351,8 @@ fn compute_theta_factor(
             gamma_pnl: None,
             working: FactorWorking::Repriced { pv: pv_t0_at_t1 },
         },
-        coupon_income,
-        cash_paid,
+        coupon_income: cash.income,
+        cash_paid: cash.total,
     })
 }
 
@@ -1415,6 +1367,7 @@ mod tests {
     }
 
     use super::*;
+    use crate::ExecutionPolicy;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::money::Money;
@@ -2348,9 +2301,9 @@ mod tests {
         mock.discount_curves = vec![CurveId::new("HEDGE")];
         let instrument: Arc<dyn Instrument> = Arc::new(mock);
         let opening = MarketContext::new().insert(flat_zero_curve("HEDGE", start, rate));
-        let mut moves = vec![0.0; KEY_RATE_BUCKETS_YEARS.len()];
+        let mut moves = vec![0.0; STANDARD_BUCKETS_YEARS.len()];
         for (tenor, movement) in [(1.0, 10.0), (5.0, -10.0)] {
-            let i = KEY_RATE_BUCKETS_YEARS
+            let i = STANDARD_BUCKETS_YEARS
                 .iter()
                 .position(|t| *t == tenor)
                 .unwrap();
@@ -2359,7 +2312,7 @@ mod tests {
         let closing = bump_curve_direction(
             &opening,
             &CurveId::new("HEDGE"),
-            &KEY_RATE_BUCKETS_YEARS,
+            &STANDARD_BUCKETS_YEARS,
             &moves,
             1.0,
         )

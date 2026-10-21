@@ -1,26 +1,5 @@
 use super::*;
 
-/// Price a full cap/floor with a flat normal volatility quote.
-#[cfg(test)]
-pub(crate) fn bachelier_cap_floor_price(
-    discount_df: &(dyn Fn(f64) -> f64 + Sync),
-    forward_df: &(dyn Fn(f64) -> f64 + Sync),
-    maturity: f64,
-    strike: f64,
-    normal_vol: f64,
-    is_cap: bool,
-    frequency: SwapFrequency,
-) -> f64 {
-    scheduled_bachelier_cap_floor_price(
-        discount_df,
-        forward_df,
-        &CapFloorSchedule::synthetic(maturity, frequency),
-        strike,
-        normal_vol,
-        is_cap,
-    )
-}
-
 pub(super) fn scheduled_bachelier_cap_floor_price(
     discount_df: &(dyn Fn(f64) -> f64 + Sync),
     forward_df: &(dyn Fn(f64) -> f64 + Sync),
@@ -68,6 +47,11 @@ pub(super) fn scheduled_cap_floor_bachelier_vega(
         .sum()
 }
 
+/// Simple forward rate over a caplet period from a discount-factor function.
+///
+/// Non-finite or non-positive discount factors propagate as `NaN` instead of
+/// being clamped: the cap/floor residuals and the fixed-kappa sigma solve rely
+/// on the non-finite-price check to detect broken curves.
 pub(super) fn scheduled_forward_rate(
     forward_df: &(dyn Fn(f64) -> f64 + Sync),
     period: &CapletSchedule,
@@ -111,118 +95,6 @@ pub(crate) fn scheduled_cap_floor_price(
             )
         })
         .sum()
-}
-
-/// Cap/floor shape used by HW1F pricing helpers.
-#[cfg(test)]
-#[derive(Clone, Copy)]
-pub(crate) struct CapFloorPriceSpec {
-    pub(super) maturity: f64,
-    pub(super) strike: f64,
-    pub(super) is_cap: bool,
-    pub(super) frequency: SwapFrequency,
-}
-
-#[cfg(test)]
-impl CapFloorPriceSpec {
-    pub(crate) fn new(maturity: f64, strike: f64, is_cap: bool, frequency: SwapFrequency) -> Self {
-        Self {
-            maturity,
-            strike,
-            is_cap,
-            frequency,
-        }
-    }
-
-    pub(super) fn from_quote(quote: &CapFloorQuote, frequency: SwapFrequency) -> Self {
-        Self::new(quote.maturity, quote.strike, quote.is_cap, frequency)
-    }
-}
-
-/// Price a full cap/floor exactly under HW1F by pricing each caplet as a
-/// zero-coupon bond option.
-///
-/// A caplet fixing at `T`, paying `τ·max(L(T,S) − K, 0)` at `S`, equals
-/// `(1 + τK)` zero-coupon bond **puts** with strike `X = 1/(1 + τK)` on
-/// `P(T,S)`, expiring at `T`; a floorlet is the corresponding bond **call**
-/// (Brigo–Mercurio §2.6 / Hull §31). The ZCB option is priced with the same
-/// HW1F bond-option formula used by the Jamshidian swaption decomposition
-/// ([`hw_bond_vol`]). This replaces the earlier mapping of HW bond vol to an
-/// approximate forward-rate normal vol, which understated the caplet vol by
-/// a `(1 + τF)` factor.
-///
-/// Dual-curve handling: the ZCB option is evaluated on the forward
-/// (projection) curve and scaled by the deterministic discount/projection
-/// basis `P_d(0,S)/P_f(0,S)`; for single-curve calibration the factor is 1
-/// and the price is exact.
-#[cfg(test)]
-pub(crate) fn hw1f_cap_floor_price(
-    kappa: f64,
-    sigma: f64,
-    discount_df: &(dyn Fn(f64) -> f64 + Sync),
-    forward_df: &(dyn Fn(f64) -> f64 + Sync),
-    spec: CapFloorPriceSpec,
-) -> f64 {
-    let periods: Vec<_> = cap_floor_periods(spec.maturity, spec.frequency).collect();
-    finstack_quant_models::rates::hull_white::hw1f_cap_floor_price(
-        HullWhiteCalibrationParams { kappa, sigma },
-        discount_df,
-        forward_df,
-        &periods,
-        spec.strike,
-        spec.is_cap,
-    )
-}
-
-/// Price a full cap/floor under a scheduled HW1F short-rate volatility.
-#[cfg(test)]
-pub(crate) fn hw1f_cap_floor_price_with_model(
-    params: &HullWhiteParams,
-    discount_df: &(dyn Fn(f64) -> f64 + Sync),
-    forward_df: &(dyn Fn(f64) -> f64 + Sync),
-    spec: CapFloorPriceSpec,
-) -> finstack_quant_core::Result<f64> {
-    let periods: Vec<_> = cap_floor_periods(spec.maturity, spec.frequency)
-        .map(|(t_start, t_end, accrual)| (t_start, t_start, t_end, accrual))
-        .collect();
-    finstack_quant_models::rates::hull_white::hw1f_cap_floor_price_with_model(
-        params,
-        discount_df,
-        forward_df,
-        &periods,
-        spec.strike,
-        spec.is_cap,
-    )
-}
-
-/// Return the flat normal vol that reproduces the HW1F cap/floor model price.
-#[cfg(test)]
-pub(crate) fn hw1f_cap_floor_implied_normal_vol(
-    kappa: f64,
-    sigma: f64,
-    discount_df: &(dyn Fn(f64) -> f64 + Sync),
-    forward_df: &(dyn Fn(f64) -> f64 + Sync),
-    spec: CapFloorPriceSpec,
-) -> finstack_quant_core::Result<f64> {
-    let target = hw1f_cap_floor_price(kappa, sigma, discount_df, forward_df, spec);
-    cap_floor_implied_normal_vol(target, discount_df, forward_df, spec)
-}
-
-#[cfg(test)]
-pub(super) fn cap_floor_implied_normal_vol(
-    target: f64,
-    discount_df: &(dyn Fn(f64) -> f64 + Sync),
-    forward_df: &(dyn Fn(f64) -> f64 + Sync),
-    spec: CapFloorPriceSpec,
-) -> finstack_quant_core::Result<f64> {
-    scheduled_cap_floor_implied_normal_vol(
-        target,
-        discount_df,
-        forward_df,
-        &CapFloorSchedule::synthetic(spec.maturity, spec.frequency),
-        spec.strike,
-        spec.is_cap,
-    )
 }
 
 pub(crate) fn scheduled_cap_floor_implied_normal_vol(
@@ -270,25 +142,6 @@ pub(super) fn cap_floor_periods(
         let end = (idx + 1) as f64 * accrual;
         (start, end, accrual)
     })
-}
-
-/// Simple forward rate between `start` and `end` from a discount-factor
-/// function.
-///
-/// Non-finite or non-positive discount factors propagate as `NaN` instead of
-/// being clamped: callers (`HullWhiteCapFloorTarget::calculate_residuals`,
-/// `solve_cap_floor_sigma_for_fixed_kappa`) rely on the non-finite-price
-/// check to detect broken curves, and `f64::max` would silently absorb a NaN
-/// (`NaN.max(1e-12) == 1e-12`), defeating that error contract.
-#[cfg(test)]
-pub(super) fn forward_rate_from_df(df: &(dyn Fn(f64) -> f64 + Sync), start: f64, end: f64) -> f64 {
-    let accrual = (end - start).max(1e-12);
-    let p_start = df(start);
-    let p_end = df(end);
-    if !p_start.is_finite() || !p_end.is_finite() || p_start <= 0.0 || p_end <= 0.0 {
-        return f64::NAN;
-    }
-    (p_start / p_end - 1.0) / accrual
 }
 
 pub(super) fn normal_caplet_price(

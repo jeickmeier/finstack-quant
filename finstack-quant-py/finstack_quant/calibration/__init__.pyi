@@ -33,7 +33,7 @@ __all__ = [
     "CalibrationEnvelopeError",
     "CalibrationPlan",
     "CalibrationReport",
-    "CalibrationResult",
+    "CalibrationResultEnvelope",
     "CalibrationStep",
     "CalibrationValidationReport",
     "CdsQuote",
@@ -3467,17 +3467,6 @@ class CalibrationEnvelope:
 
         """
 
-    def dry_run(self) -> CalibrationValidationReport:
-        """Validate this envelope statically without solving.
-
-        Returns
-        -------
-        CalibrationValidationReport
-            Every static error found in a single pass, plus the step dependency
-            graph. Findings are reported, so this method never raises.
-
-        """
-
     def to_json(self) -> str:
         """
         Serialize the envelope to compact canonical JSON.
@@ -4313,7 +4302,7 @@ class CalibrationValidationReport:
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
 
-class CalibrationResult:
+class CalibrationResultEnvelope:
     """Calibrated market plus the plan-level and per-step calibration reports.
 
     Examples:
@@ -4383,22 +4372,6 @@ class CalibrationResult:
         """
 
     @property
-    def report_json(self) -> str:
-        """
-        JSON twin of :attr:`report`.
-
-        Returns
-        -------
-        str
-            JSON twin of :attr:`report`.
-
-        Raises
-        ------
-        ValueError
-            If the underlying value cannot be serialized to JSON.
-        """
-
-    @property
     def step_ids(self) -> list[str]:
         """
         Identifiers of the steps executed by the plan.
@@ -4424,36 +4397,6 @@ class CalibrationResult:
             Total solver iterations across every step.
         """
 
-    @property
-    def max_residual_ratio(self) -> float:
-        """
-                Largest ``|residual| / step_tolerance`` across every quote.
-
-        Below 1.0 when every quote repriced inside its step's tolerance. Raw
-        per-step residual statistics live on ``step_report(step_id).max_residual``.
-        NaN when no step reported a tolerance-scaled aggregate.
-
-                This property does not raise.
-
-                Returns
-                -------
-                float
-                    Largest ``|residual| / step_tolerance`` across every quote. Below 1.0 when every quote repriced inside its step's tolerance. Raw per-step residual statistics live on ``step_report(step_id).max_residual``. NaN when no step reported a tolerance-scaled aggregate.
-        """
-
-    @property
-    def rmse_ratio(self) -> float:
-        """
-        Root-mean-square ``|residual| / step_tolerance`` across every quote.
-
-        This property does not raise.
-
-        Returns
-        -------
-        float
-            Root-mean-square ``|residual| / step_tolerance`` across every quote.
-        """
-
     def step_report(self, step_id: str) -> CalibrationReport:
         """Return the calibration report for one step.
 
@@ -4466,26 +4409,6 @@ class CalibrationResult:
         -------
         CalibrationReport
             Typed step report with raw residuals keyed by quote id.
-
-        Raises
-        ------
-        KeyError
-            If no step with that identifier exists.
-
-        """
-
-    def step_report_json(self, step_id: str) -> str:
-        """JSON twin of :meth:`step_report`.
-
-        Parameters
-        ----------
-        step_id : str
-            Identifier of the calibration step.
-
-        Returns
-        -------
-        str
-            Compact JSON encoding of the step report.
 
         Raises
         ------
@@ -4526,7 +4449,7 @@ class CalibrationResult:
         pandas.DataFrame
             Columns ``step_id``, ``success``, ``iterations``, ``max_residual``,
             ``rmse`` and ``convergence_reason``. Plan-level aggregates
-            (``max_residual_ratio``, ``rmse_ratio``) are getters on the result.
+            (``max_residual_ratio``, ``rmse_ratio``) are on ``result.report``.
 
         Raises
         ------
@@ -4566,7 +4489,7 @@ class CalibrationResult:
         """
 
     @staticmethod
-    def from_json(json: str) -> CalibrationResult:
+    def from_json(json: str) -> CalibrationResultEnvelope:
         """
         Strictly load a result from JSON.
 
@@ -4579,7 +4502,7 @@ class CalibrationResult:
 
         Returns
         -------
-        CalibrationResult
+        CalibrationResultEnvelope
             The loaded result.
 
         Raises
@@ -4596,8 +4519,8 @@ class CalibrationResult:
 
         Examples
         --------
-        >>> from finstack_quant.calibration import CalibrationResult
-        >>> CalibrationResult.from_json("{")
+        >>> from finstack_quant.calibration import CalibrationResultEnvelope
+        >>> CalibrationResultEnvelope.from_json("{")
         Traceback (most recent call last):
         finstack_quant.portfolio.ContractValidationError: ...
         """
@@ -4755,7 +4678,7 @@ def dry_run_json(
 
 def calibrate(
     envelope: CalibrationEnvelope | dict[str, Any] | str,
-) -> CalibrationResult:
+) -> CalibrationResultEnvelope:
     """Execute a calibration plan and return the calibrated market and reports.
 
     Parameters
@@ -4766,7 +4689,7 @@ def calibrate(
 
     Returns
     -------
-    CalibrationResult
+    CalibrationResultEnvelope
         Calibrated market, plan-level report, per-step reports and residuals.
 
     Raises

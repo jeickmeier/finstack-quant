@@ -459,7 +459,7 @@ class TestValuationsNamespace:
         for name in (
             "CalibrationEnvelope",
             "CalibrationEnvelopeError",
-            "CalibrationResult",
+            "CalibrationResultEnvelope",
             "calibrate",
             "calibrate_bermudan_lmm_base_vol",
             "dry_run",
@@ -483,7 +483,7 @@ class TestCalibrationNamespace:
             "CalibrationEnvelopeError",
             "CalibrationPlan",
             "CalibrationReport",
-            "CalibrationResult",
+            "CalibrationResultEnvelope",
             "CalibrationStep",
             "CalibrationValidationReport",
             "CdsQuote",
@@ -516,7 +516,7 @@ class TestCalibrationNamespace:
             "validate_vol_bounds",
         }
         assert set(calibration.__all__) == expected
-        assert calibration.CalibrationResult.__module__ == "finstack_quant.calibration"
+        assert calibration.CalibrationResultEnvelope.__module__ == "finstack_quant.calibration"
         assert calibration.CalibrationEnvelopeError.__module__ == "finstack_quant.calibration"
 
     def test_models_stub_exports_fourier_pricers(self) -> None:

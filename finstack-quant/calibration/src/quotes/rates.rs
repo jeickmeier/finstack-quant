@@ -1,9 +1,9 @@
 //! Interest rate market quote schema.
 
 use super::ids::{Pillar, QuoteId};
-use super::validate;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::types::IndexId;
+use finstack_quant_core::validation::validate_f64_finite;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::market::conventions::ids::IrFutureContractId;
 use serde::{Deserialize, Serialize};
@@ -240,15 +240,17 @@ impl RateQuote {
     /// Validate that every quoted rate or futures price field is finite.
     pub fn validate(&self) -> Result<()> {
         match self {
-            Self::Deposit { rate, .. } | Self::Fra { rate, .. } => validate::finite(*rate, "rate"),
+            Self::Deposit { rate, .. } | Self::Fra { rate, .. } => {
+                validate_f64_finite(*rate, "rate")
+            }
             Self::Swap {
                 rate,
                 spread_decimal,
                 ..
             } => {
-                validate::finite(*rate, "rate")?;
+                validate_f64_finite(*rate, "rate")?;
                 if let Some(spread) = spread_decimal {
-                    validate::finite(*spread, "spread_decimal")?;
+                    validate_f64_finite(*spread, "spread_decimal")?;
                 }
                 Ok(())
             }
@@ -257,8 +259,8 @@ impl RateQuote {
                 convexity_adjustment,
                 ..
             } => {
-                validate::finite(*price, "price")?;
-                validate::finite(*convexity_adjustment, "convexity_adjustment")
+                validate_f64_finite(*price, "price")?;
+                validate_f64_finite(*convexity_adjustment, "convexity_adjustment")
             }
         }
     }

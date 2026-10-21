@@ -18,7 +18,6 @@
             "df_hard_min": 1e-12,
             "jacobian_step_size": 1e-6,
             "min_scan_grid_points": 20,
-            "min_t_spot": 1e-6,
             "scan_grid_points": 48,
             "scan_grid_step": 0.0001,
             "validation_tolerance": 1e-8,
@@ -142,11 +141,6 @@
           "default": "error",
           "description": "Runtime validation mode (warnings vs errors)."
         },
-        "verbose": {
-          "default": false,
-          "description": "Enable verbose logging of the calibration process.",
-          "type": "boolean"
-        },
         "vol_surface": {
           "$ref": "#/$defs/VolSurfaceSolveConfig",
           "default": {
@@ -227,7 +221,6 @@
               "df_hard_min": 1e-12,
               "jacobian_step_size": 1e-6,
               "min_scan_grid_points": 20,
-              "min_t_spot": 1e-6,
               "scan_grid_points": 48,
               "scan_grid_step": 0.0001,
               "validation_tolerance": 1e-8,
@@ -286,7 +279,6 @@
               "tolerance": 1e-10
             },
             "validation_mode": "error",
-            "verbose": false,
             "vol_surface": {
               "validation_tolerance": 0.001
             }
@@ -744,11 +736,6 @@
               "$ref": "#/$defs/SurfaceExtrapolationPolicy",
               "default": "error",
               "description": "Extrapolation policy used when interpolating SABR parameters across the\nexpiry–tenor grid for target points that do not have a directly calibrated bucket."
-            },
-            "sabr_interpolation": {
-              "$ref": "#/$defs/SabrInterpolationMethod",
-              "default": "bilinear",
-              "description": "SABR parameter interpolation method between expiries/tenors."
             },
             "swap_index": {
               "anyOf": [
@@ -1487,12 +1474,6 @@
           "format": "uint",
           "minimum": 0,
           "type": "integer"
-        },
-        "min_t_spot": {
-          "default": 1e-6,
-          "description": "Minimum time threshold for considering a knot at spot (t=0).",
-          "format": "double",
-          "type": "number"
         },
         "scan_grid_points": {
           "default": 48,
@@ -4953,11 +4934,6 @@
         }
       ]
     },
-    "SabrInterpolationMethod": {
-      "const": "bilinear",
-      "description": "Interpolation method for SABR parameters across the expiry–tenor grid.",
-      "type": "string"
-    },
     "SabrParameterData": {
       "additionalProperties": false,
       "description": "Data-only SABR parameters for one volatility-cube node.\n\nThis type records calibrated market data. SABR evaluation, interpolation,\ncalibration, and convention conversion are owned by\n`finstack-quant-models`.",
@@ -5329,7 +5305,6 @@
             "df_hard_min": 1e-12,
             "jacobian_step_size": 1e-6,
             "min_scan_grid_points": 20,
-            "min_t_spot": 1e-6,
             "scan_grid_points": 48,
             "scan_grid_step": 0.0001,
             "validation_tolerance": 1e-8,
@@ -5388,7 +5363,6 @@
             "tolerance": 1e-10
           },
           "validation_mode": "error",
-          "verbose": false,
           "vol_surface": {
             "validation_tolerance": 0.001
           }

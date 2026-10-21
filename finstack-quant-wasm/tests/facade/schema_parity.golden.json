@@ -823,7 +823,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 215970
+            "bytes": 215015
           },
           {
             "path": "schemas/calibration/1/calibration_result.schema.json",
@@ -837,7 +837,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_validation_report.schema.json",
             "type_name": "CalibrationValidationReport",
             "kind": "output",
-            "bytes": 15420
+            "bytes": 14643
           },
           {
             "path": "schemas/calibration/1/hull_white_cap_floor_calibration_config.schema.json",
@@ -872,7 +872,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/step_params.schema.json",
             "type_name": "StepParams",
             "kind": "component",
-            "bytes": 61699
+            "bytes": 61295
           },
           {
             "path": "schemas/market/1/cds_quote.schema.json",
@@ -997,7 +997,6 @@
           "RatesStepConventions",
           "ResidualWeightingScheme",
           "RollRule",
-          "SabrInterpolationMethod",
           "SabrParameterData",
           "Seniority",
           "SeriesInterpolation",
@@ -2122,7 +2121,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
             "type_name": "CheckSuiteSpec",
             "kind": "input",
-            "bytes": 22797
+            "bytes": 22285
           },
           {
             "path": "schemas/statements/1/financial_model_spec.schema.json",
@@ -2165,13 +2164,6 @@
             "type_name": "NormalizationResult",
             "kind": "output",
             "bytes": 23140
-          },
-          {
-            "path": "schemas/statements/1/rollup_spec.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
-            "type_name": "RollupSpec",
-            "kind": "input",
-            "bytes": 3898
           },
           {
             "path": "schemas/statements/1/statement_result.schema.json",
@@ -3610,7 +3602,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 215970
+            "bytes": 215015
           },
           {
             "domain": "calibration",
@@ -3626,7 +3618,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_validation_report.schema.json",
             "type_name": "CalibrationValidationReport",
             "kind": "output",
-            "bytes": 15420
+            "bytes": 14643
           },
           {
             "domain": "calibration",
@@ -3666,7 +3658,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/step_params.schema.json",
             "type_name": "StepParams",
             "kind": "component",
-            "bytes": 61699
+            "bytes": 61295
           },
           {
             "domain": "calibration",
@@ -4530,7 +4522,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
             "type_name": "CheckSuiteSpec",
             "kind": "input",
-            "bytes": 22797
+            "bytes": 22285
           },
           {
             "domain": "statements",
@@ -4579,14 +4571,6 @@
             "type_name": "NormalizationResult",
             "kind": "output",
             "bytes": 23140
-          },
-          {
-            "domain": "statements",
-            "path": "schemas/statements/1/rollup_spec.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
-            "type_name": "RollupSpec",
-            "kind": "input",
-            "bytes": 3898
           },
           {
             "domain": "statements",

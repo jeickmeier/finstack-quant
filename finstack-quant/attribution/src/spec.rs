@@ -3,7 +3,7 @@
 //! Provides serializable specs for defining complete attribution runs in JSON,
 //! with stable schemas and deterministic round-trip serialization.
 
-use super::{AttributionMethod, CreditFactorDetailOptions, ExecutionPolicy, PnlAttribution};
+use crate::{AttributionMethod, CreditFactorDetailOptions, ExecutionPolicy, PnlAttribution};
 use finstack_quant_core::{
     config::{FinstackConfig, ResultsMeta},
     currency::Currency,

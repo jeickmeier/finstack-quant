@@ -1994,10 +1994,6 @@ export type D_08Aea844Abd10Cb00E40 =
        */
       sabr_extrapolation?: "error" | "clamp";
       /**
-       * SABR parameter interpolation method between expiries/tenors.
-       */
-      sabr_interpolation?: "bilinear";
-      /**
        * Optional floating index identifier used to resolve market swap conventions.
        *
        * Swaption forward/par rate calculations require swap schedule conventions (fixed frequency,
@@ -5410,10 +5406,6 @@ export interface DE1605Cebc97720Bf2277 {
    * Runtime validation mode (warnings vs errors).
    */
   validation_mode?: "warn" | "error";
-  /**
-   * Enable verbose logging of the calibration process.
-   */
-  verbose?: boolean;
   vol_surface?: D_41166743D7Ec9326Bdd4;
 }
 /**
@@ -5445,10 +5437,6 @@ export interface D_65447E12Defc07E99879 {
    * Minimum required success points in scan before attempting polish.
    */
   min_scan_grid_points?: number;
-  /**
-   * Minimum time threshold for considering a knot at spot (t=0).
-   */
-  min_t_spot?: number;
   /**
    * Number of points in the initial geometric scan grid.
    */

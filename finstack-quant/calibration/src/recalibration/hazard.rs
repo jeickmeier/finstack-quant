@@ -2,13 +2,13 @@
 
 use super::cache::KeyedOnceCache;
 use super::ensure_replay_fit_accepted;
+use crate::CalibrationConfig;
 use crate::api::schema::{HazardCurveParams, StepParams};
+use crate::quotes::MarketQuote;
 use crate::quotes::cds::CdsQuote;
 use crate::quotes::ids::Pillar;
-use crate::quotes::MarketQuote;
 use crate::step_runtime;
 use crate::targets::hazard::ReplayQuote;
-use crate::CalibrationConfig;
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{HazardCalibrationRecipe, HazardCurve};
@@ -239,13 +239,8 @@ pub(crate) fn hazard_with_deal_quote_override(
         Pillar::Date(deal_override.contract_end),
         deal_override.spread_bp,
     );
-    let build_ctx = crate::build::BuildCtx::new(
-        hazard.base_date(),
-        1.0,
-        finstack_quant_core::FxHashMap::default(),
-    );
     let contractual_pillar =
-        crate::build::cds::resolve_cds_quote_dates(&deal_quote, &build_ctx)?.maturity;
+        crate::build::cds::cds_pillar_maturity(hazard.base_date(), deal_quote.pillar())?;
     let contractual_time = hazard.day_count().year_fraction(
         hazard.base_date(),
         contractual_pillar,
@@ -821,8 +816,8 @@ pub(super) fn recalibrate_hazard_with_recovery(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::quotes::ids::{Pillar, QuoteId};
     use crate::CalibrationReport;
+    use crate::quotes::ids::{Pillar, QuoteId};
     use finstack_quant_core::market_data::term_structures::{
         HazardCalibrationInput, HazardCalibrationRecipe,
     };

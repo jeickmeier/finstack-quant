@@ -26,7 +26,7 @@ use finstack_quant_valuations_credit::cds::CdsValuationConvention;
 /// |---------|---------------|---------------------|
 /// | **Rates** | `"discount"`, `"forward"` | *(none -- errors if missing)* |
 /// | **CDS** | `"discount"`, `"credit"` | *(none -- errors if missing)* |
-/// | **XCCY** | *(none at context level)* | `"domestic_discount"`, `"foreign_discount"`, `"domestic_forward"`, `"foreign_forward"` (convention-derived defaults) |
+/// | **XCCY** | `"domestic_discount"`, `"foreign_discount"` | *(none -- forward curves are the convention index ids)* |
 /// | **CDS Tranche** | `"discount"`, `"credit"` | *(none -- errors if missing)* |
 ///
 /// # Examples

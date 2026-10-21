@@ -7,7 +7,7 @@ import pytest
 from finstack_quant.calibration import (
     CalibrationEnvelope,
     CalibrationPlan,
-    CalibrationResult,
+    CalibrationResultEnvelope,
     CalibrationStep,
     CdsQuote,
     CdsTrancheQuote,
@@ -36,7 +36,7 @@ from finstack_quant.portfolio import ContractLimitExceededError
 
 @pytest.mark.parametrize("spread", [float("nan"), float("inf"), float("-inf")])
 def test_swap_quote_rejects_nonfinite_optional_spread(spread: float) -> None:
-    with pytest.raises(ValueError, match="spread_decimal must be finite"):
+    with pytest.raises(ValueError, match="Invalid spread_decimal: must be finite"):
         RateQuote.swap("USD-SWAP-2Y", "USD-SOFR-OIS", "2Y", 0.04, spread_decimal=spread)
 
 
@@ -114,7 +114,7 @@ def test_result_loading_rejects_metadata_beyond_canonical_depth_limit() -> None:
         "entries": [{"kind": "computation_step", "name": "probe", "description": "nested", "metadata": metadata}],
     }
     with pytest.raises(ContractLimitExceededError, match="depth"):
-        CalibrationResult.from_json(json.dumps(payload))
+        CalibrationResultEnvelope.from_json(json.dumps(payload))
 
 
 def test_cap_floor_quote_rejects_lognormal_construction_and_json() -> None:
@@ -199,7 +199,7 @@ def test_typed_quotes_expose_fields_and_reject_invalid_inputs() -> None:
         "USD",
     )
     assert str(yoy.maturity) == "2031-05-08"
-    with pytest.raises(ValueError, match="rate must be finite"):
+    with pytest.raises(ValueError, match="Invalid rate: must be finite"):
         InflationQuote.inflation_swap("ZC", "2031-05-08", float("nan"), "USA-CPI-U", "USD")
     with pytest.raises(ValueError, match="spot_fx"):
         XccyQuote("X", "EUR-USD", "5Y", -12.5, spot_fx=-1.0)

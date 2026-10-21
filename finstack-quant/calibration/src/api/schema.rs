@@ -103,7 +103,7 @@ fn prefix_json_pointer(prefix: &str, child: Option<&str>) -> String {
     match child {
         None | Some("") => prefix.to_string(),
         Some(pointer) if pointer.starts_with('/') => format!("{prefix}{pointer}"),
-        Some(pointer) => format!("{prefix}/{}", pointer.replace('~', "~0").replace('/', "~1")),
+        Some(pointer) => format!("{prefix}/{}", super::validate::escape_json_pointer(pointer)),
     }
 }
 
@@ -370,34 +370,6 @@ pub struct CalibrationEnvelope {
     pub prior_market: Vec<PriorMarketObject>,
 }
 
-/// Serialized payloads of the market data collected so far, keyed by `(kind, id)`.
-type DatumPayloads = IndexMap<(&'static str, String), serde_json::Value>;
-
-/// Append `datum` unless an identical datum of the same kind and id is already collected.
-fn push_distinct_datum(
-    market_data: &mut Vec<MarketDatum>,
-    payloads: &mut DatumPayloads,
-    datum: MarketDatum,
-) -> Result<(), super::errors::EnvelopeError> {
-    use super::errors::EnvelopeError;
-    let payload = serde_json::to_value(&datum).map_err(|error| EnvelopeError::JsonSerialize {
-        target: "MarketDatum".to_string(),
-        message: error.to_string(),
-    })?;
-    let key = (datum.kind_name(), datum.id().to_string());
-    match payloads.get(&key) {
-        Some(existing) if existing != &payload => Err(EnvelopeError::ConflictingMarketDatum {
-            id: datum.id().to_string(),
-        }),
-        Some(_) => Ok(()),
-        None => {
-            payloads.insert(key, payload);
-            market_data.push(datum);
-            Ok(())
-        }
-    }
-}
-
 impl CalibrationEnvelope {
     /// Create a current-version calibration request envelope.
     ///
@@ -421,35 +393,6 @@ impl CalibrationEnvelope {
             market_data,
             prior_market,
         }
-    }
-
-    /// Append market data, collecting identical repeats once.
-    ///
-    /// Each datum is appended in order unless a datum of the same kind and id
-    /// with an identical payload is already present (in the envelope or
-    /// earlier in `market_data`), in which case it is collected once. Extra data can therefore repeat an existing input without duplication.
-    ///
-    /// # Arguments
-    ///
-    /// * `market_data` - Additional flat market-data inputs, in the order they
-    ///   should follow the envelope's existing `market_data`.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`super::errors::EnvelopeError::ConflictingMarketDatum`] when a
-    /// datum repeats the kind and id of one already present with a different
-    /// payload, and [`super::errors::EnvelopeError::JsonSerialize`] if a datum
-    /// cannot be serialized for the comparison.
-    pub fn with_market_data(
-        mut self,
-        market_data: Vec<MarketDatum>,
-    ) -> Result<Self, super::errors::EnvelopeError> {
-        let mut payloads = DatumPayloads::new();
-        let existing = std::mem::take(&mut self.market_data);
-        for datum in existing.into_iter().chain(market_data) {
-            push_distinct_datum(&mut self.market_data, &mut payloads, datum)?;
-        }
-        Ok(self)
     }
 
     /// Serialize this request envelope as canonical pretty-printed JSON.
@@ -490,8 +433,8 @@ impl CalibrationEnvelope {
     /// Returns [`ContractError`] for malformed JSON, resource-limit failures,
     /// a missing or malformed schema marker, an unsupported schema version, or
     /// an invalid calibration-envelope shape. Semantic findings are returned
-    /// in the bounded validation report so `dry_run` can report all findings;
-    /// execution rejects that report before constructing market state.
+    /// as contract diagnostics in the bounded validation report rather than as
+    /// an error. ([`super::validate::dry_run`] reports them as `EnvelopeError`s.)
     pub fn from_slice_strict(
         bytes: &[u8],
         limits: &LoadLimits,
@@ -1061,9 +1004,6 @@ pub struct SwaptionVolParams {
     /// Target tenor times (in years) for the surface grid.
     #[serde(default)]
     pub target_tenors: Vec<f64>,
-    /// SABR parameter interpolation method between expiries/tenors.
-    #[serde(default)]
-    pub sabr_interpolation: SabrInterpolationMethod,
     /// Optional calendar identifier for date adjustments.
     #[serde(default)]
     pub calendar_id: Option<String>,
@@ -1370,16 +1310,6 @@ pub enum SwaptionVolConvention {
         /// both forwards and strikes and retained in calibrated artifacts.
         shift: f64,
     },
-}
-
-/// Interpolation method for SABR parameters across the expiry–tenor grid.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum SabrInterpolationMethod {
-    /// Bilinear interpolation in (expiry, tenor) over SABR parameters.
-    #[default]
-    Bilinear,
 }
 
 fn default_interp_linear() -> InterpStyle {

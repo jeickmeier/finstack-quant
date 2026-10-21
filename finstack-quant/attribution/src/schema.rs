@@ -29,54 +29,20 @@ fn attribution_result_examples() -> finstack_quant_core::Result<Vec<serde_json::
     };
     let as_of_t0 = date(time::Month::January, 1)?;
     let as_of_t1 = date(time::Month::February, 1)?;
-    let zero = Money::from((0_i64, Currency::USD));
-    let attribution = crate::PnlAttribution {
-        total_pnl: Money::from((12500_i64, Currency::USD)),
-        mark_to_market_pnl: None,
-        pv_t0: None,
-        pv_t1: None,
-        carry: Money::from((12500_i64, Currency::USD)),
-        rates_curves_pnl: zero,
-        credit_curves_pnl: zero,
-        inflation_curves_pnl: zero,
-        correlations_pnl: zero,
-        fx_pnl: zero,
-        fx_translation_pnl: zero,
-        vol_pnl: zero,
-        cross_factor_pnl: zero,
-        model_params_pnl: zero,
-        market_scalars_pnl: zero,
-        residual: zero,
-        carry_detail: None,
-        rates_detail: None,
-        credit_detail: None,
-        inflation_detail: None,
-        correlations_detail: None,
-        fx_detail: None,
-        vol_detail: None,
-        cross_factor_detail: None,
-        model_params_detail: None,
-        scalars_detail: None,
-        credit_factor_detail: None,
-        credit_carry_decomposition: None,
-        waterfall_steps: Vec::new(),
-        sensitivity_steps: Vec::new(),
-        meta: crate::AttributionMeta {
-            t0: as_of_t0,
-            t1: as_of_t1,
-            method: crate::AttributionMethod::default(),
-            instrument_id: "DEP_3M".to_string(),
-            num_repricings: 1,
-            tolerance_abs: 1e-6,
-            tolerance_pct: 1e-6,
-            residual_pct: 0.0,
-            rounding: Default::default(),
-            fx_policy: None,
-            execution_policy: None,
-            notes: Vec::new(),
-        },
-        result_invalid: false,
-    };
+    let mut attribution = crate::PnlAttribution::new(
+        Money::from((12500_i64, Currency::USD)),
+        "DEP_3M",
+        as_of_t0,
+        as_of_t1,
+        crate::AttributionMethod::default(),
+    );
+    attribution.mark_to_market_pnl = None;
+    attribution.carry = attribution.total_pnl;
+    attribution.residual = Money::from((0_i64, Currency::USD));
+    attribution.meta.num_repricings = 1;
+    attribution.meta.tolerance_abs = 1e-6;
+    attribution.meta.tolerance_pct = 1e-6;
+    attribution.meta.residual_pct = 0.0;
     let results_meta = finstack_quant_core::config::results_meta(
         &finstack_quant_core::config::FinstackConfig::default(),
     );

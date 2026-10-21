@@ -50,6 +50,26 @@ pub(crate) struct InflationCurveTarget {
     scratch: ContextScratch,
 }
 
+/// Parse an inflation observation lag the delivered curve can represent:
+/// a month lag, or none (an empty spec).
+///
+/// # Errors
+///
+/// Returns an error if `spec` does not parse or is a day-based lag, which an
+/// inflation curve cannot carry.
+pub(crate) fn parse_observation_lag(spec: &str) -> Result<InflationLag> {
+    if spec.trim().is_empty() {
+        return Ok(InflationLag::None);
+    }
+    let lag = spec.parse::<InflationLag>()?;
+    match lag {
+        InflationLag::Months(_) | InflationLag::None => Ok(lag),
+        _ => Err(finstack_quant_core::Error::Validation(format!(
+            "Inflation calibration observation_lag '{spec}' is unsupported: use a month lag or no lag; inflation curves cannot represent day-based observation lags"
+        ))),
+    }
+}
+
 impl InflationCurveTarget {
     /// Creates a new inflation curve bootstrapper.
     ///
@@ -105,7 +125,7 @@ impl InflationCurveTarget {
         }
 
         let base_date = self.params.base_date;
-        let lag = self.parse_lag(&self.params.observation_lag)?;
+        let lag = parse_observation_lag(&self.params.observation_lag)?;
         if let Ok(index) = self
             .base_context
             .get_inflation_index(self.params.curve_id.as_str())
@@ -190,23 +210,9 @@ impl InflationCurveTarget {
         ))
     }
 
-    /// Parse a lag that can also be represented by the delivered curve.
-    fn parse_lag(&self, spec: &str) -> Result<InflationLag> {
-        if spec.trim().is_empty() {
-            return Ok(InflationLag::None);
-        }
-        let lag = spec.parse::<InflationLag>()?;
-        match lag {
-            InflationLag::Months(_) | InflationLag::None => Ok(lag),
-            _ => Err(finstack_quant_core::Error::Validation(format!(
-                "Inflation calibration observation_lag '{spec}' is unsupported: use a month lag or no lag; inflation curves cannot represent day-based observation lags"
-            ))),
-        }
-    }
-
     /// Preserve the calibration lag for instruments that inherit curve metadata.
     fn indexation_lag_months(&self) -> Result<u32> {
-        Ok(match self.parse_lag(&self.params.observation_lag)? {
+        Ok(match parse_observation_lag(&self.params.observation_lag)? {
             InflationLag::Months(months) => u32::from(months),
             _ => 0,
         })
@@ -228,7 +234,7 @@ impl InflationCurveTarget {
     fn reference_date(&self) -> Result<finstack_quant_core::dates::Date> {
         Self::apply_lag(
             self.params.base_date,
-            self.parse_lag(&self.params.observation_lag)?,
+            parse_observation_lag(&self.params.observation_lag)?,
         )
     }
 
@@ -291,17 +297,14 @@ impl InflationCurveTarget {
                 &config,
                 success_tolerance,
             )?,
-            CalibrationMethod::GlobalSolve { .. } => GlobalFitOptimizer::optimize(
+            CalibrationMethod::GlobalSolve {
+                use_analytical_jacobian,
+            } => GlobalFitOptimizer::optimize(
                 &target,
                 &prepared_quotes,
                 &config,
                 success_tolerance,
-                matches!(
-                    params.method,
-                    CalibrationMethod::GlobalSolve {
-                        use_analytical_jacobian: true
-                    }
-                ),
+                use_analytical_jacobian,
             )?,
         };
 
