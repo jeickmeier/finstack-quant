@@ -90,9 +90,9 @@ def test_monte_carlo_pricers_resolve_defaults_in_rust() -> None:
     assert default.num_paths > 0
     explicit = monte_carlo.EuropeanPricer(500, 7, False)
     assert (explicit.num_paths, explicit.seed, explicit.use_parallel) == (500, 7, False)
-    call = explicit.price_call(100.0, 100.0, 0.05, 0.0, 0.2, 1.0)
+    call = explicit.price_gbm(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True)
     assert call.num_paths == 500
-    assert explicit.price_call(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, currency="EUR").mean.currency.code == "EUR"
+    assert explicit.price_gbm(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True, currency="EUR").mean.currency.code == "EUR"
 
     lsmc = monte_carlo.LsmcPricer(500, 7, False, 10, "polynomial", 3, False)
     assert (lsmc.basis, lsmc.basis_degree, lsmc.antithetic) == ("polynomial", 3, False)

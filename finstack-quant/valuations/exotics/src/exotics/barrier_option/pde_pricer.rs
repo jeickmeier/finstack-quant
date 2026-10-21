@@ -228,7 +228,7 @@ impl BarrierOptionPdePricer {
         let r = bs_inputs.r_eff();
 
         if inst.observed_barrier_breached == Some(true) {
-            let unit = finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
+            let unit = finstack_quant_models::closed_form::bs_price_unchecked(
                 spot,
                 inst.strike,
                 r,
@@ -814,7 +814,7 @@ mod tests {
     /// met by the Rannacher solve but breached by an oscillating CN solve.
     #[test]
     fn w01_rannacher_knock_out_matches_analytical_continuous() {
-        use finstack_quant_models::closed_form::barrier::{barrier_price, BarrierParams};
+        use finstack_quant_models::closed_form::{barrier_price, BarrierParams};
 
         let as_of = date(2024, 1, 1);
         let expiry = date(2025, 1, 1);
@@ -954,7 +954,7 @@ mod tests {
     /// the leading-order error so the parity is tight.
     #[test]
     fn w08_knock_in_parity_consistent_with_shared_grid() {
-        use finstack_quant_models::closed_form::barrier::{barrier_price, BarrierParams};
+        use finstack_quant_models::closed_form::{barrier_price, BarrierParams};
 
         let as_of = date(2024, 1, 1);
         let expiry = date(2025, 1, 1);
@@ -1070,7 +1070,7 @@ mod tests {
     #[test]
     fn production_barrier_pde_expiry_only_monitoring_matches_truncated_call() {
         use finstack_quant_core::math::special_functions::norm_cdf;
-        use finstack_quant_models::closed_form::vanilla::bs_price_unchecked;
+        use finstack_quant_models::closed_form::bs_price_unchecked;
         let as_of = date(2024, 1, 1);
         let expiry = date(2025, 1, 1);
         let mkt = market(as_of, 100.0, 0.25, 0.05);

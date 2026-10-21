@@ -15,7 +15,7 @@
 //!
 //! - **Continuous monitoring**: Analytical formulas (Reiner & Rubinstein 1991)
 //! - **Discrete monitoring**: Monte Carlo or PDE on explicit observation dates
-//! - See [`models::closed_form::barrier`](finstack_quant_models::closed_form::barrier) for formulas
+//! - See [`models::closed_form::barrier_price`](finstack_quant_models::closed_form::barrier_price) for formulas
 //!
 //! # Monitoring and rebates
 //!
@@ -34,7 +34,7 @@
 //!
 //! - [`BarrierOption`](crate::exotics::barrier_option::BarrierOption) for instrument struct
 //! - [`finstack_quant_core::types::BarrierType`] for up/down and in/out classification
-//! - [`models::closed_form::barrier`](finstack_quant_models::closed_form::barrier) for pricing
+//! - [`models::closed_form::barrier_price`](finstack_quant_models::closed_form::barrier_price) for pricing
 
 pub(crate) mod metrics;
 pub(crate) mod pde_pricer;

@@ -615,7 +615,7 @@ impl CommoditySwaption {
             return Ok(Some(intrinsic * inputs.annuity * self.quantity));
         }
 
-        let d1 = finstack_quant_models::volatility::d1_d2_black76(
+        let d1 = finstack_quant_models::closed_form::d1_d2_black76(
             inputs.forward,
             self.fixed_price,
             inputs.sigma,
@@ -702,7 +702,7 @@ impl CommoditySwaption {
             return Ok(Some(0.0));
         }
 
-        let d1 = finstack_quant_models::volatility::d1_d2_black76(
+        let d1 = finstack_quant_models::closed_form::d1_d2_black76(
             inputs.forward,
             self.fixed_price,
             inputs.sigma,

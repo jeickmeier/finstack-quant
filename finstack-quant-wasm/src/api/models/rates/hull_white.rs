@@ -8,7 +8,6 @@ use std::sync::Arc;
 use crate::api::core::market_discount::JsDiscountCurve;
 use crate::utils::input::{from_js_json, js_bool, js_f64, js_f64_seq};
 use crate::utils::to_js_err;
-use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
 use finstack_quant_models::rates::hull_white::{self, HullWhiteCalibrationParams, HullWhiteParams};
 use wasm_bindgen::prelude::*;
 
@@ -54,14 +53,13 @@ impl JsHullWhiteParams {
         times: JsValue,
         values: JsValue,
     ) -> Result<JsHullWhiteParams, JsValue> {
-        let schedule = PiecewiseConstantCurve::new(
+        HullWhiteParams::piecewise(
+            js_f64(&kappa, "kappa")?,
             js_f64_seq(&times, "times")?,
             js_f64_seq(&values, "values")?,
         )
-        .map_err(to_js_err)?;
-        HullWhiteParams::new(js_f64(&kappa, "kappa")?, schedule)
-            .map(|inner| Self { inner })
-            .map_err(to_js_err)
+        .map(|inner| Self { inner })
+        .map_err(to_js_err)
     }
 
     /// Mean-reversion speed per year.
@@ -73,13 +71,13 @@ impl JsHullWhiteParams {
     /// Segment start times of the volatility schedule, in years.
     #[wasm_bindgen(getter)]
     pub fn times(&self) -> Box<[f64]> {
-        self.inner.volatility.times().into()
+        self.inner.times().into()
     }
 
     /// Volatility on each schedule segment, as decimals.
     #[wasm_bindgen(getter)]
     pub fn values(&self) -> Box<[f64]> {
-        self.inner.volatility.values().into()
+        self.inner.values().into()
     }
 
     /// Short-rate volatility in force at a time.
@@ -90,7 +88,7 @@ impl JsHullWhiteParams {
     ///
     /// Throws a `TypeError` if `t` is not a number.
     pub fn sigma(&self, t: JsValue) -> Result<f64, JsValue> {
-        Ok(self.inner.volatility.value_at(js_f64(&t, "t")?))
+        Ok(self.inner.sigma(js_f64(&t, "t")?))
     }
 
     /// Variance of the short-rate state variable at a time.
@@ -140,13 +138,13 @@ impl JsHullWhiteParams {
     /// Throws a `validation` error if the times are out of order or non-finite.
     #[wasm_bindgen(js_name = bondVol)]
     pub fn bond_vol(&self, t: JsValue, expiry: JsValue, maturity: JsValue) -> Result<f64, JsValue> {
-        hull_white::hw_bond_vol_with_model(
-            &self.inner,
-            js_f64(&t, "t")?,
-            js_f64(&expiry, "expiry")?,
-            js_f64(&maturity, "maturity")?,
-        )
-        .map_err(to_js_err)
+        self.inner
+            .bond_vol(
+                js_f64(&t, "t")?,
+                js_f64(&expiry, "expiry")?,
+                js_f64(&maturity, "maturity")?,
+            )
+            .map_err(to_js_err)
     }
 }
 

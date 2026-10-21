@@ -19,25 +19,17 @@ use crate::utils::input::{
 };
 use crate::utils::to_js_err;
 use finstack_quant_core::wire::serde_parse;
-use finstack_quant_models::closed_form::heston::{
-    heston_price as heston_price_core, HestonPricingParams,
-};
-use finstack_quant_models::closed_form::vanilla::{
-    bs_greeks as bs_greeks_core, bs_price as bs_price_core,
-    vanilla_expiry_payoff as vanilla_expiry_payoff_core, DEFAULT_THETA_DAYS_PER_YEAR,
-};
 use finstack_quant_models::closed_form::{
     asian_option_price as asian_option_price_core, bachelier_greeks as bachelier_greeks_core,
-    bachelier_price as bachelier_price_core, barrier_call as barrier_call_core,
-    barrier_put as barrier_put_core, black76_greeks as black76_greeks_core,
+    bachelier_price as bachelier_price_core, barrier_option_price as barrier_option_price_core,
+    black76_greeks as black76_greeks_core, black76_implied_vol as black76_implied_vol_core,
     black76_price as black76_price_core, black_shifted_price as black_shifted_price_core,
-    black_shifted_vega as black_shifted_vega_core,
-    lookback_option_price as lookback_option_price_core,
-    quanto_option_price as quanto_option_price_core, DEFAULT_ASIAN_AVERAGING,
-    DEFAULT_LOOKBACK_STRIKE_TYPE,
-};
-use finstack_quant_models::closed_form::{
-    black76_implied_vol as black76_implied_vol_core, bs_implied_vol as bs_implied_vol_core,
+    black_shifted_vega as black_shifted_vega_core, bs_greeks as bs_greeks_core,
+    bs_implied_vol as bs_implied_vol_core, bs_price as bs_price_core,
+    heston_price as heston_price_core, lookback_option_price as lookback_option_price_core,
+    quanto_option_price as quanto_option_price_core,
+    vanilla_expiry_payoff as vanilla_expiry_payoff_core, HestonPricingParams,
+    DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE, DEFAULT_THETA_DAYS_PER_YEAR,
 };
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_models::types::OptionType;
@@ -516,7 +508,7 @@ pub fn black_shifted_vega(
     black_shifted_vega_core(forward, strike, vol, expiry, shift).map_err(to_js_err)
 }
 
-/// Reiner-Rubinstein continuous-monitoring barrier call price.
+/// Reiner-Rubinstein continuous-monitoring barrier option price.
 ///
 /// `direction` is `"up"` or `"down"`, `knock` is `"in"` or `"out"`.
 /// Reiner-Rubinstein (1991): see docs/REFERENCES.md#reiner-rubinstein-1991.
@@ -529,14 +521,15 @@ pub fn black_shifted_vega(
 /// @param expiry - Time to expiry in years.
 /// @param direction - Barrier direction: `"up"` for an upper barrier or `"down"` for a lower barrier.
 /// @param knock - Barrier activation: `"in"` for knock-in or `"out"` for knock-out.
+/// @param is_call - Whether to value a call (`true`, default) or put (`false`).
 ///
 /// # Errors
 ///
 /// Throws a JavaScript exception if `direction` or `knock` is unsupported, or
 /// the supplied model inputs produce a non-finite barrier price.
-#[wasm_bindgen(js_name = barrierCall)]
+#[wasm_bindgen(js_name = barrierOptionPrice)]
 #[allow(clippy::too_many_arguments)]
-pub fn barrier_call(
+pub fn barrier_option_price(
     spot: JsValue,
     strike: JsValue,
     barrier: JsValue,
@@ -546,6 +539,7 @@ pub fn barrier_call(
     expiry: JsValue,
     direction: JsValue,
     knock: JsValue,
+    is_call: Option<JsValue>,
 ) -> Result<f64, JsValue> {
     let spot = js_f64(&spot, "spot")?;
     let strike = js_f64(&strike, "strike")?;
@@ -556,54 +550,18 @@ pub fn barrier_call(
     let expiry = js_f64(&expiry, "expiry")?;
     let direction: &str = &js_string(&direction, "direction")?;
     let knock: &str = &js_string(&knock, "knock")?;
-    barrier_call_core(
-        spot, strike, barrier, rate, div_yield, vol, expiry, direction, knock,
-    )
-    .map_err(to_js_err)
-}
-
-/// Reiner-Rubinstein continuous-monitoring barrier put price.
-///
-/// `direction` is `"up"` or `"down"`, `knock` is `"in"` or `"out"`.
-/// Reiner-Rubinstein (1991): see docs/REFERENCES.md#reiner-rubinstein-1991.
-/// @param spot - Current spot price or exchange rate in the same units as the strike.
-/// @param strike - Option strike price in the same price units as the underlying.
-/// @param barrier - Continuously monitored barrier level in the same price units as spot.
-/// @param rate - Continuously compounded risk-free rate, expressed as a decimal.
-/// @param div_yield - Continuous dividend yield or foreign rate, expressed as a decimal.
-/// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
-/// @param expiry - Time to expiry in years.
-/// @param direction - Barrier direction: `"up"` for an upper barrier or `"down"` for a lower barrier.
-/// @param knock - Barrier activation: `"in"` for knock-in or `"out"` for knock-out.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if `direction` or `knock` is unsupported, or
-/// the supplied model inputs produce a non-finite barrier price.
-#[wasm_bindgen(js_name = barrierPut)]
-#[allow(clippy::too_many_arguments)]
-pub fn barrier_put(
-    spot: JsValue,
-    strike: JsValue,
-    barrier: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    direction: JsValue,
-    knock: JsValue,
-) -> Result<f64, JsValue> {
-    let spot = js_f64(&spot, "spot")?;
-    let strike = js_f64(&strike, "strike")?;
-    let barrier = js_f64(&barrier, "barrier")?;
-    let rate = js_f64(&rate, "rate")?;
-    let div_yield = js_f64(&div_yield, "divYield")?;
-    let vol = js_f64(&vol, "vol")?;
-    let expiry = js_f64(&expiry, "expiry")?;
-    let direction: &str = &js_string(&direction, "direction")?;
-    let knock: &str = &js_string(&knock, "knock")?;
-    barrier_put_core(
-        spot, strike, barrier, rate, div_yield, vol, expiry, direction, knock,
+    let is_call = js_opt_bool(is_call.as_ref(), "isCall")?;
+    barrier_option_price_core(
+        spot,
+        strike,
+        barrier,
+        rate,
+        div_yield,
+        vol,
+        expiry,
+        direction,
+        knock,
+        OptionType::from(is_call.unwrap_or(true)),
     )
     .map_err(to_js_err)
 }
@@ -849,7 +807,7 @@ pub fn heston_price(
 /// and a `validation` error if it is malformed.
 #[wasm_bindgen(js_name = bsGreeksIsValid)]
 pub fn bs_greeks_is_valid(greeks: JsValue) -> Result<bool, JsValue> {
-    let greeks: finstack_quant_models::closed_form::vanilla::BsGreeks =
+    let greeks: finstack_quant_models::closed_form::BsGreeks =
         crate::utils::input::from_js_json(&greeks, "greeks")?;
     Ok(greeks.is_valid())
 }

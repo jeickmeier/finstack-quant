@@ -4,7 +4,7 @@ use finstack_quant_models::credit::lgd::{
     CollateralPiece, DownturnLgd, EadCalculator, WorkoutCollateralType, WorkoutCosts, WorkoutLgd,
 };
 use finstack_quant_models::credit::migration::{
-    projection, GeneratorMatrix, MigrationSimulator, RatingScale, TransitionMatrix,
+    project, GeneratorMatrix, MigrationSimulator, RatingScale, TransitionMatrix,
 };
 use finstack_quant_models::credit::pd::MasterScale;
 
@@ -32,8 +32,8 @@ fn reference_transition_matrix() -> TransitionMatrix {
 #[test]
 fn credit_workflow_maps_migration_and_loss_modules_together() {
     let annual = reference_transition_matrix();
-    let generator = GeneratorMatrix::from_transition_matrix(&annual).unwrap();
-    let half_year = projection::project(&generator, 0.5).unwrap();
+    let generator = GeneratorMatrix::from_transition_matrix(&annual, None).unwrap();
+    let half_year = project(&generator, 0.5).unwrap();
 
     // Propagate all surviving rating states across both half-year periods.
     let pd_half = half_year.probability("BBB", "D").unwrap();
@@ -42,7 +42,7 @@ fn credit_workflow_maps_migration_and_loss_modules_together() {
         .unwrap()
         .probability("BBB", "D")
         .unwrap();
-    let direct_pd = projection::project(&generator, 1.0)
+    let direct_pd = project(&generator, 1.0)
         .unwrap()
         .probability("BBB", "D")
         .unwrap();

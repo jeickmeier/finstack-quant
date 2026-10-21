@@ -25,7 +25,6 @@ TailScenarioBreakdown = _risk.TailScenarioBreakdown
 StressAttribution = _risk.StressAttribution
 DEFAULT_UTILIZATION_THRESHOLD = _risk.DEFAULT_UTILIZATION_THRESHOLD
 parametric_var_decomposition = _risk.parametric_var_decomposition
-parametric_es_decomposition = _risk.parametric_es_decomposition
 historical_var_decomposition = _risk.historical_var_decomposition
 evaluate_risk_budget = _risk.evaluate_risk_budget
 build_stress_attribution = _risk.build_stress_attribution
@@ -50,7 +49,6 @@ __all__: list[str] = [
     "decompose_factors",
     "evaluate_risk_budget",
     "historical_var_decomposition",
-    "parametric_es_decomposition",
     "parametric_var_decomposition",
     "position_component_var",
 ]

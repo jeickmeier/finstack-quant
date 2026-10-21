@@ -22,7 +22,7 @@
 use crate::monte_carlo::paths::ProcessParams;
 use crate::monte_carlo::process::cir::CirParams;
 use crate::monte_carlo::process::ou::HullWhite1FParams;
-use crate::monte_carlo::process::ProcessMetadata;
+use crate::monte_carlo::traits::ProcessMetadata;
 use crate::monte_carlo::traits::StochasticProcess;
 
 /// Parameters for utilization process (mean-reverting OU).

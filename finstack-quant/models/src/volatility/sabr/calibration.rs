@@ -1,6 +1,6 @@
 //! SABR model, smile, parameter, and calibration support.
 //!
-use super::model::BETA_SNAP_TOL;
+use super::expansion::BETA_SNAP_TOL;
 use super::parameters::SabrParameters;
 use crate::closed_form::{bachelier_vega, black_vega};
 use finstack_quant_core::math::solver_multi::{
@@ -19,7 +19,7 @@ use finstack_quant_core::{Error, Result};
 ///
 /// The vega convention must match the vol convention of the quotes being
 /// fitted, which follows the model's own β classification
-/// ([`SabrParameters::implied_volatility`] returns normal vols for β≈0):
+/// ([`SabrParameters::implied_vol`] returns normal vols for β≈0):
 ///
 /// - `beta ≈ 0` (within `BETA_SNAP_TOL`): the quotes are *normal*
 ///   (Bachelier) vols, so weight with Bachelier vega `√T·φ((F−K)/(σ_N√T))`.
@@ -118,7 +118,7 @@ fn candidate_fits_quotes(
     };
     strikes.iter().zip(market_vols).all(|(&strike, &quote)| {
         parameters
-            .implied_volatility(forward, strike, time_to_expiry)
+            .implied_vol(forward, strike, time_to_expiry)
             .is_ok_and(|vol| vol.is_finite() && (vol - quote).abs() <= tolerance * quote)
     })
 }
@@ -137,7 +137,7 @@ fn validate_quote_fit(
         .map(|(&strike, &market_vol)| {
             outcome
                 .parameters
-                .implied_volatility(forward, strike, time_to_expiry)
+                .implied_vol(forward, strike, time_to_expiry)
                 .map(|v| v - market_vol)
         })
         .collect::<Result<Vec<_>>>()?;
@@ -246,11 +246,11 @@ impl SabrShift {
     pub const AUTO_KEYWORD: &'static str = "auto";
 }
 
-/// Parse the host keyword form of a shift policy.
+/// Parse the keyword form of a shift policy.
 ///
-/// Only [`SabrShift::AUTO_KEYWORD`] (`"auto"`, case-sensitive) is a keyword;
-/// hosts map their null/None to [`SabrShift::None`] and numbers to
-/// [`SabrShift::Fixed`] themselves.
+/// Only [`SabrShift::AUTO_KEYWORD`] (`"auto"`, case-sensitive) is a keyword.
+/// The full host union (`null`, a number, or `"auto"`) is the serde form; see
+/// the `Deserialize` impl.
 ///
 /// # Examples
 ///
@@ -285,6 +285,91 @@ impl std::fmt::Display for SabrShift {
             Self::Fixed(shift) => write!(f, "{shift}"),
             Self::Auto => f.write_str(Self::AUTO_KEYWORD),
         }
+    }
+}
+
+/// Wire form: `null` for [`SabrShift::None`], the number for
+/// [`SabrShift::Fixed`], and `"auto"` for [`SabrShift::Auto`] — the union the
+/// Python and WASM bindings accept and return.
+impl serde::Serialize for SabrShift {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        match self {
+            Self::None => serializer.serialize_unit(),
+            Self::Fixed(shift) => serializer.serialize_f64(*shift),
+            Self::Auto => serializer.serialize_str(Self::AUTO_KEYWORD),
+        }
+    }
+}
+
+/// Reads the wire form written by `Serialize`: `null`, any number, or the
+/// `"auto"` keyword (through [`std::str::FromStr`]); booleans and every
+/// other shape are rejected.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_models::volatility::sabr::SabrShift;
+///
+/// let parse = |json: &str| serde_json::from_str::<SabrShift>(json);
+/// assert_eq!(parse("null")?, SabrShift::None);
+/// assert_eq!(parse("0.02")?, SabrShift::Fixed(0.02));
+/// assert_eq!(parse("\"auto\"")?, SabrShift::Auto);
+/// assert!(parse("true").is_err());
+/// assert_eq!(serde_json::to_string(&SabrShift::Auto)?, "\"auto\"");
+/// # Ok::<(), serde_json::Error>(())
+/// ```
+impl<'de> serde::Deserialize<'de> for SabrShift {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        struct ShiftVisitor;
+
+        impl serde::de::Visitor<'_> for ShiftVisitor {
+            type Value = SabrShift;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("null, a number, or \"auto\"")
+            }
+
+            fn visit_unit<E: serde::de::Error>(self) -> std::result::Result<SabrShift, E> {
+                Ok(SabrShift::None)
+            }
+
+            fn visit_none<E: serde::de::Error>(self) -> std::result::Result<SabrShift, E> {
+                Ok(SabrShift::None)
+            }
+
+            fn visit_f64<E: serde::de::Error>(self, v: f64) -> std::result::Result<SabrShift, E> {
+                Ok(SabrShift::Fixed(v))
+            }
+
+            fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<SabrShift, E> {
+                Ok(SabrShift::Fixed(v as f64))
+            }
+
+            fn visit_u64<E: serde::de::Error>(self, v: u64) -> std::result::Result<SabrShift, E> {
+                Ok(SabrShift::Fixed(v as f64))
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<SabrShift, E> {
+                v.parse().map_err(E::custom)
+            }
+
+            fn visit_bool<E: serde::de::Error>(
+                self,
+                _v: bool,
+            ) -> std::result::Result<SabrShift, E> {
+                Err(E::custom(format!(
+                    "SABR shift must be null/None, a number, or {:?}; got bool",
+                    SabrShift::AUTO_KEYWORD
+                )))
+            }
+        }
+
+        deserializer.deserialize_any(ShiftVisitor)
     }
 }
 
@@ -755,7 +840,7 @@ impl SabrCalibrator {
                     {
                         let weight = weights[index];
                         output[index] = parameters
-                            .implied_volatility(forward, strike, time_to_expiry)
+                            .implied_vol(forward, strike, time_to_expiry)
                             .map_or(1e6, |model_vol| weight * (model_vol - market_vol));
                     }
                 };
@@ -920,7 +1005,7 @@ impl SabrCalibrator {
                         strikes.iter().zip(market_vols).enumerate()
                     {
                         output[index] = parameters
-                            .implied_volatility(forward, strike, time_to_expiry)
+                            .implied_vol(forward, strike, time_to_expiry)
                             .map_or(1e6, |model_vol| weights[index] * (model_vol - market_vol));
                     }
                 };
@@ -991,7 +1076,7 @@ pub(super) fn solve_alpha_for_atm(
     let mut last_error = f64::INFINITY;
     for _ in 0..MAX_ITER {
         let params = SabrParameters::new(alpha, beta, nu, rho)?;
-        let model_vol = params.implied_volatility(forward, forward, time_to_expiry)?;
+        let model_vol = params.implied_vol(forward, forward, time_to_expiry)?;
 
         let error = model_vol - target_atm_vol;
         last_error = error;
@@ -1002,7 +1087,7 @@ pub(super) fn solve_alpha_for_atm(
         // Numerical derivative for Newton step
         let bump = alpha * 1e-6;
         let params_bumped = SabrParameters::new(alpha + bump, beta, nu, rho)?;
-        let vol_bumped = params_bumped.implied_volatility(forward, forward, time_to_expiry)?;
+        let vol_bumped = params_bumped.implied_vol(forward, forward, time_to_expiry)?;
 
         let d_vol_d_alpha = (vol_bumped - model_vol) / bump;
         if d_vol_d_alpha.abs() < 1e-14 {
@@ -1056,13 +1141,13 @@ mod acceptance_tests {
             .iter()
             .map(|&k| {
                 true_params
-                    .implied_volatility(forward, k, expiry)
+                    .implied_vol(forward, k, expiry)
                     .expect("synthetic vol should compute")
             })
             .collect();
 
         let true_atm = true_params
-            .implied_volatility(forward, forward, expiry)
+            .implied_vol(forward, forward, expiry)
             .expect("true ATM vol should compute");
 
         // The nearest-strike quote (K=98) — what the OLD `find_atm_vol` would pin
@@ -1169,7 +1254,7 @@ mod acceptance_tests {
             .iter()
             .map(|&strike| {
                 source_parameters
-                    .implied_volatility(forward, strike, time_to_expiry)
+                    .implied_vol(forward, strike, time_to_expiry)
                     .expect("source volatility")
             })
             .collect();
@@ -1223,7 +1308,7 @@ mod acceptance_tests {
                             vega_weight(forward, strike, market_vol, time_to_expiry, beta).sqrt();
                         let model_vol = outcome
                             .parameters
-                            .implied_volatility(forward, strike, time_to_expiry)
+                            .implied_vol(forward, strike, time_to_expiry)
                             .expect("fitted volatility");
                         weight * (model_vol - market_vol)
                     }
@@ -1261,7 +1346,7 @@ mod acceptance_tests {
 
         let pinned_atm = pinned_first
             .parameters
-            .implied_volatility(forward, forward, time_to_expiry)
+            .implied_vol(forward, forward, time_to_expiry)
             .expect("pinned ATM volatility");
         assert!((pinned_atm - atm_vol).abs() <= calibrator.tolerance);
     }

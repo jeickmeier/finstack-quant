@@ -10,8 +10,8 @@
 //! [`super::credit`].
 
 use super::filter::{AttributeFilter, DependencyFilter};
-use crate::primitives::dependency::MarketDependency;
-use crate::primitives::factor_types::FactorId;
+use crate::FactorId;
+use crate::MarketDependency;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -338,7 +338,7 @@ impl FactorMatcher for CascadeMatcher {
 #[cfg(test)]
 mod tests_mapping_table {
     use super::*;
-    use crate::primitives::dependency::{CurveType, DependencyType, MarketDependency};
+    use crate::{CurveType, DependencyType, MarketDependency};
     use finstack_quant_core::types::CurveId;
 
     #[test]
@@ -506,7 +506,7 @@ mod tests_mapping_table {
 #[cfg(test)]
 mod tests_hierarchical {
     use super::*;
-    use crate::primitives::dependency::MarketDependency;
+    use crate::MarketDependency;
     use finstack_quant_core::types::CurveId;
 
     fn credit_tree() -> FactorNode {
@@ -685,7 +685,7 @@ mod tests_hierarchical {
 #[cfg(test)]
 mod tests_cascade {
     use super::*;
-    use crate::primitives::dependency::{DependencyType, MarketDependency};
+    use crate::{DependencyType, MarketDependency};
     use finstack_quant_core::types::CurveId;
 
     #[test]

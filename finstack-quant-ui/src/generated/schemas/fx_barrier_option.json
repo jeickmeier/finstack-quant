@@ -4367,7 +4367,7 @@
       "oneOf": [
         {
           "const": "calendar_365",
-          "description": "Calendar-day theta: annual theta divided by\n[`finstack_quant_models::closed_form::vanilla::DEFAULT_THETA_DAYS_PER_YEAR`] (365).",
+          "description": "Calendar-day theta: annual theta divided by\n[`finstack_quant_models::closed_form::DEFAULT_THETA_DAYS_PER_YEAR`] (365).",
           "type": "string"
         },
         {

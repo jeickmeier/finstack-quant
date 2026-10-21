@@ -13,18 +13,19 @@ use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::BarrierType;
 use finstack_quant_models::monte_carlo::discretization::euler::EulerMaruyama;
+use finstack_quant_models::monte_carlo::discretization::exact::{ExactGbm, ExactMultiGbm};
+use finstack_quant_models::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
 use finstack_quant_models::monte_carlo::discretization::lmm_predictor_corrector::LmmPredictorCorrector;
+use finstack_quant_models::monte_carlo::discretization::qe_cir::QeCir;
 use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
-use finstack_quant_models::monte_carlo::discretization::{
-    ExactGbm, ExactHullWhite1F, ExactMultiGbm, ExactSchwartzSmith, QeCir,
-};
+use finstack_quant_models::monte_carlo::discretization::schwartz_smith::ExactSchwartzSmith;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig, PathCaptureConfig};
 use finstack_quant_models::monte_carlo::payoff::asian::{
     default_fixing_steps, Asian, AveragingMethod,
 };
 use finstack_quant_models::monte_carlo::payoff::barrier::{BarrierMonitoring, BarrierOptionPayoff};
 use finstack_quant_models::monte_carlo::payoff::lookback::Lookback;
-use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+use finstack_quant_models::monte_carlo::payoff::vanilla::European;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
     PathDependentPricer, PathDependentPricerConfig,
 };
@@ -71,8 +72,8 @@ pub fn schwartz_smith() -> SchwartzSmithProcess {
     SchwartzSmithProcess::new(params, 0.0, SPOT.ln())
 }
 
-pub fn european_call(num_steps: usize) -> EuropeanCall {
-    EuropeanCall::new(STRIKE, 1.0, num_steps)
+pub fn european_call(num_steps: usize) -> European {
+    European::new(OptionType::Call, STRIKE, 1.0, num_steps)
 }
 
 pub fn asian_call(num_steps: usize) -> Asian {

@@ -13,6 +13,8 @@
 //! - online mean / variance estimation via Welford's algorithm
 //! - optional early stopping on a target 95% confidence-interval half-width
 //! - optional path capture for visualization and diagnostics
+//! - [`simulate_path_fractional`], a per-path loop that injects pre-generated
+//!   fractional noise for rough-volatility schemes the generic engine rejects
 //! - built-in antithetic pairing in the generic engine loop
 //!
 //! # Important Runtime Constraints
@@ -44,6 +46,7 @@
 //!   `docs/REFERENCES.md#hull-options-futures`.
 
 mod config;
+mod fractional;
 mod path_capture;
 mod pricing;
 mod simulation;
@@ -52,6 +55,7 @@ mod simulation;
 mod tests;
 
 pub use config::{McEngineConfig, MAX_CAPTURED_PATHS, MAX_NUM_PATHS};
+pub use fractional::simulate_path_fractional;
 pub use path_capture::{PathCaptureConfig, PathCaptureMode};
 pub use pricing::McEngine;
 

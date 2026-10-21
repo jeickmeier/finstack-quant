@@ -1,11 +1,13 @@
 //! Direct Hull-White one-factor calibrators on curve handles.
 //!
 //! Twins of Python `finstack_quant.calibration.hull_white`: quotes, configs
-//! and fitted parameters are plain objects (`SwaptionQuote`, `CapFloorQuote`,
-//! `CapFloorCalibrationConfig`, `PiecewiseSigmaCalibrationConfig`,
-//! `HullWhiteCalibrationParams`, `HullWhiteParams`), curves are
-//! `core.DiscountCurve` handles, and each fit returns the Python tuple as a
-//! two-element array `[params, report]`.
+//! and scalar fitted parameters are plain objects (`SwaptionQuote`,
+//! `CapFloorQuote`, `CapFloorCalibrationConfig`,
+//! `PiecewiseSigmaCalibrationConfig`, `HullWhiteCalibrationParams`), curves
+//! are `core.DiscountCurve` handles, and each fit returns the Python tuple as
+//! a two-element array `[params, report]`. The piecewise bootstrap returns
+//! the `models.rates.hullWhite.HullWhiteParams` handle, the one host type for
+//! Rust `HullWhiteParams`.
 //!
 //! wasm-bindgen cannot borrow an optional class handle, so the raw cap/floor
 //! functions take `forward` as a required handle; `exports/calibration.js`
@@ -13,6 +15,7 @@
 //! (`forward: None` projects on the discount curve).
 
 use crate::api::core::market_discount::JsDiscountCurve;
+use crate::api::models::rates::hull_white::JsHullWhiteParams;
 use crate::utils::input::{from_js_json, js_f64, js_opt_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_calibration::hull_white::{
@@ -118,7 +121,7 @@ pub fn calibrate_hull_white_to_cap_floors(
 /// @param quotes - Array (or JSON) of `CapFloorQuote` objects with distinct maturities in years; each maturity adds one constant-sigma interval.
 /// @param config - `PiecewiseSigmaCalibrationConfig` object: `fixed_kappa`, `sigma_min`, `sigma_max` (absolute rate volatility), `fit_tolerance` and optional `frequency` (default `"semi_annual"`).
 /// @param forward - Curve projecting the caplet forwards; the published function defaults it to `discount`.
-/// @returns `[params, report]`: the piecewise `HullWhiteParams` and the `CalibrationReport`.
+/// @returns `[params, report]`: the piecewise `HullWhiteParams` handle (`models.rates.hullWhite.HullWhiteParams`) and the `CalibrationReport` object.
 ///
 /// # Errors
 ///
@@ -132,17 +135,20 @@ pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
     quotes: JsValue,
     config: JsValue,
     forward: &JsDiscountCurve,
-) -> Result<JsValue, JsValue> {
+) -> Result<js_sys::Array, JsValue> {
     let quotes: Vec<CapFloorQuote> = from_js_json(&quotes, "quotes")?;
     let config: PiecewiseSigmaCalibrationConfig = from_js_json(&config, "config")?;
-    let fitted = rust_hw::bootstrap_hull_white_sigma_schedule_to_cap_floors(
+    let (params, report) = rust_hw::bootstrap_hull_white_sigma_schedule_to_cap_floors(
         &discount.inner,
         Some(&forward.inner),
         &quotes,
         config,
     )
     .map_err(to_js_err)?;
-    to_js_value(&fitted)
+    Ok(js_sys::Array::of2(
+        &JsHullWhiteParams { inner: params }.into(),
+        &to_js_value(&report)?,
+    ))
 }
 
 #[cfg(test)]

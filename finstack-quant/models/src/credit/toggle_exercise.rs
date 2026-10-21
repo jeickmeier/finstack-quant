@@ -14,7 +14,7 @@
 //! # Examples
 //!
 //! ```
-//! use finstack_quant_models::credit::toggle_exercise::{
+//! use finstack_quant_models::credit::{
 //!     CreditState, CreditStateVariable, ThresholdDirection, ToggleExerciseModel,
 //! };
 //!
@@ -547,8 +547,7 @@ impl ToggleExerciseModel {
             }
             Self::Stochastic(s) => {
                 let value = extract_state_value(state, &s.state_variable);
-                let p =
-                    crate::credit::scoring::ohlson::logistic(s.intercept + s.sensitivity * value);
+                let p = crate::credit::scoring::logistic(s.intercept + s.sensitivity * value);
                 u < p
             }
             Self::OptimalExercise(o) => {

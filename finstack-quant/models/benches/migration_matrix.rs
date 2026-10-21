@@ -5,8 +5,7 @@
 //! the path that shares the `RatingScale` via `Arc` instead of cloning it.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_quant_models::credit::migration::MigrationSimulator;
-use finstack_quant_models::credit::migration::{GeneratorMatrix, RatingScale};
+use finstack_quant_models::credit::migration::{GeneratorMatrix, MigrationSimulator, RatingScale};
 use std::hint::black_box;
 
 /// Build a valid `n`-state generator: each non-absorbing state migrates to its

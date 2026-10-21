@@ -28,7 +28,7 @@
 use crate::swaption::types::Swaption;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_models::trees::{HullWhiteTree, HullWhiteTreeConfig};
+use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
 use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
     resolve_hw1f_params, Hw1fParamFamily,
 };

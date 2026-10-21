@@ -29,7 +29,7 @@ use finstack_quant_core::math::time_grid::TimeGrid;
 /// * `r_end` - Simulated instantaneous short rate at the end of the step.
 /// * `dt` - Positive step length in years.
 #[inline]
-pub fn bank_step_factor(r_start: f64, r_end: f64, dt: f64) -> f64 {
+pub(crate) fn bank_step_factor(r_start: f64, r_end: f64, dt: f64) -> f64 {
     (0.5 * (r_start + r_end) * dt).exp()
 }
 
@@ -37,7 +37,8 @@ pub fn bank_step_factor(r_start: f64, r_end: f64, dt: f64) -> f64 {
 /// short-rate path, one entry per grid point (`num_steps + 1`, `B(t_0) = 1`).
 ///
 /// `rate_path` carries one short rate per grid point. Each step applies
-/// [`bank_step_factor`] over the corresponding grid interval.
+/// the trapezoidal factor `exp(½(r_start + r_end)·dt)` over the corresponding
+/// grid interval.
 ///
 /// # Arguments
 ///

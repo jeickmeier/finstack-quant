@@ -9,6 +9,7 @@ use crate::utils::input::{
     js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_opt_string_seq, js_uint,
 };
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
+use finstack_quant_core::math::linalg::rows_of;
 use finstack_quant_core::Error;
 use finstack_quant_models::rates::dtsm::{DieboldLi, YieldPanel, YieldPca};
 use wasm_bindgen::prelude::*;
@@ -51,16 +52,6 @@ pub fn nelson_siegel_yields(
     finstack_quant_models::rates::dtsm::nelson_siegel_yields(lambda, factors, &tenors)
         .map(Vec::into_boxed_slice)
         .map_err(to_js_err)
-}
-
-/// Rows of a dense matrix as nested vectors (host conversion only).
-macro_rules! matrix_rows {
-    ($matrix:expr) => {
-        $matrix
-            .row_iter()
-            .map(|row| row.iter().copied().collect::<Vec<f64>>())
-            .collect::<Vec<Vec<f64>>>()
-    };
 }
 
 /// A panel of yield observations: one row per date, one column per tenor.
@@ -121,7 +112,7 @@ impl JsYieldPanel {
     /// Yields as nested rows: one `number[]` per date.
     #[wasm_bindgen(getter)]
     pub fn yields(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&matrix_rows!(self.inner.yields))
+        to_js_value(&rows_of(&self.inner.yields))
     }
 
     /// Number of observation dates (rows).
@@ -144,7 +135,7 @@ impl JsYieldPanel {
     /// Throws a `validation` error if the rows cannot be converted.
     #[wasm_bindgen(js_name = yieldChanges)]
     pub fn yield_changes(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&matrix_rows!(self.inner.yield_changes()))
+        to_js_value(&rows_of(&self.inner.yield_changes()))
     }
 }
 
@@ -166,11 +157,9 @@ impl JsDieboldLi {
     /// Throws a `validation` error if `lambda` is not positive and finite.
     #[wasm_bindgen(constructor)]
     pub fn new(lambda: Option<JsValue>) -> Result<JsDieboldLi, JsValue> {
-        match js_opt_f64(lambda.as_ref(), "lambda")? {
-            Some(lambda) => DieboldLi::new(lambda).map_err(to_js_err),
-            None => Ok(DieboldLi::with_default_lambda()),
-        }
-        .map(|inner| Self { inner })
+        DieboldLi::new(js_opt_f64(lambda.as_ref(), "lambda")?)
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
     }
 
     /// Exponential decay parameter (Python `lambda_`).
@@ -198,7 +187,7 @@ impl JsDieboldLi {
     #[wasm_bindgen(getter)]
     pub fn phi(&self) -> Result<JsValue, JsValue> {
         match self.inner.phi() {
-            Some(phi) => to_js_value(&matrix_rows!(phi)),
+            Some(phi) => to_js_value(&rows_of(phi)),
             None => Ok(JsValue::UNDEFINED),
         }
     }
@@ -215,7 +204,7 @@ impl JsDieboldLi {
     #[wasm_bindgen(getter, js_name = qCov)]
     pub fn q_cov(&self) -> Result<JsValue, JsValue> {
         match self.inner.q_cov() {
-            Some(q_cov) => to_js_value(&matrix_rows!(q_cov)),
+            Some(q_cov) => to_js_value(&rows_of(q_cov)),
             None => Ok(JsValue::UNDEFINED),
         }
     }
@@ -228,7 +217,7 @@ impl JsDieboldLi {
     /// Throws a `validation` error if the rows cannot be converted.
     #[wasm_bindgen(js_name = loadingMatrix)]
     pub fn loading_matrix(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&matrix_rows!(self.inner.loading_matrix()))
+        to_js_value(&rows_of(&self.inner.loading_matrix()))
     }
 
     /// Extract the factor time series by cross-sectional OLS on each date.
@@ -350,13 +339,13 @@ impl JsYieldPca {
     /// Loadings as nested rows: one row per tenor, one column per component.
     #[wasm_bindgen(getter)]
     pub fn loadings(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&matrix_rows!(self.inner.loadings()))
+        to_js_value(&rows_of(self.inner.loadings()))
     }
 
     /// Scores as nested rows: one row per date, one column per component.
     #[wasm_bindgen(getter)]
     pub fn scores(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&matrix_rows!(self.inner.scores()))
+        to_js_value(&rows_of(self.inner.scores()))
     }
 
     /// Tenors in years, one per loading row.
@@ -465,7 +454,7 @@ impl JsYieldPca {
             .inner
             .reconstruct(js_uint(&num_components, "numComponents")?)
             .map_err(to_js_err)?;
-        to_js_value(&matrix_rows!(matrix))
+        to_js_value(&rows_of(&matrix))
     }
 
     /// Reporting view restricted to the leading components.

@@ -4,10 +4,8 @@
 //! canonical Rust validation. C-contiguous `float64` NumPy arrays are copied
 //! directly from their backing buffer, avoiding per-element Python extraction.
 
-use finstack_quant_factor::risk::{
-    flatten_position_pnls as core_flatten_position_pnls,
-    flatten_square_matrix as core_flatten_square_matrix,
-};
+use finstack_quant_core::math::linalg::flatten_square_matrix as core_flatten_square_matrix;
+use finstack_quant_factor::risk::flatten_position_pnls as core_flatten_position_pnls;
 use numpy::{PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::prelude::*;
 

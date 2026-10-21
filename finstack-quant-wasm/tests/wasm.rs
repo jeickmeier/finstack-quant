@@ -29,8 +29,8 @@ mod wasm_implied_vol;
 mod wasm_math;
 #[path = "wasm_metric_keys.rs"]
 mod wasm_metric_keys;
-#[path = "wasm_models_analytic.rs"]
-mod wasm_models_analytic;
+#[path = "wasm_models_closed_form.rs"]
+mod wasm_models_closed_form;
 #[path = "wasm_models_correlation.rs"]
 mod wasm_models_correlation;
 #[path = "wasm_models_credit.rs"]

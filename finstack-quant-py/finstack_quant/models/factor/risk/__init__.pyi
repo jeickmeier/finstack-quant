@@ -36,7 +36,6 @@ __all__ = [
     "decompose_factors",
     "evaluate_risk_budget",
     "historical_var_decomposition",
-    "parametric_es_decomposition",
     "parametric_var_decomposition",
     "position_component_var",
 ]
@@ -89,48 +88,6 @@ def parametric_var_decomposition(
     >>> result = parametric_var_decomposition(["A", "B"], [1.0, 2.0], [[0.04, 0.0], [0.0, 0.01]])
     >>> round(result.portfolio_var, 6)
     -0.465235
-    """
-    ...
-
-def parametric_es_decomposition(
-    position_ids: list[str] | None,
-    weights: list[float],
-    covariance: list[list[float]] | npt.NDArray[np.float64] | pd.DataFrame,
-    confidence: float | None = None,
-) -> PositionRiskDecomposition:
-    """
-    Decompose portfolio parametric expected shortfall across positions.
-
-    Parameters
-    ----------
-    position_ids : list[str] | None
-        Position identifiers aligned with ``weights``; ``None`` allowed with a
-        ``pandas.DataFrame`` covariance.
-    weights : list[float]
-        Portfolio weights or exposures, one per position.
-    covariance : list[list[float]] | numpy.ndarray | pd.DataFrame
-        Square covariance matrix aligned with ``position_ids``.
-    confidence : float | None
-        ES confidence strictly inside ``(0.5, 1)``. ``None`` uses ``0.95``.
-
-    Returns
-    -------
-    PositionRiskDecomposition
-        ``portfolio_var``, ``portfolio_es`` (losses negative) and per-position
-        VaR and ES rows.
-
-    Raises
-    ------
-    ValueError
-        If dimensions do not match, covariance is malformed, or the
-        confidence level is invalid.
-
-    Examples
-    --------
-    >>> from finstack_quant.models.factor.risk import parametric_es_decomposition
-    >>> result = parametric_es_decomposition(["A", "B"], [1.0, 2.0], [[0.04, 0.0], [0.0, 0.01]])
-    >>> round(result.portfolio_es, 6)
-    -0.583423
     """
     ...
 
@@ -240,14 +197,14 @@ class FactorContribution:
     ('Rates', 0.5)
     """
 
-    @classmethod
-    def from_json(cls, json_str: str) -> FactorContribution:
+    @staticmethod
+    def from_json(json: str) -> FactorContribution:
         """
         Deserialize a factor contribution from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized factor contribution, normally produced by
             ``FactorContribution.to_json``.
 
@@ -387,14 +344,14 @@ class PositionFactorContribution:
     ('P1', 'Rates')
     """
 
-    @classmethod
-    def from_json(cls, json_str: str) -> PositionFactorContribution:
+    @staticmethod
+    def from_json(json: str) -> PositionFactorContribution:
         """
         Deserialize a position-factor contribution from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized position-factor contribution, normally
             produced by ``PositionFactorContribution.to_json``.
 
@@ -520,14 +477,14 @@ class PositionResidualContribution:
     ('P1', 'other')
     """
 
-    @classmethod
-    def from_json(cls, json_str: str) -> PositionResidualContribution:
+    @staticmethod
+    def from_json(json: str) -> PositionResidualContribution:
         """
         Deserialize a residual contribution from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized residual contribution, normally produced by
             ``PositionResidualContribution.to_json``.
 
@@ -667,14 +624,14 @@ class RiskDecomposition:
     (1.0, 1.0)
     """
 
-    @classmethod
-    def from_json(cls, json_str: str) -> RiskDecomposition:
+    @staticmethod
+    def from_json(json: str) -> RiskDecomposition:
         """
         Deserialize a risk decomposition from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized factor-and-residual decomposition, normally
             produced by ``RiskDecomposition.to_json``.
 
@@ -910,14 +867,14 @@ class PositionVarContribution:
     ('P1', -1.0)
     """
 
-    @classmethod
-    def from_json(cls, json_str: str) -> PositionVarContribution:
+    @staticmethod
+    def from_json(json: str) -> PositionVarContribution:
         """
         Deserialize a position VaR contribution from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized component and marginal VaR contribution,
             normally produced by ``PositionVarContribution.to_json``.
 
@@ -1077,14 +1034,14 @@ class PositionEsContribution:
     ('P1', -1.2)
     """
 
-    @classmethod
-    def from_json(cls, json_str: str) -> PositionEsContribution:
+    @staticmethod
+    def from_json(json: str) -> PositionEsContribution:
         """
         Deserialize a position ES contribution from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized component and marginal expected-shortfall
             contribution, normally produced by ``PositionEsContribution.to_json``.
 
@@ -1224,14 +1181,14 @@ class PositionRiskDecomposition:
     (-1.0, 'parametric')
     """
 
-    @classmethod
-    def from_json(cls, json_str: str) -> PositionRiskDecomposition:
+    @staticmethod
+    def from_json(json: str) -> PositionRiskDecomposition:
         """
         Deserialize a position risk decomposition from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized VaR/ES decomposition, normally produced by
             ``PositionRiskDecomposition.to_json``.
 
@@ -1443,14 +1400,14 @@ class PositionBudgetEntry:
     ('P1', 1.25)
     """
 
-    @classmethod
-    def from_json(cls, json_str: str) -> PositionBudgetEntry:
+    @staticmethod
+    def from_json(json: str) -> PositionBudgetEntry:
         """
         Deserialize a risk-budget entry from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized per-position budget comparison, normally
             produced by ``PositionBudgetEntry.to_json``.
 
@@ -1610,14 +1567,14 @@ class RiskBudgetResult:
     (0.0, False)
     """
 
-    @classmethod
-    def from_json(cls, json_str: str) -> RiskBudgetResult:
+    @staticmethod
+    def from_json(json: str) -> RiskBudgetResult:
         """
         Deserialize a risk-budget result from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized portfolio risk-budget result, normally
             produced by ``RiskBudgetResult.to_json``.
 
@@ -1745,14 +1702,14 @@ class StressPositionEntry:
     ('P1', -10.0)
     """
 
-    @classmethod
-    def from_json(cls, json_str: str) -> StressPositionEntry:
+    @staticmethod
+    def from_json(json: str) -> StressPositionEntry:
         """
         Deserialize a stress position entry from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized per-position tail-stress contribution, normally
             produced by ``StressPositionEntry.to_json``.
 
@@ -1892,14 +1849,14 @@ class TailScenarioBreakdown:
     (0, -10.0)
     """
 
-    @classmethod
-    def from_json(cls, json_str: str) -> TailScenarioBreakdown:
+    @staticmethod
+    def from_json(json: str) -> TailScenarioBreakdown:
         """
         Deserialize a tail scenario breakdown from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized tail-scenario P&L breakdown, normally
             produced by ``TailScenarioBreakdown.to_json``.
 
@@ -2056,14 +2013,14 @@ class StressAttribution:
     (-5.0, 1)
     """
 
-    @classmethod
-    def from_json(cls, json_str: str) -> StressAttribution:
+    @staticmethod
+    def from_json(json: str) -> StressAttribution:
         """
         Deserialize stress attribution from canonical JSON.
 
         Parameters
         ----------
-        json_str : str
+        json : str
             Canonical serialized tail-loss attribution, normally produced by
             ``StressAttribution.to_json``.
 

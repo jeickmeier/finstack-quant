@@ -317,8 +317,8 @@ fn test_putable_bond_tree_pricing_reasonable() {
 
 #[test]
 fn test_mean_reversion_reduces_rate_dispersion() {
-    use finstack_quant_models::trees::HullWhiteTree;
-    use finstack_quant_models::trees::HullWhiteTreeConfig;
+    use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
+    use finstack_quant_models::trees::hull_white_tree::HullWhiteTreeConfig;
 
     let as_of = date!(2020 - 01 - 01);
     let rate = 0.05;

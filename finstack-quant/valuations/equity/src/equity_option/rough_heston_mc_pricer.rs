@@ -245,51 +245,25 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughHestonM
         let initial_state = [spot, s.v0];
         let rng = finstack_quant_models::monte_carlo::rng::philox::PhiloxRng::new(seed_val);
 
-        let result = match equity_option.option_type {
-            OptionType::Call => {
-                let payoff = finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall::new(
-                    equity_option.strike,
-                    equity_option.quantity,
-                    self.num_steps,
-                );
-                engine
-                    .price(
-                        &rng,
-                        &process,
-                        &disc,
-                        &initial_state,
-                        &payoff,
-                        ccy,
-                        discount_factor,
-                    )
-                    .map_err(|e| {
-                        finstack_quant_valuations_core::pricer::PricingError::from_core(
-                            e,
-                            err_ctx.clone(),
-                        )
-                    })?
-            }
-            OptionType::Put => {
-                let payoff = finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanPut::new(
-                    equity_option.strike,
-                    equity_option.quantity,
-                    self.num_steps,
-                );
-                engine
-                    .price(
-                        &rng,
-                        &process,
-                        &disc,
-                        &initial_state,
-                        &payoff,
-                        ccy,
-                        discount_factor,
-                    )
-                    .map_err(|e| {
-                        finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx)
-                    })?
-            }
-        };
+        let payoff = finstack_quant_models::monte_carlo::payoff::vanilla::European::new(
+            equity_option.option_type,
+            equity_option.strike,
+            equity_option.quantity,
+            self.num_steps,
+        );
+        let result = engine
+            .price(
+                &rng,
+                &process,
+                &disc,
+                &initial_state,
+                &payoff,
+                ccy,
+                discount_factor,
+            )
+            .map_err(|e| {
+                finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
+            })?;
 
         let pv = result.mean;
         let mut vr = finstack_quant_valuations_core::results::ValuationResult::stamped(

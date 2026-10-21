@@ -5,8 +5,6 @@
 //! position identifiers and for constructing valuation-backed sensitivities.
 
 mod budget;
-mod math;
-pub(crate) use math::validate_covariance;
 mod parametric;
 mod position;
 mod residual;
@@ -17,16 +15,31 @@ pub use budget::{
 };
 pub use parametric::decompose_factors;
 pub use position::{
-    build_stress_attribution, flatten_position_pnls, flatten_square_matrix,
-    historical_var_decomposition, parametric_es_decomposition, parametric_var_decomposition,
-    DecompositionMethod, PositionEsContribution, PositionRiskDecomposition,
-    PositionVarContribution, StressAttribution, StressPositionEntry, TailScenarioBreakdown,
+    build_stress_attribution, flatten_position_pnls, historical_var_decomposition,
+    parametric_var_decomposition, DecompositionMethod, PositionEsContribution,
+    PositionRiskDecomposition, PositionVarContribution, StressAttribution, StressPositionEntry,
+    TailScenarioBreakdown,
 };
 pub use residual::apply_residual_contributions;
 pub use types::{
     FactorContribution, PositionFactorContribution, PositionResidualContribution,
     ResidualContributionSource, RiskDecomposition,
 };
+
+/// Absolute tolerance below which a computed variance is numerical noise:
+/// variances in `[-VARIANCE_TOLERANCE, 0)` clamp to zero, lower ones are
+/// rejected.
+pub(crate) const VARIANCE_TOLERANCE: f64 = 1e-12;
+
+/// Normal-tail multipliers at `confidence`: the quantile `z = Φ⁻¹(c)` and the
+/// expected-shortfall multiplier `φ(z) / (1 − c)`.
+pub(crate) fn tail_multipliers(confidence: f64) -> (f64, f64) {
+    let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(confidence);
+    (
+        z,
+        finstack_quant_core::math::special_functions::norm_pdf(z) / (1.0 - confidence),
+    )
+}
 
 /// Snap tolerance used when deciding whether a floating-point tail-size
 /// product represents an integer.

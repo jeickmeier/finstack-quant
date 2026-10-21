@@ -122,7 +122,7 @@ pub struct ExchangeOfferAnalysis {
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`] when any amount is negative or non-finite.
+/// Returns [`finstack_quant_core::Error::Validation`] when any amount is negative or non-finite.
 ///
 /// # Arguments
 ///
@@ -269,7 +269,7 @@ pub struct LmeAnalysis {
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`] when `notional` is not positive and finite,
+/// Returns [`finstack_quant_core::Error::Validation`] when `notional` is not positive and finite,
 /// `opt_acceptance_pct` falls outside `[0, 1]`, or `repurchase_price_pct`
 /// falls outside the range admitted by `lme_type`.
 ///

@@ -220,8 +220,7 @@ mod altman_tests {
 
 #[cfg(test)]
 mod ohlson_tests {
-    use crate::credit::scoring::ohlson::{ohlson_o_score, OhlsonOScoreInput};
-    use crate::credit::scoring::CreditScoringError;
+    use crate::credit::scoring::{ohlson_o_score, CreditScoringError, OhlsonOScoreInput};
 
     #[test]
     fn o_score_rejects_non_binary_indicators() {

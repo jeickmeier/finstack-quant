@@ -10,8 +10,8 @@ use contributions::{
     PyPositionResidualContribution, PyPositionRiskDecomposition, PyPositionVarContribution,
 };
 use functions::{
-    decompose_factors, historical_var_decomposition, parametric_es_decomposition,
-    parametric_var_decomposition, position_component_var,
+    decompose_factors, historical_var_decomposition, parametric_var_decomposition,
+    position_component_var,
 };
 use pyo3::prelude::*;
 use stress::{
@@ -37,7 +37,6 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
 
     m.add_function(wrap_pyfunction!(parametric_var_decomposition, m)?)?;
-    m.add_function(wrap_pyfunction!(parametric_es_decomposition, m)?)?;
     m.add_function(wrap_pyfunction!(historical_var_decomposition, m)?)?;
     m.add_function(wrap_pyfunction!(evaluate_risk_budget, m)?)?;
     m.add_function(wrap_pyfunction!(build_stress_attribution, m)?)?;

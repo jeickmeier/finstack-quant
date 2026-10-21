@@ -42,7 +42,7 @@ use super::{
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_models::credit::migration::{RatingScale, GeneratorMatrix, projection};
+/// use finstack_quant_models::credit::migration::{RatingScale, GeneratorMatrix, project};
 ///
 /// // 2-state generator: AAA→D at rate 0.1
 /// let scale = RatingScale::custom(vec!["AAA".to_string(), "D".to_string()])
@@ -51,7 +51,7 @@ use super::{
 ///     .expect("valid generator");
 ///
 /// // 1-year projection
-/// let p1 = projection::project(&gen, 1.0).expect("valid projection");
+/// let p1 = project(&gen, 1.0).expect("valid projection");
 /// assert!(p1.probability("AAA", "D").unwrap() > 0.0);
 /// ```
 ///

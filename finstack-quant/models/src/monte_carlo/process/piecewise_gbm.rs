@@ -9,7 +9,7 @@
 //! following a calendar-arbitrage-free total-variance bootstrap.
 
 use crate::monte_carlo::paths::ProcessParams;
-use crate::monte_carlo::process::ProcessMetadata;
+use crate::monte_carlo::traits::ProcessMetadata;
 use crate::monte_carlo::traits::{Discretization, StochasticProcess};
 use finstack_quant_core::Result;
 
@@ -18,7 +18,7 @@ use finstack_quant_core::Result;
 /// The forward rate, dividend yield, and volatility are constant within each
 /// interval `[times[i-1], times[i])` (with `times[-1] = 0`). This captures a
 /// term structure of rates and volatility between observation/reset dates that
-/// a single-parameter [`finstack_quant_models`] GBM cannot.
+/// a single-parameter [`GbmProcess`](crate::monte_carlo::process::gbm::GbmProcess) cannot.
 #[derive(Debug, Clone)]
 pub struct PiecewiseGbmProcess {
     /// Interval end times (years from valuation), sorted ascending.

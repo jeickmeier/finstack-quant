@@ -160,7 +160,7 @@ public = ["FactorCovarianceMatrix", "FactorModelConfig", "credit", "risk", "sche
 [crates.models.factor.modules]
 matching           = { python = "finstack_quant.models.factor.matching", status = "missing", note = "MatchingConfig typed host-language constructors deferred; JSON contracts remain Rust-owned. The crate-root matching re-exports (CascadeMatcher, HierarchicalMatcher, MappingTableMatcher, FactorMatcher trait family, MappingRule, AttributeFilter, DependencyFilter) are Rust-only." }
 credit             = { python = "finstack_quant.models.factor.credit", status = "exists", note = "Credit hierarchy artifacts, covariance forecasts, VolHorizon, and typed FactorCovarianceMatrix/FactorModelConfig forecast outputs are flattened into this namespace. CreditCalibrator accepts CreditCalibrationConfig / CreditCalibrationInputs as dicts or JSON strings (plus CreditCalibrator.from_dataframe for pandas panels, which converts the frames and calls Rust CreditCalibrationInputs::from_panel to anchor at the last panel date; the generic series is named by a required GenericFactorSpec dict/JSON); the config/input structs themselves (CreditCalibrationConfig, CreditCalibrationInputs, HistoryPanel, IssuerTagPanel, GenericFactorSeries, BucketSizeThresholds and the enum families PanelFrequency, PanelSpace, VolModelChoice, CovarianceStrategy, BetaShrinkage, BucketWeighting, IssuerBetaPolicy) are reached through those wire shapes and CreditFactorModel getters, not parallel constructors. Rust-only families: hierarchy internals (CreditHierarchySpec, HierarchyDimension, IssuerBetaRow, IssuerBetas, IssuerBetaMode, IssuerTags, FitQuality, LevelsAtAnchor, LevelAnchor, VolState, FactorVolModel, FactorHistories, FactorCorrelationMatrix, CalibrationDiagnostics, FoldUpRecord, DateRange, dimension_key; GenericFactorSpec is reached as a wire shape), the peel kernel (credit::peel), unit helpers (credit::units), DecompositionError (mapped to KeyError/ValueError/RuntimeError), and the calibration sub-pipeline (assemble, inventory, panel, peel_fit, statistics, validation)." }
-risk               = { python = "finstack_quant.models.factor.risk", status = "exists", note = "Pure factor and position decomposition, stress attribution, and risk-budget result types and functions. Both hosts return the canonical Rust results: parametric_var_decomposition, parametric_es_decomposition, and historical_var_decomposition return PositionRiskDecomposition and evaluate_risk_budget returns RiskBudgetResult (WASM returns the same serde shapes as plain objects). The three decomposition functions and build_stress_attribution are Rust free functions under the same names (finstack_quant_models::factor::risk); an omitted confidence defaults to 0.95 in Rust, not in the bindings, which only convert the matrix input and call them. Position P&L matrices are position-major (one row per position) in both hosts; Python additionally reads a labelled pandas.DataFrame (rows = scenarios) and NumPy arrays as host input conversions. decompose_factors / decomposeFactors bind the Rust free function of the same name: Python takes the portfolio SensitivityMatrix handle, WASM the SensitivityMatrixJson wire object (or its JSON text); both take a FactorCovarianceMatrix and an optional RiskMeasure (omitted = the Rust RiskMeasure::default(), variance) and return RiskDecomposition. Rust-only families: DecompositionMethod as a bare enum (hosts read PositionRiskDecomposition.method), residual plumbing (apply_residual_contributions, ResidualContributionSource as a bare enum - hosts read source_kind/source_issuer_id), the flat-matrix adapters flatten_square_matrix/flatten_position_pnls (the hosts call them on list input), and risk::math kernels. Documented rename: position_component_var / positionComponentVar is the free-function form of the Rust method PositionRiskDecomposition::component_var in both hosts (the decomposition is a plain value there, not a handle)." }
+risk               = { python = "finstack_quant.models.factor.risk", status = "exists", note = "Pure factor and position decomposition, stress attribution, and risk-budget result types and functions. Both hosts return the canonical Rust results: parametric_var_decomposition and historical_var_decomposition return PositionRiskDecomposition (whose portfolio_es / es_contributions carry the parametric Expected Shortfall attribution) and evaluate_risk_budget returns RiskBudgetResult (WASM returns the same serde shapes as plain objects). The two decomposition functions and build_stress_attribution are Rust free functions under the same names (finstack_quant_models::factor::risk); an omitted confidence defaults to 0.95 in Rust, not in the bindings, which only convert the matrix input and call them. Position P&L matrices are position-major (one row per position) in both hosts; Python additionally reads a labelled pandas.DataFrame (rows = scenarios) and NumPy arrays as host input conversions. decompose_factors / decomposeFactors bind the Rust free function of the same name: Python takes the portfolio SensitivityMatrix handle, WASM the SensitivityMatrixJson wire object (or its JSON text); both take a FactorCovarianceMatrix and an optional RiskMeasure (omitted = the Rust RiskMeasure::default(), variance) and return RiskDecomposition. Rust-only families: DecompositionMethod as a bare enum (hosts read PositionRiskDecomposition.method), residual plumbing (apply_residual_contributions, ResidualContributionSource as a bare enum - hosts read source_kind/source_issuer_id), the flat-matrix adapter flatten_position_pnls and core::math::linalg::flatten_square_matrix (the hosts call them on list input), and risk::math kernels. Documented rename: position_component_var / positionComponentVar is the free-function form of the Rust method PositionRiskDecomposition::component_var in both hosts (the decomposition is a plain value there, not a handle)." }
 schema             = { python = "finstack_quant.models.factor.schema", status = "exists", note = "Compiled-in JSON Schema accessors; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 
 # The remaining crate-root `pub use` surface (BumpSizeConfig,
@@ -207,7 +207,6 @@ public = [
     "decompose_factors",
     "evaluate_risk_budget",
     "historical_var_decomposition",
-    "parametric_es_decomposition",
     "parametric_var_decomposition",
     "position_component_var",
 ]
@@ -481,12 +480,12 @@ rates        = { python = "finstack_quant.models.rates", status = "exists", note
 # constants: `theta_days_per_year` = `DEFAULT_THETA_DAYS_PER_YEAR`, `averaging` =
 # `DEFAULT_ASIAN_AVERAGING` (an `AveragingMethod`; hosts parse its serde label),
 # `strike_type` = `DEFAULT_LOOKBACK_STRIKE_TYPE`. The
-# optional `is_call` of `asian_option_price` / `lookback_option_price` /
-# `quanto_option_price` / `heston_price` defaults to a call in both hosts (a
+# optional `is_call` of `barrier_option_price` / `asian_option_price` /
+# `lookback_option_price` / `quanto_option_price` / `heston_price` defaults to a call in both hosts (a
 # host signature default mapped to `OptionType::Call`). Rust-only closed-form
 # items, deliberately not bound: `bs_price_unchecked` / `bs_greeks_unchecked`,
 # `barrier_rebate` / `PayoutTiming` /
-# `BarrierParams` / `barrier_touch_probability`, `quanto_call` / `quanto_put` /
+# `BarrierParams` / `barrier_touch_probability`, `quanto_price` /
 # `quanto_drift_adjustment` (use `quanto_option_price`),
 # `HestonStripPricer` / `HestonFourierSettings` /
 # `heston_*_prices_fourier` strips, `OptionMarketParams`, `ExerciseStyle`,
@@ -498,8 +497,7 @@ public = [
     "asian_option_price",
     "bachelier_greeks",
     "bachelier_price",
-    "barrier_call",
-    "barrier_put",
+    "barrier_option_price",
     "black76_greeks",
     "black76_implied_vol",
     "black76_price",
@@ -519,7 +517,11 @@ public = [
 
 [crates.models.monte_carlo]
 python_package = "finstack_quant.models.monte_carlo"
-# `finite_diff_*` take `is_call: bool` and return a typed `Estimate` whose
+# `finite_diff_delta` / `finite_diff_gamma` bind the Rust
+# `greeks::gbm_european` functions of the same names (the generic kernels are
+# Rust-only `finite_diff_*_from_inputs`). The hosts take `is_call: bool`
+# where the Rust `GbmEuropeanFdSpec` field is `option_type: OptionType`
+# (`true` is `Call`), and return a typed `Estimate` whose
 # `stderr` is the paired (common-random-number) standard error. The
 # closed-form Black-Scholes reference is `models.bs_price`. Rust-only:
 # engine/process/discretization/RNG/payoff
@@ -542,8 +544,7 @@ public = [
     "finite_diff_delta",
     "finite_diff_gamma",
     "heston_satisfies_feller",
-    "price_heston_call",
-    "price_heston_put",
+    "price_heston",
     "simulate_paths",
 ]
 
@@ -585,8 +586,7 @@ public = ["dtsm", "hull_white"]
 # `fd_instantaneous_forward`, `hw1f_caplet_price_from_dfs`,
 # `hw1f_term_caplet_price_from_dfs_with_model`,
 # `hw1f_delayed_coupon_adjustment` (shared delayed-payment pricing kernel),
-# `hw1f_cap_floor_price_with_model` and `hw_bond_vol_with_model` (bound as
-# `HullWhiteParams.bond_vol`). WASM binds the same names under
+# and `hw1f_cap_floor_price_with_model`. WASM binds the same names under
 # `models.rates.hullWhite`; its facade makes `forwardCurve` optional because
 # wasm-bindgen cannot borrow an optional handle.
 [crates.models.rates.hull_white]
@@ -658,11 +658,10 @@ public = [
     "materialize_cube_tenor_slice_normal",
     "materialize_fx_delta_surface",
     "strike_to_delta",
-    "surface_to_dataframe",
 ]
 
 # Diebold-Li is one typed pipeline in Rust and both hosts:
-# `DieboldLi(lambda_=None)` (Rust `DieboldLi::new` / `with_default_lambda`)
+# `DieboldLi(lambda_=None)` (Rust `DieboldLi::new(Option<f64>)`, default 0.7308)
 # `.extract_factors(panel)` / `.fit(panel)` / `.forecast(horizon)`, returning the
 # typed `FactorTimeSeries` / `YieldForecast`. `nelson_siegel_yields` is the one
 # free function. Yield-curve PCA is reached through the bound `YieldPca` methods
@@ -691,7 +690,7 @@ status = "exists"
 
 [crates.calibration.modules]
 schema = { python = "finstack_quant.calibration.schema", status = "exists", note = "Registry-backed index/get/validate over calibration envelopes and raw market-quote schemas; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
-hull_white = { python = "finstack_quant.calibration.hull_white", status = "exists", note = "Scalar and piecewise-sigma Hull-White fits to swaption and cap/floor quotes, with SwaptionQuote / CapFloorQuote / HullWhiteCalibrationParams / CapFloorCalibrationConfig / PiecewiseSigmaCalibrationConfig. Both hosts call the curve-input Rust entry points (calibrate_hull_white_to_swaptions, calibrate_hull_white_to_cap_floors, bootstrap_hull_white_sigma_schedule_to_cap_floors), which adapt a DiscountCurve to the model clock; the closure-input solvers (`*_with_fn`) stay Rust-only. WASM binds the three functions on the calibration namespace with the quote, config and parameter types as plain objects, returns the (params, report) tuple as a two-element array. The piecewise bootstrap returns finstack_quant.models.rates.hull_white.HullWhiteParams (one Python class for the Rust type; WASM returns its plain-object wire form)." }
+hull_white = { python = "finstack_quant.calibration.hull_white", status = "exists", note = "Scalar and piecewise-sigma Hull-White fits to swaption and cap/floor quotes, with SwaptionQuote / CapFloorQuote / HullWhiteCalibrationParams / CapFloorCalibrationConfig / PiecewiseSigmaCalibrationConfig. The piecewise bootstrap returns models.rates.hull_white.HullWhiteParams, the one host class for Rust HullWhiteParams in both hosts. Both hosts call the curve-input Rust entry points (calibrate_hull_white_to_swaptions, calibrate_hull_white_to_cap_floors, bootstrap_hull_white_sigma_schedule_to_cap_floors), which adapt a DiscountCurve to the model clock; the closure-input solvers (`*_with_fn`) stay Rust-only. WASM binds the three functions on the calibration namespace with the quote, config and scalar parameter types as plain objects and returns the (params, report) tuple as a two-element array; the bootstrap's params element is the models.rates.hullWhite.HullWhiteParams handle." }
 
 [crates.calibration.symbols]
 public = [
@@ -847,9 +846,12 @@ public = [
 # `finstack_quant.models.correlation.__all__` must appear here (alphabetical,
 # matching the package __all__ ordering). Python names mirror the canonical
 # Rust names in finstack_quant_models::correlation (LatentFactorKind, not
-# LatentFactor). `nearest_correlation` is canonically owned by
-# finstack_quant_core::math::linalg and re-exported through
-# finstack_quant_models::correlation.
+# LatentFactor). The matrix and joint-probability helpers are bound here
+# directly from core: `nearest_correlation`, `validate_correlation_matrix` and
+# `cholesky_decompose` (core `cholesky_correlation`) from
+# finstack_quant_core::math::linalg; `CorrelatedBernoulli`,
+# `correlation_bounds` and `joint_probabilities` from
+# finstack_quant_core::math::probability.
 # Errors: `finstack_quant_models::correlation::Error` folds into the core
 # taxonomy (`From<correlation::Error> for core::Error`); non-convergence /
 # eigendecomposition failures map to `RuntimeError`, everything else to
@@ -1049,19 +1051,19 @@ note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, 
 #     arguments of pit_to_ttc / ttc_to_pit)
 #   - lgd::SeniorityClass / SeniorityCalibration, lgd::CreditConversionFactor,
 #     lgd::DownturnMethod (string / float / `method` + `params` on the host side)
-    #   - toggle_exercise::{ThresholdToggle, StochasticToggle, OptimalToggle}
+#   - credit::{ThresholdToggle, StochasticToggle, OptimalToggle}
 #     (reached through ToggleExerciseModel.kind / .params)
-#   - dynamic_recovery::DynamicRecoveryModel, endogenous_hazard::LeverageHazardMap
+#   - credit::{DynamicRecoveryModel, LeverageHazardMap}
 #     (reached through DynamicRecoverySpec.kind / .model and
 #     EndogenousHazardSpec.kind / .leverage_hazard_map)
 #   - MigrationSimulator::simulate / empirical_matrix with a caller-supplied
 #     RNG (hosts always use the seeded canonical Pcg64); RatingPaths is a
 #     host-side collection over Vec<RatingPath>, not a Rust type
 # WASM binds the same typed handles under `models.credit` (MertonModel, the
-# PIK specifications, ToggleExerciseModel, RatingFactorTable and the lgd / pd /
-# migration / scoring / recovery_waterfall families, flattened into the one
-# namespace); CreditState and the result types cross as plain objects. The
-# [parity] ledger pins the per-name accounting.
+# PIK specifications, ToggleExerciseModel, RatingFactorTable) and nests the
+# submodules like Rust and Python (`models.credit.{lgd, liabilityManagement,
+# migration, pd, recoveryWaterfall, scoring}`); CreditState and the result
+# types cross as plain objects. The [parity] ledger pins the per-name accounting.
 [crates.models.credit]
 python_package = "finstack_quant.models.credit"
 public = [
@@ -1836,6 +1838,68 @@ js_rule_members = { free = "wasm ownership: releases the wasm-bindgen handle", t
 # as `literal` and bound the members that compute or validate in Rust.
 backlog_ceiling = { modules = 0, members = 0 }
 
+# Host names in `finstack_quant.models` that are not the name of the Rust item
+# they bind, read by tests/parity/test_rust_names.py (a Python name and its
+# WASM twin pair through the ledger above, so this covers both hosts). Keys are
+# Python paths; values say what the host reads in Rust. An entry that becomes a
+# Rust name must be removed.
+[parity.rust_names]
+"finstack_quant.models.correlation.cholesky_decompose" = "binds core `math::linalg::cholesky_correlation`; the host name was kept when the models re-export was removed"
+"finstack_quant.models.credit.DynamicRecoverySpec.kind" = "serde tag of the Rust `model()` enum variant"
+"finstack_quant.models.credit.EndogenousHazardSpec.kind" = "serde tag of the Rust `leverage_hazard_map()` enum variant"
+"finstack_quant.models.credit.ToggleExerciseModel.kind" = "serde tag of the Rust enum variant"
+"finstack_quant.models.credit.ToggleExerciseModel.params" = "the Rust enum variant's payload as a dict"
+"finstack_quant.models.credit.lgd.DownturnLgd.params" = "serde form of the Rust `method()` enum"
+"finstack_quant.models.credit.migration.GeneratorMatrix.to_matrix" = "Rust `to_rows()` (host nested-list / NumPy exit)"
+"finstack_quant.models.credit.migration.TransitionMatrix.to_matrix" = "Rust `to_rows()` (host nested-list / NumPy exit)"
+"finstack_quant.models.credit.migration.RatingPaths" = "host collection over the Rust `Vec<RatingPath>` returned by `MigrationSimulator::simulate`; Rust has no named type"
+"finstack_quant.models.credit.migration.RatingPaths.default_rate" = "share of the Rust paths that end in the default state"
+"finstack_quant.models.credit.migration.RatingPaths.paths" = "the Rust `Vec<RatingPath>`"
+"finstack_quant.models.factor.FactorCovarianceMatrix.data" = "Rust `as_slice()` (row-major values)"
+"finstack_quant.models.factor.FactorCovarianceMatrix.to_numpy" = "NumPy exit of Rust `as_slice()`"
+"finstack_quant.models.factor.FactorModelConfig.factor_ids" = "ids of the Rust `factors` field"
+"finstack_quant.models.factor.FactorModelConfig.n_factors" = "length of the Rust `factors` field"
+"finstack_quant.models.factor.credit.CreditFactorModel.covariance" = "Rust `config.covariance` (second getter for `config`, PY-18)"
+"finstack_quant.models.factor.credit.CreditFactorModel.n_factors" = "length of the Rust `config.factors` field"
+"finstack_quant.models.factor.credit.CreditFactorModel.n_issuers" = "length of the Rust `issuer_betas` field"
+"finstack_quant.models.factor.credit.CreditFactorModel.n_levels" = "length of the Rust `hierarchy.levels` field"
+"finstack_quant.models.factor.credit.LevelsAtDate.level_values" = "Rust `level(level_index)` as a dict"
+"finstack_quant.models.factor.credit.LevelsAtDate.n_levels" = "length of the Rust `by_level` field"
+"finstack_quant.models.factor.credit.PeriodDecomposition.from_date" = "Rust field `from`, a Python keyword"
+"finstack_quant.models.factor.credit.PeriodDecomposition.to_date" = "Rust field `to`, paired with `from_date`"
+"finstack_quant.models.factor.credit.PeriodDecomposition.level_deltas" = "Rust `level(level_index)` as a dict"
+"finstack_quant.models.factor.credit.PeriodDecomposition.n_levels" = "length of the Rust `by_level` field"
+"finstack_quant.models.factor.credit.VolHorizon.n" = "payload of the Rust `NSteps` variant"
+"finstack_quant.models.factor.credit.VolHorizon.years_value" = "payload of the Rust `Years` variant"
+"finstack_quant.models.factor.risk.PositionResidualContribution.source_issuer_id" = "issuer id of the Rust `source` enum (see the `risk` module note)"
+"finstack_quant.models.factor.risk.PositionResidualContribution.source_kind" = "variant of the Rust `source` enum (see the `risk` module note)"
+"finstack_quant.models.factor.risk.TailScenarioBreakdown.position_ids" = "position ids the Rust `position_pnls` are ordered by"
+"finstack_quant.models.factor.risk.position_component_var" = "free-function form of Rust `PositionRiskDecomposition::component_var` (see the `risk` module note)"
+"finstack_quant.models.liquidity.kyle_lambda" = "free-function form of Rust `KyleLambdaModel::lambda_from_series` (see `[crates.models.liquidity]`)"
+"finstack_quant.models.monte_carlo.Estimate.ci_lower" = "first element of the Rust `ci_95` tuple"
+"finstack_quant.models.monte_carlo.Estimate.ci_upper" = "second element of the Rust `ci_95` tuple"
+"finstack_quant.models.monte_carlo.MoneyEstimate.ci_lower" = "first element of the Rust `ci_95` tuple"
+"finstack_quant.models.monte_carlo.MoneyEstimate.ci_upper" = "second element of the Rust `ci_95` tuple"
+"finstack_quant.models.monte_carlo.LsmcPricer.antithetic" = "Rust `LsmcConfig::antithetic` of the pricer's config"
+"finstack_quant.models.monte_carlo.LsmcPricer.basis" = "Rust `LsmcConvenience::basis` (default regression basis)"
+"finstack_quant.models.monte_carlo.LsmcPricer.basis_degree" = "Rust `LsmcConvenience::basis_degree`"
+"finstack_quant.models.monte_carlo.LsmcPricer.num_paths" = "Rust `LsmcConfig::num_paths` of the pricer's config"
+"finstack_quant.models.monte_carlo.LsmcPricer.seed" = "Rust `LsmcConfig::seed` of the pricer's config"
+"finstack_quant.models.monte_carlo.LsmcPricer.use_parallel" = "Rust `LsmcConfig::use_parallel` of the pricer's config"
+"finstack_quant.models.monte_carlo.PathDependentPricer.antithetic" = "Rust `PathDependentPricerConfig::antithetic`"
+"finstack_quant.models.monte_carlo.PathDependentPricer.num_paths" = "Rust `PathDependentPricerConfig::num_paths`"
+"finstack_quant.models.monte_carlo.PathDependentPricer.seed" = "Rust `PathDependentPricerConfig::seed`"
+"finstack_quant.models.monte_carlo.PathDependentPricer.use_brownian_bridge" = "Rust `PathDependentPricerConfig::use_brownian_bridge`"
+"finstack_quant.models.monte_carlo.PathDependentPricer.use_parallel" = "Rust `PathDependentPricerConfig::use_parallel`"
+"finstack_quant.models.monte_carlo.PathDependentPricer.use_sobol" = "Rust `PathDependentPricerConfig::use_sobol`"
+"finstack_quant.models.rates.dtsm.FactorTimeSeries.level" = "column 0 of the Rust `factors` matrix"
+"finstack_quant.models.rates.dtsm.FactorTimeSeries.slope" = "column 1 of the Rust `factors` matrix"
+"finstack_quant.models.rates.dtsm.FactorTimeSeries.curvature" = "column 2 of the Rust `factors` matrix"
+"finstack_quant.models.rates.dtsm.YieldPcaView.num_components" = "length of the Rust `eigenvalues` field"
+"finstack_quant.models.volatility.ArbitrageReport.by_severity" = "Rust `counts_by_severity` field"
+"finstack_quant.models.volatility.ArbitrageReport.by_type" = "Rust `counts_by_type` field"
+"finstack_quant.models.volatility.ArbitrageReport.total_violations" = "length of the Rust `violations` field"
+
 [parity.modules."finstack_quant"]
 js = ""
 excluded = { "__version__" = "dunder" }
@@ -1985,26 +2049,26 @@ js = "models.credit"
 types = { CreditState = "CreditState" }
 
 [parity.modules."finstack_quant.models.credit.lgd"]
-js = "models.credit"
+js = "models.credit.lgd"
 types = { CollateralPiece = "CollateralPiece", WorkoutLgdResult = "WorkoutLgdResult" }
 
 [parity.modules."finstack_quant.models.credit.liability_management"]
-js = "models.credit"
+js = "models.credit.liabilityManagement"
 types = { ExchangeOfferAnalysis = "ExchangeOfferAnalysis", LeverageImpact = "LeverageImpact", LmeAnalysis = "LmeAnalysis" }
 
 [parity.modules."finstack_quant.models.credit.migration"]
-js = "models.credit"
+js = "models.credit.migration"
 
 [parity.modules."finstack_quant.models.credit.pd"]
-js = "models.credit"
+js = "models.credit.pd"
 types = { MasterScaleGrade = "MasterScaleGrade", MasterScaleResult = "MasterScaleResult" }
 
 [parity.modules."finstack_quant.models.credit.recovery_waterfall"]
-js = "models.credit"
+js = "models.credit.recoveryWaterfall"
 types = { RecoveryAllocation = "RecoveryAllocation", RecoveryClaim = "RecoveryClaim", RecoveryWaterfallResult = "RecoveryWaterfallResult" }
 
 [parity.modules."finstack_quant.models.credit.scoring"]
-js = "models.credit"
+js = "models.credit.scoring"
 types = { ScoringResult = "ScoringResult" }
 
 [parity.modules."finstack_quant.models.factor"]
@@ -2042,7 +2106,6 @@ js = "models.rates.hullWhite"
 [parity.modules."finstack_quant.models.volatility"]
 js = "models.volatility"
 types = { ArbitrageReport = "ArbitrageReport", LocalVolSurface = "LocalVolSurface", SviParams = "SviParams" }
-excluded = { surface_to_dataframe = "pandas" }
 
 [parity.modules."finstack_quant.portfolio"]
 js = "portfolio"
@@ -2284,8 +2347,10 @@ vmResultRequiresCall = "twin of the Python property VmResult.requires_call (Rust
 [parity.js."models".wasm_only]
 bsGreeksIsValid = "free-function twin of Python BsGreeks.is_valid: the type is a plain object in WASM"
 
-[parity.js."models.credit".wasm_only]
+[parity.js."models.credit.lgd".wasm_only]
 collateralPieceLiquidationValue = "free-function twin of the Python property CollateralPiece.liquidation_value (Rust CollateralPiece::liquidation_value), which is not serialized: the type is a plain object in WASM"
+
+[parity.js."models.credit.recoveryWaterfall".wasm_only]
 recoveryClaimTotalClaim = "free-function twin of the Python property RecoveryClaim.total_claim (Rust RecoveryClaim::total_claim), which is not serialized: the type is a plain object in WASM"
 
 [parity.js."models.factor".wasm_only]
@@ -2763,10 +2828,10 @@ total_violations = "literal"
 grid_shape = "literal"
 
 [parity.members."finstack_quant.models.credit.lgd.CollateralPiece".renames]
-liquidation_value = { js = "models.credit.collateralPieceLiquidationValue", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+liquidation_value = { js = "models.credit.lgd.collateralPieceLiquidationValue", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
 
 [parity.members."finstack_quant.models.credit.recovery_waterfall.RecoveryClaim".renames]
-total_claim = { js = "models.credit.recoveryClaimTotalClaim", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+total_claim = { js = "models.credit.recoveryWaterfall.recoveryClaimTotalClaim", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
 
 [parity.members."finstack_quant.models.liquidity.LiquidityProfile".renames]
 half_spread = { js = "models.liquidity.liquidityProfileHalfSpread", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }

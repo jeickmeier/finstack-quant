@@ -1,9 +1,9 @@
 //! Financial invariants and invalid-input regressions from the models audit.
 
 use finstack_quant_core::{currency::Currency, market_data::surfaces::VolSurface};
-use finstack_quant_models::closed_form::vanilla::bs_price;
+use finstack_quant_models::closed_form::bs_price;
 use finstack_quant_models::correlation::PortfolioLossResult;
-use finstack_quant_models::fourier::{bs_cos_price, CosMarketParams};
+use finstack_quant_models::fourier::cos::{bs_cos_price, CosMarketParams};
 use finstack_quant_models::monte_carlo::{
     pricer::{
         basis::PolynomialBasis,
@@ -49,7 +49,7 @@ fn cos_requires_a_nonempty_expansion_and_reconciles_to_black_scholes() {
         rate: 0.05,
         div_yield: 0.0,
         expiry: 1.0,
-        is_call: true,
+        option_type: OptionType::Call,
         n_terms: Some(0),
     };
     assert!(bs_cos_price(market, 0.2).is_err());

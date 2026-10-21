@@ -26,7 +26,7 @@ use super::super::paths::ProcessParams;
 #[cfg(test)]
 use super::super::traits::state_keys;
 use super::super::traits::{PathState, StateKey, StochasticProcess};
-use super::metadata::ProcessMetadata;
+use crate::monte_carlo::traits::ProcessMetadata;
 
 /// CIR process parameters.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

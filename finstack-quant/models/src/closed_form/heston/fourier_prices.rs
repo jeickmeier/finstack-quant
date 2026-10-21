@@ -1,7 +1,7 @@
 use super::params::HESTON_TAIL_LOG_TARGET;
 use super::{HestonFourierSettings, HestonPricingParams, HestonStripPricer};
 #[cfg(test)]
-use crate::closed_form::vanilla::bs_price_unchecked;
+use crate::closed_form::bs_price_unchecked;
 use crate::types::OptionType;
 use finstack_quant_core::{Error, Result};
 
@@ -50,7 +50,7 @@ fn resolve_heston_settings(
 /// # Example
 ///
 /// ```text
-/// use finstack_quant_models::closed_form::heston::{
+/// use finstack_quant_models::closed_form::{
 ///     heston_call_price_fourier, HestonPricingParams,
 /// };
 ///
@@ -279,7 +279,7 @@ pub(crate) fn heston_put_price_fourier(
 ///
 /// ```rust
 /// use finstack_quant_models::types::OptionType;
-/// use finstack_quant_models::closed_form::heston::{heston_price, HestonPricingParams};
+/// use finstack_quant_models::closed_form::{heston_price, HestonPricingParams};
 ///
 /// let params = HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04)?;
 /// let call = heston_price(100.0, 100.0, 1.0, &params, OptionType::Call, None)?;

@@ -171,7 +171,6 @@
       "finstack_quant.models.factor.credit.VolHorizon",
       "finstack_quant.models.factor.credit.decompose_levels",
       "finstack_quant.models.factor.credit.decompose_period",
-      "finstack_quant.models.factor.risk.parametric_es_decomposition",
       "finstack_quant.models.factor.risk.parametric_var_decomposition"
     ],
     "models": [],
@@ -927,7 +926,6 @@
       "_shared.analyst_history.history_spec",
       "_shared.analyst_liquidity.liquidity_panel",
       "_shared.analyst_liquidity.position_factor_panel",
-      "finstack_quant.models.factor.risk.parametric_es_decomposition",
       "finstack_quant.models.factor.risk.parametric_var_decomposition",
       "finstack_quant.portfolio.Portfolio",
       "finstack_quant.portfolio.aggregate_metrics",

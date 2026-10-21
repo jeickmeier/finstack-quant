@@ -27,7 +27,7 @@
 //! - BSM expected prices are discounted spot-based values; QuantLib computed
 //!   them via `blackFormula` on `F = S*exp((r-q)T)` with `discount =
 //!   exp(-rT)`, which is identical to the BSM spot formula implemented by
-//!   [`finstack_quant_models::closed_form::vanilla::bs_price`].
+//!   [`finstack_quant_models::closed_form::bs_price`].
 //! - QuantLib `sabrVolatility(strike, forward, T, alpha, beta, nu, rho)`
 //!   swaps the (nu, rho) order relative to [`SabrParameters::new`].
 //!
@@ -318,7 +318,7 @@ fn test_vol_models_quantlib_parity() {
                     continue;
                 }
                 *counts.entry("bsm").or_default() += 1;
-                let call = finstack_quant_models::closed_form::vanilla::bs_price(
+                let call = finstack_quant_models::closed_form::bs_price(
                     *spot,
                     *strike,
                     *rate,
@@ -328,7 +328,7 @@ fn test_vol_models_quantlib_parity() {
                     finstack_quant_models::types::OptionType::Call,
                 )
                 .expect("valid Black-Scholes inputs");
-                let put = finstack_quant_models::closed_form::vanilla::bs_price(
+                let put = finstack_quant_models::closed_form::bs_price(
                     *spot,
                     *strike,
                     *rate,
@@ -446,11 +446,11 @@ fn test_vol_models_quantlib_parity() {
                 *counts.entry("heston").or_default() += 1;
                 let params =
                     HestonParams::new(*v0, *kappa, *theta, *sigma, *rho).expect("valid Heston");
-                let call = finstack_quant_models::closed_form::heston::heston_call_price_fourier(
+                let call = finstack_quant_models::closed_form::heston_call_price_fourier(
                     *spot,
                     *strike,
                     *t,
-                    &finstack_quant_models::closed_form::heston::HestonPricingParams {
+                    &finstack_quant_models::closed_form::HestonPricingParams {
                         r: *rate,
                         q: *dividend_yield,
                         model: params,
@@ -458,11 +458,11 @@ fn test_vol_models_quantlib_parity() {
                     None,
                 )
                 .expect("checked Heston price");
-                let put = finstack_quant_models::closed_form::heston::heston_price(
+                let put = finstack_quant_models::closed_form::heston_price(
                     *spot,
                     *strike,
                     *t,
-                    &finstack_quant_models::closed_form::heston::HestonPricingParams {
+                    &finstack_quant_models::closed_form::HestonPricingParams {
                         r: *rate,
                         q: *dividend_yield,
                         model: params,

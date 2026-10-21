@@ -14,18 +14,13 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{dates_to_datetime_index, dict_to_dataframe};
 use crate::errors::{core_to_py, value_error};
+use finstack_quant_core::math::linalg::rows_of;
 use finstack_quant_models::rates::dtsm::{
     self, DieboldLi, FactorTimeSeries, YieldForecast, YieldPanel, YieldPca, YieldPcaView,
 };
-use nalgebra::{DMatrix, DVector};
+use nalgebra::DVector;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule, PyType};
-
-fn matrix_rows(matrix: &DMatrix<f64>) -> Vec<Vec<f64>> {
-    (0..matrix.nrows())
-        .map(|i| (0..matrix.ncols()).map(|j| matrix[(i, j)]).collect())
-        .collect()
-}
 
 fn vector_values(vector: &DVector<f64>) -> Vec<f64> {
     vector.iter().copied().collect()
@@ -174,7 +169,7 @@ impl PyYieldPanel {
     /// Yield matrix as row-major nested lists (``yields[date_idx][tenor_idx]``).
     #[getter]
     fn yields(&self) -> Vec<Vec<f64>> {
-        matrix_rows(&self.inner.yields)
+        rows_of(&self.inner.yields)
     }
 
     /// Number of observation dates.
@@ -191,7 +186,7 @@ impl PyYieldPanel {
 
     /// First differences of the yields as ``T-1`` row-major nested lists.
     fn yield_changes(&self) -> Vec<Vec<f64>> {
-        matrix_rows(&self.inner.yield_changes())
+        rows_of(&self.inner.yield_changes())
     }
 
     /// The panel as a ``pandas.DataFrame`` (one column per tenor, in years).
@@ -288,13 +283,13 @@ impl PyFactorTimeSeries {
     /// Factor matrix as row-major nested lists ``factors[date_idx] = [level, slope, curvature]``.
     #[getter]
     fn factors(&self) -> Vec<Vec<f64>> {
-        matrix_rows(&self.inner.factors)
+        rows_of(&self.inner.factors)
     }
 
     /// OLS residual matrix as row-major nested lists (``residuals[date_idx][tenor_idx]``).
     #[getter]
     fn residuals(&self) -> Vec<Vec<f64>> {
-        self.inner.residual_rows()
+        rows_of(&self.inner.residuals)
     }
 
     /// Cross-sectional R-squared per tenor.
@@ -381,11 +376,9 @@ impl PyDieboldLi {
     #[pyo3(signature = (lambda_ = None))]
     #[pyo3(text_signature = "(lambda_=None)")]
     fn new(lambda_: Option<f64>) -> PyResult<Self> {
-        match lambda_ {
-            Some(lambda) => DieboldLi::new(lambda).map_err(core_to_py),
-            None => Ok(DieboldLi::with_default_lambda()),
-        }
-        .map(Self::from_inner)
+        DieboldLi::new(lambda_)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     /// Decay parameter in the years convention.
@@ -412,7 +405,7 @@ impl PyDieboldLi {
     /// VAR(1) coefficient matrix ``Phi`` (3x3, row-major), or ``None`` before ``fit_var``.
     #[getter]
     fn phi(&self) -> Option<Vec<Vec<f64>>> {
-        self.inner.phi().map(matrix_rows)
+        self.inner.phi().map(rows_of)
     }
 
     /// VAR(1) unconditional mean ``mu`` (length 3), or ``None`` before ``fit_var``.
@@ -424,12 +417,12 @@ impl PyDieboldLi {
     /// VAR(1) residual covariance ``Q`` (3x3, row-major), or ``None`` before ``fit_var``.
     #[getter]
     fn q_cov(&self) -> Option<Vec<Vec<f64>>> {
-        self.inner.q_cov().map(matrix_rows)
+        self.inner.q_cov().map(rows_of)
     }
 
     /// Nelson-Siegel loading matrix (``N x 3``, row-major) for the recorded tenors.
     fn loading_matrix(&self) -> Vec<Vec<f64>> {
-        matrix_rows(&self.inner.loading_matrix())
+        rows_of(&self.inner.loading_matrix())
     }
 
     /// Extract level/slope/curvature factors from ``panel`` via OLS.
@@ -649,13 +642,13 @@ impl PyYieldPca {
     /// Loadings as row-major nested lists ``loadings[tenor][k]``.
     #[getter]
     fn loadings(&self) -> Vec<Vec<f64>> {
-        matrix_rows(self.inner.loadings())
+        rows_of(self.inner.loadings())
     }
 
     /// Scores as row-major nested lists ``scores[t][k]``.
     #[getter]
     fn scores(&self) -> Vec<Vec<f64>> {
-        matrix_rows(self.inner.scores())
+        rows_of(self.inner.scores())
     }
 
     /// Tenor grid in years (synthetic ``1..N`` after ``fit_yield_changes``).
@@ -726,7 +719,7 @@ impl PyYieldPca {
     fn reconstruct(&self, num_components: usize) -> PyResult<Vec<Vec<f64>>> {
         self.inner
             .reconstruct(num_components)
-            .map(|m| matrix_rows(&m))
+            .map(|m| rows_of(&m))
             .map_err(core_to_py)
     }
 
@@ -744,7 +737,7 @@ impl PyYieldPca {
     /// Loadings as a ``pandas.DataFrame`` indexed by tenor with columns
     /// ``PC1, PC2, ...``.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        loadings_dataframe(py, &matrix_rows(self.inner.loadings()), self.inner.tenors())
+        loadings_dataframe(py, &rows_of(self.inner.loadings()), self.inner.tenors())
     }
 
     fn __repr__(&self) -> String {

@@ -15,10 +15,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_models::closed_form::bachelier_price_with_annuity;
-use finstack_quant_models::trees::BinomialTree;
+use finstack_quant_models::closed_form::{bachelier_price_with_annuity, d1_d2_black76};
+use finstack_quant_models::trees::binomial_tree::BinomialTree;
 use finstack_quant_models::types::{ExerciseStyle, OptionMarketParams, OptionType};
-use finstack_quant_models::volatility::d1_d2_black76;
 
 /// Official American lattice size when `tree_steps` is omitted on PV.
 const OFFICIAL_TREE_STEPS: usize = 401;
@@ -519,7 +518,7 @@ impl FutureOptionTerms {
                     option_type: self.option_type,
                 };
                 params.validate()?;
-                BinomialTree::leisen_reimer(steps).price_american(&params)
+                BinomialTree::leisen_reimer(steps).price_american(&params, &[])
             }
             FutureOptionModel::Normal => {
                 self.additive_american_unit_price(futures_price, volatility, t, rate, steps)

@@ -4,7 +4,7 @@ Covers:
 - B1: `bs_price`, `bs_greeks`, `bs_implied_vol`, `black76_implied_vol`.
 - B2: `finstack_quant.models.correlation.nearest_correlation`.
 - B3: `SabrParameters` / `SabrSmile` / `SabrCalibrator`.
-- B5: `barrier_call`, `asian_option_price`, `lookback_option_price`,
+- B5: `barrier_option_price`, `asian_option_price`, `lookback_option_price`,
       `quanto_option_price`.
 """
 
@@ -18,8 +18,7 @@ from finstack_quant.models import (
     asian_option_price,
     bachelier_greeks,
     bachelier_price,
-    barrier_call,
-    barrier_put,
+    barrier_option_price,
     black76_greeks,
     black76_implied_vol,
     black76_price,
@@ -82,7 +81,7 @@ def test_new_closed_form_bindings_run() -> None:
     assert abs(bachelier_greeks(0.03, 0.03, 0.0075, 1.0, True).delta - 0.5) < 1e-9
     assert black_shifted_price(-0.005, -0.005, 0.25, 1.0, 0.03, True) > 0.0
     assert black_shifted_vega(-0.005, -0.005, 0.25, 1.0, 0.03) > 0.0
-    assert barrier_put(100.0, 100.0, 80.0, 0.05, 0.0, 0.2, 1.0, "down", "out") > 0.0
+    assert barrier_option_price(100.0, 100.0, 80.0, 0.05, 0.0, 0.2, 1.0, "down", "out", is_call=False) > 0.0
     p = heston_price(100.0, 100.0, 1.0, 0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04)
     assert 5.0 < p < 15.0
 
@@ -201,8 +200,8 @@ def test_sabr_fixed_shift_and_atm_pinning() -> None:
 
 def test_barrier_knock_in_plus_knock_out_equals_vanilla() -> None:
     spot, strike, barrier, r, q, sigma, t = 100.0, 100.0, 110.0, 0.05, 0.02, 0.2, 1.0
-    up_in = barrier_call(spot, strike, barrier, r, q, sigma, t, "up", "in")
-    up_out = barrier_call(spot, strike, barrier, r, q, sigma, t, "up", "out")
+    up_in = barrier_option_price(spot, strike, barrier, r, q, sigma, t, "up", "in")
+    up_out = barrier_option_price(spot, strike, barrier, r, q, sigma, t, "up", "out")
     vanilla = bs_price(spot, strike, r, q, sigma, t, True)
     assert abs(up_in + up_out - vanilla) < 1e-6
 
@@ -256,4 +255,4 @@ def test_quanto_option_price_call_positive() -> None:
 
 def test_barrier_unknown_direction_raises() -> None:
     with pytest.raises(ValueError, match=r"barrier spec|direction"):
-        barrier_call(100.0, 100.0, 110.0, 0.05, 0.02, 0.2, 1.0, "sideways", "in")
+        barrier_option_price(100.0, 100.0, 110.0, 0.05, 0.02, 0.2, 1.0, "sideways", "in")

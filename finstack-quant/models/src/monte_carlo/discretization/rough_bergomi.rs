@@ -42,7 +42,7 @@
 //! generator emits increments `ΔỸ_k` whose running sum reconstructs the level
 //! `Ỹ_{t_k}`, accumulating `work[0] += ΔỸ` recovers the Volterra process.
 //! The engine must zero the work buffer before each new path (see
-//! [`simulate_path_fractional`](crate::monte_carlo::engine_fractional::simulate_path_fractional)).
+//! [`simulate_path_fractional`](crate::monte_carlo::engine::simulate_path_fractional)).
 //!
 //! # References
 //!
@@ -536,7 +536,7 @@ mod tests {
         let mc_price = sum_payoff / num_paths as f64;
 
         // Analytic reference: Black-Scholes ATM call at σ = √ξ₀, r = q = 0.
-        let bs_price = crate::closed_form::vanilla::bs_price(
+        let bs_price = crate::closed_form::bs_price(
             s0,
             strike,
             0.0,

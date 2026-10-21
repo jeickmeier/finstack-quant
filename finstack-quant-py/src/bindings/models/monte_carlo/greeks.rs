@@ -3,12 +3,10 @@
 //! Thin wrappers around the canonical GBM European finite-difference
 //! convenience entry points in `finstack_quant_models::monte_carlo::greeks::gbm_european`.
 
-use super::engine::resolve_currency;
+use super::engine::extract_optional_currency;
 use super::results::PyEstimate;
 use crate::errors::core_to_py;
-use finstack_quant_models::monte_carlo::greeks::gbm_european::{
-    finite_diff_delta_gbm, finite_diff_gamma_gbm, GbmEuropeanFdSpec,
-};
+use finstack_quant_models::monte_carlo::greeks::gbm_european::{self, GbmEuropeanFdSpec};
 use finstack_quant_models::types::OptionType;
 use pyo3::prelude::*;
 
@@ -39,7 +37,7 @@ fn spec_from_args(
         num_steps,
         bump_size,
         option_type: OptionType::from(is_call),
-        currency: Some(resolve_currency(currency)?),
+        currency: extract_optional_currency(currency)?,
     })
 }
 
@@ -117,7 +115,7 @@ fn finite_diff_delta(
         spot, strike, rate, div_yield, vol, expiry, is_call, num_paths, seed, num_steps, bump_size,
         currency,
     )?;
-    py.detach(|| finite_diff_delta_gbm(spec))
+    py.detach(|| gbm_european::finite_diff_delta(spec))
         .map(PyEstimate::from_inner)
         .map_err(core_to_py)
 }
@@ -192,7 +190,7 @@ fn finite_diff_gamma(
         spot, strike, rate, div_yield, vol, expiry, is_call, num_paths, seed, num_steps, bump_size,
         currency,
     )?;
-    py.detach(|| finite_diff_gamma_gbm(spec))
+    py.detach(|| gbm_european::finite_diff_gamma(spec))
         .map(PyEstimate::from_inner)
         .map_err(core_to_py)
 }

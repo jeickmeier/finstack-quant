@@ -7,7 +7,7 @@ use crate::monte_carlo::traits::PathState;
 use crate::monte_carlo::traits::Payoff;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Error as CoreError;
+use finstack_quant_core::Error;
 
 /// Cliquet payoff aggregation type.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -103,7 +103,7 @@ impl CliquetCallPayoff {
     ) -> finstack_quant_core::Result<Self> {
         for i in 1..reset_dates.len() {
             if reset_dates[i - 1] >= reset_dates[i] {
-                return Err(CoreError::Validation(format!(
+                return Err(Error::Validation(format!(
                     "CliquetCallPayoff: reset_dates must be strictly increasing (index {} = {} >= index {} = {})",
                     i - 1,
                     reset_dates[i - 1],
@@ -113,12 +113,12 @@ impl CliquetCallPayoff {
             }
         }
         if local_cap < local_floor {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "CliquetCallPayoff: local_cap ({local_cap}) must be >= local_floor ({local_floor})"
             )));
         }
         if global_cap < global_floor {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "CliquetCallPayoff: global_cap ({global_cap}) must be >= global_floor ({global_floor})"
             )));
         }
@@ -202,13 +202,13 @@ impl Payoff for CliquetCallPayoff {
     fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
         const EPS: f64 = 1e-6;
         let spot = state.spot().ok_or_else(|| {
-            CoreError::Validation(format!(
+            Error::Validation(format!(
                 "CliquetCallPayoff requires SPOT at step {}",
                 state.step
             ))
         })?;
         if !spot.is_finite() || spot <= 0.0 {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "CliquetCallPayoff SPOT must be finite and positive at step {}, got {spot}",
                 state.step
             )));

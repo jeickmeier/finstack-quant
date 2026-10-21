@@ -53,7 +53,6 @@ __all__ = [
     "materialize_cube_tenor_slice_normal",
     "materialize_fx_delta_surface",
     "strike_to_delta",
-    "surface_to_dataframe",
 ]
 
 # SABR volatility smile
@@ -822,7 +821,7 @@ class SabrSmile:
         ...
 
     @property
-    def t(self) -> float:
+    def time_to_expiry(self) -> float:
         """
         Time to expiry in years this smile is anchored on.
 
@@ -2121,38 +2120,6 @@ def check_surface_grid(
     """
     ...
 
-def surface_to_dataframe(surface: VolSurface) -> pd.DataFrame:
-    """
-    Tabulate a core ``VolSurface`` grid as a DataFrame.
-
-    Parameters
-    ----------
-    surface : VolSurface
-        Data-only surface, e.g. from :func:`materialize_cube_tenor_slice` or
-        :func:`materialize_fx_delta_surface`.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Index ``expiry`` (years), one column per strike / secondary-axis
-        node, values in the surface's ``quote_type`` units (decimal Black vol
-        or absolute normal vol).
-
-    Raises
-    ------
-    ValueError
-        If the stored grid length does not match ``expiries x strikes``.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.market_data import FxDeltaVolSurface
-    >>> from finstack_quant.models.volatility import materialize_fx_delta_surface, surface_to_dataframe
-    >>> s = FxDeltaVolSurface("FX", [1.0], [0.12], [0.01], [0.002])
-    >>> surface_to_dataframe(materialize_fx_delta_surface(s, 1.1, 0.03, 0.02)).shape
-    (1, 3)
-    """
-    ...
-
 _VolatilityConvention = Literal["normal", "lognormal"] | dict[str, dict[str, float]]
 
 def convert_atm_volatility(
@@ -2524,8 +2491,8 @@ class LocalVolSurface:
         -------
         pd.DataFrame
             One row per expiry (index named ``"expiry"``, in years) and one
-            float64 column per strike, the layout of
-            :func:`surface_to_dataframe` for an implied surface.
+            float64 column per strike: the ``expiry`` x ``strike`` pivot
+            of ``VolSurface.to_dataframe()`` for an implied surface.
 
         Raises
         ------

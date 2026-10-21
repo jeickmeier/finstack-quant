@@ -13,34 +13,38 @@ artifacts from `MarketContext`; valuations owns lookup and override precedence,
 then supplies a concrete `VolSource` to pricing code.
 
 Consumed by [`models::closed_form`](../closed_form/) and
-[`models::trees`](../trees/) (both use `black::d1_d2`), by
-`calibration::hull_white` (`normal::bachelier_price_with_annuity`), by
+[`models::trees`](../trees/), by
+`calibration::hull_white`, by
 `calibration::targets::vol` (`SabrCalibrator::calibrate`, the
 SABR slice fitter used by calibration's volatility surface step), and by the rates/FX/vol
 instrument pricers — `rates/{swaption, cap_floor, cms_option, cms_swap}`,
 the asset-owned futures-option instruments, `fx/fx_digital_option`,
-`exotics/range_accrual` — which reach for `normal::bachelier_price_with_annuity`,
-`black::{d1_d2, d1_black76, d1_d2_black76}`, and
-`SABRParameters` / `VolatilityConvention`.
+`exotics/range_accrual` — which reach for `volatility::sabr::SabrParameters` /
+`volatility::VolatilityConvention` here and for `closed_form::{d1_d2, d1_d2_black76,
+bachelier_price_with_annuity}`.
 
 ## Layout
 
 | File | Contents |
 |------|----------|
-| [`mod.rs`](mod.rs) | Re-exports |
-| [`black.rs`](black.rs) | `d1`, `d1_d2`, `d1_black76`, `d1_d2_black76` |
-| [`normal.rs`](normal.rs) | `bachelier_price_with_annuity` |
-| [`sabr/`](sabr/) | `SabrParameters`, `SabrCalibrator`, `SabrSmile` |
-| [`source.rs`](source.rs) | `VolSource` plus surface, cube, and FX delta-volatility evaluation/materialization |
-| [`arbitrage/`](arbitrage/) | Model-dependent volatility arbitrage checks |
-| [`heston.rs`](heston.rs), [`rough_heston.rs`](rough_heston.rs), [`local_vol.rs`](local_vol.rs), [`svi.rs`](svi.rs) | Stochastic/local volatility engines and fitting |
+| [`mod.rs`](mod.rs) | Facade: flat re-exports of the private children below, plus the public submodules |
+| [`source.rs`](source.rs) | `VolSource` plus surface and cube evaluation/materialization (private, re-exported flat) |
+| [`fx.rs`](fx.rs) | FX delta quotes: `FxVolSurfaceBuilder`, `get_fx_delta_vol`, delta/strike conversion (private, re-exported flat) |
+| [`implied.rs`](implied.rs) | `implied_vol_black`, `implied_vol_bachelier` (private, re-exported flat) |
+| [`convert.rs`](convert.rs) | `VolatilityConvention` and `convert_atm_volatility` (private, re-exported flat) |
+| [`dupire.rs`](dupire.rs) | Crate-private Dupire kernel shared by `local_vol` and the arbitrage density check |
+| [`sabr/`](sabr/) | `volatility::sabr::{SabrParameters, SabrCalibrator, SabrShift, SabrSmile, ...}`; children private |
+| [`arbitrage/`](arbitrage/) | `volatility::arbitrage::{check_surface, ButterflyCheck, ArbitrageReport, ...}`; children private |
+| [`heston.rs`](heston.rs), [`rough_heston.rs`](rough_heston.rs), [`local_vol.rs`](local_vol.rs), [`svi.rs`](svi.rs), [`variance_replication.rs`](variance_replication.rs) | Public submodules: stochastic/local volatility engines, fitting and variance replication |
 
-`norm_cdf` and `norm_pdf` are re-exported from `finstack_quant_core::math` for
-caller convenience; they are not defined here.
+Every item has exactly one public path: items of a private child are reached
+through `volatility::`, items of a public submodule only through that submodule
+(SABR is `volatility::sabr::SabrParameters`, never `volatility::SabrParameters`).
+`norm_cdf` / `norm_pdf` live in `finstack_quant_core::math`.
 
-## Black-Scholes helpers (`black.rs`)
+## Black-Scholes helpers (`closed_form::d1_d2*`, in [`closed_form/black.rs`](../closed_form/black.rs))
 
-All four functions are `#[inline]` — they sit inside Greeks and calibration
+Both functions are `#[inline]` — they sit inside Greeks and calibration
 loops.
 
 | Function | Formula | Argument order |
@@ -50,7 +54,7 @@ loops.
 
 Note the `d1_d2` argument order: rate, then **volatility**, then time, then
 dividend yield. `d1_d2` / `d1_d2_black76` return both terms from one `ln` and
-one `sqrt`; `d1` / `d1_black76` return the first term alone.
+one `sqrt`.
 
 Degenerate inputs (`t <= 0` or `σ <= 0`) return the limiting values:
 
@@ -62,7 +66,7 @@ Degenerate inputs (`t <= 0` or `σ <= 0`) return the limiting values:
 
 References: Black & Scholes (1973); Black (1976).
 
-## Bachelier / normal model (`normal.rs`)
+## Bachelier / normal model (`closed_form::bachelier_price_with_annuity`, in [`closed_form/bachelier.rs`](../closed_form/bachelier.rs))
 
 Arithmetic Brownian motion on the underlying, so negative forwards and strikes
 are admissible. This is the quoting convention for EUR/JPY/CHF swaptions and
@@ -103,16 +107,16 @@ dσ = ν σ dW₂
 
 ### Vol quoting convention — read this first
 
-`SABRModel::implied_volatility` returns a **normal (Bachelier)** volatility in
+`SabrParameters::implied_vol` returns a **normal (Bachelier)** volatility in
 absolute rate units when β is within `BETA_SNAP_TOL = 1e-4` of 0, and a
 **lognormal (Black)** volatility otherwise. Storing one in a surface that
-expects the other is a silent unit error. `SABRParameters::quote_convention()`
+expects the other is a silent unit error. `SabrParameters::quote_convention()`
 returns the `VolatilityConvention::{Normal, Lognormal, ShiftedLognormal}` tag
-of the vols `implied_volatility(forward, strike, t)` produces. The same rule
+of the vols `implied_vol(forward, strike, t)` produces. The same rule
 binds calibration: pass normal quotes when calibrating with β ≈ 0 and
 lognormal quotes otherwise.
 
-### `SABRParameters`
+### `SabrParameters` (construction, [`sabr/parameters.rs`](sabr/parameters.rs))
 
 | Constructor | β | Notes |
 |-------------|---|-------|
@@ -125,7 +129,7 @@ lognormal quotes otherwise.
 
 Accessors: `shift()`, `is_shifted()`, `validate()`.
 
-### `SABRModel`
+### `SabrParameters` (Hagan expansion, [`sabr/expansion.rs`](sabr/expansion.rs))
 
 Hagan et al. (2002) expansion **with the Obloj (2008) correction applied** to
 the z/χ(z) ratio: geometric-mean moneyness replaces the difference-of-powers
@@ -140,11 +144,12 @@ Residual accuracy limits after the correction:
 β is snapped to exactly 0 or 1 within `BETA_SNAP_TOL` so the dedicated normal
 and lognormal branches engage and `powf` with a near-zero exponent is avoided.
 Near ATM the χ(z) ratio blends between a Taylor series and the exact form via a
-Hermite smoothstep, which keeps Greeks continuous. `implied_volatility`
+Hermite smoothstep, which keeps Greeks continuous. `implied_vol`
 validates inputs up front (positive expiry, positive effective forward and
-strike after any shift) and returns `Result<f64>`.
+strike after any shift) and returns `Result<f64>`. `implied_vol_lognormal` and
+`implied_vol_normal` evaluate one convention explicitly.
 
-### `SABRCalibrator`
+### `SabrCalibrator`
 
 Levenberg-Marquardt on normalized vega-weighted squared relative quote errors over
 (α, ν, ρ), with β fixed by the caller.
@@ -166,9 +171,9 @@ quote, independently of numerical solver convergence. The outcome reports signed
 errors in the original quote units and the maximum relative quote error. A fit
 outside this budget fails, including stalled and iteration-limited solves.
 
-### `SABRSmile`
+### `SabrSmile`
 
-`SABRSmile::new(model, forward, time_to_expiry)`.
+`SabrSmile::new(params, forward, time_to_expiry)`.
 
 | Method | Notes |
 |--------|-------|
@@ -192,13 +197,13 @@ forward-based call prices; carry is already in the smile's forward.
 
 | Model | Home |
 |-------|------|
-| Heston parameters, characteristic function, and calibration | `models::volatility::heston` |
-| Heston Fourier *pricing* | [`models::closed_form::heston`](../closed_form/heston/) |
+| Heston parameters and characteristic function | `models::volatility::heston` |
+| Heston Fourier *pricing* | [`models::closed_form::heston_price`](../closed_form/heston/) |
 | Dupire local volatility (`LocalVolSurface::from_implied_vol(surface, forwards)`, one forward per expiry) | `models::volatility::local_vol` |
 | SVI surface | `models::volatility::svi` |
 | Rough Heston | `models::volatility::rough_heston` |
 | SABR parameters, smile, and calibration | `models::volatility::sabr` |
-| Black-76 / Bachelier pricing and vega | `models::closed_form::volatility` |
+| Black-76 / Bachelier pricing, vega and `d1`/`d2` | `models::closed_form` |
 | Normal↔lognormal conversion and implied-volatility inversion | `models::volatility` |
 
 ## Model selection
@@ -208,15 +213,17 @@ forward-based call prices; carry is already in the smile's forward.
 | Black-Scholes / Black-76 | Closed form, exact Greeks | No smile | Vanillas, quick marks |
 | Bachelier | Handles negative rates natively | No smile | Negative-rate swaptions and caps |
 | SABR | Market-standard smile fit, fast to evaluate | Expansion degrades past ~10Y and for ν > 1 | Rates and FX smile interpolation |
-| Heston (core + `closed_form::heston`) | Rich smile dynamics, semi-analytical | Five parameters to calibrate | Equity exotics, surface fitting |
+| Heston (core + `closed_form::heston_price`) | Rich smile dynamics, semi-analytical | Five parameters to calibrate | Equity exotics, surface fitting |
 | Local volatility (core) | Exact fit to the market surface | Unrealistic forward smile dynamics | Barrier pricing, local hedging |
 
 ## Example
 
 ```rust
 use finstack_quant_models::types::OptionType;
-use finstack_quant_models::volatility::{d1_d2, d1_d2_black76, norm_cdf, SABRCalibrator, SABRModel, SABRParameters, SABRSmile, VolatilityConvention};
-use finstack_quant_models::closed_form::bachelier_price_with_annuity;
+use finstack_quant_core::math::norm_cdf;
+use finstack_quant_models::closed_form::{bachelier_price_with_annuity, d1_d2, d1_d2_black76};
+use finstack_quant_models::volatility::sabr::{SabrCalibrator, SabrParameters, SabrSmile};
+use finstack_quant_models::volatility::VolatilityConvention;
 
 // Black-Scholes delta: note the (spot, strike, r, sigma, t, q) order.
 let (d1, _d2) = d1_d2(100.0, 105.0, 0.05, 0.20, 0.5, 0.02);
@@ -230,18 +237,17 @@ let receiver = bachelier_price_with_annuity(OptionType::Put, -0.002, -0.003, 0.0
 assert!(receiver >= 0.0);
 
 // SABR: build a rates smile at beta = 0.5 and read one vol off it.
-let params = SABRParameters::rates_standard(0.02, 0.30, -0.10)?;
+let params = SabrParameters::rates_standard(0.02, 0.30, -0.10)?;
 assert_eq!(params.quote_convention(), VolatilityConvention::Lognormal); // beta = 0.5
-let model = SABRModel::new(params);
-let vol = model.implied_volatility(0.03, 0.035, 1.0)?;
+let vol = params.implied_vol(0.03, 0.035, 1.0)?;
 
 // Calibrate to a market smile, then check the fit for butterfly arbitrage.
 let strikes = [0.01, 0.02, 0.03, 0.04, 0.05];
 let market_vols = [0.22, 0.20, 0.19, 0.195, 0.21];
-let fitted = SABRCalibrator::high_precision()
+let fitted = SabrCalibrator::high_precision()
     .calibrate(0.03, &strikes, &market_vols, 1.0, 0.5)?;
 
-let smile = SABRSmile::new(SABRModel::new(fitted), 0.03, 1.0);
+let smile = SabrSmile::new(fitted, 0.03, 1.0);
 let vols = smile.generate_smile(&strikes)?;
 let report = smile.validate_no_arbitrage(&strikes, 0.03)?;
 if !report.is_arbitrage_free() {
@@ -258,60 +264,54 @@ if !report.is_arbitrage_free() {
 - Time is a year fraction; the day-count basis is the caller's choice.
 - Everything here is `f64` analytics, not `Money` — see
   [INVARIANTS.md](../../../../../INVARIANTS.md) §1.
-- `SABRParameters`, `SABRMarketData`, `ArbitrageValidationResult`,
-  `ButterflyViolation`, and `MonotonicityViolation` all derive
-  `Serialize`/`Deserialize`/`JsonSchema`, but only `SABRParameters` sets
-  `deny_unknown_fields` (serde and schemars both). The three violation/result
-  types are output views, where leniency is acceptable; `SABRMarketData` is a
-  calibration **input** struct and its openness is a gap against the object
-  strictness rule in
-  [docs/SERDE_STABILITY.md](../../../../../docs/SERDE_STABILITY.md).
-  `SABRModel`, `SABRCalibrator`, and `SABRSmile` are runtime types with no
-  serde.
+- `SabrParameters`, `ArbitrageValidationResult`, `ButterflyViolation`, and
+  `MonotonicityViolation` derive `Serialize`/`Deserialize`/`JsonSchema` and
+  set serde `deny_unknown_fields` (`SabrParameters` also sets it for
+  schemars), per [docs/SERDE_STABILITY.md](../../../../../docs/SERDE_STABILITY.md).
+  `SabrCalibrator` and `SabrSmile` are runtime types with no serde.
 - Fallible constructors return `finstack_quant_core::Result<Self>` with
   `Error::Validation` messages that quote the offending value.
 
 ## Binding exposure
 
-SABR is the only part of this module reachable from the host languages, and the
-class names use the lower-cased acronym on both sides:
+The SABR classes keep their Rust names on both hosts:
 
-**Python** — `finstack_quant.valuations`: `SabrParameters`, `SabrModel`,
+**Python** — `finstack_quant.models.volatility`: `SabrParameters`,
 `SabrSmile`, `SabrCalibrator`. `SabrCalibrator` exposes `calibrate`, taking
 `(forward, strikes, market_vols, t, beta)` with `beta` required, plus
 `high_precision()`, `with_tolerance()`, `with_shift(None | float | "auto")`
 and `with_atm_pinning(bool)`.
 
-**WASM** — `valuations` namespace: `SabrParameters`, `SabrModel`, `SabrSmile`,
+**WASM** — `models.volatility` namespace: `SabrParameters`, `SabrSmile`,
 `SabrCalibrator`.
 
-`black.rs` and `normal.rs` are not bound directly; they surface through the
+The `d1`/`d2` helpers and `bachelier_price_with_annuity` (now in `closed_form`) are not bound directly; they surface through the
 instrument pricers and through `valuations.bs_price` / `bsPrice`.
 
 ## Verification
 
 ```bash
-# Unit tests for this module (never `cargo test` — it would run doc tests).
-cargo nextest run -p finstack-quant-valuations --lib -E 'test(/models::volatility/)'
+# Tests matching this module (never `cargo test` directly).
+mise run rust-test-filter -- finstack-quant-models volatility
 
 # One area at a time.
-cargo nextest run -p finstack-quant-valuations --lib -E 'test(/volatility::sabr/)'
+mise run rust-test-filter -- finstack-quant-models volatility::sabr
 
 mise run rust-test
 mise run rust-lint
 
-# Criterion: the `sabr_slice` bench drives `SABRCalibrator` through the
+# Criterion: the `sabr_slice` bench drives `SabrCalibrator` through the
 # calibration API (`sabr_slice_calibration`).
 mise run rust-bench
 ```
 
-Every test in this module is a SABR test: [`sabr/tests.rs`](sabr/tests.rs) plus
-`#[cfg(test)]` blocks in [`sabr/parameters.rs`](sabr/parameters.rs). They cover parameter validation,
+The SABR tests are [`sabr/tests.rs`](sabr/tests.rs) plus `#[cfg(test)]`
+blocks in [`sabr/parameters.rs`](sabr/parameters.rs). They cover parameter validation,
 SABR ATM vol recovery, smile monotonicity, calibration round-trips, shifted
 SABR on negative rates, arbitrage detection and repair, χ(z) series/exact
 blending continuity, extreme ρ, the β ∈ {0, 0.5, 1} branches.
 
-`black.rs` and `normal.rs` carry **no tests of their own** — no `d₁`/`d₂`
+The `d1`/`d2` helpers and `bachelier_price_with_annuity` carry **no direct tests** — no `d₁`/`d₂`
 textbook check, no `t = 0` / `σ = 0` / ATM limit, no Bachelier reference value.
 They are exercised only indirectly, through the closed-form and instrument
 pricers that call them. Filling that gap is the first thing to do when
@@ -324,7 +324,7 @@ touching either file.
 2. Parameters struct deriving `Serialize, Deserialize, schemars::JsonSchema`,
    validated in a fallible `new()` returning
    `finstack_quant_core::Result<Self>`.
-3. Model struct exposing `implied_volatility()` and/or `price_*()`. Mark hot
+3. Model struct exposing `implied_vol()` and/or `price_*()`. Mark hot
    entry points `#[inline]` and `#[must_use]`.
 4. If the model's vol output convention is β- or regime-dependent, expose a tag
    type the way `SabrParameters::quote_convention` does — an untagged vol is a unit bug waiting to

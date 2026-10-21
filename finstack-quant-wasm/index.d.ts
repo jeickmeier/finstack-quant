@@ -6696,7 +6696,7 @@ export interface CreditIndexDataConstructor {
  *   [90, 100, 110],
  *   [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
  * );
- * models.volatility.getSurfaceVol(surface.toJson(), 0.75, 100); // 0.205
+ * models.volatility.getSurfaceVol(surface, 0.75, 100); // 0.205
  * surface.gridShape; // [2, 3]
  * ```
  */
@@ -6795,7 +6795,7 @@ export interface VolSurfaceOptions {
  *   [90, 100, 110],
  *   [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
  * );
- * models.volatility.getSurfaceVol(surface.toJson(), 0.75, 100); // 0.205
+ * models.volatility.getSurfaceVol(surface, 0.75, 100); // 0.205
  * surface.gridShape; // [2, 3]
  * ```
  */
@@ -6833,7 +6833,7 @@ export interface VolSurfaceConstructor {
  * Volatility grid at one fixed option expiry, indexed by underlying tenor and strike.
  *
  * The fixed-expiry slice of a SABR cube: `models.volatility.materializeCubeExpirySlice`
- * returns its wire object, and `fromJson` turns that object into a handle.
+ * returns this handle, and `fromJson` loads one from its canonical JSON.
  * Shifted-Black quotes carry one displacement per tenor, in strike units.
  *
  * @example
@@ -6897,7 +6897,7 @@ export interface VolCubeExpirySlice extends WasmOwned {
  * Volatility grid at one fixed option expiry, indexed by underlying tenor and strike.
  *
  * The fixed-expiry slice of a SABR cube: `models.volatility.materializeCubeExpirySlice`
- * returns its wire object, and `fromJson` turns that object into a handle.
+ * returns this handle, and `fromJson` loads one from its canonical JSON.
  * Shifted-Black quotes carry one displacement per tenor, in strike units.
  *
  * @example
@@ -6943,7 +6943,7 @@ export interface VolCubeExpirySliceConstructor {
    * Deserialize from the canonical JSON wire form shared with Python
    * `VolCubeExpirySlice.to_json`.
    *
-   * @param json - Canonical VolCubeExpirySlice JSON text or plain object, such as a `materializeCubeExpirySlice` result; unknown fields are rejected and the grid is re-validated.
+   * @param json - Canonical VolCubeExpirySlice JSON text or plain object, such as `toJson()` output; unknown fields are rejected and the grid is re-validated.
    * @returns The validated `VolCubeExpirySlice`.
    * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it does not match the schema or fails grid validation.
    */
@@ -9265,9 +9265,9 @@ declare class CreditFactorModel {
   private constructor();
   /**
    * Deserialize and validate a `CreditFactorModel` from JSON.
-   * @returns A calibrated `CreditFactorModel` handle.
-   * @param json - JSON-serialized CreditFactorModel to deserialize.
-   * @throws Error - Throws a `validation` error if the JSON is malformed or fails validation.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
    */
   static fromJson(json: JsonInput): CreditFactorModel;
   /**
@@ -9277,8 +9277,8 @@ declare class CreditFactorModel {
   readonly schema: string;
   /**
    * Serialize to compact canonical JSON.
-   * @returns Canonical JSON string.
-   * @throws Error - Throws a JavaScript exception if the model cannot be serialized to JSON.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -9391,9 +9391,9 @@ declare class LevelsAtDate {
   private constructor();
   /**
    * Deserialize a hierarchy-level snapshot from canonical JSON.
-   * @param json - Canonical `LevelsAtDate` JSON containing `date`, `generic`, `by_level`, and `adder` fields.
-   * @returns A validated `LevelsAtDate` handle.
-   * @throws Error - Throws when the JSON is malformed or a numeric field is non-finite.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
    */
   static fromJson(json: JsonInput): LevelsAtDate;
   /**
@@ -9423,8 +9423,8 @@ declare class LevelsAtDate {
   adder(): Record<string, number>;
   /**
    * Serialize the snapshot to compact canonical JSON.
-   * @returns Canonical JSON string.
-   * @throws Error - Throws if any numeric output field is non-finite (NaN/Inf), naming the offending field instead of silently serializing `null`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -9442,9 +9442,9 @@ declare class PeriodDecomposition {
   private constructor();
   /**
    * Deserialize a period decomposition from canonical JSON.
-   * @param json - Canonical `PeriodDecomposition` JSON containing `from`, `to`, `d_generic`, `by_level`, and `d_adder` fields.
-   * @returns A validated `PeriodDecomposition` handle.
-   * @throws Error - Throws when the JSON is malformed or a numeric field is non-finite.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
    */
   static fromJson(json: JsonInput): PeriodDecomposition;
   /**
@@ -9478,8 +9478,8 @@ declare class PeriodDecomposition {
   dAdder(): Record<string, number>;
   /**
    * Serialize the decomposition to compact canonical JSON.
-   * @returns Canonical JSON string.
-   * @throws Error - Throws if any numeric output field is non-finite (NaN/Inf), naming the offending field instead of silently serializing `null`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -9739,27 +9739,6 @@ export interface FactorRiskNamespace {
     covariance: NumericArray[],
     confidence?: number | null,
     computeIncremental?: boolean | null
-  ): PositionRiskDecomposition;
-  /**
-   * Decompose portfolio Expected Shortfall into position contributions via
-   * parametric Euler allocation.
-   *
-   * Returns the canonical `PositionRiskDecomposition` (the object Python's
-   * `parametric_es_decomposition` returns): portfolio VaR/ES (losses
-   * negative), `method`, and per-position `var_contributions` and
-   * `es_contributions` rows.
-   * @returns The canonical `PositionRiskDecomposition` with VaR and ES contributions.
-   * @param positionIds - Position identifiers, one per weight.
-   * @param weights - Position weights or exposures in portfolio currency.
-   * @param covariance - Square position-return covariance matrix as nested rows (`n x n`, row-major).
-   * @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` defaults to 0.95.
-   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if identifier, weight, or covariance dimensions disagree; the covariance matrix is not finite, symmetric, and positive semidefinite; or `confidence` is not finite and in `(0.5, 1)`.
-   */
-  parametricEsDecomposition(
-    positionIds: string[],
-    weights: NumericArray,
-    covariance: NumericArray[],
-    confidence?: number | null
   ): PositionRiskDecomposition;
   /**
    * Decompose portfolio VaR and Expected Shortfall from per-position scenario
@@ -10284,7 +10263,7 @@ export interface CopulaSpec extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
 }
@@ -10402,7 +10381,7 @@ export interface RecoverySpec extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
 }
@@ -10530,7 +10509,7 @@ export interface PortfolioLossResult extends WasmOwned {
   /**
    * Serialize to the canonical JSON wire format.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
 }
@@ -11079,48 +11058,27 @@ export interface CorrelationNamespace {
  */
 export interface EuropeanPricer extends WasmOwned {
   /**
-   * Price a European call under GBM.
+   * Price a European option under GBM.
    * @param spot - Spot level at time 0.
    * @param strike - Exercise price in the same units as `spot`.
    * @param rate - Continuously compounded risk-free rate (decimal, annualized).
    * @param divYield - Continuous dividend yield (decimal, annualized).
    * @param vol - Annualized GBM volatility (decimal).
    * @param expiry - Time to expiry in years.
+   * @param isCall - Whether to value a call (`true`) or put (`false`).
    * @param numSteps - Optional time-grid steps; omitted uses the registry default.
    * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
    * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
    * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
    */
-  priceCall(
+  priceGbm(
     spot: number,
     strike: number,
     rate: number,
     divYield: number,
     vol: number,
     expiry: number,
-    numSteps?: number,
-    currency?: string
-  ): MoneyEstimate;
-  /**
-   * Price a European put under GBM.
-   * @param spot - Spot level at time 0.
-   * @param strike - Exercise price in the same units as `spot`.
-   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
-   * @param divYield - Continuous dividend yield (decimal, annualized).
-   * @param vol - Annualized GBM volatility (decimal).
-   * @param expiry - Time to expiry in years.
-   * @param numSteps - Optional time-grid steps; omitted uses the registry default.
-   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
-   * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-   * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
-   */
-  pricePut(
-    spot: number,
-    strike: number,
-    rate: number,
-    divYield: number,
-    vol: number,
-    expiry: number,
+    isCall: boolean,
     numSteps?: number,
     currency?: string
   ): MoneyEstimate;
@@ -11145,7 +11103,7 @@ export interface EuropeanPricer extends WasmOwned {
  * import init, { models } from "finstack-quant-wasm";
  * await init();
  * const pricer = new models.monteCarlo.EuropeanPricer(10000, 42);
- * const call = pricer.priceCall(100, 100, 0.05, 0.0, 0.2, 1.0);
+ * const call = pricer.priceGbm(100, 100, 0.05, 0.0, 0.2, 1.0, true);
  * console.log(call.mean.amount, call.stderr);
  * pricer.free();
  * ```
@@ -11434,20 +11392,20 @@ export interface PathDependentPricerConstructor {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const est = models.monteCarlo.priceHestonCall(
- *   100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, 5000, 42n,
+ * const est = models.monteCarlo.priceHeston(
+ *   100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, true, 5000, 42n,
  * );
  * console.log(est.mean.amount, est.mean.currency);
  * // Path count and seed default to the Rust registry values.
- * const byDefault = models.monteCarlo.priceHestonCall(
- *   100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0,
+ * const byDefault = models.monteCarlo.priceHeston(
+ *   100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, false,
  * );
  * console.log(byDefault.num_paths); // 100000
  * ```
  */
 export interface MonteCarloNamespace {
   /**
-   * Price a European call under Heston stochastic volatility.
+   * Price a European option under Heston stochastic volatility.
    * @param spot - Current spot price or exchange rate in the same units as the strike.
    * @param strike - Option strike price in the same price units as the underlying.
    * @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
@@ -11458,6 +11416,7 @@ export interface MonteCarloNamespace {
    * @param rho - Instantaneous correlation between the asset and variance shocks.
    * @param v0 - Initial instantaneous variance in the Heston stochastic-volatility model.
    * @param expiry - Time to option expiry in years on the model's annual time basis.
+   * @param isCall - Whether to value a call (`true`) or put (`false`).
    * @param numPaths - Integer number of independent path estimators in [2, 10000000]; each antithetic pair counts once. Omitted or `null` uses the Rust registry European-pricer default (100 000).
    * @param seed - Deterministic random-number seed (number or BigInt); omitted or `null` uses the Rust registry default seed, so results stay reproducible.
    * @param numSteps - Optional positive integer number of time steps per simulated path; omitted uses the Rust registry default.
@@ -11465,7 +11424,7 @@ export interface MonteCarloNamespace {
    * @returns The Rust `MoneyEstimate` serde object: `mean` and `ci_95` as `{amount, currency}` money, plus `stderr`, `num_paths`, `num_simulated_paths` and the optional statistics (`null` when not captured).
    * @throws Error - Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite; `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive; `rho` is outside `[-1, 1]`; a count is fractional or exceeds the wasm32 integer range; the expiry, step count, path count, or computed discount factor fails validation; a simulated discounted payoff is non-finite; or the result cannot be serialized.
    */
-  priceHestonCall(
+  priceHeston(
     spot: number,
     strike: number,
     rate: number,
@@ -11476,41 +11435,7 @@ export interface MonteCarloNamespace {
     rho: number,
     v0: number,
     expiry: number,
-    numPaths?: number | null,
-    seed?: bigint | number | null,
-    numSteps?: number | null,
-    currency?: string | null
-  ): MoneyEstimate;
-  /**
-   * Price a European put under Heston stochastic volatility.
-   * @param spot - Current spot price or exchange rate in the same units as the strike.
-   * @param strike - Option strike price in the same price units as the underlying.
-   * @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
-   * @param divYield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
-   * @param kappa - Mean-reversion speed of variance in the Heston stochastic-volatility model.
-   * @param theta - Long-run variance level in the Heston stochastic-volatility model.
-   * @param volOfVol - Annualized volatility of variance in the Heston stochastic-volatility model.
-   * @param rho - Instantaneous correlation between the asset and variance shocks.
-   * @param v0 - Initial instantaneous variance in the Heston stochastic-volatility model.
-   * @param expiry - Time to option expiry in years on the model's annual time basis.
-   * @param numPaths - Integer number of independent path estimators in [2, 10000000]; each antithetic pair counts once. Omitted or `null` uses the Rust registry European-pricer default (100 000).
-   * @param seed - Deterministic random-number seed (number or BigInt); omitted or `null` uses the Rust registry default seed, so results stay reproducible.
-   * @param numSteps - Optional positive integer number of time steps per simulated path; omitted uses the Rust registry default.
-   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the Rust registry default currency.
-   * @returns The Rust `MoneyEstimate` serde object: `mean` and `ci_95` as `{amount, currency}` money, plus `stderr`, `num_paths`, `num_simulated_paths` and the optional statistics (`null` when not captured).
-   * @throws Error - Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite; `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive; `rho` is outside `[-1, 1]`; a count is fractional or exceeds the wasm32 integer range; the expiry, step count, path count, or computed discount factor fails validation; a simulated discounted payoff is non-finite; or the result cannot be serialized.
-   */
-  priceHestonPut(
-    spot: number,
-    strike: number,
-    rate: number,
-    divYield: number,
-    kappa: number,
-    theta: number,
-    volOfVol: number,
-    rho: number,
-    v0: number,
-    expiry: number,
+    isCall: boolean,
     numPaths?: number | null,
     seed?: bigint | number | null,
     numSteps?: number | null,
@@ -24725,7 +24650,7 @@ export interface SabrParameters extends WasmOwned {
   /**
    * Serialize to the Rust `SabrParameters` JSON wire form.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
 }
@@ -24897,7 +24822,7 @@ export interface SabrSmile extends WasmOwned {
   /**
    * Time to expiry of the smile, in years.
    */
-  readonly t: number;
+  readonly timeToExpiry: number;
 }
 
 /**
@@ -24970,7 +24895,7 @@ export interface SabrCalibrator extends WasmOwned {
    * preserving all other settings.
    * @returns A `SabrCalibrator` handle.
    * @param shift - `null`/`undefined` fits the quotes as-is; a number is a fixed additive shift in the forward's units (decimal rate or price); `"auto"` picks the smallest standardized shift (1-4%) that leaves 10bp of headroom above the most negative forward or strike, or none when every input is non-negative. The shift used is stored on the fitted `SabrParameters`.
-   * @throws Error - Throws a `FinstackError` (`kind: "validation"`) for a string other than `"auto"` (parsed by the Rust `SabrShift`), and a `TypeError` (`kind: "invalid_type"`) for any other non-null, non-number value such as a boolean.
+   * @throws Error - Throws a `FinstackError` (`kind: "validation"`) for a boolean, a string other than `"auto"` or any other shape the Rust `SabrShift` wire form rejects, and a `TypeError` (`kind: "invalid_type"`) for a non-finite number or a value JSON cannot represent.
    */
   withShift(shift: number | 'auto' | null | undefined): SabrCalibrator;
   /**
@@ -25035,7 +24960,7 @@ export interface AssetDynamics extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
 }
@@ -25115,7 +25040,7 @@ export interface BetaRecovery extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -25154,7 +25079,7 @@ export interface BetaRecovery extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const recovery = new models.credit.BetaRecovery(0.4, 0.2);
+ * const recovery = new models.credit.lgd.BetaRecovery(0.4, 0.2);
  * console.log(recovery.alpha, recovery.quantile(0.05), recovery.sampleSeeded(3, 42));
  * recovery.free();
  * ```
@@ -25199,7 +25124,7 @@ export interface DownturnLgd extends WasmOwned {
   /**
    * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails.
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -25218,7 +25143,7 @@ export interface DownturnLgd extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const downturn = models.credit.DownturnLgd.regulatoryFloor(0.08, 0.1);
+ * const downturn = models.credit.lgd.DownturnLgd.regulatoryFloor(0.08, 0.1);
  * console.log(downturn.method, downturn.adjust(0.35));
  * downturn.free();
  * ```
@@ -25242,9 +25167,9 @@ export interface DownturnLgdConstructor {
   baselUnsecured(): DownturnLgd;
   /**
    * Load a downturn adjustment from canonical JSON and validate its parameters.
-   * @param json - `DownturnLgd` JSON text or plain object; unknown fields are rejected.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
    * @returns The validated handle.
-   * @throws Error - Throws a `validation` error if the payload is malformed or its parameters are out of range.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
    */
   fromJson(json: JsonInput): DownturnLgd;
   /**
@@ -25288,7 +25213,7 @@ export interface DynamicRecoverySpec extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -25404,7 +25329,7 @@ export interface EadCalculator extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -25427,7 +25352,7 @@ export interface EadCalculator extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const ead = new models.credit.EadCalculator(600, 400, 0.75);
+ * const ead = new models.credit.lgd.EadCalculator(600, 400, 0.75);
  * console.log(ead.ead, ead.utilization, ead.totalCommitment);
  * ead.free();
  * ```
@@ -25497,7 +25422,7 @@ export interface EndogenousHazardSpec extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -25598,7 +25523,7 @@ export interface GeneratorMatrix extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -25631,13 +25556,13 @@ export interface GeneratorMatrix extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
- * const generator = new models.credit.GeneratorMatrix(scale, [
+ * const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+ * const generator = new models.credit.migration.GeneratorMatrix(scale, [
  *   [-0.1, 0.08, 0.02],
  *   [0.1, -0.2, 0.1],
  *   [0, 0, 0],
  * ]);
- * console.log(generator.exitRate("A"), models.credit.project(generator, 2).probability("A", "D"));
+ * console.log(generator.exitRate("A"), models.credit.migration.project(generator, 2).probability("A", "D"));
  * ```
  */
 export interface GeneratorMatrixConstructor {
@@ -25668,18 +25593,11 @@ export interface GeneratorMatrixConstructor {
    * Estimate the generator of a transition matrix by matrix logarithm with
    * regularization (Israel-Rosenthal-Wei).
    * @param p - `TransitionMatrix` whose generator to extract.
+   * @param roundTripTol - Optional largest accepted absolute difference between `exp(Q * horizon)` and `p`; omitted or `null` uses the default `1e-2`.
    * @returns The regularized generator; `roundTripError` reports the fit.
-   * @throws Error - Throws a `computation` error if no valid generator exists or the round trip exceeds the default tolerance.
+   * @throws Error - Throws a `computation` error if no valid generator exists or the round trip exceeds the tolerance, and a `TypeError` if `roundTripTol` is not a number.
    */
-  fromTransitionMatrix(p: TransitionMatrix): GeneratorMatrix;
-  /**
-   * Estimate the generator of a transition matrix with an explicit round-trip tolerance.
-   * @param p - `TransitionMatrix` whose generator to extract.
-   * @param roundTripTol - Largest accepted absolute difference between `exp(Q * horizon)` and `p`.
-   * @returns The regularized generator.
-   * @throws Error - Throws a `computation` error if no valid generator exists or the round trip exceeds `roundTripTol`.
-   */
-  fromTransitionMatrixWithTol(p: TransitionMatrix, roundTripTol: number): GeneratorMatrix;
+  fromTransitionMatrix(p: TransitionMatrix, roundTripTol?: number | null): GeneratorMatrix;
 }
 
 /**
@@ -25702,7 +25620,7 @@ export interface MasterScale extends WasmOwned {
   mapPds(pds: NumericArray): generated.models.MasterScaleResult[];
   /**
    * Map a credit-scoring result to a grade through its implied PD.
-   * @param result - `ScoringResult` object or JSON, as returned by the `models.credit` scoring functions.
+   * @param result - `ScoringResult` object or JSON, as returned by the `models.credit.scoring` functions.
    * @returns The `MasterScaleResult` object for the score's implied PD.
    * @throws Error - Throws a `validation` error if the result is malformed, has no implied PD, or its PD is non-finite.
    */
@@ -25711,7 +25629,7 @@ export interface MasterScale extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -25730,7 +25648,7 @@ export interface MasterScale extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const scale = new models.credit.MasterScale([
+ * const scale = new models.credit.pd.MasterScale([
  *   { label: "A", upper_pd: 0.01, central_pd: 0.005 },
  *   { label: "B", upper_pd: 0.1, central_pd: 0.04 },
  *   { label: "C", upper_pd: 1.0, central_pd: 0.3 },
@@ -25792,7 +25710,7 @@ export interface MertonBarrierType extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
 }
@@ -25950,7 +25868,7 @@ export interface MertonModel extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26174,7 +26092,7 @@ export interface MigrationSimulator extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26193,9 +26111,9 @@ export interface MigrationSimulator extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
- * const generator = new models.credit.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
- * const simulator = new models.credit.MigrationSimulator(generator, 5);
+ * const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+ * const generator = new models.credit.migration.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
+ * const simulator = new models.credit.migration.MigrationSimulator(generator, 5);
  * console.log(simulator.simulate(0, 100, 7).defaultRate);
  * console.log(simulator.empiricalMatrix(200, 7).probability("A", "D"));
  * ```
@@ -26241,7 +26159,7 @@ export interface RatingFactorTable extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26337,7 +26255,7 @@ export interface RatingPath extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26362,10 +26280,10 @@ export interface RatingPath extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
- * const generator = new models.credit.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
- * const path = new models.credit.MigrationSimulator(generator, 5).simulate(0, 1, 7).paths[0];
- * const copy = models.credit.RatingPath.fromJson(path.toJson());
+ * const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+ * const generator = new models.credit.migration.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
+ * const path = new models.credit.migration.MigrationSimulator(generator, 5).simulate(0, 1, 7).paths[0];
+ * const copy = models.credit.migration.RatingPath.fromJson(path.toJson());
  * console.log(copy.labelAt(5), copy.defaulted());
  * ```
  */
@@ -26395,7 +26313,7 @@ export interface RatingPaths extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26418,10 +26336,10 @@ export interface RatingPaths extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
- * const generator = new models.credit.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
- * const batch = new models.credit.MigrationSimulator(generator, 5).simulate(0, 100, 7);
- * const copy = models.credit.RatingPaths.fromJson(batch.toJson());
+ * const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+ * const generator = new models.credit.migration.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
+ * const batch = new models.credit.migration.MigrationSimulator(generator, 5).simulate(0, 100, 7);
+ * const copy = models.credit.migration.RatingPaths.fromJson(batch.toJson());
  * console.log(copy.length, copy.defaultRate);
  * ```
  */
@@ -26489,7 +26407,7 @@ export interface RatingScale extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26511,7 +26429,7 @@ export interface RatingScale extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
+ * const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
  * console.log(scale.nStates, scale.labels(), scale.defaultState());
  * scale.free();
  * ```
@@ -26591,7 +26509,7 @@ export interface SimulatedPaths extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26674,7 +26592,7 @@ export interface ToggleExerciseModel extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26796,7 +26714,7 @@ export interface TransitionMatrix extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26825,8 +26743,8 @@ export interface TransitionMatrix extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
- * const matrix = new models.credit.TransitionMatrix(
+ * const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+ * const matrix = new models.credit.migration.TransitionMatrix(
  *   scale,
  *   [[0.9, 0.08, 0.02], [0.1, 0.8, 0.1], [0, 0, 1]],
  *   1.0,
@@ -26869,7 +26787,7 @@ export interface WorkoutCosts extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26892,8 +26810,8 @@ export interface WorkoutCosts extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const costs = new models.credit.WorkoutCosts(0.05, 0.03);
- * console.log(costs.totalRate, models.credit.WorkoutCosts.zero().totalRate);
+ * const costs = new models.credit.lgd.WorkoutCosts(0.05, 0.03);
+ * console.log(costs.totalRate, models.credit.lgd.WorkoutCosts.zero().totalRate);
  * costs.free();
  * ```
  */
@@ -26956,7 +26874,7 @@ export interface WorkoutLgd extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -26983,11 +26901,11 @@ export interface WorkoutLgd extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const workout = models.credit.WorkoutLgd.builder()
+ * const workout = models.credit.lgd.WorkoutLgd.builder()
  *   .collateral({ collateral_type: "real_estate", book_value: 800000, haircut: 0.3 })
  *   .workoutYears(2)
  *   .discountRate(0.05)
- *   .costs(new models.credit.WorkoutCosts(0.05, 0.03))
+ *   .costs(new models.credit.lgd.WorkoutCosts(0.05, 0.03))
  *   .build();
  * console.log(workout.evaluate(1000000).lgd, workout.evaluate(1000000).recovery_rate);
  * workout.free();
@@ -27081,11 +26999,173 @@ export interface WorkoutLgdBuilderClass {
  * import init, { models } from "finstack-quant-wasm";
  * await init();
  * const model = new models.credit.MertonModel(100, 0.25, 60, 0.03);
- * console.log(model.defaultProbability(1), models.credit.pitToTtc(0.02, 0.15, -1.0));
+ * console.log(model.defaultProbability(1), models.credit.pd.pitToTtc(0.02, 0.15, -1.0));
  * model.free();
  * ```
  */
 export interface ModelCreditNamespace {
+  /**
+   * Asset-value dynamics: geometric Brownian, jump-diffusion or CreditGrades.
+   */
+  AssetDynamics: AssetDynamicsConstructor;
+  /**
+   * Notional-dependent recovery specification for PIK instruments.
+   */
+  DynamicRecoverySpec: DynamicRecoverySpecConstructor;
+  /**
+   * Leverage-dependent hazard-rate specification for PIK instruments.
+   */
+  EndogenousHazardSpec: EndogenousHazardSpecConstructor;
+  /**
+   * Loss given default and exposure at default (Rust `credit::lgd`).
+   */
+  lgd: CreditLgdNamespace;
+  /**
+   * Liability-management analytics (Rust `credit::liability_management`).
+   */
+  liabilityManagement: CreditLiabilityManagementNamespace;
+  /**
+   * Default-barrier monitoring rule: terminal or first-passage.
+   */
+  MertonBarrierType: MertonBarrierTypeConstructor;
+  /**
+   * Structural (Merton-family) credit model of one firm.
+   */
+  MertonModel: MertonModelConstructor;
+  /**
+   * Rating migration (Rust `credit::migration`).
+   */
+  migration: CreditMigrationNamespace;
+  /**
+   * Moody's WARF rating factor for one credit rating.
+   * @param rating - Rating label such as `"Baa3"`, `"BBB-"` or `"B2"`; agency notches are normalized by the Rust parser.
+   * @returns The Moody's weighted-average rating factor for that rating (for example 610 for Baa3).
+   * @throws Error - Throws a `TypeError` if `rating` is not a string, and a `validation` error if it is not a recognized rating or has no factor in the Moody's table.
+   */
+  moodysWarfFactor(rating: string): number;
+  /**
+   * PD calibration (Rust `credit::pd`).
+   */
+  pd: CreditPdNamespace;
+  /**
+   * Rating-to-factor table for WARF-style portfolio credit quality.
+   */
+  RatingFactorTable: RatingFactorTableConstructor;
+  /**
+   * Recovery waterfall (Rust `credit::recovery_waterfall`).
+   */
+  recoveryWaterfall: CreditRecoveryWaterfallNamespace;
+  /**
+   * Accounting-based credit scoring (Rust `credit::scoring`).
+   */
+  scoring: CreditScoringNamespace;
+  /**
+   * Monte Carlo asset-value paths returned by `MertonModel.simulatePaths`.
+   */
+  SimulatedPaths: SimulatedPathsConstructor;
+  /**
+   * PIK/cash toggle exercise rule.
+   */
+  ToggleExerciseModel: ToggleExerciseModelConstructor;
+}
+
+/**
+ * Loss given default and exposure at default: Beta recovery, workout LGD, downturn LGD and EAD.
+ * Mirrors Rust `credit::lgd`.
+ *
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const recovery = new models.credit.lgd.BetaRecovery(0.4, 0.2);
+ * console.log(recovery.quantile(0.95));
+ * recovery.free();
+ * ```
+ */
+export interface CreditLgdNamespace {
+  /**
+   * Beta-distributed recovery rate.
+   */
+  BetaRecovery: BetaRecoveryConstructor;
+  /**
+   * Net liquidation value of a collateral piece after its haircut.
+   *
+   * Twin of the Rust `CollateralPiece::liquidation_value` and the Python
+   * property `CollateralPiece.liquidation_value`.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const piece = { collateral_type: "real_estate" as const, book_value: 800_000, haircut: 0.25 };
+   * console.log(models.credit.lgd.collateralPieceLiquidationValue(piece)); // 600000
+   * ```
+   * @param piece - `CollateralPiece` object or JSON (`collateral_type`, `book_value`, `haircut`), as held by `WorkoutLgd.collateral`.
+   * @returns `book_value * (1 - haircut)`, in the book value's monetary units.
+   * @throws Error - Throws a `TypeError` if `piece` is neither a string nor a plain object, and a `validation` error if it is malformed, the book value is negative or non-finite, or the haircut is outside `[0, 1]`.
+   */
+  collateralPieceLiquidationValue(piece: generated.models.CollateralPiece | string): number;
+  /**
+   * Downturn LGD adjustment.
+   */
+  DownturnLgd: DownturnLgdConstructor;
+  /**
+   * Exposure-at-default calculator.
+   */
+  EadCalculator: EadCalculatorConstructor;
+  /**
+   * Historical Beta recovery distribution for a debt seniority class.
+   * @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
+   * @param ratingAgency - Agency whose calibration to use, such as `"moodys"` or `"sp"`; omitted uses the registry default.
+   * @returns The calibrated `BetaRecovery` handle.
+   * @throws Error - Throws a `validation` error if the seniority or agency is not recognized.
+   */
+  seniorityRecoveryStats(seniority: string, ratingAgency?: string): BetaRecovery;
+  /**
+   * Direct and indirect workout cost rates.
+   */
+  WorkoutCosts: WorkoutCostsConstructor;
+  /**
+   * Workout LGD model: collateral waterfall, costs and time value.
+   */
+  WorkoutLgd: WorkoutLgdConstructor;
+  /**
+   * One-call workout LGD from collateral tuples and cost assumptions.
+   * @param ead - Exposure at default in monetary units; positive.
+   * @param collateral - Array of `[collateralType, bookValue, haircut]` tuples, such as `[["real_estate", 800000, 0.3]]`.
+   * @param directCostPct - Direct workout costs as a fraction of EAD.
+   * @param indirectCostPct - Indirect workout costs as a fraction of EAD.
+   * @param timeToResolutionYears - Expected workout duration in years.
+   * @param discountRate - Annual discount rate over the workout period, as a decimal.
+   * @returns The `WorkoutLgdResult` object (`net_recovery`, `lgd`, `recovery_rate`).
+   * @throws Error - Throws a `validation` error if any input is out of range or a collateral type is not recognized.
+   */
+  workoutLgd(
+    ead: number,
+    collateral: readonly (readonly [string, number, number])[] | string,
+    directCostPct: number,
+    indirectCostPct: number,
+    timeToResolutionYears: number,
+    discountRate: number
+  ): generated.models.WorkoutLgdResult;
+  /**
+   * Fluent builder returned by `WorkoutLgd.builder()`.
+   */
+  WorkoutLgdBuilder: WorkoutLgdBuilderClass;
+}
+
+/**
+ * Liability-management analytics: exchange offers and LME transactions.
+ * Mirrors Rust `credit::liability_management`.
+ *
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const hurdle = models.credit.liabilityManagement.tenderRecommendationHurdle();
+ * console.log(hurdle); // 0.02
+ * ```
+ */
+export interface CreditLiabilityManagementNamespace {
   /**
    * Compare hold-versus-tender economics for a distressed exchange offer.
    * Tendering is recommended only when total consideration exceeds the
@@ -27123,53 +27203,46 @@ export interface ModelCreditNamespace {
     ebitda?: number | null
   ): LmeAnalysis;
   /**
-   * Asset-value dynamics: geometric Brownian, jump-diffusion or CreditGrades.
+   * Minimum NPV ratio at which a tender is recommended. Twin of the Rust and
+   * Python constant `TENDER_RECOMMENDATION_HURDLE`: a holder is advised to
+   * tender when the tender NPV is at least `old_npv` times this hurdle.
+   * @returns The dimensionless hurdle multiple.
    */
-  AssetDynamics: AssetDynamicsConstructor;
-  /**
-   * Beta-distributed recovery rate.
-   */
-  BetaRecovery: BetaRecoveryConstructor;
-  /**
-   * Downturn LGD adjustment.
-   */
-  DownturnLgd: DownturnLgdConstructor;
-  /**
-   * Notional-dependent recovery specification for PIK instruments.
-   */
-  DynamicRecoverySpec: DynamicRecoverySpecConstructor;
-  /**
-   * Exposure-at-default calculator.
-   */
-  EadCalculator: EadCalculatorConstructor;
-  /**
-   * Leverage-dependent hazard-rate specification for PIK instruments.
-   */
-  EndogenousHazardSpec: EndogenousHazardSpecConstructor;
+  tenderRecommendationHurdle(): number;
+}
+
+/**
+ * Rating scales, transition and generator matrices, and rating-migration simulation.
+ * Mirrors Rust `credit::migration`.
+ *
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+ * const generator = new models.credit.migration.GeneratorMatrix(scale, [
+ *   -0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0,
+ * ]);
+ * console.log(models.credit.migration.project(generator, 2).probability("A", "D"));
+ * ```
+ */
+export interface CreditMigrationNamespace {
   /**
    * Continuous-time Markov-chain generator matrix.
    */
   GeneratorMatrix: GeneratorMatrixConstructor;
   /**
-   * Rating master scale mapping PDs to grades.
-   */
-  MasterScale: MasterScaleConstructor;
-  /**
-   * Default-barrier monitoring rule: terminal or first-passage.
-   */
-  MertonBarrierType: MertonBarrierTypeConstructor;
-  /**
-   * Structural (Merton-family) credit model of one firm.
-   */
-  MertonModel: MertonModelConstructor;
-  /**
    * Gillespie simulator of rating migration.
    */
   MigrationSimulator: MigrationSimulatorConstructor;
   /**
-   * Rating-to-factor table for WARF-style portfolio credit quality.
+   * Transition matrix implied by a generator over a horizon, `exp(Q * t)`.
+   * @param generator - `GeneratorMatrix` handle to exponentiate.
+   * @param t - Horizon in years; positive and finite.
+   * @returns The projected `TransitionMatrix` with horizon `t`.
+   * @throws Error - Throws a `validation` error if `t` is not positive and finite, and a `computation` error if the matrix exponential fails.
    */
-  RatingFactorTable: RatingFactorTableConstructor;
+  project(generator: GeneratorMatrix, t: number): TransitionMatrix;
   /**
    * One simulated rating trajectory.
    */
@@ -27183,29 +27256,91 @@ export interface ModelCreditNamespace {
    */
   RatingScale: RatingScaleConstructor;
   /**
-   * Monte Carlo asset-value paths returned by `MertonModel.simulatePaths`.
-   */
-  SimulatedPaths: SimulatedPathsConstructor;
-  /**
-   * PIK/cash toggle exercise rule.
-   */
-  ToggleExerciseModel: ToggleExerciseModelConstructor;
-  /**
    * Rating transition matrix over a fixed horizon.
    */
   TransitionMatrix: TransitionMatrixConstructor;
+}
+
+/**
+ * PD calibration: master scales, PIT/TTC conversion, central tendency and the Basel IRB PD floor.
+ * Mirrors Rust `credit::pd`.
+ *
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * console.log(models.credit.pd.pitToTtc(0.02, 0.15, -1.0), models.credit.pd.baselIrbPdFloor());
+ * ```
+ */
+export interface CreditPdNamespace {
   /**
-   * Direct and indirect workout cost rates.
+   * Apply the Basel IRB regulatory PD floor.
+   * @param pd - Default probability as a decimal.
+   * @returns `max(pd, 0.0003)`.
+   * @throws Error - Throws a `TypeError` if `pd` is not a number.
    */
-  WorkoutCosts: WorkoutCostsConstructor;
+  applyBaselIrbPdFloor(pd: number): number;
   /**
-   * Workout LGD model: collateral waterfall, costs and time value.
+   * Basel IRB regulatory PD floor (0.03%), as a decimal. Twin of the Rust and
+   * Python constant `BASEL_IRB_PD_FLOOR`.
+   * @returns The floor, `0.0003`.
    */
-  WorkoutLgd: WorkoutLgdConstructor;
+  baselIrbPdFloor(): number;
   /**
-   * Fluent builder returned by `WorkoutLgd.builder()`.
+   * Long-run central-tendency PD from a history of annual default rates.
+   * @param annualDefaultRates - Annual default rates as decimals in `[0, 1]`, as a `number[]` or `Float64Array`; non-empty.
+   * @returns The central-tendency default probability.
+   * @throws Error - Throws a `validation` error if the series is empty or a rate is non-finite or outside `[0, 1]`.
    */
-  WorkoutLgdBuilder: WorkoutLgdBuilderClass;
+  centralTendency(annualDefaultRates: NumericArray): number;
+  /**
+   * Rating master scale mapping PDs to grades.
+   */
+  MasterScale: MasterScaleConstructor;
+  /**
+   * Convert a point-in-time PD to through-the-cycle under the Vasicek single-factor model.
+   * @param pdPit - Point-in-time default probability, strictly between 0 and 1.
+   * @param assetCorrelation - Asset correlation with the systematic factor, strictly between 0 and 1.
+   * @param cycleIndex - Standardized credit-cycle index; positive in benign conditions, negative in stress.
+   * @returns The through-the-cycle default probability.
+   * @throws Error - Throws a `validation` error if the PD or correlation is outside `(0, 1)` or an input is non-finite.
+   */
+  pitToTtc(pdPit: number, assetCorrelation: number, cycleIndex: number): number;
+  /**
+   * Convert a through-the-cycle PD to point-in-time under the Vasicek single-factor model.
+   * @param pdTtc - Through-the-cycle default probability, strictly between 0 and 1.
+   * @param assetCorrelation - Asset correlation with the systematic factor, strictly between 0 and 1.
+   * @param cycleIndex - Standardized credit-cycle index; positive in benign conditions, negative in stress.
+   * @returns The point-in-time default probability.
+   * @throws Error - Throws a `validation` error if the PD or correlation is outside `(0, 1)` or an input is non-finite.
+   */
+  ttcToPit(pdTtc: number, assetCorrelation: number, cycleIndex: number): number;
+}
+
+/**
+ * Absolute-priority recovery waterfall over a bankruptcy estate.
+ * Mirrors Rust `credit::recovery_waterfall`.
+ *
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const result = models.credit.recoveryWaterfall.allocateRecovery(80, [
+ *   {
+ *     id: "TL-B",
+ *     seniority: "senior_secured",
+ *     priority: 1,
+ *     principal: 100,
+ *     accrued: 0,
+ *     penalties: 0,
+ *     collateral_value: null,
+ *     collateral_haircut: 0,
+ *   },
+ * ]);
+ * console.log(result.total_distributed); // 80
+ * ```
+ */
+export interface CreditRecoveryWaterfallNamespace {
   /**
    * Allocate a bankruptcy estate across claims under the absolute priority rule.
    *
@@ -27221,6 +27356,47 @@ export interface ModelCreditNamespace {
     estateValue: number,
     claims: readonly generated.models.RecoveryClaim[] | string
   ): generated.models.RecoveryWaterfallResult;
+  /**
+   * Total allowed amount of a recovery claim: principal plus accrued amounts
+   * and penalties.
+   *
+   * Twin of the Rust `RecoveryClaim::total_claim` and the Python property
+   * `RecoveryClaim.total_claim`.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const claim = {
+   *   id: "TL-B",
+   *   seniority: "senior_secured",
+   *   priority: 1,
+   *   principal: 100,
+   *   accrued: 5,
+   *   penalties: 1,
+   *   collateral_value: null,
+   *   collateral_haircut: 0,
+   * };
+   * console.log(models.credit.recoveryWaterfall.recoveryClaimTotalClaim(claim)); // 106
+   * ```
+   * @param claim - `RecoveryClaim` object or JSON, as passed to `allocateRecovery`.
+   * @returns `principal + accrued + penalties`, in the claim's monetary units.
+   * @throws Error - Throws a `TypeError` if `claim` is neither a string nor a plain object, and a `validation` error if it is malformed.
+   */
+  recoveryClaimTotalClaim(claim: generated.models.RecoveryClaim | string): number;
+}
+
+/**
+ * Accounting-based credit scores: Altman Z / Z' / Z'' / EM, Ohlson O-Score and Zmijewski.
+ * Mirrors Rust `credit::scoring`.
+ *
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * console.log(models.credit.scoring.zmijewskiScore(0.05, 0.6, 1.5).implied_pd);
+ * ```
+ */
+export interface CreditScoringNamespace {
   /**
    * Altman emerging-market score: the Z''-Score plus a constant of 3.25.
    * @param workingCapitalToTotalAssets - Working capital divided by total assets (ratio X1).
@@ -27286,52 +27462,6 @@ export interface ModelCreditNamespace {
     salesToTotalAssets: number
   ): generated.models.ScoringResult;
   /**
-   * Apply the Basel IRB regulatory PD floor.
-   * @param pd - Default probability as a decimal.
-   * @returns `max(pd, 0.0003)`.
-   * @throws Error - Throws a `TypeError` if `pd` is not a number.
-   */
-  applyBaselIrbPdFloor(pd: number): number;
-  /**
-   * Basel IRB regulatory PD floor (0.03%), as a decimal. Twin of the Rust and
-   * Python constant `BASEL_IRB_PD_FLOOR`.
-   * @returns The floor, `0.0003`.
-   */
-  baselIrbPdFloor(): number;
-
-  /**
-   * Long-run central-tendency PD from a history of annual default rates.
-   * @param annualDefaultRates - Annual default rates as decimals in `[0, 1]`, as a `number[]` or `Float64Array`; non-empty.
-   * @returns The central-tendency default probability.
-   * @throws Error - Throws a `validation` error if the series is empty or a rate is non-finite or outside `[0, 1]`.
-   */
-  centralTendency(annualDefaultRates: NumericArray): number;
-  /**
-   * Net liquidation value of a collateral piece after its haircut.
-   *
-   * Twin of the Rust `CollateralPiece::liquidation_value` and the Python
-   * property `CollateralPiece.liquidation_value`.
-   * @example
-   * ```typescript
-   * import init, { models } from "finstack-quant-wasm";
-   * await init();
-   * const piece = { collateral_type: "real_estate" as const, book_value: 800_000, haircut: 0.25 };
-   * console.log(models.credit.collateralPieceLiquidationValue(piece)); // 600000
-   * ```
-   * @param piece - `CollateralPiece` object or JSON (`collateral_type`, `book_value`, `haircut`), as held by `WorkoutLgd.collateral`.
-   * @returns `book_value * (1 - haircut)`, in the book value's monetary units.
-   * @throws Error - Throws a `TypeError` if `piece` is neither a string nor a plain object, and a `validation` error if it is malformed, the book value is negative or non-finite, or the haircut is outside `[0, 1]`.
-   */
-  collateralPieceLiquidationValue(piece: generated.models.CollateralPiece | string): number;
-
-  /**
-   * Moody's WARF rating factor for one credit rating.
-   * @param rating - Rating label such as `"Baa3"`, `"BBB-"` or `"B2"`; agency notches are normalized by the Rust parser.
-   * @returns The Moody's weighted-average rating factor for that rating (for example 610 for Baa3).
-   * @throws Error - Throws a `TypeError` if `rating` is not a string, and a `validation` error if it is not a recognized rating or has no factor in the Moody's table.
-   */
-  moodysWarfFactor(rating: string): number;
-  /**
    * Ohlson (1980) O-Score logit bankruptcy model.
    * @param logTotalAssetsAdjusted - Natural log of total assets deflated by the GNP price-level index.
    * @param totalLiabilitiesToTotalAssets - Total liabilities divided by total assets.
@@ -27356,93 +27486,6 @@ export interface ModelCreditNamespace {
     negativeNetIncomeTwoYears: number,
     netIncomeChange: number
   ): generated.models.ScoringResult;
-  /**
-   * Convert a point-in-time PD to through-the-cycle under the Vasicek single-factor model.
-   * @param pdPit - Point-in-time default probability, strictly between 0 and 1.
-   * @param assetCorrelation - Asset correlation with the systematic factor, strictly between 0 and 1.
-   * @param cycleIndex - Standardized credit-cycle index; positive in benign conditions, negative in stress.
-   * @returns The through-the-cycle default probability.
-   * @throws Error - Throws a `validation` error if the PD or correlation is outside `(0, 1)` or an input is non-finite.
-   */
-  pitToTtc(pdPit: number, assetCorrelation: number, cycleIndex: number): number;
-  /**
-   * Transition matrix implied by a generator over a horizon, `exp(Q * t)`.
-   * @param generator - `GeneratorMatrix` handle to exponentiate.
-   * @param t - Horizon in years; positive and finite.
-   * @returns The projected `TransitionMatrix` with horizon `t`.
-   * @throws Error - Throws a `validation` error if `t` is not positive and finite, and a `computation` error if the matrix exponential fails.
-   */
-  project(generator: GeneratorMatrix, t: number): TransitionMatrix;
-  /**
-   * Total allowed amount of a recovery claim: principal plus accrued amounts
-   * and penalties.
-   *
-   * Twin of the Rust `RecoveryClaim::total_claim` and the Python property
-   * `RecoveryClaim.total_claim`.
-   * @example
-   * ```typescript
-   * import init, { models } from "finstack-quant-wasm";
-   * await init();
-   * const claim = {
-   *   id: "TL-B",
-   *   seniority: "senior_secured",
-   *   priority: 1,
-   *   principal: 100,
-   *   accrued: 5,
-   *   penalties: 1,
-   *   collateral_value: null,
-   *   collateral_haircut: 0,
-   * };
-   * console.log(models.credit.recoveryClaimTotalClaim(claim)); // 106
-   * ```
-   * @param claim - `RecoveryClaim` object or JSON, as passed to `allocateRecovery`.
-   * @returns `principal + accrued + penalties`, in the claim's monetary units.
-   * @throws Error - Throws a `TypeError` if `claim` is neither a string nor a plain object, and a `validation` error if it is malformed.
-   */
-  recoveryClaimTotalClaim(claim: generated.models.RecoveryClaim | string): number;
-  /**
-   * Historical Beta recovery distribution for a debt seniority class.
-   * @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
-   * @param ratingAgency - Agency whose calibration to use, such as `"moodys"` or `"sp"`; omitted uses the registry default.
-   * @returns The calibrated `BetaRecovery` handle.
-   * @throws Error - Throws a `validation` error if the seniority or agency is not recognized.
-   */
-  seniorityRecoveryStats(seniority: string, ratingAgency?: string): BetaRecovery;
-  /**
-   * Minimum NPV ratio at which a tender is recommended. Twin of the Rust and
-   * Python constant `TENDER_RECOMMENDATION_HURDLE`: a holder is advised to
-   * tender when the tender NPV is at least `old_npv` times this hurdle.
-   * @returns The dimensionless hurdle multiple.
-   */
-  tenderRecommendationHurdle(): number;
-  /**
-   * Convert a through-the-cycle PD to point-in-time under the Vasicek single-factor model.
-   * @param pdTtc - Through-the-cycle default probability, strictly between 0 and 1.
-   * @param assetCorrelation - Asset correlation with the systematic factor, strictly between 0 and 1.
-   * @param cycleIndex - Standardized credit-cycle index; positive in benign conditions, negative in stress.
-   * @returns The point-in-time default probability.
-   * @throws Error - Throws a `validation` error if the PD or correlation is outside `(0, 1)` or an input is non-finite.
-   */
-  ttcToPit(pdTtc: number, assetCorrelation: number, cycleIndex: number): number;
-  /**
-   * One-call workout LGD from collateral tuples and cost assumptions.
-   * @param ead - Exposure at default in monetary units; positive.
-   * @param collateral - Array of `[collateralType, bookValue, haircut]` tuples, such as `[["real_estate", 800000, 0.3]]`.
-   * @param directCostPct - Direct workout costs as a fraction of EAD.
-   * @param indirectCostPct - Indirect workout costs as a fraction of EAD.
-   * @param timeToResolutionYears - Expected workout duration in years.
-   * @param discountRate - Annual discount rate over the workout period, as a decimal.
-   * @returns The `WorkoutLgdResult` object (`net_recovery`, `lgd`, `recovery_rate`).
-   * @throws Error - Throws a `validation` error if any input is out of range or a collateral type is not recognized.
-   */
-  workoutLgd(
-    ead: number,
-    collateral: readonly (readonly [string, number, number])[] | string,
-    directCostPct: number,
-    indirectCostPct: number,
-    timeToResolutionYears: number,
-    discountRate: number
-  ): generated.models.WorkoutLgdResult;
   /**
    * Zmijewski (1984) probit financial-distress model.
    * @param netIncomeToTotalAssets - Net income divided by total assets.
@@ -27776,7 +27819,7 @@ export interface DieboldLi extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -27849,7 +27892,7 @@ export interface YieldPanel extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -27966,7 +28009,7 @@ export interface YieldPca extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -28142,7 +28185,7 @@ export interface HullWhiteParams extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -28375,27 +28418,27 @@ export interface VolatilityNamespace {
   getCubeVolClamped(cube: VolCube, expiry: number, tenor: number, strike: number): number;
   /**
    * Interpolate a fixed-expiry cube slice; coordinates outside the grid are rejected.
-   * @param slice - `VolCubeExpirySlice` object or JSON in the canonical wire form, such as a `materializeCubeExpirySlice` result or `core.VolCubeExpirySlice.toJson()`.
+   * @param slice - `core.VolCubeExpirySlice` handle, such as a `materializeCubeExpirySlice` result.
    * @param tenor - Underlying tenor in years, within the slice's tenor axis.
    * @param strike - Strike in forward-rate units, within the slice's strike axis.
    * @returns The bilinearly interpolated volatility in the slice's quote convention.
-   * @throws Error - Throws a `validation` error if `slice` is malformed or a coordinate is non-finite or outside the grid.
+   * @throws Error - Throws a `validation` error if a coordinate is non-finite or outside the grid.
    */
   getCubeExpirySliceVol(
-    slice: generated.core.VolCubeExpirySlice | string,
+    slice: VolCubeExpirySlice,
     tenor: number,
     strike: number
   ): number;
   /**
    * Interpolate a fixed-expiry cube slice with flat clamping to the grid edges.
-   * @param slice - `VolCubeExpirySlice` object or JSON in the canonical wire form.
+   * @param slice - `core.VolCubeExpirySlice` handle.
    * @param tenor - Underlying tenor in years; clamped to the slice's tenor axis.
    * @param strike - Strike in forward-rate units; clamped to the slice's strike axis.
    * @returns The interpolated volatility in the slice's quote convention; `NaN` for non-finite coordinates.
-   * @throws Error - Throws a `validation` error if `slice` is malformed.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `tenor` or `strike` is not a number.
    */
   getCubeExpirySliceVolClamped(
-    slice: generated.core.VolCubeExpirySlice | string,
+    slice: VolCubeExpirySlice,
     tenor: number,
     strike: number
   ): number;
@@ -28544,28 +28587,25 @@ export interface VolatilityNamespace {
    * Twin of the Rust and Python `LocalVolSurface.from_implied_vol`. The local variance at each node of the implied grid is `(dw/dT) / g` in total variance `w = sigma^2 T` and log-moneyness `k = ln(K / F_T)` (Gatheral 2006, eq. 1.10), with the time derivative taken at fixed `k`.
    * @example
    * ```typescript
-   * import init, { models } from "finstack-quant-wasm";
+   * import init, { core, models } from "finstack-quant-wasm";
    * await init();
-   * const implied = {
-   *   id: "FLAT",
-   *   expiries: [0.5, 1.0],
-   *   strikes: [90, 100, 110],
-   *   vols_row_major: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
-   *   secondary_axis: "strike" as const,
-   *   interpolation_mode: "vol" as const,
-   *   quote_type: "black_lognormal" as const,
-   * };
+   * const implied = new core.VolSurface(
+   *   "FLAT",
+   *   [0.5, 1.0],
+   *   [90, 100, 110],
+   *   [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+   * );
    * const local = models.volatility.localVolFromImpliedVol(implied, [100, 100]);
    * console.log(local.expiries, local.strikes); // [0.5, 1] [90, 100, 110]
    * console.log(local.local_vols.every((v) => Math.abs(v - 0.2) < 1e-12)); // true
    * ```
-   * @param surface - `VolSurface` object or JSON in the canonical wire form: unshifted Black implied volatilities (decimals) on expiries in years and positive cash strikes, at least two expiries and three strikes.
+   * @param surface - `core.VolSurface` handle of unshifted Black implied volatilities (decimals) on expiries in years and positive cash strikes, at least two expiries and three strikes.
    * @param forwards - Forward price of the underlying for each surface expiry, in strike units and in the order of `surface.expiries`; finite and positive. For a flat carry, `F(T) = S * exp((r - q) * T)`.
    * @returns The `LocalVolSurface` object: `expiries` in years, `strikes`, and `local_vols` as annualized decimals in row-major order (`local_vols[i * strikes.length + j]` for expiry `i`, strike `j`).
-   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `surface` is malformed, has fewer than two expiries or three strikes, is not an unshifted Black strike surface, `forwards` has the wrong length or a non-positive entry, or the surface has butterfly or calendar arbitrage at a node (the message names the node).
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `surface` has fewer than two expiries or three strikes, is not an unshifted Black strike surface, `forwards` has the wrong length or a non-positive entry, or the surface has butterfly or calendar arbitrage at a node (the message names the node).
    */
   localVolFromImpliedVol(
-    surface: generated.core.VolSurface | string,
+    surface: VolSurface,
     forwards: NumericArray
   ): generated.models.LocalVolSurface;
   /**
@@ -28574,28 +28614,25 @@ export interface VolatilityNamespace {
    * Twin of the Rust and Python `LocalVolSurface.from_implied_vol_smoothed`. Smoothing regularises the second strike derivative, the usual source of a non-positive Dupire density on market-calibrated grids.
    * @example
    * ```typescript
-   * import init, { models } from "finstack-quant-wasm";
+   * import init, { core, models } from "finstack-quant-wasm";
    * await init();
-   * const implied = {
-   *   id: "FLAT",
-   *   expiries: [0.5, 1.0],
-   *   strikes: [90, 100, 110],
-   *   vols_row_major: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
-   *   secondary_axis: "strike" as const,
-   *   interpolation_mode: "vol" as const,
-   *   quote_type: "black_lognormal" as const,
-   * };
+   * const implied = new core.VolSurface(
+   *   "FLAT",
+   *   [0.5, 1.0],
+   *   [90, 100, 110],
+   *   [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+   * );
    * const local = models.volatility.localVolFromImpliedVolSmoothed(implied, [100, 100], 5.0);
    * console.log(local.local_vols.length); // 6
    * ```
-   * @param surface - `VolSurface` object or JSON, as for `localVolFromImpliedVol`.
+   * @param surface - `core.VolSurface` handle, as for `localVolFromImpliedVol`.
    * @param forwards - One forward per surface expiry, as for `localVolFromImpliedVol`.
    * @param sigmaStrikes - Standard deviation of the Gaussian kernel in strike (price) units, non-negative; zero disables smoothing.
    * @returns The `LocalVolSurface` object on the grid of `surface`.
    * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `sigmaStrikes` is negative or non-finite, or for any error of `localVolFromImpliedVol` on the smoothed surface.
    */
   localVolFromImpliedVolSmoothed(
-    surface: generated.core.VolSurface | string,
+    surface: VolSurface,
     forwards: NumericArray,
     sigmaStrikes: number
   ): generated.models.LocalVolSurface;
@@ -28690,27 +28727,27 @@ export interface VolatilityNamespace {
   ): generated.models.ArbitrageReport;
   /**
    * Interpolate a volatility surface; coordinates outside the grid are rejected.
-   * @param surface - `VolSurface` object or JSON in the canonical wire form (`id`, `expiries`, `strikes`, `vols_row_major`, ...), such as a `materializeCube*` result.
+   * @param surface - `core.VolSurface` handle, such as a `materializeCubeTenorSlice` or `materializeFxDeltaSurface` result.
    * @param expiry - Option expiry in years, within the surface grid.
    * @param strike - Strike in the surface's own units, within the surface grid.
    * @returns The interpolated volatility, as a decimal.
-   * @throws Error - Throws a `validation` error if `surface` is malformed or a coordinate is outside the grid.
+   * @throws Error - Throws a `validation` error if a coordinate is outside the grid.
    */
   getSurfaceVol(
-    surface: generated.core.VolSurface | string,
+    surface: VolSurface,
     expiry: number,
     strike: number
   ): number;
   /**
    * Interpolate a volatility surface with flat clamping to the grid edges.
-   * @param surface - `VolSurface` object or JSON in the canonical wire form.
+   * @param surface - `core.VolSurface` handle.
    * @param expiry - Option expiry in years; clamped to the surface grid.
    * @param strike - Strike in the surface's own units; clamped to the surface grid.
    * @returns The interpolated volatility, as a decimal; `NaN` for non-finite coordinates.
-   * @throws Error - Throws a `validation` error if `surface` is malformed.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `expiry` or `strike` is not a number.
    */
   getSurfaceVolClamped(
-    surface: generated.core.VolSurface | string,
+    surface: VolSurface,
     expiry: number,
     strike: number
   ): number;
@@ -28719,60 +28756,60 @@ export interface VolatilityNamespace {
    * @param cube - `core.VolCube` handle.
    * @param expiry - Option expiry in years, within the cube grid.
    * @param strikes - Strictly increasing strikes of the output surface.
-   * @returns The tenor by strike `VolCubeExpirySlice` object in its canonical wire form (`id`, `expiry`, `tenors`, `strikes`, `vols_row_major`, `quote_type`, optional `displacements`).
+   * @returns The tenor by strike `core.VolCubeExpirySlice` handle.
    * @throws Error - Throws a `validation` error if the expiry is outside the cube, the strikes are invalid, or a SABR evaluation fails.
    */
   materializeCubeExpirySlice(
     cube: VolCube,
     expiry: number,
     strikes: NumericArray
-  ): generated.core.VolCubeExpirySlice;
+  ): VolCubeExpirySlice;
   /**
    * Materialize the normal (Bachelier) volatility slice of a SABR cube at one option expiry.
    * @param cube - `core.VolCube` handle.
    * @param expiry - Option expiry in years, within the cube grid.
    * @param strikes - Strictly increasing strikes of the output surface.
-   * @returns The tenor by strike `VolCubeExpirySlice` object of normal volatilities.
+   * @returns The tenor by strike `core.VolCubeExpirySlice` handle of normal volatilities.
    * @throws Error - Throws a `validation` error if the expiry is outside the cube, the strikes are invalid, or a SABR evaluation fails.
    */
   materializeCubeExpirySliceNormal(
     cube: VolCube,
     expiry: number,
     strikes: NumericArray
-  ): generated.core.VolCubeExpirySlice;
+  ): VolCubeExpirySlice;
   /**
    * Materialize the Black volatility slice of a SABR cube at one underlying tenor.
    * @param cube - `core.VolCube` handle.
    * @param tenor - Underlying tenor in years, within the cube grid.
    * @param strikes - Strictly increasing strikes of the output surface.
-   * @returns The expiry by strike `VolSurface` object in its canonical wire form.
+   * @returns The expiry by strike `core.VolSurface` handle.
    * @throws Error - Throws a `validation` error if the tenor is outside the cube, the strikes are invalid, or a SABR evaluation fails.
    */
   materializeCubeTenorSlice(
     cube: VolCube,
     tenor: number,
     strikes: NumericArray
-  ): generated.core.VolSurface;
+  ): VolSurface;
   /**
    * Materialize the normal (Bachelier) volatility slice of a SABR cube at one underlying tenor.
    * @param cube - `core.VolCube` handle.
    * @param tenor - Underlying tenor in years, within the cube grid.
    * @param strikes - Strictly increasing strikes of the output surface.
-   * @returns The expiry by strike `VolSurface` object of normal volatilities.
+   * @returns The expiry by strike `core.VolSurface` handle of normal volatilities.
    * @throws Error - Throws a `validation` error if the tenor is outside the cube, the strikes are invalid, or a SABR evaluation fails.
    */
   materializeCubeTenorSliceNormal(
     cube: VolCube,
     tenor: number,
     strikes: NumericArray
-  ): generated.core.VolSurface;
+  ): VolSurface;
   /**
    * Materialize an FX delta-quoted surface as an expiry by strike volatility surface.
    * @param surface - `core.FxDeltaVolSurface` handle.
    * @param spot - FX spot rate (domestic per unit of foreign); positive.
    * @param domesticRate - Continuously compounded domestic rate, as a decimal.
    * @param foreignRate - Continuously compounded foreign rate, as a decimal.
-   * @returns The strike-space `VolSurface` object in its canonical wire form.
+   * @returns The strike-space `core.VolSurface` handle.
    * @throws Error - Throws a `validation` error if an input is non-finite or out of range or a delta-to-strike conversion fails.
    */
   materializeFxDeltaSurface(
@@ -28780,7 +28817,7 @@ export interface VolatilityNamespace {
     spot: number,
     domesticRate: number,
     foreignRate: number
-  ): generated.core.VolSurface;
+  ): VolSurface;
   /**
    * Durrleman's function `g(k)` of an SVI slice; the slice is free of butterfly
    * arbitrage where `g(k) >= 0`.
@@ -28831,7 +28868,7 @@ export interface AlmgrenChrissModel extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -28928,7 +28965,7 @@ export interface KyleLambdaModel extends WasmOwned {
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
    * @returns Compact canonical JSON text.
-   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   * @throws Error - Throws a `validation` error if serialization fails, for example on a non-finite value the type's wire form rejects.
    */
   toJson(): string;
   /**
@@ -29538,11 +29575,11 @@ export interface ModelsNamespace {
     shift: number
   ): number;
   /**
-   * Reiner-Rubinstein continuous-monitoring barrier call price.
+   * Reiner-Rubinstein continuous-monitoring barrier option price.
    *
    * `direction` is `"up"` or `"down"`, `knock` is `"in"` or `"out"`.
    * Reiner-Rubinstein (1991): see docs/REFERENCES.md#reiner-rubinstein-1991.
-   * @returns Discounted barrier-call price in the same units as `spot`.
+   * @returns Discounted barrier option price in the same units as `spot`.
    * @param spot - Current spot price or exchange rate in the same units as the strike.
    * @param strike - Option strike price in the same price units as the underlying.
    * @param barrier - Continuously monitored barrier level in the same price units as spot.
@@ -29552,9 +29589,10 @@ export interface ModelsNamespace {
    * @param expiry - Time to expiry in years.
    * @param direction - Barrier direction: `"up"` for an upper barrier or `"down"` for a lower barrier.
    * @param knock - Barrier activation: `"in"` for knock-in or `"out"` for knock-out.
+   * @param isCall - Whether to value a call (`true`, default) or put (`false`).
    * @throws Error - Throws a JavaScript exception if `direction` or `knock` is unsupported, or the supplied model inputs produce a non-finite barrier price.
    */
-  barrierCall(
+  barrierOptionPrice(
     spot: number,
     strike: number,
     barrier: number,
@@ -29563,35 +29601,8 @@ export interface ModelsNamespace {
     vol: number,
     expiry: number,
     direction: 'up' | 'down',
-    knock: 'in' | 'out'
-  ): number;
-  /**
-   * Reiner-Rubinstein continuous-monitoring barrier put price.
-   *
-   * `direction` is `"up"` or `"down"`, `knock` is `"in"` or `"out"`.
-   * Reiner-Rubinstein (1991): see docs/REFERENCES.md#reiner-rubinstein-1991.
-   * @returns Discounted barrier-put price in the same units as `spot`.
-   * @param spot - Current spot price or exchange rate in the same units as the strike.
-   * @param strike - Option strike price in the same price units as the underlying.
-   * @param barrier - Continuously monitored barrier level in the same price units as spot.
-   * @param rate - Continuously compounded risk-free rate, expressed as a decimal.
-   * @param divYield - Continuous dividend yield or foreign rate, expressed as a decimal.
-   * @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
-   * @param expiry - Time to expiry in years.
-   * @param direction - Barrier direction: `"up"` for an upper barrier or `"down"` for a lower barrier.
-   * @param knock - Barrier activation: `"in"` for knock-in or `"out"` for knock-out.
-   * @throws Error - Throws a JavaScript exception if `direction` or `knock` is unsupported, or the supplied model inputs produce a non-finite barrier price.
-   */
-  barrierPut(
-    spot: number,
-    strike: number,
-    barrier: number,
-    rate: number,
-    divYield: number,
-    vol: number,
-    expiry: number,
-    direction: 'up' | 'down',
-    knock: 'in' | 'out'
+    knock: 'in' | 'out',
+    isCall?: boolean
   ): number;
   /**
    * Arithmetic (Turnbull-Wakeman) or geometric (Kemna-Vorst) Asian option.
@@ -30518,7 +30529,7 @@ export interface CalibrationNamespace {
    * @param quotes - Array (or JSON) of `CapFloorQuote` objects with distinct maturities in years; each maturity adds one constant-sigma interval.
    * @param config - `PiecewiseSigmaCalibrationConfig` object: `fixed_kappa`, `sigma_min`, `sigma_max` (absolute rate volatility), `fit_tolerance` and optional `frequency` (default `"semi_annual"`).
    * @param forward - Curve projecting the caplet forwards; the published function defaults it to `discount`.
-   * @returns `[params, report]`: the piecewise `HullWhiteParams` and the `CalibrationReport`.
+   * @returns `[params, report]`: the piecewise `HullWhiteParams` handle (`models.rates.hullWhite.HullWhiteParams`) and the `CalibrationReport` object.
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` if no quotes are supplied, maturities repeat, the configuration bounds are invalid (`kind: "validation"`), or an interval's sigma cannot be bracketed or solved.
    */
   bootstrapHullWhiteSigmaScheduleToCapFloors(
@@ -30526,7 +30537,7 @@ export interface CalibrationNamespace {
     quotes: readonly generated.calibration.CapFloorQuote[] | string,
     config: generated.calibration.PiecewiseSigmaCalibrationConfig | string,
     forward?: DiscountCurve | null
-  ): [generated.models.HullWhiteParams, generated.calibration.CalibrationReport];
+  ): [HullWhiteParams, generated.calibration.CalibrationReport];
   /**
    * Build a zero-coupon inflation swap quote.
    *

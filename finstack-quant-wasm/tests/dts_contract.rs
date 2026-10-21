@@ -792,10 +792,6 @@ fn portfolio_dts_pins_python_parity_optional_parameters() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "parametricEsDecomposition(positionIds: string[], weights: NumericArray, covariance: NumericArray[], confidence?: number | null): PositionRiskDecomposition;",
-    ));
-    assert!(contains_ignoring_ws(
-        &dts,
         "historicalVarDecomposition(positionIds: string[], positionPnls: NumericArray[], confidence?: number | null): PositionRiskDecomposition;",
     ));
     assert!(contains_ignoring_ws(
@@ -1161,8 +1157,11 @@ fn models_and_valuations_dts_expose_owned_credit_namespaces() {
     assert!(model_credit.contains("ToggleExerciseModel: ToggleExerciseModelConstructor;"));
     assert!(!dts.contains("mertonModelJson("));
     assert!(!dts.contains("creditStateJson("));
-    assert!(model_credit.contains("analyzeExchangeOffer("));
-    assert!(model_credit.contains("analyzeLme("));
+    assert!(model_credit.contains("liabilityManagement: CreditLiabilityManagementNamespace;"));
+    assert!(!model_credit.contains("analyzeExchangeOffer("));
+    let liability_management = interface_block(&dts, "CreditLiabilityManagementNamespace");
+    assert!(liability_management.contains("analyzeExchangeOffer("));
+    assert!(liability_management.contains("analyzeLme("));
     assert!(!core.contains("analyzeExchangeOffer("));
     assert!(!core.contains("analyzeLme("));
     assert!(!dts.contains("export interface CreditDerivativesNamespace"));
@@ -1215,21 +1214,19 @@ fn models_monte_carlo_dts_matches_pricing_surface() {
     // Black-Scholes references live at `models.bsPrice`, not here.
     assert!(!monte_carlo.contains("blackScholesCall("));
     assert!(!monte_carlo.contains("blackScholesPut("));
-    for name in ["priceHestonCall(", "priceHestonPut("] {
-        assert!(
-            monte_carlo.contains(name),
-            "MonteCarloNamespace is missing `{name}`"
-        );
-    }
+    assert!(
+        monte_carlo.contains("priceHeston("),
+        "MonteCarloNamespace is missing `priceHeston`"
+    );
     // Path count and seed are optional: the Rust registry owns their defaults.
-    assert_eq!(monte_carlo.matches("numPaths?: number | null,").count(), 2);
+    assert_eq!(monte_carlo.matches("numPaths?: number | null,").count(), 1);
     assert_eq!(
         monte_carlo
             .matches("seed?: bigint | number | null,")
             .count(),
-        2
+        1
     );
-    assert_eq!(monte_carlo.matches("): MoneyEstimate;").count(), 2);
+    assert_eq!(monte_carlo.matches("): MoneyEstimate;").count(), 1);
     assert!(declares_type(&dts, "MoneyEstimate"));
     assert!(!dts.contains("MonteCarloEstimateJson"));
     let models = interface_block(&dts, "ModelsNamespace");

@@ -3,9 +3,9 @@
 //! Implements Cox-Ross-Rubinstein (CRR) and Leisen-Reimer binomial trees
 //! for American and Bermudan options on the shared recombining-lattice engine.
 
+use crate::closed_form::d1_d2;
 use crate::trees::tree_framework::NodeState;
 use crate::types::{OptionMarketParams, OptionType};
-use crate::volatility::d1_d2;
 use finstack_quant_core::math::time_grid::map_exercise_dates_to_steps;
 use finstack_quant_core::validation::validate_f64_positive;
 use finstack_quant_core::FxHashSet;
@@ -71,11 +71,9 @@ impl OptionValuator {
 
 impl TreeValuator for OptionValuator {
     fn value_at_maturity(&self, state: &NodeState) -> Result<f64> {
-        Ok(intrinsic(
-            self.option_type,
-            self.ex_spot(state)?,
-            self.strike,
-        ))
+        Ok(self
+            .option_type
+            .intrinsic(self.ex_spot(state)?, self.strike))
     }
 
     fn value_at_node(&self, state: &NodeState, continuation_value: f64, _dt: f64) -> Result<f64> {
@@ -84,19 +82,15 @@ impl TreeValuator for OptionValuator {
             .as_ref()
             .is_some_and(|steps| steps.contains(&state.step))
         {
-            let ex_exercise = intrinsic(self.option_type, self.ex_spot(state)?, self.strike);
-            let cum_exercise = intrinsic(self.option_type, self.cum_spot(state)?, self.strike);
+            let ex_exercise = self
+                .option_type
+                .intrinsic(self.ex_spot(state)?, self.strike);
+            let cum_exercise = self
+                .option_type
+                .intrinsic(self.cum_spot(state)?, self.strike);
             return Ok(continuation_value.max(ex_exercise).max(cum_exercise));
         }
         Ok(continuation_value)
-    }
-}
-
-#[inline]
-fn intrinsic(option_type: OptionType, spot: f64, strike: f64) -> f64 {
-    match option_type {
-        OptionType::Call => (spot - strike).max(0.0),
-        OptionType::Put => (strike - spot).max(0.0),
     }
 }
 
@@ -398,7 +392,7 @@ impl BinomialTree {
         )
     }
 
-    /// Price an American option with known cash dividends.
+    /// Price an American option, optionally with known cash dividends.
     ///
     /// # Arguments
     ///
@@ -406,8 +400,16 @@ impl BinomialTree {
     ///   dividend yield, non-negative annual volatility, positive expiry in
     ///   years, and option side. Continuous yield remains active alongside the
     ///   scheduled cash dividends; it must exclude those scheduled payments.
-    /// * `dividends` - Cash-dividend schedule as `(time_in_years, cash_amount)` pairs.
-    pub fn price_american_with_discrete_dividends(
+    /// * `dividends` - Cash-dividend schedule as `(time_in_years, cash_amount)`
+    ///   pairs, each with a positive time inside the option life and a positive
+    ///   amount. An empty slice prices the plain (continuous-yield-only) tree.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the spot or strike is not positive, the tree
+    /// parameters are invalid, or a dividend lies outside the option life.
+    #[must_use = "pricing result should not be discarded"]
+    pub fn price_american(
         &self,
         market_params: &OptionMarketParams,
         dividends: &[(f64, f64)],
@@ -416,7 +418,13 @@ impl BinomialTree {
         self.price_with_discrete_dividends(market_params, Some(&all_steps), dividends)
     }
 
-    /// Price a Bermudan option with known cash dividends.
+    /// Price European option using binomial tree (for validation)
+    #[must_use = "pricing result should not be discarded"]
+    pub fn price_european(&self, market_params: &OptionMarketParams) -> Result<f64> {
+        self.price_with_exercise(market_params, None)
+    }
+
+    /// Price a Bermudan option, optionally with known cash dividends.
     ///
     /// # Arguments
     ///
@@ -425,8 +433,16 @@ impl BinomialTree {
     ///   years, and option side. Continuous yield remains active alongside the
     ///   scheduled cash dividends; it must exclude those scheduled payments.
     /// * `exercise_dates` - Permitted exercise times in years from the valuation date.
-    /// * `dividends` - Cash-dividend schedule as `(time_in_years, cash_amount)` pairs.
-    pub fn price_bermudan_with_discrete_dividends(
+    /// * `dividends` - Cash-dividend schedule as `(time_in_years, cash_amount)`
+    ///   pairs, each with a positive time inside the option life and a positive
+    ///   amount. An empty slice prices the plain (continuous-yield-only) tree.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the spot or strike is not positive, the tree
+    /// parameters are invalid, or a dividend lies outside the option life.
+    #[must_use = "pricing result should not be discarded"]
+    pub fn price_bermudan(
         &self,
         market_params: &OptionMarketParams,
         exercise_dates: &[f64],
@@ -437,33 +453,6 @@ impl BinomialTree {
         steps.sort();
         steps.dedup();
         self.price_with_discrete_dividends(market_params, Some(&steps), dividends)
-    }
-
-    /// Price American option using binomial tree
-    #[must_use = "pricing result should not be discarded"]
-    pub fn price_american(&self, market_params: &OptionMarketParams) -> Result<f64> {
-        let all_steps: Vec<usize> = (0..self.steps).collect();
-        self.price_with_exercise(market_params, Some(&all_steps))
-    }
-
-    /// Price European option using binomial tree (for validation)
-    #[must_use = "pricing result should not be discarded"]
-    pub fn price_european(&self, market_params: &OptionMarketParams) -> Result<f64> {
-        self.price_with_exercise(market_params, None)
-    }
-
-    /// Price Bermudan option with specified exercise dates
-    #[must_use = "pricing result should not be discarded"]
-    pub fn price_bermudan(
-        &self,
-        market_params: &OptionMarketParams,
-        exercise_dates: &[f64], // Times when exercise is allowed
-    ) -> Result<f64> {
-        let mut steps =
-            map_exercise_dates_to_steps(exercise_dates, market_params.time_to_expiry, self.steps);
-        steps.sort();
-        steps.dedup();
-        self.price_with_exercise(market_params, Some(&steps))
     }
 }
 
@@ -478,16 +467,12 @@ mod tests {
         let put = OptionMarketParams::put(100.0, 110.0, 0.05, 0.20, 1.0);
         let call = OptionMarketParams::call(100.0, 95.0, 0.04, 0.25, 0.75);
         let prices = [
-            BinomialTree::crr(50).price_american(&put),
+            BinomialTree::crr(50).price_american(&put, &[]),
             BinomialTree::crr(50).price_european(&put),
             BinomialTree::leisen_reimer(51).price_european(&call),
-            BinomialTree::leisen_reimer(51).price_bermudan(&put, &[0.25, 0.5, 0.75]),
-            BinomialTree::crr(40).price_american_with_discrete_dividends(&call, &[(0.3, 2.0)]),
-            BinomialTree::crr(40).price_bermudan_with_discrete_dividends(
-                &put,
-                &[0.5],
-                &[(0.25, 1.5), (0.6, 1.5)],
-            ),
+            BinomialTree::leisen_reimer(51).price_bermudan(&put, &[0.25, 0.5, 0.75], &[]),
+            BinomialTree::crr(40).price_american(&call, &[(0.3, 2.0)]),
+            BinomialTree::crr(40).price_bermudan(&put, &[0.5], &[(0.25, 1.5), (0.6, 1.5)]),
         ];
         let bits: Vec<u64> = prices
             .into_iter()
@@ -513,14 +498,10 @@ mod tests {
                 for (spot, strike) in [(invalid, 100.0), (100.0, invalid)] {
                     let params = OptionMarketParams::call(spot, strike, 0.05, 0.2, 1.0);
                     assert!(tree.price_european(&params).is_err());
-                    assert!(tree.price_american(&params).is_err());
-                    assert!(tree.price_bermudan(&params, &[0.5]).is_err());
-                    assert!(tree
-                        .price_american_with_discrete_dividends(&params, &[(0.5, 2.0)])
-                        .is_err());
-                    assert!(tree
-                        .price_bermudan_with_discrete_dividends(&params, &[0.5], &[(0.5, 2.0)])
-                        .is_err());
+                    assert!(tree.price_american(&params, &[]).is_err());
+                    assert!(tree.price_bermudan(&params, &[0.5], &[]).is_err());
+                    assert!(tree.price_american(&params, &[(0.5, 2.0)]).is_err());
+                    assert!(tree.price_bermudan(&params, &[0.5], &[(0.5, 2.0)]).is_err());
                 }
             }
         }
@@ -541,12 +522,12 @@ mod tests {
                         option_type,
                     );
                     let actual = tree
-                        .price_bermudan_with_discrete_dividends(&params, &[], &[(0.5, 2.0)])
+                        .price_bermudan(&params, &[], &[(0.5, 2.0)])
                         .expect("deterministic cash dividend and continuous carry");
                     let carry = params.rate - params.dividend_yield;
                     let terminal_spot = params.spot * carry.exp() - 2.0 * (carry * 0.5).exp();
                     let expected =
-                        intrinsic(option_type, terminal_spot, params.strike) * (-params.rate).exp();
+                        option_type.intrinsic(terminal_spot, params.strike) * (-params.rate).exp();
                     assert!(
                         (actual - expected).abs() < 1e-10,
                         "yield={yield_rate}, side={option_type}: {actual} vs {expected}"
@@ -561,9 +542,9 @@ mod tests {
         let mut params = OptionMarketParams::call(100.0, 100.0, 0.05, 0.2, 1.0);
         params.dividend_yield = 0.05;
         for tree in [BinomialTree::crr(100), BinomialTree::leisen_reimer(101)] {
-            let without_cash = tree.price_american(&params).expect("continuous yield");
+            let without_cash = tree.price_american(&params, &[]).expect("continuous yield");
             let with_cash = tree
-                .price_american_with_discrete_dividends(&params, &[(0.5, 1e-8)])
+                .price_american(&params, &[(0.5, 1e-8)])
                 .expect("vanishing cash dividend");
             assert!(
                 (with_cash - without_cash).abs() < 1e-6,
@@ -688,7 +669,9 @@ mod tests {
 
         let tree = BinomialTree::crr(100); // Use CRR since LR has issues
 
-        let american = tree.price_american(&market_params).expect("should succeed");
+        let american = tree
+            .price_american(&market_params, &[])
+            .expect("should succeed");
         let european = tree.price_european(&market_params).expect("should succeed");
 
         println!(
@@ -717,9 +700,11 @@ mod tests {
         // Exercise allowed quarterly
         let exercise_dates = vec![0.25, 0.5, 0.75, 1.0];
 
-        let american = tree.price_american(&market_params).expect("should succeed");
+        let american = tree
+            .price_american(&market_params, &[])
+            .expect("should succeed");
         let bermudan = tree
-            .price_bermudan(&market_params, &exercise_dates)
+            .price_bermudan(&market_params, &exercise_dates, &[])
             .expect("should succeed");
         let european = tree.price_european(&market_params).expect("should succeed");
 
@@ -882,7 +867,7 @@ mod tests {
         let params = OptionMarketParams::new(100.0, 90.0, 0.05, 0.0, 1.0, 0.0, OptionType::Call);
         let div_amount = 5.0;
         let actual = tree
-            .price_bermudan_with_discrete_dividends(&params, &[], &[(1.0, div_amount)])
+            .price_bermudan(&params, &[], &[(1.0, div_amount)])
             .expect("terminal cash dividend");
         let terminal_spot = params.spot * params.rate.exp() - div_amount;
         let expected = (terminal_spot - params.strike).max(0.0) * (-params.rate).exp();

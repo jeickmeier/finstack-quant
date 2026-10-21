@@ -8,7 +8,7 @@ use crate::monte_carlo::traits::PathState;
 use crate::monte_carlo::traits::Payoff;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Error as CoreError;
+use finstack_quant_core::Error;
 
 /// Final payoff type for autocallable products.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -132,28 +132,28 @@ impl AutocallablePayoff {
         payment_df_ratios: Vec<f64>,
     ) -> finstack_quant_core::Result<Self> {
         if observation_dates.len() != autocall_barriers.len() {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "AutocallablePayoff: observation_dates ({}) and autocall_barriers ({}) must have the same length",
                 observation_dates.len(),
                 autocall_barriers.len()
             )));
         }
         if observation_dates.len() != coupon_barriers.len() {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "AutocallablePayoff: observation_dates ({}) and coupon_barriers ({}) must have the same length",
                 observation_dates.len(),
                 coupon_barriers.len()
             )));
         }
         if observation_dates.len() != coupons.len() {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "AutocallablePayoff: observation_dates ({}) and coupons ({}) must have the same length",
                 observation_dates.len(),
                 coupons.len()
             )));
         }
         if observation_dates.len() != payment_df_ratios.len() {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "AutocallablePayoff: observation_dates ({}) and payment_df_ratios ({}) must have the same length",
                 observation_dates.len(),
                 payment_df_ratios.len()
@@ -161,7 +161,7 @@ impl AutocallablePayoff {
         }
         for i in 1..observation_dates.len() {
             if observation_dates[i - 1] >= observation_dates[i] {
-                return Err(CoreError::Validation(format!(
+                return Err(Error::Validation(format!(
                     "AutocallablePayoff: observation_dates must be strictly increasing (index {} = {} >= index {} = {})",
                     i - 1,
                     observation_dates[i - 1],
@@ -263,13 +263,13 @@ impl AutocallablePayoff {
 impl Payoff for AutocallablePayoff {
     fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
         let spot = state.spot().ok_or_else(|| {
-            CoreError::Validation(format!(
+            Error::Validation(format!(
                 "AutocallablePayoff requires SPOT at step {}",
                 state.step
             ))
         })?;
         if !spot.is_finite() || spot <= 0.0 {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "AutocallablePayoff SPOT must be finite and positive at step {}, got {spot}",
                 state.step
             )));

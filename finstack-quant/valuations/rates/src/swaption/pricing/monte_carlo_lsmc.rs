@@ -26,7 +26,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::Result;
-use finstack_quant_models::monte_carlo::discretization::ExactHullWhite1F;
+use finstack_quant_models::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
 use finstack_quant_models::monte_carlo::pricer::basis::BasisFunctions;
 use finstack_quant_models::monte_carlo::pricer::lsq::solve_least_squares;
 use finstack_quant_models::monte_carlo::process::ou::HullWhite1FProcess;

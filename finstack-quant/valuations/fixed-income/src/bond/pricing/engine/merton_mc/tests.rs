@@ -1,9 +1,9 @@
 use super::*;
-use finstack_quant_models::credit::dynamic_recovery::DynamicRecoverySpec;
-use finstack_quant_models::credit::endogenous_hazard::EndogenousHazardSpec;
-use finstack_quant_models::credit::toggle_exercise::ThresholdDirection;
-use finstack_quant_models::credit::toggle_exercise::{CreditStateVariable, ToggleExerciseModel};
-use finstack_quant_models::credit::{AssetDynamics, MertonBarrierType, MertonModel};
+use finstack_quant_models::credit::ThresholdDirection;
+use finstack_quant_models::credit::{
+    AssetDynamics, CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec,
+    MertonBarrierType, MertonModel, ToggleExerciseModel,
+};
 use finstack_quant_valuations_core::instruments::MertonMcCalibrationSpec;
 
 fn test_merton() -> MertonModel {

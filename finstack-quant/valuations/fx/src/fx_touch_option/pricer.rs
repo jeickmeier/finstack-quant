@@ -147,7 +147,7 @@ fn price_touch(
     let sqrt_t = t.sqrt();
     let sigma_sqrt_t = sigma * sqrt_t;
     if sigma_sqrt_t <= 0.0 || t <= 0.0 {
-        let hit = finstack_quant_models::closed_form::barrier::barrier_touch_probability(
+        let hit = finstack_quant_models::closed_form::barrier_touch_probability(
             spot,
             barrier,
             t,

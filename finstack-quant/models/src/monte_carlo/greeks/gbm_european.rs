@@ -5,13 +5,13 @@
 //! `finite_diff_gamma`, so the pipeline — including registry-backed defaults —
 //! is defined once in Rust.
 
-use crate::monte_carlo::discretization::ExactGbm;
+use crate::monte_carlo::discretization::exact::ExactGbm;
 use crate::monte_carlo::engine::{McEngine, McEngineConfig};
 use crate::monte_carlo::estimate::Estimate;
 use crate::monte_carlo::greeks::finite_diff::{
-    finite_diff_delta, finite_diff_gamma, FiniteDiffInputs,
+    finite_diff_delta_from_inputs, finite_diff_gamma_from_inputs, FiniteDiffInputs,
 };
-use crate::monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
+use crate::monte_carlo::payoff::vanilla::European;
 use crate::monte_carlo::process::gbm::GbmProcess;
 use crate::monte_carlo::registry;
 use crate::monte_carlo::rng::philox::PhiloxRng;
@@ -86,7 +86,7 @@ enum FdKind {
 /// Returns an error if registry defaults cannot be loaded, `vol` is not
 /// strictly positive, GBM or bump inputs fail validation, or a path
 /// simulation fails.
-pub fn finite_diff_delta_gbm(spec: GbmEuropeanFdSpec) -> Result<Estimate> {
+pub fn finite_diff_delta(spec: GbmEuropeanFdSpec) -> Result<Estimate> {
     run_gbm_fd(spec, FdKind::Delta)
 }
 
@@ -103,13 +103,13 @@ pub fn finite_diff_delta_gbm(spec: GbmEuropeanFdSpec) -> Result<Estimate> {
 ///
 /// # Returns
 ///
-/// An [`Estimate`] shaped as for [`finite_diff_delta_gbm`], with `mean` the
+/// An [`Estimate`] shaped as for [`finite_diff_delta`], with `mean` the
 /// gamma per squared unit of spot.
 ///
 /// # Errors
 ///
-/// Same failure modes as [`finite_diff_delta_gbm`].
-pub fn finite_diff_gamma_gbm(spec: GbmEuropeanFdSpec) -> Result<Estimate> {
+/// Same failure modes as [`finite_diff_delta`].
+pub fn finite_diff_gamma(spec: GbmEuropeanFdSpec) -> Result<Estimate> {
     run_gbm_fd(spec, FdKind::Gamma)
 }
 
@@ -139,39 +139,19 @@ fn run_gbm_fd(spec: GbmEuropeanFdSpec, kind: FdKind) -> Result<Estimate> {
     let disc = ExactGbm::new();
     let discount_factor = flat_discount_factor(spec.rate, spec.expiry)?;
 
-    let (value, stderr) = match spec.option_type {
-        OptionType::Call => {
-            let payoff = EuropeanCall::new(spec.strike, 1.0, num_steps);
-            let inputs = FiniteDiffInputs {
-                engine: &engine,
-                rng: &rng,
-                process: &gbm,
-                disc: &disc,
-                payoff: &payoff,
-                currency,
-                discount_factor,
-            };
-            match kind {
-                FdKind::Delta => finite_diff_delta(&inputs, spec.spot, bump_size)?,
-                FdKind::Gamma => finite_diff_gamma(&inputs, spec.spot, bump_size)?,
-            }
-        }
-        OptionType::Put => {
-            let payoff = EuropeanPut::new(spec.strike, 1.0, num_steps);
-            let inputs = FiniteDiffInputs {
-                engine: &engine,
-                rng: &rng,
-                process: &gbm,
-                disc: &disc,
-                payoff: &payoff,
-                currency,
-                discount_factor,
-            };
-            match kind {
-                FdKind::Delta => finite_diff_delta(&inputs, spec.spot, bump_size)?,
-                FdKind::Gamma => finite_diff_gamma(&inputs, spec.spot, bump_size)?,
-            }
-        }
+    let payoff = European::new(spec.option_type, spec.strike, 1.0, num_steps);
+    let inputs = FiniteDiffInputs {
+        engine: &engine,
+        rng: &rng,
+        process: &gbm,
+        disc: &disc,
+        payoff: &payoff,
+        currency,
+        discount_factor,
+    };
+    let (value, stderr) = match kind {
+        FdKind::Delta => finite_diff_delta_from_inputs(&inputs, spec.spot, bump_size)?,
+        FdKind::Gamma => finite_diff_gamma_from_inputs(&inputs, spec.spot, bump_size)?,
     };
 
     let half_width = CI_95_Z * stderr;
@@ -211,7 +191,7 @@ mod tests {
 
     #[test]
     fn finite_diff_delta_gbm_atm_call_is_between_zero_and_one() {
-        let est = finite_diff_delta_gbm(atm_spec()).expect("delta should succeed");
+        let est = finite_diff_delta(atm_spec()).expect("delta should succeed");
         assert!(est.mean > 0.0 && est.mean < 1.0, "delta={}", est.mean);
         assert!(est.stderr.is_finite() && est.stderr >= 0.0);
         assert_eq!(est.num_paths, 2_000);
@@ -261,8 +241,8 @@ mod tests {
     #[test]
     fn finite_diff_delta_gbm_matches_black_scholes_atm_and_25d() {
         let (atm_spot, atm_strike) = (100.0, 100.0);
-        let est = finite_diff_delta_gbm(crn_spec(atm_spot, atm_strike, OptionType::Call))
-            .expect("atm delta");
+        let est =
+            finite_diff_delta(crn_spec(atm_spot, atm_strike, OptionType::Call)).expect("atm delta");
         let (bs_delta, _) = bs_spot_delta_gamma(atm_spot, atm_strike, 0.05, 0.0, 0.2, 1.0, true);
         let tol = (4.0 * est.stderr).max(0.03);
         assert!(
@@ -273,8 +253,8 @@ mod tests {
         );
 
         let otm_strike = 120.0;
-        let est_25 = finite_diff_delta_gbm(crn_spec(atm_spot, otm_strike, OptionType::Call))
-            .expect("otm delta");
+        let est_25 =
+            finite_diff_delta(crn_spec(atm_spot, otm_strike, OptionType::Call)).expect("otm delta");
         let (bs_delta_25, _) = bs_spot_delta_gamma(atm_spot, otm_strike, 0.05, 0.0, 0.2, 1.0, true);
         let tol_25 = (4.0 * est_25.stderr).max(0.03);
         assert!(
@@ -288,7 +268,7 @@ mod tests {
     #[test]
     fn finite_diff_gamma_gbm_matches_black_scholes_atm() {
         let spec = crn_spec(100.0, 100.0, OptionType::Call);
-        let est = finite_diff_gamma_gbm(spec).expect("atm gamma");
+        let est = finite_diff_gamma(spec).expect("atm gamma");
         let (_, bs_gamma) = bs_spot_delta_gamma(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, true);
         let tol = (4.0 * est.stderr).max(0.01);
         assert!(
@@ -308,10 +288,10 @@ mod tests {
         let bits = |estimate: Estimate| [estimate.mean.to_bits(), estimate.stderr.to_bits()];
         let put = || crn_spec(100.0, 110.0, OptionType::Put);
         let got = [
-            bits(finite_diff_delta_gbm(atm_spec()).expect("call delta")),
-            bits(finite_diff_gamma_gbm(atm_spec()).expect("call gamma")),
-            bits(finite_diff_delta_gbm(put()).expect("put delta")),
-            bits(finite_diff_gamma_gbm(put()).expect("put gamma")),
+            bits(finite_diff_delta(atm_spec()).expect("call delta")),
+            bits(finite_diff_gamma(atm_spec()).expect("call gamma")),
+            bits(finite_diff_delta(put()).expect("put delta")),
+            bits(finite_diff_gamma(put()).expect("put gamma")),
         ];
         const PINS: [[[u64; 2]; 4]; 2] = [
             [
@@ -335,8 +315,7 @@ mod tests {
 
     #[test]
     fn finite_diff_put_delta_is_negative() {
-        let est =
-            finite_diff_delta_gbm(crn_spec(100.0, 100.0, OptionType::Put)).expect("put delta");
+        let est = finite_diff_delta(crn_spec(100.0, 100.0, OptionType::Put)).expect("put delta");
         assert!(est.mean < 0.0 && est.mean > -1.0, "put delta={}", est.mean);
     }
 
@@ -344,7 +323,7 @@ mod tests {
     fn finite_diff_delta_gbm_rejects_non_positive_vol() {
         let mut spec = atm_spec();
         spec.vol = 0.0;
-        let err = finite_diff_delta_gbm(spec).expect_err("zero vol");
+        let err = finite_diff_delta(spec).expect_err("zero vol");
         assert!(
             err.to_string().contains("strictly positive volatility"),
             "unexpected error: {err}"

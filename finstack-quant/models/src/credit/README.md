@@ -42,11 +42,12 @@ routes through `market_anchored`; and by both host bindings — see
 | [`toggle_exercise.rs`](toggle_exercise.rs) | `ToggleExerciseModel`, `CreditState`, `ThresholdToggle`, `StochasticToggle`, `OptimalToggle` |
 | [`market_anchored.rs`](market_anchored.rs) | Fractional-to-absolute credit-vol mappings (`conditional_average_hazard`, `cir_diffusion_coefficient`) |
 
-Re-exported at the `credit` root: `AssetDynamics`, `MertonBarrierType`,
-`MertonModel`, `SimulatedPaths`, `DynamicRecoverySpec`, `EndogenousHazardSpec`,
-`CreditState`, `CreditStateVariable`,
-`OptimalToggle`, `ThresholdDirection`, `ToggleExerciseModel`. `ThresholdToggle`
-and `StochasticToggle` are reachable through `credit::toggle_exercise::`.
+These modules are private; their items are public only at the `credit` root:
+`AssetDynamics`, `MertonBarrierType`, `MertonModel`, `SimulatedPaths`,
+`DynamicRecoveryModel`, `DynamicRecoverySpec`, `EndogenousHazardSpec`,
+`LeverageHazardMap`, `CreditState`, `CreditStateVariable`, `OptimalToggle`,
+`StochasticToggle`, `ThresholdDirection`, `ThresholdToggle`,
+`ToggleExerciseModel`.
 
 ## Merton structural model (`merton/`)
 
@@ -328,10 +329,11 @@ schedule on the config takes precedence.
 ## Example
 
 ```rust
-use finstack_quant_models::credit::{market_anchored::conditional_average_hazard, toggle_exercise::{CreditStateVariable, ThresholdDirection}, AssetDynamics, MertonBarrierType, MertonModel};
-use finstack_quant_models::credit::dynamic_recovery::DynamicRecoverySpec;
-use finstack_quant_models::credit::endogenous_hazard::EndogenousHazardSpec;
-use finstack_quant_models::credit::toggle_exercise::ToggleExerciseModel;
+use finstack_quant_models::credit::{
+    market_anchored::conditional_average_hazard, AssetDynamics,
+    CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec,
+    MertonBarrierType, MertonModel, ThresholdDirection, ToggleExerciseModel,
+};
 
 // Direct construction.
 let model = MertonModel::new(100.0, 0.20, 80.0, 0.05)?;

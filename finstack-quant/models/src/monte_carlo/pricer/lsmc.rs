@@ -45,7 +45,7 @@
 
 use super::super::results::MoneyEstimate;
 use super::lsq::regression_coefficients_with_basis;
-use crate::monte_carlo::discretization::ExactGbm;
+use crate::monte_carlo::discretization::exact::ExactGbm;
 use crate::monte_carlo::estimate::{independent_estimator_stats, Estimate};
 use crate::monte_carlo::pricer::basis::{build_lsmc_basis, BasisFunctions, BasisKind, LsmcBasis};
 use crate::monte_carlo::process::gbm::GbmProcess;
@@ -211,10 +211,7 @@ impl AmericanExercise {
     /// * `spot` - Simulated underlying level in the strike's units.
     #[must_use]
     pub fn exercise_value(&self, spot: f64) -> f64 {
-        match self.option_type {
-            OptionType::Call => (spot - self.strike).max(0.0),
-            OptionType::Put => (self.strike - spot).max(0.0),
-        }
+        self.option_type.intrinsic(spot, self.strike)
     }
 }
 
@@ -1074,17 +1071,19 @@ impl LsmcPricer {
     /// * `vol` - Annualized GBM volatility (decimal).
     /// * `expiry` - Time to expiry in years.
     /// * `num_steps` - Number of time-grid steps between `0` and `expiry`.
-    /// * `currency` - Currency stamped on the returned estimate.
+    /// * `currency` - Currency stamped on the returned estimate; `None` uses the
+    ///   registry default `convenience.default_currency`.
     /// * `basis` - Regression basis family.
     /// * `basis_degree` - Basis degree; must be positive (`laguerre` also
     ///   requires the degree in `[1, 4]`).
     ///
     /// # Errors
     ///
-    /// Returns an error when the strike, GBM parameters, basis, path count,
-    /// step count, or discounting inputs fail validation, or the run fails.
+    /// Returns an error when the registry default currency cannot be resolved,
+    /// the strike, GBM parameters, basis, path count, step count, or
+    /// discounting inputs fail validation, or the run fails.
     #[allow(clippy::too_many_arguments)]
-    pub fn price_gbm_american(
+    pub fn price_american(
         &self,
         option_type: OptionType,
         spot: f64,
@@ -1094,10 +1093,11 @@ impl LsmcPricer {
         vol: f64,
         expiry: f64,
         num_steps: usize,
-        currency: Currency,
+        currency: Option<Currency>,
         basis: BasisKind,
         basis_degree: usize,
     ) -> Result<MoneyEstimate> {
+        let currency = crate::monte_carlo::convenience::resolve_currency(currency)?;
         let exercise = AmericanExercise::new(option_type, strike)?;
         crate::monte_carlo::require_positive_vol(vol)?;
         let process = GbmProcess::with_params(rate, div_yield, vol)?;
@@ -1122,7 +1122,8 @@ impl LsmcPricer {
     /// * `vol` - Annualized GBM volatility (decimal).
     /// * `expiry` - Time to expiry in years.
     /// * `num_steps` - Number of time-grid steps between `0` and `expiry`.
-    /// * `currency` - Currency stamped on the returned estimate.
+    /// * `currency` - Currency stamped on the returned estimate; `None` uses the
+    ///   registry default `convenience.default_currency`.
     /// * `basis` - Regression basis family.
     /// * `basis_degree` - Basis degree; must be positive (`laguerre` also
     ///   requires the degree in `[1, 4]`).
@@ -1134,7 +1135,7 @@ impl LsmcPricer {
     /// Returns an error when inputs fail validation, `pricing_seed` matches the
     /// training seed, or either Monte Carlo pass fails.
     #[allow(clippy::too_many_arguments)]
-    pub fn price_gbm_american_unbiased(
+    pub fn price_american_unbiased(
         &self,
         option_type: OptionType,
         spot: f64,
@@ -1144,11 +1145,12 @@ impl LsmcPricer {
         vol: f64,
         expiry: f64,
         num_steps: usize,
-        currency: Currency,
+        currency: Option<Currency>,
         basis: BasisKind,
         basis_degree: usize,
         pricing_seed: u64,
     ) -> Result<MoneyEstimate> {
+        let currency = crate::monte_carlo::convenience::resolve_currency(currency)?;
         let exercise = AmericanExercise::new(option_type, strike)?;
         crate::monte_carlo::require_positive_vol(vol)?;
         let process = GbmProcess::with_params(rate, div_yield, vol)?;
@@ -1592,7 +1594,7 @@ mod tests {
         let pricer = LsmcPricer::gbm_american(1_000, 8, 42, false, true)
             .expect("GBM American pricer should construct");
         let estimate = pricer
-            .price_gbm_american(
+            .price_american(
                 OptionType::Put,
                 100.0,
                 100.0,
@@ -1601,7 +1603,7 @@ mod tests {
                 0.2,
                 1.0,
                 8,
-                Currency::USD,
+                Some(Currency::USD),
                 BasisKind::Laguerre,
                 3,
             )
@@ -1614,7 +1616,7 @@ mod tests {
         let pricer = LsmcPricer::gbm_american(4_000, 8, 7, false, true)
             .expect("GBM American pricer should construct");
         let estimate = pricer
-            .price_gbm_american(
+            .price_american(
                 OptionType::Put,
                 50.0,
                 100.0,
@@ -1623,7 +1625,7 @@ mod tests {
                 0.2,
                 1.0,
                 8,
-                Currency::USD,
+                Some(Currency::USD),
                 BasisKind::Laguerre,
                 3,
             )
@@ -1641,7 +1643,7 @@ mod tests {
         let pricer = LsmcPricer::gbm_american(2_000, 2, 17, false, true)
             .expect("GBM American pricer should construct");
         let estimate = pricer
-            .price_gbm_american(
+            .price_american(
                 OptionType::Put,
                 50.0,
                 100.0,
@@ -1650,7 +1652,7 @@ mod tests {
                 0.2,
                 1.0 / 252.0,
                 2,
-                Currency::USD,
+                Some(Currency::USD),
                 BasisKind::Laguerre,
                 3,
             )
@@ -1688,7 +1690,7 @@ mod tests {
         let div_yield = 0.0;
         let vol = 0.2;
         let expiry = 1.0;
-        let european = crate::closed_form::vanilla::bs_price(
+        let european = crate::closed_form::bs_price(
             spot,
             strike,
             rate,
@@ -1701,7 +1703,7 @@ mod tests {
         let pricer = LsmcPricer::gbm_american(8_000, 8, 11, false, true)
             .expect("GBM American pricer should construct");
         let estimate = pricer
-            .price_gbm_american(
+            .price_american(
                 OptionType::Put,
                 spot,
                 strike,
@@ -1710,7 +1712,7 @@ mod tests {
                 vol,
                 expiry,
                 8,
-                Currency::USD,
+                Some(Currency::USD),
                 BasisKind::Laguerre,
                 3,
             )
@@ -1732,7 +1734,7 @@ mod tests {
         let div_yield = 0.0;
         let vol = 0.2;
         let expiry = 1.0;
-        let european = crate::closed_form::vanilla::bs_price(
+        let european = crate::closed_form::bs_price(
             spot,
             strike,
             rate,
@@ -1745,7 +1747,7 @@ mod tests {
         let pricer = LsmcPricer::gbm_american(8_000, 8, 13, false, true)
             .expect("GBM American pricer should construct");
         let estimate = pricer
-            .price_gbm_american(
+            .price_american(
                 OptionType::Call,
                 spot,
                 strike,
@@ -1754,7 +1756,7 @@ mod tests {
                 vol,
                 expiry,
                 8,
-                Currency::USD,
+                Some(Currency::USD),
                 BasisKind::Laguerre,
                 3,
             )
@@ -1788,7 +1790,7 @@ mod tests {
         let (spot, strike, rate, div_yield, vol, expiry, num_steps, currency) =
             (100.0, 105.0, 0.05, 0.03, 0.25, 1.0, 10, Currency::USD);
         let estimates = [
-            pricer.price_gbm_american(
+            pricer.price_american(
                 OptionType::Put,
                 spot,
                 strike,
@@ -1797,11 +1799,11 @@ mod tests {
                 vol,
                 expiry,
                 num_steps,
-                currency,
+                Some(currency),
                 BasisKind::Laguerre,
                 3,
             ),
-            pricer.price_gbm_american(
+            pricer.price_american(
                 OptionType::Call,
                 spot,
                 strike,
@@ -1810,11 +1812,11 @@ mod tests {
                 vol,
                 expiry,
                 num_steps,
-                currency,
+                Some(currency),
                 BasisKind::Polynomial,
                 2,
             ),
-            pricer.price_gbm_american_unbiased(
+            pricer.price_american_unbiased(
                 OptionType::Put,
                 spot,
                 strike,
@@ -1823,12 +1825,12 @@ mod tests {
                 vol,
                 expiry,
                 num_steps,
-                currency,
+                Some(currency),
                 BasisKind::Laguerre,
                 3,
                 99,
             ),
-            pricer.price_gbm_american_unbiased(
+            pricer.price_american_unbiased(
                 OptionType::Call,
                 spot,
                 strike,
@@ -1837,7 +1839,7 @@ mod tests {
                 vol,
                 expiry,
                 num_steps,
-                currency,
+                Some(currency),
                 BasisKind::Polynomial,
                 2,
                 99,

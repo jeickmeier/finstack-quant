@@ -18,7 +18,7 @@
 
 use super::super::paths::ProcessParams;
 use super::super::traits::StochasticProcess;
-use super::metadata::ProcessMetadata;
+use crate::monte_carlo::traits::ProcessMetadata;
 use finstack_quant_core::math::linalg::validate_correlation_matrix;
 
 /// Parameters for one-dimensional Brownian motion with drift.

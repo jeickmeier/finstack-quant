@@ -87,7 +87,7 @@ Keep in domain-specific modules ONLY if exclusively useful for that domain:
 - ✅ Move `cholesky_decomposition` to `core::math::linalg` - useful for factor models, portfolio optimization
 - ✅ Move `OnlineStats` to `core::math::stats` - useful for streaming metrics anywhere
 - ❌ Keep `GbmProcess` in `models::monte_carlo::process` - specific to stochastic path simulation
-- ❌ Keep `EuropeanCall` payoff in `models::monte_carlo::payoff` - specific to MC option pricing
+- ❌ Keep `European` payoff in `models::monte_carlo::payoff` - specific to MC option pricing
 
 **Before adding math utilities**:
 
