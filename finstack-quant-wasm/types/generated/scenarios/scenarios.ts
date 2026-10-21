@@ -1739,7 +1739,7 @@ export type CommitmentFeeBase = "undrawn" | "commitment_minus_outstanding";
  * - **Withheld**: Reduces initial cash proceeds, increases effective yield
  * - **Separate**: May be accounted as upfront fee or amortized discount
  *
- * For effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].
+ * For effective interest rate (EIR) amortization schedules, see [`OidEirSpec`](crate::loan_terms::OidEirSpec).
  *
  * # Variants
  *
@@ -13539,7 +13539,7 @@ export interface QuantoOption {
 }
 /**
  * Option on spot commodity. Options on a specified futures contract use
- * [`crate::CommodityFutureOption`], including futures delivery.
+ * [`crate::commodity::commodity_future_option::CommodityFutureOption`], including futures delivery.
  *
  * # Pricing
  *
