@@ -182,20 +182,19 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughHestonM
             .map_err(|e| {
                 finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
             })?;
+        let to_pricing_error =
+            |e| finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone());
+        let model = finstack_quant_models::volatility::heston::HestonParams::new(
+            s.v0, s.kappa, s.theta, s.sigma_v, s.rho,
+        )
+        .map_err(to_pricing_error)?;
         let params = finstack_quant_models::monte_carlo::process::rough_heston::RoughHestonParams {
             r,
             q,
             hurst: hurst_exp,
-            kappa: s.kappa,
-            theta: s.theta,
-            sigma_v: s.sigma_v,
-            rho: s.rho,
-            v0: s.v0,
-        }
-        .validate()
-        .map_err(|e| {
-            finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
-        })?;
+            model,
+        };
+        params.validate().map_err(to_pricing_error)?;
         let process =
             finstack_quant_models::monte_carlo::process::rough_heston::RoughHestonProcess::new(
                 params,

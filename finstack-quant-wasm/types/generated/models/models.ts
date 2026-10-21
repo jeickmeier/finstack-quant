@@ -1378,7 +1378,7 @@ export type ProcessSpec =
        */
       r: number;
       /**
-       * Spot–variance correlation ρ ∈ \[−1, 1\].
+       * Spot–variance correlation ρ ∈ (−1, 1).
        */
       rho: number;
       /**
@@ -5238,7 +5238,7 @@ export interface RoughHestonFourierParams {
   /**
    * Vol-of-vol.
    */
-  sigma: number;
+  sigma_v: number;
   /**
    * Long-run variance.
    */
@@ -5269,7 +5269,7 @@ export interface RoughHestonParams {
    */
   r: number;
   /**
-   * Spot–variance correlation ρ ∈ \[−1, 1\].
+   * Spot–variance correlation ρ ∈ (−1, 1).
    */
   rho: number;
   /**

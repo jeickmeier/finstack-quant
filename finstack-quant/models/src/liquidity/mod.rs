@@ -51,11 +51,9 @@ mod kyle;
 mod lvar;
 mod types;
 
-use finstack_quant_core::{Error, Result};
+use finstack_quant_core::Result;
 
-fn invalid_input(message: impl Into<String>) -> Error {
-    Error::Validation(message.into())
-}
+use crate::invalid_input;
 
 pub use types::{
     days_to_liquidate, liquidity_tier, LiquidityProfile, LiquidityTier, SpreadVolatilityKind,

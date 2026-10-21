@@ -361,7 +361,8 @@ pub fn build_exercise_aligned_grid(
         .last()
         .ok_or_else(|| finstack_quant_core::Error::Validation("empty LMM tenors".to_string()))?;
     validate_exercise_schedule(exercise_times, maturity)?;
-    let process = LmmProcess::new(params.clone().validate()?);
+    params.validate()?;
+    let process = LmmProcess::new(params.clone());
     let canonical_exercises = exercise_times
         .iter()
         .map(|&exercise| {
@@ -567,8 +568,6 @@ mod tests {
             ]],
             initial_forwards: vec![0.03, 0.032, 0.034, 0.036],
         }
-        .validate()
-        .expect("valid params")
     }
 
     fn test_config(num_paths: usize, antithetic: bool, oos_lsmc: bool) -> Hw1fMcConfig {

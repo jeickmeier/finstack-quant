@@ -908,7 +908,7 @@
           "type": "number"
         },
         "rho": {
-          "description": "Spot–variance correlation ρ ∈ \\[−1, 1\\].",
+          "description": "Spot–variance correlation ρ ∈ (−1, 1).",
           "format": "double",
           "type": "number"
         },

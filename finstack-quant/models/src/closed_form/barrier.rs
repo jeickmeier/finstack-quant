@@ -128,6 +128,7 @@
 //! - [`BarrierParams`] for parameter grouping
 //! - Monte Carlo barrier pricing for discrete monitoring and exotic payoffs
 
+use super::vanilla::require_finite_positive;
 use crate::types::OptionType;
 use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::special_functions::{log_norm_cdf, norm_cdf};
@@ -300,22 +301,9 @@ fn validate_barrier_inputs(
     strike: f64,
     barrier: f64,
 ) -> finstack_quant_core::Result<()> {
-    if !spot.is_finite() || spot <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "barrier pricing requires a strictly positive finite spot, got {spot}"
-        )));
-    }
-    if !strike.is_finite() || strike <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "barrier pricing requires a strictly positive finite strike, got {strike}"
-        )));
-    }
-    if !barrier.is_finite() || barrier <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "barrier pricing requires a strictly positive finite barrier, got {barrier}"
-        )));
-    }
-    Ok(())
+    require_finite_positive("barrier pricing", "spot", spot)?;
+    require_finite_positive("barrier pricing", "strike", strike)?;
+    require_finite_positive("barrier pricing", "barrier", barrier)
 }
 
 /// Helper function for barrier pricing.

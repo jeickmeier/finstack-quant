@@ -178,8 +178,6 @@ mod tests {
             ]],
             initial_forwards: vec![0.03, 0.03, 0.03],
         }
-        .validate()
-        .expect("valid")
     }
 
     #[test]
@@ -322,7 +320,7 @@ mod tests {
         let mut params = simple_params();
         params.vol_times = vec![0.5];
         params.vol_values = vec![vec![[0.0; 3]; 3], vec![[0.2, 0.1, 0.0]; 3]];
-        let process = LmmProcess::new(params.validate().expect("valid parameters"));
+        let process = LmmProcess::new(params);
         let disc = LmmPredictorCorrector::new();
         let mut rates = [0.03; 3];
         disc.step(&process, 0.0, 0.5, &mut rates, &[1.0, -0.5], &mut [0.0; 9]);
@@ -337,7 +335,7 @@ mod tests {
         let mut params = simple_params();
         params.vol_times = vec![0.5];
         params.vol_values = vec![vec![[0.1; 3]; 3], vec![[0.2; 3]; 3]];
-        let process = LmmProcess::new(params.validate().expect("valid parameters"));
+        let process = LmmProcess::new(params);
         let disc = LmmPredictorCorrector::new();
         for (t, dt) in [(0.0, 0.75), (0.5, 0.75)] {
             let mut rates = [0.03; 3];
