@@ -1,6 +1,6 @@
 //! Scenario application for portfolios.
 //!
-//! Applies [`ScenarioSpec`](finstack_quant_scenarios::ScenarioSpec) to a
+//! Applies [`ScenarioSpec`] to a
 //! cloned market context and a borrowed-or-owned portfolio state, then
 //! optionally re-values with the stressed data.
 
