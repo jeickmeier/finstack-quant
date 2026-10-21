@@ -731,7 +731,7 @@ fn scenarios_dts_matches_structured_surface() {
     );
     assert!(contains_ignoring_ws(
         &dts,
-        "computeHorizonReturn(instrumentJson: JsonInput, marketJson: JsonInput, asOf: string, scenarioJson: JsonInput, method?: 'parallel' | 'waterfall' | 'metrics_based' | 'taylor', configJson?: JsonInput, calendarId?: string): HorizonReport;",
+        "computeHorizonReturn(instrumentJson: JsonInput, marketJson: JsonInput, asOf: string, scenarioJson: JsonInput, method?: JsonInput, configJson?: JsonInput, calendarId?: string): HorizonReport;",
     ));
     assert!(declares_type(&dts, "HorizonResult"));
     assert!(contains_ignoring_ws(
@@ -1814,7 +1814,7 @@ fn rust_computation_twins_are_declared() {
         "calibrationResultContentHash(resultJson: CalibrationResultEnvelope | string): string;",
         "attributePnlMany(inputs: AttributionInputs | string, instruments: JsonInput[] | string): PnlAttribution[];",
         "attributeReturnContribution(spec: JsonInput): ReturnContributionResult;",
-        "pnlAttributionExplainText(pnl: PnlAttribution | string): string;",
+        "pnlAttributionExplainText(pnl: PnlAttribution | string, showZeros?: boolean | null): string;",
         "financialModelContentHash(modelJson: JsonInput): string;",
         "nodeToDatedSchedule(modelJson: JsonInput, resultJson: StatementResult | string, nodeId: string, convention?: 'end' | 'start' | null): [string, number][];",
         "scenarioComparisonTable(scenarioResultsJson: ScenarioResults | string, metrics: string[]): TableEnvelope;",

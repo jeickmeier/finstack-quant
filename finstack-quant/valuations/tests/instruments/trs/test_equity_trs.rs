@@ -275,69 +275,46 @@ fn test_equity_trs_cashflow_provider_emits_financing_flows() {
     );
 }
 
-/// The exported cashflow schedule must stay CLOSE to the financing-leg PV.
-///
-/// Since the engine unification, `pv_financing_leg` prices through
-/// `TrsEngine` (the same engine as the par-spread/annuity metrics, honoring
-/// `FloatingLegCompounding`), while the exported schedule keeps the
-/// cashflow-builder convention (term-index fixing at the reset date). The two
-/// projection conventions — index fixing at reset vs discrete forward over
-/// the accrual period — differ by curve-shape detail only (~$40 on a $260k
-/// leg here), never by structure. The tolerance below (1bp of notional)
-/// admits that convention gap while still failing loudly on a structural
-/// break (a dropped period or wrong discounting is worth thousands).
-///
-/// The exact PV-consistency guard is `par_spread_reprices_*_equity_trs_to_zero`
-/// in `test_trs_metrics.rs`: the reported par spread must reprice the swap's
-/// `base_value` to ~0, which pins PV and metrics to one engine.
+/// The exported schedule nets both legs on the pricing engine, so it
+/// reprices `base_value` exactly for either side and either financing
+/// compounding convention.
 #[test]
-fn test_equity_trs_financing_leg_matches_provider_schedule() {
+fn test_equity_trs_cashflow_schedule_reprices_base_value() {
     let market = create_market_context();
     let as_of = as_of_date();
-    let trs = TestEquityTrsBuilder::new().spread_bp(50.0).build();
-
-    let financing_pv = trs.pv_financing_leg(&market, as_of).unwrap();
-    let schedule = trs
-        .cashflow_schedule(&market, as_of)
-        .expect("financing schedule should build");
-    let discount = market
-        .get_discount(trs.financing_leg.discount_curve_id.as_str())
-        .expect("discount curve");
-    let payment_dates = trs.schedule.period_schedule().expect("period schedule");
-    let mut expected_pv = 0.0;
-
-    // Filter to coupon-only flows (the signed canonical schedule now also
-    // contains notional flows which are not part of the financing leg PV).
-    let coupon_flows: Vec<_> = schedule
-        .get_flows()
-        .iter()
-        .filter(|cf| cf.kind.is_interest_like())
-        .collect();
-
-    for (flow, payment_end) in coupon_flows.iter().zip(payment_dates.dates.iter().skip(1)) {
-        if *payment_end <= as_of {
-            continue;
+    let discount = market.get_discount("USD-OIS").expect("discount curve");
+    for side in [PayReceive::Receive, PayReceive::Pay] {
+        for compounding in [
+            finstack_quant_cashflows::builder::FloatingLegCompounding::Simple,
+            finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears {
+                lookback_days: 0,
+            },
+        ] {
+            let mut trs = TestEquityTrsBuilder::new()
+                .spread_bp(50.0)
+                .side(side)
+                .build();
+            trs.financing_leg.compounding = compounding;
+            let pv = trs.value(&market, as_of).expect("pv").amount();
+            let schedule = trs
+                .cashflow_schedule(&market, as_of)
+                .expect("schedule should build");
+            let mut exported = 0.0;
+            for cf in schedule.get_flows() {
+                exported += cf.amount.amount()
+                    * discount
+                        .as_ref()
+                        .df_between_dates(as_of, cf.date)
+                        .expect("df");
+            }
+            approx_eq(
+                exported,
+                pv,
+                1e-6,
+                &format!("{side:?} {compounding:?} exported flows must reprice base_value"),
+            );
         }
-        let payment_date = trs
-            .schedule
-            .payment_date_for(*payment_end)
-            .expect("payment date");
-        let df = discount
-            .as_ref()
-            .df_between_dates(as_of, payment_date)
-            .expect("relative df");
-        expected_pv += flow.amount.amount() * df;
     }
-
-    // 1bp of the 10M notional: wide enough for the documented projection-
-    // convention gap, far too tight for a structural break.
-    approx_eq(
-        financing_pv.amount(),
-        expected_pv,
-        1_000.0,
-        "Financing PV should reconcile to provider schedule up to the \
-         projection-convention gap",
-    );
 }
 
 #[test]
@@ -561,12 +538,8 @@ fn test_equity_trs_cashflow_schedule_generation() {
     let flows = trs.dated_cashflows(&market, as_of).unwrap();
 
     // Assert
-    // Signed canonical schedule: 4 quarterly coupons + initial/final notional = 6 flows
-    assert_eq!(
-        flows.len(),
-        6,
-        "Should have 6 flows (4 coupons + 2 notionals)"
-    );
+    // Net of both legs: one flow per quarterly payment date
+    assert_eq!(flows.len(), 4, "Should have 4 quarterly net cashflows");
 
     // All flows on or after as_of, in correct currency
     for (date, amount) in &flows {
@@ -666,4 +639,34 @@ fn test_equity_trs_notional_scaling() {
         0.01, // 1% tolerance for rounding
         "NPV should scale linearly with notional",
     );
+}
+
+/// Theta across the first financing reset holds the crossed fixings at their
+/// as-of projection (exported with the cashflow schedule); the market carries
+/// no fixing for the reset window.
+#[test]
+fn test_equity_trs_theta_across_a_financing_reset() {
+    let market = create_market_context();
+    let as_of = as_of_date();
+    for compounding in [
+        finstack_quant_cashflows::builder::FloatingLegCompounding::Simple,
+        finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears {
+            lookback_days: 0,
+        },
+    ] {
+        let mut trs = TestEquityTrsBuilder::new().initial_level(5000.0).build();
+        assert!(trs.schedule.start > as_of);
+        trs.financing_leg.compounding = compounding;
+        trs.metric_pricing_overrides.theta_period =
+            Some(finstack_quant_core::dates::Tenor::parse("1W").expect("tenor"));
+        let result = trs
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[finstack_quant_valuations::metrics::MetricId::Theta],
+                finstack_quant_valuations::instruments::PricingOptions::default(),
+            )
+            .unwrap_or_else(|err| panic!("{compounding:?} theta across the start reset: {err}"));
+        assert!(result.measures["theta"].is_finite(), "{compounding:?}");
+    }
 }

@@ -4,9 +4,8 @@ use crate::calibration::calibration_support as cal_utils;
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::{
     BaseCorrelationParams, CalibrationEnvelope, CalibrationPlan, CalibrationStep,
-    ForwardCurveParams, HazardCurveParams, InflationCurveParams, SabrInterpolationMethod,
-    StepParams, SurfaceExtrapolationPolicy, SwaptionVolConvention, SwaptionVolParams,
-    VolSurfaceParams,
+    ForwardCurveParams, HazardCurveParams, InflationCurveParams, StepParams,
+    SurfaceExtrapolationPolicy, SwaptionVolConvention, SwaptionVolParams, VolSurfaceParams,
 };
 use finstack_quant_calibration::quotes::cds::CdsQuote;
 use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
@@ -162,7 +161,50 @@ fn inflation_preflight_rejects_invalid_observation_lag() {
     let err = engine::calibrate(&envelope).expect_err("invalid lag should fail");
     let msg = err.to_string();
     assert!(
-        msg.contains("Invalid observation_lag"),
+        msg.contains("Invalid inflation lag"),
+        "unexpected error: {msg}"
+    );
+}
+
+#[test]
+fn inflation_preflight_rejects_day_based_observation_lag() {
+    let base_date = base_date();
+    let discount = usd_discount_curve(base_date);
+    let source_market = MarketContext::new().insert(discount);
+
+    let quote = MarketQuote::Inflation(InflationQuote::InflationSwap {
+        id: QuoteId::new("USA-CPI-U-ZCIS-20300102"),
+        maturity: Date::from_calendar_date(2030, Month::January, 2).expect("maturity"),
+        rate: 0.02,
+        index: "USA-CPI-U".to_string(),
+        convention:
+            finstack_quant_valuations_core::market::conventions::ids::InflationSwapConventionId::new(
+                "USD",
+            ),
+    });
+
+    let step = CalibrationStep {
+        id: "infl".to_string(),
+        quote_set: "infl".to_string(),
+        params: StepParams::Inflation(InflationCurveParams {
+            curve_id: "USD-CPI".into(),
+            currency: Currency::USD,
+            base_date,
+            discount_curve_id: "USD-OIS".into(),
+            index: "USA-CPI-U".to_string(),
+            observation_lag: "90D".to_string(),
+            base_cpi: 100.0,
+            notional: 1.0,
+            method: Default::default(),
+            interpolation: Default::default(),
+        }),
+    };
+
+    let envelope = envelope_for_step(step, vec![quote], source_market);
+    let err = engine::calibrate(&envelope).expect_err("day-based lag should fail in preflight");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("day-based observation lags"),
         "unexpected error: {msg}"
     );
 }
@@ -215,7 +257,6 @@ fn swaption_vol_preflight_rejects_invalid_shift() {
             sabr_beta: 0.5,
             target_expiries: Vec::new(),
             target_tenors: Vec::new(),
-            sabr_interpolation: SabrInterpolationMethod::default(),
             calendar_id: None,
             fixed_day_count: None,
             swap_index: None,

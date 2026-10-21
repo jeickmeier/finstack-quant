@@ -356,7 +356,7 @@ fn requested_metrics(input: &EvaluationInput<'_>, position: &Position) -> Positi
 ///   preserves that order.
 /// * `options` - Pricing options whose `metric_registry`, when present,
 ///   decides applicability; otherwise the shared standard registry is used.
-pub(crate) fn supported_metrics(
+fn supported_metrics(
     instrument: &dyn Instrument,
     menu: &[MetricId],
     options: &PricingOptions,

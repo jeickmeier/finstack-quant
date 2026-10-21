@@ -121,6 +121,35 @@ def _clo() -> StructuredCredit:
     )
 
 
+def test_pool_assets_and_hedge_swaps_accept_a_json_array_string() -> None:
+    loans = _loans()
+    pool = AssetPool("P", "clo", USD).with_assets(json.dumps([loan.to_dict() for loan in loans]))
+    assert [asset.to_dict() for asset in pool.assets] == [loan.to_dict() for loan in loans]
+
+    hedge = HedgeSwap(InterestRateSwap.example(), notional={"tranche_par": "A"})
+    deal = (
+        StructuredCredit
+        .builder()
+        .id("CLO-HEDGED")
+        .deal_type("clo")
+        .pool(pool)
+        .tranches(TrancheStructure([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]))
+        .closing_date(CLOSE)
+        .first_payment_date(datetime.date(2024, 4, 1))
+        .maturity(MATURITY)
+        .frequency(Tenor.quarterly())
+        .discount_curve_id("USD-OIS")
+        .hedge_swaps(json.dumps([hedge.to_dict()]))
+        .build()
+    )
+    assert [h.to_dict() for h in deal.hedge_swaps] == [hedge.to_dict()]
+
+    with pytest.raises(ValueError, match="assets"):
+        AssetPool("P", "clo", USD).with_assets("[{")
+    with pytest.raises(ValueError, match="hedge_swaps"):
+        StructuredCredit.builder().hedge_swaps("[{")
+
+
 def test_pool_asset_rows_round_trip_through_the_typed_pool() -> None:
     loan = PoolAsset(
         "L0",

@@ -8,10 +8,11 @@
 //! practice: a clean price applies to the drawn balance at settlement plus
 //! accrued cash interest; the undrawn commitment and letters of credit are
 //! not in the quote, though their fees are in the flows being repriced.
-//! Without a quote the target is the model value carried from the valuation
-//! date to settlement on the discount curve, so with the default
-//! `settlement_days = 0` the model discount margin of a par facility on a
-//! flat consistent curve is exactly its contractual margin.
+//! Without a quote the target is the model value, less the flows paid before
+//! settlement, carried from the valuation date to settlement on the discount
+//! curve, so with the default `settlement_days = 0` the model discount margin
+//! of a par facility on a flat consistent curve is exactly its contractual
+//! margin.
 
 use std::sync::Arc;
 
@@ -121,7 +122,8 @@ fn holder_flows(schedule: &CashFlowSchedule, settlement: Date) -> Vec<(Date, f64
 }
 
 /// Dirty target price at settlement: the quoted clean price on the drawn
-/// balance plus accrued, else the model value carried to settlement.
+/// balance plus accrued, else the model value carried to settlement net of
+/// the flows paid in `(as_of, settlement]`, which go to the seller.
 fn target_price(
     facility: &RevolvingCredit,
     schedule: &CashFlowSchedule,
@@ -146,7 +148,18 @@ fn target_price(
             "discount factor from {as_of} to settlement {settlement} must be positive"
         )));
     }
-    Ok(context.base_value.amount() / carry)
+    // The model value counts these flows; `holder_flows` does not, as for
+    // `TermLoan::value_at_settlement`. DF-only, like the term loan: survival
+    // over the settlement lag is not removed.
+    let mut pre_settlement = 0.0;
+    for cf in schedule
+        .get_flows()
+        .iter()
+        .filter(|cf| cf.date > as_of && cf.date <= settlement)
+    {
+        pre_settlement += cf.amount.amount() * disc.df_between_dates(as_of, cf.date)?;
+    }
+    Ok((context.base_value.amount() - pre_settlement) / carry)
 }
 
 /// Contractual margin at `as_of` for the discount-margin guess and the

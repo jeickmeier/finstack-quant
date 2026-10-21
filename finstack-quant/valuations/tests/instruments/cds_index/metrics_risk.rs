@@ -655,3 +655,125 @@ fn test_recovery01_scales_with_notional() {
         0.05,
     );
 }
+
+// Mode dispatch: every metric follows `pricing`, not `constituents.is_empty()`.
+
+fn metric(
+    idx: &finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex,
+    ctx: &MarketContext,
+    as_of: time::Date,
+    id: MetricId,
+    options: finstack_quant_valuations::instruments::PricingOptions,
+) -> f64 {
+    idx.price_with_metrics(ctx, as_of, std::slice::from_ref(&id), options)
+        .unwrap_or_else(|err| panic!("{id:?}: {err}"))
+        .measures[&id]
+}
+
+#[test]
+fn single_curve_metrics_ignore_attached_constituents() {
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2030 - 01 - 01);
+    let as_of = start;
+    // Constituent curves deliberately differ from the index curve.
+    let mut ctx = standard_market_context(as_of);
+    for i in 1..=5 {
+        ctx = ctx.insert(flat_hazard_curve(
+            &format!("HZ{i}"),
+            as_of,
+            STANDARD_RECOVERY_SENIOR,
+            0.03,
+        ));
+    }
+    let plain = standard_single_curve_index("CDX-MODE", start, end, 10_000_000.0);
+    let mut attached = plain.clone();
+    attached.constituents = equal_weight_constituents(5);
+    assert_eq!(
+        attached.pricing,
+        finstack_quant_valuations::instruments::credit_derivatives::cds_index::IndexPricing::SingleCurve
+    );
+
+    for id in [
+        MetricId::Recovery01,
+        MetricId::ExpectedLoss,
+        MetricId::JumpToDefault,
+    ] {
+        let options = crate::instruments::test_support::credit::pricing_options;
+        let expected = metric(&plain, &ctx, as_of, id.clone(), options());
+        let actual = metric(&attached, &ctx, as_of, id.clone(), options());
+        assert!(expected.abs() > 0.0, "{id:?} fixture must be non-zero");
+        relative_eq(actual, expected, 1e-12, &format!("{id:?} follows pricing"));
+    }
+}
+
+#[test]
+fn recovery01_skips_defaulted_constituents_without_curves() {
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2030 - 01 - 01);
+    let as_of = start;
+    // HZ5 belongs to the defaulted name and is legitimately absent.
+    let ctx = multi_constituent_market_context(as_of, 4);
+    let mut idx = standard_constituents_index("CDX-DEFAULTED", start, end, 10_000_000.0, 5);
+    idx.constituents[4].defaulted = true;
+    idx.index_factor = 0.8;
+
+    let recovery01 = metric(
+        &idx,
+        &ctx,
+        as_of,
+        MetricId::Recovery01,
+        crate::instruments::test_support::credit::pricing_options(),
+    );
+    assert!(
+        recovery01.is_finite() && recovery01.abs() > 0.0,
+        "Recovery01 {recovery01}"
+    );
+}
+
+#[test]
+fn parallel_cs01_uses_the_configured_credit_spread_bump() {
+    use finstack_quant_core::types::CurveId;
+    use finstack_quant_valuations::recalibration::QuoteBump;
+
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2030 - 01 - 01);
+    let as_of = start;
+    let bump_bp = 50.0;
+    let ctx = replayable_standard_market_context(as_of);
+    let idx = standard_single_curve_index("CDX-BUMP", start, end, 10_000_000.0);
+
+    let mut config = finstack_quant_core::config::FinstackConfig::default();
+    config
+        .extensions
+        .insert(
+            "valuations.sensitivities.v1",
+            serde_json::json!({ "credit_spread_bump_bp": bump_bp }),
+        )
+        .expect("valid sensitivity configuration");
+    let cs01 = metric(
+        &idx,
+        &ctx,
+        as_of,
+        MetricId::Cs01,
+        crate::instruments::test_support::credit::pricing_options().with_config(&config),
+    );
+
+    let hazard = ctx.get_hazard("HZ-INDEX").expect("index hazard");
+    let discount_id = CurveId::new("USD-OIS");
+    let pv_at = |bp: f64| {
+        let bumped = finstack_quant_calibration::recalibration::bump_hazard_spreads(
+            &hazard,
+            &ctx,
+            &QuoteBump::ParallelBp(bp),
+            Some(&discount_id),
+            None,
+            None,
+        )
+        .expect("re-bootstrap");
+        idx.value(&ctx.clone().insert(bumped), as_of)
+            .expect("pv")
+            .amount()
+    };
+    let expected = (pv_at(bump_bp) - pv_at(-bump_bp)) / (2.0 * bump_bp);
+    relative_eq(cs01, expected, 1e-9, "parallel CS01 at the configured bump");
+}
