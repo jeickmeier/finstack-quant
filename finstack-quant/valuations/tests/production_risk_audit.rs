@@ -121,7 +121,7 @@ fn fx01_follows_active_spot_and_forward_overrides() {
 #[test]
 fn equity_scalar_volatility_risk_is_separate_from_source_nodes() {
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_valuations::instruments::EquityOption;
+    use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
     let as_of = date!(2025 - 01 - 01);
     let mut option = EquityOption::example().expect("option");
     option.expiry = date!(2026 - 01 - 01);
@@ -175,7 +175,7 @@ fn equity_scalar_volatility_risk_is_separate_from_source_nodes() {
 
 #[test]
 fn touch_vega_follows_the_active_scalar_quote() {
-    use finstack_quant_valuations::instruments::FxTouchOption;
+    use finstack_quant_valuations::instruments::fx::fx_touch_option::FxTouchOption;
     let as_of = date!(2025 - 01 - 01);
     let market = market();
     let mut option = FxTouchOption::example().expect("touch");
@@ -213,7 +213,8 @@ fn touch_vega_follows_the_active_scalar_quote() {
 #[test]
 fn analytical_barrier_price_and_risk_use_the_active_quote() {
     use finstack_quant_core::{market_data::scalars::MarketScalar, types::BarrierType};
-    use finstack_quant_valuations::{instruments::BarrierOption, pricer::ModelKey};
+    use finstack_quant_valuations::instruments::exotics::barrier_option::BarrierOption;
+    use finstack_quant_valuations::pricer::ModelKey;
     let as_of = date!(2025 - 01 - 01);
     let mut option = BarrierOption::example().expect("barrier");
     option.expiry = date!(2026 - 01 - 01);

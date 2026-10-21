@@ -9,12 +9,10 @@
 //! Period return is `pnl / capital` for one composite unit. The chained
 //! `return_index` starts at `100` on the first output row.
 use super::types::{cashflows_between, validate_history};
-use super::{
-    CompositeExposureReport, CompositeInstrument, CompositeMarketObservation, CompositeSpec,
-    CompositeTrade,
-};
+use super::{CompositeInstrument, CompositeMarketObservation, CompositeSpec, CompositeTrade};
 use crate::instruments::{Instrument, PricingOptions};
 use crate::metrics::MetricId;
+use crate::results::composite::CompositeExposureReport;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::money::Money;
@@ -318,15 +316,17 @@ mod tests {
         let legs = vec![
             CompositeLegSpec::new(
                 "A",
-                crate::instruments::InstrumentJson::Equity(
-                    crate::instruments::Equity::new("A", "A", Currency::USD).with_spot_id("A"),
+                crate::instruments::json_loader::InstrumentJson::Equity(
+                    crate::instruments::equity::spot::Equity::new("A", "A", Currency::USD)
+                        .with_spot_id("A"),
                 ),
                 1.0,
             ),
             CompositeLegSpec::new(
                 "B",
-                crate::instruments::InstrumentJson::Equity(
-                    crate::instruments::Equity::new("B", "B", Currency::USD).with_spot_id("B"),
+                crate::instruments::json_loader::InstrumentJson::Equity(
+                    crate::instruments::equity::spot::Equity::new("B", "B", Currency::USD)
+                        .with_spot_id("B"),
                 ),
                 -1.0,
             ),

@@ -21,7 +21,7 @@
 //! inputs compare against an independently constructed canonical rate spec.
 
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_valuations::instruments::instrument_json_of;
+use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::pricer::{parse_boxed_instrument_from_json, price_instrument};
 use serde_json::Value;
@@ -147,9 +147,10 @@ fn price_case(cases: &Value, ty: &str, extra: &[(Value, Value)]) -> String {
         PricingOptions::default(),
     )
     .unwrap_or_else(|e| panic!("{ty}: {e}"));
-    let canonical_json = finstack_quant_valuations::instruments::InstrumentEnvelope::new(
-        instrument_json_of(parsed.as_instrument()).expect("registered instrument"),
-    );
+    let canonical_json =
+        finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope::new(
+            instrument_json_of(parsed.as_instrument()).expect("registered instrument"),
+        );
     let canonical = parse_boxed_instrument_from_json(
         &serde_json::to_string(&canonical_json).expect("canonical JSON"),
         None,
@@ -515,7 +516,7 @@ fn assert_rejects_at<T: serde::Serialize + serde::de::DeserializeOwned>(
 #[test]
 // schema-rejection-test: RevolvingCredit `commitment_amount`, `drawn_amount`, `base_rate_spec`
 fn retired_revolver_keys_are_rejected() {
-    use finstack_quant_valuations::instruments::RevolvingCredit;
+    use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit;
     use serde_json::json;
     let rc = RevolvingCredit::example().expect("revolver");
     let usd = json!({"amount": "1", "currency": "USD"});
@@ -600,7 +601,7 @@ fn retired_term_loan_keys_are_rejected() {
 #[test]
 // schema-rejection-test: AssetBackedFacility `unused_fee_bp`, `spread_bp`, `forward_curve_id`, `draw_schedule`; FacilityProjection `unused_fees`
 fn retired_facility_keys_are_rejected() {
-    use finstack_quant_valuations::instruments::AssetBackedFacility;
+    use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility;
     use serde_json::json;
     let abf = AssetBackedFacility::example().expect("abf");
     assert_rejects_at(&abf, "", "unused_fee_bp", json!(50.0));
@@ -631,8 +632,8 @@ fn retired_utilization_keys_are_rejected() {
 #[test]
 // schema-rejection-test: ConvertibleBond `fixed_coupon`, `floating_coupon`; ConversionEvent price_trigger `threshold`, `lookback_days`
 fn retired_convertible_keys_are_rejected() {
+    use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
     use finstack_quant_valuations::instruments::ConversionEvent;
-    use finstack_quant_valuations::instruments::ConvertibleBond;
     use serde_json::json;
     let cb = ConvertibleBond::example().expect("convertible");
     assert_rejects_at(&cb, "", "fixed_coupon", Value::Null);
@@ -650,8 +651,8 @@ fn retired_convertible_keys_are_rejected() {
 /// when omitted, as the retired `fee_bp` / `unused_fee_bp` did.
 #[test]
 fn omitted_contractual_fees_default_to_zero() {
+    use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility;
     use finstack_quant_valuations::instruments::fixed_income::loan_terms::CommitmentStep;
-    use finstack_quant_valuations::instruments::AssetBackedFacility;
     use serde_json::json;
     let step: CommitmentStep = serde_json::from_value(
         json!({"date": "2025-01-01", "amount": {"amount": "1", "currency": "USD"}}),

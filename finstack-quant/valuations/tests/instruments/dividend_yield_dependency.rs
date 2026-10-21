@@ -1,9 +1,12 @@
 //! Dividend-yield identifiers are market scalars, not time series.
 
 use finstack_quant_core::types::PriceId;
-use finstack_quant_valuations::instruments::{
-    AsianOption, Autocallable, BarrierOption, CliquetOption, Instrument, LookbackOption,
-};
+use finstack_quant_valuations::instruments::equity::autocallable::Autocallable;
+use finstack_quant_valuations::instruments::equity::cliquet_option::CliquetOption;
+use finstack_quant_valuations::instruments::exotics::asian_option::AsianOption;
+use finstack_quant_valuations::instruments::exotics::barrier_option::BarrierOption;
+use finstack_quant_valuations::instruments::exotics::lookback_option::LookbackOption;
+use finstack_quant_valuations::instruments::Instrument;
 
 fn assert_dividend_yield_is_market_scalar<T: Instrument>(
     instrument: &T,

@@ -871,7 +871,7 @@ mod tests {
         })
         .map(|model| model.with_custom_sensitivity_engine(FixedSensitivityEngine))
         .expect("model");
-        let mut bond = finstack_quant_valuations::instruments::Bond::fixed(
+        let mut bond = finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
             "BOND-ISSUER-B",
             Money::from((1_000_000_i64, Currency::USD)),
             finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),

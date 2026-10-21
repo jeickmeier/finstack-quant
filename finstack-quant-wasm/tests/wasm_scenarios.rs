@@ -168,7 +168,10 @@ fn compose_scenarios_rejects_mixed_hazard_bump_modes_as_javascript_error() {
 #[wasm_bindgen_test]
 fn instrument_copies_are_returned_and_missing_inventory_is_rejected() {
     use finstack_quant_scenarios::{OperationSpec, ScenarioSpec};
-    use finstack_quant_valuations::instruments::{instrument_json_of, Bond, InstrumentEnvelope};
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+    use finstack_quant_valuations::instruments::json_loader::{
+        instrument_json_of, InstrumentEnvelope,
+    };
     use finstack_quant_valuations::pricer::InstrumentType;
     let bond = Bond::example().unwrap();
     let inventory = serde_json::to_string(&vec![InstrumentEnvelope::new(

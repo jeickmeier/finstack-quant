@@ -28,7 +28,7 @@ use finstack_quant_core::schema::{
     externalize_schema_definitions, ExternalSchemaDefinition, SchemaArtifact, SchemaKind,
 };
 use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use finstack_quant_valuations::results::ValuationResult;
 use serde_json::Value;
 

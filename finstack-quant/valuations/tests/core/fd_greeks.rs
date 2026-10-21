@@ -10,7 +10,7 @@ use time::macros::date;
 fn generic_greeks_follow_the_active_override_without_a_surface() {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::{surfaces::VolSurface, term_structures::DiscountCurve};
-    use finstack_quant_valuations::instruments::EquityOption;
+    use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
     use finstack_quant_valuations::metrics::{MetricCalculator, MetricContext};
     let as_of = date!(2025 - 01 - 01);
     let mut option = EquityOption::example().expect("option");

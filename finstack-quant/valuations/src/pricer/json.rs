@@ -7,7 +7,8 @@
 
 use super::{parse_model_key, shared_standard_registry, ModelKey};
 use crate::instruments::json_loader::{instrument_load_error, MAX_JSON_BYTES};
-use crate::instruments::{Instrument, InstrumentEnvelope, InstrumentJson, MetricPricingOverrides};
+use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+use crate::instruments::{Instrument, MetricPricingOverrides};
 use crate::metrics::MetricId;
 use crate::results::ValuationResult;
 use finstack_quant_core::contract::{parse_json_value, LoadLimits};
@@ -221,7 +222,7 @@ pub fn instrument_envelope_from_spec(
 ///
 /// * `json` - Required canonical v1 instrument envelope whose `type` must be
 ///   the discriminator of `T` (for example `"bond"` for
-///   [`crate::instruments::Bond`]).
+///   [`crate::instruments::fixed_income::bond::Bond`]).
 ///
 /// # Errors
 ///
@@ -1068,11 +1069,12 @@ mod tests {
                 .expect("canonical fx spot"),
         )
         .expect("json");
-        let spot: crate::instruments::FxSpot =
+        let spot: crate::instruments::fx::fx_spot::FxSpot =
             parse_typed_instrument_json(&fx_spot).expect("typed fx spot");
         assert_eq!(spot.id.as_str(), "EURUSD-SPOT");
-        let err = parse_typed_instrument_json::<crate::instruments::FxForward>(&fx_spot)
-            .expect_err("wrong envelope type should be rejected");
+        let err =
+            parse_typed_instrument_json::<crate::instruments::fx::fx_forward::FxForward>(&fx_spot)
+                .expect_err("wrong envelope type should be rejected");
         assert!(matches!(err, Error::Validation(_)));
         assert!(err
             .to_string()
@@ -1168,15 +1170,15 @@ mod tests {
 
     #[test]
     fn composite_metric_pricing_overrides_merge_into_root() {
-        let composite =
-            crate::instruments::CompositeInstrument::example().expect("composite example");
+        let composite = crate::instruments::composite::CompositeInstrument::example()
+            .expect("composite example");
         let json = envelope_json(InstrumentJson::Composite(Box::new(composite)));
         let merged = instrument_json_for_pricing(
             &json,
             Some(r#"{"theta_period":{"count":1,"unit":"months"}}"#),
         )
         .expect("merge");
-        let envelope: crate::instruments::InstrumentEnvelope =
+        let envelope: crate::instruments::json_loader::InstrumentEnvelope =
             serde_json::from_str(merged.as_ref()).expect("merged composite must still parse");
         let InstrumentJson::Composite(parsed) = envelope.instrument else {
             panic!("expected composite");

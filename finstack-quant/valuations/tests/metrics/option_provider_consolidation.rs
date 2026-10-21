@@ -9,12 +9,13 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::fx::{FxMatrix, FxQuery, SimpleFxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_valuations::instruments::fx::fx_option::FxOption;
 use finstack_quant_valuations::instruments::fx::fx_option::{
     FxDeltaConvention, FxDeltaConventionKind,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
-use finstack_quant_valuations::instruments::{Attributes, FxOption, OptionType};
+use finstack_quant_valuations::instruments::{Attributes, OptionType};
 use finstack_quant_valuations::instruments::{
     OptionGreekKind, OptionGreeksProvider, OptionGreeksRequest,
 };

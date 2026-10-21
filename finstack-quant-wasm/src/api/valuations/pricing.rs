@@ -751,9 +751,13 @@ pub(super) mod tests {
         }
     }
 
-    fn envelope_json(instrument: finstack_quant_valuations::instruments::InstrumentJson) -> String {
+    fn envelope_json(
+        instrument: finstack_quant_valuations::instruments::json_loader::InstrumentJson,
+    ) -> String {
         serde_json::to_string(
-            &finstack_quant_valuations::instruments::InstrumentEnvelope::new(instrument),
+            &finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope::new(
+                instrument,
+            ),
         )
         .expect("serialize instrument envelope")
     }
@@ -805,7 +809,7 @@ pub(super) mod tests {
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::Rate;
         use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-        use finstack_quant_valuations::instruments::InstrumentJson;
+        use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 
         let bond = Bond::fixed(
             "TEST-BOND",
@@ -824,7 +828,8 @@ pub(super) mod tests {
 
     fn revolving_credit_json(invalid_gearing: bool, with_credit: bool) -> String {
         use finstack_quant_cashflows::builder::RateSpec;
-        use finstack_quant_valuations::instruments::{InstrumentJson, RevolvingCredit};
+        use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit;
+        use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 
         let mut facility = RevolvingCredit::example().expect("facility");
         if invalid_gearing {
@@ -869,8 +874,8 @@ pub(super) mod tests {
     }
 
     pub(crate) fn bermudan_swaption_json() -> String {
+        use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
         use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaption;
-        use finstack_quant_valuations::instruments::InstrumentJson;
 
         envelope_json(InstrumentJson::BermudanSwaption(
             BermudanSwaption::example().expect("example"),
@@ -882,7 +887,8 @@ pub(super) mod tests {
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
         use finstack_quant_valuations::instruments::exotics::tarn::Tarn;
-        use finstack_quant_valuations::instruments::{InstrumentJson, InstrumentPricingOverrides};
+        use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+        use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
         use time::Month;
 
         let mut instrument_pricing_overrides = InstrumentPricingOverrides::default();
@@ -925,7 +931,8 @@ pub(super) mod tests {
         use finstack_quant_valuations::instruments::exotics::snowball::{
             Snowball, SnowballVariant,
         };
-        use finstack_quant_valuations::instruments::{InstrumentJson, InstrumentPricingOverrides};
+        use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+        use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
         use time::Month;
 
         let mut instrument_pricing_overrides = InstrumentPricingOverrides::default();
@@ -972,7 +979,8 @@ pub(super) mod tests {
         use finstack_quant_valuations::instruments::exotics::snowball::{
             Snowball, SnowballVariant,
         };
-        use finstack_quant_valuations::instruments::{InstrumentJson, InstrumentPricingOverrides};
+        use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+        use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
         use time::Month;
 
         let inverse_floater = Snowball {
@@ -1013,8 +1021,9 @@ pub(super) mod tests {
         use finstack_quant_valuations::instruments::exotics::range_accrual::{
             BoundsType, RangeAccrualTerms,
         };
+        use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
         use finstack_quant_valuations::instruments::BermudanCallProvision;
-        use finstack_quant_valuations::instruments::{InstrumentJson, InstrumentPricingOverrides};
+        use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
         use time::Month;
 
         let mut instrument_pricing_overrides = InstrumentPricingOverrides::default();
@@ -1080,9 +1089,10 @@ pub(super) mod tests {
         use finstack_quant_core::dates::{Date, DayCount, Tenor, TenorUnit};
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
+        use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
         use finstack_quant_valuations::instruments::rates::cms_spread_option::CmsSpreadOption;
+        use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
         use finstack_quant_valuations::instruments::OptionType;
-        use finstack_quant_valuations::instruments::{InstrumentJson, InstrumentPricingOverrides};
         use time::Month;
 
         let option = CmsSpreadOption {
@@ -1465,7 +1475,9 @@ pub(super) mod tests {
             "return_floor": return_floor
         });
         let bond = serde_json::from_value(spec).expect("valid return-floor bond fixture");
-        envelope_json(finstack_quant_valuations::instruments::InstrumentJson::Bond(bond))
+        envelope_json(
+            finstack_quant_valuations::instruments::json_loader::InstrumentJson::Bond(bond),
+        )
     }
 
     /// Minimal 5-year flat discount market for the return-floor tests.

@@ -7302,7 +7302,7 @@
     },
     "CompositeInstrument": {
       "additionalProperties": false,
-      "description": "Priceable composite instrument containing an unresolved policy and resolved state.\n\nValuation and risk use the current `spec` and `state` exactly as stored.\nCall [`Self::rebalance`] to obtain a distinct instrument with newly resolved\nquantities. Direct field edits must preserve the specification/state invariants.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::{CompositeInstrument, Instrument};\n\nlet composite = CompositeInstrument::example()?;\nassert_eq!(composite.id(), \"COMPOSITE-EXAMPLE\");\nassert_eq!(composite.state.resolved_legs.len(), 2);\n# Ok::<(), finstack_quant_core::Error>(())\n```",
+      "description": "Priceable composite instrument containing an unresolved policy and resolved state.\n\nValuation and risk use the current `spec` and `state` exactly as stored.\nCall [`Self::rebalance`] to obtain a distinct instrument with newly resolved\nquantities. Direct field edits must preserve the specification/state invariants.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::Instrument;\nuse finstack_quant_valuations::instruments::composite::CompositeInstrument;\n\nlet composite = CompositeInstrument::example()?;\nassert_eq!(composite.id(), \"COMPOSITE-EXAMPLE\");\nassert_eq!(composite.state.resolved_legs.len(), 2);\n# Ok::<(), finstack_quant_core::Error>(())\n```",
       "properties": {
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",

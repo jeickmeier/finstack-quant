@@ -22,7 +22,8 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, DealType, LiquidationSpec, PoolAsset,
 };
-use finstack_quant_valuations::instruments::{Instrument, InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
 use time::Month;

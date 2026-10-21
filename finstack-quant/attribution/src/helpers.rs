@@ -23,8 +23,8 @@ use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::{
     df_from_yield, YieldCompounding,
 };
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
-use finstack_quant_valuations::instruments::Bond;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::MarketDependencies;
 use finstack_quant_valuations::instruments::PricingOptions;
@@ -1133,7 +1133,7 @@ mod tests {
 
     #[test]
     fn discount_only_bond_does_not_use_unused_book_families() {
-        use finstack_quant_valuations::instruments::Bond;
+        use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
         let bond = Bond::fixed(
             "USE-BOND",
             Money::from((1_000_000_i64, Currency::USD)),
@@ -1176,7 +1176,7 @@ mod tests {
     /// Knot grid must reach 100y for ultra-long bonds.
     #[test]
     fn flat_ytm_market_uses_street_semiannual_compounding() {
-        use finstack_quant_valuations::instruments::Bond;
+        use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 
         let as_of = date!(2025 - 01 - 01);
         let bond = Bond::fixed(
@@ -1230,7 +1230,7 @@ mod tests {
     /// DF(1y) at 5% must be 1/1.05, not the hardcoded Street-2 (1.025)^-2.
     #[test]
     fn flat_ytm_market_uses_bond_coupon_frequency() {
-        use finstack_quant_valuations::instruments::Bond;
+        use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
         use finstack_quant_valuations::instruments::BondConvention;
 
         let as_of = date!(2025 - 01 - 01);
@@ -1268,7 +1268,7 @@ mod tests {
     #[test]
     fn reprice_funding_cost_uses_repo_curve_when_configured() {
         use finstack_quant_core::types::CurveId;
-        use finstack_quant_valuations::instruments::Bond;
+        use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 
         let as_of_t0 = date!(2025 - 01 - 15);
         let as_of_t1 = date!(2025 - 01 - 16);

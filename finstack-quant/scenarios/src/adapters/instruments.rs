@@ -5,7 +5,7 @@
 //! otherwise they are stored as metadata attributes for downstream processing.
 
 use crate::warning::Warning;
-use finstack_quant_valuations::instruments::instrument_json_of;
+use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
 use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use finstack_quant_valuations::pricer::InstrumentType;
 
@@ -133,7 +133,7 @@ where
 
     let Some(composite) = instrument
         .as_any_mut()
-        .downcast_mut::<finstack_quant_valuations::instruments::CompositeInstrument>(
+        .downcast_mut::<finstack_quant_valuations::instruments::composite::CompositeInstrument>(
     ) else {
         return 0;
     };
@@ -277,12 +277,13 @@ fn normalise_filters(attrs: &indexmap::IndexMap<String, String>) -> Vec<(String,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_valuations::instruments::CompositeInstrument;
+    use finstack_quant_valuations::instruments::composite::CompositeInstrument;
 
     #[test]
     fn sequential_price_losses_compound_and_spreads_remain_additive() {
         let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
-            finstack_quant_valuations::instruments::Bond::example().expect("bond"),
+            finstack_quant_valuations::instruments::fixed_income::bond::Bond::example()
+                .expect("bond"),
         )];
         for _ in 0..2 {
             apply_instrument_shock(

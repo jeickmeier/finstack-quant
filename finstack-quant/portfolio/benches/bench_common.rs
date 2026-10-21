@@ -913,7 +913,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .observation_calendar_id("USNY".into())
             .realized_var_method(RealizedVarMethod::CloseToClose)
             .price_series_policy(
-                finstack_quant_valuations::instruments::EquityPriceSeriesPolicy::Adjusted,
+                finstack_quant_valuations::instruments::equity::variance_swap::EquityPriceSeriesPolicy::Adjusted,
             )
             .side(finstack_quant_valuations::instruments::PayReceive::Receive)
             .discount_curve_id("USD-OIS".into())

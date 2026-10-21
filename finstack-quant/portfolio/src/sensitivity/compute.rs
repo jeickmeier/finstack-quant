@@ -242,7 +242,7 @@ mod tests {
         FactorCovarianceMatrix, FactorId, FactorModelConfig, MatchingConfig, RiskMeasure,
         UnmatchedPolicy,
     };
-    use finstack_quant_valuations::instruments::Equity;
+    use finstack_quant_valuations::instruments::equity::spot::Equity;
     use std::sync::Arc;
 
     fn as_of() -> Date {

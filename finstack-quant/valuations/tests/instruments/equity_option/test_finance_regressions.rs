@@ -4,9 +4,8 @@ use super::helpers::*;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_valuations::instruments::{
-    EquityOption, ExerciseStyle, Instrument, PricingOptions,
-};
+use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
+use finstack_quant_valuations::instruments::{ExerciseStyle, Instrument, PricingOptions};
 use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
 use time::{macros::date, Duration};
 

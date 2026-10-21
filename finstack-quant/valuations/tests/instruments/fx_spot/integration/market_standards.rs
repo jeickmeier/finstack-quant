@@ -9,7 +9,8 @@ use finstack_quant_core::{
     money::{fx::FxMatrix, Money},
     types::InstrumentId,
 };
-use finstack_quant_valuations::instruments::{FxSpot, Instrument};
+use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;
+use finstack_quant_valuations::instruments::Instrument;
 use std::sync::Arc;
 
 #[test]

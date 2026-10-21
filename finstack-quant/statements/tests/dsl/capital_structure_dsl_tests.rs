@@ -404,7 +404,7 @@ fn test_aggregate_period_flows() {
     use finstack_quant_core::dates::{build_periods, Date};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations::instruments::Bond;
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     use finstack_quant_valuations::instruments::Instrument;
 
     use std::sync::Arc;
@@ -446,7 +446,7 @@ fn test_build_instrument_from_spec_bond_variant() {
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_statements::capital_structure::build_instrument_from_spec;
     use finstack_quant_statements::types::{DebtInstrumentSpec, FinancialStatementInstrument};
-    use finstack_quant_valuations::instruments::Bond;
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     use time::Month;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).unwrap();

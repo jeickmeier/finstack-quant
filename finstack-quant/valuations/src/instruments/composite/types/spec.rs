@@ -8,7 +8,8 @@ use super::spec_support::{
     validate_history, CompositeLegSpec, CompositeMarketObservation, CompositeState, RebalanceRule,
     WeightingMethod, MAX_COMPOSITE_DEPTH, MAX_COMPOSITE_LEGS, MIN_ABS_INPUT,
 };
-use crate::instruments::{Attributes, InstrumentEnvelope, InstrumentJson, PricingOptions};
+use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+use crate::instruments::{Attributes, PricingOptions};
 use crate::metrics::{is_additive_metric, MetricId};
 use crate::results::composite::ResolvedCompositeLeg;
 use finstack_quant_core::currency::Currency;

@@ -15,8 +15,8 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
 fn bond_json() -> String {
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-    use finstack_quant_valuations::instruments::Bond;
     use time::macros::date;
 
     let bond = Bond::fixed(
@@ -110,8 +110,8 @@ fn default_attribution_metrics_non_empty() {
 
 #[wasm_bindgen_test]
 fn principal_redemption_preserves_total_return_without_coupon_income() {
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-    use finstack_quant_valuations::instruments::Bond;
     use time::macros::date;
 
     let bond = Bond::fixed(
@@ -162,7 +162,7 @@ fn principal_redemption_preserves_total_return_without_coupon_income() {
 fn deposit_principal_redemption_preserves_total_return_after_maturity() {
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-    use finstack_quant_valuations::instruments::Deposit;
+    use finstack_quant_valuations::instruments::rates::deposit::Deposit;
     use time::macros::date;
 
     let deposit = Deposit::builder()

@@ -335,9 +335,9 @@ impl Instrument for Basket {
         deps.add_discount_curve(self.discount_curve_id.clone());
         for constituent in &self.constituents {
             match &constituent.reference {
-                ConstituentReference::Instrument(instrument) => {
-                    deps.merge(crate::instruments::market_dependencies_of(instrument)?)
-                }
+                ConstituentReference::Instrument(instrument) => deps.merge(
+                    crate::instruments::json_loader::market_dependencies_of(instrument)?,
+                ),
                 ConstituentReference::MarketData { price_id, .. } => {
                     deps.add_market_scalar_id(price_id.as_str());
                 }
@@ -470,7 +470,7 @@ mod tests {
         BasketConstituent {
             id: id.to_string(),
             reference: ConstituentReference::Instrument(Box::new(InstrumentJson::Equity(
-                crate::instruments::Equity::new(id, id, Currency::USD)
+                crate::instruments::equity::spot::Equity::new(id, id, Currency::USD)
                     .with_quantity(1.0)
                     .with_quoted_spot(spot),
             ))),

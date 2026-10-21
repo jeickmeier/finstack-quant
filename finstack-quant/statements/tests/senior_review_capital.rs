@@ -207,7 +207,8 @@ fn canonical_negative_debt_coupons_are_income() {
     negative_loan.rate = RateSpec::Floating(floating);
     let market = swap_market(-0.01);
     let spec = FinancialStatementInstrument::TermLoan(negative_loan);
-    let instrument: finstack_quant_valuations::instruments::InstrumentJson = spec.clone().into();
+    let instrument: finstack_quant_valuations::instruments::json_loader::InstrumentJson =
+        spec.clone().into();
     let instrument = instrument.into_boxed().expect("valid negative-rate debt");
     let raw = instrument
         .raw_cashflow_schedule(&market, as_of)
@@ -242,7 +243,7 @@ fn canonical_negative_debt_coupons_are_income() {
 
 #[test]
 fn placeholder_rate_option_schedule_is_rejected_explicitly() {
-    let option = finstack_quant_valuations::instruments::CapFloor::example()
+    let option = finstack_quant_valuations::instruments::rates::cap_floor::CapFloor::example()
         .expect("canonical cap/floor fixture");
     let as_of = date!(2025 - 01 - 01);
     let period = build_periods("2025..2025", None)

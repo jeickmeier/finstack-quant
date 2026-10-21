@@ -6,8 +6,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::types::{CurveId, PriceId};
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::NodeId;
-use finstack_quant_valuations::instruments::instrument_json_of;
-use finstack_quant_valuations::instruments::{Instrument, InstrumentEnvelope};
+use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
+use finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::recalibration::RecalibrationProvider;
 use indexmap::IndexMap;
 

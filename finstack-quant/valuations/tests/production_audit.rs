@@ -173,11 +173,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::{cashflow::CFKind, currency::Currency, money::Money};
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::DrawEvent;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
     CommitmentFeeBase, DdtlSpec, TermLoan,
 };
-use finstack_quant_valuations::instruments::Bond;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
@@ -770,8 +770,8 @@ fn m4_inflation_zero_strike_requires_normal_quotes_without_fabricated_conversion
         surfaces::{VolQuoteType, VolSurface},
         term_structures::InflationCurve,
     };
+    use finstack_quant_valuations::instruments::rates::cap_floor::RateOptionType;
     use finstack_quant_valuations::instruments::rates::inflation_cap_floor::InflationCapFloor;
-    use finstack_quant_valuations::instruments::RateOptionType;
     use finstack_quant_valuations::pricer::ModelKey;
     let as_of = date!(2024 - 01 - 15);
     let mut option = InflationCapFloor::example().expect("example");

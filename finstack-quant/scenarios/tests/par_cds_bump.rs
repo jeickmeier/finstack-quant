@@ -11,7 +11,7 @@ use finstack_quant_scenarios::{
     TenorMatchMode,
 };
 use finstack_quant_statements::types::FinancialModelSpec;
-use finstack_quant_valuations::instruments::Bond;
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
 use time::Month;
 

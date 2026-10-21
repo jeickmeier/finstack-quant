@@ -1589,9 +1589,11 @@ pub(super) mod tests {
         );
     }
 
-    fn canonical_credit_bond(curve_id: CurveId) -> finstack_quant_valuations::instruments::Bond {
+    fn canonical_credit_bond(
+        curve_id: CurveId,
+    ) -> finstack_quant_valuations::instruments::fixed_income::bond::Bond {
         use finstack_quant_factor::ISSUER_ID_META_KEY;
-        let mut bond = finstack_quant_valuations::instruments::Bond::fixed(
+        let mut bond = finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
             "BOND-ISSUER-B",
             Money::from((1_000_000_i64, Currency::USD)),
             finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),

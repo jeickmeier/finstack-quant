@@ -76,7 +76,7 @@ fn test_dv01_increases_with_maturity() {
 fn test_dv01_zero_for_zero_period() {
     // Setup - zero period deposit (start == end) is invalid
     let base = date(2025, 1, 1);
-    let result = finstack_quant_valuations::instruments::Deposit::builder()
+    let result = finstack_quant_valuations::instruments::rates::deposit::Deposit::builder()
         .id(finstack_quant_core::types::InstrumentId::new(
             "DEP-ZERO-DV01",
         ))

@@ -22,12 +22,14 @@ use finstack_quant_models::monte_carlo::payoff::autocallable::FinalPayoffType;
 use finstack_quant_valuations::instruments::equity::autocallable::Autocallable;
 use finstack_quant_valuations::instruments::equity::cliquet_option::CliquetOption;
 use finstack_quant_valuations::instruments::equity::EquityPathModel;
+use finstack_quant_valuations::instruments::exotics::asian_option::AsianOption;
+use finstack_quant_valuations::instruments::exotics::barrier_option::BarrierOption;
 use finstack_quant_valuations::instruments::exotics::lookback_option::{
     LookbackOption, LookbackType,
 };
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::{
-    AsianOption, BarrierOption, Instrument, InstrumentPricingOverrides, Monitoring, OptionType,
+    Instrument, InstrumentPricingOverrides, Monitoring, OptionType,
 };
 use finstack_quant_valuations::pricer::{
     standard_pricer_registry, InstrumentType, ModelKey, PricerKey,

@@ -17,7 +17,7 @@ fn flat_surface(id: &str, vol: f64) -> VolSurface {
 #[test]
 fn near_zero_and_zero_volatility_preserve_bilinear_cross_derivative() {
     use finstack_quant_core::{currency::Currency, money::Money};
-    use finstack_quant_valuations::instruments::EquityOption;
+    use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
     use finstack_quant_valuations::metrics::MetricContext;
     use std::sync::Arc;
     for vol in [0.0, 0.005, 0.02] {

@@ -7,10 +7,14 @@ use finstack_quant_core::contract::{
 };
 use finstack_quant_core::dates::Period;
 use finstack_quant_core::wire::SchemaVersion;
-use finstack_quant_valuations::instruments::{
-    Bond, CapFloor, ConvertibleBond, InstrumentJson, InterestRateSwap, RevolvingCredit, Swaption,
-    TermLoan,
-};
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
+use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit;
+use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+use finstack_quant_valuations::instruments::rates::cap_floor::CapFloor;
+use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
+use finstack_quant_valuations::instruments::rates::swaption::Swaption;
 use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
 
@@ -1132,7 +1136,8 @@ mod period_timeline_tests {
     #[test]
     fn financial_statement_instrument_conversion_rejects_unsupported_types() {
         let unsupported = InstrumentJson::Equity(
-            finstack_quant_valuations::instruments::Equity::example().expect("example"),
+            finstack_quant_valuations::instruments::equity::spot::Equity::example()
+                .expect("example"),
         );
         let error = FinancialStatementInstrument::try_from(unsupported)
             .expect_err("equity is not a capital-structure debt instrument");

@@ -67,7 +67,7 @@ instrument_class!(
     /// Typed wrapper for the Rust `StructuredCredit` instrument (ABS, CLO, CMBS or RMBS deal).
     JsStructuredCredit,
     "StructuredCredit",
-    finstack_quant_valuations::instruments::StructuredCredit
+    finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit
 );
 
 instrument_builder_entry!(
@@ -82,7 +82,7 @@ instrument_market_dependencies!(JsStructuredCredit, "StructuredCredit");
 
 instrument_pricing!(JsStructuredCredit, "StructuredCredit");
 
-factories!(JsStructuredCredit, "StructuredCredit", finstack_quant_valuations::instruments::StructuredCredit, {
+factories!(JsStructuredCredit, "StructuredCredit", finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit, {
         /// Canonical example deal (mirrors Rust `StructuredCredit::example`): a USD 100,000,000 CLO with one 7% fixed-rate collateral bond and one 6% senior note, closing 2024-01-01, legal final 2034-01-01, discounted on `USD-OIS` with the `nyse` calendar.
         /// @returns The example deal.
         /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).

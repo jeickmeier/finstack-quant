@@ -142,7 +142,7 @@ fn test_capital_structure_builds_revolving_credit() {
     // RevolvingCredit had no typed DebtInstrumentSpec variant and was absent
     // from the old `Generic` brute-force list (Bond/IRS/TermLoan/Deposit/FRA/
     // Repo). Routing through the canonical registry makes it constructible.
-    use finstack_quant_valuations::instruments::RevolvingCredit;
+    use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit;
 
     let rcf = RevolvingCredit::example().expect("example RevolvingCredit");
     let spec = DebtInstrumentSpec {

@@ -9,7 +9,7 @@ instrument_class!(
     /// Typed wrapper for the Rust `CdsOption` instrument: a European option on a single-name or index CDS, struck on a forward spread or a clean index price. A call is the right to buy protection (payer), a put the right to sell it (receiver); `delta`, `gamma`, `vega`, `theta` and `implied_vol` are metric ids of `price` / `metric`.
     JsCdsOption,
     "CdsOption",
-    finstack_quant_valuations::instruments::CdsOption
+    finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption
 );
 
 instrument_builder_entry!(JsCdsOption, "CdsOption", JsCdsOptionBuilder);
@@ -95,7 +95,7 @@ getters!(JsCdsOption, "CdsOption", |i| {
         coupon_bp as couponBp => json(i.coupon_bp.and_then(|d| rust_decimal::prelude::ToPrimitive::to_f64(&d))),
 });
 
-factories!(JsCdsOption, "CdsOption", finstack_quant_valuations::instruments::CdsOption, {
+factories!(JsCdsOption, "CdsOption", finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption, {
         /// Canonical 100bp-strike call on a 5-year USD 10,000,000 corporate CDS (mirrors Rust `CdsOption::example`): expiry 2025-06-20, CDS maturity 2030-06-20, cash settlement, 40% recovery, curves `USD-OIS` / `CORP-HAZARD`, vol surface `CDSOPT-VOL`.
         /// @returns The example option.
         /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).

@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use finstack_quant_valuations::instruments::instrument_json_of;
+use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
 use finstack_quant_valuations::instruments::json_loader::{instrument_registry, registry_tags};
 use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use serde::Deserialize;

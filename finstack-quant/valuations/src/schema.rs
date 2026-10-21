@@ -515,9 +515,10 @@ mod examples;
 #[cfg(feature = "json-schema")]
 use crate::instruments::json_loader::instrument_registry;
 #[cfg(feature = "json-schema")]
+use crate::instruments::json_loader::InstrumentEnvelope;
+#[cfg(feature = "json-schema")]
 use crate::instruments::{
-    InstrumentEnvelope, InstrumentPricingOverrides, MetricPricingOverrides,
-    ScenarioPricingOverrides,
+    InstrumentPricingOverrides, MetricPricingOverrides, ScenarioPricingOverrides,
 };
 #[cfg(feature = "json-schema")]
 use finstack_quant_core::schema::{SchemaArtifact, SchemaKind};
@@ -721,6 +722,7 @@ pub fn artifacts_slice() -> &'static [SchemaArtifact] {
 #[must_use]
 pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::instruments::cashflow_export::InstrumentCashflowEnvelope;
+    use crate::instruments::composite::{CompositeHistoryRow, CompositeRebalanceResult};
     use crate::instruments::credit_derivatives::cds_index::CdsIndexParams;
     use crate::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
     use crate::instruments::fixed_income::asset_backed_facility::FacilityProjection;
@@ -731,9 +733,8 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         BorrowingBaseReport, EquityMetrics, OasResult, PoolStats, ScenarioTable,
         SimulationDiagnostics, TrancheCashflows, TrancheMetrics,
     };
-    use crate::instruments::{
-        CompositeHistoryRow, CompositeRebalanceResult, InstrumentJson, MarketDependencies,
-    };
+    use crate::instruments::json_loader::InstrumentJson;
+    use crate::instruments::MarketDependencies;
     use crate::market::conventions::{
         CdsConventionSpec, InflationSwapConventions, IrFutureConventions, RateIndexConventions,
         SwaptionConventions, XccyConventions,

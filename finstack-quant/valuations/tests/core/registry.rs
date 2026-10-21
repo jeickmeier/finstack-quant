@@ -541,9 +541,10 @@ fn structured_credit_parity_instrument_vs_registry() {
 #[test]
 fn composite_reuses_leaf_results_only_within_one_request() {
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_valuations::instruments::{
-        CompositeInstrument, Equity, Instrument, InstrumentJson, PricingOptions,
-    };
+    use finstack_quant_valuations::instruments::composite::CompositeInstrument;
+    use finstack_quant_valuations::instruments::equity::spot::Equity;
+    use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+    use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
     use time::macros::date;
     struct CountingEquity {
         calls: Arc<AtomicUsize>,

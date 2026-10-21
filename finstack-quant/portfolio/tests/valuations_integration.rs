@@ -7,9 +7,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::Portfolio;
-use finstack_quant_valuations::instruments::Bond;
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::InstrumentJson;
 use std::sync::Arc;
 use time::macros::date;
 

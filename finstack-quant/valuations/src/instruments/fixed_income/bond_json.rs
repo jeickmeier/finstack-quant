@@ -5,8 +5,8 @@
 
 /// Construct tagged bond instrument JSON from a cashflow schedule JSON payload.
 ///
-/// Parses and validates a canonical cashflow schedule, constructs a [`Bond`](crate::instruments::Bond),
-/// wraps it in [`crate::instruments::InstrumentJson::Bond`], and serializes the
+/// Parses and validates a canonical cashflow schedule, constructs a [`Bond`](crate::instruments::fixed_income::bond::Bond),
+/// wraps it in [`crate::instruments::json_loader::InstrumentJson::Bond`], and serializes the
 /// tagged instrument.
 ///
 /// # Arguments
@@ -36,14 +36,14 @@ pub fn bond_from_cashflows_json(
             finstack_quant_core::Error::Validation(format!("invalid cashflow schedule JSON: {err}"))
         })?;
     schedule.validate()?;
-    let bond = crate::instruments::Bond::from_cashflows(
+    let bond = crate::instruments::fixed_income::bond::Bond::from_cashflows(
         instrument_id,
         schedule,
         discount_curve_id,
         quoted_clean_price_pct,
     )?;
-    let instrument = crate::instruments::InstrumentJson::Bond(bond);
-    let envelope = crate::instruments::InstrumentEnvelope::new(instrument);
+    let instrument = crate::instruments::json_loader::InstrumentJson::Bond(bond);
+    let envelope = crate::instruments::json_loader::InstrumentEnvelope::new(instrument);
     serde_json::to_string(&envelope).map_err(|err| {
         finstack_quant_core::Error::Validation(format!(
             "failed to serialize bond instrument envelope: {err}"

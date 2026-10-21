@@ -520,7 +520,8 @@ fn commodity_spot_option_zero_vol_delta_matches_resolved_forward_payoff(
 
 #[test]
 fn resolved_delivery_greeks_are_independent_of_selected_optional_model() {
-    use finstack_quant_valuations::instruments::{CommoditySpotOptionExercise, PricingOptions};
+    use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOptionExercise;
+    use finstack_quant_valuations::instruments::PricingOptions;
     use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
     let (mut option, market, as_of) = atm_commodity_spot_option(OptionType::Call);
     let delivery = as_of + time::Duration::days(10);
@@ -565,10 +566,11 @@ fn resolved_delivery_greeks_are_independent_of_selected_optional_model() {
 #[test]
 fn composite_resolved_claims_preserve_value_and_risk_through_snapshot_replay() {
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::{
-        CommoditySpotOptionExercise, CompositeInstrument, CompositeLegSpec, CompositeSpec,
-        InstrumentJson, RebalanceRule, WeightingMethod,
+    use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOptionExercise;
+    use finstack_quant_valuations::instruments::composite::{
+        CompositeInstrument, CompositeLegSpec, CompositeSpec, RebalanceRule, WeightingMethod,
     };
+    use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
     let (mut cash, market, as_of) = atm_commodity_spot_option(OptionType::Call);
     let delivery = as_of + time::Duration::days(10);
     cash.id = "CASH-CLAIM".into();

@@ -24,8 +24,8 @@ fn date(year: i32, month: time::Month, day: u8) -> Result<Date> {
 
 /// The instrument union's bond branch.
 pub(super) fn instrument_json() -> Result<Vec<Value>> {
-    example(&crate::instruments::InstrumentJson::Bond(
-        crate::instruments::Bond::example()?,
+    example(&crate::instruments::json_loader::InstrumentJson::Bond(
+        crate::instruments::fixed_income::bond::Bond::example()?,
     ))
 }
 
@@ -69,9 +69,9 @@ pub(super) fn var_result() -> Result<Vec<Value>> {
 
 /// The canonical composite with one rebalancing trade.
 pub(super) fn composite_rebalance_result() -> Result<Vec<Value>> {
-    example(&crate::instruments::CompositeRebalanceResult {
-        instrument: crate::instruments::CompositeInstrument::example()?,
-        trades: vec![crate::instruments::CompositeTrade {
+    example(&crate::instruments::composite::CompositeRebalanceResult {
+        instrument: crate::instruments::composite::CompositeInstrument::example()?,
+        trades: vec![crate::instruments::composite::CompositeTrade {
             instrument_id: "AAPL".into(),
             instrument_type: "equity".to_string(),
             quantity_delta: 25.0,
@@ -81,7 +81,7 @@ pub(super) fn composite_rebalance_result() -> Result<Vec<Value>> {
 
 /// One dated composite state with no look-through exposures.
 pub(super) fn composite_history_row() -> Result<Vec<Value>> {
-    example_from_json::<crate::instruments::CompositeHistoryRow>(json!({
+    example_from_json::<crate::instruments::composite::CompositeHistoryRow>(json!({
         "date": "2025-01-31",
         "value": {"amount": "1012500", "currency": "USD"},
         "cashflows": {"amount": "0", "currency": "USD"},
@@ -301,7 +301,7 @@ pub(super) fn simulation_diagnostics() -> Result<Vec<Value>> {
 /// The market data the canonical bond needs to price.
 pub(super) fn market_dependencies() -> Result<Vec<Value>> {
     use crate::instruments::Instrument;
-    example(&crate::instruments::Bond::example()?.market_dependencies()?)
+    example(&crate::instruments::fixed_income::bond::Bond::example()?.market_dependencies()?)
 }
 
 pub(super) fn convertible_greeks() -> Result<Vec<Value>> {

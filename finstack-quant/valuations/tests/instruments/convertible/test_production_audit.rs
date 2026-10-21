@@ -480,10 +480,9 @@ fn production_convertible_implied_vol_preserves_selected_engine() {
             market: &MarketContext,
             as_of: Date,
         ) -> Result<ValuationResult, PricingError> {
-            let bond = expect_inst::<finstack_quant_valuations::instruments::ConvertibleBond>(
-                instrument,
-                InstrumentType::Convertible,
-            )?;
+            let bond = expect_inst::<
+                finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond,
+            >(instrument, InstrumentType::Convertible)?;
             let value = price_convertible_bond(&with_tree_steps(bond, 17), market, as_of).map_err(
                 |error| {
                     PricingError::model_failure_with_context(

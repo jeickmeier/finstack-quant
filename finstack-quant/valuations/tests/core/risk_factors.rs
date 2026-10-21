@@ -42,7 +42,7 @@ fn test_risk_factor_label() {
 
 #[test]
 fn test_extract_discount_factors_from_bond() -> Result<()> {
-    use finstack_quant_valuations::instruments::Bond;
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 
     let as_of = date!(2024 - 01 - 01);
 
@@ -107,7 +107,7 @@ fn test_extract_discount_factors_from_bond() -> Result<()> {
 
 #[test]
 fn test_extract_factors_empty_market() -> Result<()> {
-    use finstack_quant_valuations::instruments::Bond;
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 
     let as_of = date!(2024 - 01 - 01);
     let bond = Bond::fixed(
