@@ -16,10 +16,11 @@ use std::sync::Arc;
 
 use crate::api::core::market_hazard::JsHazardCurve;
 use crate::utils::input::{from_js_json, js_bool, js_f64, js_f64_seq, js_string, js_u64, js_uint};
+use crate::utils::wire::js_parse;
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::types::CreditRating;
-use finstack_quant_core::wire::serde_tag;
+use finstack_quant_core::wire::{serde_parse, serde_tag};
 use finstack_quant_models::credit::dynamic_recovery::DynamicRecoverySpec;
 use finstack_quant_models::credit::endogenous_hazard::EndogenousHazardSpec;
 use finstack_quant_models::credit::toggle_exercise::{
@@ -31,12 +32,6 @@ use finstack_quant_models::credit::{
 };
 use wasm_bindgen::prelude::*;
 
-pub(crate) fn js_rating(value: &JsValue, label: &str) -> Result<CreditRating, JsValue> {
-    js_string(value, label)?
-        .parse::<CreditRating>()
-        .map_err(to_js_err)
-}
-
 /// Moody's WARF rating factor for one credit rating.
 /// @param rating - Rating label such as `"Baa3"`, `"BBB-"` or `"B2"`; agency notches are normalized by the Rust parser.
 /// @returns The Moody's weighted-average rating factor for that rating (for example 610 for Baa3).
@@ -47,7 +42,7 @@ pub(crate) fn js_rating(value: &JsValue, label: &str) -> Result<CreditRating, Js
 /// if it is not a recognized rating or has no factor in the Moody's table.
 #[wasm_bindgen(js_name = moodysWarfFactor)]
 pub fn moodys_warf_factor(rating: JsValue) -> Result<f64, JsValue> {
-    credit::moodys_warf_factor(js_rating(&rating, "rating")?).map_err(to_js_err)
+    credit::moodys_warf_factor(js_parse::<CreditRating>(&rating, "rating")?).map_err(to_js_err)
 }
 
 /// Rating-to-factor table used for WARF-style portfolio credit quality.
@@ -101,7 +96,7 @@ impl JsRatingFactorTable {
     #[wasm_bindgen(js_name = getFactor)]
     pub fn get_factor(&self, rating: JsValue) -> Result<f64, JsValue> {
         self.inner
-            .get_factor(js_rating(&rating, "rating")?)
+            .get_factor(js_parse::<CreditRating>(&rating, "rating")?)
             .map_err(to_js_err)
     }
 
@@ -706,9 +701,9 @@ impl JsMertonModel {
         let base_date = parse_iso_date(&js_string(&base_date, "baseDate")?)?;
         let tenors = js_f64_seq(&tenors, "tenors")?;
         let recovery = js_f64(&recovery, "recovery")?;
-        let day_count: DayCount = js_string(&day_count, "dayCount")?
-            .parse()
-            .map_err(to_js_err)?;
+        // `FromStr`, not `js_wire`: the day-count parser accepts aliases
+        // ("ACT/360") that the strict serde names reject.
+        let day_count: DayCount = js_parse(&day_count, "dayCount")?;
         self.inner
             .to_hazard_curve(&id, base_date, &tenors, recovery, day_count)
             .map(|curve| JsHazardCurve {
@@ -1160,12 +1155,10 @@ impl JsToggleExerciseModel {
         threshold: JsValue,
         direction: JsValue,
     ) -> Result<JsToggleExerciseModel, JsValue> {
-        let variable = js_string(&variable, "variable")?
-            .parse::<CreditStateVariable>()
+        let variable = serde_parse::<CreditStateVariable>(&js_string(&variable, "variable")?)
             .map_err(to_js_err)?;
         let threshold = js_f64(&threshold, "threshold")?;
-        let direction = js_string(&direction, "direction")?
-            .parse::<ThresholdDirection>()
+        let direction = serde_parse::<ThresholdDirection>(&js_string(&direction, "direction")?)
             .map_err(to_js_err)?;
         ToggleExerciseModel::threshold(variable, threshold, direction)
             .map(|inner| Self { inner })
@@ -1187,8 +1180,7 @@ impl JsToggleExerciseModel {
         intercept: JsValue,
         sensitivity: JsValue,
     ) -> Result<JsToggleExerciseModel, JsValue> {
-        let variable = js_string(&variable, "variable")?
-            .parse::<CreditStateVariable>()
+        let variable = serde_parse::<CreditStateVariable>(&js_string(&variable, "variable")?)
             .map_err(to_js_err)?;
         ToggleExerciseModel::stochastic(
             variable,

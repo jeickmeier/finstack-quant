@@ -12,7 +12,6 @@ use crate::utils::input::{
     from_js_json, js_bool, js_f64, js_opt_bool, js_opt_currency, js_opt_f64, js_opt_string,
     js_opt_u64, js_opt_uint, js_u64,
 };
-use std::str::FromStr;
 
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::currency::Currency;
@@ -88,7 +87,7 @@ pub fn price_heston_call(
     let num_paths: Option<usize> = js_opt_uint(num_paths.as_ref(), "numPaths")?;
     let seed = js_opt_u64(seed.as_ref(), "seed")?;
     let num_steps: Option<usize> = js_opt_uint(num_steps.as_ref(), "numSteps")?;
-    let currency = js_opt_string(currency.as_ref(), "currency")?;
+    let currency = js_opt_currency(currency.as_ref(), "currency")?;
     price_heston(
         true, spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, num_paths,
         seed, num_steps, currency,
@@ -156,7 +155,7 @@ pub fn price_heston_put(
     let num_paths: Option<usize> = js_opt_uint(num_paths.as_ref(), "numPaths")?;
     let seed = js_opt_u64(seed.as_ref(), "seed")?;
     let num_steps: Option<usize> = js_opt_uint(num_steps.as_ref(), "numSteps")?;
-    let currency = js_opt_string(currency.as_ref(), "currency")?;
+    let currency = js_opt_currency(currency.as_ref(), "currency")?;
     price_heston(
         false, spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, num_paths,
         seed, num_steps, currency,
@@ -179,17 +178,13 @@ fn price_heston(
     num_paths: Option<usize>,
     seed: Option<u64>,
     num_steps: Option<usize>,
-    currency: Option<String>,
+    currency: Option<Currency>,
 ) -> Result<JsValue, JsValue> {
     use finstack_quant_models::monte_carlo::pricer::heston as canonical;
 
     // The canonical entry point owns the registry defaults for path count,
     // seed, step count, currency, and (wasm-gated) parallelism; the binding
     // only marshals explicitly supplied values.
-    let ccy = currency
-        .as_deref()
-        .map(|code| Currency::from_str(code).map_err(to_js_err))
-        .transpose()?;
     let est = canonical::price_heston(
         OptionType::from(is_call),
         spot,
@@ -205,7 +200,7 @@ fn price_heston(
         num_paths,
         seed,
         num_steps,
-        ccy,
+        currency,
     )
     .map_err(to_js_err)?;
     crate::utils::to_js_value(&est)

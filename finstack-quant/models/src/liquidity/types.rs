@@ -304,20 +304,6 @@ impl std::fmt::Display for LiquidityTier {
     }
 }
 
-impl LiquidityTier {
-    /// Lowercase label used by the Python and WASM convenience bindings.
-    #[must_use]
-    pub const fn as_binding_str(self) -> &'static str {
-        match self {
-            Self::Tier1 => "tier1",
-            Self::Tier2 => "tier2",
-            Self::Tier3 => "tier3",
-            Self::Tier4 => "tier4",
-            Self::Tier5 => "tier5",
-        }
-    }
-}
-
 /// Default days-to-liquidate thresholds `[tier1_max, tier2_max, tier3_max, tier4_max]` in trading days.
 pub const DEFAULT_HORIZON_GRID_DAYS: [f64; 4] = [1.0, 5.0, 20.0, 60.0];
 
@@ -508,12 +494,10 @@ mod tests {
     }
 
     #[test]
-    fn tier_binding_labels_are_lowercase() {
-        assert_eq!(LiquidityTier::Tier1.as_binding_str(), "tier1");
-        assert_eq!(LiquidityTier::Tier2.as_binding_str(), "tier2");
-        assert_eq!(LiquidityTier::Tier3.as_binding_str(), "tier3");
-        assert_eq!(LiquidityTier::Tier4.as_binding_str(), "tier4");
-        assert_eq!(LiquidityTier::Tier5.as_binding_str(), "tier5");
+    fn tier_serde_labels_are_lowercase() {
+        use finstack_quant_core::wire::serde_label;
+        assert_eq!(serde_label(&LiquidityTier::Tier1).unwrap(), "tier1");
+        assert_eq!(serde_label(&LiquidityTier::Tier5).unwrap(), "tier5");
     }
 
     #[test]

@@ -1,5 +1,6 @@
 //! Behavioral tests for distressed-exchange and LME analytics.
 
+use finstack_quant_core::wire::{serde_label, serde_parse};
 use finstack_quant_models::credit::liability_management::{
     analyze_exchange_offer, analyze_lme, ExchangeType, LmeType, TENDER_RECOMMENDATION_HURDLE,
 };
@@ -63,14 +64,17 @@ fn exchange_offer_rejects_negative_and_non_finite_amounts() {
 #[test]
 fn exchange_type_parsing_is_exact() {
     assert_eq!(
-        "par_for_par".parse::<ExchangeType>().expect("canonical"),
+        serde_parse::<ExchangeType>("par_for_par").expect("canonical"),
         ExchangeType::ParForPar
     );
     for retired in ["par", " Par-For-Par ", "UPTIER"] {
-        assert!(retired.parse::<ExchangeType>().is_err());
+        assert!(serde_parse::<ExchangeType>(retired).is_err());
     }
-    assert_eq!(ExchangeType::Downtier.to_string(), "downtier");
-    assert!("mystery".parse::<ExchangeType>().is_err());
+    assert_eq!(
+        serde_label(&ExchangeType::Downtier).expect("label"),
+        "downtier"
+    );
+    assert!(serde_parse::<ExchangeType>("mystery").is_err());
 }
 
 #[test]
@@ -155,17 +159,15 @@ fn lme_rejects_out_of_range_inputs_per_structure() {
 #[test]
 fn lme_type_parsing_is_exact() {
     assert_eq!(
-        "open_market_repurchase"
-            .parse::<LmeType>()
-            .expect("canonical"),
+        serde_parse::<LmeType>("open_market_repurchase").expect("canonical"),
         LmeType::OpenMarketRepurchase
     );
     assert_eq!(
-        "tender_offer".parse::<LmeType>().expect("canonical"),
+        serde_parse::<LmeType>("tender_offer").expect("canonical"),
         LmeType::TenderOffer
     );
     assert_eq!(
-        "amend_and_extend".parse::<LmeType>().expect("canonical"),
+        serde_parse::<LmeType>("amend_and_extend").expect("canonical"),
         LmeType::AmendAndExtend
     );
     for retired in [
@@ -177,13 +179,13 @@ fn lme_type_parsing_is_exact() {
         "ae",
         "amend-and-extend",
     ] {
-        assert!(retired.parse::<LmeType>().is_err());
+        assert!(serde_parse::<LmeType>(retired).is_err());
     }
     assert_eq!(
-        LmeType::OpenMarketRepurchase.to_string(),
+        serde_label(&LmeType::OpenMarketRepurchase).expect("label"),
         "open_market_repurchase"
     );
-    assert!("mystery".parse::<LmeType>().is_err());
+    assert!(serde_parse::<LmeType>("mystery").is_err());
 }
 
 #[test]

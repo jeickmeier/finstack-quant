@@ -13,16 +13,9 @@ def test_surface_report_keys_match_stub_contract() -> None:
 
     assert report.passed is True
     assert report.total_violations == 0
-    assert set(report.by_severity) == {"negligible", "minor", "major", "critical"}
-    # Every `ArbitrageType` variant is reported, including the SVI checks.
-    assert set(report.by_type) == {
-        "butterfly",
-        "calendar_spread",
-        "local_vol_density",
-        "svi_moment_bound",
-        "svi_butterfly_condition",
-        "svi_calendar_spread",
-    }
+    # The count maps are the sparse Rust `counts_by_*` maps: a clean surface has none.
+    assert report.by_severity == {}
+    assert report.by_type == {}
 
     # Violation rows are the serde form of the Rust `ArbitrageViolation`.
     expected_violation_keys = {

@@ -11,6 +11,7 @@
 
 use crate::utils::input::{js_f64, js_opt_f64, js_string};
 use crate::utils::{to_js_err, to_js_value};
+use finstack_quant_core::wire::serde_parse;
 use finstack_quant_models::credit::liability_management::{self as lm, ExchangeType, LmeType};
 use wasm_bindgen::prelude::*;
 
@@ -44,8 +45,8 @@ pub fn analyze_exchange_offer(
     let new_pv = js_f64(&new_pv, "newPv")?;
     let consent_fee = js_f64(&consent_fee, "consentFee")?;
     let equity_sweetener_value = js_f64(&equity_sweetener_value, "equitySweetenerValue")?;
-    let exchange_type: &str = &js_string(&exchange_type, "exchangeType")?;
-    let exchange_type: ExchangeType = exchange_type.parse().map_err(to_js_err)?;
+    let exchange_type = serde_parse::<ExchangeType>(&js_string(&exchange_type, "exchangeType")?)
+        .map_err(to_js_err)?;
     let analysis = lm::analyze_exchange_offer(
         old_pv,
         new_pv,
@@ -88,8 +89,7 @@ pub fn analyze_lme(
     let repurchase_price_pct = js_f64(&repurchase_price_pct, "repurchasePricePct")?;
     let opt_acceptance_pct = js_f64(&opt_acceptance_pct, "optAcceptancePct")?;
     let ebitda = js_opt_f64(ebitda.as_ref(), "ebitda")?;
-    let lme_type: &str = &js_string(&lme_type, "lmeType")?;
-    let lme_type: LmeType = lme_type.parse().map_err(to_js_err)?;
+    let lme_type = serde_parse::<LmeType>(&js_string(&lme_type, "lmeType")?).map_err(to_js_err)?;
     let analysis = lm::analyze_lme(
         lme_type,
         notional,

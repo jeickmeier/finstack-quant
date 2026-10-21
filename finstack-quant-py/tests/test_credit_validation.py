@@ -50,7 +50,7 @@ def test_lgd_typed_surface() -> None:
     assert model.evaluate(100.0) == result
     assert model.collateral[0].liquidation_value == pytest.approx(56.0)
     assert credit.lgd.WorkoutLgd.from_json(model.to_json()).evaluate(100.0).lgd == pytest.approx(result.lgd)
-    with pytest.raises(ValueError, match="unknown collateral type"):
+    with pytest.raises(ValueError, match="unknown variant `real-estate`"):
         credit.lgd.CollateralPiece("real-estate", 1.0, 0.0)
 
     floor = credit.lgd.DownturnLgd.regulatory_floor(0.05, 0.25)
@@ -87,7 +87,7 @@ def test_structural_spec_constructors_and_equality() -> None:
     threshold = credit.ToggleExerciseModel.threshold("leverage", 5.0, "above")
     assert threshold.should_pik(credit.CreditState(leverage=6.0), 0.0)
     assert not threshold.should_pik(credit.CreditState(leverage=4.0), 0.0)
-    with pytest.raises(ValueError, match="hazard_rate, distance_to_default, leverage"):
+    with pytest.raises(ValueError, match="expected one of `hazard_rate`, `distance_to_default`, `leverage`"):
         credit.ToggleExerciseModel.threshold("ebitda", 1.0, "above")
 
     terminal, same_terminal = credit.MertonBarrierType.terminal(), credit.MertonBarrierType.terminal()

@@ -54,14 +54,15 @@ def test_default_probabilities_follow_the_rust_horizon_rule() -> None:
 
 
 def test_toggle_label_errors_come_from_rust() -> None:
-    with pytest.raises(ValueError, match="unknown credit state variable") as variable:
+    # Labels parse through the serde names, so the error lists them.
+    with pytest.raises(ValueError, match="unknown variant") as variable:
         ToggleExerciseModel.threshold("bogus", 1.0, "above")
-    assert str(variable.value) == (
-        "unknown credit state variable: bogus (expected one of hazard_rate, distance_to_default, leverage)"
+    assert str(variable.value).endswith(
+        "unknown variant `bogus`, expected one of `hazard_rate`, `distance_to_default`, `leverage`"
     )
-    with pytest.raises(ValueError, match="unknown threshold direction") as direction:
+    with pytest.raises(ValueError, match="unknown variant") as direction:
         ToggleExerciseModel.threshold("leverage", 1.0, "sideways")
-    assert str(direction.value) == "unknown threshold direction: sideways (expected one of above, below)"
+    assert str(direction.value).endswith("unknown variant `sideways`, expected `above` or `below`")
 
 
 def test_constructors_reject_values_json_cannot_carry() -> None:

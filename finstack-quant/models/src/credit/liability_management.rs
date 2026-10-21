@@ -49,9 +49,6 @@
 //! # }
 //! ```
 
-use core::fmt;
-use core::str::FromStr;
-
 use finstack_quant_core::validation::validate_f64_non_negative;
 use finstack_quant_core::{Error, Result};
 
@@ -81,51 +78,6 @@ pub enum ExchangeType {
     Uptier,
     /// Participating creditors are subordinated relative to their old claim.
     Downtier,
-}
-
-impl ExchangeType {
-    /// Canonical snake_case name of this exchange structure.
-    ///
-    /// # Returns
-    ///
-    /// The serde representation, for example `"par_for_par"`.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::ParForPar => "par_for_par",
-            Self::Discount => "discount",
-            Self::Uptier => "uptier",
-            Self::Downtier => "downtier",
-        }
-    }
-}
-
-impl fmt::Display for ExchangeType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl FromStr for ExchangeType {
-    type Err = Error;
-
-    /// Parse an exchange structure from its canonical snake_case wire value.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::Validation`] when the label is not a known structure.
-    fn from_str(value: &str) -> Result<Self> {
-        match value {
-            "par_for_par" => Ok(Self::ParForPar),
-            "discount" => Ok(Self::Discount),
-            "uptier" => Ok(Self::Uptier),
-            "downtier" => Ok(Self::Downtier),
-            _ => Err(validation_error(format!(
-                "unknown exchange_type '{value}' — expected one of par_for_par, discount, \
-                 uptier, downtier"
-            ))),
-        }
-    }
 }
 
 /// Hold-versus-tender economics of a distressed exchange offer.
@@ -253,51 +205,6 @@ pub enum LmeType {
     /// Transfer of collateral to an unrestricted subsidiary; no par is
     /// retired and remaining holders are structurally diluted.
     Dropdown,
-}
-
-impl LmeType {
-    /// Canonical snake_case name of this LME structure.
-    ///
-    /// # Returns
-    ///
-    /// The serde representation, for example `"open_market_repurchase"`.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::OpenMarketRepurchase => "open_market_repurchase",
-            Self::TenderOffer => "tender_offer",
-            Self::AmendAndExtend => "amend_and_extend",
-            Self::Dropdown => "dropdown",
-        }
-    }
-}
-
-impl fmt::Display for LmeType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl FromStr for LmeType {
-    type Err = Error;
-
-    /// Parse an LME structure from its canonical snake_case wire value.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::Validation`] when the label is not a known structure.
-    fn from_str(value: &str) -> Result<Self> {
-        match value {
-            "open_market_repurchase" => Ok(Self::OpenMarketRepurchase),
-            "tender_offer" => Ok(Self::TenderOffer),
-            "amend_and_extend" => Ok(Self::AmendAndExtend),
-            "dropdown" => Ok(Self::Dropdown),
-            _ => Err(validation_error(format!(
-                "unknown lme_type '{value}' — expected open_market_repurchase, tender_offer, \
-                 amend_and_extend, dropdown"
-            ))),
-        }
-    }
 }
 
 /// Gross-leverage impact of a liability management exercise.

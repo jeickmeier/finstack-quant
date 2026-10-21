@@ -1,8 +1,8 @@
 //! Canonical string-keyed dispatch for the closed-form exotic pricers.
 //!
 //! Host bindings (Python, WASM) expose the barrier / Asian / lookback / quanto
-//! closed forms behind compact string selectors (`direction`/`knock`,
-//! `averaging`, `strike_type`) plus a call/put flag. This module is the single
+//! closed forms behind compact selectors (`direction`/`knock` and
+//! `strike_type` strings, the [`AveragingMethod`] enum) plus a call/put flag. This module is the single
 //! home for that selector parsing and routing so both hosts share one match
 //! table and one error message; the leaf formulas in [`super::barrier`],
 //! [`super::asian`], [`super::lookback`], and [`super::quanto`] are unchanged.
@@ -15,6 +15,7 @@
 //! ```rust
 //! use finstack_quant_models::types::OptionType;
 //! use finstack_quant_models::closed_form::{asian_option_price, barrier_call, barrier_put};
+//! use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 //!
 //! let barrier = barrier_call(100.0, 100.0, 90.0, 0.05, 0.02, 0.20, 1.0, "down", "out")?;
 //! assert!(barrier > 0.0);
@@ -22,7 +23,7 @@
 //! assert!(barrier_put >= 0.0);
 //!
 //! let asian = asian_option_price(
-//!     100.0, 100.0, 0.05, 0.02, 0.20, 1.0, 12, "arithmetic", OptionType::Call,
+//!     100.0, 100.0, 0.05, 0.02, 0.20, 1.0, 12, AveragingMethod::Arithmetic, OptionType::Call,
 //! )?;
 //! assert!(asian > 0.0);
 //! # Ok::<(), finstack_quant_core::Error>(())
@@ -40,12 +41,13 @@ use super::lookback::{
 };
 use super::quanto::{quanto_call, quanto_put};
 use super::vanilla::checked_closed_form_value;
+use crate::monte_carlo::payoff::asian::AveragingMethod;
 use crate::types::OptionType;
 use finstack_quant_core::types::BarrierType;
 
 /// Averaging convention host bindings use when `averaging` is omitted from
-/// [`asian_option_price`]: `"arithmetic"` (Turnbull-Wakeman approximation).
-pub const DEFAULT_ASIAN_AVERAGING: &str = "arithmetic";
+/// [`asian_option_price`]: arithmetic (Turnbull-Wakeman approximation).
+pub const DEFAULT_ASIAN_AVERAGING: AveragingMethod = AveragingMethod::Arithmetic;
 
 /// Strike convention host bindings use when `strike_type` is omitted from
 /// [`lookback_option_price`]: `"fixed"`.
@@ -209,14 +211,14 @@ pub fn barrier_put(
 /// * `vol` - Annualized volatility, decimal.
 /// * `expiry` - Time to expiry in years.
 /// * `num_fixings` - Positive number of equally spaced averaging observations.
-/// * `averaging` - `"arithmetic"` (Turnbull-Wakeman) or `"geometric"` (Kemna-Vorst).
+/// * `averaging` - [`AveragingMethod::Arithmetic`] (Turnbull-Wakeman) or
+///   [`AveragingMethod::Geometric`] (Kemna-Vorst).
 /// * `option_type` - Call or put payoff convention.
 ///
 /// # Errors
 ///
-/// Returns `Error::Validation` if `num_fixings` is zero, `averaging` is not a
-/// supported convention, any input is outside its valid domain, or the
-/// resulting option price is non-finite.
+/// Returns `Error::Validation` if `num_fixings` is zero, any input is outside
+/// its valid domain, or the resulting option price is non-finite.
 #[allow(clippy::too_many_arguments)]
 pub fn asian_option_price(
     spot: f64,
@@ -226,7 +228,7 @@ pub fn asian_option_price(
     vol: f64,
     expiry: f64,
     num_fixings: usize,
-    averaging: &str,
+    averaging: AveragingMethod,
     option_type: OptionType,
 ) -> Result<f64> {
     if num_fixings == 0 {
@@ -237,22 +239,17 @@ pub fn asian_option_price(
     validate_exotic_common("asian option", spot, rate, div_yield, vol, expiry)?;
     validate_positive_finite("asian option", "strike", strike)?;
     let value = match (averaging, option_type) {
-        ("arithmetic", OptionType::Call) => {
+        (AveragingMethod::Arithmetic, OptionType::Call) => {
             arithmetic_asian_call_tw(spot, strike, expiry, rate, div_yield, vol, num_fixings)
         }
-        ("arithmetic", OptionType::Put) => {
+        (AveragingMethod::Arithmetic, OptionType::Put) => {
             arithmetic_asian_put_tw(spot, strike, expiry, rate, div_yield, vol, num_fixings)
         }
-        ("geometric", OptionType::Call) => {
+        (AveragingMethod::Geometric, OptionType::Call) => {
             geometric_asian_call(spot, strike, expiry, rate, div_yield, vol, num_fixings)
         }
-        ("geometric", OptionType::Put) => {
+        (AveragingMethod::Geometric, OptionType::Put) => {
             geometric_asian_put(spot, strike, expiry, rate, div_yield, vol, num_fixings)
-        }
-        _ => {
-            return Err(Error::Validation(format!(
-                "unknown averaging '{averaging}'; expected 'arithmetic' or 'geometric'"
-            )));
         }
     };
     checked_closed_form_value(value, "asian option price")
@@ -509,18 +506,40 @@ mod tests {
     fn asian_dispatch_matches_leaf_functions() {
         let (s, k, t, r, q, sigma, n) = (100.0, 100.0, 1.0, 0.05, 0.02, 0.20, 12);
         assert_eq!(
-            asian_option_price(s, k, r, q, sigma, t, n, "arithmetic", OptionType::Call).unwrap(),
+            asian_option_price(
+                s,
+                k,
+                r,
+                q,
+                sigma,
+                t,
+                n,
+                AveragingMethod::Arithmetic,
+                OptionType::Call
+            )
+            .unwrap(),
             arithmetic_asian_call_tw(s, k, t, r, q, sigma, n)
         );
         assert_eq!(
-            asian_option_price(s, k, r, q, sigma, t, n, "geometric", OptionType::Put).unwrap(),
+            asian_option_price(
+                s,
+                k,
+                r,
+                q,
+                sigma,
+                t,
+                n,
+                AveragingMethod::Geometric,
+                OptionType::Put
+            )
+            .unwrap(),
             geometric_asian_put(s, k, t, r, q, sigma, n)
         );
     }
 
     #[test]
     fn asian_dispatch_rejects_zero_fixings() {
-        for averaging in ["arithmetic", "geometric"] {
+        for averaging in [AveragingMethod::Arithmetic, AveragingMethod::Geometric] {
             let err = asian_option_price(
                 100.0,
                 100.0,
@@ -535,23 +554,6 @@ mod tests {
             .unwrap_err();
             assert!(err.to_string().contains("num_fixings must be positive"));
         }
-    }
-
-    #[test]
-    fn asian_dispatch_rejects_unknown_averaging() {
-        let err = asian_option_price(
-            100.0,
-            100.0,
-            0.05,
-            0.02,
-            0.20,
-            1.0,
-            12,
-            "median",
-            OptionType::Call,
-        )
-        .unwrap_err();
-        assert!(err.to_string().contains("unknown averaging 'median'"));
     }
 
     #[test]

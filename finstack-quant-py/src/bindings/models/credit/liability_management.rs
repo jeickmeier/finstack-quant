@@ -3,6 +3,7 @@
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema;
 use crate::errors::core_to_py;
+use finstack_quant_core::wire::{serde_label, serde_parse};
 use finstack_quant_models::credit::liability_management::{
     self as lm, ExchangeOfferAnalysis, ExchangeType, LeverageImpact, LmeAnalysis, LmeType,
     TENDER_RECOMMENDATION_HURDLE,
@@ -31,8 +32,8 @@ pub struct PyExchangeOfferAnalysis {
 impl PyExchangeOfferAnalysis {
     /// Which exchange structure this analyses.
     #[getter]
-    fn exchange_type(&self) -> String {
-        self.inner.exchange_type.as_str().to_string()
+    fn exchange_type(&self) -> PyResult<String> {
+        serde_label(&self.inner.exchange_type).map_err(core_to_py)
     }
 
     /// Net present value of the existing instrument.
@@ -93,11 +94,10 @@ impl PyExchangeOfferAnalysis {
     /// ``pd.concat`` over several candidate offers gives a hold-versus-tender
     /// comparison table directly.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        // Built explicitly rather than serializing `inner` so `exchange_type`
-        // lands as its canonical string label instead of the serde enum
-        // representation.
+        // Built explicitly so the column order is fixed; `exchange_type`
+        // serializes to its snake_case label.
         let row = serde_json::json!({
-            "exchange_type": self.inner.exchange_type.as_str(),
+            "exchange_type": self.inner.exchange_type,
             "old_npv": self.inner.old_npv,
             "new_npv": self.inner.new_npv,
             "consent_fee": self.inner.consent_fee,
@@ -124,15 +124,15 @@ impl PyExchangeOfferAnalysis {
         )
     }
 
-    fn __repr__(&self) -> String {
-        format!(
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
             "ExchangeOfferAnalysis(exchange_type='{}', tender_total={}, delta_npv={}, \
              tender_recommended={})",
-            self.inner.exchange_type,
+            self.exchange_type()?,
             self.inner.tender_total,
             self.inner.delta_npv,
             self.inner.tender_recommended
-        )
+        ))
     }
 }
 
@@ -236,8 +236,8 @@ pub struct PyLmeAnalysis {
 impl PyLmeAnalysis {
     /// Which liability-management exercise this analyses.
     #[getter]
-    fn lme_type(&self) -> String {
-        self.inner.lme_type.as_str().to_string()
+    fn lme_type(&self) -> PyResult<String> {
+        serde_label(&self.inner.lme_type).map_err(core_to_py)
     }
 
     /// Cash cost of the exercise, including fees.
@@ -302,7 +302,7 @@ impl PyLmeAnalysis {
         // so the row is flattened by hand.
         let leverage = self.inner.leverage_impact.as_ref();
         let row = serde_json::json!({
-            "lme_type": self.inner.lme_type.as_str(),
+            "lme_type": self.inner.lme_type,
             "cost": self.inner.cost,
             "notional_reduction": self.inner.notional_reduction,
             "discount_capture": self.inner.discount_capture,
@@ -333,14 +333,14 @@ impl PyLmeAnalysis {
         )
     }
 
-    fn __repr__(&self) -> String {
-        format!(
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
             "LmeAnalysis(lme_type='{}', cost={}, notional_reduction={}, discount_capture={})",
-            self.inner.lme_type,
+            self.lme_type()?,
             self.inner.cost,
             self.inner.notional_reduction,
             self.inner.discount_capture
-        )
+        ))
     }
 }
 
@@ -381,7 +381,7 @@ fn analyze_exchange_offer(
     equity_sweetener_value: f64,
     exchange_type: &str,
 ) -> PyResult<PyExchangeOfferAnalysis> {
-    let exchange_type: ExchangeType = exchange_type.parse().map_err(core_to_py)?;
+    let exchange_type = serde_parse::<ExchangeType>(exchange_type).map_err(core_to_py)?;
     lm::analyze_exchange_offer(
         old_pv,
         new_pv,
@@ -428,7 +428,7 @@ fn analyze_lme(
     opt_acceptance_pct: f64,
     ebitda: Option<f64>,
 ) -> PyResult<PyLmeAnalysis> {
-    let lme_type: LmeType = lme_type.parse().map_err(core_to_py)?;
+    let lme_type = serde_parse::<LmeType>(lme_type).map_err(core_to_py)?;
     lm::analyze_lme(
         lme_type,
         notional,

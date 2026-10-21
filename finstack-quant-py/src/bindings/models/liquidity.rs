@@ -923,9 +923,9 @@ fn days_to_liquidate(position_quantity: f64, adv: f64, participation_rate: f64) 
 #[pyfunction]
 #[pyo3(signature = (days_to_liquidate, thresholds = None))]
 #[pyo3(text_signature = "(days_to_liquidate, thresholds=None)")]
-fn liquidity_tier(days_to_liquidate: f64, thresholds: Option<[f64; 4]>) -> PyResult<&'static str> {
+fn liquidity_tier(days_to_liquidate: f64, thresholds: Option<[f64; 4]>) -> PyResult<String> {
     liquidity::liquidity_tier(days_to_liquidate, thresholds)
-        .map(|tier| tier.as_binding_str())
+        .and_then(|tier| finstack_quant_core::wire::serde_label(&tier))
         .map_err(core_to_py)
 }
 

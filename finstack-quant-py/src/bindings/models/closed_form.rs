@@ -22,6 +22,7 @@ use crate::bindings::pandas_utils::{
 };
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::core_to_py;
+use finstack_quant_core::wire::serde_parse;
 use finstack_quant_models::closed_form::heston::{heston_price, HestonPricingParams};
 use finstack_quant_models::closed_form::vanilla::{
     bs_greeks, bs_price, vanilla_expiry_payoff, BsGreeks, DEFAULT_THETA_DAYS_PER_YEAR,
@@ -32,6 +33,7 @@ use finstack_quant_models::closed_form::{
     quanto_option_price, ForwardGreeks, DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE,
 };
 use finstack_quant_models::closed_form::{black76_implied_vol, bs_implied_vol};
+use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_models::types::OptionType;
 use pyo3::prelude::*;
 
@@ -1039,8 +1041,8 @@ fn barrier_put_wrapper(
 /// num_fixings : int
 ///     Number of averaging fixings.
 /// averaging : str, optional
-///     ``"arithmetic"`` (Turnbull-Wakeman, default) or ``"geometric"``
-///     (Kemna-Vorst exact).
+///     ``"arithmetic"`` (Turnbull-Wakeman) or ``"geometric"`` (Kemna-Vorst
+///     exact); ``None`` (default) selects arithmetic.
 /// is_call : bool, optional
 ///     ``True`` for call (default), ``False`` for put.
 ///
@@ -1065,7 +1067,7 @@ fn barrier_put_wrapper(
 /// - Kemna-Vorst (1990): see docs/REFERENCES.md#kemna-vorst-1990
 /// - Turnbull-Wakeman (1991): see docs/REFERENCES.md#turnbull-wakeman-1991
 #[pyfunction(name = "asian_option_price")]
-#[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, num_fixings, averaging=DEFAULT_ASIAN_AVERAGING, is_call=true))]
+#[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, num_fixings, averaging=None, is_call=true))]
 #[allow(clippy::too_many_arguments)]
 fn asian_option_wrapper(
     spot: f64,
@@ -1075,9 +1077,14 @@ fn asian_option_wrapper(
     vol: f64,
     expiry: f64,
     num_fixings: usize,
-    averaging: &str,
+    averaging: Option<&str>,
     is_call: bool,
 ) -> PyResult<f64> {
+    let averaging = averaging
+        .map(serde_parse::<AveragingMethod>)
+        .transpose()
+        .map_err(core_to_py)?
+        .unwrap_or(DEFAULT_ASIAN_AVERAGING);
     asian_option_price(
         spot,
         strike,
