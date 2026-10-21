@@ -72,10 +72,7 @@
           "title",
           "type"
         ],
-        "definitions": [
-          "Period",
-          "PeriodId"
-        ]
+        "definitions": ["Period", "PeriodId"]
       },
       "llm": {
         "id": "https://finstack_quant.dev/schemas/dates/1/period_plan.schema.json",
@@ -92,10 +89,7 @@
           "title",
           "type"
         ],
-        "definitions": [
-          "Period",
-          "PeriodId"
-        ]
+        "definitions": ["Period", "PeriodId"]
       },
       "report": [
         {
@@ -1211,34 +1205,14 @@
       "canonical": {
         "id": "https://finstack_quant.dev/schemas/cashflow/1/amortization_spec.schema.json",
         "title": "AmortizationSpec",
-        "keys": [
-          "$id",
-          "$schema",
-          "description",
-          "examples",
-          "oneOf",
-          "title"
-        ],
+        "keys": ["$id", "$schema", "description", "examples", "oneOf", "title"],
         "definitions": []
       },
       "llm": {
         "id": "https://finstack_quant.dev/schemas/cashflow/1/amortization_spec.schema.json",
         "title": "AmortizationSpec",
-        "keys": [
-          "$defs",
-          "$id",
-          "$schema",
-          "description",
-          "examples",
-          "oneOf",
-          "title"
-        ],
-        "definitions": [
-          "Currency",
-          "Date",
-          "DecimalWire",
-          "Money"
-        ]
+        "keys": ["$defs", "$id", "$schema", "description", "examples", "oneOf", "title"],
+        "definitions": ["Currency", "Date", "DecimalWire", "Money"]
       },
       "report": [
         {
@@ -5906,12 +5880,7 @@
           "title",
           "type"
         ],
-        "definitions": [
-          "Adjustment",
-          "AdjustmentCap",
-          "AdjustmentValue",
-          "CapBaseMode"
-        ]
+        "definitions": ["Adjustment", "AdjustmentCap", "AdjustmentValue", "CapBaseMode"]
       },
       "statement_result_schema": {
         "id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
@@ -5974,22 +5943,12 @@
         "title",
         "type"
       ],
-      "definitions": [
-        "AccrualMethod",
-        "ExCouponRule"
-      ]
+      "definitions": ["AccrualMethod", "ExCouponRule"]
     },
     "https://finstack_quant.dev/schemas/cashflow/1/amortization_spec.schema.json": {
       "id": "https://finstack_quant.dev/schemas/cashflow/1/amortization_spec.schema.json",
       "title": "AmortizationSpec",
-      "keys": [
-        "$id",
-        "$schema",
-        "description",
-        "examples",
-        "oneOf",
-        "title"
-      ],
+      "keys": ["$id", "$schema", "description", "examples", "oneOf", "title"],
       "definitions": []
     },
     "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule.schema.json": {
@@ -6073,42 +6032,19 @@
         "title",
         "type"
       ],
-      "definitions": [
-        "CouponType",
-        "RollRule",
-        "StubKind"
-      ]
+      "definitions": ["CouponType", "RollRule", "StubKind"]
     },
     "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json": {
       "id": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json",
       "title": "DefaultModelSpec",
-      "keys": [
-        "$id",
-        "$schema",
-        "description",
-        "examples",
-        "oneOf",
-        "title"
-      ],
+      "keys": ["$id", "$schema", "description", "examples", "oneOf", "title"],
       "definitions": []
     },
     "https://finstack_quant.dev/schemas/cashflow/1/fee_specs.schema.json": {
       "id": "https://finstack_quant.dev/schemas/cashflow/1/fee_specs.schema.json",
       "title": "FeeSpec",
-      "keys": [
-        "$defs",
-        "$id",
-        "$schema",
-        "description",
-        "examples",
-        "oneOf",
-        "title"
-      ],
-      "definitions": [
-        "FeeAccrualBasis",
-        "FeeBase",
-        "StubKind"
-      ]
+      "keys": ["$defs", "$id", "$schema", "description", "examples", "oneOf", "title"],
+      "definitions": ["FeeAccrualBasis", "FeeBase", "StubKind"]
     },
     "https://finstack_quant.dev/schemas/cashflow/1/floating_coupon_spec.schema.json": {
       "id": "https://finstack_quant.dev/schemas/cashflow/1/floating_coupon_spec.schema.json",
@@ -6152,14 +6088,7 @@
     "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json": {
       "id": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
       "title": "PrepaymentModelSpec",
-      "keys": [
-        "$id",
-        "$schema",
-        "description",
-        "examples",
-        "oneOf",
-        "title"
-      ],
+      "keys": ["$id", "$schema", "description", "examples", "oneOf", "title"],
       "definitions": []
     },
     "https://finstack_quant.dev/schemas/cashflow/1/recovery_model_spec.schema.json": {
@@ -6192,11 +6121,7 @@
         "title",
         "type"
       ],
-      "definitions": [
-        "CashFlowMeta",
-        "CashflowRepresentation",
-        "ProjectedFixing"
-      ]
+      "definitions": ["CashFlowMeta", "CashflowRepresentation", "ProjectedFixing"]
     },
     "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json": {
       "id": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json",
@@ -6213,10 +6138,7 @@
         "title",
         "type"
       ],
-      "definitions": [
-        "RollRule",
-        "StubKind"
-      ]
+      "definitions": ["RollRule", "StubKind"]
     },
     "https://finstack_quant.dev/schemas/cashflow/1/step_up_coupon_spec.schema.json": {
       "id": "https://finstack_quant.dev/schemas/cashflow/1/step_up_coupon_spec.schema.json",
@@ -6233,11 +6155,7 @@
         "title",
         "type"
       ],
-      "definitions": [
-        "CouponType",
-        "RollRule",
-        "StubKind"
-      ]
+      "definitions": ["CouponType", "RollRule", "StubKind"]
     }
   },
   "instrument": {
