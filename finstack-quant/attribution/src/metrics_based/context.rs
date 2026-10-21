@@ -88,8 +88,9 @@ impl<'a> MetricsContext<'a> {
                 rates_curve_ids.push(id.clone());
             }
         }
-        let (avg_rate_shift_bp, rate_curves_measured) =
-            average_rates(&rates_curve_ids, market_t0, market_t1);
+        let (avg_rate_shift_bp, rate_curves_measured) = average_over(&rates_curve_ids, |id| {
+            measure_rate_curve_shift_bp(id.as_str(), market_t0, market_t1)
+        });
         let mut rate_keyrates =
             extract_keyrate_per_curve(&val_t0.measures, &rates_curve_ids, "bucketed_dv01")?;
         let mut paired_rate_keyrates = finstack_quant_core::HashMap::default();
@@ -168,16 +169,6 @@ impl<'a> MetricsContext<'a> {
             },
         })
     }
-}
-
-fn average_rates(
-    curves: &[CurveId],
-    t0: &MarketContext,
-    t1: &MarketContext,
-) -> (Option<f64>, usize) {
-    average_over(curves, |id| {
-        measure_rate_curve_shift_bp(id.as_str(), t0, t1)
-    })
 }
 
 fn average_credit(
