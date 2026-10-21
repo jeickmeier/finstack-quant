@@ -5,13 +5,10 @@
 //! fractional kernel internally using standard normal increments — no fBM generator
 //! is required.
 
-use super::pricing::{
-    collect_inputs, has_future_discrete_dividends, require_european, resolve_lifecycle_value,
-};
+use super::pricing::{stochastic_vol_inputs, ModelInputs};
 use super::types::EquityOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::OptionType;
 use finstack_quant_valuations_core::pricer::expect_inst;
@@ -83,87 +80,24 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughHestonM
             instrument,
             finstack_quant_valuations_core::pricer::InstrumentType::EquityOption,
         )?;
-        if let Some(pv) =
-            resolve_lifecycle_value(equity_option, market, as_of).map_err(|error| {
-                finstack_quant_valuations_core::pricer::PricingError::model_failure_with_context(
-                    error.to_string(),
-                    finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                        equity_option,
-                    )
-                    .model(finstack_quant_valuations_core::pricer::ModelKey::MonteCarloRoughHeston),
-                )
-            })?
-        {
-            return Ok(
-                finstack_quant_valuations_core::results::ValuationResult::stamped(
-                    equity_option.id(),
-                    as_of,
-                    pv,
-                ),
-            );
-        }
-        require_european(equity_option, "Rough Heston Monte Carlo").map_err(|e| {
-            finstack_quant_valuations_core::pricer::PricingError::model_failure_with_context(
-                e.to_string(),
-                finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                    equity_option,
-                ),
-            )
-        })?;
-
-        // W-31: `collect_inputs` applies the escrowed-dividend model
-        // (spot shift + `q = 0`) when `discrete_dividends` is non-empty. The
-        // escrowed-dividend identity holds only under Black-Scholes; under the
-        // rough Heston stochastic-vol dynamics it is invalid, so feeding the
-        // escrowed spot into the MC silently mis-prices a single-stock option
-        // with discrete dividends. Reject it explicitly rather than price it
-        // wrong.
-        if has_future_discrete_dividends(equity_option, as_of) {
-            return Err(
-                finstack_quant_valuations_core::pricer::PricingError::model_failure_with_context(
-                    "rough Heston Monte Carlo pricing does not support discrete \
-                 dividends: the escrowed-dividend spot adjustment is a \
-                 Black-Scholes-only construct and is invalid under stochastic \
-                 volatility. Use the Black-Scholes pricer for discrete \
-                 dividends, or supply a continuous dividend yield instead."
-                        .to_string(),
-                    finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                        equity_option,
-                    )
-                    .model(finstack_quant_valuations_core::pricer::ModelKey::MonteCarloRoughHeston),
-                ),
-            );
-        }
-
-        let inputs = collect_inputs(equity_option, market, as_of).map_err(|e| {
-            finstack_quant_valuations_core::pricer::PricingError::model_failure_with_context(
-                e.to_string(),
-                finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                    equity_option,
-                )
-                .model(finstack_quant_valuations_core::pricer::ModelKey::MonteCarloRoughHeston),
-            )
-        })?;
-        let (spot, r, q, _sigma, t) = (inputs.spot, inputs.r, inputs.q, inputs.sigma, inputs.t_vol);
-
-        if t <= 0.0 {
-            let intrinsic = match equity_option.option_type {
-                OptionType::Call => (spot - equity_option.strike).max(0.0),
-                OptionType::Put => (equity_option.strike - spot).max(0.0),
-            };
-            return Ok(finstack_quant_valuations_core::results::ValuationResult::stamped(
-                equity_option.id(),
-                as_of,
-                Money::new(intrinsic * equity_option.quantity, equity_option.currency).map_err(
-                    |error| {
-                        finstack_quant_valuations_core::pricer::PricingError::from_core(
-                            error,
-                            finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(equity_option),
-                        )
-                    },
-                )?,
-            ));
-        }
+        let (spot, r, q, t) = match stochastic_vol_inputs(
+            equity_option,
+            market,
+            as_of,
+            finstack_quant_valuations_core::pricer::ModelKey::MonteCarloRoughHeston,
+            "rough Heston Monte Carlo",
+        )? {
+            ModelInputs::Settled(pv) => {
+                return Ok(
+                    finstack_quant_valuations_core::results::ValuationResult::stamped(
+                        equity_option.id(),
+                        as_of,
+                        pv,
+                    ),
+                );
+            }
+            ModelInputs::Live(inputs) => (inputs.spot, inputs.r, inputs.q, inputs.t_vol),
+        };
 
         let err_ctx = finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
             equity_option,

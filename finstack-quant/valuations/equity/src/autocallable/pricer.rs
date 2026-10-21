@@ -1,16 +1,14 @@
 //! Autocallable Monte Carlo pricer.
 
 use crate::autocallable::types::Autocallable;
-use crate::piecewise_gbm::bootstrap_forward_gbm;
+use crate::past_fixings::fixing_on;
+use crate::piecewise_gbm::{bootstrap_forward_gbm, PiecewiseGbmMc};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_models::monte_carlo::engine::McEngine;
 use finstack_quant_models::monte_carlo::payoff::autocallable::AutocallablePayoff;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
-use finstack_quant_models::monte_carlo::process::piecewise_gbm::PiecewiseExactGbm;
-use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::TimeGrid;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
@@ -94,7 +92,7 @@ impl AutocallableMcPricer {
         for idx in 0..n_past {
             let obs_date = inst.observation_dates[idx];
             let payment_date = inst.payment_dates[idx];
-            let fix = inst.fixing_on(obs_date).ok_or_else(|| {
+            let fix = fixing_on(&inst.past_fixings, obs_date).ok_or_else(|| {
                 finstack_quant_core::Error::Validation(format!(
                     "Autocallable '{}': observation date {} is on or before as_of {} but has \
                      no entry in past_fixings; provide the observed fixing to price this \
@@ -134,7 +132,7 @@ impl AutocallableMcPricer {
 
         if n_past == inst.observation_dates.len() {
             let last_obs = inst.observation_dates[n_past - 1];
-            let final_fixing = inst.fixing_on(last_obs).ok_or_else(|| {
+            let final_fixing = fixing_on(&inst.past_fixings, last_obs).ok_or_else(|| {
                 finstack_quant_core::Error::Validation(format!(
                     "Autocallable '{}': missing fixing for final observation date {}",
                     inst.id, last_obs
@@ -239,12 +237,6 @@ impl AutocallableMcPricer {
             fixed_coupon_expiry_ratio,
         );
 
-        // Derive deterministic seed from instrument ID and scenario.
-        let seed = inst
-            .instrument_pricing_overrides
-            .model_config
-            .mc_seed(&inst.id);
-
         let merged_cfg =
             finstack_quant_valuations_core::instruments::common_impl::helpers::merged_path_config(
                 &self.config,
@@ -263,25 +255,17 @@ impl AutocallableMcPricer {
 
         // Mirror `PathDependentPricer::price_with_grid` (non-Sobol path) but drive
         // the piecewise process with its exact discretization.
-        let mut engine_config = merged_cfg.engine_config(time_grid);
-        engine_config.target_ci_half_width = inst
-            .instrument_pricing_overrides
-            .model_config
-            .mc_target_ci_half_width;
-        let engine = McEngine::new(engine_config);
-        let rng = PhiloxRng::new(seed);
-        let disc = PiecewiseExactGbm::new();
-        let initial_state = vec![initial_spot];
-
-        let result = engine.price(
-            &rng,
-            &process,
-            &disc,
-            &initial_state,
-            &payoff,
-            inst.notional.currency(),
+        let result = PiecewiseGbmMc {
+            config: &merged_cfg,
+            overrides: &inst.instrument_pricing_overrides,
+            instrument_id: &inst.id,
+            time_grid,
+            process: &process,
+            initial_spot,
+            currency: inst.notional.currency(),
             discount_factor,
-        )?;
+        }
+        .price(&payoff)?;
 
         let mean = result.mean;
         Ok((mean, Some(result)))

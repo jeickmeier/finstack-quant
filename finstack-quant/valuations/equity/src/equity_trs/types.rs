@@ -414,15 +414,11 @@ impl EquityTotalReturnSwap {
                 )));
             }
         }
-        for (d, v) in &self.past_fixings {
-            if !v.is_finite() || *v <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "EquityTRS '{}' past_fixings[{}] = {} must be finite and positive",
-                    self.id.as_str(),
-                    d,
-                    v
-                )));
-            }
+        crate::past_fixings::validate_positive_fixings(
+            &format_args!("EquityTRS '{}'", self.id.as_str()),
+            &self.past_fixings,
+        )?;
+        for (d, _) in &self.past_fixings {
             if *d < self.schedule.start || *d > self.schedule.end {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "EquityTRS '{}' past fixing date {} must lie in [{}, {}]",
@@ -442,14 +438,6 @@ impl EquityTotalReturnSwap {
             }
         }
         Ok(())
-    }
-
-    /// Look up the observed underlying level for a reset (period-start) date.
-    pub fn fixing_on(&self, date: Date) -> Option<f64> {
-        self.past_fixings
-            .iter()
-            .find(|(d, _)| *d == date)
-            .map(|(_, v)| *v)
     }
 
     /// Calculates the present value of the total return leg.
@@ -612,7 +600,10 @@ mod validation_tests {
         let mut trs = base();
         trs.past_fixings = vec![(trs.schedule.end, 110.0)];
         trs.validate().expect("final fixing is valid until payment");
-        assert_eq!(trs.fixing_on(trs.schedule.end), Some(110.0));
+        assert_eq!(
+            crate::past_fixings::fixing_on(&trs.past_fixings, trs.schedule.end),
+            Some(110.0)
+        );
         trs.past_fixings[0].0 = trs.schedule.end.next_day().expect("next day");
         assert!(trs.validate().is_err());
     }

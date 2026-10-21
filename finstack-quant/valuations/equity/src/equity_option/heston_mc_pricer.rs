@@ -4,7 +4,8 @@
 //! using Monte Carlo simulation with the QE (Quadratic Exponential) discretization
 //! scheme.
 
-use crate::equity_option::pricing::{collect_inputs, require_european, resolve_lifecycle_value};
+use crate::equity_option::pricing::inputs::EquityOptionInputs;
+use crate::equity_option::pricing::{model_error, stochastic_vol_inputs, ModelInputs};
 use crate::equity_option::types::EquityOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -17,7 +18,7 @@ use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::TimeGrid;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
+    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
@@ -41,48 +42,32 @@ impl EquityOptionHestonMcPricer {
         }
     }
 
-    /// Price an equity option using Heston Monte Carlo.
+    /// Price an equity option using Heston Monte Carlo; returns the PV and
+    /// its Monte Carlo standard error (zero for a settled value).
     fn price_internal(
         &self,
         inst: &EquityOption,
         market: &MarketContext,
         as_of: Date,
+    ) -> std::result::Result<(Money, f64), PricingError> {
+        let model = ModelKey::MonteCarloHeston;
+        match stochastic_vol_inputs(inst, market, as_of, model, "Heston Monte Carlo")? {
+            ModelInputs::Settled(pv) => Ok((pv, 0.0)),
+            ModelInputs::Live(inputs) => self
+                .simulate(inst, market, inputs)
+                .map_err(|e| model_error(inst, model, e)),
+        }
+    }
+
+    /// Simulate the live option under Heston QE dynamics.
+    fn simulate(
+        &self,
+        inst: &EquityOption,
+        market: &MarketContext,
+        inputs: EquityOptionInputs,
     ) -> finstack_quant_core::Result<(Money, f64)> {
-        if let Some(value) = resolve_lifecycle_value(inst, market, as_of)? {
-            return Ok((value, 0.0));
-        }
-        // The escrowed-dividend identity used by `collect_inputs`
-        // is Black-Scholes-specific; reject it for Heston stochastic vol.
-        if inst
-            .discrete_dividends
-            .iter()
-            .any(|(ex_date, _)| *ex_date > as_of && *ex_date <= inst.expiry)
-        {
-            return Err(finstack_quant_core::Error::Validation(
-                "Heston Monte Carlo pricing does not support discrete dividends: \
-                 the escrowed-dividend spot adjustment is a Black-Scholes-only \
-                 construct and is invalid under stochastic volatility. Use the \
-                 Black-Scholes pricer for discrete dividends, or supply a \
-                 continuous dividend yield instead."
-                    .to_string(),
-            ));
-        }
-
-        let inputs = collect_inputs(inst, market, as_of)?;
-        let (spot, r, q, _sigma, t) = (inputs.spot, inputs.r, inputs.q, inputs.sigma, inputs.t_vol);
+        let (spot, r, q, t) = (inputs.spot, inputs.r, inputs.q, inputs.t_vol);
         let ccy = inst.currency;
-
-        if t <= 0.0 {
-            let intrinsic = match inst.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
-                    (spot - inst.strike).max(0.0)
-                }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
-                    (inst.strike - spot).max(0.0)
-                }
-            };
-            return Ok((Money::new(intrinsic * inst.quantity, ccy)?, 0.0));
-        }
 
         // Heston parameters: **Audit P3b** — use the strict resolver so a
         // Missing or mistyped HESTON_* scalars fail loudly rather than selecting
@@ -179,34 +164,7 @@ impl Pricer for EquityOptionHestonMcPricer {
         as_of: Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
         let equity_option = expect_inst::<EquityOption>(instrument, InstrumentType::EquityOption)?;
-        if let Some(pv) =
-            resolve_lifecycle_value(equity_option, market, as_of).map_err(|error| {
-                PricingError::model_failure_with_context(
-                    error.to_string(),
-                    PricingErrorContext::from_instrument(equity_option)
-                        .model(ModelKey::MonteCarloHeston),
-                )
-            })?
-        {
-            return Ok(ValuationResult::stamped(equity_option.id(), as_of, pv));
-        }
-        require_european(equity_option, "Heston Monte Carlo").map_err(|e| {
-            PricingError::model_failure_with_context(
-                e.to_string(),
-                PricingErrorContext::from_instrument(equity_option)
-                    .model(ModelKey::MonteCarloHeston),
-            )
-        })?;
-
-        let (pv, stderr) = self
-            .price_internal(equity_option, market, as_of)
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::from_instrument(equity_option)
-                        .model(ModelKey::MonteCarloHeston),
-                )
-            })?;
+        let (pv, stderr) = self.price_internal(equity_option, market, as_of)?;
 
         let mut result = ValuationResult::stamped(equity_option.id(), as_of, pv);
         if stderr > 0.0 {

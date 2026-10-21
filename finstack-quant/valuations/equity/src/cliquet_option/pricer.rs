@@ -5,11 +5,8 @@ use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_models::monte_carlo::engine::McEngine;
 use finstack_quant_models::monte_carlo::payoff::cliquet::CliquetCallPayoff;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
-use finstack_quant_models::monte_carlo::process::piecewise_gbm::PiecewiseExactGbm;
-use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::TimeGrid;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
@@ -77,7 +74,7 @@ impl CliquetOptionMcPricer {
         let mut locked_sum = 0.0;
         let mut locked_growth = 1.0;
         for &d in &inst.reset_dates[..n_past] {
-            let level = match inst.fixing_on(d) {
+            let level = match crate::past_fixings::fixing_on(&inst.past_fixings, d) {
                 Some(v) => v,
                 None if d == as_of => initial_spot,
                 None => {
@@ -186,9 +183,6 @@ impl CliquetOptionMcPricer {
             &format!("CliquetOption {}", inst.id),
         )?;
 
-        let steps_per_year = self.config.steps_per_year;
-        let num_steps = ((t * steps_per_year).round() as usize).max(self.config.min_steps);
-
         // Payoff reset times: the remaining (future) reset dates only.
         //
         // Past reset dates (including a strike-set reset at the contract
@@ -207,36 +201,20 @@ impl CliquetOptionMcPricer {
             .filter(|&t| t > 0.0)
             .collect();
 
-        // Derive deterministic seed from instrument ID and scenario
+        let merged_cfg =
+            finstack_quant_valuations_core::instruments::common_impl::helpers::merged_path_config(
+                &self.config,
+                &inst.instrument_pricing_overrides,
+            )?;
 
-        let seed = inst
-            .instrument_pricing_overrides
-            .model_config
-            .mc_seed(&inst.id);
-
-        // Build time grid that includes reset dates to ensure exact period boundaries.
-        // Without this, the MC simulation may not visit exact reset dates, leading to
-        // interpolation error in the piecewise process and slightly wrong period returns.
-        let mut grid_times = Vec::with_capacity(num_steps + reset_times.len() + 1);
-        grid_times.push(0.0);
-
-        let dt_grid = t / num_steps as f64;
-        for i in 1..=num_steps {
-            grid_times.push(i as f64 * dt_grid);
-        }
-
-        // Add reset times (ensure we visit exact dates)
-        for &reset_t in &reset_times {
-            if reset_t > 1e-10 && reset_t <= t {
-                grid_times.push(reset_t);
-            }
-        }
-
-        // Sort and dedup (prefer reset times when merging nearby points)
-        grid_times.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        grid_times.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
-
-        let time_grid = TimeGrid::from_times(grid_times)?;
+        // Uniform grid plus the reset times as required knots, so the
+        // simulation visits each exact period boundary.
+        let time_grid = TimeGrid::uniform_with_required_times(
+            t,
+            merged_cfg.steps_per_year,
+            merged_cfg.min_steps,
+            &reset_times,
+        )?;
 
         // Build payoff (consumes reset_times via move). The first simulated
         // period anchors to the last observed level (`sim_anchor`), and the
@@ -253,22 +231,6 @@ impl CliquetOptionMcPricer {
         )?
         .with_prior_locked_returns(locked_sum, locked_growth);
 
-        let merged_cfg =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::merged_path_config(
-                &self.config,
-                &inst.instrument_pricing_overrides,
-            )?;
-        let mut engine_config = merged_cfg.engine_config(time_grid);
-        engine_config.target_ci_half_width = inst
-            .instrument_pricing_overrides
-            .model_config
-            .mc_target_ci_half_width;
-        let engine = McEngine::new(engine_config);
-
-        let rng = PhiloxRng::new(seed);
-        let disc = PiecewiseExactGbm::new();
-        let initial_state = vec![initial_spot];
-
         // The payoff is FIXED on the last reset date but PAID at the contract
         // expiry (settlement), so the terminal cashflow is discounted from
         // `expiry` — matching the fully-observed branch above. Validation
@@ -276,15 +238,17 @@ impl CliquetOptionMcPricer {
         // discount window.
         let discount_factor = disc_curve.df_between_dates(as_of, inst.expiry)?;
 
-        let result = engine.price(
-            &rng,
-            &process,
-            &disc,
-            &initial_state,
-            &payoff,
-            inst.notional.currency(),
+        let result = crate::piecewise_gbm::PiecewiseGbmMc {
+            config: &merged_cfg,
+            overrides: &inst.instrument_pricing_overrides,
+            instrument_id: &inst.id,
+            time_grid,
+            process: &process,
+            initial_spot,
+            currency: inst.notional.currency(),
             discount_factor,
-        )?;
+        }
+        .price(&payoff)?;
 
         let mean = result.mean;
         Ok((mean, Some(result)))
