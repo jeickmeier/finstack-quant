@@ -262,8 +262,7 @@ impl CreditDefaultSwap {
         finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
         let discount = market.get_discount(self.premium_leg.discount_curve_id.as_str())?;
         let hazard = market.get_hazard(self.protection_leg.credit_curve_id.as_str())?;
-        super::pricing::CdsPricer::with_config(super::pricing::CdsPricerConfig::from_cds(self))
-            .par_spread(self, discount.as_ref(), hazard.as_ref(), as_of)
+        CdsPricer::new().par_spread(self, discount.as_ref(), hazard.as_ref(), as_of)
     }
 
     /// Create a canonical example CDS for testing and documentation.
@@ -606,7 +605,8 @@ impl CreditDefaultSwap {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        self.validate()?;
+        // Unchecked kernel: every caller enters through the validated pricing
+        // lifecycle (`Instrument::value*` or the pricer registry).
         let disc = market.get_discount(&self.premium_leg.discount_curve_id)?;
         let surv = market.get_hazard(&self.protection_leg.credit_curve_id)?;
         CdsPricer::new().npv_full(self, disc.as_ref(), surv.as_ref(), as_of)

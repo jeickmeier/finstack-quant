@@ -388,15 +388,39 @@ impl CdsTranchePricer {
                 exposure,
             )
         } else {
-            let t = self.years_from_base(index_data, maturity)?;
+            let (count, default_prob, recovery) = self.homogeneous_pool(index_data, maturity)?;
             self.homogeneous_capped_expectation(
                 cap_pct / 100.0,
-                usize::from(index_data.num_constituents()),
-                self.get_default_probability(index_data, t)?,
-                index_data.recovery_rate(),
+                count,
+                default_prob,
+                recovery,
                 self.smooth_correlation_boundary(correlation),
                 exposure,
             )
+        }
+    }
+
+    /// Constituent count, default probability to `date` and recovery of a
+    /// homogeneous (index-curve) pool.
+    fn homogeneous_pool(
+        &self,
+        index_data: &CreditIndexData,
+        date: Date,
+    ) -> Result<(usize, f64, f64)> {
+        let t = self.years_from_base(index_data, date)?;
+        Ok((
+            usize::from(index_data.num_constituents()),
+            self.get_default_probability(index_data, t)?,
+            index_data.recovery_rate(),
+        ))
+    }
+
+    /// Conditional default probability `P(default | factors)` of a name with
+    /// unconditional `default_prob` under the pricer's copula at `correlation`.
+    fn conditional_pd(&self, default_prob: f64, correlation: f64) -> impl Fn(&[f64]) -> f64 + '_ {
+        let threshold = self.default_threshold_for_copula(default_prob);
+        move |factors| {
+            self.conditional_default_prob_copula(self.copula(), threshold, factors, correlation)
         }
     }
 
@@ -414,14 +438,7 @@ impl CdsTranchePricer {
             PoolExposure::Loss => 1.0 - base_recovery,
             PoolExposure::Recovery => base_recovery,
         };
-        let threshold = self.default_threshold_for_copula(default_prob);
-        let conditional_p = |factors: &[f64]| {
-            if self.copula_spec.is_gaussian() {
-                self.conditional_default_probability_enhanced(threshold, correlation, factors[0])
-            } else {
-                self.conditional_default_prob_copula(self.copula(), threshold, factors, correlation)
-            }
-        };
+        let conditional_p = self.conditional_pd(default_prob, correlation);
         self.integrate_factors(&|factors| {
             self.conditional_equity_tranche_capped(count, cap, conditional_p(factors), exposure)
         })
@@ -457,13 +474,13 @@ impl CdsTranchePricer {
                 )?,
             ));
         }
-        let t = self.years_from_base(index_data, date)?;
+        let (count, default_prob, recovery) = self.homogeneous_pool(index_data, date)?;
         self.homogeneous_capped_pair(
             loss_cap_pct / 100.0,
             recovery_cap_pct / 100.0,
-            usize::from(index_data.num_constituents()),
-            self.get_default_probability(index_data, t)?,
-            index_data.recovery_rate(),
+            count,
+            default_prob,
+            recovery,
             self.smooth_correlation_boundary(correlation),
         )
     }
@@ -478,14 +495,7 @@ impl CdsTranchePricer {
         base_recovery: f64,
         correlation: f64,
     ) -> Result<(f64, f64)> {
-        let threshold = self.default_threshold_for_copula(default_prob);
-        let conditional_p = |factors: &[f64]| {
-            if self.copula_spec.is_gaussian() {
-                self.conditional_default_probability_enhanced(threshold, correlation, factors[0])
-            } else {
-                self.conditional_default_prob_copula(self.copula(), threshold, factors, correlation)
-            }
-        };
+        let conditional_p = self.conditional_pd(default_prob, correlation);
         self.integrate_factors_pair(&|factors| {
             self.conditional_equity_tranche_pair(
                 count,

@@ -244,8 +244,17 @@ fn test_conditional_default_probability() {
     let correlation = 0.30;
     let default_threshold = standard_normal_inv_cdf(0.05); // 5% default probability
 
+    let conditional = |factor: f64| {
+        model.conditional_default_prob_copula(
+            model.copula(),
+            default_threshold,
+            &[factor],
+            correlation,
+        )
+    };
+
     // Test with market factor = 0 (should be reasonable value close to original default prob)
-    let cond_prob = model.conditional_default_probability(default_threshold, correlation, 0.0);
+    let cond_prob = conditional(0.0);
     assert!(
         cond_prob > 0.01 && cond_prob < 0.1,
         "Expected reasonable default prob, got {}",
@@ -253,11 +262,11 @@ fn test_conditional_default_probability() {
     );
 
     // Test with negative market factor (should increase default prob)
-    let cond_prob_neg = model.conditional_default_probability(default_threshold, correlation, -1.0);
+    let cond_prob_neg = conditional(-1.0);
     assert!(cond_prob_neg > 0.05);
 
     // Test with positive market factor (should decrease default prob)
-    let cond_prob_pos = model.conditional_default_probability(default_threshold, correlation, 1.0);
+    let cond_prob_pos = conditional(1.0);
     assert!(cond_prob_pos < 0.05);
 }
 
@@ -1080,49 +1089,31 @@ fn test_smooth_correlation_boundary_c1_at_seams() {
 }
 
 #[test]
-fn test_conditional_default_probability_enhanced() {
+fn test_conditional_default_probability_is_bounded_at_smoothed_correlations() {
     let model = CdsTranchePricer::new();
     let default_threshold = standard_normal_inv_cdf(0.05); // 5% unconditional default prob
 
-    // Test enhanced function across various correlation and market factor combinations
+    // Pricing passes every base correlation through the smooth boundary
+    // before the copula conditional, including degenerate inputs.
     let correlations = [1e-8, 0.01, 0.3, 0.7, 0.99, 1.0 - 1e-8];
     let market_factors = [-4.0, -2.0, -1.0, 0.0, 1.0, 2.0, 4.0];
 
     for &correlation in &correlations {
+        let smoothed = model.smooth_correlation_boundary(correlation);
         for &market_factor in &market_factors {
-            let enhanced_prob = model.conditional_default_probability_enhanced(
+            let prob = model.conditional_default_prob_copula(
+                model.copula(),
                 default_threshold,
-                correlation,
-                market_factor,
+                &[market_factor],
+                smoothed,
             );
-            let standard_prob = model.conditional_default_probability(
-                default_threshold,
-                correlation.clamp(0.01, 0.99), // Clamp for standard function
-                market_factor,
-            );
-
-            // Enhanced function should always give finite, bounded results
             assert!(
-                enhanced_prob.is_finite(),
-                "Enhanced conditional prob should be finite for ρ={}, Z={}",
+                (0.0..=1.0).contains(&prob),
+                "conditional prob should be finite in [0,1]: got {} for ρ={}, Z={}",
+                prob,
                 correlation,
                 market_factor
             );
-            assert!(
-                (0.0..=1.0).contains(&enhanced_prob),
-                "Enhanced conditional prob should be in [0,1]: got {} for ρ={}, Z={}",
-                enhanced_prob,
-                correlation,
-                market_factor
-            );
-
-            // For normal correlation ranges, should be close to standard implementation
-            if (0.05..=0.95).contains(&correlation) {
-                let diff = (enhanced_prob - standard_prob).abs();
-                assert!(diff < 0.01,
-                    "Enhanced and standard methods should agree in normal range: diff={} for ρ={}, Z={}",
-                    diff, correlation, market_factor);
-            }
         }
     }
 }

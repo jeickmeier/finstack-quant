@@ -93,18 +93,14 @@ fn test_accrual_on_default() {
         100.0,
         0.40,
     );
-    let pricer_with = CdsPricer::new();
-    let pricer_without = CdsPricer::with_config(CdsPricerConfig {
-        include_accrual_on_default: false,
-        ..Default::default()
-    });
-    let pv_with = pricer_with
-        .pv_premium_leg(&cds, &disc, &credit, as_of)
+    let pricer = CdsPricer::new();
+    let pv_with = pricer
+        .premium_leg_annuity(&cds, &disc, &credit, as_of, 0.01, true)
         .expect("should succeed");
-    let pv_without = pricer_without
-        .pv_premium_leg(&cds, &disc, &credit, as_of)
+    let pv_without = pricer
+        .premium_leg_annuity(&cds, &disc, &credit, as_of, 0.01, false)
         .expect("should succeed");
-    assert!(pv_with.amount() > pv_without.amount());
+    assert!(pv_with > pv_without);
 }
 
 #[test]
@@ -184,7 +180,7 @@ fn risky_pv01_reconciles_clean_npv_to_par_spread() {
         0.40,
     );
     cds.valuation_convention = CdsValuationConvention::BloombergCdswClean;
-    let pricer = CdsPricer::with_config(CdsPricerConfig::from_cds(&cds));
+    let pricer = CdsPricer::new();
     let par_spread = pricer
         .par_spread(&cds, &disc, &credit, as_of)
         .expect("par spread");
@@ -245,16 +241,14 @@ fn test_par_spread_full_premium_option_runs() {
         0.0,
         0.40,
     );
-    let pricer_ra = CdsPricer::new();
-    let pricer_full = CdsPricer::with_config(CdsPricerConfig {
-        par_spread_uses_full_premium: true,
-        ..Default::default()
-    });
-    let s1 = pricer_ra
+    let mut full_premium_cds = cds.clone();
+    full_premium_cds.valuation_convention = CdsValuationConvention::BloombergCdswCleanFullPremium;
+    let pricer = CdsPricer::new();
+    let s1 = pricer
         .par_spread(&cds, &disc, &credit, as_of)
         .expect("should succeed");
-    let s2 = pricer_full
-        .par_spread(&cds, &disc, &credit, as_of)
+    let s2 = pricer
+        .par_spread(&full_premium_cds, &disc, &credit, as_of)
         .expect("should succeed");
     assert!(s1.is_finite() && s2.is_finite());
 }
@@ -537,23 +531,19 @@ fn test_premium_leg_per_bp_matches_risky_annuity_without_accrual_on_default() {
         0.40,
     );
 
-    let without_aod = CdsPricer::with_config(CdsPricerConfig {
-        include_accrual_on_default: false,
-        ..Default::default()
-    });
-    let risky_annuity = without_aod
+    let pricer = CdsPricer::new();
+    let risky_annuity = pricer
         .risky_annuity(&cds, &disc, &credit, as_of)
         .expect("risky annuity");
-    let per_bp_without_aod = without_aod
-        .premium_leg_pv_per_bp(&cds, &disc, &credit, as_of)
+    let per_bp_without_aod = pricer
+        .premium_leg_annuity(&cds, &disc, &credit, as_of, ONE_BASIS_POINT, false)
         .expect("premium leg per bp");
     assert!(
         (per_bp_without_aod - risky_annuity * ONE_BASIS_POINT).abs() < 1e-14,
         "premium leg per bp without AoD should equal risky annuity × 1bp"
     );
 
-    let with_aod = CdsPricer::new();
-    let per_bp_with_aod = with_aod
+    let per_bp_with_aod = pricer
         .premium_leg_pv_per_bp(&cds, &disc, &credit, as_of)
         .expect("premium leg per bp with AoD");
     assert!(
@@ -585,18 +575,20 @@ fn test_full_premium_par_spread_is_below_risky_annuity_par_spread() {
     );
     cds.valuation_convention = CdsValuationConvention::IsdaDirty;
 
-    let isda = CdsPricer::new();
-    let full_premium = CdsPricer::with_config(CdsPricerConfig {
-        par_spread_uses_full_premium: true,
-        ..Default::default()
-    });
-
-    let isda_spread = isda
+    // Same trade and conventions; only the par-spread denominator differs:
+    // the risky annuity (ISDA) versus the full premium leg per unit spread
+    // including accrual-on-default (the full-premium denominator).
+    let pricer = CdsPricer::new();
+    let isda_spread = pricer
         .par_spread(&cds, &disc, &credit, as_of)
         .expect("ISDA par spread");
-    let full_spread = full_premium
-        .par_spread(&cds, &disc, &credit, as_of)
-        .expect("full-premium par spread");
+    let protection = pricer
+        .pv_protection_leg_raw(&cds, &disc, &credit, as_of)
+        .expect("protection leg");
+    let full_denominator = pricer
+        .premium_leg_annuity(&cds, &disc, &credit, as_of, 1.0, true)
+        .expect("full-premium denominator");
+    let full_spread = protection / (full_denominator * cds.notional.amount()) * 10_000.0;
 
     assert!(isda_spread.is_finite() && full_spread.is_finite());
     assert!(
@@ -692,7 +684,7 @@ fn test_time_and_settlement_helpers_match_curve_and_calendar_conventions() {
     // Sunday 2025-01-05; the fallback must then roll forward to the next
     // weekday — Monday 2025-01-06 — because a settlement date is by
     // definition a business day.
-    let fallback_settlement = settlement_date(base_date, 3, None, 252.0).expect("fallback");
+    let fallback_settlement = settlement_date(base_date, 3, None).expect("fallback");
     assert!(
         !fallback_settlement.is_weekend(),
         "fallback settlement must not land on a weekend, got {fallback_settlement:?}"
@@ -718,7 +710,7 @@ fn test_time_and_settlement_helpers_match_curve_and_calendar_conventions() {
     let monday =
         Date::from_calendar_date(2025, time::Month::January, 6).expect("valid Monday date");
     assert_eq!(
-        settlement_date(friday, 1, Some(nyse), 252.0).expect("calendar settlement"),
+        settlement_date(friday, 1, Some(nyse)).expect("calendar settlement"),
         monday,
         "calendar-aware settlement should advance by business days"
     );

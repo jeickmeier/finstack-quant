@@ -98,6 +98,16 @@ impl CdsTranchePricer {
         as_of: Date,
     ) -> Result<Money> {
         tranche.validate()?;
+        self.price_validated_tranche(tranche, market, as_of)
+    }
+
+    /// [`Self::price_tranche`] for a tranche the caller already validated.
+    pub(super) fn price_validated_tranche(
+        &self,
+        tranche: &CdsTranche,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<Money> {
         let discount_curve = market.get_discount(tranche.discount_curve_id.as_ref())?;
         let wiped_out = tranche.realized_loss >= tranche.detach_pct / 100.0;
         let net_pv = if wiped_out {

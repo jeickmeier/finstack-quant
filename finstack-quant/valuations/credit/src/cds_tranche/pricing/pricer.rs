@@ -48,9 +48,6 @@ pub(super) const BESPOKE_SETTLEMENT_DAYS: i32 = 3;
 /// Numerical tolerance for integration convergence and boundary checks
 pub(super) const NUMERICAL_TOLERANCE: f64 = 1e-10;
 
-/// Clip parameter for CDF arguments to prevent overflow (±10 sigma)
-pub(super) const CDF_CLIP: f64 = 10.0;
-
 /// Probability clamp epsilon to avoid 0/1 extremes in probits/CDFs
 pub(super) const PROBABILITY_CLIP: f64 = 1e-12;
 

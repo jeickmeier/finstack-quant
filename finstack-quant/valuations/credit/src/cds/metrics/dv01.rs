@@ -9,6 +9,7 @@ use super::{deal_quote_override, market_doc_clause};
 use crate::cds::CreditDefaultSwap;
 use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::sensitivity_central_diff;
@@ -17,6 +18,34 @@ use finstack_quant_valuations_core::recalibration::{
     DiscountCurveRecalibrationRequest, HazardRecalibrationAction, HazardRecalibrationRequest,
     QuoteBump,
 };
+
+/// Market with discount curve `discount_id` shifted by a parallel `bump_bp`
+/// (basis points): a swap-quote bump and rebuild when the curve records its
+/// rate calibration, a parallel bump of the discount factors otherwise. Shared
+/// by the CDS and CDS-option DV01 calculators so both report one unit and sign.
+pub(crate) fn discount_bumped_market(
+    context: &MetricContext,
+    discount_id: &CurveId,
+    bump_bp: f64,
+) -> Result<MarketContext> {
+    let mut bumped_market: MarketContext = context.curves.as_ref().clone();
+    let base_discount = context.curves.get_discount(discount_id.as_str())?;
+    if let Some(calibration) = base_discount.rate_calibration() {
+        let bumped_discount = context.rebuild_discount_curve(
+            DiscountCurveRecalibrationRequest {
+                curve: std::sync::Arc::clone(&base_discount),
+                recipe: calibration.clone(),
+                market: std::sync::Arc::clone(&context.curves),
+                bump: QuoteBump::ParallelBp(bump_bp),
+            },
+            "dv01",
+        )?;
+        bumped_market = bumped_market.insert(bumped_discount.as_ref().clone());
+    } else {
+        bumped_market.apply_curve_bump_in_place(discount_id, BumpSpec::parallel_bp(bump_bp))?;
+    }
+    Ok(bumped_market)
+}
 
 /// CDS DV01 calculator with par-spread hazard re-bootstrap when possible.
 pub(crate) struct CdsDv01Calculator;
@@ -28,27 +57,8 @@ impl CdsDv01Calculator {
         bump_bp: f64,
         rebootstrap_hazard: bool,
     ) -> Result<f64> {
-        let mut bumped_market: MarketContext = context.curves.as_ref().clone();
-        let base_discount = context
-            .curves
-            .get_discount(cds.premium_leg.discount_curve_id.as_str())?;
-        if let Some(calibration) = base_discount.rate_calibration() {
-            let bumped_discount = context.rebuild_discount_curve(
-                DiscountCurveRecalibrationRequest {
-                    curve: std::sync::Arc::clone(&base_discount),
-                    recipe: calibration.clone(),
-                    market: std::sync::Arc::clone(&context.curves),
-                    bump: QuoteBump::ParallelBp(bump_bp),
-                },
-                "dv01",
-            )?;
-            bumped_market = bumped_market.insert(bumped_discount.as_ref().clone());
-        } else {
-            bumped_market.apply_curve_bump_in_place(
-                &cds.premium_leg.discount_curve_id,
-                BumpSpec::parallel_bp(bump_bp),
-            )?;
-        }
+        let mut bumped_market =
+            discount_bumped_market(context, &cds.premium_leg.discount_curve_id, bump_bp)?;
 
         if rebootstrap_hazard {
             let base_hazard = context

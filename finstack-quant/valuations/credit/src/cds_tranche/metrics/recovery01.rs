@@ -30,6 +30,7 @@
 //! market context's single canonical curve for each ID. Per-issuer recovery
 //! agreements remain unchanged.
 
+use crate::cds::metrics::recovery01::{bumped_recovery, RECOVERY_BUMP};
 use crate::cds_tranche::CdsTranche;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
@@ -40,9 +41,6 @@ use finstack_quant_valuations_core::recalibration::{
     HazardRecalibrationAction, HazardRecalibrationRequest,
 };
 use std::sync::Arc;
-
-/// Standard recovery rate bump: 1% (0.01)
-const RECOVERY_BUMP: f64 = 0.01;
 
 /// Recovery01 calculator for CDS Tranche.
 pub(crate) struct Recovery01Calculator;
@@ -121,9 +119,9 @@ impl MetricCalculator for Recovery01Calculator {
         let original_index = market.get_credit_index(&tranche.credit_index_id)?;
         let base_recovery = original_index.recovery_rate();
 
-        let bumped_recovery_up = (base_recovery + RECOVERY_BUMP).clamp(0.0, 1.0);
+        let bumped_recovery_up = bumped_recovery(base_recovery, RECOVERY_BUMP);
         let up_delta = bumped_recovery_up - base_recovery;
-        let bumped_recovery_down = (base_recovery - RECOVERY_BUMP).clamp(0.0, 1.0);
+        let bumped_recovery_down = bumped_recovery(base_recovery, -RECOVERY_BUMP);
         let down_delta = base_recovery - bumped_recovery_down;
 
         let has_par_quotes = original_index

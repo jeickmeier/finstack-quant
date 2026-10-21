@@ -68,28 +68,9 @@ impl CdsTranchePricer {
         conditional_default_prob: f64,
         exposure: f64,
     ) -> Result<f64> {
-        if !conditional_default_prob.is_finite() {
-            return Err(Error::Validation(
-                "conditional default probability must be finite".to_owned(),
-            ));
-        }
         let individual_notional = 1.0 / num_constituents as f64; // Normalized to 1.0 total
 
-        // Evaluate the whole conditional binomial PMF once (O(n)) instead of
-        // reconstructing a distribution per `k`. The PMF is written into a
-        // per-thread scratch buffer that is reused across quadrature-node
-        // evaluations, so this integrand allocates no `(N + 1)`-element vector
-        // on every call. The buffer is thread-local, so parallel tranche
-        // pricing remains correct and deterministic.
-        thread_local! {
-            static PMF_SCRATCH: std::cell::RefCell<Vec<f64>> =
-                const { std::cell::RefCell::new(Vec::new()) };
-        }
-
-        PMF_SCRATCH.with(|cell| {
-            let mut pmf = cell.borrow_mut();
-            binomial_pmf_all_into(&mut pmf, num_constituents, conditional_default_prob)?;
-
+        with_conditional_pmf(num_constituents, conditional_default_prob, |pmf| {
             let mut expected = 0.0;
 
             // Sum over all possible numbers of defaults
@@ -103,7 +84,7 @@ impl CdsTranchePricer {
                 expected += prob_k_defaults * capped;
             }
 
-            Ok(expected)
+            expected
         })
     }
 
@@ -118,21 +99,8 @@ impl CdsTranchePricer {
         loss_exposure: f64,
         recovery_exposure: f64,
     ) -> Result<(f64, f64)> {
-        if !conditional_default_prob.is_finite() {
-            return Err(Error::Validation(
-                "conditional default probability must be finite".to_owned(),
-            ));
-        }
         let individual_notional = 1.0 / num_constituents as f64;
-        thread_local! {
-            static PMF_SCRATCH: std::cell::RefCell<Vec<f64>> =
-                const { std::cell::RefCell::new(Vec::new()) };
-        }
-
-        PMF_SCRATCH.with(|cell| {
-            let mut pmf = cell.borrow_mut();
-            binomial_pmf_all_into(&mut pmf, num_constituents, conditional_default_prob)?;
-
+        with_conditional_pmf(num_constituents, conditional_default_prob, |pmf| {
             let mut loss = 0.0;
             let mut recovery = 0.0;
             for (k, &prob_k_defaults) in pmf.iter().enumerate() {
@@ -140,7 +108,7 @@ impl CdsTranchePricer {
                 loss += prob_k_defaults * (defaulted * loss_exposure).min(loss_cap);
                 recovery += prob_k_defaults * (defaulted * recovery_exposure).min(recovery_cap);
             }
-            Ok((loss, recovery))
+            (loss, recovery)
         })
     }
 
@@ -525,8 +493,12 @@ impl CdsTranchePricer {
             ))
             .insert_credit_index(&tranche.credit_index_id, bumped_index_down)?;
 
-        let pv_up = self.price_tranche(tranche, &ctx_up, as_of)?.amount();
-        let pv_down = self.price_tranche(tranche, &ctx_down, as_of)?.amount();
+        let pv_up = self
+            .price_validated_tranche(tranche, &ctx_up, as_of)?
+            .amount();
+        let pv_down = self
+            .price_validated_tranche(tranche, &ctx_down, as_of)?
+            .amount();
 
         // Central difference per unit ρ, rescaled to the per-1% (0.01 absolute
         // correlation) reporting convention shared with Recovery01.
@@ -601,6 +573,35 @@ impl CdsTranchePricer {
         }
         Ok(impacts.iter().sum::<f64>() / (impacts.len() as f64))
     }
+}
+
+/// Run `f` on the binomial PMF of defaults among `num_constituents` names with
+/// conditional default probability `conditional_default_prob`.
+///
+/// The whole PMF is evaluated once (O(n)) instead of reconstructing a
+/// distribution per `k`, into a per-thread scratch buffer reused across
+/// quadrature-node evaluations, so the integrand allocates no
+/// `(N + 1)`-element vector on every call. The buffer is thread-local, so
+/// parallel tranche pricing remains correct and deterministic.
+fn with_conditional_pmf<T>(
+    num_constituents: usize,
+    conditional_default_prob: f64,
+    f: impl FnOnce(&[f64]) -> T,
+) -> Result<T> {
+    if !conditional_default_prob.is_finite() {
+        return Err(Error::Validation(
+            "conditional default probability must be finite".to_owned(),
+        ));
+    }
+    thread_local! {
+        static PMF_SCRATCH: std::cell::RefCell<Vec<f64>> =
+            const { std::cell::RefCell::new(Vec::new()) };
+    }
+    PMF_SCRATCH.with(|cell| {
+        let mut pmf = cell.borrow_mut();
+        binomial_pmf_all_into(&mut pmf, num_constituents, conditional_default_prob)?;
+        Ok(f(&pmf))
+    })
 }
 
 #[cfg(test)]
