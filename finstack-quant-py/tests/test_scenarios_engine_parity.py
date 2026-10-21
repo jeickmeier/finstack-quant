@@ -15,6 +15,7 @@ import pickle
 import pandas as pd
 import pytest
 
+from finstack_quant.attribution import default_waterfall_order
 from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
@@ -302,9 +303,35 @@ def test_horizon_json_uses_null_for_undefined_derived_returns() -> None:
     assert HorizonResult.from_json(result.to_json()).to_json() == result.to_json()
 
 
-@pytest.mark.parametrize("method", ["parallel", "waterfall", "metrics_based", "taylor"])
+# Every attribution method in its AttributionMethod wire form.
+HORIZON_METHODS = [
+    "parallel",
+    "waterfall",
+    {"waterfall": default_waterfall_order()},
+    "metrics_based",
+    "taylor",
+    {"taylor": {}},
+    json.dumps({"taylor": {}}),
+]
+
+
+@pytest.mark.parametrize(
+    "method",
+    HORIZON_METHODS,
+    ids=[
+        "parallel",
+        "waterfall shorthand",
+        "waterfall wire",
+        "metrics_based",
+        "taylor shorthand",
+        "taylor wire",
+        "taylor JSON",
+    ],
+)
 @pytest.mark.parametrize("instrument_kind", ["deposit", "bond"])
-def test_horizon_methods_support_standard_fixed_income_instruments(method: str, instrument_kind: str) -> None:
+def test_horizon_methods_support_standard_fixed_income_instruments(
+    method: str | dict[str, object], instrument_kind: str
+) -> None:
     instrument = (
         Bond.fixed("HORIZON-BOND", 100.0, 0.05, "2024-01-01", "2034-01-01", "none", "USD-OIS", currency="USD")
         if instrument_kind == "bond"
@@ -323,9 +350,23 @@ def test_horizon_methods_support_standard_fixed_income_instruments(method: str, 
     )
 
 
-@pytest.mark.parametrize("method", ["parallel", "waterfall", "metrics_based", "taylor"])
+@pytest.mark.parametrize(
+    "method",
+    HORIZON_METHODS,
+    ids=[
+        "parallel",
+        "waterfall shorthand",
+        "waterfall wire",
+        "metrics_based",
+        "taylor shorthand",
+        "taylor wire",
+        "taylor JSON",
+    ],
+)
 @pytest.mark.parametrize("issue_date", ["2025-01-02", "2025-01-03"])
-def test_floating_horizons_preserve_opening_and_crossed_fixings(method: str, issue_date: str) -> None:
+def test_floating_horizons_preserve_opening_and_crossed_fixings(
+    method: str | dict[str, object], issue_date: str
+) -> None:
     origin = "2025-01-02"
     market = MarketContext()
     market.insert(DiscountCurve("USD-OIS", origin, [(0.0, 1.0), (1.0, 0.95), (2.0, 0.9)], day_count="act_365f"))

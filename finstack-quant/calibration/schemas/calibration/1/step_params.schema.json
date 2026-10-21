@@ -387,11 +387,6 @@
         }
       ]
     },
-    "SabrInterpolationMethod": {
-      "const": "bilinear",
-      "description": "Interpolation method for SABR parameters across the expiry–tenor grid.",
-      "type": "string"
-    },
     "Seniority": {
       "description": "Seniority level for credit exposures.\n\nUsed to tag a hazard curve with the seniority of the issuer's debt\nobserved by the curve. Drives the recovery-rate prior in default\nmodelling and selects the right LGD prior in\n`finstack_quant_models::credit::lgd::seniority`.\n\nOrder is **not** total — `SeniorSecured` is strictly senior to `Senior`,\n`Subordinated`, and `Junior`, but the relative ordering of `Subordinated`\nvs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics.",
       "oneOf": [
@@ -927,11 +922,6 @@
           "$ref": "#/$defs/SurfaceExtrapolationPolicy",
           "default": "error",
           "description": "Extrapolation policy used when interpolating SABR parameters across the\nexpiry–tenor grid for target points that do not have a directly calibrated bucket."
-        },
-        "sabr_interpolation": {
-          "$ref": "#/$defs/SabrInterpolationMethod",
-          "default": "bilinear",
-          "description": "SABR parameter interpolation method between expiries/tenors."
         },
         "swap_index": {
           "anyOf": [

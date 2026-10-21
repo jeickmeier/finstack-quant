@@ -27,10 +27,14 @@ use super::extract::extract_config;
 ///     Valuation date (ISO 8601 accepted, e.g. ``"2025-01-15"``).
 /// scenario : ScenarioSpec | str
 ///     Typed scenario or JSON-serialized ``ScenarioSpec``.
-/// method : str | None, default None
-///     Attribution method: ``"parallel"``, ``"waterfall"``,
-///     ``"metrics_based"``, or ``"taylor"``. ``None`` selects the Rust default
-///     (``AttributionMethod::default()``, currently ``"parallel"``).
+/// method : str | dict | None, default None
+///     ``AttributionMethod`` wire value: ``"parallel"``, ``"metrics_based"``,
+///     ``{"waterfall": [...factors]}`` (for example
+///     ``{"waterfall": default_waterfall_order()}``) or
+///     ``{"taylor": {...config}}`` (``{"taylor": {}}`` for the defaults),
+///     the shorthand strings ``"waterfall"`` and ``"taylor"`` for their
+///     canonical defaults, or the same wire value as JSON text. ``None`` selects
+///     the Rust default (``AttributionMethod::default()``, currently ``"parallel"``).
 ///     ``"metrics_based"`` calculates the instrument's applicable subset of
 ///     the default attribution metrics (DV01, CS01, vega, ...) at the opening
 ///     snapshot, using the same configuration and recalibration provider as
@@ -83,7 +87,7 @@ pub(crate) fn compute_horizon_return<'py>(
     market: &Bound<'py, PyAny>,
     as_of: &Bound<'py, PyAny>,
     scenario: &Bound<'py, PyAny>,
-    method: Option<&str>,
+    method: Option<&Bound<'py, PyAny>>,
     config: Option<&Bound<'py, PyAny>>,
     calendar_id: Option<&str>,
 ) -> PyResult<PyHorizonResult> {
@@ -100,9 +104,23 @@ pub(crate) fn compute_horizon_return<'py>(
     let date = crate::bindings::date_utils::py_to_date(as_of)?;
     let scenario = crate::bindings::extract::extract_scenario_spec(py, scenario)?;
     let attribution_method = method
-        .map(finstack_quant_scenarios::attribution_method_from_str)
-        .transpose()
-        .map_err(scenarios_to_py)?
+        .map(
+            |method| -> PyResult<finstack_quant_attribution::AttributionMethod> {
+                if let Ok(method_text) = method.extract::<String>() {
+                    if !method_text.trim_start().starts_with(['{', '[', '"']) {
+                        return finstack_quant_scenarios::attribution_method_from_str(&method_text)
+                            .map_err(scenarios_to_py);
+                    }
+                    return serde_json::from_str(&method_text).map_err(|e| {
+                        crate::errors::serde_json_to_py(e, "invalid attribution method")
+                    });
+                }
+                let json = crate::bindings::module_utils::py_to_json_string(py, method, "method")?;
+                serde_json::from_str(&json)
+                    .map_err(|e| crate::errors::serde_json_to_py(e, "invalid attribution method"))
+            },
+        )
+        .transpose()?
         .unwrap_or_default();
     let finstack_config = extract_config(config)?;
 

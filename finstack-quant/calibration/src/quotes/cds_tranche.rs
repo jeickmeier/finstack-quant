@@ -1,7 +1,9 @@
 //! CDS tranche market quote schema.
 
 use super::ids::QuoteId;
-use super::validate;
+use finstack_quant_core::validation::{
+    validate_f64_abs_le, validate_f64_finite, validate_f64_positive, validate_f64_unit_interval,
+};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::market::conventions::ids::CdsConventionKey;
 use serde::{Deserialize, Serialize};
@@ -115,21 +117,16 @@ impl CdsTrancheQuote {
 
     /// Validate attachment/detachment, running spread, and decimal upfront bounds.
     pub fn validate(&self) -> Result<()> {
-        validate::unit_interval(self.attachment, "attachment")?;
-        validate::unit_interval(self.detachment, "detachment")?;
+        validate_f64_unit_interval(self.attachment, "attachment")?;
+        validate_f64_unit_interval(self.detachment, "detachment")?;
         if self.attachment >= self.detachment {
             return Err(Error::Validation(format!(
                 "attachment must be less than detachment; got attachment={}, detachment={}",
                 self.attachment, self.detachment
             )));
         }
-        validate::finite(self.upfront_pct, "upfront_pct")?;
-        if self.upfront_pct.abs() > 1.0 {
-            return Err(Error::Validation(format!(
-                "upfront_pct must satisfy abs(upfront_pct) <= 1; got {}",
-                self.upfront_pct
-            )));
-        }
-        validate::positive(self.coupon_bp, "coupon_bp")
+        validate_f64_finite(self.upfront_pct, "upfront_pct")?;
+        validate_f64_abs_le(self.upfront_pct, 1.0, "upfront_pct", None)?;
+        validate_f64_positive(self.coupon_bp, "coupon_bp")
     }
 }
