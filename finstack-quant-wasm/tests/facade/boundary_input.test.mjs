@@ -341,7 +341,7 @@ test('optional numbers: omitted and null mean the default, other types throw', (
   assert.equal(analytics.sharpe(returns, null, null), byDefault);
   assert.equal(analytics.sharpe(returns, undefined, undefined), byDefault);
   assert.notEqual(analytics.sharpe(returns, 0.02), byDefault);
-  assert.throws(() => analytics.sharpe(returns, '0.02'), invalidType('rf'));
+  assert.throws(() => analytics.sharpe(returns, '0.02'), invalidType('riskFreeRate'));
   assert.throws(() => analytics.sharpe(returns, 0, true), invalidType('periodsPerYear'));
 });
 

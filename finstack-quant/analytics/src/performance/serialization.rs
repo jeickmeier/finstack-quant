@@ -1,7 +1,7 @@
 //! Serde wire type for [`super::Performance`]; caches are rebuilt on load.
 
 use super::{invalid_return_series, Performance, TickerSpan};
-use crate::dates::{Date, PeriodKind};
+use finstack_quant_core::dates::{Date, PeriodKind};
 
 #[derive(serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -22,7 +22,7 @@ pub(super) struct PerformanceState {
 }
 
 impl TryFrom<PerformanceState> for Performance {
-    type Error = crate::error::Error;
+    type Error = finstack_quant_core::Error;
 
     fn try_from(state: PerformanceState) -> Result<Self, Self::Error> {
         let benchmark = state

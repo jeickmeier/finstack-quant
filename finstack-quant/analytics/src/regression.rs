@@ -154,7 +154,7 @@ pub fn constrained_least_squares(
     n_factors: usize,
     returns: &[f64],
     weights: &[f64],
-) -> crate::Result<Vec<f64>> {
+) -> finstack_quant_core::Result<Vec<f64>> {
     let n_assets = returns.len();
     if n_assets == 0 || n_factors == 0 {
         return Err(finstack_quant_core::Error::Validation(
@@ -257,7 +257,7 @@ pub fn constrained_least_squares(
 pub(crate) fn normalized_svd_least_squares(
     mut design: DMatrix<f64>,
     targets: &DMatrix<f64>,
-) -> crate::Result<DMatrix<f64>> {
+) -> finstack_quant_core::Result<DMatrix<f64>> {
     let (n, p) = design.shape();
     if n == 0 || p == 0 || targets.nrows() != n || targets.ncols() == 0 {
         return Err(InputError::DimensionMismatch.into());
@@ -332,7 +332,7 @@ pub(crate) fn normalized_svd_least_squares(
 /// # Arguments
 ///
 /// * `values` - Input or computed floating-point values that must all be finite.
-pub(crate) fn ensure_finite(values: &[f64]) -> crate::Result<()> {
+pub(crate) fn ensure_finite(values: &[f64]) -> finstack_quant_core::Result<()> {
     for &value in values {
         if value.is_nan() {
             return Err(InputError::NonFiniteValue {

@@ -14,7 +14,7 @@
 //! - empty or invalid VaR / ES / tail-ratio / parametric / Cornish-Fisher
 //!   inputs return [`f64::NAN`] (matching Sharpe when `n < 2`)
 
-use crate::math::stats::mean_var;
+use finstack_quant_core::math::stats::mean_var;
 use finstack_quant_core::math::stats::quantile;
 
 fn has_strict_confidence(confidence: f64) -> bool {
@@ -23,6 +23,16 @@ fn has_strict_confidence(confidence: f64) -> bool {
 
 fn valid_horizon(ann_factor: Option<f64>) -> bool {
     ann_factor.is_none_or(|af| af.is_finite() && af > 0.0)
+}
+
+/// Scale the per-period quantile `mean + z·vol` to a horizon of `ann_factor`
+/// periods (`mean·h + z·vol·√h`); `None` keeps the per-period quantile.
+#[inline]
+fn horizon_quantile(mean: f64, vol: f64, z: f64, ann_factor: Option<f64>) -> f64 {
+    match ann_factor {
+        Some(af) => mean * af + z * vol * af.sqrt(),
+        None => mean + z * vol,
+    }
 }
 
 fn historical_sample(returns: &[f64], confidence: f64) -> Option<Vec<f64>> {
@@ -255,16 +265,6 @@ pub(crate) fn kurtosis(returns: &[f64]) -> f64 {
     kurt
 }
 
-/// Bias-corrected sample skewness and excess kurtosis in one pass.
-///
-/// Avoids running `moments4` twice when both metrics are needed (e.g. in
-/// summary outputs).
-#[must_use]
-pub(crate) fn skew_kurt(returns: &[f64]) -> (f64, f64) {
-    let (_, _, skew, kurt) = moments4(returns);
-    (skew, kurt)
-}
-
 /// Parametric (Gaussian) Value-at-Risk.
 ///
 /// Assumes normally distributed returns:
@@ -302,11 +302,8 @@ pub(crate) fn parametric_var(returns: &[f64], confidence: f64, ann_factor: Optio
     }
     let (m, var) = mean_var(returns);
     let vol = var.sqrt();
-    let z = crate::math::special_functions::standard_normal_inv_cdf(1.0 - confidence);
-    match ann_factor {
-        Some(af) => m * af + z * vol * af.sqrt(),
-        None => m + z * vol,
-    }
+    let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0 - confidence);
+    horizon_quantile(m, vol, z, ann_factor)
 }
 /// Cornish-Fisher Value-at-Risk: adjusts Gaussian VaR for skewness and kurtosis.
 ///
@@ -377,7 +374,7 @@ pub(crate) fn cornish_fisher_var(returns: &[f64], confidence: f64, ann_factor: O
         Some(af) => (s / af.sqrt(), k / af),
         None => (s, k),
     };
-    let z = crate::math::special_functions::standard_normal_inv_cdf(1.0 - confidence);
+    let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0 - confidence);
     let z2 = z * z;
     let z3 = z2 * z;
     // Maillard (2012) monotonicity guard: d z_cf / d z at the target z must
@@ -395,17 +392,11 @@ pub(crate) fn cornish_fisher_var(returns: &[f64], confidence: f64, ann_factor: O
             "Cornish-Fisher expansion non-monotonic at requested confidence; \
              falling back to parametric (Gaussian) VaR"
         );
-        return match ann_factor {
-            Some(af) => m * af + z * vol * af.sqrt(),
-            None => m + z * vol,
-        };
+        return horizon_quantile(m, vol, z, ann_factor);
     }
     let z_cf =
         z + (z2 - 1.0) * s / 6.0 + (z3 - 3.0 * z) * k / 24.0 - (2.0 * z3 - 5.0 * z) * s * s / 36.0;
-    match ann_factor {
-        Some(af) => m * af + z_cf * vol * af.sqrt(),
-        None => m + z_cf * vol,
-    }
+    horizon_quantile(m, vol, z_cf, ann_factor)
 }
 /// Compute mean, standard deviation, skewness (G₁), and excess kurtosis (G₂) in a single pass.
 ///
@@ -465,7 +456,7 @@ pub(super) fn moments4(returns: &[f64]) -> (f64, f64, f64, f64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::stats::{mean, mean_var, variance};
+    use finstack_quant_core::math::stats::{mean, mean_var, variance};
 
     fn assert_f64_eq_nan_aware(actual: f64, expected: f64) {
         if expected.is_nan() {
@@ -584,7 +575,7 @@ mod tests {
         let pvar = parametric_var(&r, 0.95, None);
         let m = mean(&r);
         let vol = variance(&r).sqrt();
-        let z = crate::math::special_functions::standard_normal_inv_cdf(0.05);
+        let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.05);
         let expected = m + z * vol;
         assert!((pvar - expected).abs() < 1e-14);
     }
@@ -607,7 +598,7 @@ mod tests {
         let returns = [0.01, -0.02, 0.03, -0.01, 0.02, -0.005];
         let actual = parametric_var(&returns, 0.95, Some(10.0));
         let (m, var) = mean_var(&returns);
-        let z = crate::math::special_functions::standard_normal_inv_cdf(0.05);
+        let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.05);
         let expected = m * 10.0 + z * var.sqrt() * 10.0_f64.sqrt();
         assert!((actual - expected).abs() < 1e-14);
         let period = parametric_var(&returns, 0.95, None);
@@ -681,7 +672,7 @@ mod tests {
         let vol = variance(&r).sqrt();
         let s = skewness(&r);
         let k = kurtosis(&r);
-        let z = crate::math::special_functions::standard_normal_inv_cdf(0.05);
+        let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.05);
         let z2 = z * z;
         let z3 = z2 * z;
         let z_cf = z + (z2 - 1.0) * s / 6.0 + (z3 - 3.0 * z) * k / 24.0
@@ -701,7 +692,7 @@ mod tests {
         // Under i.i.d. aggregation over h periods, S_h = S/√h and K_h = K/h.
         let s = skewness(&returns) / ann_factor.sqrt();
         let k = kurtosis(&returns) / ann_factor;
-        let z = crate::math::special_functions::standard_normal_inv_cdf(0.05);
+        let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.05);
         let z2 = z * z;
         let z3 = z2 * z;
         let z_cf = z + (z2 - 1.0) * s / 6.0 + (z3 - 3.0 * z) * k / 24.0

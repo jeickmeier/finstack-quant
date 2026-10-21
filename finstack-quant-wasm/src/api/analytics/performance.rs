@@ -14,7 +14,11 @@ use crate::utils::{
     date_to_iso, parse_iso_date, parse_iso_dates, to_js_err, to_js_rows_numeric, to_js_value,
     to_js_value_numeric,
 };
-use finstack_quant_analytics as fa;
+use finstack_quant_analytics::{
+    CagrDayCount, DatedSeries, Performance, ReturnKind, RollingGreeks, DEFAULT_ANNUALIZE,
+    DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_FREQUENCY, DEFAULT_MAR,
+    DEFAULT_PERIODIC_FREQUENCY, DEFAULT_RISK_FREE_RATE, DEFAULT_ROLLING_WINDOW,
+};
 use finstack_quant_core::dates::{
     calendar_by_id_strict, FiscalConfig, HolidayCalendar, PeriodKind,
 };
@@ -51,9 +55,9 @@ fn make_fiscal_config(
     FiscalConfig::from_parts(month, day).map_err(to_js_err)
 }
 
-fn parse_cagr_day_count(day_count: Option<&str>) -> Result<fa::CagrDayCount, JsValue> {
+fn parse_cagr_day_count(day_count: Option<&str>) -> Result<CagrDayCount, JsValue> {
     day_count
-        .map(str::parse::<fa::CagrDayCount>)
+        .map(str::parse::<CagrDayCount>)
         .transpose()
         .map_err(to_js_err)
         .map(Option::unwrap_or_default)
@@ -83,7 +87,7 @@ fn parse_panel_inputs(
         dates: parse_dates(dates)?,
         values: js_f64_matrix(&values, "values")?,
         ticker_names: js_string_seq(&ticker_names, "tickerNames")?,
-        frequency: parse_frequency(frequency.as_deref(), fa::DEFAULT_FREQUENCY)?,
+        frequency: parse_frequency(frequency.as_deref(), DEFAULT_FREQUENCY)?,
     })
 }
 
@@ -128,10 +132,10 @@ fn obj_from_pairs(pairs: &[(&str, JsValue)]) -> Result<JsValue, JsValue> {
     Ok(obj.into())
 }
 
-/// Serialize a rolling [`fa::DatedSeries`] with its Rust field names:
+/// Serialize a rolling [`DatedSeries`] with its Rust field names:
 /// `{ values: Float64Array, dates: string[], value_column: string }`, where
 /// `value_column` is the Rust `RollingMetric` name of the series.
-fn dated_series_to_js(series: &fa::DatedSeries) -> Result<JsValue, JsValue> {
+fn dated_series_to_js(series: &DatedSeries) -> Result<JsValue, JsValue> {
     obj_from_pairs(&[
         ("values", vec_f64_to_js(&series.values)),
         ("dates", dates_to_js_array(&series.dates).into()),
@@ -139,7 +143,7 @@ fn dated_series_to_js(series: &fa::DatedSeries) -> Result<JsValue, JsValue> {
     ])
 }
 
-fn rolling_greeks_to_js(rg: &fa::RollingGreeks) -> Result<JsValue, JsValue> {
+fn rolling_greeks_to_js(rg: &RollingGreeks) -> Result<JsValue, JsValue> {
     obj_from_pairs(&[
         ("dates", dates_to_js_array(&rg.dates).into()),
         ("alphas", vec_f64_to_js(&rg.alphas)),
@@ -159,7 +163,7 @@ fn rolling_greeks_to_js(rg: &fa::RollingGreeks) -> Result<JsValue, JsValue> {
 /// returned as rejected JsValue errors.
 #[wasm_bindgen(js_name = Performance)]
 pub struct JsPerformance {
-    inner: fa::Performance,
+    inner: Performance,
 }
 
 #[wasm_bindgen(js_class = Performance)]
@@ -186,7 +190,7 @@ impl JsPerformance {
         let benchmark_ticker = js_opt_string(benchmark_ticker.as_ref(), "benchmarkTicker")?;
         let frequency = js_opt_string(frequency.as_ref(), "frequency")?;
         let panel = parse_panel_inputs(dates, prices, ticker_names, frequency)?;
-        let inner = fa::Performance::new(
+        let inner = Performance::new(
             panel.dates,
             panel.values,
             panel.ticker_names,
@@ -220,7 +224,7 @@ impl JsPerformance {
         let benchmark_ticker = js_opt_string(benchmark_ticker.as_ref(), "benchmarkTicker")?;
         let frequency = js_opt_string(frequency.as_ref(), "frequency")?;
         let panel = parse_panel_inputs(dates, returns, ticker_names, frequency)?;
-        let inner = fa::Performance::from_returns(
+        let inner = Performance::from_returns(
             panel.dates,
             panel.values,
             panel.ticker_names,
@@ -361,7 +365,7 @@ impl JsPerformance {
         Ok(vec_f64_to_js(
             &self
                 .inner
-                .mean_return(annualize.unwrap_or(fa::DEFAULT_ANNUALIZE)),
+                .mean_return(annualize.unwrap_or(DEFAULT_ANNUALIZE)),
         ))
     }
 
@@ -373,7 +377,7 @@ impl JsPerformance {
         Ok(vec_f64_to_js(
             &self
                 .inner
-                .volatility(annualize.unwrap_or(fa::DEFAULT_ANNUALIZE)),
+                .volatility(annualize.unwrap_or(DEFAULT_ANNUALIZE)),
         ))
     }
 
@@ -382,9 +386,11 @@ impl JsPerformance {
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     pub fn sharpe(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
-        Ok(vec_f64_to_js(&self.inner.sharpe(
-            risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
-        )))
+        Ok(vec_f64_to_js(
+            &self
+                .inner
+                .sharpe(risk_free_rate.unwrap_or(DEFAULT_RISK_FREE_RATE)),
+        ))
     }
 
     /// Sortino ratio per asset for the given per-period minimum acceptable return.
@@ -393,7 +399,7 @@ impl JsPerformance {
     pub fn sortino(&self, mar: Option<JsValue>) -> Result<JsValue, JsValue> {
         let mar = js_opt_f64(mar.as_ref(), "mar")?;
         Ok(vec_f64_to_js(
-            &self.inner.sortino(mar.unwrap_or(fa::DEFAULT_MAR)),
+            &self.inner.sortino(mar.unwrap_or(DEFAULT_MAR)),
         ))
     }
 
@@ -434,7 +440,7 @@ impl JsPerformance {
         let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(
             self.inner
-                .value_at_risk(confidence.unwrap_or(fa::DEFAULT_CONFIDENCE)),
+                .value_at_risk(confidence.unwrap_or(DEFAULT_CONFIDENCE)),
         )
     }
 
@@ -448,7 +454,7 @@ impl JsPerformance {
         let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(
             self.inner
-                .expected_shortfall(confidence.unwrap_or(fa::DEFAULT_CONFIDENCE)),
+                .expected_shortfall(confidence.unwrap_or(DEFAULT_CONFIDENCE)),
         )
     }
 
@@ -492,9 +498,7 @@ impl JsPerformance {
     pub fn downside_deviation(&self, mar: Option<JsValue>) -> Result<JsValue, JsValue> {
         let mar = js_opt_f64(mar.as_ref(), "mar")?;
         Ok(vec_f64_to_js(
-            &self
-                .inner
-                .downside_deviation(mar.unwrap_or(fa::DEFAULT_MAR)),
+            &self.inner.downside_deviation(mar.unwrap_or(DEFAULT_MAR)),
         ))
     }
 
@@ -539,7 +543,7 @@ impl JsPerformance {
     pub fn omega_ratio(&self, threshold: Option<JsValue>) -> Result<JsValue, JsValue> {
         let threshold = js_opt_f64(threshold.as_ref(), "threshold")?;
         Ok(vec_f64_to_js(
-            &self.inner.omega_ratio(threshold.unwrap_or(fa::DEFAULT_MAR)),
+            &self.inner.omega_ratio(threshold.unwrap_or(DEFAULT_MAR)),
         ))
     }
 
@@ -551,9 +555,11 @@ impl JsPerformance {
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     pub fn treynor(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
-        Ok(vec_f64_to_js(&self.inner.treynor(
-            risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
-        )))
+        Ok(vec_f64_to_js(
+            &self
+                .inner
+                .treynor(risk_free_rate.unwrap_or(DEFAULT_RISK_FREE_RATE)),
+        ))
     }
 
     /// Gain-to-pain ratio per asset.
@@ -613,7 +619,7 @@ impl JsPerformance {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         result_vec_f64_to_js(
             self.inner
-                .pain_ratio(risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE)),
+                .pain_ratio(risk_free_rate.unwrap_or(DEFAULT_RISK_FREE_RATE)),
         )
     }
 
@@ -626,7 +632,7 @@ impl JsPerformance {
         let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(
             self.inner
-                .tail_ratio(confidence.unwrap_or(fa::DEFAULT_CONFIDENCE)),
+                .tail_ratio(confidence.unwrap_or(DEFAULT_CONFIDENCE)),
         )
     }
 
@@ -660,10 +666,10 @@ impl JsPerformance {
     ) -> Result<JsValue, JsValue> {
         let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         let horizon_periods = js_opt_f64(horizon_periods.as_ref(), "horizonPeriods")?;
-        result_vec_f64_to_js(self.inner.parametric_var(
-            confidence.unwrap_or(fa::DEFAULT_CONFIDENCE),
-            horizon_periods,
-        ))
+        result_vec_f64_to_js(
+            self.inner
+                .parametric_var(confidence.unwrap_or(DEFAULT_CONFIDENCE), horizon_periods),
+        )
     }
 
     /// Cornish-Fisher adjusted value-at-risk per asset.
@@ -682,10 +688,10 @@ impl JsPerformance {
     ) -> Result<JsValue, JsValue> {
         let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         let horizon_periods = js_opt_f64(horizon_periods.as_ref(), "horizonPeriods")?;
-        result_vec_f64_to_js(self.inner.cornish_fisher_var(
-            confidence.unwrap_or(fa::DEFAULT_CONFIDENCE),
-            horizon_periods,
-        ))
+        result_vec_f64_to_js(
+            self.inner
+                .cornish_fisher_var(confidence.unwrap_or(DEFAULT_CONFIDENCE), horizon_periods),
+        )
     }
 
     /// Conditional drawdown-at-risk per asset: mean of exactly the worst
@@ -695,10 +701,7 @@ impl JsPerformance {
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
     pub fn cdar(&self, confidence: Option<JsValue>) -> Result<JsValue, JsValue> {
         let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
-        result_vec_f64_to_js(
-            self.inner
-                .cdar(confidence.unwrap_or(fa::DEFAULT_CONFIDENCE)),
-        )
+        result_vec_f64_to_js(self.inner.cdar(confidence.unwrap_or(DEFAULT_CONFIDENCE)))
     }
 
     /// Linearly annualized M-squared per asset. Cash subtraction and addition
@@ -709,7 +712,7 @@ impl JsPerformance {
     pub fn m_squared(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         Ok(vec_f64_to_js(&self.inner.m_squared(
-            risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
+            risk_free_rate.unwrap_or(DEFAULT_RISK_FREE_RATE),
         )))
     }
 
@@ -735,8 +738,8 @@ impl JsPerformance {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(self.inner.modified_sharpe(
-            risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
-            confidence.unwrap_or(fa::DEFAULT_CONFIDENCE),
+            risk_free_rate.unwrap_or(DEFAULT_RISK_FREE_RATE),
+            confidence.unwrap_or(DEFAULT_CONFIDENCE),
         ))
     }
 
@@ -760,8 +763,8 @@ impl JsPerformance {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         let n = js_opt_uint(n.as_ref(), "n")?;
         result_vec_f64_to_js(self.inner.sterling_ratio(
-            risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
-            n.unwrap_or(fa::DEFAULT_DRAWDOWN_COUNT),
+            risk_free_rate.unwrap_or(DEFAULT_RISK_FREE_RATE),
+            n.unwrap_or(DEFAULT_DRAWDOWN_COUNT),
         ))
     }
 
@@ -785,8 +788,8 @@ impl JsPerformance {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         let n = js_opt_uint(n.as_ref(), "n")?;
         result_vec_f64_to_js(self.inner.burke_ratio(
-            risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
-            n.unwrap_or(fa::DEFAULT_DRAWDOWN_COUNT),
+            risk_free_rate.unwrap_or(DEFAULT_RISK_FREE_RATE),
+            n.unwrap_or(DEFAULT_DRAWDOWN_COUNT),
         ))
     }
 
@@ -854,8 +857,8 @@ impl JsPerformance {
         let table = self
             .inner
             .summary(
-                risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
-                confidence.unwrap_or(fa::DEFAULT_CONFIDENCE),
+                risk_free_rate.unwrap_or(DEFAULT_RISK_FREE_RATE),
+                confidence.unwrap_or(DEFAULT_CONFIDENCE),
             )
             .map_err(to_js_err)?;
         to_js_value(&table)
@@ -883,7 +886,7 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = periodicReturns)]
     pub fn periodic_returns(&self, frequency: Option<JsValue>) -> Result<JsValue, JsValue> {
         let frequency = js_opt_string(frequency.as_ref(), "frequency")?;
-        let kind = parse_frequency(frequency.as_deref(), fa::DEFAULT_PERIODIC_FREQUENCY)?;
+        let kind = parse_frequency(frequency.as_deref(), DEFAULT_PERIODIC_FREQUENCY)?;
         to_js_value(&self.inner.periodic_returns(kind))
     }
 
@@ -980,7 +983,7 @@ impl JsPerformance {
         to_js_rows_numeric(
             &self
                 .inner
-                .greeks(risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE)),
+                .greeks(risk_free_rate.unwrap_or(DEFAULT_RISK_FREE_RATE)),
         )
     }
 
@@ -1008,8 +1011,8 @@ impl JsPerformance {
             .inner
             .rolling_greeks(
                 ticker_idx,
-                window.unwrap_or(fa::DEFAULT_ROLLING_WINDOW),
-                risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
+                window.unwrap_or(DEFAULT_ROLLING_WINDOW),
+                risk_free_rate.unwrap_or(DEFAULT_RISK_FREE_RATE),
             )
             .map_err(to_js_err)?;
         rolling_greeks_to_js(&rg)
@@ -1034,7 +1037,7 @@ impl JsPerformance {
         let window = js_opt_uint(window.as_ref(), "window")?;
         let series = self
             .inner
-            .rolling_volatility(ticker_idx, window.unwrap_or(fa::DEFAULT_ROLLING_WINDOW))
+            .rolling_volatility(ticker_idx, window.unwrap_or(DEFAULT_ROLLING_WINDOW))
             .map_err(to_js_err)?;
         dated_series_to_js(&series)
     }
@@ -1063,8 +1066,8 @@ impl JsPerformance {
             .inner
             .rolling_sortino(
                 ticker_idx,
-                window.unwrap_or(fa::DEFAULT_ROLLING_WINDOW),
-                mar.unwrap_or(fa::DEFAULT_MAR),
+                window.unwrap_or(DEFAULT_ROLLING_WINDOW),
+                mar.unwrap_or(DEFAULT_MAR),
             )
             .map_err(to_js_err)?;
         dated_series_to_js(&series)
@@ -1094,8 +1097,8 @@ impl JsPerformance {
             .inner
             .rolling_sharpe(
                 ticker_idx,
-                window.unwrap_or(fa::DEFAULT_ROLLING_WINDOW),
-                risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
+                window.unwrap_or(DEFAULT_ROLLING_WINDOW),
+                risk_free_rate.unwrap_or(DEFAULT_RISK_FREE_RATE),
             )
             .map_err(to_js_err)?;
         dated_series_to_js(&series)
@@ -1146,7 +1149,7 @@ impl JsPerformance {
         to_js_value(
             &self
                 .inner
-                .drawdown_details(ticker_idx, n.unwrap_or(fa::DEFAULT_DRAWDOWN_COUNT))
+                .drawdown_details(ticker_idx, n.unwrap_or(DEFAULT_DRAWDOWN_COUNT))
                 .map_err(to_js_err)?,
         )
     }
@@ -1184,9 +1187,9 @@ impl JsPerformance {
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         let factors = js_f64_matrix(&factor_returns, "factorReturns")?;
         let refs: Vec<&[f64]> = factors.iter().map(|v| v.as_slice()).collect();
-        let kind = fa::ReturnKind::from_label(
+        let kind = ReturnKind::from_label(
             return_kind.as_deref(),
-            risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
+            risk_free_rate.unwrap_or(DEFAULT_RISK_FREE_RATE),
         )
         .map_err(to_js_err)?;
         let result = self
@@ -1257,10 +1260,7 @@ impl JsPerformance {
         let aggregation_frequency =
             js_opt_string(aggregation_frequency.as_ref(), "aggregationFrequency")?;
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
-        let pk = parse_frequency(
-            aggregation_frequency.as_deref(),
-            fa::DEFAULT_PERIODIC_FREQUENCY,
-        )?;
+        let pk = parse_frequency(aggregation_frequency.as_deref(), DEFAULT_PERIODIC_FREQUENCY)?;
         let fc = make_fiscal_config(
             fiscal_year_start_month.as_ref(),
             fiscal_year_start_day.as_ref(),
@@ -1298,7 +1298,7 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsPerformance, JsValue> {
         let json: &str = &json_text(&json, "json")?;
-        let inner: fa::Performance = serde_json::from_str(json).map_err(to_js_err)?;
+        let inner: Performance = serde_json::from_str(json).map_err(to_js_err)?;
         Ok(JsPerformance { inner })
     }
 }

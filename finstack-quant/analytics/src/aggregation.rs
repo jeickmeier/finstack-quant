@@ -5,11 +5,11 @@
 //! Uses `dates::periods::PeriodId` as grouping keys and `DateExt` for
 //! date-to-period mapping.
 
-use crate::dates::{Date, DateExt, FiscalConfig, PeriodId, PeriodKind};
+use finstack_quant_core::dates::{Date, DateExt, FiscalConfig, PeriodId, PeriodKind};
 use finstack_quant_core::wire::NonFiniteFields;
 
 use super::returns::comp_total;
-use crate::math::summation::NeumaierAccumulator;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 
 /// One calendar bucket of a periodic-return series.
 ///
@@ -306,10 +306,10 @@ pub(crate) fn period_stats_inner(returns: impl Iterator<Item = f64>) -> PeriodSt
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::{Month, PeriodKind};
+    use finstack_quant_core::dates::{Month, PeriodKind};
 
     fn d(y: i32, m: u8, day: u8) -> Date {
-        crate::dates::create_date(y, Month::try_from(m).expect("valid month"), day)
+        finstack_quant_core::dates::create_date(y, Month::try_from(m).expect("valid month"), day)
             .expect("valid date")
     }
 

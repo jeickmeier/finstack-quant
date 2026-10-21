@@ -77,6 +77,7 @@ def test_native_frames_preserve_infinite_period_statistics() -> None:
         assert frame[name].dtype == "float64"
     assert frame["consecutive_wins"].dtype == "int64"
     assert frame["consecutive_losses"].dtype == "int64"
+    assert list(frame.columns) == list(stats.to_series().index)
 
 
 def test_degenerate_regression_frames_keep_numeric_nan_columns() -> None:
