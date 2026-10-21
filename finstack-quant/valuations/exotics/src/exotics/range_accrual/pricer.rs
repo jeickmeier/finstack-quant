@@ -112,43 +112,6 @@ pub struct RangeAccrualMcPricer {
     config: PathDependentPricerConfig,
 }
 
-fn validate_historical_observations(inst: &RangeAccrual, as_of: Date) -> Result<()> {
-    let expected = inst
-        .terms
-        .observation_dates
-        .iter()
-        .filter(|&&date| date <= as_of)
-        .count();
-    if expected == 0 {
-        return Ok(());
-    }
-    let in_range = inst.terms.past_observations_in_range.ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!(
-            "RangeAccrual '{}' requires past_observations_in_range for {expected} historical observations",
-            inst.id
-        ))
-    })?;
-    let total = inst.terms.total_past_observations.ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!(
-            "RangeAccrual '{}' requires total_past_observations for {expected} historical observations",
-            inst.id
-        ))
-    })?;
-    if total != expected {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "RangeAccrual '{}' historical observation count mismatch: supplied {total}, expected {expected}",
-            inst.id
-        )));
-    }
-    if in_range > total {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "RangeAccrual '{}' past_observations_in_range ({in_range}) exceeds total historical observations ({total})",
-            inst.id
-        )));
-    }
-    Ok(())
-}
-
 impl RangeAccrualMcPricer {
     /// Create a new range accrual MC pricer with default config.
     pub fn new() -> Self {
@@ -181,7 +144,8 @@ impl RangeAccrualMcPricer {
                 inst.id
             )));
         }
-        validate_historical_observations(inst, as_of)?;
+        inst.terms
+            .validate_historical_observations("RangeAccrual", &inst.id, as_of)?;
 
         let future_dates: Vec<Date> = inst
             .terms
@@ -426,7 +390,8 @@ pub fn npv_analytic(inst: &RangeAccrual, market: &MarketContext, as_of: Date) ->
         return Ok(Money::from((0_i64, inst.terms.notional.currency())));
     }
     inst.validate()?;
-    validate_historical_observations(inst, as_of)?;
+    inst.terms
+        .validate_historical_observations("RangeAccrual", &inst.id, as_of)?;
 
     let has_future_observations =
         inst.terms

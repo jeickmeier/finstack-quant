@@ -1,5 +1,6 @@
 //! Commodity option instrument definition and pricing logic.
 
+use crate::commodity::bump_price_curve_pct;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -1004,29 +1005,8 @@ impl CommoditySpotOption {
             ));
         }
 
-        #[derive(Debug)]
-        enum ForwardDriver {
-            QuotedForward(f64),
-            PriceCurve,
-            SpotScalar(PriceId),
-        }
-
-        let driver = if let Some(fwd) = self.quoted_forward {
-            ForwardDriver::QuotedForward(fwd)
-        } else if market
-            .get_price_curve(self.forward_curve_id.as_str())
-            .is_ok()
-        {
-            ForwardDriver::PriceCurve
-        } else if let Some(ref spot_id) = self.spot_id {
-            ForwardDriver::SpotScalar(spot_id.clone())
-        } else {
-            return Err(finstack_quant_core::Error::Validation(
-                "Cannot compute gamma: no quoted_forward, PriceCurve, or spot_id available"
-                    .to_string(),
-            ));
-        };
-
+        // `forward_price` errors unless `quoted_forward` or the price curve
+        // supplies the forward, so those are the two drivers to bump.
         let bump_pct = bumps.spot_bump_decimal;
         let forward_price = self.forward_price(market, as_of)?;
         let bump_size = forward_price * bump_pct;
@@ -1036,8 +1016,8 @@ impl CommoditySpotOption {
 
         let pv_base = self.value(market, as_of)?.amount();
 
-        let (pv_up, pv_down) = match driver {
-            ForwardDriver::QuotedForward(fwd) => {
+        let (pv_up, pv_down) = match self.quoted_forward {
+            Some(fwd) => {
                 let mut up = self.clone();
                 up.quoted_forward = Some(fwd * (1.0 + bump_pct));
                 let pv_up = up.value(market, as_of)?.amount();
@@ -1047,42 +1027,10 @@ impl CommoditySpotOption {
                 let pv_down = down.value(market, as_of)?.amount();
                 (pv_up, pv_down)
             }
-            ForwardDriver::PriceCurve => {
-                use finstack_quant_core::market_data::bumps::{
-                    BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
-                };
-                let curve_id = CurveId::new(self.forward_curve_id.as_str());
-                let up = market.bump([MarketBump::Curve {
-                    id: curve_id.clone(),
-                    spec: BumpSpec {
-                        bump_type: BumpType::Parallel,
-                        mode: BumpMode::Additive,
-                        units: BumpUnits::Percent,
-                        value: bump_pct * 100.0,
-                    },
-                }])?;
+            None => {
+                let up = bump_price_curve_pct(market, self.forward_curve_id.as_str(), bump_pct)?;
                 let pv_up = self.value(&up, as_of)?.amount();
-
-                let down = market.bump([MarketBump::Curve {
-                    id: curve_id,
-                    spec: BumpSpec {
-                        bump_type: BumpType::Parallel,
-                        mode: BumpMode::Additive,
-                        units: BumpUnits::Percent,
-                        value: -bump_pct * 100.0,
-                    },
-                }])?;
-                let pv_down = self.value(&down, as_of)?.amount();
-                (pv_up, pv_down)
-            }
-            ForwardDriver::SpotScalar(ref spot_id) => {
-                let up = finstack_quant_valuations_core::metrics::bump_scalar_price(
-                    market, spot_id, bump_pct,
-                )?;
-                let down = finstack_quant_valuations_core::metrics::bump_scalar_price(
-                    market, spot_id, -bump_pct,
-                )?;
-                let pv_up = self.value(&up, as_of)?.amount();
+                let down = bump_price_curve_pct(market, self.forward_curve_id.as_str(), -bump_pct)?;
                 let pv_down = self.value(&down, as_of)?.amount();
                 (pv_up, pv_down)
             }
@@ -1149,29 +1097,8 @@ impl CommoditySpotOption {
                 "CommoditySpotOption analytical Greeks support European exercise only".to_string(),
             ));
         }
-        #[derive(Debug)]
-        enum ForwardDriver {
-            QuotedForward(f64),
-            PriceCurve,
-            SpotScalar(PriceId),
-        }
-
-        let driver = if let Some(fwd) = self.quoted_forward {
-            ForwardDriver::QuotedForward(fwd)
-        } else if market
-            .get_price_curve(self.forward_curve_id.as_str())
-            .is_ok()
-        {
-            ForwardDriver::PriceCurve
-        } else if let Some(ref spot_id) = self.spot_id {
-            ForwardDriver::SpotScalar(spot_id.clone())
-        } else {
-            return Err(finstack_quant_core::Error::Validation(
-                "Cannot compute vanna: no quoted_forward, PriceCurve, or spot_id available"
-                    .to_string(),
-            ));
-        };
-
+        // `forward_price` errors unless `quoted_forward` or the price curve
+        // supplies the forward, so those are the two drivers to bump.
         let fwd_bump_pct = bumps.spot_bump_decimal;
         let vol_bump = bumps.vol_bump_decimal;
 
@@ -1184,8 +1111,8 @@ impl CommoditySpotOption {
         let pv_with_bumps = |fwd_bump_pct: f64,
                              vol_bump: f64|
          -> finstack_quant_core::Result<f64> {
-            match driver {
-                ForwardDriver::QuotedForward(fwd) => {
+            match self.quoted_forward {
+                Some(fwd) => {
                     let mut inst = self.clone();
                     inst.quoted_forward = Some(fwd * (1.0 + fwd_bump_pct));
                     let bumped =
@@ -1196,37 +1123,12 @@ impl CommoditySpotOption {
                         )?;
                     Ok(inst.value(&bumped, as_of)?.amount())
                 }
-                ForwardDriver::PriceCurve => {
-                    use finstack_quant_core::market_data::bumps::{
-                        BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
-                    };
-                    let curve_id = CurveId::new(self.forward_curve_id.as_str());
-                    let bumped_price = market.bump([MarketBump::Curve {
-                        id: curve_id,
-                        spec: BumpSpec {
-                            bump_type: BumpType::Parallel,
-                            mode: BumpMode::Additive,
-                            units: BumpUnits::Percent,
-                            value: fwd_bump_pct * 100.0,
-                        },
-                    }])?;
+                None => {
+                    let bumped_price =
+                        bump_price_curve_pct(market, self.forward_curve_id.as_str(), fwd_bump_pct)?;
                     let bumped =
                         finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
                             &bumped_price,
-                            self.vol_surface_id.as_str(),
-                            vol_bump,
-                        )?;
-                    Ok(self.value(&bumped, as_of)?.amount())
-                }
-                ForwardDriver::SpotScalar(ref spot_id) => {
-                    let bumped_spot = finstack_quant_valuations_core::metrics::bump_scalar_price(
-                        market,
-                        spot_id,
-                        fwd_bump_pct,
-                    )?;
-                    let bumped =
-                        finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
-                            &bumped_spot,
                             self.vol_surface_id.as_str(),
                             vol_bump,
                         )?;

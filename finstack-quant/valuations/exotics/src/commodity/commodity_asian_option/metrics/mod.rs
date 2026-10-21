@@ -20,7 +20,7 @@ pub(crate) fn register_commodity_asian_option_metrics(
         instrument: InstrumentType::CommodityAsianOption,
         metrics: [
             (Delta, greeks::AsianDeltaCalculator),
-            (Vega, greeks::AsianVegaCalculator),
+            (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega::<crate::commodity::commodity_asian_option::CommodityAsianOption>::default()),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
         ]

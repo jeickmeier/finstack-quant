@@ -1,6 +1,6 @@
 //! Hull-White 1F Monte Carlo pricer for TARNs.
 
-use crate::exotics::hw1f_note::{Hw1fNote, Hw1fNotePricer};
+use crate::exotics::hw1f_note::{exact_estimate, zero_estimate, Hw1fNote, Hw1fNotePricer};
 use crate::exotics::tarn::Tarn;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -241,20 +241,7 @@ impl Hw1fNote for Tarn {
             finstack_quant_core::Error::Validation("TARN requires payment dates".to_string())
         })?;
         if as_of >= final_coupon_date {
-            let zero = Money::from((0_i64, inst.notional.currency()));
-            return Ok(MoneyEstimate {
-                mean: zero,
-                stderr: 0.0,
-                ci_95: (zero, zero),
-                num_paths: 0,
-                num_simulated_paths: 0,
-                std_dev: Some(0.0),
-                median: None,
-                percentile_25: None,
-                percentile_75: None,
-                min: Some(0.0),
-                max: Some(0.0),
-            });
+            return Ok(zero_estimate(inst.notional.currency()));
         }
         if as_of > first_coupon_date {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -437,19 +424,11 @@ fn deterministic_estimate(
     );
     payoff.settle_all_seasoned();
     let pv = payoff.value(inst.notional.currency())?;
-    Ok(MoneyEstimate {
-        mean: pv,
-        stderr: 0.0,
-        ci_95: (pv, pv),
-        num_paths: config.num_paths,
-        num_simulated_paths: config.simulated_path_count(),
-        std_dev: Some(0.0),
-        median: None,
-        percentile_25: None,
-        percentile_75: None,
-        min: Some(pv.amount()),
-        max: Some(pv.amount()),
-    })
+    Ok(exact_estimate(
+        pv,
+        config.num_paths,
+        config.simulated_path_count(),
+    ))
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 //! Hull-White 1F Monte Carlo pricer for callable range accruals.
 
 use crate::exotics::callable_range_accrual::CallableRangeAccrual;
-use crate::exotics::hw1f_note::{Hw1fNote, Hw1fNotePricer};
+use crate::exotics::hw1f_note::{zero_estimate, Hw1fNote, Hw1fNotePricer};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -312,32 +312,11 @@ impl Hw1fNote for CallableRangeAccrual {
         // state as its underlying range accrual.  Do not silently treat
         // already-fixed observations as out-of-range when a seasoned trade is
         // valued without that state.
-        let range = &inst.range_accrual;
-        let historical_count = range
-            .observation_dates
-            .iter()
-            .filter(|&&date| date <= as_of)
-            .count();
-        if historical_count > 0 {
-            let supplied_total = range.total_past_observations.ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "CallableRangeAccrual '{}' requires total_past_observations for {historical_count} historical observations",
-                    inst.id
-                ))
-            })?;
-            let supplied_in_range = range.past_observations_in_range.ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "CallableRangeAccrual '{}' requires past_observations_in_range for {historical_count} historical observations",
-                    inst.id
-                ))
-            })?;
-            if supplied_total != historical_count || supplied_in_range > supplied_total {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CallableRangeAccrual '{}' historical observation state is inconsistent: supplied total={supplied_total}, in_range={supplied_in_range}, expected total={historical_count}",
-                    inst.id
-                )));
-            }
-        }
+        inst.range_accrual.validate_historical_observations(
+            "CallableRangeAccrual",
+            &inst.id,
+            as_of,
+        )?;
 
         let discount_curve = market.get_discount(inst.range_accrual.discount_curve_id.as_ref())?;
         let hw_params = pricer.effective_hw_params(inst, market)?;
@@ -530,23 +509,6 @@ fn initial_short_rate(inst: &CallableRangeAccrual, market: &MarketContext) -> Re
         )));
     }
     Ok(rate)
-}
-
-fn zero_estimate(currency: finstack_quant_core::currency::Currency) -> MoneyEstimate {
-    let zero = Money::from((0_i64, currency));
-    MoneyEstimate {
-        mean: zero,
-        stderr: 0.0,
-        ci_95: (zero, zero),
-        num_paths: 0,
-        num_simulated_paths: 0,
-        std_dev: Some(0.0),
-        median: None,
-        percentile_25: None,
-        percentile_75: None,
-        min: Some(0.0),
-        max: Some(0.0),
-    }
 }
 
 #[cfg(test)]

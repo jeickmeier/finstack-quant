@@ -2,15 +2,12 @@
 //!
 //! Provides risk sensitivities for commodity spread options:
 //! - **Delta (leg 1)**: Sensitivity to leg 1 forward price (bump-and-reprice on PriceCurve)
-//! - **Vega**: Volatility sensitivity (bump-and-reprice on vol surfaces)
+//! - **Vega**: Volatility sensitivity (bump-and-reprice on both leg vol surfaces)
 //! - **DV01**: Interest rate sensitivity (discount curve bump)
 //! - **Theta**: Time decay
 
+use crate::commodity::bump_price_curve_pct;
 use crate::commodity::commodity_spread_option::CommoditySpreadOption;
-use finstack_quant_core::market_data::bumps::{
-    BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
-};
-use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
@@ -30,56 +27,38 @@ impl MetricCalculator for SpreadDeltaCalculator {
 
         let bump_pct = sens_config::resolve(context)?.spot_bump_decimal;
 
-        let (curve_id, forward) = match self.leg {
-            1 => (
-                CurveId::new(inst.leg1_forward_curve_id.as_str()),
-                inst.leg1_forward(&context.curves)?,
-            ),
-            2 => (
-                CurveId::new(inst.leg2_forward_curve_id.as_str()),
-                inst.leg2_forward(&context.curves)?,
-            ),
+        let curve_id = match self.leg {
+            1 => &inst.leg1_forward_curve_id,
+            2 => &inst.leg2_forward_curve_id,
             _ => {
                 return Err(finstack_quant_core::Error::Validation(
                     "invalid spread leg".into(),
                 ))
             }
         };
+        let forward = inst.leg_forward(&context.curves, curve_id)?;
         let bump_size = forward * bump_pct;
         if bump_size <= 0.0 {
             return Ok(0.0);
         }
 
-        let market_up = context.curves.bump([MarketBump::Curve {
-            id: curve_id.clone(),
-            spec: BumpSpec {
-                bump_type: BumpType::Parallel,
-                mode: BumpMode::Additive,
-                units: BumpUnits::Percent,
-                value: bump_pct * 100.0,
-            },
-        }])?;
+        let market_up = bump_price_curve_pct(&context.curves, curve_id.as_str(), bump_pct)?;
         let pv_up = inst.value(&market_up, context.as_of)?.amount();
 
-        let market_down = context.curves.bump([MarketBump::Curve {
-            id: curve_id,
-            spec: BumpSpec {
-                bump_type: BumpType::Parallel,
-                mode: BumpMode::Additive,
-                units: BumpUnits::Percent,
-                value: -bump_pct * 100.0,
-            },
-        }])?;
+        let market_down = bump_price_curve_pct(&context.curves, curve_id.as_str(), -bump_pct)?;
         let pv_down = inst.value(&market_down, context.as_of)?.amount();
 
         Ok((pv_up - pv_down) / (2.0 * bump_size))
     }
 }
 
-/// Vega calculator: combined sensitivity to both vol surfaces.
+/// Vega calculator for one spread leg's volatility surface, or both.
 ///
-/// Bumps each distinct leg volatility surface once by the resolved vol bump
-/// (default 1 vol point) and reports the result per vol point.
+/// Bumps the leg surface (`Some(leg)`) or each distinct leg surface once
+/// (`None`, the headline `Vega`) by the resolved vol bump (default 1 vol
+/// point) and reports the result per vol point. The Kirk pricer reads the
+/// surfaces directly, so the surfaces are bumped even when an implied-vol
+/// override is set (the core `GenericFdVega` would bump that unused quote).
 struct SpreadVegaCalculator {
     leg: Option<u8>,
 }
@@ -90,38 +69,21 @@ impl MetricCalculator for SpreadVegaCalculator {
 
         let vol_bump = sens_config::resolve(context)?.vol_bump_decimal;
 
-        let bump_market = |amount: f64| -> Result<_> {
-            match self.leg {
-                Some(1) => finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
-                    &context.curves,
-                    inst.leg1_vol_surface_id.as_str(),
-                    amount,
-                ),
-                Some(2) => finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
-                    &context.curves,
-                    inst.leg2_vol_surface_id.as_str(),
-                    amount,
-                ),
-                None => {
-                    let first = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
-                        &context.curves,
-                        inst.leg1_vol_surface_id.as_str(),
-                        amount,
-                    )?;
-                    if inst.leg1_vol_surface_id == inst.leg2_vol_surface_id {
-                        Ok(first)
-                    } else {
-                        finstack_quant_valuations_core::metrics::bump_surface_vol_absolute(
-                            &first,
-                            inst.leg2_vol_surface_id.as_str(),
-                            amount,
-                        )
-                    }
+        let bump = finstack_quant_valuations_core::metrics::bump_surface_vol_absolute;
+        let bump_market = |amount: f64| match self.leg {
+            Some(1) => bump(&context.curves, inst.leg1_vol_surface_id.as_str(), amount),
+            Some(2) => bump(&context.curves, inst.leg2_vol_surface_id.as_str(), amount),
+            None => {
+                let first = bump(&context.curves, inst.leg1_vol_surface_id.as_str(), amount)?;
+                if inst.leg1_vol_surface_id == inst.leg2_vol_surface_id {
+                    Ok(first)
+                } else {
+                    bump(&first, inst.leg2_vol_surface_id.as_str(), amount)
                 }
-                Some(_) => Err(finstack_quant_core::Error::Validation(
-                    "invalid spread-option vega leg".into(),
-                )),
             }
+            Some(_) => Err(finstack_quant_core::Error::Validation(
+                "invalid spread-option vega leg".into(),
+            )),
         };
         let pv_up = inst.value(&bump_market(vol_bump)?, context.as_of)?.amount();
         let pv_dn = inst

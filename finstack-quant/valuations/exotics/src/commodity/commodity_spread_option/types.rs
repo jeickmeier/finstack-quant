@@ -198,16 +198,11 @@ impl CommoditySpreadOption {
             .map(|t| t.max(0.0))
     }
 
-    /// Get forward price for leg 1 from the price curve.
-    pub(crate) fn leg1_forward(&self, market: &MarketContext) -> Result<f64> {
-        let price_curve = market.get_price_curve(self.leg1_forward_curve_id.as_str())?;
-        price_curve.price_on_date(self.expiry)
-    }
-
-    /// Get forward price for leg 2 from the price curve.
-    pub(crate) fn leg2_forward(&self, market: &MarketContext) -> Result<f64> {
-        let price_curve = market.get_price_curve(self.leg2_forward_curve_id.as_str())?;
-        price_curve.price_on_date(self.expiry)
+    /// Forward price at expiry read from the leg price curve `curve_id`.
+    pub(crate) fn leg_forward(&self, market: &MarketContext, curve_id: &CurveId) -> Result<f64> {
+        market
+            .get_price_curve(curve_id.as_str())?
+            .price_on_date(self.expiry)
     }
 
     /// Validate correlation is finite and within [-1, 1].

@@ -1,7 +1,7 @@
 //! Asian option pricers (Monte Carlo and analytical).
 
 // Common imports for all pricers
-use crate::exotics::asian_option::types::AsianOption;
+use crate::exotics::asian_option::types::{average_intrinsic, realized_average, AsianOption};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::{
@@ -16,7 +16,7 @@ use finstack_quant_valuations_core::results::ValuationResult;
 
 // MC-specific imports
 use finstack_quant_models::monte_carlo::engine::PathCaptureConfig;
-use finstack_quant_models::monte_carlo::payoff::asian::Asian;
+use finstack_quant_models::monte_carlo::payoff::asian::{Asian, AveragingMethod};
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
     PathDependentPricer, PathDependentPricerConfig,
 };
@@ -255,29 +255,7 @@ impl AsianOptionMcPricer {
         let (hist_sum, hist_prod_log, hist_count) = inst.accumulated_state(as_of);
 
         if t <= 0.0 {
-            // Expired: use realized average
-            let average = if hist_count > 0 {
-                match inst.averaging_method {
-                    finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic => {
-                        hist_sum / hist_count as f64
-                    }
-                    finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Geometric => {
-                        (hist_prod_log / hist_count as f64).exp()
-                    }
-                }
-            } else {
-                resolve_spot(inst, curves)?
-            };
-
-            let intrinsic = match inst.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
-                    (average - inst.strike).max(0.0)
-                }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
-                    (inst.strike - average).max(0.0)
-                }
-            };
-            return Money::new(intrinsic * inst.quantity, inst.currency);
+            return expired_value(inst, curves, hist_sum, hist_prod_log, hist_count);
         }
 
         let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
@@ -526,6 +504,26 @@ impl Pricer for AsianOptionMcPricer {
 use finstack_quant_models::closed_form::asian::arithmetic_asian_tw_price_times;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::BlackScholesInputsDf;
 
+/// Value of an expired Asian option: the intrinsic of the realized average
+/// (current spot when nothing was recorded) times quantity, undiscounted.
+///
+/// Shared by the GBM and Heston Monte Carlo pricers.
+pub(super) fn expired_value(
+    inst: &AsianOption,
+    curves: &MarketContext,
+    hist_sum: f64,
+    hist_prod_log: f64,
+    hist_count: usize,
+) -> finstack_quant_core::Result<Money> {
+    let average = match realized_average(inst.averaging_method, hist_sum, hist_prod_log, hist_count)
+    {
+        Some(average) => average,
+        None => resolve_spot(inst, curves)?,
+    };
+    let intrinsic = average_intrinsic(inst.option_type, average, inst.strike);
+    Money::new(intrinsic * inst.quantity, inst.currency)
+}
+
 /// Underlying spot from `spot_id`, in the option currency when quoted as a price.
 pub(crate) fn resolve_spot(
     inst: &AsianOption,
@@ -593,6 +591,7 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
         as_of: Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
         let asian = expect_inst::<AsianOption>(instrument, InstrumentType::AsianOption)?;
+        asian.validate_past_fixings(as_of)?;
 
         let inputs = analytic_inputs(asian, market, as_of)?;
         let (spot, r, q, sigma, t) = (
@@ -603,34 +602,13 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
             inputs.t,
         );
 
-        asian.validate_past_fixings(as_of)?;
         let (sum, log_prod, count) = asian.accumulated_state(as_of);
         let total_fixings = asian.fixing_dates.len();
 
         if t <= 0.0 {
-            // Handle expired option using realized average
-            let average = if count > 0 {
-                match asian.averaging_method {
-                    finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic => {
-                        sum / count as f64
-                    }
-                    finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Geometric => {
-                        (log_prod / count as f64).exp()
-                    }
-                }
-            } else {
-                // Fallback if no fixings recorded (unlikely for expired option)
-                spot
-            };
-
-            let intrinsic = match asian.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
-                    (average - asian.strike).max(0.0)
-                }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
-                    (asian.strike - average).max(0.0)
-                }
-            };
+            let average =
+                realized_average(asian.averaging_method, sum, log_prod, count).unwrap_or(spot);
+            let intrinsic = average_intrinsic(asian.option_type, average, asian.strike);
             return Ok(ValuationResult::stamped(
                 asian.id(),
                 as_of,
@@ -731,6 +709,7 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
         as_of: Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
         let asian = expect_inst::<AsianOption>(instrument, InstrumentType::AsianOption)?;
+        asian.validate_past_fixings(as_of)?;
 
         // Date-based DF for time-consistent discounting
         let bs_inputs = analytic_inputs(asian, market, as_of)?;
@@ -741,20 +720,14 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
         let sigma = bs_inputs.sigma;
         let t = bs_inputs.t;
 
-        asian.validate_past_fixings(as_of)?;
         let (sum, _, count) = asian.accumulated_state(as_of);
         let total_fixings = asian.fixing_dates.len();
 
         if t <= 0.0 {
-            let average = if count > 0 { sum / count as f64 } else { spot };
-            let intrinsic = match asian.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
-                    (average - asian.strike).max(0.0)
-                }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
-                    (asian.strike - average).max(0.0)
-                }
-            };
+            // Turnbull-Wakeman prices the arithmetic average.
+            let average =
+                realized_average(AveragingMethod::Arithmetic, sum, 0.0, count).unwrap_or(spot);
+            let intrinsic = average_intrinsic(asian.option_type, average, asian.strike);
             return Ok(ValuationResult::stamped(
                 asian.id(),
                 as_of,
@@ -770,15 +743,8 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
         let future_fixings = total_fixings.saturating_sub(count);
         if future_fixings == 0 {
             // Deterministic case (all fixings past, but not expired?)
-            let average = sum / total_fixings as f64;
-            let payoff = match asian.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
-                    (average - asian.strike).max(0.0)
-                }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
-                    (asian.strike - average).max(0.0)
-                }
-            };
+            let payoff =
+                average_intrinsic(asian.option_type, sum / total_fixings as f64, asian.strike);
             // Use the date-based DF from inputs
             return Ok(ValuationResult::stamped(
                 asian.id(),
@@ -803,58 +769,24 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
         let scale = m / n;
 
         let price = if k_eff < 0.0 {
-            match asian.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
-                    // Deep ITM: PV = DF_T * (Expected_Avg - K)
-                    // Expected_Avg = (Past_Sum + Sum(F_i)) / N
-                    // F_i = forward price for fixing date i
-                    //     = S * exp(-q*t_i) / df_i  (GK forward formula)
-                    //
-                    // We compute each forward using date-based DFs for consistency.
-                    let disc_curve = market.get_discount(asian.discount_curve_id.as_str())?;
-
-                    let mut sum_fwd = 0.0;
-                    for date in &asian.fixing_dates {
-                        if *date > as_of {
-                            let t_i = asian.day_count.year_fraction(
-                                as_of,
-                                *date,
-                                DayCountContext::default(),
-                            )?;
-                            // Get date-based DF for this fixing
-                            let df_i = disc_curve.df_between_dates(as_of, *date)?;
-                            // GK forward: F_i = S * exp(-q*t_i) / df_i
-                            let forward_i = spot * (-q * t_i).exp() / df_i;
-                            sum_fwd += forward_i;
-                        }
-                    }
-                    let expected_avg = (sum + sum_fwd) / n;
-                    // Use date-based DF for final discounting
-                    (expected_avg - k).max(0.0) * df_expiry
-                }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
-                    // Deep ITM put (k_eff < 0): past fixings already push average above K.
-                    // Compute expected average using forwards and return discounted payoff.
-                    // PV = DF_T * max(K - Expected_Avg, 0)
-                    let disc_curve = market.get_discount(asian.discount_curve_id.as_str())?;
-
-                    let mut sum_fwd = 0.0;
-                    for date in &asian.fixing_dates {
-                        if *date > as_of {
-                            let t_i = asian.day_count.year_fraction(
-                                as_of,
-                                *date,
-                                DayCountContext::default(),
-                            )?;
-                            let df_i = disc_curve.df_between_dates(as_of, *date)?;
-                            let forward_i = spot * (-q * t_i).exp() / df_i;
-                            sum_fwd += forward_i;
-                        }
-                    }
-                    let expected_avg = (sum + sum_fwd) / n;
-                    (k - expected_avg).max(0.0) * df_expiry
+            // Deep ITM (k_eff < 0): past fixings alone settle the moneyness, so
+            // PV = DF_T · max(±(E[A] − K), 0) with E[A] = (Σ past + Σ F_i) / N
+            // and each GK forward F_i = S · exp(−q·t_i) / DF(t_i) on date-based DFs.
+            let disc_curve = market.get_discount(asian.discount_curve_id.as_str())?;
+            let mut sum_fwd = 0.0;
+            for date in &asian.fixing_dates {
+                if *date > as_of {
+                    let t_i =
+                        asian
+                            .day_count
+                            .year_fraction(as_of, *date, DayCountContext::default())?;
+                    let df_i = disc_curve.df_between_dates(as_of, *date)?;
+                    let forward_i = spot * (-q * t_i).exp() / df_i;
+                    sum_fwd += forward_i;
                 }
             }
+            let expected_avg = (sum + sum_fwd) / n;
+            average_intrinsic(asian.option_type, expected_avg, k) * df_expiry
         } else {
             // Price the remaining-fixings option on the ACTUAL future fixing
             // times: seasoned schedules are concentrated near expiry, so the
