@@ -968,9 +968,9 @@ fn test_price_rejects_zero_chunk_size() {
 fn captured_rough_heston_paths_reset_history_and_match_streaming_prices() {
     use crate::monte_carlo::discretization::rough_heston::RoughHestonHybrid;
     use crate::monte_carlo::payoff::vanilla::EuropeanCall;
-    use crate::monte_carlo::process::metadata::ProcessMetadata;
     use crate::monte_carlo::process::rough_heston::{RoughHestonParams, RoughHestonProcess};
     use crate::monte_carlo::rng::philox::PhiloxRng;
+    use crate::monte_carlo::traits::ProcessMetadata;
     use finstack_quant_core::math::fractional::HurstExponent;
 
     let process = RoughHestonProcess::new(
@@ -1410,7 +1410,7 @@ fn test_estimate_serde_requires_canonical_path_counts() {
 /// `2 * num_paths` simulated paths. Without antithetics both counts match.
 #[test]
 fn test_engine_antithetic_records_simulated_path_count() {
-    use crate::monte_carlo::discretization::ExactGbm;
+    use crate::monte_carlo::discretization::exact::ExactGbm;
     use crate::monte_carlo::payoff::vanilla::EuropeanCall;
     use crate::monte_carlo::process::gbm::GbmProcess;
     use crate::monte_carlo::rng::philox::PhiloxRng;
@@ -1472,7 +1472,8 @@ fn test_engine_antithetic_records_simulated_path_count() {
 /// (see [`crate::monte_carlo::traits::Discretization::applies_correlation_internally`]).
 mod correlation_regression {
     use super::*;
-    use crate::monte_carlo::discretization::{EulerMaruyama, QeHeston};
+    use crate::monte_carlo::discretization::euler::EulerMaruyama;
+    use crate::monte_carlo::discretization::qe_heston::QeHeston;
     use crate::monte_carlo::payoff::vanilla::EuropeanCall;
     use crate::monte_carlo::process::gbm::{GbmParams, MultiGbmProcess};
     use crate::monte_carlo::process::heston::HestonProcess;

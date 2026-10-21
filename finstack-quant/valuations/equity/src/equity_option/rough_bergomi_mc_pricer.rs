@@ -223,7 +223,7 @@ fn simulate_rbergomi<F: finstack_quant_models::monte_carlo::traits::Payoff>(
         let mut payoff = payoff_template.clone();
         payoff.reset();
 
-        let pv = finstack_quant_models::monte_carlo::engine_fractional::simulate_path_fractional(
+        let pv = finstack_quant_models::monte_carlo::engine::simulate_path_fractional(
             rng,
             time_grid,
             process,

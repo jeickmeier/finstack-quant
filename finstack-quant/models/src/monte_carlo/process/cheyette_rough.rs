@@ -84,7 +84,7 @@ use super::super::paths::ProcessParams;
 #[cfg(test)]
 use super::super::traits::state_keys;
 use super::super::traits::{PathState, StateKey, StochasticProcess};
-use super::metadata::ProcessMetadata;
+use crate::monte_carlo::traits::ProcessMetadata;
 use finstack_quant_core::market_data::term_structures::ForwardVarianceCurve;
 use finstack_quant_core::math::fractional::HurstExponent;
 

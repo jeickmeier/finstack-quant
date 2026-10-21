@@ -12,10 +12,13 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::BarrierType;
+use finstack_quant_models::monte_carlo::discretization::euler::EulerMaruyama;
+use finstack_quant_models::monte_carlo::discretization::exact::{ExactGbm, ExactMultiGbm};
+use finstack_quant_models::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
 use finstack_quant_models::monte_carlo::discretization::lmm_predictor_corrector::LmmPredictorCorrector;
-use finstack_quant_models::monte_carlo::discretization::{
-    EulerMaruyama, ExactGbm, ExactHullWhite1F, ExactMultiGbm, ExactSchwartzSmith, QeCir, QeHeston,
-};
+use finstack_quant_models::monte_carlo::discretization::qe_cir::QeCir;
+use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
+use finstack_quant_models::monte_carlo::discretization::schwartz_smith::ExactSchwartzSmith;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig, PathCaptureConfig};
 use finstack_quant_models::monte_carlo::payoff::asian::{
     default_fixing_steps, Asian, AveragingMethod,

@@ -33,10 +33,9 @@
 //!
 //! - Models and simulation inputs: [`rng`], [`process`], and [`discretization`].
 //! - Engine contracts and execution: [`traits`],
-//!   [`TimeGrid`](finstack_quant_core::math::time_grid::TimeGrid), [`engine`], and
-//!   [`engine_fractional`].
-//! - Products and analytics: [`payoff`], [`pricer`], [`barriers`], [`greeks`], and
-//!   [`variance_reduction`].
+//!   [`TimeGrid`](finstack_quant_core::math::time_grid::TimeGrid), and [`engine`].
+//! - Products and analytics: [`payoff`], [`pricer`], [`greeks`], and
+//!   [`control_variate`].
 //! - Results and diagnostics: [`estimate`],
 //!   [`OnlineStats`](finstack_quant_core::math::stats::OnlineStats), [`paths`], and [`results`].
 //! - Runtime defaults and reproducibility: [`registry`] and [`seed`].
@@ -91,10 +90,9 @@ pub mod process;
 pub mod rng;
 pub mod traits;
 
-pub mod barriers;
+pub mod control_variate;
 pub mod convenience;
 pub mod engine;
-pub mod engine_fractional;
 pub mod greeks;
 pub mod payoff;
 pub mod pricer;
@@ -102,7 +100,6 @@ pub mod registry;
 pub mod results;
 pub mod seed;
 pub mod simulate;
-pub mod variance_reduction;
 
 #[cfg(test)]
 mod mc_process_params_serialization;

@@ -63,34 +63,38 @@ use crate::monte_carlo::discretization::cheyette_rough::CheyetteRoughEuler;
 use crate::monte_carlo::discretization::euler::{EulerMaruyama, LogEuler};
 use crate::monte_carlo::discretization::exact::{ExactGbm, ExactMultiGbm};
 use crate::monte_carlo::discretization::exact_gbm_dividends::ExactGbmWithDividends;
+use crate::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
 use crate::monte_carlo::discretization::lmm_predictor_corrector::LmmPredictorCorrector;
 use crate::monte_carlo::discretization::milstein::Milstein;
+use crate::monte_carlo::discretization::qe_cir::QeCir;
+use crate::monte_carlo::discretization::qe_heston::QeHeston;
 use crate::monte_carlo::discretization::rough_bergomi::RoughBergomiEuler;
 use crate::monte_carlo::discretization::rough_heston::RoughHestonHybrid;
-use crate::monte_carlo::discretization::{ExactHullWhite1F, ExactSchwartzSmith, QeCir, QeHeston};
+use crate::monte_carlo::discretization::schwartz_smith::ExactSchwartzSmith;
 use crate::monte_carlo::engine::{
     build_correlation_factor, fill_shocks, McEngine, NoiseHook, MAX_CAPTURED_PATHS,
 };
-use crate::monte_carlo::process::brownian::{BrownianProcess, MultiBrownianProcess};
+use crate::monte_carlo::process::brownian::{
+    BrownianParams, BrownianProcess, MultiBrownianProcess,
+};
 use crate::monte_carlo::process::cheyette_rough::{
     CheyetteRoughVolParams, CheyetteRoughVolProcess,
 };
 use crate::monte_carlo::process::cir::{CirParams, CirPlusPlusProcess, CirProcess};
-use crate::monte_carlo::process::gbm::MultiGbmProcess;
+use crate::monte_carlo::process::gbm::{GbmParams, GbmProcess, MultiGbmProcess};
 use crate::monte_carlo::process::gbm_dividends::{Dividend, GbmWithDividends};
 use crate::monte_carlo::process::heston::HestonProcess;
 use crate::monte_carlo::process::lmm::{LmmParams, LmmProcess};
 use crate::monte_carlo::process::local_vol::{LocalVolParams, LocalVolProcess};
-use crate::monte_carlo::process::multi_ou::MultiOuProcess;
+use crate::monte_carlo::process::multi_ou::{MultiOuParams, MultiOuProcess};
 use crate::monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
 use crate::monte_carlo::process::rough_bergomi::{RoughBergomiParams, RoughBergomiProcess};
 use crate::monte_carlo::process::rough_heston::{RoughHestonParams, RoughHestonProcess};
 use crate::monte_carlo::process::schwartz_smith::{SchwartzSmithParams, SchwartzSmithProcess};
-use crate::monte_carlo::process::{
-    BrownianParams, GbmParams, GbmProcess, MultiOuParams, ProcessMetadata,
-};
 use crate::monte_carlo::rng::philox::PhiloxRng;
-use crate::monte_carlo::traits::{Discretization, RandomStream, StochasticProcess};
+use crate::monte_carlo::traits::{
+    Discretization, ProcessMetadata, RandomStream, StochasticProcess,
+};
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
@@ -838,7 +842,7 @@ where
 ///
 /// `fractional` is the generator and Hurst exponent for a process that needs
 /// injected noise. Such a stream follows
-/// [`simulate_path_fractional`](crate::monte_carlo::engine_fractional::simulate_path_fractional)
+/// [`simulate_path_fractional`](crate::monte_carlo::engine::simulate_path_fractional)
 /// as the pricers drive it: the generator's normals are drawn first, then each
 /// step draws its vector of normals and has the fractional increment and its
 /// driving normal written over factor slots 1 and 2. No engine-side

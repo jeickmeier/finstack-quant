@@ -89,7 +89,7 @@
 //!
 //! ```
 //! use finstack_quant_core::currency::Currency;
-//! use finstack_quant_models::monte_carlo::discretization::ExactGbm;
+//! use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
 //! use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 //! use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
 //! use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
@@ -126,7 +126,7 @@
 
 use super::super::paths::ProcessParams;
 use super::super::traits::{PathState, ProportionalDiffusion, StateKey, StochasticProcess};
-use super::metadata::ProcessMetadata;
+use crate::monte_carlo::traits::ProcessMetadata;
 use finstack_quant_core::math::linalg::validate_correlation_matrix;
 use std::sync::Arc;
 

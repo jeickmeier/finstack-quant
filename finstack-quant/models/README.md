@@ -62,7 +62,7 @@ path-dependent processes (`lmm`, `rough_bergomi`, `rough_heston`,
 that consume one. It is the one
 path-simulation entry point and is bound in Python and WASM.
 
-Antithetic pairing is **not** in `variance_reduction` — it is implemented inline
+Antithetic pairing is **not** in `control_variate` — it is implemented inline
 in the engine loop and configured with `McEngineConfig::antithetic`.
 
 ### Processes
@@ -130,7 +130,7 @@ reduction, optional serial early stopping, and optional path capture.
 
 ```rust
 use finstack_quant_core::currency::Currency;
-use finstack_quant_models::monte_carlo::discretization::ExactGbm;
+use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
@@ -177,7 +177,7 @@ consumers can interpret them.
 
 ```rust
 use finstack_quant_core::currency::Currency;
-use finstack_quant_models::monte_carlo::discretization::ExactGbm;
+use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
 use finstack_quant_models::monte_carlo::engine::{
     McEngine, McEngineConfig, PathCaptureConfig,
 };
@@ -282,7 +282,7 @@ closed with `SobolRng`.
 
 ```rust
 use finstack_quant_core::currency::Currency;
-use finstack_quant_models::monte_carlo::discretization::ExactGbm;
+use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::greeks::finite_diff::{
     finite_diff_delta, FiniteDiffInputs,
@@ -387,7 +387,7 @@ The engine rejects these configurations instead of proceeding:
 - `process.dim() == 0`, or `initial_state.len() != process.dim()`.
 - A process that reports `requires_injected_noise()` (rough-volatility models):
   the generic loop would fill those factor slots with i.i.d. normals. Drive them
-  through `engine_fractional::simulate_path_fractional` or a dedicated pricer.
+  through `engine::simulate_path_fractional` or a dedicated pricer.
 - A process with a `dedicated_scheme()` paired with a different scheme.
 - A payoff whose `max_event_step()` exceeds the grid — the fixing would silently
   never fire.

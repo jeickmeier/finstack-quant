@@ -1,14 +1,13 @@
 //! Fractional noise integration for rough volatility Monte Carlo simulation.
 //!
-//! Provides helper functions to run Monte Carlo paths with pre-generated
-//! fractional Brownian motion increments. Used by rBergomi and Cheyette rough
-//! vol discretizations.
+//! Runs one Monte Carlo path with pre-generated fractional Brownian motion
+//! increments, for rough-volatility schemes such as rBergomi.
 //!
 //! The standard [`crate::monte_carlo::engine::McEngine`] simulation loop draws i.i.d.
 //! normals at each time step. Rough volatility models instead need
 //! correlated noise across *all* steps, generated upfront via an
 //! implementor of [`crate::monte_carlo::rng::fbm::FractionalNoiseGenerator`]. The
-//! functions in this module wrap the per-path simulation loop to handle
+//! function in this module wraps the per-path simulation loop to handle
 //! that pre-generation and injection.
 //!
 //! # Usage

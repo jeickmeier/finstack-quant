@@ -529,7 +529,7 @@ impl CommoditySpotOption {
         Option<finstack_quant_valuations_core::results::MonteCarloValuationDetails>,
     )> {
         use finstack_quant_core::math::time_grid::TimeGrid;
-        use finstack_quant_models::monte_carlo::discretization::ExactSchwartzSmith;
+        use finstack_quant_models::monte_carlo::discretization::schwartz_smith::ExactSchwartzSmith;
         use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
         use finstack_quant_models::monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
         use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithProcess;

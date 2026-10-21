@@ -42,7 +42,7 @@
 //! generator emits increments `ΔỸ_k` whose running sum reconstructs the level
 //! `Ỹ_{t_k}`, accumulating `work[0] += ΔỸ` recovers the Volterra process.
 //! The engine must zero the work buffer before each new path (see
-//! [`simulate_path_fractional`](crate::monte_carlo::engine_fractional::simulate_path_fractional)).
+//! [`simulate_path_fractional`](crate::monte_carlo::engine::simulate_path_fractional)).
 //!
 //! # References
 //!

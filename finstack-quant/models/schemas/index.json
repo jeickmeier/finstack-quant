@@ -506,7 +506,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/monte_carlo_result.schema.json",
-      "bytes": 35935,
+      "bytes": 35924,
       "kind": "output",
       "path": "schemas/models/1/monte_carlo_result.schema.json",
       "summary": "Monte Carlo pricing result with optional captured paths.",

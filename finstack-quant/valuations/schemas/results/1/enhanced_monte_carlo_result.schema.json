@@ -952,7 +952,7 @@
       ]
     },
     "ProcessParams": {
-      "description": "Metadata describing the process behind a captured dataset.\n\nThis structure is typically populated by\n[`crate::monte_carlo::process::metadata::ProcessMetadata`] implementations and stored in a\n[`PathDataset`]. It describes how to interpret captured state vectors rather\nthan how to price the instrument.",
+      "description": "Metadata describing the process behind a captured dataset.\n\nThis structure is typically populated by\n[`crate::monte_carlo::traits::ProcessMetadata`] implementations and stored in a\n[`PathDataset`]. It describes how to interpret captured state vectors rather\nthan how to price the instrument.",
       "properties": {
         "correlation": {
           "description": "Optional row-major `n x n` correlation matrix.",

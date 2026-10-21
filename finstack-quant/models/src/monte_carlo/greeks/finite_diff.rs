@@ -654,7 +654,7 @@ mod tests {
 
     #[test]
     fn paired_greeks_reject_missing_dedicated_dividend_scheme() {
-        use crate::monte_carlo::discretization::EulerMaruyama;
+        use crate::monte_carlo::discretization::euler::EulerMaruyama;
         use crate::monte_carlo::process::gbm_dividends::GbmWithDividends;
 
         let engine = test_engine(8);

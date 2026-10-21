@@ -7,7 +7,7 @@
 //!
 //! Important assumptions such as time units, rate / volatility quoting, and
 //! state-vector layout are documented in each process module. Use
-//! [`metadata::ProcessMetadata`] when captured paths need a stable schema for
+//! [`crate::monte_carlo::traits::ProcessMetadata`] when captured paths need a stable schema for
 //! downstream consumers.
 
 pub mod brownian;
@@ -19,18 +19,12 @@ pub mod gbm_dividends;
 pub mod heston;
 pub mod lmm;
 pub mod local_vol;
-pub mod metadata;
 pub mod multi_ou;
 pub mod ou;
 pub mod piecewise_gbm;
 pub mod rough_bergomi;
 pub mod rough_heston;
 pub mod schwartz_smith;
-
-pub use brownian::BrownianParams;
-pub use gbm::{GbmParams, GbmProcess};
-pub use metadata::ProcessMetadata;
-pub use multi_ou::MultiOuParams;
 
 /// Validate a piecewise knot schedule: equal non-empty lengths, finite
 /// entries, strictly increasing times and, when `require_non_negative_times`

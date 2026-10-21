@@ -9,7 +9,7 @@
 //! following a calendar-arbitrage-free total-variance bootstrap.
 
 use crate::monte_carlo::paths::ProcessParams;
-use crate::monte_carlo::process::metadata::ProcessMetadata;
+use crate::monte_carlo::traits::ProcessMetadata;
 use crate::monte_carlo::traits::{Discretization, StochasticProcess};
 use finstack_quant_core::Result;
 

@@ -40,7 +40,7 @@ use super::super::traits::{Discretization, StochasticProcess};
 /// **biased research scheme**: the process applies partial truncation
 /// (`v = max(v, 0)` in drift and diffusion) and the engine applies
 /// Cholesky to the declared factor correlation. Production Heston
-/// Europeans use [`crate::monte_carlo::discretization::QeHeston`] via
+/// Europeans use [`crate::monte_carlo::discretization::qe_heston::QeHeston`] via
 /// [`crate::monte_carlo::pricer::heston::price_heston`].
 #[derive(Debug, Clone, Default)]
 pub struct EulerMaruyama;

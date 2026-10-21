@@ -119,8 +119,8 @@
 
 use super::super::paths::ProcessParams;
 use super::super::traits::StochasticProcess;
-use super::metadata::ProcessMetadata;
 use crate::closed_form::HestonPricingParams;
+use crate::monte_carlo::traits::ProcessMetadata;
 
 /// Check the Feller condition `2κθ ≥ σ_v²` from raw variance-process parameters.
 ///
@@ -157,11 +157,11 @@ pub fn heston_satisfies_feller(kappa: f64, theta: f64, sigma_v: f64) -> bool {
 /// State: [S, v] (spot and variance)
 /// Factors: 2 correlated Brownian motions
 ///
-/// Pairing this process with [`crate::monte_carlo::discretization::EulerMaruyama`] is a
+/// Pairing this process with [`crate::monte_carlo::discretization::euler::EulerMaruyama`] is a
 /// **biased research scheme**: drift and diffusion apply partial truncation
 /// (`v = max(v, 0)`) and the engine applies Cholesky to
 /// [`StochasticProcess::factor_correlation`]. Production Heston Europeans
-/// use [`crate::monte_carlo::discretization::QeHeston`] via
+/// use [`crate::monte_carlo::discretization::qe_heston::QeHeston`] via
 /// [`crate::monte_carlo::pricer::heston::price_heston`].
 #[derive(Debug, Clone)]
 pub struct HestonProcess {

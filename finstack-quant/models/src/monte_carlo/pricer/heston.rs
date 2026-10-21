@@ -26,7 +26,7 @@
 //!   Stochastic Volatility with Applications to Bond and Currency Options."
 //!   *Review of Financial Studies*, 6(2), 327-343. `docs/REFERENCES.md#heston-1993`
 
-use crate::monte_carlo::discretization::QeHeston;
+use crate::monte_carlo::discretization::qe_heston::QeHeston;
 use crate::monte_carlo::engine::{McEngine, McEngineConfig};
 use crate::monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
 use crate::monte_carlo::process::heston::HestonProcess;

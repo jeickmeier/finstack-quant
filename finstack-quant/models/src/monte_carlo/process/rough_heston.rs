@@ -74,7 +74,7 @@
 
 use super::super::paths::ProcessParams;
 use super::super::traits::{PathState, StateKey, StochasticProcess};
-use super::metadata::ProcessMetadata;
+use crate::monte_carlo::traits::ProcessMetadata;
 use finstack_quant_core::math::fractional::HurstExponent;
 
 /// Rough Heston model parameters.

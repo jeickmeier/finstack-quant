@@ -52,7 +52,7 @@ pub(super) fn adaptive_chunk_size(num_paths: usize) -> usize {
 /// Build the engine-side correlation factor for shock transformation.
 ///
 /// Returns `None` when the discretization applies correlation internally
-/// (e.g. [`crate::monte_carlo::discretization::QeHeston`]) or when the process does not
+/// (e.g. [`crate::monte_carlo::discretization::qe_heston::QeHeston`]) or when the process does not
 /// declare a correlation matrix via [`StochasticProcess::factor_correlation`].
 /// Otherwise returns a Cholesky factor of the declared matrix, which the
 /// engine applies to raw independent shocks before each
@@ -230,7 +230,7 @@ impl McEngine {
                 "this process requires externally injected noise (e.g. Volterra/fBM \
                  increments for rough-volatility models); the generic engine would fill \
                  those factor slots with i.i.d. N(0,1) draws and silently produce wrong \
-                 dynamics. Drive it through engine_fractional::simulate_path_fractional \
+                 dynamics. Drive it through engine::simulate_path_fractional \
                  or its dedicated pricer instead."
                     .to_string(),
             ));
@@ -385,7 +385,7 @@ impl McEngine {
     ///
     /// ```
     /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_models::monte_carlo::discretization::ExactGbm;
+    /// use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
     /// use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
     /// use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
     /// use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
@@ -503,7 +503,7 @@ impl McEngine {
     ///
     /// ```
     /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_models::monte_carlo::discretization::ExactGbm;
+    /// use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
     /// use finstack_quant_models::monte_carlo::engine::{
     ///     McEngine, McEngineConfig, PathCaptureConfig,
     /// };

@@ -15,6 +15,7 @@ use finstack_quant_valuations_core::pricer::{
 use finstack_quant_valuations_core::results::ValuationResult;
 
 // MC-specific imports
+use finstack_quant_models::monte_carlo::control_variate::apply_control_variate;
 use finstack_quant_models::monte_carlo::engine::PathCaptureConfig;
 use finstack_quant_models::monte_carlo::payoff::asian::Asian;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
@@ -22,7 +23,6 @@ use finstack_quant_models::monte_carlo::pricer::path_dependent::{
 };
 use finstack_quant_models::monte_carlo::process::gbm::{GbmParams, GbmProcess};
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
-use finstack_quant_models::monte_carlo::variance_reduction::control_variate::apply_control_variate;
 
 /// Exact simulation grid and one event index for every future fixing.
 /// Repeated indices retain contractual observations sharing a model time.
