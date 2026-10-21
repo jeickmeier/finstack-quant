@@ -92,7 +92,6 @@
           "allow_non_monotonic": false,
           "min_forward_tenor": 1e-06,
           "rate_calibration": null,
-          "calibration_ois_cutoff_days": null,
           "fx_policy": null
         }
       ],
@@ -105,7 +104,6 @@
       "credit_indices": [],
       "fx_delta_vol_surfaces": [],
       "vol_cubes": [],
-      "collateral": {},
       "hierarchy": null
     },
     "market_t1": {
@@ -140,7 +138,6 @@
           "allow_non_monotonic": false,
           "min_forward_tenor": 1e-06,
           "rate_calibration": null,
-          "calibration_ois_cutoff_days": null,
           "fx_policy": null
         }
       ],
@@ -153,7 +150,6 @@
       "credit_indices": [],
       "fx_delta_vol_surfaces": [],
       "vol_cubes": [],
-      "collateral": {},
       "hierarchy": null
     },
     "attribution_method": "parallel",
@@ -437,7 +433,6 @@
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
-                "rate_epsilon": 1e-12,
                 "generic_epsilon": 1e-10
               },
               "version": 1
@@ -507,7 +502,6 @@
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
-                "rate_epsilon": 1e-12,
                 "generic_epsilon": 1e-10
               },
               "version": 1
@@ -678,7 +672,6 @@
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
-                "rate_epsilon": 1e-12,
                 "generic_epsilon": 1e-10
               },
               "version": 1
@@ -796,7 +789,6 @@
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
-                "rate_epsilon": 1e-12,
                 "generic_epsilon": 1e-10
               },
               "version": 1

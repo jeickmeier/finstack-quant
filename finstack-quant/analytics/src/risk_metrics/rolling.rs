@@ -8,7 +8,7 @@
 //! numerical recovery can trigger additional rebuilds.
 
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::math::neumaier_sum;
+use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 
 use super::return_based::invalid_annualization_factor;
@@ -435,7 +435,7 @@ where
 mod tests {
     use super::*;
     use crate::risk_metrics::return_based::{sortino, volatility};
-    use finstack_quant_core::dates::{Duration, Month};
+    use time::{Duration, Month};
     fn jan1(year: i32) -> Date {
         Date::from_calendar_date(year, Month::January, 1).expect("valid date")
     }

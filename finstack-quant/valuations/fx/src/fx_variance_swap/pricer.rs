@@ -1,6 +1,7 @@
 //! Shared pricing and metric helpers for FX instruments.
 //!
 use crate::fx_variance_swap::FxVarianceSwap;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_models::closed_form::vanilla::bs_price_unchecked;
 use finstack_quant_models::volatility::variance_replication::carr_madan_forward_variance;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df;
@@ -188,7 +189,7 @@ fn get_historical_ohlc_with_dates(
         .clone()
         .unwrap_or_else(|| inst.series_id());
 
-    let method_label = inst.realized_var_method.label();
+    let method_label = inst.realized_var_method;
     let inst_id = inst.id.as_str().to_owned();
 
     let open_id = inst.open_series_id.as_deref().ok_or_else(|| {
@@ -319,7 +320,7 @@ fn require_close_to_close_forecast(inst: &FxVarianceSwap) -> Result<()> {
     if inst.realized_var_method.requires_ohlc() {
         return Err(finstack_quant_core::Error::Validation(format!(
             "FX variance swap '{}': pre-settlement forecasting is supported only for close_to_close; {} requires an estimator-specific OHLC forecast model. Fully observed settlement remains supported.",
-            inst.id, inst.realized_var_method.label(),
+            inst.id, inst.realized_var_method,
         )));
     }
     Ok(())
@@ -350,7 +351,7 @@ fn remaining_squared_returns(
             "FX variance forecast requires finite positive spot".into(),
         ));
     }
-    let mut total = finstack_quant_core::math::NeumaierAccumulator::new();
+    let mut total = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     let mut count = 0;
     let mut prior_boundary = None;
     for window in obs_dates.windows(2).filter(|window| window[1] > as_of) {
@@ -556,9 +557,18 @@ mod tests {
                 .clone()
                 .with_quote_type(VolQuoteType::Normal)
                 .unwrap(),
-            base.as_ref()
-                .clone()
-                .with_secondary_axis(VolSurfaceAxis::Tenor),
+            finstack_quant_core::market_data::surfaces::VolSurface::from_grid_opts(
+                base.id(),
+                base.expiries(),
+                base.strikes(),
+                base.vols(),
+                finstack_quant_core::market_data::surfaces::VolGridOpts {
+                    secondary_axis: VolSurfaceAxis::Tenor,
+                    ..finstack_quant_core::market_data::surfaces::VolGridOpts::default()
+                },
+                None,
+            )
+            .expect("tenor surface"),
         ] {
             let context = market.clone().insert_surface(surface);
             let error = replicated_variance_to(&swap, &context, swap.start_date, swap.maturity)
@@ -589,7 +599,7 @@ mod tests {
                 swap.strike_variance = 0.0;
                 let dates = observation_dates(&swap).expect("dates");
                 let final_date = *dates.last().expect("last");
-                let as_of = final_date - finstack_quant_core::dates::Duration::days(1);
+                let as_of = final_date - time::Duration::days(1);
                 let market = zero_rate_market(as_of, 0.00001);
                 // Exactly two known returns, +1% then -1%; all remaining
                 // historical closes and the final close are 1.0.

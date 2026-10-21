@@ -20,6 +20,7 @@ use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_models::monte_carlo::discretization::credit_line::CreditLineDiscretization;
 use finstack_quant_models::monte_carlo::process::credit_line::{
     CreditLineProcess, CreditLineProcessParams, CreditSpreadParams, InterestRateSpec,
@@ -28,7 +29,6 @@ use finstack_quant_models::monte_carlo::process::credit_line::{
 use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream, StochasticProcess};
-use finstack_quant_models::monte_carlo::TimeGrid;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use finstack_quant_models::rates::hw1f::{initial_short_rate_from_curve, prepare_hw1f_params};
 

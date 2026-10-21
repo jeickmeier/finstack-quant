@@ -91,7 +91,7 @@ use crate::monte_carlo::process::{
 };
 use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::{Discretization, RandomStream, StochasticProcess};
-use crate::monte_carlo::TimeGrid;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 

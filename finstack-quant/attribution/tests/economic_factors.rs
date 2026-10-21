@@ -25,7 +25,7 @@ use finstack_quant_valuations::{
 use std::sync::Arc;
 use time::macros::date;
 
-fn discount(as_of: time::Date) -> DiscountCurve {
+fn discount(as_of: finstack_quant_core::dates::Date) -> DiscountCurve {
     DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .day_count(DayCount::Act365F)
@@ -38,9 +38,12 @@ fn cpi_index(latest: f64) -> InflationIndex {
     let mut observations = Vec::new();
     for year in 2023..=2025 {
         for month in 1..=12 {
-            let date =
-                time::Date::from_calendar_date(year, time::Month::try_from(month).unwrap(), 1)
-                    .unwrap();
+            let date = finstack_quant_core::dates::Date::from_calendar_date(
+                year,
+                time::Month::try_from(month).unwrap(),
+                1,
+            )
+            .unwrap();
             if date > date!(2025 - 05 - 01) {
                 continue;
             }

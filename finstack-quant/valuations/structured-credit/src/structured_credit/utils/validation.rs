@@ -9,7 +9,7 @@
 use crate::structured_credit::types::{
     AllocationMode, PaymentCalculation, PaymentType, WaterfallTier,
 };
-use finstack_quant_core::HashSet;
+use finstack_quant_core::FxHashSet;
 
 /// Validation error details.
 #[derive(Debug, Clone, PartialEq, thiserror::Error, serde::Serialize, serde::Deserialize)]
@@ -81,7 +81,7 @@ pub enum ValidationError {
 pub fn validate_tiers(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
-    let mut seen_tier_ids = HashSet::default();
+    let mut seen_tier_ids = FxHashSet::default();
     for tier in tiers {
         if !seen_tier_ids.insert(&tier.id) {
             errors.push(ValidationError::DuplicateTierId {
@@ -113,7 +113,7 @@ pub fn validate_tiers(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
             }
         }
 
-        let mut seen_recipient_ids = HashSet::default();
+        let mut seen_recipient_ids = FxHashSet::default();
         for recipient in &tier.recipients {
             if !seen_recipient_ids.insert(&recipient.id) {
                 errors.push(ValidationError::DuplicateRecipientId {

@@ -8,17 +8,13 @@ use super::js_currency;
 use crate::utils::input::{
     from_js_json, js_bool, js_f64, js_opt_string, js_opt_string_seq, js_string, js_uint,
 };
+use crate::utils::wire::parse_label;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_margin::regulatory::frtb::{
     frtb_sba_charge as frtb_sba_charge_rs, CorrelationScenario, DrcPosition, FrtbRiskClass,
     FrtbSbaEngine, FrtbSensitivities,
 };
 use wasm_bindgen::prelude::*;
-
-/// Parse a lower-case serde label (scenario, risk class, DRC sector, …).
-fn serde_label<T: serde::de::DeserializeOwned>(label: &str) -> Result<T, JsValue> {
-    finstack_quant_core::wire::serde_parse(label).map_err(to_js_err)
-}
 
 /// FRTB sensitivity portfolio for the Sensitivity-Based Approach.
 ///
@@ -785,7 +781,7 @@ impl JsFrtbSbaEngine {
             .map(|labels| {
                 labels
                     .iter()
-                    .map(|label| serde_label::<CorrelationScenario>(label))
+                    .map(|label| parse_label::<CorrelationScenario>(label))
                     .collect::<Result<Vec<_>, JsValue>>()
             })
             .transpose()?;
@@ -793,7 +789,7 @@ impl JsFrtbSbaEngine {
             .map(|labels| {
                 labels
                     .iter()
-                    .map(|label| serde_label::<FrtbRiskClass>(label))
+                    .map(|label| parse_label::<FrtbRiskClass>(label))
                     .collect::<Result<Vec<_>, JsValue>>()
             })
             .transpose()?;
@@ -856,7 +852,7 @@ pub fn frtb_sba_charge(
     correlation_scenario: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let scenario = js_opt_string(correlation_scenario.as_ref(), "correlationScenario")?
-        .map(|label| serde_label::<CorrelationScenario>(&label))
+        .map(|label| parse_label::<CorrelationScenario>(&label))
         .transpose()?;
     to_js_value(&frtb_sba_charge_rs(&sensitivities.inner, scenario).map_err(to_js_err)?)
 }

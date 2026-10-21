@@ -17,8 +17,8 @@ mod validation;
 pub(crate) use config::{PyCalibrationConfig, PyRateBounds, PySolverConfig, PyValidationConfig};
 pub(crate) use envelope::{PyCalibrationEnvelope, PyCalibrationPlan, PyCalibrationStep};
 pub(crate) use quotes::{
-    PyCdsQuote, PyCdsTrancheQuote, PyCollateralEntry, PyDividendScheduleDatum, PyFxSpotDatum,
-    PyInflationQuote, PyPriceDatum, PyRateQuote, PyVolQuote, PyXccyQuote,
+    PyCdsQuote, PyCdsTrancheQuote, PyDividendScheduleDatum, PyFxSpotDatum, PyInflationQuote,
+    PyPriceDatum, PyRateQuote, PyVolQuote, PyXccyQuote,
 };
 pub(crate) use report::{
     PyCalibrationDiagnostics, PyCalibrationReport, PyCalibrationValidationReport, PyQuoteQuality,
@@ -324,7 +324,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCalibrationValidationReport>()?;
     m.add_class::<PyCdsQuote>()?;
     m.add_class::<PyCdsTrancheQuote>()?;
-    m.add_class::<PyCollateralEntry>()?;
     m.add_class::<PyDividendScheduleDatum>()?;
     m.add_class::<PyFxSpotDatum>()?;
     m.add_class::<PyInflationQuote>()?;
@@ -386,7 +385,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "CalibrationValidationReport",
                 "CdsQuote",
                 "CdsTrancheQuote",
-                "CollateralEntry",
                 "DividendScheduleDatum",
                 "FxSpotDatum",
                 "InflationQuote",

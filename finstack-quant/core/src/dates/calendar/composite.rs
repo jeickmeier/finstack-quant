@@ -11,18 +11,15 @@
 //! `calendar_id()` builds its joined id) and add no overhead beyond calling
 //! each subcalendar's `is_holiday` method.
 //!
+//! Public callers reach a composite through a `+`-joined calendar id.
+//!
 //! # Examples
 //! ```
-//! use finstack_quant_core::dates::{CompositeCalendar, HolidayCalendar, create_date};
-//! use finstack_quant_core::dates::calendar::{TARGET2, GBLO};
+//! use finstack_quant_core::dates::{calendar_by_id_strict, create_date};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!
-//! let t2 = TARGET2;
-//! let gb = GBLO;
-//! let calendars = [&t2 as &dyn HolidayCalendar, &gb as &dyn HolidayCalendar];
-//!
 //! // Treat the day as a holiday if *either* market is closed.
-//! let cal_union = CompositeCalendar::new(&calendars);
+//! let cal_union = calendar_by_id_strict("target2+gblo")?;
 //! let jan1_2025 = create_date(2025, time::Month::January, 1)?;
 //! assert!(cal_union.is_holiday(jan1_2025));
 //! let may26_2025 = create_date(2025, time::Month::May, 26)?;
@@ -31,12 +28,13 @@
 //! # }
 //! ```
 
-use crate::dates::{canonical_calendar_id, HolidayCalendar, WeekendRule};
+use super::business_days::joint_members;
+use crate::dates::{DateExt, HolidayCalendar};
 use time::Date;
 
 /// A lightweight view combining several holiday calendars (union semantics).
 #[derive(Clone, Copy)]
-pub struct CompositeCalendar<'a> {
+pub(crate) struct CompositeCalendar<'a> {
     calendars: &'a [&'a dyn HolidayCalendar],
 }
 
@@ -64,19 +62,18 @@ impl HolidayCalendar for CompositeCalendar<'_> {
     }
 
     /// A date is a business day only if it is one on **all** sub-calendars,
-    /// so each member's weekend rule (e.g. Friday/Saturday Middle East
-    /// calendars) is respected.
+    /// so each member's own `is_business_day` (weekends included) is respected.
     ///
-    /// An empty calendar list falls back to the Saturday/Sunday weekend rule.
+    /// An empty calendar list treats Saturday and Sunday as the only closed days.
     fn is_business_day(&self, date: Date) -> bool {
         if self.calendars.is_empty() {
-            return !WeekendRule::SaturdaySunday.is_weekend(date.weekday());
+            return !date.is_weekend();
         }
         self.calendars.iter().all(|c| c.is_business_day(date))
     }
 
     fn calendar_id(&self) -> Option<String> {
-        let mut member_ids = self
+        let member_ids = self
             .calendars
             .iter()
             .map(|calendar| calendar.calendar_id())
@@ -84,17 +81,19 @@ impl HolidayCalendar for CompositeCalendar<'_> {
         if member_ids.is_empty() {
             return None;
         }
-        member_ids.sort_unstable();
-        member_ids.dedup();
-        canonical_calendar_id(&member_ids.join("+")).ok()
+        Some(joint_members(&member_ids.join("+")).join("+"))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::calendar::{GBLO, TARGET2};
+    use crate::dates::calendar::{GBLO, NYSE, TARGET2, USNY};
     use time::{Date, Month};
+
+    fn make_date(y: i32, m: u8, d: u8) -> Date {
+        Date::from_calendar_date(y, Month::try_from(m).unwrap(), d).unwrap()
+    }
 
     #[test]
     fn union_marks_any_subcalendar_holiday() {
@@ -116,37 +115,95 @@ mod tests {
     }
 
     #[test]
-    fn composite_respects_subcalendar_weekend_rules() {
-        use crate::dates::calendar::types::{Calendar, WeekendRule};
-
-        // Friday/Saturday weekend calendar (e.g. Middle East), no holiday rules.
-        const FRI_SAT: Calendar = Calendar::new("fri_sat", "Fri/Sat weekend", false, &[])
-            .with_weekend_rule(WeekendRule::FridaySaturday);
+    fn composite_union_any_holiday() {
+        let t2 = TARGET2;
         let gb = GBLO;
+        let calendars = [&t2 as &dyn HolidayCalendar, &gb as &dyn HolidayCalendar];
+
+        let composite = CompositeCalendar::new(&calendars);
+
+        // Jan 1 is a holiday in both
+        let jan1 = make_date(2025, 1, 1);
+        assert!(composite.is_holiday(jan1));
+
+        // Spring bank holiday (May 26, 2025) is only in GBLO
+        let may26 = make_date(2025, 5, 26);
+        assert!(GBLO.is_holiday(may26));
+        assert!(!TARGET2.is_holiday(may26));
+        assert!(composite.is_holiday(may26)); // Union includes it
+
+        // Regular business day in both
+        let regular_day = make_date(2025, 6, 18); // Wednesday
+        assert!(!composite.is_holiday(regular_day));
+    }
+    #[test]
+    fn composite_empty_calendars_union() {
+        let calendars: &[&dyn HolidayCalendar] = &[];
+        let composite = CompositeCalendar::new(calendars);
+
+        // Empty union should have no holidays
+        let any_date = make_date(2025, 1, 1);
+        assert!(!composite.is_holiday(any_date));
+    }
+    #[test]
+    fn composite_single_calendar_behaves_like_original() {
+        let t2 = TARGET2;
+        let calendars = [&t2 as &dyn HolidayCalendar];
+
+        let composite_union = CompositeCalendar::new(&calendars);
+
+        // Test several dates
+        for day in 1..=28 {
+            let date = make_date(2025, 1, day);
+            let original = t2.is_holiday(date);
+            assert_eq!(composite_union.is_holiday(date), original);
+        }
+    }
+
+    #[test]
+    fn composite_multiple_calendars_union() {
+        let nyse = NYSE;
+        let usny = USNY;
+        let t2 = TARGET2;
+
         let calendars = [
-            &FRI_SAT as &dyn HolidayCalendar,
-            &gb as &dyn HolidayCalendar,
+            &nyse as &dyn HolidayCalendar,
+            &usny as &dyn HolidayCalendar,
+            &t2 as &dyn HolidayCalendar,
         ];
 
-        let cal_union = CompositeCalendar::new(&calendars);
+        let composite = CompositeCalendar::new(&calendars);
 
-        // Friday 2025-06-06: weekend for FRI_SAT, business day for GBLO.
-        let friday = Date::from_calendar_date(2025, Month::June, 6).expect("Valid test date");
-        assert_eq!(friday.weekday(), time::Weekday::Friday);
-        assert!(!FRI_SAT.is_business_day(friday));
-        assert!(GBLO.is_business_day(friday));
+        // Any US or EU holiday should be marked
+        let us_labor_day = make_date(2025, 9, 1); // First Monday of Sept
+        assert!(composite.is_holiday(us_labor_day));
 
-        // Business day only if ALL sub-calendars are open → closed.
-        assert!(!cal_union.is_business_day(friday));
+        // Christmas is a holiday everywhere
+        let christmas = make_date(2025, 12, 25);
+        assert!(composite.is_holiday(christmas));
+    }
 
-        // Sunday 2025-06-08: weekend for GBLO, business day for FRI_SAT.
-        let sunday = Date::from_calendar_date(2025, Month::June, 8).expect("Valid test date");
-        assert!(FRI_SAT.is_business_day(sunday));
-        assert!(!GBLO.is_business_day(sunday));
-        assert!(!cal_union.is_business_day(sunday));
+    #[test]
+    fn composite_business_day_trait_implementation() {
+        let t2 = TARGET2;
+        let gb = GBLO;
+        let calendars = [&t2 as &dyn HolidayCalendar, &gb as &dyn HolidayCalendar];
 
-        // Wednesday 2025-06-04: business day everywhere.
-        let wednesday = Date::from_calendar_date(2025, Month::June, 4).expect("Valid test date");
-        assert!(cal_union.is_business_day(wednesday));
+        let composite = CompositeCalendar::new(&calendars);
+
+        // Weekends should not be business days
+        let saturday = make_date(2025, 1, 4);
+        assert!(!composite.is_business_day(saturday));
+
+        let sunday = make_date(2025, 1, 5);
+        assert!(!composite.is_business_day(sunday));
+
+        // Holiday should not be business day
+        let holiday = make_date(2025, 1, 1);
+        assert!(!composite.is_business_day(holiday));
+
+        // Regular weekday should be business day
+        let weekday = make_date(2025, 1, 2);
+        assert!(composite.is_business_day(weekday));
     }
 }

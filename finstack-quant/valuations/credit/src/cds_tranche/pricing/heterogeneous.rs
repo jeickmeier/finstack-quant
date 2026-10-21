@@ -5,7 +5,7 @@ use super::config::{
 };
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
-use finstack_quant_core::math::norm_cdf;
+use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::{Error, Result};
 use std::cell::RefCell;
 
@@ -134,7 +134,7 @@ impl CdsTranchePricer {
                         probabilities[state] = mass * (1.0 - p);
                     }
                 }
-                Ok(finstack_quant_core::math::neumaier_sum(
+                Ok(finstack_quant_core::math::summation::neumaier_sum(
                     probabilities
                         .iter()
                         .zip(&capped_losses)
@@ -374,7 +374,7 @@ fn accumulate_issuer_pmf(
 /// many bins (up to `MAX_GRID_POINTS`).
 #[inline]
 fn expected_loss_capped(pmf: &[f64], k: f64) -> f64 {
-    finstack_quant_core::math::neumaier_sum(
+    finstack_quant_core::math::summation::neumaier_sum(
         pmf.iter()
             .enumerate()
             .map(|(i, &mass)| mass * ((i as f64) * GRID_STEP).min(k)),

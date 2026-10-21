@@ -1,9 +1,7 @@
 use pyo3::prelude::*;
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::valuations::convert::{
-    currency_from_py, enum_to_py_string, money_from_py, money_to_py,
-};
+use crate::bindings::valuations::convert::{enum_to_py_string, money_from_py, money_to_py};
 use crate::bindings::valuations::instruments::{PyBond, PyTermLoan};
 use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
 use crate::errors::serde_json_to_py;
@@ -85,7 +83,7 @@ impl PyAssetPool {
     #[pyo3(text_signature = "(id, deal_type, currency)")]
     fn new(id: &str, deal_type: &str, currency: &Bound<'_, PyAny>) -> PyResult<Self> {
         let deal_type: DealType = enum_from_str(deal_type, "deal_type")?;
-        let currency = currency_from_py(currency, "currency")?;
+        let currency = crate::bindings::core::currency::extract_currency(currency)?;
         let inner = AssetPool::new(id, deal_type, currency);
         Ok(Self { inner })
     }

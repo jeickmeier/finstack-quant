@@ -14,7 +14,7 @@ use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::{
 use finstack_quant_valuations_fixed_income::bond::{Bond, CashflowSpec};
 use time::macros::date;
 
-fn flat_eur_market(as_of: time::Date) -> MarketContext {
+fn flat_eur_market(as_of: finstack_quant_core::dates::Date) -> MarketContext {
     let curve = DiscountCurve::builder("EUR-BUND")
         .base_date(as_of)
         .knots([(0.0, 1.0), (10.0, 0.75)])
@@ -28,7 +28,10 @@ fn flat_eur_market(as_of: time::Date) -> MarketContext {
 /// ACT/365F keeps mid-coupon year fractions well-defined without an ISMA
 /// `coupon_period` context. Annual frequency is the Bund feature that makes
 /// Moosmüller differ from Street off a coupon date.
-fn bund_style_bond(issue: time::Date, maturity: time::Date) -> Bond {
+fn bund_style_bond(
+    issue: finstack_quant_core::dates::Date,
+    maturity: finstack_quant_core::dates::Date,
+) -> Bond {
     Bond::builder()
         .id("BUND-MOO".into())
         .notional(Money::new(100.0, Currency::EUR).expect("valid money fixture"))
@@ -42,7 +45,12 @@ fn bund_style_bond(issue: time::Date, maturity: time::Date) -> Bond {
         .expect("Bund-style bullet")
 }
 
-fn metric(bond: &Bond, market: &MarketContext, as_of: time::Date, id: MetricId) -> f64 {
+fn metric(
+    bond: &Bond,
+    market: &MarketContext,
+    as_of: finstack_quant_core::dates::Date,
+    id: MetricId,
+) -> f64 {
     *bond
         .price_with_metrics(
             market,

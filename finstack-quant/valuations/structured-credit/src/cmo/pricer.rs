@@ -14,6 +14,7 @@ use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::Result;

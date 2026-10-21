@@ -45,7 +45,7 @@
 //!     &portfolio,
 //!     &market,
 //!     as_of,
-//!     &finstack_quant_core::HashMap::default(),
+//!     &finstack_quant_core::FxHashMap::default(),
 //! )?;
 //!
 //! // Get margin by netting set

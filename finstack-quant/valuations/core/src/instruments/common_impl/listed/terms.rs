@@ -29,7 +29,6 @@ pub struct ListedDeliveryObligation {
     /// Deliverable asset, grade, location, or basket identifier.
     pub asset: String,
     /// Settlement date on which delivery and invoice exchange occur.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -64,14 +63,12 @@ pub struct ListedFutureTerms {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settlement_price: Option<f64>,
     /// Final date on which the contract trades.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub last_trading_date: Date,
     /// Date on which final cash settlement is completed.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

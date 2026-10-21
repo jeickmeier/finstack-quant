@@ -9,7 +9,7 @@ use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     run_simulation, run_simulation_with_diagnostics, AdvancingPolicy, AssetPool, DealType,
     DelinquencyModel, PeriodDiagnostics, PoolAsset, StepDownSpec, StepDownTrigger,
@@ -94,13 +94,13 @@ fn abs(model: DelinquencyModel) -> StructuredCredit {
     deal
 }
 
-fn simulate(deal: &StructuredCredit) -> HashMap<String, TrancheCashflows> {
+fn simulate(deal: &StructuredCredit) -> FxHashMap<String, TrancheCashflows> {
     run_simulation(deal, &market(), close()).expect("simulation")
 }
 
 /// Pool interest collections per payment date: everything the interest
 /// waterfall distributes (the deal has no fees), in payment order.
-fn collections(results: &HashMap<String, TrancheCashflows>) -> Vec<(Date, f64)> {
+fn collections(results: &FxHashMap<String, TrancheCashflows>) -> Vec<(Date, f64)> {
     let mut by_date: std::collections::BTreeMap<Date, f64> = std::collections::BTreeMap::new();
     for id in ["A", "E"] {
         for (date, amount) in &results[id].interest_flows {
@@ -118,7 +118,7 @@ fn accrual(from: Date, to: Date) -> f64 {
         .expect("accrual")
 }
 
-fn first_deferral(results: &HashMap<String, TrancheCashflows>) -> Option<Date> {
+fn first_deferral(results: &FxHashMap<String, TrancheCashflows>) -> Option<Date> {
     results["A"].deferred_flows.first().map(|(date, _)| *date)
 }
 

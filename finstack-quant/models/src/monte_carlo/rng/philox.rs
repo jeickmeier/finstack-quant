@@ -389,7 +389,10 @@ mod tests {
         for value in values {
             for uniform in [value, 1.0 - value] {
                 assert!(uniform > 0.0 && uniform < 1.0);
-                assert!(finstack_quant_core::math::standard_normal_inv_cdf(uniform).is_finite());
+                assert!(
+                    finstack_quant_core::math::special_functions::standard_normal_inv_cdf(uniform)
+                        .is_finite()
+                );
             }
         }
 

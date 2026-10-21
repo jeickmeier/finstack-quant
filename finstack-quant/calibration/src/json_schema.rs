@@ -1,5 +1,8 @@
 //! Checked-in JSON schemas owned by the calibration crate.
 
+use crate::api::schema::{CalibrationEnvelope, CalibrationResultEnvelope};
+use crate::api::validate::CalibrationValidationReport;
+use crate::quotes::MarketQuote;
 use finstack_quant_core::schema::{example, example_from_json, SchemaArtifact, SchemaKind};
 use serde_json::Value;
 use std::sync::OnceLock;
@@ -170,46 +173,54 @@ pub fn artifacts() -> &'static [SchemaArtifact] {
 
 fn build_artifacts() -> Vec<SchemaArtifact> {
     vec![
-        SchemaArtifact::new::<crate::api::schema::CalibrationEnvelope>(
-            "schemas/calibration/1/calibration.schema.json",
-            "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
-            "Calibration",
-            "Canonical typed calibration request and result envelope.",
-        )
+        finstack_quant_core::schema_artifact!(
+    CalibrationEnvelope,
+    "calibration",
+    "calibration",
+    Component,
+    "Canonical typed calibration request and result envelope.",
+    title = "Calibration"
+)
         .with_packager(finstack_quant_valuations_core::schema::package_valuations_schema)
         .with_kind(SchemaKind::Input)
         .with_summary(
             "Build a market from quotes: a calibration plan, flat market data, and any pre-built curves or surfaces.",
         )
         .with_examples(calibration_examples),
-        SchemaArtifact::new::<crate::api::schema::CalibrationResultEnvelope>(
-            "schemas/calibration/1/calibration_result.schema.json",
-            "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
-            "Calibration Result",
-            "Canonical typed calibration result envelope.",
-        )
+        finstack_quant_core::schema_artifact!(
+    CalibrationResultEnvelope,
+    "calibration",
+    "calibration_result",
+    Component,
+    "Canonical typed calibration result envelope.",
+    title = "Calibration Result"
+)
         .with_packager(finstack_quant_valuations_core::schema::package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_summary(
             "The calibrated market snapshot with the plan-level and per-step fit reports.",
         )
         .with_examples(calibration_result_examples),
-        SchemaArtifact::new::<crate::api::validate::CalibrationValidationReport>(
-            "schemas/calibration/1/calibration_validation_report.schema.json",
-            "https://finstack_quant.dev/schemas/calibration/1/calibration_validation_report.schema.json",
-            "Calibration Validation Report",
-            "Structural validation findings and the static step dependency graph.",
-        )
+        finstack_quant_core::schema_artifact!(
+    CalibrationValidationReport,
+    "calibration",
+    "calibration_validation_report",
+    Component,
+    "Structural validation findings and the static step dependency graph.",
+    title = "Calibration Validation Report"
+)
         .with_packager(finstack_quant_valuations_core::schema::package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_summary("Dry-run findings for a calibration envelope; nothing is solved.")
         .with_examples(calibration_validation_report_examples),
-        SchemaArtifact::new::<crate::quotes::MarketQuote>(
-            "schemas/market/1/market_quote.schema.json",
-            "https://finstack_quant.dev/schemas/market/1/market_quote.schema.json",
-            "Market Quote",
-            "Canonical tagged market quote.",
-        )
+        finstack_quant_core::schema_artifact!(
+    MarketQuote,
+    "market",
+    "market_quote",
+    Component,
+    "Canonical tagged market quote.",
+    title = "Market Quote"
+)
         .with_packager(finstack_quant_valuations_core::schema::package_valuations_schema)
         .with_summary("One market observation, tagged by asset class.")
         .with_examples(market_quote_examples),

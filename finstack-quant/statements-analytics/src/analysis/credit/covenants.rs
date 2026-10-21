@@ -103,13 +103,14 @@ pub fn forecast_breaches(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::dates::{Date, Month, Tenor};
+    use finstack_quant_core::dates::{Date, Tenor};
     use finstack_quant_covenants::forecast_covenant_generic;
     use finstack_quant_covenants::CovenantType;
     use finstack_quant_covenants::{Covenant, CovenantEngine, CovenantMetricId, CovenantSpec};
     use finstack_quant_statements::evaluator::StatementResult;
     use indexmap::IndexMap;
     use serde_json::json;
+    use time::Month;
 
     #[test]
     fn fiscal_horizon_uses_model_boundaries() {

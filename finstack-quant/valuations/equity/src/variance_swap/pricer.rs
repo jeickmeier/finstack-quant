@@ -2,6 +2,7 @@
 //!
 use crate::variance_swap::VarianceSwap;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_models::closed_form::vanilla::bs_price_unchecked;
 use finstack_quant_models::volatility::variance_replication::carr_madan_forward_variance;
 use finstack_quant_valuations_core::instruments::common_impl::parameters::market::OptionType;
@@ -198,7 +199,7 @@ pub(crate) fn get_historical_ohlc(
 ) -> Result<OhlcVecs> {
     let default_close = inst.close_series_id();
 
-    let method_label = inst.realized_var_method.label();
+    let method_label = inst.realized_var_method;
     let inst_id = inst.id.as_str().to_owned();
 
     let open_id = inst.open_series_id.as_deref().ok_or_else(|| {
@@ -373,7 +374,7 @@ fn spot_variance_to_date(
             inst.notional.currency(),
         )?;
     // Date-based zero rate over [as_of, target_date]: avoids the
-    // axis bias of `disc.zero(t)` when curve base != as_of.
+    // axis bias of `disc.zero_rate(t, Continuous)` when curve base != as_of.
     let df_mat = disc.as_ref().df_between_dates(as_of, target_date)?;
     let r = finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
         df_mat,
@@ -470,7 +471,21 @@ mod tests {
                     .expect("shifted surface"),
                 "black_lognormal",
             ),
-            (base.with_secondary_axis(VolSurfaceAxis::Tenor), "strike"),
+            (
+                finstack_quant_core::market_data::surfaces::VolSurface::from_grid_opts(
+                    base.id(),
+                    base.expiries(),
+                    base.strikes(),
+                    base.vols(),
+                    finstack_quant_core::market_data::surfaces::VolGridOpts {
+                        secondary_axis: VolSurfaceAxis::Tenor,
+                        ..finstack_quant_core::market_data::surfaces::VolGridOpts::default()
+                    },
+                    None,
+                )
+                .expect("tenor surface"),
+                "strike",
+            ),
         ];
         for (surface, expected) in incompatible {
             let invalid_market = market.clone().insert_surface(surface);

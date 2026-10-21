@@ -99,14 +99,12 @@ pub struct FixedLegSpec {
     #[serde(default = "crate::serde_defaults::stub_short_front")]
     pub stub: StubKind,
     /// Start date of the fixed leg
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start: Date,
     /// End date of the fixed leg
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -229,14 +227,12 @@ pub struct FloatLegSpec {
     #[serde(default)]
     pub fixing_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Start date of the floating leg
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start: Date,
     /// End date of the floating leg
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -323,14 +319,12 @@ pub struct PremiumLegSpec {
     /// `frequency` and `stub`. The equity-futures `imm` grid is rejected.
     pub roll_rule: finstack_quant_cashflows::builder::RollRule,
     /// Start date of protection
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start: Date,
     /// End date of protection
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -389,22 +383,12 @@ impl ProtectionLegSpec {
         recovery_rate: f64,
         settlement_delay: u16,
     ) -> finstack_quant_core::Result<Self> {
-        Self::validate_recovery_rate(recovery_rate)?;
+        finstack_quant_core::validation::validate_recovery_rate(recovery_rate)?;
         Ok(Self {
             credit_curve_id: credit_curve_id.into(),
             recovery_rate,
             settlement_delay,
         })
-    }
-
-    /// Validate that recovery rate is within valid bounds [0, 1].
-    ///
-    /// Delegates to the shared internal recovery-rate validator.
-    ///
-    /// # Errors
-    /// Returns an error if recovery rate is outside the valid range.
-    pub fn validate_recovery_rate(recovery_rate: f64) -> finstack_quant_core::Result<()> {
-        finstack_quant_core::validation::validate_recovery_rate(recovery_rate)
     }
 }
 

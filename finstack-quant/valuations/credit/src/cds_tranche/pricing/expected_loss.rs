@@ -526,7 +526,7 @@ impl CdsTranchePricer {
 #[cfg(test)]
 mod production_credit_audit {
     use super::*;
-    use finstack_quant_core::dates::Month;
+    use time::Month;
     #[test]
     fn base_correlation_clamps_only_numerical_budget() {
         let date = Date::from_calendar_date(2030, Month::January, 1).expect("date");

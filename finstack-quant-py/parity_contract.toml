@@ -48,13 +48,12 @@ currency      = { python = "finstack_quant.core.currency",      status = "exists
 dates         = { python = "finstack_quant.core.dates",         status = "exists" }
 decimal       = { python = "finstack_quant.core.decimal",       status = "missing", note = "Rust-only Decimal representation internals; hosts read amounts via Money / amount_decimal." }
 embedded_registry = { python = "finstack_quant.core.embedded_registry", status = "missing", note = "Rust-only shared loader for the embedded JSON registries that back rating_scales and the market conventions." }
-error         = { python = "finstack_quant.core.error",         status = "missing" }
 explain       = { python = "finstack_quant.core.explain",       status = "missing", note = "Explain helpers are not yet surfaced as a dedicated Python submodule" }
 expr          = { python = "finstack_quant.core.expr",          status = "missing", note = "Expression APIs are not yet surfaced as a dedicated Python submodule" }
 market_data   = { python = "finstack_quant.core.market_data",   status = "exists" }
 math          = { python = "finstack_quant.core.math",          status = "exists" }
-money         = { python = "finstack_quant.core.money",         status = "exists", note = "Rust Money.checked_div/abs/round map to Python numeric protocols; from_decimal_with_config maps to the config-aware constructor. These methods remain outside the opted-in WASM Money subset." }
-prelude       = { python = "finstack_quant.core.prelude",       status = "missing" }
+parallel      = { python = "finstack_quant.core.parallel",      status = "missing", note = "Rust-only rayon / wasm32-sequential execution helpers; hosts see only their deterministic results." }
+money         = { python = "finstack_quant.core.money",         status = "exists", note = "Rust Money.checked_div/abs/round map to Python numeric protocols. Money::new_with_config maps to the config-aware float constructor (Money(amount, ccy, config)) and from_decimal_with_config to Money.from_decimal(amount, ccy, config), Python's one exact-decimal entry point (a decimal.Decimal); from_decimal_str stays Rust-only in Python. These methods remain outside the opted-in WASM Money subset." }
 rating_scales = { python = "finstack_quant.core.rating_scales", status = "exists" }
 serde_guard   = { python = "finstack_quant.core.serde_guard",   status = "missing", note = "Rust-only strict-serde guard helpers; enforcement happens inside (de)serialization, not as a host API." }
 table         = { python = "finstack_quant.core.table",         status = "exists", note = "Arrow interchange surface. `ArrowTable` is a binding-level host-interop type backed by the supporting crate finstack-quant-arrow (not umbrella re-exported); exempt from strict crate mirroring like `reporting`. Intentionally NO WASM parity: arrow-rs is not built for wasm32." }
@@ -71,48 +70,17 @@ public = ["get", "index", "validate"]
 python_package = "finstack_quant.core.cashflow"
 public = ["CFKind", "CashFlow", "CashFlowAccrual"]
 
-# Symbol-level pinning for finstack_quant.core.market_data — every name in
-# `finstack_quant.core.market_data.__all__` must appear here.
-[crates.core.market_data]
-python_package = "finstack_quant.core.market_data"
-public = [
-    "BaseCorrelationCurve",
-    "CreditIndexData",
-    "DiscountCurve",
-    "ForwardCurve",
-    "FxConversionPolicy",
-    "FxDeltaVolSurface",
-    "FxMatrix",
-    "FxPairConvention",
-    "FxQuoteConvention",
-    "FxRateResult",
-    "HazardCurve",
-    "InflationCurve",
-    "InflationIndex",
-    "MarketContext",
-    "PriceCurve",
-    "SabrParameterData",
-    "ScalarTimeSeries",
-    "VolCube",
-    "VolCubeExpirySlice",
-    "VolSurface",
-    "fx_market_pair",
-    "fx_pair_convention",
-    "fx_pip_size",
-    "invert_fx_rate",
-]
-
 # Symbol-level contracts for every exposed core submodule. These are checked
 # against both runtime attributes and each module's explicit `__all__`.
 [crates.core.module_symbols.config]
 python_package = "finstack_quant.core.config"
 public = ["RoundingMode", "ToleranceConfig", "FinstackConfig"]
-note = "Subset scope: the Rust config module also exposes ConfigExtensions, CurrencyScalePolicy, RoundingPolicy, RoundingContext, ZeroKind, NumericMode, ResultsMeta and the rounding_context_from/results_meta* helpers. These policy-stamp types stay Rust-only; hosts see them serialized inside result envelopes rather than as constructible objects. Python FinstackConfig exposes the CurrencyScalePolicy maps through output_scale/ingest_scale (accepting Currency or str), set_output_scale/set_ingest_scale and the *_scale_overrides() dicts, plus rounding_mode/tolerances getters; RoundingMode and ToleranceConfig carry name/to_json/from_json/pickle."
+note = "Subset scope: the Rust config module also exposes ConfigExtensions, CurrencyScalePolicy, RoundingPolicy, RoundingContext, ZeroKind, NumericMode, ResultsMeta and the rounding_context_from/results_meta* helpers. These policy-stamp types stay Rust-only; hosts see them serialized inside result envelopes rather than as constructible objects. Python FinstackConfig exposes the CurrencyScalePolicy maps through output_scale/ingest_scale (accepting Currency or str), set_output_scale/set_ingest_scale and the *_scale_overrides() dicts, plus rounding_mode/tolerances getters; RoundingMode and ToleranceConfig carry to_json/from_json/pickle (the RoundingMode label is its __str__). The FinstackConfig extension accessors (get_extension, set_extension, remove_extension, extension_keys) are host conveniences over the pub Rust FinstackConfig.extensions map (ConfigExtensions get/insert/remove/keys), bound under the same names in both hosts; there is no Rust FinstackConfig-level method of those names."
 
 [crates.core.module_symbols.types]
 python_package = "finstack_quant.core.types"
 public = ["Rate", "Bps", "CreditRating", "Attributes"]
-note = "Subset scope: Rust-only extras are BarrierType, BarrierDirection, PayoutTiming, and every id newtype (CalendarId, CurveId, DealId, Id, IndexId, InstrumentId, IssuerId, PoolId, PriceId, UnderlyingId) — hosts pass ids as plain strings on JSON/typed surfaces. Rating-factor behavior is owned by models.credit. Python binds the full Rate/Bps value API (abs, is_zero/is_positive/is_negative, checked arithmetic dunders, as_rate/as_bp cross conversions, Rate FromStr via Rate('5%'|'25bp'|'0.05')), CreditRating predicates/to_moodys_string/notches_to with typed equality and ordering, and Attributes tags/add_tag/has_tag/matches_selector + mapping dunders; all four carry to_json/from_json/pickle. WASM binds the same Rate/Bps value API (getters, cross conversions, abs/isZero/isPositive/isNegative, toJson/fromJson, and Rate.parse for Rust FromStr) except the ZERO constants and the arithmetic dunders (JS has no operator overloading); CreditRating remains outside its core types subset. CreditRating::bucket stays Rust-only."
+note = "Subset scope: Rust-only extras are BarrierType, BarrierDirection, PayoutTiming, and every id newtype (CalendarId, CurveId, DealId, Id, IndexId, InstrumentId, IssuerId, PoolId, PriceId, UnderlyingId) — hosts pass ids as plain strings on JSON/typed surfaces. Rating-factor behavior is owned by models.credit. Python binds the full Rate/Bps value API (abs, is_zero/is_positive/is_negative, checked arithmetic dunders, as_rate/as_bp cross conversions, Rate FromStr via Rate('5%'|'25bp'|'0.05')), CreditRating predicates/to_moodys_string/notches_to with typed equality and ordering, and Attributes tags/add_tag/has_tag/matches_selector + mapping dunders; all four carry to_json/from_json/pickle. WASM binds the same Rate/Bps value API (getters, cross conversions, Rate.abs and Bps.checkedAbs (Rust Bps::checked_abs), isZero/isPositive/isNegative, toJson/fromJson, and Rate.parse for Rust FromStr), the ZERO constants as Rate.zero()/Bps.zero() static factories, and CreditRating with the same predicates, toMoodysString and notchesTo; only the arithmetic dunders stay Python-only (JS has no operator overloading). CreditRating::bucket stays Rust-only."
 
 [crates.core.module_symbols.currency]
 python_package = "finstack_quant.core.currency"
@@ -122,12 +90,12 @@ allow_additional = true # ISO-4217 code constants are generated from the Rust re
 [crates.core.module_symbols.money]
 python_package = "finstack_quant.core.money"
 public = ["Money"]
-note = "Subset scope: the Rust money module's FormatOpts struct is not bound as a host type — Python Money.format_with(decimals, show_currency, group, rounding) and WASM Money.formatWith(decimals, showCurrency, group, rounding) map its fields onto Money::format_with and reject precision above the native 1_000_000 bound — while Money.from_decimal_str / Money.fromDecimalStr bind the checked exact-text constructor. The fx submodule types beyond the bound FxMatrix/FxConversionPolicy/FxRateResult/FxQuoteConvention/FxPairConvention helpers (FxProvider, FxConfig, FxQuery, SimpleFxProvider), rounding helpers, and Money::convert(&dyn FxProvider) remain Rust-only; hosts convert via convert_at_rate or MarketContext-level FX. Python Money also accepts str/Decimal amounts, a config= kwarg (new_with_config or from_decimal_with_config), __abs__/__round__/__float__ and Money / Money -> float."
+note = "Subset scope: the Rust money module's FormatOpts struct is not bound as a host type — Python Money.format_with(decimals, show_currency, group, rounding) and WASM Money.formatWith(decimals, showCurrency, group, rounding) map its fields onto Money::format_with and reject precision above the native 1_000_000 bound — while Python Money.from_decimal (decimal.Decimal) and WASM Money.fromDecimalStr (exact decimal text, Rust from_decimal_str) are each host's one exact-decimal constructor. The fx submodule types beyond the bound FxMatrix/FxConversionPolicy/FxRateResult/FxQuoteConvention/FxPairConvention helpers (FxProvider, FxConfig, FxQuery, SimpleFxProvider), and rounding helpers remain Rust-only; hosts convert via convert_at_rate or MarketContext-level FX. Python Money takes float/int amounts and Money.from_decimal takes decimal.Decimal, each with a config= kwarg (new_with_config / from_decimal_with_config), plus __abs__/__round__/__float__ and Money / Money -> float."
 
 [crates.core.module_symbols.math]
 python_package = "finstack_quant.core.math"
-public = ["linalg", "longest_positive_run", "special_functions", "stats", "summation"]
-note = "Subset scope: 11 Rust-only math submodules are deliberately unbound (compounding, distributions, fractional, integration, interp, piecewise, probability, random, solver, solver_multi, time_grid) — they are engine internals consumed by the domain crates, not host-facing numerics. Per-submodule subsets of the bound modules: `stats` binds longest_positive_run (bound flat on core.math), mean, variance, population_variance, mean_var, the *_or_nan family (mean, sample_variance, sample_std, median, finite_min, finite_max), finite_count, correlation, covariance, quantile, log_returns, realized_variance and realized_variance_ohlc (RealizedVarMethod passed as its snake_case name) — OnlineStats/OnlineCovariance and required_samples stay Rust-only; `linalg` binds cholesky_decomposition, cholesky_solve, apply_lower_triangular, symmetric_eigen and ledoit_wolf_shrinkage (LedoitWolfResult returned as a (covariance, shrinkage) tuple) — cholesky_correlation, CorrelationFactor and transpose_row_major stay Rust-only, and the correlation validators are bound under models.correlation (validate_correlation_matrix, nearest_correlation); `special_functions` binds erf, ln_gamma, log_norm_cdf, norm_cdf, norm_pdf, norm_cdf_with_params, norm_pdf_with_params, standard_normal_inv_cdf, student_t_cdf, student_t_inv_cdf; `summation` binds kahan_sum and neumaier_sum."
+public = ["linalg", "special_functions", "stats", "summation"]
+note = "Subset scope: 11 Rust-only math submodules are deliberately unbound (compounding, distributions, fractional, integration, interp, piecewise, probability, random, solver, solver_multi, time_grid) — they are engine internals consumed by the domain crates, not host-facing numerics. Per-submodule subsets of the bound modules: `stats` binds longest_positive_run, mean, variance, population_variance, mean_var, the *_or_nan family (mean, sample_variance, sample_std, median, finite_min, finite_max), finite_count, correlation, covariance, quantile, log_returns, realized_variance and realized_variance_ohlc (RealizedVarMethod passed as its snake_case name) — OnlineStats/OnlineCovariance and required_samples stay Rust-only; `linalg` binds cholesky_decomposition, cholesky_solve, apply_lower_triangular, symmetric_eigen and ledoit_wolf_shrinkage (LedoitWolfResult returned as a (covariance, shrinkage) tuple) — CorrelationFactor and transpose_row_major stay Rust-only, and cholesky_correlation and the correlation validators are bound under models.correlation (cholesky_correlation, validate_correlation_matrix, nearest_correlation); `special_functions` binds erf, ln_gamma, log_norm_cdf, norm_cdf, norm_pdf, norm_cdf_with_params, norm_pdf_with_params, standard_normal_inv_cdf, student_t_cdf, student_t_inv_cdf; `summation` binds kahan_sum and neumaier_sum."
 
 [crates.core.module_symbols.dates]
 python_package = "finstack_quant.core.dates"
@@ -141,15 +109,15 @@ public = [
     "add_business_days", "add_months", "add_weekdays", "end_of_month", "fiscal_year",
     "is_weekend", "months_until", "quarter",
     "StubKind", "ScheduleErrorPolicy", "Schedule", "ScheduleBuilder",
-    "SifmaSettlementClass", "sifma_settlement_date", "sifma_settlement_date_for_class",
-    "estimated_sifma_settlement_date_for_class", "next_sifma_settlement",
+    "SifmaSettlementClass", "sifma_settlement_date", "estimated_sifma_settlement_date",
+    "next_sifma_settlement",
     "third_wednesday", "third_friday", "next_imm", "is_imm_date", "is_cds_date",
     "next_cds_date", "prev_cds_date", "prev_cds_semiannual_roll",
     "next_semiannual_cds_maturity", "imm_option_expiry", "next_imm_option_expiry",
     "next_third_friday",
     "create_date", "days_since_epoch", "date_from_epoch_days",
 ]
-note = "DayCountContext is the sole owned host context; it stores Rust DayCountContextState and resolves the borrowed Rust context during calculation. Rust DayCountContextState is not a separate host class. Subset scope: the Rust dates::fx (FX spot-lag/settlement date logic) and dates::calendar (calendar registry internals beyond adjust/available_calendars/CalendarMetadata/HolidayCalendar.count_business_days) submodules remain Rust-only; hosts reach calendars by string id (or `a+b` joint ids, resolved in Rust calendar_by_id_strict) through adjust, HolidayCalendar and the schedule builder. The Rust DateExt trait methods are bound as free functions taking the date first (add_business_days, add_weekdays, add_months, end_of_month, is_weekend, quarter, fiscal_year, months_until); ScheduleBuilder.to_spec / Schedule.from_spec wrap the serde ScheduleSpec; ScheduleSpec.new supplies canonical Rust builder defaults. Rust-only: DateExt::add_days (checked calendar-day arithmetic shared by Rust curve rolls and tenor/schedule generation; hosts use named financial date shifts or MarketContext.roll_forward), PeriodId::shift (signed multi-period stepping; hosts expose next/prev), PeriodId::from_date (calendar bucket construction from an already validated Rust Date), ScheduleWarning as a type (Python exposes Schedule.warnings as list[dict] with kind/message), act_act_isma_year_fraction_with_reference_period, CompositeCalendar/Calendar/Rule/WeekendRule construction."
+note = "DayCountContext is the sole owned host context; it stores Rust DayCountContextState and resolves the borrowed Rust context during calculation. Rust DayCountContextState is not a separate host class. Subset scope: the Rust dates::fx submodule (FX spot-lag/settlement date logic) remains Rust-only; calendar construction (rules, generated calendars, composites) is crate-private in Rust, and hosts reach calendars by string id (or `a+b` joint ids, resolved in Rust calendar_by_id_strict) through adjust, HolidayCalendar and the schedule builder. The Rust DateExt trait methods are bound as free functions taking the date first (add_business_days, add_weekdays, add_months, end_of_month, is_weekend, quarter, fiscal_year, months_until); ScheduleBuilder.to_spec / Schedule.from_spec wrap the serde ScheduleSpec; ScheduleSpec.new supplies canonical Rust builder defaults. Rust-only: DateExt::add_days (checked calendar-day arithmetic shared by Rust curve rolls and tenor/schedule generation; hosts use named financial date shifts or MarketContext.roll_forward), PeriodId::from_date (calendar bucket construction from an already validated Rust Date), ScheduleWarning as a type (Python exposes Schedule.warnings as list[dict] with kind/message)."
 
 [crates.core.module_symbols.market_data]
 python_package = "finstack_quant.core.market_data"
@@ -159,9 +127,9 @@ public = [
     "VolCube", "VolCubeExpirySlice", "SabrParameterData", "FxConversionPolicy", "FxRateResult", "FxMatrix",
     "FxQuoteConvention", "FxPairConvention", "fx_market_pair", "fx_pair_convention",
     "fx_pip_size", "invert_fx_rate",
-    "ScalarTimeSeries", "InflationIndex", "MarketContext",
+    "ScalarTimeSeries", "InflationIndex", "ConvertedMoney", "MarketContext",
 ]
-note = "Subset scope: Rust-only market_data extras — the dividends, fixings, hierarchy, bumps and diff submodules, curve/surface builders (DiscountCurveBuilder etc.), ValidationMode, and the BasisSpreadCurve / ParametricCurve term structures — are deliberately unbound. Hosts construct curves through the bound constructors and apply bumps/diffs through the scenarios crate. Hazard survival interpolation is intrinsic log-linear; constructors and calibration inputs expose only par-spread interpolation. CreditIndexData: Python takes issuer-level curves/recoveries/weights as constructor keywords (a dict of HazardCurve handles); the WASM constructor is homogeneous because a map of borrowed handles cannot cross the wasm-bindgen boundary without consuming them, so WASM receives issuer-level data through MarketContext.fromJson (issuer_credit_curve_ids / issuer_recovery_rates / issuer_weights). Both hosts bind the five issuer accessors."
+note = "Documented host flattening (both hosts): Rust market_data::{term_structures, surfaces, scalars, context} are mounted flat on core.market_data, and the nine Rust money::fx names (FxConversionPolicy, FxRateResult, FxMatrix, FxQuoteConvention, FxPairConvention, fx_market_pair, fx_pair_convention, fx_pip_size, invert_fx_rate) are bound here next to MarketContext.fx/convert_money rather than under core.money, which binds only Money. Moving them would change pickle class paths for no caller benefit. MarketContext.convert_money returns ConvertedMoney (Rust market_data::context::ConvertedMoney: amount + the applied FxRateResult, None for a same-currency input). Subset scope: Rust-only market_data extras — the dividends, fixings, hierarchy, bumps and diff submodules, curve/surface builders (DiscountCurveBuilder etc.), ValidationMode, and the BasisSpreadCurve / ParametricCurve term structures — are deliberately unbound. Hosts construct curves through the bound constructors and apply bumps/diffs through the scenarios crate. Hazard survival interpolation is intrinsic log-linear; constructors and calibration inputs expose only par-spread interpolation. CreditIndexData: Python takes issuer-level curves/recoveries/weights as constructor keywords (a dict of HazardCurve handles); the WASM constructor is homogeneous because a map of borrowed handles cannot cross the wasm-bindgen boundary without consuming them, so WASM receives issuer-level data through MarketContext.fromJson (issuer_credit_curve_ids / issuer_recovery_rates / issuer_weights). Both hosts bind the five issuer accessors."
 
 [crates.core.module_symbols.rating_scales]
 python_package = "finstack_quant.core.rating_scales"
@@ -737,7 +705,6 @@ public = [
     "CalibrationValidationReport",
     "CdsQuote",
     "CdsTrancheQuote",
-    "CollateralEntry",
     "DividendScheduleDatum",
     "FxSpotDatum",
     "InflationQuote",
@@ -913,7 +880,7 @@ public = [
     "RecoveryModel",
     "RecoverySpec",
     "TrancheLossStatistics",
-    "cholesky_decompose",
+    "cholesky_correlation",
     "correlation_bounds",
     "joint_probabilities",
     "nearest_correlation",
@@ -1885,7 +1852,7 @@ js = "attribution.schema"
 
 [parity.modules."finstack_quant.calibration"]
 js = "calibration"
-types = { CalibrationConfig = "CalibrationConfig", CalibrationDiagnostics = "CalibrationDiagnostics", CalibrationEnvelope = "CalibrationEnvelope", CalibrationEnvelopeError = "CalibrationEnvelopeError", CalibrationPlan = "CalibrationPlan", CalibrationReport = "CalibrationReport", CalibrationResultEnvelope = "CalibrationResultEnvelope", CalibrationStep = "CalibrationStep", CalibrationValidationReport = "CalibrationValidationReport", CdsQuote = "CdsQuote", CdsTrancheQuote = "CdsTrancheQuote", CollateralEntry = "CollateralEntry", DividendScheduleDatum = "DividendScheduleDatum", FxSpotDatum = "FxSpotDatum", InflationQuote = "InflationQuote", PriceDatum = "PriceDatum", QuoteQuality = "QuoteQuality", RateBounds = "RateBounds", RateQuote = "RateQuote", SolverConfig = "SolverConfig", ValidationConfig = "ValidationConfig", VolQuote = "VolQuote", XccyQuote = "XccyQuote" }
+types = { CalibrationConfig = "CalibrationConfig", CalibrationDiagnostics = "CalibrationDiagnostics", CalibrationEnvelope = "CalibrationEnvelope", CalibrationEnvelopeError = "CalibrationEnvelopeError", CalibrationPlan = "CalibrationPlan", CalibrationReport = "CalibrationReport", CalibrationResultEnvelope = "CalibrationResultEnvelope", CalibrationStep = "CalibrationStep", CalibrationValidationReport = "CalibrationValidationReport", CdsQuote = "CdsQuote", CdsTrancheQuote = "CdsTrancheQuote", DividendScheduleDatum = "DividendScheduleDatum", FxSpotDatum = "FxSpotDatum", InflationQuote = "InflationQuote", PriceDatum = "PriceDatum", QuoteQuality = "QuoteQuality", RateBounds = "RateBounds", RateQuote = "RateQuote", SolverConfig = "SolverConfig", ValidationConfig = "ValidationConfig", VolQuote = "VolQuote", XccyQuote = "XccyQuote" }
 
 [parity.modules."finstack_quant.calibration.hull_white"]
 js = "calibration"
@@ -1927,6 +1894,10 @@ types = { ToleranceConfig = "ToleranceConfig" }
 
 [parity.modules."finstack_quant.core.currency"]
 js = "core"
+# `Currency.code` (both hosts) duplicates `__str__`/`toString()`; it is kept as
+# the documented host convenience for reading the ISO code. The other
+# host-invented `code`/`name` getters that duplicated `toString()` (HolidayCalendar,
+# PeriodId, RoundingMode, CreditRating, UnknownScalePolicy) were removed.
 # The ISO-4217 module constants (`currency.USD`) are the static factories of
 # the WASM class (`core.Currency.usd()`): a facade value cannot hold a wasm
 # handle before `init()` runs, so each constant is a factory.
@@ -1938,14 +1909,16 @@ types = { CFKind = "CFKind", CashFlow = "CashFlow", CashFlowAccrual = "CashFlowA
 
 [parity.modules."finstack_quant.core.dates"]
 js = "core"
-types = { CalendarMetadata = "CalendarMetadata", Period = "Period", PeriodPlan = "PeriodPlan" }
+# BusinessDayConvention, StubKind, ScheduleErrorPolicy and Thirty360Convention
+# cross WASM as their snake_case labels: every WASM consumer (`adjust`,
+# `Tenor.addToDate`, `ScheduleBuilder.adjustWith/stubRule/errorPolicy`,
+# `days30360`) takes the label and parses it with the Rust `FromStr`, so the
+# TypeScript literal type is the twin of the Python enum class.
+types = { BusinessDayConvention = "BusinessDayConvention", CalendarMetadata = "CalendarMetadata", Period = "Period", PeriodPlan = "PeriodPlan", ScheduleErrorPolicy = "ScheduleErrorPolicy", StubKind = "StubKind", Thirty360Convention = "Thirty360Convention" }
 
 [parity.modules."finstack_quant.core.market_data"]
 js = "core"
 types = { SabrParameterData = "SabrParameterData" }
-
-[parity.modules."finstack_quant.core.math"]
-js = "core"
 
 [parity.modules."finstack_quant.core.math.linalg"]
 js = "core"
@@ -2594,6 +2567,18 @@ renames = { synthesized_deal = { js = "synthesizedDealJson", reason = "the Rust 
 renames = { from_arrays = { js = "constructor", reason = "Python distinguishes its pandas constructor from the Rust-shaped array adapter; WASM's constructor already accepts arrays (Rust Performance::new)" }, from_returns_arrays = { js = "fromReturns", reason = "Python distinguishes pandas and array input adapters; WASM fromReturns already accepts arrays (Rust Performance::from_returns)" } }
 wasm_only = { summary = "WASM twin of the pandas exit Performance.to_dataframe, returned as a TableEnvelope" }
 
+[parity.members."finstack_quant.core.dates.BusinessDayConvention"]
+excluded = { from_name = "literal" }
+
+[parity.members."finstack_quant.core.dates.ScheduleErrorPolicy"]
+excluded = { from_name = "literal" }
+
+[parity.members."finstack_quant.core.dates.StubKind"]
+excluded = { from_name = "literal" }
+
+[parity.members."finstack_quant.core.dates.Thirty360Convention"]
+excluded = { from_name = "literal" }
+
 [parity.members."finstack_quant.core.market_data.MarketContext"]
 wasm_only = { len = "JavaScript twin of Python __len__ (Rust MarketContext::len); JS has no length protocol for class handles" }
 
@@ -2601,7 +2586,7 @@ wasm_only = { len = "JavaScript twin of Python __len__ (Rust MarketContext::len)
 excluded = { quotes = "pandas" }
 
 [parity.members."finstack_quant.core.money.Money"]
-renames = { from_decimal = { js = "fromDecimalStr", reason = "JavaScript has no decimal type: the exact-decimal constructor takes the amount as decimal text (Rust Money::from_decimal_str), which Python also binds as from_decimal_str" } }
+renames = { from_decimal = { js = "fromDecimalStr", reason = "JavaScript has no decimal type: Python's one exact-decimal constructor takes a decimal.Decimal (Rust Money::from_decimal), so its WASM twin takes the amount as exact decimal text (Rust Money::from_decimal_str)" } }
 wasm_only = { checkedAdd = "Rust Money::checked_add; twin of Python Money.__add__ (JS has no operator overloading)", checkedDivF64 = "Rust Money::checked_div_f64; twin of Python Money.__truediv__ (JS has no operator overloading)", checkedMulF64 = "Rust Money::checked_mul_f64; twin of Python Money.__mul__ (JS has no operator overloading)", checkedNeg = "Rust Money::checked_neg; twin of Python Money.__neg__ (JS has no operator overloading)", checkedSub = "Rust Money::checked_sub; twin of Python Money.__sub__ (JS has no operator overloading)" }
 
 [parity.members."finstack_quant.core.types.Rate"]

@@ -2,19 +2,19 @@
 //!
 //! Thin shims over the core grammar (`finstack_quant_core::dates::parse_iso_date`,
 //! strict `YYYY-MM-DD`) so every binding reports the same error for the same
-//! input; formatting is `time::Date`'s ISO `Display`.
+//! input; formatting is `finstack_quant_core::dates::Date`'s ISO `Display`.
 
-use time::Date;
+use finstack_quant_core::dates::Date;
 use wasm_bindgen::JsValue;
 
 use super::to_js_err;
 
-/// Parse a strict ISO-8601 calendar date (`"YYYY-MM-DD"`) into a [`time::Date`].
+/// Parse a strict ISO-8601 calendar date (`"YYYY-MM-DD"`) into a [`finstack_quant_core::dates::Date`].
 pub fn parse_iso_date(s: &str) -> Result<Date, JsValue> {
     finstack_quant_core::dates::parse_iso_date(s).map_err(to_js_err)
 }
 
-/// Format a [`time::Date`] as `"YYYY-MM-DD"`.
+/// Format a [`finstack_quant_core::dates::Date`] as `"YYYY-MM-DD"`.
 pub fn date_to_iso(d: Date) -> String {
     d.to_string()
 }

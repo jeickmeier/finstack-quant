@@ -208,8 +208,8 @@ class TestBuilderSpecs:
         assert pos_zero == neg_zero
         assert hash(pos_zero) == hash(neg_zero)
 
-        scale_a = AmortizationSpec.linear_to(Money(Decimal("1.0"), "USD"))
-        scale_b = AmortizationSpec.linear_to(Money(Decimal("1.00"), "USD"))
+        scale_a = AmortizationSpec.linear_to(Money.from_decimal(Decimal("1.0"), "USD"))
+        scale_b = AmortizationSpec.linear_to(Money.from_decimal(Decimal("1.00"), "USD"))
         assert scale_a == scale_b
         assert hash(scale_a) == hash(scale_b)
 
@@ -881,6 +881,8 @@ class TestCashFlowSchedule:
     @pytest.mark.parametrize("scale", [1e100, 1e30, 10.0])
     @pytest.mark.parametrize("principal_delta", [False, True])
     def test_scale_amounts_overflow_is_value_error(self, scale: float, principal_delta: bool) -> None:
+        from decimal import Decimal
+
         from finstack_quant.cashflows.builder import CashFlowMeta, CashFlowSchedule, Notional
         from finstack_quant.core.cashflow import CashFlow, CFKind
         from finstack_quant.core.dates import DayCount
@@ -888,10 +890,10 @@ class TestCashFlowSchedule:
         amount = "10000000000000000000000000000" if scale == 10.0 else "1"
         if principal_delta:
             row = CashFlow("2025-06-01", Money(0, "USD"), CFKind.NOTIONAL, 0.0).with_principal_delta(
-                Money(amount, "USD")
+                Money.from_decimal(Decimal(amount), "USD")
             )
         else:
-            row = CashFlow("2025-06-01", Money(amount, "USD"), CFKind.FIXED, 0.0)
+            row = CashFlow("2025-06-01", Money.from_decimal(Decimal(amount), "USD"), CFKind.FIXED, 0.0)
         schedule = CashFlowSchedule.from_flows([row], Notional.par(0, "USD"), DayCount.ACT_360, CashFlowMeta())
         original = schedule.to_json()
         with pytest.raises(ValueError, match="conversion overflow"):

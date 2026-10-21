@@ -111,12 +111,7 @@ fn build_swap_internal(
 ) -> crate::error::Result<InterestRateSwap> {
     use finstack_quant_valuations::instruments::PayReceive;
 
-    let rate_decimal = Decimal::try_from(fixed_rate).map_err(|_| {
-        crate::error::Error::InvalidInput(format!(
-            "Invalid fixed rate: {} cannot be converted to Decimal.",
-            fixed_rate
-        ))
-    })?;
+    let rate_decimal = finstack_quant_core::decimal::f64_to_decimal(fixed_rate)?;
 
     // The swap rolls on its currency's standard rates calendar. A currency
     // without one is rejected rather than silently rolled on US holidays.

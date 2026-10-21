@@ -98,7 +98,7 @@ class TestAttributes:
 
 class TestMoney:
     def test_string_amount_and_format(self) -> None:
-        m = Money("1234567.891", "USD")
+        m = Money.from_decimal(Decimal("1234567.891"), "USD")
         assert m.amount_decimal == Decimal("1234567.891")
         assert m.format_with(group=",") == "USD 1,234,567.89"
         assert m.format_with(decimals=0, show_currency=False, rounding="floor") == "1234567"
@@ -116,27 +116,27 @@ class TestMoney:
         assert abs(Money(-2.5, "USD")) == Money(2.5, "USD")
         assert -Money(2.5, "USD") == Money(-2.5, "USD")
         assert float(Money(2.5, "USD")) == 2.5
-        assert round(Money("2.345", "USD")) == Money("2.34", "USD")
-        assert round(Money("2.355", "USD"), 2) == Money("2.36", "USD")
+        assert round(Money.from_decimal(Decimal("2.345"), "USD")) == Money.from_decimal(Decimal("2.34"), "USD")
+        assert round(Money.from_decimal(Decimal("2.355"), "USD"), 2) == Money.from_decimal(Decimal("2.36"), "USD")
 
     def test_decimal_and_config(self) -> None:
-        assert Money(Decimal("1.25"), "EUR").amount_decimal == Decimal("1.25")
+        assert Money.from_decimal(Decimal("1.25"), "EUR").amount_decimal == Decimal("1.25")
         cfg = FinstackConfig(rounding_mode="floor")
         cfg.set_ingest_scale("USD", 1)
-        assert Money(1.29, "USD", config=cfg) == Money("1.2", "USD")
+        assert Money(1.29, "USD", config=cfg) == Money.from_decimal(Decimal("1.2"), "USD")
 
-    @pytest.mark.parametrize("amount", [1.2345, "1.2345", Decimal("1.2345")])
-    def test_config_rounds_every_input_representation(self, amount: float | str | Decimal) -> None:
+    def test_config_rounds_float_and_decimal_inputs(self) -> None:
         cfg = FinstackConfig()
         cfg.set_ingest_scale("USD", 2)
-        assert Money(amount, "USD", config=cfg).amount_decimal == Decimal("1.23")
+        assert Money(1.2345, "USD", config=cfg).amount_decimal == Decimal("1.23")
+        assert Money.from_decimal(Decimal("1.2345"), "USD", config=cfg).amount_decimal == Decimal("1.23")
 
-    @pytest.mark.parametrize("amount", ["9007199254740993.125", Decimal("9007199254740993.125")])
-    def test_config_preserves_exact_decimal_before_rounding(self, amount: str | Decimal) -> None:
+    def test_config_preserves_exact_decimal_before_rounding(self) -> None:
         cfg = FinstackConfig(rounding_mode="floor")
         cfg.set_ingest_scale("USD", 2)
-        assert Money(amount, "USD", config=cfg).amount_decimal == Decimal("9007199254740993.12")
-        assert Money(amount, "USD").amount_decimal == Decimal("9007199254740993.125")
+        amount = Decimal("9007199254740993.125")
+        assert Money.from_decimal(amount, "USD", config=cfg).amount_decimal == Decimal("9007199254740993.12")
+        assert Money.from_decimal(amount, "USD").amount_decimal == Decimal("9007199254740993.125")
 
 
 class TestConfig:
@@ -152,9 +152,9 @@ class TestConfig:
         assert "floor" in repr(cfg)
         with pytest.raises(ValueError, match=r'invalid value "BANKERS": unknown variant'):
             RoundingMode.from_name("BANKERS")
-        assert RoundingMode.from_json('"ceil"').name == "ceil"
+        assert str(RoundingMode.from_json('"ceil"')) == "ceil"
         assert pickle.loads(pickle.dumps(RoundingMode.CEIL)) == RoundingMode.CEIL  # noqa: S301
-        t = ToleranceConfig(rate_epsilon=1e-9)
+        t = ToleranceConfig(generic_epsilon=1e-9)
         assert ToleranceConfig.from_json(t.to_json()) == t
 
 
@@ -204,3 +204,118 @@ class TestMathAdditions:
         assert special_functions.log_norm_cdf(float("inf")) == 0.0
         with pytest.raises(ValueError, match=r"std_dev must be finite and positive"):
             special_functions.norm_pdf_with_params(0.0, 0.0, -1.0)
+
+
+def _label_enum_classes() -> list[type]:
+    from finstack_quant.core.dates import (
+        BusinessDayConvention,
+        DayCount,
+        PeriodKind,
+        ScheduleErrorPolicy,
+        SifmaSettlementClass,
+        StubKind,
+        TenorUnit,
+        Thirty360Convention,
+    )
+    from finstack_quant.core.market_data import FxConversionPolicy, FxQuoteConvention
+    from finstack_quant.core.rating_scales import UnknownScalePolicy
+
+    return [
+        RoundingMode,
+        DayCount,
+        Thirty360Convention,
+        TenorUnit,
+        BusinessDayConvention,
+        StubKind,
+        ScheduleErrorPolicy,
+        PeriodKind,
+        FxConversionPolicy,
+        FxQuoteConvention,
+        UnknownScalePolicy,
+        SifmaSettlementClass,
+        CreditRating,
+    ]
+
+
+def _class_constants(cls: type) -> dict[str, object]:
+    return {name: value for name, value in vars(cls).items() if name.isupper() and isinstance(value, cls)}
+
+
+class TestLabelEnums:
+    """One repr style and one pickle protocol for every enum-like core wrapper."""
+
+    @pytest.mark.parametrize("cls", _label_enum_classes(), ids=lambda cls: cls.__name__)
+    def test_repr_names_the_constant_and_pickle_returns_it(self, cls: type) -> None:
+        constants = _class_constants(cls)
+        assert constants, f"{cls.__name__} exposes no class constants"
+        for name, value in constants.items():
+            assert repr(value) == f"{cls.__name__}.{name}"
+            assert pickle.loads(pickle.dumps(value)) == value  # noqa: S301
+
+    @pytest.mark.parametrize(
+        "cls",
+        [cls for cls in _label_enum_classes() if hasattr(cls, "from_name")],
+        ids=lambda cls: cls.__name__,
+    )
+    def test_str_label_round_trips_through_from_name(self, cls: type) -> None:
+        for value in _class_constants(cls).values():
+            assert cls.from_name(str(value)) == value
+
+    def test_wrong_type_fx_policy_is_type_error(self) -> None:
+        import datetime
+
+        from finstack_quant.core.market_data import FxMatrix
+
+        matrix = FxMatrix()
+        matrix.set_quote("EUR", "USD", 1.1)
+        with pytest.raises(TypeError, match="FxConversionPolicy"):
+            matrix.rate("EUR", "USD", datetime.date(2025, 1, 2), 3)
+
+
+class TestConvertedMoney:
+    def _market(self):  # noqa: ANN202
+        from finstack_quant.core.market_data import FxMatrix, MarketContext
+
+        fx = FxMatrix()
+        fx.set_quote("EUR", "USD", 1.1)
+        return MarketContext().insert_fx(fx)
+
+    def test_convert_money_reports_the_applied_rate(self) -> None:
+        converted = self._market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02")
+        assert converted.amount == Money(110.0, "USD")
+        assert converted.rate is not None
+        assert converted.rate.rate == 1.1
+        assert converted.rate.triangulated is False
+        same = self._market().convert_money(Money(5.0, "USD"), "USD", "2025-01-02")
+        assert same.rate is None
+        assert same.amount == Money(5.0, "USD")
+
+    def test_wire_pickle_and_frame(self) -> None:
+        from finstack_quant.core.market_data import ConvertedMoney
+
+        converted = self._market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02")
+        assert ConvertedMoney.from_json(converted.to_json()) == converted
+        assert pickle.loads(pickle.dumps(converted)) == converted  # noqa: S301
+        frame = converted.to_dataframe()
+        assert list(frame.columns) == ["amount", "currency", "rate", "triangulated"]
+        assert frame.iloc[0]["currency"] == "USD"
+        with pytest.raises(ValueError, match="ConvertedMoney"):
+            ConvertedMoney.from_json('{"amount": {"amount": "1", "currency": "USD"}, "rate": null, "x": 1}')
+
+
+class TestMarketJsonArguments:
+    """A market passed as JSON text goes through the strict contract loader."""
+
+    def test_unversioned_market_json_is_a_contract_error(self) -> None:
+        from finstack_quant.calibration import calibrate_bermudan_lmm_base_vol
+        from finstack_quant.portfolio import ContractValidationError
+
+        with pytest.raises(ContractValidationError):
+            calibrate_bermudan_lmm_base_vol("{}", "{}", "2025-01-01")
+
+    def test_overdeep_market_json_hits_the_load_limit(self) -> None:
+        from finstack_quant.calibration import calibrate_bermudan_lmm_base_vol
+        from finstack_quant.portfolio import ContractLimitExceededError
+
+        with pytest.raises(ContractLimitExceededError):
+            calibrate_bermudan_lmm_base_vol("{}", "[" * 200 + "]" * 200, "2025-01-01")

@@ -9,71 +9,29 @@ use super::algo::{BASE_YEAR, END_YEAR};
 use super::business_days::{CalendarMetadata, HolidayCalendar};
 use super::rule::Rule;
 use super::year_cache;
-use time::{Date, Weekday};
-
-/// Weekend convention for a calendar jurisdiction.
-///
-/// Most global markets observe Saturday/Sunday as the weekend, but Middle Eastern
-/// markets (SAR, AED, QAR, BHD, OMR, KWD) observe Friday/Saturday. Crypto and
-/// other 24/7 markets may have no weekends at all.
-#[derive(
-    Default, Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
-)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum WeekendRule {
-    /// Saturday and Sunday (default -- Western markets).
-    #[default]
-    SaturdaySunday,
-    /// Friday and Saturday (Middle East -- SAR, AED, QAR, BHD, OMR, KWD).
-    FridaySaturday,
-    /// Friday only.
-    FridayOnly,
-    /// No weekends (24/7 markets, e.g., crypto).
-    None,
-}
-
-impl WeekendRule {
-    /// Returns `true` if the given weekday is a weekend day under this rule.
-    #[inline]
-    pub const fn is_weekend(self, weekday: Weekday) -> bool {
-        match self {
-            Self::SaturdaySunday => matches!(weekday, Weekday::Saturday | Weekday::Sunday),
-            Self::FridaySaturday => matches!(weekday, Weekday::Friday | Weekday::Saturday),
-            Self::FridayOnly => matches!(weekday, Weekday::Friday),
-            Self::None => false,
-        }
-    }
-}
+use crate::dates::DateExt;
+use time::Date;
 
 /// A holiday calendar implementation that evaluates holiday rules at runtime.
 #[derive(Debug, Clone, Copy)]
 pub struct Calendar {
     /// Unique identifier (e.g., "target2", "gblo")
-    pub id: &'static str,
+    pub(crate) id: &'static str,
 
     /// Display name for the calendar
-    pub name: &'static str,
+    pub(crate) name: &'static str,
 
     /// Whether weekends should be ignored in is_holiday checks
-    pub ignore_weekends: bool,
+    pub(crate) ignore_weekends: bool,
 
     /// The rules defining this calendar's holidays
-    pub rules: &'static [Rule],
-
-    /// Weekend convention for this calendar's jurisdiction.
-    ///
-    /// Defaults to [`WeekendRule::SaturdaySunday`]. Middle Eastern calendars
-    /// should use [`WeekendRule::FridaySaturday`].
-    pub weekend_rule: WeekendRule,
+    pub(crate) rules: &'static [Rule],
 }
 
 impl Calendar {
-    /// Create a new calendar with the given parameters.
-    ///
-    /// Defaults to [`WeekendRule::SaturdaySunday`]. Use
-    /// [`with_weekend_rule`](Self::with_weekend_rule) to override.
-    pub const fn new(
+    /// Create a new calendar with the given parameters; weekends are
+    /// Saturday and Sunday.
+    pub(crate) const fn new(
         id: &'static str,
         name: &'static str,
         ignore_weekends: bool,
@@ -84,18 +42,7 @@ impl Calendar {
             name,
             ignore_weekends,
             rules,
-            weekend_rule: WeekendRule::SaturdaySunday,
         }
-    }
-
-    /// Override the weekend convention for this calendar.
-    ///
-    /// # Arguments
-    ///
-    /// * `rule` - Weekend days treated as non-business days for this calendar.
-    pub const fn with_weekend_rule(mut self, rule: WeekendRule) -> Self {
-        self.weekend_rule = rule;
-        self
     }
 
     /// Evaluates the raw holiday rules without warnings or weekend overrides.
@@ -128,10 +75,7 @@ impl HolidayCalendar for Calendar {
             self.holiday_from_rules(date)
         };
 
-        // Apply weekend ignore logic using the calendar's own weekend rule
-        // (not a hardcoded Sat/Sun) so Fri/Sat-weekend calendars agree with
-        // `is_business_day`.
-        if self.ignore_weekends && self.weekend_rule.is_weekend(date.weekday()) {
+        if self.ignore_weekends && date.is_weekend() {
             is_holiday = false;
         }
 
@@ -139,7 +83,7 @@ impl HolidayCalendar for Calendar {
     }
 
     fn is_business_day(&self, date: Date) -> bool {
-        let is_weekend = self.weekend_rule.is_weekend(date.weekday());
+        let is_weekend = date.is_weekend();
         if (BASE_YEAR..=END_YEAR).contains(&date.year()) {
             !is_weekend && !year_cache::is_holiday_cached(self, date)
         } else {
@@ -156,7 +100,6 @@ impl HolidayCalendar for Calendar {
             id: self.id,
             name: self.name,
             ignore_weekends: self.ignore_weekends,
-            weekend_rule: self.weekend_rule,
         })
     }
 }
@@ -172,126 +115,26 @@ mod tests {
             calendar.is_business_day(date)
         }
 
-        for rule in [
-            WeekendRule::SaturdaySunday,
-            WeekendRule::FridaySaturday,
-            WeekendRule::FridayOnly,
-            WeekendRule::None,
-        ] {
-            let calendar =
-                Calendar::new("borrowed", "Borrowed calendar", true, &[]).with_weekend_rule(rule);
-            let borrowed = &calendar;
-            let object: &dyn HolidayCalendar = &borrowed;
-            for day in 1..=7 {
-                let date =
-                    Date::from_calendar_date(2026, Month::October, day).expect("valid test date");
-                let expected = !rule.is_weekend(date.weekday());
-                assert_eq!(calendar.is_business_day(date), expected);
-                assert_eq!(generic_business(borrowed, date), expected);
-                assert_eq!(object.is_business_day(date), expected);
-                assert_eq!(
-                    object.count_business_days(date, date.next_day().expect("next date")),
-                    i32::from(expected)
-                );
-            }
+        let calendar = Calendar::new("borrowed", "Borrowed calendar", true, &[]);
+        let borrowed = &calendar;
+        let object: &dyn HolidayCalendar = &borrowed;
+        for day in 1..=7 {
+            let date =
+                Date::from_calendar_date(2026, Month::October, day).expect("valid test date");
+            let expected = !date.is_weekend();
+            assert_eq!(calendar.is_business_day(date), expected);
+            assert_eq!(generic_business(borrowed, date), expected);
+            assert_eq!(object.is_business_day(date), expected);
+            assert_eq!(
+                object.count_business_days(date, date.next_day().expect("next date")),
+                i32::from(expected)
+            );
         }
     }
 
     #[test]
-    fn saturday_sunday_rule() {
-        let rule = WeekendRule::SaturdaySunday;
-        assert!(!rule.is_weekend(Weekday::Monday));
-        assert!(!rule.is_weekend(Weekday::Tuesday));
-        assert!(!rule.is_weekend(Weekday::Wednesday));
-        assert!(!rule.is_weekend(Weekday::Thursday));
-        assert!(!rule.is_weekend(Weekday::Friday));
-        assert!(rule.is_weekend(Weekday::Saturday));
-        assert!(rule.is_weekend(Weekday::Sunday));
-    }
-
-    #[test]
-    fn friday_saturday_rule() {
-        let rule = WeekendRule::FridaySaturday;
-        assert!(!rule.is_weekend(Weekday::Monday));
-        assert!(!rule.is_weekend(Weekday::Tuesday));
-        assert!(!rule.is_weekend(Weekday::Wednesday));
-        assert!(!rule.is_weekend(Weekday::Thursday));
-        assert!(rule.is_weekend(Weekday::Friday));
-        assert!(rule.is_weekend(Weekday::Saturday));
-        assert!(!rule.is_weekend(Weekday::Sunday));
-    }
-
-    #[test]
-    fn friday_only_rule() {
-        let rule = WeekendRule::FridayOnly;
-        assert!(!rule.is_weekend(Weekday::Thursday));
-        assert!(rule.is_weekend(Weekday::Friday));
-        assert!(!rule.is_weekend(Weekday::Saturday));
-    }
-
-    #[test]
-    fn none_rule() {
-        let rule = WeekendRule::None;
-        for wd in [
-            Weekday::Monday,
-            Weekday::Tuesday,
-            Weekday::Wednesday,
-            Weekday::Thursday,
-            Weekday::Friday,
-            Weekday::Saturday,
-            Weekday::Sunday,
-        ] {
-            assert!(!rule.is_weekend(wd));
-        }
-    }
-
-    #[test]
-    fn default_is_saturday_sunday() {
-        assert_eq!(WeekendRule::default(), WeekendRule::SaturdaySunday);
-    }
-
-    // Calendar with FridaySaturday weekend rule
-
-    #[test]
-    fn friday_saturday_calendar_business_days() {
-        let cal = Calendar::new("me_test", "Middle East Test", true, &[])
-            .with_weekend_rule(WeekendRule::FridaySaturday);
-
-        // 2025-01-03 is a Friday
-        let friday = Date::from_calendar_date(2025, Month::January, 3).expect("Valid test date");
-        // 2025-01-04 is a Saturday
-        let saturday = Date::from_calendar_date(2025, Month::January, 4).expect("Valid test date");
-        // 2025-01-05 is a Sunday
-        let sunday = Date::from_calendar_date(2025, Month::January, 5).expect("Valid test date");
-        // 2025-01-06 is a Monday
-        let monday = Date::from_calendar_date(2025, Month::January, 6).expect("Valid test date");
-
-        // Friday and Saturday are weekend under FridaySaturday rule
-        assert!(
-            !cal.is_business_day(friday),
-            "Friday should NOT be a business day under FridaySaturday rule"
-        );
-        assert!(
-            !cal.is_business_day(saturday),
-            "Saturday should NOT be a business day under FridaySaturday rule"
-        );
-
-        // Sunday IS a business day under FridaySaturday rule
-        assert!(
-            cal.is_business_day(sunday),
-            "Sunday SHOULD be a business day under FridaySaturday rule"
-        );
-        assert!(
-            cal.is_business_day(monday),
-            "Monday SHOULD be a business day under FridaySaturday rule"
-        );
-    }
-
-    #[test]
-    fn default_calendar_preserves_sat_sun_weekends() {
-        // Existing calendars default to SaturdaySunday -- verify backward compat
-        let cal = Calendar::new("compat_test", "Compat Test", true, &[]);
-        assert_eq!(cal.weekend_rule, WeekendRule::SaturdaySunday);
+    fn calendar_weekends_are_saturday_and_sunday() {
+        let cal = Calendar::new("weekend_test", "Weekend Test", true, &[]);
 
         let saturday = Date::from_calendar_date(2025, Month::January, 4).expect("Valid test date");
         let sunday = Date::from_calendar_date(2025, Month::January, 5).expect("Valid test date");
@@ -300,61 +143,5 @@ mod tests {
         assert!(!cal.is_business_day(saturday));
         assert!(!cal.is_business_day(sunday));
         assert!(cal.is_business_day(friday));
-    }
-
-    #[test]
-    fn no_weekend_rule_makes_all_days_business_days() {
-        let cal = Calendar::new("crypto_test", "Crypto Test", true, &[])
-            .with_weekend_rule(WeekendRule::None);
-
-        // Every day of the week is a business day
-        for day in 3..=9u8 {
-            let d = Date::from_calendar_date(2025, Month::January, day).expect("Valid test date");
-            assert!(
-                cal.is_business_day(d),
-                "{d} should be a business day under None weekend rule"
-            );
-        }
-    }
-
-    #[test]
-    fn weekend_rule_serde_roundtrip() {
-        let rules = [
-            WeekendRule::SaturdaySunday,
-            WeekendRule::FridaySaturday,
-            WeekendRule::FridayOnly,
-            WeekendRule::None,
-        ];
-        for rule in rules {
-            let json =
-                serde_json::to_string(&rule).expect("JSON serialization should succeed in test");
-            let deserialized: WeekendRule =
-                serde_json::from_str(&json).expect("JSON deserialization should succeed in test");
-            assert_eq!(rule, deserialized);
-        }
-    }
-
-    #[test]
-    fn weekend_rule_serde_snake_case() {
-        assert_eq!(
-            serde_json::to_string(&WeekendRule::SaturdaySunday)
-                .expect("JSON serialization should succeed in test"),
-            "\"saturday_sunday\""
-        );
-        assert_eq!(
-            serde_json::to_string(&WeekendRule::FridaySaturday)
-                .expect("JSON serialization should succeed in test"),
-            "\"friday_saturday\""
-        );
-        assert_eq!(
-            serde_json::to_string(&WeekendRule::FridayOnly)
-                .expect("JSON serialization should succeed in test"),
-            "\"friday_only\""
-        );
-        assert_eq!(
-            serde_json::to_string(&WeekendRule::None)
-                .expect("JSON serialization should succeed in test"),
-            "\"none\""
-        );
     }
 }

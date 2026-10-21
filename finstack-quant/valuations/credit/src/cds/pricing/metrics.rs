@@ -4,10 +4,9 @@ use super::engine::{AodInputs, CdsPricer, CouponPeriod};
 use super::helpers::sp_cond_to;
 use crate::cds::CreditDefaultSwap;
 use finstack_quant_cashflows::builder::RollRule;
-use finstack_quant_core::dates::{
-    Date, DayCountContext, Schedule, ScheduleBuilder, StubKind, Tenor,
-};
+use finstack_quant_core::dates::{Date, DayCountContext, Schedule, StubKind, Tenor};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::{BASIS_POINTS_PER_UNIT, ONE_BASIS_POINT};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::constants::{credit, numerical};
@@ -37,7 +36,7 @@ pub(crate) enum AccrualDayCountPolicy {
 impl CdsPricer {
     /// Generate contractual accrual and payment dates from the premium terms.
     fn premium_schedule(&self, cds: &CreditDefaultSwap) -> Result<Schedule> {
-        let mut builder = ScheduleBuilder::new(cds.premium_leg.start, cds.premium_leg.end)?;
+        let mut builder = Schedule::builder(cds.premium_leg.start, cds.premium_leg.end)?;
         builder = match cds.premium_leg.roll_rule {
             RollRule::CdsImm => {
                 if cds.premium_leg.frequency != Tenor::quarterly()
@@ -62,7 +61,7 @@ impl CdsPricer {
             }
         };
         if let Some(calendar_id) = cds.premium_leg.calendar_id.as_deref() {
-            builder = builder.adjust_with_id(cds.premium_leg.business_day_convention, calendar_id);
+            builder = builder.adjust_with(cds.premium_leg.business_day_convention, calendar_id);
         }
         let mut schedule = builder.build()?;
         // The standard grid includes the previous roll date. The explicit
@@ -133,10 +132,7 @@ impl CdsPricer {
             && cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360
             && period.accrual_end > period.accrual_start
         {
-            let days = finstack_quant_core::dates::DayCount::calendar_days(
-                period.accrual_start,
-                period.accrual_end,
-            ) + 1;
+            let days = (period.accrual_end - period.accrual_start).whole_days() + 1;
             return Ok((days.max(0) as f64) / 360.0);
         }
         // The contractual final Act/360 coupon includes the unadjusted
@@ -146,10 +142,7 @@ impl CdsPricer {
             && period.is_final
             && period.accrual_end > period.accrual_start
         {
-            let days = finstack_quant_core::dates::DayCount::calendar_days(
-                period.accrual_start,
-                period.accrual_end,
-            ) + 1;
+            let days = (period.accrual_end - period.accrual_start).whole_days() + 1;
             return Ok((days.max(0) as f64) / 360.0);
         }
 
@@ -210,7 +203,7 @@ impl CdsPricer {
         if matches!(policy, AccrualDayCountPolicy::CdswInclusive)
             && cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360
         {
-            let days = finstack_quant_core::dates::DayCount::calendar_days(last_coupon, as_of) + 1;
+            let days = (as_of - last_coupon).whole_days() + 1;
             return Ok((days.max(0) as f64) / 360.0);
         }
 

@@ -22,7 +22,6 @@ use crate::credit::hierarchy::{GenericFactorSpec, IssuerTags};
 #[serde(deny_unknown_fields)]
 pub struct HistoryPanel {
     /// Observation dates (sorted ascending).
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
@@ -69,7 +68,6 @@ pub struct CreditCalibrationInputs {
     /// Generic factor series + spec.
     pub generic_factor: GenericFactorSeries,
     /// Calibration anchor date (must appear in `history_panel.dates`).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

@@ -67,14 +67,14 @@ try {
     );
   }
   await page.getByLabel("Search market data", { exact: true }).fill("USD~1CSA");
-  await page.getByRole("button", { name: "/collateral/USD~1CSA" }).click();
+  await page.getByRole("button", { name: "/prices/USD~1CSA" }).click();
   await originalSelected();
   assert.equal(
     await page
       .getByRole("region", { name: "Selected stored value", exact: true })
       .locator("pre")
       .textContent(),
-    '"NEG-RATES"',
+    '{"unitless":1.25}',
   );
   const pointer = await page.evaluate(() => window.marketProbe.negativePointer);
   await page.getByLabel("Search market data", { exact: true }).fill(pointer);

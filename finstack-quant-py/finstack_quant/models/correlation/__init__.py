@@ -33,7 +33,7 @@ correlation_bounds = _corr.correlation_bounds
 joint_probabilities = _corr.joint_probabilities
 validate_correlation_matrix = _corr.validate_correlation_matrix
 nearest_correlation = _corr.nearest_correlation
-cholesky_decompose = _corr.cholesky_decompose
+cholesky_correlation = _corr.cholesky_correlation
 simulate_portfolio_loss = _corr.simulate_portfolio_loss
 
 __all__: list[str] = [
@@ -52,7 +52,7 @@ __all__: list[str] = [
     "RecoveryModel",
     "RecoverySpec",
     "TrancheLossStatistics",
-    "cholesky_decompose",
+    "cholesky_correlation",
     "correlation_bounds",
     "joint_probabilities",
     "nearest_correlation",

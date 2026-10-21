@@ -1,6 +1,6 @@
 //! WASM bindings for [`finstack_quant_core::types`] rate helpers (`Rate`, `Bps`).
 
-use crate::utils::input::{from_js_json, js_f64, js_string};
+use crate::utils::input::{from_js_json, js_f64, js_int, js_string};
 use crate::utils::to_js_err;
 use finstack_quant_core::types::{Bps as RustBps, Rate as RustRate};
 use wasm_bindgen::prelude::*;
@@ -81,14 +81,16 @@ impl JsRate {
 
     /// Create a rate from a whole number of basis points.
     ///
-    /// Delegates to Rust `Rate::try_from_bp`, which rejects fractional input
-    /// rather than silently rounding it: a sub-bp rate quietly rounded to
-    /// whole bp is a pricing bug, not a convenience. Use `new Rate(decimal)`,
-    /// `Rate.fromPercent`, or `Rate.parse("62.5bp")` for sub-bp rates.
+    /// Delegates to Rust `Rate::from_bp` (the twin of Python `Rate.from_bp`).
+    /// Fractional input is rejected rather than silently rounded: a sub-bp
+    /// rate quietly rounded to whole bp is a pricing bug, not a convenience.
+    /// Use `new Rate(decimal)`, `Rate.fromPercent`, or `Rate.parse("62.5bp")`
+    /// for sub-bp rates.
     ///
     /// @param bp - Rate in whole basis points (e.g. `500` for 5%).
     /// @returns The constructed `Rate`.
-    /// @throws If `bp` is non-finite or not a whole number of basis points.
+    /// @throws `TypeError` (kind `invalid_type`) if `bp` is not a whole number
+    /// in the `i32` range.
     ///
     /// @example
     /// ```javascript
@@ -97,10 +99,10 @@ impl JsRate {
     /// ```
     #[wasm_bindgen(js_name = fromBp)]
     pub fn from_bp(bp: JsValue) -> Result<JsRate, JsValue> {
-        let bp = js_f64(&bp, "bp")?;
-        RustRate::try_from_bp(bp)
-            .map(|inner| JsRate { inner })
-            .map_err(to_js_err)
+        let bp = js_int::<i32>(&bp, "bp")?;
+        Ok(JsRate {
+            inner: RustRate::from_bp(bp),
+        })
     }
 
     /// Rate as a decimal (e.g. `0.05` for 5%).
@@ -302,8 +304,8 @@ impl JsBps {
     /// @returns A new `Bps` with the sign removed.
     /// @throws `FinstackError` (kind `validation`) when the quote is
     /// `-2147483648` bp, whose absolute value has no 32-bit representation.
-    #[wasm_bindgen(js_name = abs)]
-    pub fn abs(&self) -> Result<JsBps, JsValue> {
+    #[wasm_bindgen(js_name = checkedAbs)]
+    pub fn checked_abs(&self) -> Result<JsBps, JsValue> {
         self.inner
             .checked_abs()
             .map(|inner| JsBps { inner })
@@ -392,7 +394,7 @@ mod tests {
         };
         assert!((bps.as_percent() + 19.95).abs() < 1e-12);
         assert!((bps.as_rate().as_decimal() + 0.1995).abs() < 1e-12);
-        assert!(bps.is_negative() && bps.abs().expect("representable").is_positive());
+        assert!(bps.is_negative() && bps.checked_abs().expect("representable").is_positive());
         let rate = JsRate {
             inner: "12.5bp".parse::<RustRate>().expect("fractional bp quote"),
         };

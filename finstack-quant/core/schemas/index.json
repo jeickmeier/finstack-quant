@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/dates/1/schedule.schema.json",
-      "bytes": 5274,
+      "bytes": 5559,
       "kind": "output",
       "path": "schemas/dates/1/schedule.schema.json",
       "summary": "Generated accrual, payment and fixing dates with any construction warnings.",
@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/dates/1/schedule_spec.schema.json",
-      "bytes": 10610,
+      "bytes": 10614,
       "kind": "input",
       "path": "schemas/dates/1/schedule_spec.schema.json",
       "summary": "Persisted inputs of a date schedule: range, frequency, stub, adjustment and lags.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-      "bytes": 131074,
+      "bytes": 130625,
       "kind": "input",
       "path": "schemas/market_data/1/market_context_state.schema.json",
       "summary": "Curves, surfaces, prices, series and FX for one valuation date; the market input to every pricing, scenario and attribution call.",

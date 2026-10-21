@@ -6,7 +6,7 @@
 //! accept native timestamp objects format them here instead of inventing
 //! their own spelling.
 
-use finstack_quant_core::dates::{OffsetDateTime, PrimitiveDateTime};
+use time::{OffsetDateTime, PrimitiveDateTime};
 
 /// Order key for a timezone-naive timestamp: wall time at nanosecond precision.
 ///
@@ -21,7 +21,8 @@ use finstack_quant_core::dates::{OffsetDateTime, PrimitiveDateTime};
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::{Date, Month, PrimitiveDateTime};
+/// use finstack_quant_core::dates::Date;
+/// use time::{Month, PrimitiveDateTime};
 /// use finstack_quant_features::naive_datetime_order_key;
 ///
 /// let date = Date::from_calendar_date(2025, Month::January, 2)?;
@@ -58,7 +59,8 @@ pub fn naive_datetime_order_key(datetime: PrimitiveDateTime) -> String {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::{Date, Month, PrimitiveDateTime};
+/// use finstack_quant_core::dates::Date;
+/// use time::{Month, PrimitiveDateTime};
 /// use finstack_quant_features::datetime_order_key;
 ///
 /// let date = Date::from_calendar_date(2025, Month::January, 2)?;
@@ -79,7 +81,8 @@ pub fn datetime_order_key(datetime: OffsetDateTime) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::dates::{Date, Month};
+    use finstack_quant_core::dates::Date;
+    use time::Month;
 
     fn wall(hour: u8, nanos: u32) -> PrimitiveDateTime {
         let date = Date::from_calendar_date(2025, Month::March, 9).unwrap();

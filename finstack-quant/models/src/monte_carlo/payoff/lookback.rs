@@ -940,7 +940,7 @@ mod tests {
             PathDependentPricer, PathDependentPricerConfig,
         };
         use crate::monte_carlo::process::gbm::{GbmParams, GbmProcess};
-        use crate::monte_carlo::TimeGrid;
+        use finstack_quant_core::math::time_grid::TimeGrid;
         // For zero log drift, the reflection principle gives
         // max(log(S/S0)) ~ |N(0, sigma² T)|. Integrating its density yields
         // E[max(S)] = 2 S0 exp(sigma² T/2) Phi(sigma sqrt(T)).
@@ -948,7 +948,8 @@ mod tests {
         let sigma = 0.03_f64;
         let rate = 0.5 * sigma * sigma;
         let df = (-rate).exp();
-        let expected_max = 200.0 * rate.exp() * finstack_quant_core::math::norm_cdf(sigma);
+        let expected_max =
+            200.0 * rate.exp() * finstack_quant_core::math::special_functions::norm_cdf(sigma);
         let fixed_reference = df * (expected_max - 100.0);
         let floating_reference = df * expected_max - 100.0;
         let process = GbmProcess::new(GbmParams::new(rate, 0.0, sigma).unwrap());

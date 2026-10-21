@@ -120,9 +120,9 @@ pub(crate) fn oas_decimal_from_quote_overrides(
         }
     };
     let oas_bp = BrentSolver::new()
-        .tolerance(config.tolerance)
-        .max_iterations(config.max_iterations)
-        .initial_bracket_size(config.initial_bracket_size_bp)
+        .with_tolerance(config.tolerance)
+        .with_max_iterations(config.max_iterations)
+        .with_initial_bracket_size(config.initial_bracket_size_bp)
         .solve(objective, 0.0)
         .map_err(|error| match pricing_error.borrow_mut().take() {
             Some(pricing_error) => finstack_quant_core::Error::Validation(format!(

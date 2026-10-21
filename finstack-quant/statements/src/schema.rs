@@ -4,6 +4,11 @@ use std::sync::OnceLock;
 
 use serde_json::Value;
 
+use crate::adjustments::{NormalizationConfig, NormalizationResult};
+use crate::checks::CheckSuiteSpec;
+use crate::evaluator::{MonteCarloConfig, MonteCarloResults, RollupSpec, StatementResult};
+use crate::registry::MetricRegistry;
+use crate::FinancialModelSpec;
 use crate::{Error, Result};
 
 /// Stable base URI for statements-owned schemas.
@@ -116,7 +121,7 @@ fn financial_model_examples() -> finstack_quant_core::Result<Vec<Value>> {
 /// Built from the public types rather than hand-written JSON so the published
 /// example cannot drift from the contract it illustrates.
 fn normalization_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    use crate::adjustments::{Adjustment, AdjustmentValue, NormalizationConfig};
+    use crate::adjustments::{Adjustment, AdjustmentValue};
 
     let mut amounts = indexmap::IndexMap::new();
     for (label, amount) in [("2024Q1", 1_500_000.0), ("2024Q2", 1_250_000.0)] {
@@ -278,84 +283,81 @@ fn normalization_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
 /// contract tests and the bindings all render from one definition. Render an
 /// entry with [`finstack_quant_core::schema::SchemaArtifact::generate`].
 pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
-    finstack_quant_core::schema::SchemaArtifact::new::<crate::checks::CheckSuiteSpec>(
-        "schemas/statements/1/check_suite_spec.schema.json",
-        "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
-        "CheckSuiteSpec",
-        "Serializable check suite: built-in checks, formula checks and filtering configuration.",
+    finstack_quant_core::schema_artifact!(
+        CheckSuiteSpec,
+        "statements",
+        "check_suite_spec",
+        Input,
+        "Serializable check suite: built-in checks, formula checks and filtering configuration."
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
     .with_examples(check_suite_examples),
-    finstack_quant_core::schema::SchemaArtifact::new::<crate::FinancialModelSpec>(
-        "schemas/statements/1/financial_model_spec.schema.json",
-        "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
-        "FinancialModelSpec",
-        "Versioned financial statement model specification.",
+    finstack_quant_core::schema_artifact!(
+        FinancialModelSpec,
+        "statements",
+        "financial_model_spec",
+        Input,
+        "Versioned financial statement model specification."
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
     .with_summary(
         "Statement model graph: periods, nodes and the Value > Forecast > Formula precedence.",
     )
     .with_examples(financial_model_examples),
-    finstack_quant_core::schema::SchemaArtifact::new::<
-        crate::adjustments::NormalizationConfig,
-    >(
-        "schemas/statements/1/normalization_config.schema.json",
-        "https://finstack_quant.dev/schemas/statements/1/normalization_config.schema.json",
-        "NormalizationConfig",
-        "Financial statement normalization policy and adjustment catalog.",
+    finstack_quant_core::schema_artifact!(
+        NormalizationConfig,
+        "statements",
+        "normalization_config",
+        Component,
+        "Financial statement normalization policy and adjustment catalog."
     )
     .with_summary("Add-back and deduction catalog applied to a target metric such as EBITDA.")
     .with_examples(normalization_examples),
-    finstack_quant_core::schema::SchemaArtifact::new::<crate::evaluator::StatementResult>(
-        "schemas/statements/1/statement_result.schema.json",
-        "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
-        "StatementResult",
-        "Versioned financial statement evaluation result.",
+    finstack_quant_core::schema_artifact!(
+        StatementResult,
+        "statements",
+        "statement_result",
+        Output,
+        "Versioned financial statement evaluation result."
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Output)
     .with_summary("Evaluated node values per period, with policy stamps.")
     .with_examples(statement_result_examples),
-    finstack_quant_core::schema::SchemaArtifact::new::<crate::registry::MetricRegistry>(
-        "schemas/statements/1/metric_registry.schema.json",
-        "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
-        "MetricRegistry",
-        "Namespaced catalog of reusable metric definitions.",
+    finstack_quant_core::schema_artifact!(
+        MetricRegistry,
+        "statements",
+        "metric_registry",
+        Input,
+        "Namespaced catalog of reusable metric definitions."
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
     .with_examples(metric_registry_examples),
-    finstack_quant_core::schema::SchemaArtifact::new::<crate::evaluator::MonteCarloConfig>(
-        "schemas/statements/1/monte_carlo_config.schema.json",
-        "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
-        "MonteCarloConfig",
-        "Path count, seed and reported percentiles of a Monte Carlo statement-model evaluation.",
+    finstack_quant_core::schema_artifact!(
+        MonteCarloConfig,
+        "statements",
+        "monte_carlo_config",
+        Input,
+        "Path count, seed and reported percentiles of a Monte Carlo statement-model evaluation."
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
     .with_examples(monte_carlo_config_examples),
-    finstack_quant_core::schema::SchemaArtifact::new::<crate::evaluator::MonteCarloResults>(
-        "schemas/statements/1/monte_carlo_results.schema.json",
-        "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
-        "MonteCarloResults",
-        "Percentile summaries of a Monte Carlo statement-model evaluation.",
+    finstack_quant_core::schema_artifact!(
+        MonteCarloResults,
+        "statements",
+        "monte_carlo_results",
+        Output,
+        "Percentile summaries of a Monte Carlo statement-model evaluation."
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Output)
     .with_examples(monte_carlo_results_examples),
-    finstack_quant_core::schema::SchemaArtifact::new::<
-        crate::adjustments::NormalizationResult,
-    >(
-        "schemas/statements/1/normalization_result.schema.json",
-        "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
-        "NormalizationResult",
-        "Per-period normalization outcome: base value, applied adjustments and final value.",
+    finstack_quant_core::schema_artifact!(
+        NormalizationResult,
+        "statements",
+        "normalization_result",
+        Output,
+        "Per-period normalization outcome: base value, applied adjustments and final value."
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Output)
     .with_examples(normalization_result_examples),
-    finstack_quant_core::schema::SchemaArtifact::new::<crate::evaluator::RollupSpec>(
-        "schemas/statements/1/rollup_spec.schema.json",
-        "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
-        "RollupSpec",
-        "Target frequency and per-node methods for rolling statement results up to coarser periods.",
+    finstack_quant_core::schema_artifact!(
+        RollupSpec,
+        "statements",
+        "rollup_spec",
+        Input,
+        "Target frequency and per-node methods for rolling statement results up to coarser periods."
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
     .with_examples(rollup_spec_examples),
 ];

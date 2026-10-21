@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::error::MigrationError;
 use crate::credit::moodys_warf_factor;
 use finstack_quant_core::types::CreditRating;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 
 /// An ordered set of states defining a transition matrix's row/column layout.
 ///
@@ -28,7 +28,7 @@ use finstack_quant_core::HashMap;
 #[serde(try_from = "RatingScaleWire")]
 pub struct RatingScale {
     labels: Vec<String>,
-    index_map: HashMap<String, usize>,
+    index_map: FxHashMap<String, usize>,
     default_state: Option<usize>,
 }
 
@@ -37,7 +37,7 @@ pub struct RatingScale {
 #[serde(deny_unknown_fields)]
 struct RatingScaleWire {
     labels: Vec<String>,
-    index_map: HashMap<String, usize>,
+    index_map: FxHashMap<String, usize>,
     default_state: Option<usize>,
 }
 
@@ -269,8 +269,8 @@ impl RatingScale {
     /// Builds a `RatingScale` from `&[&str]` labels for hardcoded presets.
     fn from_static_labels(labels: &[&str], default_label: Option<&str>) -> Self {
         let labels: Vec<String> = labels.iter().map(|s| (*s).to_owned()).collect();
-        let mut index_map: HashMap<String, usize> =
-            HashMap::with_capacity_and_hasher(labels.len(), Default::default());
+        let mut index_map: FxHashMap<String, usize> =
+            FxHashMap::with_capacity_and_hasher(labels.len(), Default::default());
         for (i, label) in labels.iter().enumerate() {
             index_map.insert(label.clone(), i);
         }
@@ -287,8 +287,8 @@ impl RatingScale {
             return Err(MigrationError::InsufficientStates);
         }
 
-        let mut index_map: HashMap<String, usize> =
-            HashMap::with_capacity_and_hasher(labels.len(), Default::default());
+        let mut index_map: FxHashMap<String, usize> =
+            FxHashMap::with_capacity_and_hasher(labels.len(), Default::default());
         for (i, label) in labels.iter().enumerate() {
             if index_map.insert(label.clone(), i).is_some() {
                 return Err(MigrationError::DuplicateLabel {

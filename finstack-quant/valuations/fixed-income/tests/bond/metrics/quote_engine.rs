@@ -21,7 +21,7 @@ use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::{
 use finstack_quant_valuations_fixed_income::bond::Bond;
 use time::macros::date;
 
-fn build_simple_discount_curve(as_of: time::Date) -> DiscountCurve {
+fn build_simple_discount_curve(as_of: finstack_quant_core::dates::Date) -> DiscountCurve {
     DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .day_count(DayCount::Act365F)

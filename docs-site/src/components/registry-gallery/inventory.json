@@ -709,31 +709,31 @@
   "provenance": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "253c8f4bdf7a38f8225123623eaefc829c89ef15aaac474c56bf13dfec2b88e4"
+      "sha256": "4378c0845a071111ac9973a0dd0d8a1b868f9bb3ab7e9cbf41b91516fe44117d"
     },
     {
       "path": "finstack-quant-ui/tests/core/market-browser/cases.json",
-      "sha256": "d745c88be35e3799012d86d5cc29d9fc77b4787699909eb00ae3f874c81e7a56"
+      "sha256": "75048b2fd32b69cbc642611a0377662c917b526f58a0dc7ad07255e3936b7475"
     },
     {
       "path": "finstack-quant-ui/tests/core/cubes/cases.json",
-      "sha256": "e3861c3a00c8e0de973ca7ab092e6ee9e4b4f5c6c751c192fe5b0aa7046576f7"
+      "sha256": "e410d14fde83b6ce6813c3c1358666d0e8b771016bf15b3617716543d15beb3c"
     },
     {
       "path": "finstack-quant-ui/tests/calibration/cases.json",
-      "sha256": "16603806284279b5607d2818dea38126ebb153d10193d8dd6147503ee1fefe45"
+      "sha256": "3d0b3fbfa455d75b0a0493af66d09324acb7bc5459ad55d1ade195c0b37c4e7d"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/cases.json",
-      "sha256": "0e0d34118786f0b7519c5fd2548e36f0579c22d075826b5a23c780f407843e33"
+      "sha256": "a22ca4c5dc62aa36a5f4e7387d634374c3edd3bcfbf9f830114e9294147880ec"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "c428372bdd2187d1ad8dab2c8d6404256651a85ca37c1f3ba5d2dcd7e8ce25c5"
+      "sha256": "abfefd32bb278f1ee55359216ea8aef41e782946213b9ef8db39b38736d523b2"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "88116dd1dab7ea109ce47253f5c314319d324f6122b72b79358b46306f512795"
+      "sha256": "437dda6ff28bba370d5bf1c721deea97f505d605d41fe43251e9aeec4e09634c"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
@@ -741,7 +741,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-      "sha256": "2a0ae212c09388e6984244bbb65d3875f32d44fa210e7a895ec50e9b31fb6f6c"
+      "sha256": "97cf0614bab11d294fb2703d18e66e0f6e98d4c7697d803c4d5d21cdf0945b9c"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-model.json",

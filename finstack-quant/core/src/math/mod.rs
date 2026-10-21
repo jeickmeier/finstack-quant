@@ -19,7 +19,7 @@
 //! ## Root finding
 //!
 //! ```rust
-//! use finstack_quant_core::math::BrentSolver;
+//! use finstack_quant_core::math::solver::BrentSolver;
 //! # fn main() -> finstack_quant_core::Result<()> {
 //!
 //! let root = BrentSolver::new().solve(|x| x * x - 2.0, 1.0)?;
@@ -31,8 +31,7 @@
 //! ## Basic statistics
 //!
 //! ```rust
-//! use finstack_quant_core::math::stats::population_variance;
-//! use finstack_quant_core::math::{mean, variance};
+//! use finstack_quant_core::math::stats::{mean, population_variance, variance};
 //!
 //! let data = [1.0, 2.0, 3.0, 4.0];
 //! assert_eq!(mean(&data), 2.5);
@@ -143,22 +142,3 @@ pub mod time_grid;
 pub mod units;
 
 pub use compounding::{z_spread_discount_factor, Compounding};
-pub use distributions::{binomial_pmf_all, binomial_pmf_all_into};
-pub use integration::{
-    gauss_legendre_grid, gauss_legendre_integrate_composite, GaussHermiteQuadrature,
-};
-pub use interp::{ExtrapolationPolicy, LogLinearStrategy, MonotoneConvexStrategy};
-pub use random::RandomNumberGenerator;
-pub use solver::BrentSolver;
-pub use solver_multi::LevenbergMarquardtSolver;
-pub use special_functions::{
-    ln_gamma, log_norm_cdf, norm_cdf, norm_pdf, standard_normal_inv_cdf, student_t_cdf,
-    student_t_inv_cdf,
-};
-pub use stats::{
-    correlation, covariance, finite_count, finite_max_or_nan, finite_min_or_nan,
-    longest_positive_run, mean, mean_or_nan, median_or_nan, quantile, sample_std_or_nan,
-    sample_variance_or_nan, variance,
-};
-pub use summation::{kahan_sum, neumaier_sum, NeumaierAccumulator};
-pub use time_grid::{map_date_to_step, map_exercise_dates_to_steps};

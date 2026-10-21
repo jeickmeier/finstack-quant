@@ -2,10 +2,9 @@
 
 use std::str::FromStr;
 
-use crate::errors::display_to_py;
+use crate::bindings::macros::{typed_or_label, wire_methods};
 use finstack_quant_core::currency::Currency;
 use pyo3::basic::CompareOp;
-use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
 use pyo3::IntoPyObjectExt;
@@ -48,7 +47,7 @@ impl PyCurrency {
     fn from_numeric(_cls: &Bound<'_, PyType>, code: u16) -> PyResult<Self> {
         Currency::try_from(code)
             .map(Self::from_inner)
-            .map_err(display_to_py)
+            .map_err(crate::errors::core_to_py)
     }
 
     /// Three-letter ISO-4217 code (uppercase).
@@ -97,43 +96,16 @@ impl PyCurrency {
         }
         Ok(py.NotImplemented())
     }
-
-    /// Serialize this currency to a JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize a currency from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: Currency = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self::from_inner(inner))
-    }
 }
 
-/// Extract a [`Currency`] from a [`PyCurrency`] instance or an ISO string code.
-pub(crate) fn extract_currency(obj: &Bound<'_, PyAny>) -> PyResult<Currency> {
-    if let Ok(ccy) = obj.extract::<PyRef<'_, PyCurrency>>() {
-        return Ok(ccy.inner);
-    }
-    if let Ok(s) = obj.extract::<String>() {
-        return Currency::from_str(&s).map_err(crate::errors::core_to_py);
-    }
-    Err(PyTypeError::new_err(
-        "expected Currency or str currency code",
-    ))
-}
+wire_methods!(PyCurrency, Currency, "Currency");
+
+typed_or_label!(
+    pub(crate) fn extract_currency -> Currency,
+    PyCurrency,
+    "Currency or str currency code",
+    |label| Currency::from_str(label).map_err(crate::errors::core_to_py)
+);
 
 /// Build the `finstack_quant.core.currency` submodule and register [`PyCurrency`].
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

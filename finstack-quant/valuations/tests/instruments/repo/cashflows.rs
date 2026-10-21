@@ -4,6 +4,7 @@ use super::fixtures::*;
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::rates::repo::Repo;
 use finstack_quant_valuations::instruments::Instrument;

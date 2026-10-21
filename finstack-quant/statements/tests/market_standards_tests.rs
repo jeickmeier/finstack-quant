@@ -1300,14 +1300,14 @@ fn test_periods_per_year() {
 #[test]
 fn test_period_next() {
     let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let q2 = q1.next().unwrap();
+    let q2 = q1.shift(1).unwrap();
     assert_eq!(
         q2,
         PeriodId::quarter(2025, 2).expect("valid period fixture")
     );
 
     let q4 = PeriodId::quarter(2025, 4).expect("valid period fixture");
-    let next_q1 = q4.next().unwrap();
+    let next_q1 = q4.shift(1).unwrap();
     assert_eq!(
         next_q1,
         PeriodId::quarter(2026, 1).expect("valid period fixture")
@@ -1317,14 +1317,14 @@ fn test_period_next() {
 #[test]
 fn test_period_prev() {
     let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
-    let q1 = q2.prev().unwrap();
+    let q1 = q2.shift(-1).unwrap();
     assert_eq!(
         q1,
         PeriodId::quarter(2025, 1).expect("valid period fixture")
     );
 
     let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let prev_q4 = q1.prev().unwrap();
+    let prev_q4 = q1.shift(-1).unwrap();
     assert_eq!(
         prev_q4,
         PeriodId::quarter(2024, 4).expect("valid period fixture")

@@ -10,7 +10,7 @@ use crate::Portfolio;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
-use finstack_quant_core::HashSet;
+use finstack_quant_core::FxHashSet;
 use finstack_quant_factor::risk::{FactorContribution, RiskDecomposition};
 use finstack_quant_factor::FactorId;
 
@@ -167,7 +167,7 @@ impl FactorModel {
         };
         let mut scenario_positions = portfolio.positions().to_vec();
 
-        let mut changed = HashSet::default();
+        let mut changed = FxHashSet::default();
         for change in changes {
             match change {
                 PositionChange::Remove { position_id } => {
@@ -1165,7 +1165,10 @@ mod tests {
                 return Ok(Money::new(amount, self.currency).expect("valid money fixture"));
             }
             let pv = self.raw_offset
-                + market.get_discount(self.discount_curve.as_str())?.zero(1.0) * self.scale;
+                + market
+                    .get_discount(self.discount_curve.as_str())?
+                    .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous)
+                    * self.scale;
             Ok(Money::new(pv, self.currency).expect("valid money fixture"))
         }
 
@@ -1175,7 +1178,10 @@ mod tests {
             _as_of: finstack_quant_core::dates::Date,
         ) -> finstack_quant_core::Result<f64> {
             Ok(self.raw_offset
-                + market.get_discount(self.discount_curve.as_str())?.zero(1.0) * self.scale)
+                + market
+                    .get_discount(self.discount_curve.as_str())?
+                    .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous)
+                    * self.scale)
         }
 
         fn base_value_raw_with_currency(

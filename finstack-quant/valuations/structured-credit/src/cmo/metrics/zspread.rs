@@ -10,6 +10,7 @@ use crate::cmo::pricer::{resolve_collateral, tranche_cashflows_on};
 use crate::cmo::AgencyCmo;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_fixed_income::mbs_passthrough::pricer::quote_basis_pool;
@@ -78,10 +79,10 @@ pub(crate) fn calculate_tranche_zspread(
     // boundary (or a silent 0.0) as a converged spread.
     const MAX_ITERATIONS: usize = 100;
     let solver = BrentSolver::new()
-        .tolerance(1e-8)
-        .max_iterations(MAX_ITERATIONS)
-        .bracket_bounds(-0.10, 0.20)
-        .initial_bracket_size(Some(0.05));
+        .with_tolerance(1e-8)
+        .with_max_iterations(MAX_ITERATIONS)
+        .with_bracket_bounds(-0.10, 0.20)
+        .with_initial_bracket_size(Some(0.05));
 
     // Capture any pricing error from the objective so it can be propagated
     // after the solver finishes (`BrentSolver::solve` expects `Fn(f64) -> f64`).

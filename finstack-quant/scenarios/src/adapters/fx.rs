@@ -108,7 +108,7 @@ mod tests {
             _on: finstack_quant_core::dates::Date,
             _policy: FxConversionPolicy,
         ) -> finstack_quant_core::Result<f64> {
-            Err(finstack_quant_core::error::InputError::NotFound {
+            Err(finstack_quant_core::InputError::NotFound {
                 id: format!("FX:{from}->{to}"),
             }
             .into())

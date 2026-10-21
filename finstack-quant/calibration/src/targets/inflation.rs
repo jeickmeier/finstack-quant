@@ -24,7 +24,6 @@ use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 use finstack_quant_valuations_rates::inflation_swap::{InflationSwap, YoYInflationSwap};
-use rust_decimal::Decimal;
 use std::sync::Arc;
 
 // CPI hard bounds are now configurable via InflationCurveSolveConfig.
@@ -147,11 +146,7 @@ impl InflationCurveTarget {
                     .notional(Money::new(self.params.notional, self.params.currency)?)
                     .start_date(base_date)
                     .maturity(maturity)
-                    .fixed_rate(Decimal::try_from(rate).map_err(|_| {
-                        finstack_quant_core::Error::Input(
-                            finstack_quant_core::InputError::ConversionOverflow,
-                        )
-                    })?)
+                    .fixed_rate(finstack_quant_core::decimal::f64_to_decimal(rate)?)
                     .frequency(frequency)
                     .base_cpi_opt(Some(base_cpi))
                     .inflation_index_id(self.params.curve_id.clone())
@@ -171,11 +166,7 @@ impl InflationCurveTarget {
                     .notional(Money::new(self.params.notional, self.params.currency)?)
                     .start_date(base_date)
                     .maturity(maturity)
-                    .fixed_rate(Decimal::try_from(rate).map_err(|_| {
-                        finstack_quant_core::Error::Input(
-                            finstack_quant_core::InputError::ConversionOverflow,
-                        )
-                    })?)
+                    .fixed_rate(finstack_quant_core::decimal::f64_to_decimal(rate)?)
                     .inflation_index_id(self.params.curve_id.clone())
                     .discount_curve_id(self.params.discount_curve_id.clone())
                     .day_count(conventions.day_count)

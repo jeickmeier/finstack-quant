@@ -506,7 +506,7 @@ pub struct CorporateAnalysisOptions {
     pub check_suite: Option<CheckSuiteSpec>,
     /// Valuation date (ISO `YYYY-MM-DD`); required when a market context is
     /// supplied.
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")

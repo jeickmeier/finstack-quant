@@ -20,8 +20,8 @@ fn tree_pinned_loan(
     context: &MetricContext,
 ) -> finstack_quant_core::Result<TermLoan> {
     let oas = oas_decimal_from_quote_overrides(loan, context)?.ok_or_else(|| {
-        finstack_quant_core::Error::internal(
-            "term-loan option risk found a price quote but could not resolve its OAS",
+        finstack_quant_core::Error::Internal(
+            "term-loan option risk found a price quote but could not resolve its OAS".into(),
         )
     })?;
     let mut pinned = loan.clone();

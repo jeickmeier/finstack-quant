@@ -3,6 +3,7 @@
 use crate::equity_option::types::EquityOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
@@ -89,7 +90,8 @@ pub(crate) fn resolve_lifecycle_value(
                 };
                 spot * (-q * t).exp()
             } else {
-                let mut dividend_pv = finstack_quant_core::math::NeumaierAccumulator::new();
+                let mut dividend_pv =
+                    finstack_quant_core::math::summation::NeumaierAccumulator::new();
                 for (date, amount) in future_dividends {
                     dividend_pv.add(*amount * discount_curve.df_between_dates(as_of, *date)?);
                 }

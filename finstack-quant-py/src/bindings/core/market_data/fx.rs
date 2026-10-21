@@ -6,7 +6,6 @@ use finstack_quant_core::money::fx::{
     fx_market_pair as rust_fx_market_pair, fx_pair_convention as rust_fx_pair_convention,
     fx_pip_size as rust_fx_pip_size, invert_fx_rate as rust_invert_fx_rate, CurrencyPair,
     FxConversionPolicy, FxMatrix, FxPairConvention, FxQuery, FxQuoteConvention, FxRateResult,
-    SimpleFxProvider,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
@@ -14,26 +13,18 @@ use pyo3::wrap_pyfunction;
 
 use crate::bindings::core::currency::{extract_currency, PyCurrency};
 use crate::bindings::date_utils::py_to_date;
+use crate::bindings::macros::{
+    impl_repr_html_via_dataframe, label_enum, typed_or_label, wire_methods,
+};
 use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema;
-use crate::errors::{core_to_py, display_to_py};
+use crate::errors::core_to_py;
 
-/// Parse an [`FxConversionPolicy`] from a string.
-fn parse_fx_policy(s: &str) -> PyResult<FxConversionPolicy> {
-    s.parse::<FxConversionPolicy>()
-        .map_err(|e| crate::errors::value_error(format!("Invalid FxConversionPolicy {s:?}: {e}")))
-}
-
-fn extract_fx_policy(value: &Bound<'_, PyAny>) -> PyResult<FxConversionPolicy> {
-    if let Ok(wrapper) = value.extract::<PyRef<'_, PyFxConversionPolicy>>() {
-        Ok(wrapper.inner)
-    } else if let Ok(s) = value.extract::<String>() {
-        parse_fx_policy(&s)
-    } else {
-        Err(crate::errors::value_error(
-            "policy must be FxConversionPolicy or str",
-        ))
-    }
-}
+typed_or_label!(
+    fn extract_fx_policy -> FxConversionPolicy,
+    PyFxConversionPolicy,
+    "FxConversionPolicy or str",
+    |label| label.parse().map_err(core_to_py)
+);
 
 /// FX conversion policy enum.
 ///
@@ -52,51 +43,14 @@ pub struct PyFxConversionPolicy {
     pub(crate) inner: FxConversionPolicy,
 }
 
-impl PyFxConversionPolicy {
-    pub(crate) fn from_inner(inner: FxConversionPolicy) -> Self {
-        Self { inner }
-    }
-}
-
-#[pymethods]
-impl PyFxConversionPolicy {
+label_enum!(PyFxConversionPolicy, FxConversionPolicy, "FxConversionPolicy", from_name, {
     /// Use spot/forward on the cashflow date.
-    #[classattr]
-    const CASHFLOW_DATE: PyFxConversionPolicy = PyFxConversionPolicy {
-        inner: FxConversionPolicy::CashflowDate,
-    };
+    CASHFLOW_DATE => CashflowDate,
     /// Use period end date.
-    #[classattr]
-    const PERIOD_END: PyFxConversionPolicy = PyFxConversionPolicy {
-        inner: FxConversionPolicy::PeriodEnd,
-    };
+    PERIOD_END => PeriodEnd,
     /// Use an average over the period.
-    #[classattr]
-    const PERIOD_AVERAGE: PyFxConversionPolicy = PyFxConversionPolicy {
-        inner: FxConversionPolicy::PeriodAverage,
-    };
-
-    /// Parse from a string label (e.g. ``"cashflow_date"``).
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, name)")]
-    fn from_name(_cls: &Bound<'_, pyo3::types::PyType>, name: &str) -> PyResult<Self> {
-        parse_fx_policy(name).map(Self::from_inner)
-    }
-
-    /// Support ``pickle`` by reconstructing through ``from_name``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_name = py.get_type::<Self>().getattr("from_name")?;
-        Ok((from_name, (self.inner.to_string(),)))
-    }
-
-    fn __repr__(&self) -> String {
-        format!("FxConversionPolicy({})", self.inner)
-    }
-
-    fn __str__(&self) -> String {
-        self.inner.to_string()
-    }
-}
+    PERIOD_AVERAGE => PeriodAverage,
+});
 
 /// Result of an FX rate query.
 ///
@@ -110,29 +64,11 @@ impl PyFxConversionPolicy {
 #[derive(Clone, Debug)]
 pub struct PyFxRateResult {
     /// Inner Rust result.
-    inner: FxRateResult,
+    pub(crate) inner: FxRateResult,
 }
 
 #[pymethods]
 impl PyFxRateResult {
-    /// Deserialize an FX lookup result from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this result to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// The FX conversion rate.
     #[getter]
     fn rate(&self) -> f64 {
@@ -177,18 +113,10 @@ impl PyFxRateResult {
             },
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(PyFxRateResult, FxRateResult, "FxRateResult");
+impl_repr_html_via_dataframe!(PyFxRateResult);
 
 /// Foreign-exchange rate matrix for currency conversion.
 ///
@@ -210,10 +138,8 @@ impl PyFxMatrix {
     /// Create an empty FX matrix.
     #[new]
     fn new() -> Self {
-        let provider = Arc::new(SimpleFxProvider::new());
-        let matrix = FxMatrix::new(provider);
         Self {
-            inner: Arc::new(matrix),
+            inner: Arc::new(FxMatrix::default()),
         }
     }
 
@@ -347,21 +273,24 @@ impl PyFxMatrix {
     #[staticmethod]
     #[pyo3(text_signature = "(quotes)")]
     fn from_dict(quotes: &Bound<'_, pyo3::types::PyDict>) -> PyResult<Self> {
-        let matrix = Self::new();
         let mut parsed = Vec::with_capacity(quotes.len());
         for (key, value) in quotes.iter() {
             let pair: String = key.extract()?;
             let pair: CurrencyPair = pair.parse().map_err(core_to_py)?;
             parsed.push((pair.base, pair.quote, value.extract::<f64>()?));
         }
-        matrix.inner.set_quotes(&parsed).map_err(core_to_py)?;
-        Ok(matrix)
+        FxMatrix::from_quotes(&parsed)
+            .map(|matrix| Self {
+                inner: Arc::new(matrix),
+            })
+            .map_err(core_to_py)
     }
 
     /// Explicit pair-global quotes as a pandas ``DataFrame``.
     ///
-    /// Columns: ``base``, ``quote`` (ISO codes) and ``rate``. Date-scoped
-    /// quotes set with ``set_quote_on`` are not included.
+    /// Columns: ``base``, ``quote`` (ISO codes) and ``rate``, in the Rust
+    /// snapshot order (by ISO-4217 numeric code of base, then quote).
+    /// Date-scoped quotes set with ``set_quote_on`` are not included.
     ///
     /// Returns
     /// -------
@@ -373,7 +302,7 @@ impl PyFxMatrix {
     ///     If repeated quote updates prevent a coherent snapshot or the
     ///     provider cannot version its snapshot quotes.
     fn quotes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let mut state: Vec<(String, String, f64)> = self
+        let state: Vec<(String, String, f64)> = self
             .inner
             .get_serializable_state()
             .map_err(core_to_py)?
@@ -381,7 +310,6 @@ impl PyFxMatrix {
             .into_iter()
             .map(|(base, quote, rate)| (base.to_string(), quote.to_string(), rate))
             .collect();
-        state.sort_by(|a, b| (&a.0, &a.1).cmp(&(&b.0, &b.1)));
         let data = pyo3::types::PyDict::new(py);
         data.set_item(
             "base",
@@ -403,12 +331,6 @@ impl PyFxMatrix {
             state.pinned_quotes.len()
         ))
     }
-}
-
-/// Parse an [`FxQuoteConvention`] from a string.
-fn parse_fx_quote_convention(s: &str) -> PyResult<FxQuoteConvention> {
-    s.parse::<FxQuoteConvention>()
-        .map_err(|e| crate::errors::value_error(format!("Invalid FxQuoteConvention {s:?}: {e}")))
 }
 
 /// USD quotation style for a market FX pair (Direct or Indirect versus USD).
@@ -434,44 +356,12 @@ impl PyFxQuoteConvention {
     }
 }
 
-#[pymethods]
-impl PyFxQuoteConvention {
+label_enum!(PyFxQuoteConvention, FxQuoteConvention, "FxQuoteConvention", from_name, {
     /// USD is the quote currency (EURUSD, GBPUSD).
-    #[classattr]
-    const DIRECT: PyFxQuoteConvention = PyFxQuoteConvention {
-        inner: FxQuoteConvention::Direct,
-    };
+    DIRECT => Direct,
     /// USD is the base currency (USDJPY, USDCAD).
-    #[classattr]
-    const INDIRECT: PyFxQuoteConvention = PyFxQuoteConvention {
-        inner: FxQuoteConvention::Indirect,
-    };
-
-    /// Parse from a string label (``"direct"`` or ``"indirect"``).
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Convention label: ``"direct"`` or ``"indirect"``.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, name)")]
-    fn from_name(_cls: &Bound<'_, pyo3::types::PyType>, name: &str) -> PyResult<Self> {
-        parse_fx_quote_convention(name).map(Self::from_inner)
-    }
-
-    /// Support ``pickle`` by reconstructing through ``from_name``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_name = py.get_type::<Self>().getattr("from_name")?;
-        Ok((from_name, (self.inner.to_string(),)))
-    }
-
-    fn __repr__(&self) -> String {
-        format!("FxQuoteConvention({})", self.inner)
-    }
-
-    fn __str__(&self) -> String {
-        self.inner.to_string()
-    }
-}
+    INDIRECT => Indirect,
+});
 
 /// Market convention for one FX pair after Bloomberg/Reuters CCY1 ordering.
 ///

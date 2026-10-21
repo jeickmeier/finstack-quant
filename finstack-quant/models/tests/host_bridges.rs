@@ -3,7 +3,7 @@
 //! accessors). Python and WebAssembly both call these, so each case pins the
 //! one behaviour the two hosts share.
 
-use finstack_quant_core::error::ErrorKind;
+use finstack_quant_core::ErrorKind;
 use finstack_quant_models::correlation::LatentMultiFactor;
 use finstack_quant_models::credit::migration::{
     default_rate, GeneratorMatrix, MigrationSimulator, RatingScale, TransitionMatrix,

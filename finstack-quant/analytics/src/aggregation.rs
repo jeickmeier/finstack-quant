@@ -19,7 +19,8 @@ use finstack_quant_core::math::summation::NeumaierAccumulator;
 ///
 /// ```rust
 /// use finstack_quant_analytics::PeriodicReturn;
-/// use finstack_quant_core::dates::{Date, Month};
+/// use finstack_quant_core::dates::Date;
+/// use time::Month;
 ///
 /// let point = PeriodicReturn {
 ///     date: Date::from_calendar_date(2025, Month::January, 31)?,
@@ -306,7 +307,8 @@ pub(crate) fn period_stats_inner(returns: impl Iterator<Item = f64>) -> PeriodSt
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::dates::{Month, PeriodKind};
+    use finstack_quant_core::dates::PeriodKind;
+    use time::Month;
 
     fn d(y: i32, m: u8, day: u8) -> Date {
         finstack_quant_core::dates::create_date(y, Month::try_from(m).expect("valid month"), day)

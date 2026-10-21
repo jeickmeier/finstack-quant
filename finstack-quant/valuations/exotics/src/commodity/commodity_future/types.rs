@@ -18,7 +18,6 @@ pub enum CommodityFutureFixing {
     /// One official observation at the supplied date.
     Single {
         /// Date whose forward or realized price determines final settlement.
-        #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
@@ -31,14 +30,13 @@ pub enum CommodityFutureFixing {
     /// Equal-weight arithmetic average over explicit exchange observation dates.
     ArithmeticAverage {
         /// Ordered, unique exchange observation dates.
-        #[serde(with = "finstack_quant_core::wire::dates")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
         )]
         fixing_dates: Vec<Date>,
         /// Official prices already fixed, keyed by observation date.
-        #[serde(default, with = "finstack_quant_core::wire::dated_f64_values")]
+        #[serde(default)]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -245,7 +243,7 @@ impl CommodityFuture {
                 } else {
                     None
                 };
-                let mut sum = finstack_quant_core::math::NeumaierAccumulator::new();
+                let mut sum = finstack_quant_core::math::summation::NeumaierAccumulator::new();
                 for fixing_date in fixing_dates {
                     let price = if *fixing_date < as_of {
                         past_fixings

@@ -220,7 +220,7 @@ it("preserves the scoped published Float64Array return through structured clone"
     "USD-SWAPTION",
     [1],
     [5],
-    [0.03, 0.5, -0.2, 0.4, NaN],
+    [{ alpha: 0.03, beta: 0.5, rho: -0.2, nu: 0.4 }],
     [0.03],
   );
   try {

@@ -94,7 +94,7 @@ mod tests {
     use crate::evaluator::Evaluator;
     use crate::types::AmountOrScalar;
     use finstack_quant_core::dates::PeriodId;
-    use finstack_quant_core::error::ErrorKind;
+    use finstack_quant_core::ErrorKind;
 
     fn model() -> FinancialModelSpec {
         let q1 = PeriodId::quarter(2025, 1).expect("valid period");

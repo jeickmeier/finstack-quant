@@ -454,10 +454,10 @@ pub(crate) fn calculate_mc_oas(
 
     // Solve for OAS using Brent's method
     let solver = BrentSolver::new()
-        .tolerance(config.tolerance)
-        .max_iterations(200)
-        .bracket_bounds(-0.10, 0.20)
-        .initial_bracket_size(Some(0.05));
+        .with_tolerance(config.tolerance)
+        .with_max_iterations(200)
+        .with_bracket_bounds(-0.10, 0.20)
+        .with_initial_bracket_size(Some(0.05));
 
     let result = solver.solve(objective, 0.0);
 

@@ -1076,22 +1076,20 @@ mod tests {
         sens.equity_curvature
             .insert(("ACME".to_string(), 3), (7.0, -4.0));
         let table = sens.to_table().expect("table");
-        let kind = table
-            .column("kind")
-            .and_then(|c| c.as_strings())
-            .expect("kind");
-        let issuer = table
-            .column("issuer")
-            .and_then(|c| c.as_nullable_strings())
-            .expect("issuer");
-        let amount = table
-            .column("amount")
-            .and_then(|c| c.as_f64())
-            .expect("amount");
-        assert_eq!(kind, ["curvature_down", "curvature_up", "delta", "delta"]);
+        let Some(TableColumnData::String(kind)) = table.column("kind").map(|c| &c.data) else {
+            panic!("kind column");
+        };
+        let Some(TableColumnData::NullableString(issuer)) = table.column("issuer").map(|c| &c.data)
+        else {
+            panic!("issuer column");
+        };
+        let Some(TableColumnData::Float64(amount)) = table.column("amount").map(|c| &c.data) else {
+            panic!("amount column");
+        };
+        assert_eq!(*kind, ["curvature_down", "curvature_up", "delta", "delta"]);
         assert_eq!(issuer[2].as_deref(), Some("EUR"));
         assert_eq!(issuer[3].as_deref(), Some("USD"));
-        assert_eq!(amount, [-4.0, 7.0, 50.0, 100.0]);
+        assert_eq!(*amount, [-4.0, 7.0, 50.0, 100.0]);
     }
 
     fn every_frtb_adder() -> FrtbSensitivities {

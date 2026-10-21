@@ -17,6 +17,7 @@
 use crate::exotics::range_accrual::types::RangeAccrual;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::payoff::range_accrual::RangeAccrualPayoff;
@@ -1080,8 +1081,8 @@ mod tests {
             let std = sigma * t.sqrt();
             let z_lower = ((100.0_f64 / forward).ln() + 0.5 * sigma * sigma * t) / std;
             let z_upper = ((120.0_f64 / forward).ln() + 0.5 * sigma * sigma * t) / std;
-            let probability = finstack_quant_core::math::norm_cdf(z_upper)
-                - finstack_quant_core::math::norm_cdf(z_lower);
+            let probability = finstack_quant_core::math::special_functions::norm_cdf(z_upper)
+                - finstack_quant_core::math::special_functions::norm_cdf(z_lower);
             let expected = full_coupon * probability;
             let analytical = npv_analytic(&inst, &curves, as_of)
                 .expect("quanto analytical")

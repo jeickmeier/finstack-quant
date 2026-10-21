@@ -22,7 +22,6 @@ mod elementwise_math {
             .expect("elementwise expression compiles")
             .eval(ctx, cols)
             .expect("element-wise function should evaluate")
-            .values
     }
 
     #[test]
@@ -38,7 +37,7 @@ mod elementwise_math {
             Expr::column("rhs"),
         ))
         .expect("elementwise expression compiles");
-        let result = expr.eval(&ctx, &cols).unwrap().values;
+        let result = expr.eval(&ctx, &cols).unwrap();
 
         assert_eq!(result[0], 11.0);
         assert_eq!(result[1], 22.0);
@@ -54,13 +53,13 @@ mod elementwise_math {
 
         let abs = CompiledExpr::new(Expr::call(Function::Abs, vec![Expr::column("v")]))
             .expect("elementwise expression compiles");
-        let abs_result = abs.eval(&ctx, &cols).unwrap().values;
+        let abs_result = abs.eval(&ctx, &cols).unwrap();
         assert_eq!(&abs_result[..3], &[3.0, 0.0, 4.0]);
         assert!(abs_result[3].is_nan());
 
         let sign = CompiledExpr::new(Expr::call(Function::Sign, vec![Expr::column("v")]))
             .expect("elementwise expression compiles");
-        let sign_result = sign.eval(&ctx, &cols).unwrap().values;
+        let sign_result = sign.eval(&ctx, &cols).unwrap();
         assert_eq!(&sign_result[..3], &[-1.0, 0.0, 1.0]);
         assert!(sign_result[3].is_nan());
     }
@@ -245,7 +244,7 @@ mod elementwise_math {
         let denom = Expr::call(Function::Pow, vec![one_plus_r, Expr::literal(3.0)]);
         let expr = CompiledExpr::new(Expr::bin_op(BinOp::Div, Expr::literal(1.0), denom))
             .expect("elementwise expression compiles");
-        let result = expr.eval(&ctx, &cols).unwrap().values;
+        let result = expr.eval(&ctx, &cols).unwrap();
 
         assert!((result[0] - 1.0 / 1.05_f64.powi(3)).abs() < 1e-12);
         assert!((result[1] - 1.0 / 1.10_f64.powi(3)).abs() < 1e-12);

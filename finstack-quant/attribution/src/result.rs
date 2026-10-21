@@ -403,7 +403,6 @@ pub struct AttributionMeta {
     pub method: AttributionMethod,
 
     /// Start date (T₀).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -411,7 +410,6 @@ pub struct AttributionMeta {
     pub t0: Date,
 
     /// End date (T₁).
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

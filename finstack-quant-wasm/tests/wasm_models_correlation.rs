@@ -137,7 +137,7 @@ fn wasm_copula_from_gaussian_spec() {
     assert_eq!(copula.tail_dependence(JsValue::from(0.3)).unwrap(), 0.0);
 
     let pd = 0.05_f64;
-    let threshold = finstack_quant_core::math::standard_normal_inv_cdf(pd);
+    let threshold = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(pd);
     let correlation = 0.3_f64;
     let cond = copula
         .conditional_default_prob(

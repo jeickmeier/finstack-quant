@@ -367,10 +367,10 @@ impl StructuredCredit {
     ) -> finstack_quant_core::Result<()> {
         let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
         let tranche = |id: &str| self.tranches.tranches.iter().find(|t| t.id.as_str() == id);
-        let mut seen_ids: finstack_quant_core::HashSet<&str> =
-            finstack_quant_core::HashSet::default();
-        let mut seen_keys: finstack_quant_core::HashSet<(&str, super::CoverageTestType)> =
-            finstack_quant_core::HashSet::default();
+        let mut seen_ids: finstack_quant_core::FxHashSet<&str> =
+            finstack_quant_core::FxHashSet::default();
+        let mut seen_keys: finstack_quant_core::FxHashSet<(&str, super::CoverageTestType)> =
+            finstack_quant_core::FxHashSet::default();
         for test in tests {
             if let Some(pct) = test.divert_pct {
                 if !pct.is_finite() || pct <= 0.0 || pct > 100.0 {
@@ -599,8 +599,8 @@ impl StructuredCredit {
         // The waterfall also DEFINES each tranche's interest claim (F3): at
         // most one interest-type recipient may name a tranche, otherwise the
         // claim is ambiguous (split-coupon tiers are not supported).
-        let mut interest_claim_owner: finstack_quant_core::HashMap<&str, &str> =
-            finstack_quant_core::HashMap::default();
+        let mut interest_claim_owner: finstack_quant_core::FxHashMap<&str, &str> =
+            finstack_quant_core::FxHashMap::default();
         for tier in &waterfall.tiers {
             for recipient in &tier.recipients {
                 let mut referenced: Vec<&str> = Vec::new();

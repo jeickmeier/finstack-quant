@@ -132,8 +132,9 @@ impl MetricCalculator for ImpliedVolCalculator {
                     (price.amount() - market_price) / option.notional.amount()
                 })
         };
-        let mut solver = BrentSolver::new().tolerance(1e-12);
-        solver.max_iterations = 100;
+        let solver = BrentSolver::new()
+            .with_tolerance(1e-12)
+            .with_max_iterations(100);
         let upper = match quote.convention {
             VolatilityConvention::Normal => 1.0,
             _ => 5.0,

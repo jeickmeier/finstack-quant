@@ -15,7 +15,7 @@ use super::collateral::{InstrumentCollateral, ReserveInterestDestination};
 use super::enums::{AssetType, DealType};
 use super::npl::LiquidationSpec;
 use super::tranches::TrancheStructure;
-use crate::structured_credit::types::constants::BASIS_POINTS_DIVISOR;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::types::CreditRating;
 
 /// Individual asset held in a structured-credit collateral pool.
@@ -46,7 +46,6 @@ pub struct PoolAsset {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_floor_bp: Option<f64>,
     /// Contractual maturity date of the asset.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -65,7 +64,7 @@ pub struct PoolAsset {
     /// Realized or modeled recovery amount when the asset is defaulted.
     pub recovery_amount: Option<Money>,
     /// Economic default date for the outstanding recovery claim; required for defaulted assets.
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -74,7 +73,7 @@ pub struct PoolAsset {
     /// Acquisition price in the asset currency, used for trading gain/loss.
     pub purchase_price: Option<Money>,
     /// Date on which the pool acquired the asset, if known.
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -84,7 +83,7 @@ pub struct PoolAsset {
     /// the seasoning-dependent prepayment/default curves (PSA, SDA, ABS,
     /// vector) and the amortization schedule. Falls back to
     /// `acquisition_date`, then to the deal closing date (new collateral).
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
@@ -290,7 +289,7 @@ impl PoolAsset {
             id: id.into(),
             asset_type: AssetType::FirstLienLoan {},
             balance,
-            rate: spread_bp / BASIS_POINTS_DIVISOR, // Initialize with spread only
+            rate: spread_bp / BASIS_POINTS_PER_UNIT, // Initialize with spread only
             spread_bp: Some(spread_bp),
             forward_curve_id: Some(forward_curve_id.into().as_str().to_string()),
             maturity,
@@ -390,7 +389,7 @@ impl PoolAsset {
     ///
     /// Returns the explicit spread if available, otherwise derives from rate.
     pub fn spread_bp(&self) -> f64 {
-        self.spread_bp.unwrap_or(self.rate * BASIS_POINTS_DIVISOR)
+        self.spread_bp.unwrap_or(self.rate * BASIS_POINTS_PER_UNIT)
     }
 
     /// Remaining term to maturity in years
@@ -435,7 +434,6 @@ impl PoolAsset {
 #[serde(deny_unknown_fields)]
 pub struct ReinvestmentPeriod {
     /// Inclusive end date of the reinvestment period.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -650,7 +648,6 @@ pub struct RepLine {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_floor_bp: Option<f64>,
     /// Weighted average maturity date
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -738,7 +735,7 @@ impl RepLine {
 
     /// Get effective spread in basis points
     pub fn spread_bp(&self) -> f64 {
-        self.spread_bp.unwrap_or(self.rate * BASIS_POINTS_DIVISOR)
+        self.spread_bp.unwrap_or(self.rate * BASIS_POINTS_PER_UNIT)
     }
 }
 
@@ -1341,8 +1338,8 @@ pub fn calculate_pool_stats(
     as_of: Date,
 ) -> finstack_quant_core::Result<PoolStats> {
     // Count unique obligors and industries
-    let mut obligors = finstack_quant_core::HashSet::default();
-    let mut industries = finstack_quant_core::HashSet::default();
+    let mut obligors = finstack_quant_core::FxHashSet::default();
+    let mut industries = finstack_quant_core::FxHashSet::default();
 
     for asset in &pool.assets {
         if let Some(ref obligor) = asset.obligor_id {

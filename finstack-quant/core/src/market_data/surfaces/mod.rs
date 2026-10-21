@@ -47,7 +47,7 @@
 //! - FX volatility quoting: `docs/REFERENCES.md#clark-fx-options`,
 //!   `docs/REFERENCES.md#wystup-fx-options`
 
-pub mod fx_delta_vol_surface;
+mod fx_delta_vol_surface;
 mod sabr_parameter_data;
 mod vol_cube;
 mod vol_cube_expiry_slice;
@@ -55,7 +55,7 @@ mod vol_surface;
 
 pub use fx_delta_vol_surface::FxDeltaVolSurface;
 pub use sabr_parameter_data::SabrParameterData;
-pub use vol_cube::{VolCube, VolCubeBuilder};
+pub use vol_cube::VolCube;
 pub use vol_cube_expiry_slice::VolCubeExpirySlice;
 pub use vol_surface::{
     VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis, VolSurfaceBuilder,
@@ -64,7 +64,7 @@ pub use vol_surface::{
 /// Validate a surface axis: non-empty, finite, and strictly increasing if `len > 1`.
 pub(super) fn validate_axis(axis: &[f64]) -> crate::Result<()> {
     if axis.is_empty() {
-        return Err(crate::error::InputError::TooFewPoints.into());
+        return Err(crate::InputError::TooFewPoints.into());
     }
     if axis.iter().any(|x| !x.is_finite()) {
         return Err(crate::Error::Validation(
@@ -72,7 +72,7 @@ pub(super) fn validate_axis(axis: &[f64]) -> crate::Result<()> {
         ));
     }
     if axis.len() > 1 {
-        crate::math::interp::utils::validate_knots(axis)?;
+        crate::math::interp::validate_knots(axis)?;
     }
     Ok(())
 }

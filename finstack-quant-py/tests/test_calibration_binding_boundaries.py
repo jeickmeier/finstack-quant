@@ -11,7 +11,6 @@ from finstack_quant.calibration import (
     CalibrationStep,
     CdsQuote,
     CdsTrancheQuote,
-    CollateralEntry,
     DividendScheduleDatum,
     FxSpotDatum,
     InflationQuote,
@@ -173,7 +172,6 @@ def test_typed_market_data_feeds_the_envelope() -> None:
         FxSpotDatum("EURUSD", "EUR", "USD", 1.1),
         PriceDatum("AAPL", 187.5),
         DividendScheduleDatum({"id": "AAPL-DIVS", "underlying": "AAPL", "events": []}),
-        CollateralEntry("EUR", "USD"),
     ]
     envelope = CalibrationEnvelope(plan, market_data=[*quotes, *data])
     kinds = [datum["kind"] for datum in envelope.market_data[2:]]
@@ -185,7 +183,6 @@ def test_typed_market_data_feeds_the_envelope() -> None:
         "fx_spot",
         "price",
         "dividend_schedule",
-        "collateral",
     ]
     assert calibrate(envelope).success
     for datum in data:

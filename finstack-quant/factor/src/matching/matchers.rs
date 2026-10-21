@@ -13,7 +13,7 @@ use super::filter::{AttributeFilter, DependencyFilter};
 use crate::primitives::dependency::MarketDependency;
 use crate::primitives::factor_types::FactorId;
 use finstack_quant_core::types::Attributes;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
@@ -134,7 +134,7 @@ pub struct MappingTableMatcher {
     rules: Vec<MappingRule>,
     /// Rule indices with an exact `dependency_filter.id`, grouped by that id
     /// in declaration order.
-    exact_by_id: HashMap<String, Vec<usize>>,
+    exact_by_id: FxHashMap<String, Vec<usize>>,
     /// Rule indices with `dependency_filter.id == None`, in declaration order.
     wildcards: Vec<usize>,
 }
@@ -160,8 +160,8 @@ impl MappingTableMatcher {
     }
 }
 
-fn index_mapping_rules(rules: &[MappingRule]) -> (HashMap<String, Vec<usize>>, Vec<usize>) {
-    let mut exact_by_id: HashMap<String, Vec<usize>> = HashMap::default();
+fn index_mapping_rules(rules: &[MappingRule]) -> (FxHashMap<String, Vec<usize>>, Vec<usize>) {
+    let mut exact_by_id: FxHashMap<String, Vec<usize>> = FxHashMap::default();
     let mut wildcards = Vec::new();
     for (idx, rule) in rules.iter().enumerate() {
         match rule.dependency_filter.id.as_deref() {

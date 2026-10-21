@@ -4,28 +4,38 @@
 use std::sync::Arc;
 
 use crate::api::core::currency::JsCurrency;
-use crate::utils::input::{from_js_json, js_f64, js_string};
-use crate::utils::{parse_iso_date, to_js_err};
+use crate::utils::input::{from_js_json, js_currency, js_f64, js_string};
+use crate::utils::to_js_err;
+use crate::utils::wire::js_date;
 use finstack_quant_core::currency::Currency as RustCurrency;
 use finstack_quant_core::money::fx::{
     fx_market_pair as rust_fx_market_pair, fx_pair_convention as rust_fx_pair_convention,
     fx_pip_size as rust_fx_pip_size, invert_fx_rate as rust_invert_fx_rate, CurrencyPair,
     FxConversionPolicy as RustFxConversionPolicy, FxMatrix as RustFxMatrix,
     FxPairConvention as RustFxPairConvention, FxQuery, FxQuoteConvention as RustFxQuoteConvention,
-    FxRateResult as RustFxRateResult, SimpleFxProvider,
+    FxRateResult as RustFxRateResult,
 };
 use js_sys::Array;
 use wasm_bindgen::prelude::*;
 
 /// Typed FX conversion policy wrapper for WASM callers.
 #[wasm_bindgen(js_name = FxConversionPolicy)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct JsFxConversionPolicy {
     inner: RustFxConversionPolicy,
 }
 
 #[wasm_bindgen(js_class = FxConversionPolicy)]
 impl JsFxConversionPolicy {
+    /// The Rust default policy (`FxConversionPolicy::default()`, cashflow date).
+    ///
+    /// @returns The default conversion policy, the one `FxMatrix.rate` uses
+    /// when `policy` is omitted.
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Use spot/forward on the cashflow date.
     #[wasm_bindgen(js_name = cashflowDate)]
     pub fn cashflow_date() -> Self {
@@ -76,7 +86,7 @@ impl JsFxConversionPolicy {
 /// Structured FX lookup result for WASM callers.
 #[wasm_bindgen(js_name = FxRateResult)]
 pub struct JsFxRateResult {
-    inner: RustFxRateResult,
+    pub(crate) inner: RustFxRateResult,
 }
 
 #[wasm_bindgen(js_class = FxRateResult)]
@@ -247,11 +257,7 @@ impl JsFxPairConvention {
 /// alphabetic currency.
 #[wasm_bindgen(js_name = fxMarketPair)]
 pub fn fx_market_pair(a: JsValue, b: JsValue) -> Result<Array, JsValue> {
-    let a: &str = &js_string(&a, "a")?;
-    let b: &str = &js_string(&b, "b")?;
-    let a: RustCurrency = a.parse().map_err(to_js_err)?;
-    let b: RustCurrency = b.parse().map_err(to_js_err)?;
-    let (base, quote) = rust_fx_market_pair(a, b);
+    let (base, quote) = rust_fx_market_pair(js_currency(&a, "a")?, js_currency(&b, "b")?);
     let out = Array::new();
     out.push(&JsCurrency { inner: base }.into());
     out.push(&JsCurrency { inner: quote }.into());
@@ -272,10 +278,8 @@ pub fn fx_market_pair(a: JsValue, b: JsValue) -> Result<Array, JsValue> {
 /// alphabetic currency.
 #[wasm_bindgen(js_name = fxPairConvention)]
 pub fn fx_pair_convention(base: JsValue, quote: JsValue) -> Result<JsFxPairConvention, JsValue> {
-    let base: &str = &js_string(&base, "base")?;
-    let quote: &str = &js_string(&quote, "quote")?;
-    let base: RustCurrency = base.parse().map_err(to_js_err)?;
-    let quote: RustCurrency = quote.parse().map_err(to_js_err)?;
+    let base = js_currency(&base, "base")?;
+    let quote = js_currency(&quote, "quote")?;
     Ok(JsFxPairConvention {
         inner: rust_fx_pair_convention(base, quote),
     })
@@ -295,10 +299,8 @@ pub fn fx_pair_convention(base: JsValue, quote: JsValue) -> Result<JsFxPairConve
 /// alphabetic currency.
 #[wasm_bindgen(js_name = fxPipSize)]
 pub fn fx_pip_size(base: JsValue, quote: JsValue) -> Result<f64, JsValue> {
-    let base: &str = &js_string(&base, "base")?;
-    let quote: &str = &js_string(&quote, "quote")?;
-    let base: RustCurrency = base.parse().map_err(to_js_err)?;
-    let quote: RustCurrency = quote.parse().map_err(to_js_err)?;
+    let base = js_currency(&base, "base")?;
+    let quote = js_currency(&quote, "quote")?;
     Ok(rust_fx_pip_size(base, quote))
 }
 
@@ -331,12 +333,12 @@ impl Default for JsFxMatrix {
 
 #[wasm_bindgen(js_class = FxMatrix)]
 impl JsFxMatrix {
-    /// Create an empty FX matrix.
+    /// Create an empty FX matrix (Rust `FxMatrix::default`): rates come only
+    /// from quotes set on it.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        let matrix = RustFxMatrix::new(Arc::new(SimpleFxProvider::new()));
         Self {
-            inner: Arc::new(matrix),
+            inner: Arc::new(RustFxMatrix::default()),
         }
     }
 
@@ -354,14 +356,13 @@ impl JsFxMatrix {
     #[wasm_bindgen(js_name = setQuote)]
     pub fn set_quote(&self, base: JsValue, quote: JsValue, rate: JsValue) -> Result<(), JsValue> {
         let rate = js_f64(&rate, "rate")?;
-        let base: &str = &js_string(&base, "base")?;
-        let quote: &str = &js_string(&quote, "quote")?;
-        let base_currency: RustCurrency = base.parse().map_err(to_js_err)?;
-        let quote_currency: RustCurrency = quote.parse().map_err(to_js_err)?;
         self.inner
-            .set_quote(base_currency, quote_currency, rate)
-            .map_err(to_js_err)?;
-        Ok(())
+            .set_quote(
+                js_currency(&base, "base")?,
+                js_currency(&quote, "quote")?,
+                rate,
+            )
+            .map_err(to_js_err)
     }
 
     /// Set several pair-global quotes atomically (Rust `FxMatrix::set_quotes`).
@@ -392,7 +393,7 @@ impl JsFxMatrix {
     }
 
     /// Build a matrix from quotes keyed by currency pair (Rust `CurrencyPair`
-    /// parsing plus `FxMatrix::set_quotes`).
+    /// parsing plus `FxMatrix::from_quotes`).
     ///
     /// # Arguments
     ///
@@ -414,9 +415,11 @@ impl JsFxMatrix {
                 Ok((pair.base, pair.quote, rate))
             })
             .collect::<Result<Vec<_>, JsValue>>()?;
-        let matrix = Self::new();
-        matrix.inner.set_quotes(&quotes).map_err(to_js_err)?;
-        Ok(matrix)
+        RustFxMatrix::from_quotes(&quotes)
+            .map(|matrix| Self {
+                inner: Arc::new(matrix),
+            })
+            .map_err(to_js_err)
     }
 
     /// Set an authoritative quote scoped to one date and conversion policy.
@@ -442,14 +445,14 @@ impl JsFxMatrix {
         rate: JsValue,
     ) -> Result<(), JsValue> {
         let rate = js_f64(&rate, "rate")?;
-        let base: &str = &js_string(&base, "base")?;
-        let quote: &str = &js_string(&quote, "quote")?;
-        let date: &str = &js_string(&date, "date")?;
-        let base_currency: RustCurrency = base.parse().map_err(to_js_err)?;
-        let quote_currency: RustCurrency = quote.parse().map_err(to_js_err)?;
-        let d = parse_iso_date(date)?;
         self.inner
-            .set_quote_on(base_currency, quote_currency, d, policy.inner, rate)
+            .set_quote_on(
+                js_currency(&base, "base")?,
+                js_currency(&quote, "quote")?,
+                js_date(&date, "date")?,
+                policy.inner,
+                rate,
+            )
             .map_err(to_js_err)
     }
 
@@ -457,8 +460,8 @@ impl JsFxMatrix {
     /// Global quotes precede pinned fixings, then provider observations,
     /// resolving source priority before taking a reciprocal.
     ///
-    /// The published facade makes `policy` optional: when omitted it calls
-    /// the Rust default query (`FxQuery::new`, cashflow-date policy).
+    /// The published facade makes `policy` optional: when omitted it passes
+    /// `new FxConversionPolicy()`, the Rust default (cashflow date).
     ///
     /// # Arguments
     /// * `base` - Base (from) currency ISO code.
@@ -479,45 +482,12 @@ impl JsFxMatrix {
         date: JsValue,
         policy: &JsFxConversionPolicy,
     ) -> Result<JsFxRateResult, JsValue> {
-        let base: &str = &js_string(&base, "base")?;
-        let quote: &str = &js_string(&quote, "quote")?;
-        let date: &str = &js_string(&date, "date")?;
-        let base_currency: RustCurrency = base.parse().map_err(to_js_err)?;
-        let quote_currency: RustCurrency = quote.parse().map_err(to_js_err)?;
-        let d = parse_iso_date(date)?;
-        let query = FxQuery::with_policy(base_currency, quote_currency, d, policy.inner);
-        let result = self.inner.rate(query).map_err(to_js_err)?;
-        Ok(JsFxRateResult { inner: result })
-    }
-
-    /// Look up an FX rate with the Rust default query (`FxQuery::new`).
-    ///
-    /// Raw-package implementation of `rate(base, quote, date)` without a
-    /// policy; the published facade folds it into `rate` and removes this
-    /// name from the public prototype.
-    /// @param base - Base currency code of the FX quote, where the rate is quote per base.
-    /// @param quote - Quote currency code of the FX rate, expressed per unit of base currency.
-    /// @param date - ISO-8601 date used by the calculation or market-data lookup.
-    ///
-    /// # Errors
-    ///
-    /// Throws a JavaScript exception if either currency code or `date` is invalid,
-    /// no direct, inverse, or triangulated quote is available, or a resolved
-    /// quote is non-finite or non-positive.
-    #[wasm_bindgen(js_name = rateWithDefaultPolicy)]
-    pub fn rate_with_default_policy(
-        &self,
-        base: JsValue,
-        quote: JsValue,
-        date: JsValue,
-    ) -> Result<JsFxRateResult, JsValue> {
-        let base: &str = &js_string(&base, "base")?;
-        let quote: &str = &js_string(&quote, "quote")?;
-        let date: &str = &js_string(&date, "date")?;
-        let base_currency: RustCurrency = base.parse().map_err(to_js_err)?;
-        let quote_currency: RustCurrency = quote.parse().map_err(to_js_err)?;
-        let d = parse_iso_date(date)?;
-        let query = FxQuery::new(base_currency, quote_currency, d);
+        let query = FxQuery::with_policy(
+            js_currency(&base, "base")?,
+            js_currency(&quote, "quote")?,
+            js_date(&date, "date")?,
+            policy.inner,
+        );
         self.inner
             .rate(query)
             .map(|inner| JsFxRateResult { inner })

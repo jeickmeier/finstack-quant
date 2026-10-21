@@ -122,15 +122,14 @@ fn test_all_flows_preserve_currency() {
 /// Bus/252 year fraction for a known date range using TARGET2 calendar.
 #[test]
 fn test_bus_252_year_fraction() {
-    use finstack_quant_core::dates::calendar::TARGET2;
-    use finstack_quant_core::dates::{DayCount, DayCountContext};
+    use finstack_quant_core::dates::{calendar_by_id_strict, DayCount, DayCountContext};
 
     let start = d(2024, 1, 2); // First business day of 2024
     let end = d(2024, 7, 1);
 
-    let calendar = TARGET2;
+    let calendar = calendar_by_id_strict("target2").expect("target2 calendar");
     let ctx = DayCountContext {
-        calendar: Some(&calendar),
+        calendar: Some(calendar),
         frequency: None,
         bus_basis: None,
         coupon_period: None,

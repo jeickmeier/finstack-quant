@@ -3,10 +3,7 @@
 //! Financial constants used across margin computation modules,
 //! following ISDA SIMM and industry standard conventions.
 
-/// Standard days per year for year fraction calculations (ACT/365 Fixed).
-///
-/// Re-exported from `finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR`.
-pub use finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR;
+use finstack_quant_core::dates::CALENDAR_DAYS_PER_YEAR;
 
 /// Duration approximation factor.
 ///

@@ -5,7 +5,7 @@
 //! and validation guarantees.
 
 use super::FactorId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use serde::{Deserialize, Deserializer, Serialize};
 
 /// User-supplied factor covariance matrix with row-major storage.
@@ -40,7 +40,7 @@ pub struct FactorCovarianceMatrix {
     /// Factor-to-row lookup, rebuilt on deserialization rather than carried on
     /// the wire.
     #[serde(skip)]
-    index: HashMap<FactorId, usize>,
+    index: FxHashMap<FactorId, usize>,
     /// Cached `√max(variance, 0)` per factor, rebuilt with [`Self::new`].
     #[serde(skip)]
     stdevs: Vec<f64>,
@@ -261,8 +261,8 @@ impl FactorCovarianceMatrix {
 
     fn build_index(
         factor_ids: &[FactorId],
-    ) -> finstack_quant_core::Result<HashMap<FactorId, usize>> {
-        let mut index = HashMap::with_capacity_and_hasher(factor_ids.len(), Default::default());
+    ) -> finstack_quant_core::Result<FxHashMap<FactorId, usize>> {
+        let mut index = FxHashMap::with_capacity_and_hasher(factor_ids.len(), Default::default());
         for (idx, factor_id) in factor_ids.iter().cloned().enumerate() {
             if index.insert(factor_id.clone(), idx).is_some() {
                 return Err(finstack_quant_core::Error::Validation(format!(

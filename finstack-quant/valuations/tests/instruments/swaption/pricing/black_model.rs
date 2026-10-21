@@ -53,8 +53,8 @@ fn test_black_formula_manual_validation() {
     let d1 = ((forward / strike).ln() + 0.5 * var) / sqrt_var;
     let d2 = d1 - sqrt_var;
 
-    let norm_d1 = finstack_quant_core::math::norm_cdf(d1);
-    let norm_d2 = finstack_quant_core::math::norm_cdf(d2);
+    let norm_d1 = finstack_quant_core::math::special_functions::norm_cdf(d1);
+    let norm_d2 = finstack_quant_core::math::special_functions::norm_cdf(d2);
 
     let expected = annuity * (forward * norm_d1 - strike * norm_d2) * swaption.notional.amount();
 

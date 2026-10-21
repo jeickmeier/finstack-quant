@@ -8,6 +8,7 @@ use crate::quanto_option::types::QuantoOption;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
 use finstack_quant_valuations_core::pricer::{
@@ -30,7 +31,7 @@ fn collect_quanto_inputs(
         .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
 
     // Recover continuously-compounded rates from *date-based* discount factors,
-    // mirroring `shared.rs::collect_fx_option_inputs_no_vol`. `curve.zero(t)`
+    // mirroring `shared.rs::collect_fx_option_inputs_no_vol`. `curve.zero_rate(t, Continuous)`
     // interpolates on the curve's own time axis, so the rate it returns does
     // not satisfy `e^{-r·t} = df_between_dates(as_of, expiry)` whenever
     // `as_of != base_date` or the instrument and curve day-counts differ.
@@ -279,7 +280,7 @@ mod tests {
     /// Item 3 regression: `r_dom`/`r_for` must be recovered from *date-based*
     /// discount factors so that `e^{-r·t} == df_between_dates(as_of, expiry)`.
     /// The fixture uses a discount curve whose `base_date` precedes `as_of`,
-    /// which makes the prior `curve.zero(t)` (time-axis interpolation) disagree
+    /// which makes the prior `curve.zero_rate(t, Continuous)` (time-axis interpolation) disagree
     /// with the actual discount factor over the option's life.
     #[test]
     fn quanto_inputs_use_date_based_discount_rates() {
@@ -288,7 +289,7 @@ mod tests {
         let expiry = date!(2026 - 07 - 01);
 
         // Non-flat curves: the instantaneous forward rate rises across tenors,
-        // so `df(t2)/df(t1) != df(t2 - t1)` and the curve-axis `zero()` lookup
+        // so `df(t2)/df(t1) != df(t2 - t1)` and the curve-axis `zero_rate()` lookup
         // genuinely disagrees with date-based discounting.
         let usd = DiscountCurve::builder("USD-OIS")
             .base_date(curve_base)
@@ -384,9 +385,12 @@ mod tests {
             (-r_for * t).exp()
         );
 
-        // The buggy time-axis lookup disagrees: `zero(t)` reads df at curve
+        // The buggy time-axis lookup disagrees: `zero_rate(t, Continuous)` reads df at curve
         // time `t` (anchored at base_date), not the option's `as_of→expiry` df.
-        let bug_r_dom = market.get_discount("USD-OIS").expect("usd").zero(t);
+        let bug_r_dom = market
+            .get_discount("USD-OIS")
+            .expect("usd")
+            .zero_rate(t, finstack_quant_core::math::Compounding::Continuous);
         assert!(
             ((-bug_r_dom * t).exp() - df_dom).abs() > 1e-4,
             "fixture must expose the curve-axis bug for the domestic rate"

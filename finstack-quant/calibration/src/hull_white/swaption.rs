@@ -626,8 +626,8 @@ pub(super) fn hw1f_swaption_price_prepared(
         let bracket_lo = f0t0 - half_width;
         let bracket_hi = f0t0 + half_width;
         let brent = BrentSolver::new()
-            .tolerance(1e-12)
-            .bracket_bounds(bracket_lo, bracket_hi);
+            .with_tolerance(1e-12)
+            .with_bracket_bounds(bracket_lo, bracket_hi);
         match brent.solve(g, f0t0) {
             Ok(r) => r_star = r,
             Err(_) => {

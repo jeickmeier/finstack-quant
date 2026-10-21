@@ -14,6 +14,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxPolicyMeta};
@@ -139,7 +140,7 @@ where
 pub(crate) fn measured_unless_missing(
     measurement: finstack_quant_core::Result<f64>,
 ) -> finstack_quant_core::Result<Option<f64>> {
-    use finstack_quant_core::error::InputError;
+    use finstack_quant_core::InputError;
     match measurement {
         Ok(shift) => Ok(Some(shift)),
         Err(finstack_quant_core::Error::Input(

@@ -100,7 +100,7 @@ impl PyMetricPricingOverrides {
     ) -> PyResult<Self> {
         let theta_period = match theta_period {
             Some(value) if !value.is_none() => {
-                Some(super::convert::tenor_from_py(value, "theta_period")?)
+                Some(crate::bindings::core::dates::tenor::extract_tenor(value)?)
             }
             _ => None,
         };

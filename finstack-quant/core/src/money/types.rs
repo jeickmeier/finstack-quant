@@ -23,9 +23,8 @@
 
 use crate::config::{FinstackConfig, RoundingMode};
 use crate::currency::Currency;
-use crate::dates::Date;
 use crate::decimal::f64_to_decimal;
-use crate::error::{Error, InputError};
+use crate::{Error, InputError};
 use core::fmt;
 
 use super::rounding::{
@@ -77,12 +76,13 @@ pub struct FormatOpts {
 }
 
 impl Default for FormatOpts {
-    /// Defaults: 2 decimals, currency code shown, `','` grouping, Bankers rounding.
+    /// Defaults, matching `Display`: currency minor-unit decimals, currency
+    /// code shown, no grouping, Bankers rounding.
     fn default() -> Self {
         Self {
-            decimals: Some(2),
+            decimals: None,
             show_currency: true,
-            group: Some(','),
+            group: None,
             rounding: RoundingMode::Bankers,
         }
     }
@@ -101,10 +101,12 @@ impl FormatOpts {
     ///
     /// * `decimals` - Fractional digits to display; `None` selects the
     ///   currency's ISO-4217 minor units. Must lie in `0..=Self::MAX_DECIMALS`.
-    /// * `show_currency` - Whether to prepend the ISO-4217 currency code.
+    /// * `show_currency` - Whether to prepend the ISO-4217 currency code;
+    ///   `None` selects `true`.
     /// * `group` - Optional single-character thousands separator (e.g.
     ///   `Some(',')`); `None` disables grouping.
-    /// * `rounding` - Rounding mode applied to the displayed value.
+    /// * `rounding` - Rounding mode applied to the displayed value; `None`
+    ///   selects [`RoundingMode::default`] (bankers).
     ///
     /// # Returns
     ///
@@ -120,18 +122,20 @@ impl FormatOpts {
     /// use finstack_quant_core::money::FormatOpts;
     /// use finstack_quant_core::config::RoundingMode;
     ///
-    /// let opts = FormatOpts::new(Some(2), true, Some(","), RoundingMode::Bankers)
+    /// let opts = FormatOpts::new(Some(2), Some(true), Some(","), Some(RoundingMode::Bankers))
     ///     .expect("bounded precision");
     /// assert_eq!(opts.decimals, Some(2));
     /// assert_eq!(opts.group, Some(','));
-    /// assert!(FormatOpts::new(None, true, Some(", "), RoundingMode::Bankers).is_err());
+    /// assert!(FormatOpts::new(None, None, Some(", "), None).is_err());
     /// ```
     pub fn new(
         decimals: Option<usize>,
-        show_currency: bool,
+        show_currency: Option<bool>,
         group: Option<&str>,
-        rounding: RoundingMode,
+        rounding: Option<RoundingMode>,
     ) -> Result<Self, Error> {
+        let show_currency = show_currency.unwrap_or(true);
+        let rounding = rounding.unwrap_or_default();
         if decimals.is_some_and(|precision| precision > Self::MAX_DECIMALS) {
             return Err(Error::Validation(format!(
                 "formatting precision exceeds {}",
@@ -246,6 +250,26 @@ impl Money {
         Self::try_new_impl(amount, currency, None)
     }
 
+    /// An exact zero amount in `currency`.
+    ///
+    /// # Arguments
+    ///
+    /// * `currency` - ISO-4217 currency tag of the zero amount.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::money::Money;
+    ///
+    /// let zero = Money::zero(Currency::USD);
+    /// assert_eq!(zero.amount(), 0.0);
+    /// assert_eq!(zero.currency(), Currency::USD);
+    /// ```
+    #[must_use]
+    pub fn zero(currency: Currency) -> Self {
+        Self::from_decimal(rust_decimal::Decimal::ZERO, currency)
+    }
+
     /// Construct from a `Decimal` amount, preserving full precision.
     ///
     /// Unlike [`Money::new`], this constructor never goes
@@ -256,27 +280,16 @@ impl Money {
     ///
     /// `rust_decimal::Decimal` already rejects `NaN` / `Infinity` at parse
     /// time, so callers parsing user-supplied strings will surface those errors
-    /// before reaching this constructor.
-    ///
-    /// # Errors
-    ///
-    /// Returns `InputError::ConversionOverflow` when the Decimal cannot be
-    /// converted to the finite `f64` view used by [`Self::amount`].
+    /// before reaching this constructor. Every `Decimal` has a finite `f64`
+    /// view for [`Self::amount`], so construction cannot fail.
     ///
     /// # Arguments
     ///
     /// * `amount` - Finite monetary quantity in major currency units before rounding
     /// * `currency` - ISO-4217 currency that defines scale, rounding, and display units
-    pub fn from_decimal(amount: rust_decimal::Decimal, currency: Currency) -> Result<Self, Error> {
-        // rust_decimal::Decimal models a fixed-precision number with no
-        // NaN/Infinity representation, so finiteness is structural. The
-        // remaining concern is converting back to f64 for downstream f64-only
-        // code paths — guard at construction time so we never hold a value
-        // that can't round-trip through Money::amount().
-        if rust_decimal::prelude::ToPrimitive::to_f64(&amount).is_none() {
-            return Err(Error::Input(InputError::ConversionOverflow));
-        }
-        Ok(Self { amount, currency })
+    #[must_use]
+    pub fn from_decimal(amount: rust_decimal::Decimal, currency: Currency) -> Self {
+        Self { amount, currency }
     }
 
     /// Construct from exact decimal text, rejecting any inexact representation.
@@ -312,9 +325,7 @@ impl Money {
     /// Returns `Error::Validation` when the text cannot be represented
     /// exactly as a `Decimal` (malformed input, non-finite tokens, mantissa
     /// precision beyond 96 bits, a malformed exponent, or an exponent whose
-    /// application would exceed the 28-digit scale or 96-bit mantissa), or
-    /// `InputError::ConversionOverflow` when the exact value cannot produce
-    /// the finite `f64` view used by [`Self::amount`].
+    /// application would exceed the 28-digit scale or 96-bit mantissa).
     ///
     /// # Examples
     /// ```rust
@@ -325,7 +336,10 @@ impl Money {
     /// assert_eq!(money.amount_decimal().to_string(), "1.245");
     /// ```
     pub fn from_decimal_str(amount: &str, currency: Currency) -> Result<Self, Error> {
-        Self::from_decimal(crate::decimal::parse_decimal(amount)?, currency)
+        Ok(Self::from_decimal(
+            crate::decimal::parse_decimal(amount)?,
+            currency,
+        ))
     }
 
     /// Construct from an exact Decimal using the configured ingest rounding policy.
@@ -335,15 +349,12 @@ impl Money {
     /// * `amount` - Exact monetary amount in major currency units, rounded without conversion through f64.
     /// * `currency` - ISO-4217 currency used to select the ingest scale.
     /// * `cfg` - Configuration supplying the currency scale override (or max(6, ISO minor-unit digits)) and rounding mode.
-    ///
-    /// # Errors
-    ///
-    /// Returns a conversion error if the rounded amount cannot provide an f64 view.
+    #[must_use]
     pub fn from_decimal_with_config(
         amount: rust_decimal::Decimal,
         currency: Currency,
         cfg: &FinstackConfig,
-    ) -> Result<Self, Error> {
+    ) -> Self {
         let scale = cfg.ingest_scale(currency) as i32;
         Self::from_decimal(
             super::rounding::round_decimal(amount, scale, cfg.rounding.mode),
@@ -624,14 +635,13 @@ impl Money {
     ///
     /// Returns a currency mismatch, division-by-zero, or conversion-overflow error.
     pub fn checked_div(self, rhs: Self) -> Result<f64, Error> {
-        use rust_decimal::prelude::ToPrimitive;
         ensure_same_currency(&self, &rhs)?;
         if rhs.amount.is_zero() {
             return Err(Error::Validation("division by zero".into()));
         }
         self.amount
             .checked_div(rhs.amount)
-            .and_then(|ratio| ratio.to_f64())
+            .map(|ratio| ratio.as_f64())
             .ok_or(Error::Input(InputError::ConversionOverflow))
     }
 
@@ -661,67 +671,6 @@ impl Money {
             amount: super::rounding::round_decimal(self.amount, dp, RoundingMode::Bankers),
             currency: self.currency,
         })
-    }
-
-    /// Convert this [`Money`] into another currency using an `FxProvider`.
-    ///
-    /// # Parameters
-    /// - `to`: target [`Currency`](crate::currency::Currency)
-    /// - `on`: valuation date used for the FX lookup
-    /// - `provider`: FX source implementing `FxProvider`
-    /// - `policy`: lookup policy hint passed to the provider
-    ///
-    /// # Examples
-    /// ```rust
-    /// use finstack_quant_core::money::fx::{FxConversionPolicy, FxProvider};
-    /// use finstack_quant_core::money::Money;
-    /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_core::dates::Date;
-    /// use time::Month;
-    ///
-    /// struct StaticFx;
-    /// impl FxProvider for StaticFx {
-    ///     fn rate(
-    ///         &self,
-    ///         _from: Currency,
-    ///         _to: Currency,
-    ///         _on: Date,
-    ///         _policy: FxConversionPolicy,
-    ///     ) -> finstack_quant_core::Result<f64> {
-    ///         Ok(1.2)
-    ///     }
-    /// }
-    ///
-    /// let eur = Money::from((100_i64, Currency::EUR));
-    /// let trade_date = Date::from_calendar_date(2024, Month::January, 2).expect("Valid date");
-    /// let usd = eur.convert(
-    ///     Currency::USD,
-    ///     trade_date,
-    ///     &StaticFx,
-    ///     FxConversionPolicy::CashflowDate,
-    /// ).expect("Currency conversion should succeed");
-    /// assert_eq!(usd.amount(), 120.0);
-    /// assert_eq!(usd.currency(), Currency::USD);
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Propagates a provider lookup failure. It also returns
-    /// `InputError::InvalidFxRate` for a non-finite or non-positive quote, and
-    /// `InputError::ConversionOverflow` when applying a valid quote exceeds
-    /// Decimal precision.
-    pub fn convert(
-        self,
-        to: Currency,
-        on: Date,
-        provider: &impl crate::money::fx::FxProvider,
-        policy: crate::money::fx::FxConversionPolicy,
-    ) -> crate::Result<Self> {
-        if self.currency == to {
-            return Ok(self);
-        }
-        let rate = provider.rate(self.currency, to, on, policy)?;
-        self.convert_at_rate(to, rate)
     }
 
     /// Convert this amount using an already-resolved FX rate.
@@ -760,12 +709,7 @@ impl fmt::Display for Money {
         // Route through the canonical formatter so `Display` always agrees with
         // `format(currency_decimals, true)` (a raw `{:.prec$}` on the Decimal
         // would truncate instead of round).
-        let dp = usize::from(self.currency.decimals());
-        f.write_str(&self.format_with(FormatOpts {
-            decimals: Some(dp),
-            group: None,
-            ..FormatOpts::default()
-        }))
+        f.write_str(&self.format_with(FormatOpts::default()))
     }
 }
 
@@ -842,7 +786,10 @@ mod tests {
     #[test]
     fn grouped_format_handles_negative_values() {
         let m = Money::new(-1234.56, Currency::USD).expect("valid money fixture");
-        let formatted = m.format_with(FormatOpts::default());
+        let formatted = m.format_with(FormatOpts {
+            group: Some(','),
+            ..FormatOpts::default()
+        });
         assert!(
             formatted.starts_with("USD -1,234.56"),
             "formatted output should keep sign on integer part only: {}",
@@ -920,31 +867,10 @@ mod tests {
         assert_eq!(object.get("currency"), Some(&serde_json::json!("USD")));
     }
 
-    struct NaNProvider;
-    impl crate::money::fx::FxProvider for NaNProvider {
-        fn rate(
-            &self,
-            _from: Currency,
-            _to: Currency,
-            _on: Date,
-            _policy: crate::money::fx::FxConversionPolicy,
-        ) -> crate::Result<f64> {
-            Ok(f64::NAN)
-        }
-    }
-
     #[test]
     fn convert_rejects_non_finite_rate() {
         let usd = Money::from((5_i64, Currency::USD));
-        let date =
-            Date::from_calendar_date(2024, time::Month::January, 1).expect("Valid test date");
-        let res = usd.convert(
-            Currency::EUR,
-            date,
-            &NaNProvider,
-            crate::money::fx::FxConversionPolicy::CashflowDate,
-        );
-        assert!(res.is_err());
+        assert!(usd.convert_at_rate(Currency::EUR, f64::NAN).is_err());
     }
 
     #[test]
@@ -978,9 +904,9 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result,
-            Err(crate::error::Error::Input(
-                crate::error::InputError::NonFiniteValue { kind }
-            )) if kind == crate::error::NonFiniteKind::NaN
+            Err(crate::Error::Input(
+                crate::InputError::NonFiniteValue { kind }
+            )) if kind == crate::NonFiniteKind::NaN
         ));
     }
 
@@ -990,9 +916,9 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result,
-            Err(crate::error::Error::Input(
-                crate::error::InputError::NonFiniteValue { kind }
-            )) if kind == crate::error::NonFiniteKind::PosInfinity
+            Err(crate::Error::Input(
+                crate::InputError::NonFiniteValue { kind }
+            )) if kind == crate::NonFiniteKind::PosInfinity
         ));
     }
 
@@ -1002,9 +928,9 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result,
-            Err(crate::error::Error::Input(
-                crate::error::InputError::NonFiniteValue { kind }
-            )) if kind == crate::error::NonFiniteKind::NegInfinity
+            Err(crate::Error::Input(
+                crate::InputError::NonFiniteValue { kind }
+            )) if kind == crate::NonFiniteKind::NegInfinity
         ));
     }
 
@@ -1085,7 +1011,7 @@ mod tests {
         use core::str::FromStr;
 
         let amount = rust_decimal::Decimal::from_str("10000000000000000.1").expect("valid decimal");
-        let eur = Money::from_decimal(amount, Currency::EUR).expect("representable amount");
+        let eur = Money::from_decimal(amount, Currency::EUR);
         let usd = eur
             .convert_at_rate(Currency::USD, 2.0)
             .expect("valid conversion");
@@ -1105,10 +1031,8 @@ mod tests {
 
     #[test]
     fn hash_matches_equality_across_decimal_scale() {
-        let a = Money::from_decimal(rust_decimal::Decimal::new(10, 1), Currency::USD)
-            .expect("1.0 is representable");
-        let b = Money::from_decimal(rust_decimal::Decimal::new(100, 2), Currency::USD)
-            .expect("1.00 is representable");
+        let a = Money::from_decimal(rust_decimal::Decimal::new(10, 1), Currency::USD);
+        let b = Money::from_decimal(rust_decimal::Decimal::new(100, 2), Currency::USD);
         assert_eq!(a, b);
         assert_eq!(hash_of(a), hash_of(b));
     }
@@ -1136,7 +1060,7 @@ mod tests {
         assert_eq!(tiny.amount_decimal(), rust_decimal::Decimal::new(1, 27));
         assert_eq!(
             tiny.format_with(
-                FormatOpts::new(Some(28), false, None, RoundingMode::Bankers)
+                FormatOpts::new(Some(28), Some(false), None, Some(RoundingMode::Bankers))
                     .expect("bounded opts")
             ),
             "0.0000000000000000000000000010"
@@ -1145,7 +1069,7 @@ mod tests {
         assert_eq!(reduced.amount_decimal(), rust_decimal::Decimal::new(2, 28));
         assert_eq!(
             reduced.format_with(
-                FormatOpts::new(Some(28), false, None, RoundingMode::Bankers)
+                FormatOpts::new(Some(28), Some(false), None, Some(RoundingMode::Bankers))
                     .expect("bounded opts")
             ),
             "0.0000000000000000000000000002"
@@ -1179,20 +1103,20 @@ mod tests {
     fn money_format_opts_new_bounds_precision() {
         assert!(FormatOpts::new(
             Some(FormatOpts::MAX_DECIMALS),
-            true,
+            Some(true),
             None,
-            RoundingMode::Bankers
+            Some(RoundingMode::Bankers)
         )
         .is_ok());
         let result = FormatOpts::new(
             Some(FormatOpts::MAX_DECIMALS + 1),
-            true,
+            Some(true),
             None,
-            RoundingMode::Bankers,
+            Some(RoundingMode::Bankers),
         );
         assert!(matches!(result, Err(Error::Validation(_))));
         assert!(
-            FormatOpts::new(None, true, Some(","), RoundingMode::Bankers)
+            FormatOpts::new(None, Some(true), Some(","), Some(RoundingMode::Bankers))
                 .expect("unbounded precision")
                 .decimals
                 .is_none()
@@ -1230,7 +1154,7 @@ mod tests {
         for (amount, expected, mode, name) in vectors.iter().copied() {
             let money =
                 Money::from_decimal_str(amount, Currency::USD).expect("exact vector amount");
-            let opts = FormatOpts::new(Some(2), true, Some(","), mode)
+            let opts = FormatOpts::new(Some(2), Some(true), Some(","), Some(mode))
                 .expect("bounded formatting options");
             assert_eq!(money.format_with(opts), expected, "{name} {amount}");
             assert_eq!(

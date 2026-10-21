@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::contract::ContractDescriptor;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, Month, PeriodId};
+use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::adjustments::CapBaseMode;
 use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};
@@ -24,6 +24,7 @@ use finstack_quant_statements::types::NodeValueType;
 use finstack_quant_statements::FinancialModelSpec;
 use indexmap::IndexMap;
 use serde_json::{json, Value};
+use time::Month;
 
 const CANONICAL_DECIMAL_PATTERN: &str = r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$";
 

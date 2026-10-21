@@ -156,7 +156,7 @@ fra_quote=next(q['rate'] for q in forward_input['market_data'] if q['type']=='fr
 convexity_adjustment=0.0001
 futures_price=100-100*(fra_quote+convexity_adjustment)
 recovered_forward=(100-futures_price)/100-convexity_adjustment
-print({'discount_zero_1y':discount_curve.zero(1),'projection_rate_1y':forward_curve.rate(1),'futures_price':futures_price,'explicit_convexity_bp':1,'recovered_forward':recovered_forward})
+print({'discount_zero_1y':discount_curve.zero_rate(1),'projection_rate_1y':forward_curve.rate(1),'futures_price':futures_price,'explicit_convexity_bp':1,'recovered_forward':recovered_forward})
 
 import copy
 from datetime import timedelta
@@ -204,7 +204,7 @@ for mode in ('linear','log_linear'):
 ax.set(xlabel='Years',ylabel='Short-interval forward (%)');ax.legend();fig.tight_layout()
 market=build_market('foundations');bond=json.dumps(instruments('foundations')['USD-CORP'])
 calibrated_pv=price_instrument(bond,market,AS_OF).price
-hand_rate=market.get_discount('USD-OIS').zero(1)
+hand_rate=market.get_discount('USD-OIS').zero_rate(1)
 market.insert(DiscountCurve.flat('USD-OIS',AS_OF,hand_rate))
 hand_pv=price_instrument(bond,market,AS_OF).price
 print({'calibrated_PV':calibrated_pv,'flat_hand_curve_PV':hand_pv,'difference':calibrated_pv-hand_pv})
@@ -252,7 +252,7 @@ The interpolated 9y zero receives 4/5 of the endpoint move. Its instantaneous fo
 ```python exec id=exercise-zero-interpolation-segment role=exercise
 from _shared.analyst_book import build_market
 curve=build_market('foundations').get_discount('USD-OIS')
-z5,z10=curve.zero(5),curve.zero(10)
+z5,z10=curve.zero_rate(5),curve.zero_rate(10)
 # For linear z(t), instantaneous f(t)=z(t)+t*zprime(t).
 t=9.0;weight=(t-5)/5
 z9=z5+weight*(z10-z5);forward9=z9+t*(z10-z5)/5

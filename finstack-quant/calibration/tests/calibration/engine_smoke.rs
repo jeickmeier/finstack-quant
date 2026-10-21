@@ -19,7 +19,7 @@ use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use time::Month;
 
 use super::tolerances;
@@ -71,7 +71,7 @@ fn test_v2_simple_usd_calibration() {
     ];
 
     let mut market_data: Vec<MarketDatum> = Vec::new();
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert("usd_ois".to_string(), cal_utils::quote_set_ids(&quotes));
     quote_sets.insert("usd_3m".to_string(), cal_utils::quote_set_ids(&fwd_quotes));
     cal_utils::extend_market_data(&mut market_data, &quotes);
@@ -231,7 +231,7 @@ fn independent_failing_discount_envelope(
 ) -> CalibrationEnvelope {
     let base_date = Date::from_calendar_date(2025, Month::January, 2).unwrap();
     let mut market_data: Vec<MarketDatum> = Vec::new();
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
+    let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     let mut steps = Vec::new();
     for i in 0..n {
         let quotes = vec![

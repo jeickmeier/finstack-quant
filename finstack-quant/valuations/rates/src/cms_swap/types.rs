@@ -60,14 +60,12 @@ pub struct CmsSwap {
     /// Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based.
     pub cms_tenor: Tenor,
     /// Fixing dates for CMS rate observations.
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
     )]
     pub fixing_dates: Vec<Date>,
     /// Payment dates for the CMS leg.
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
@@ -157,28 +155,24 @@ pub struct CmsSwap {
 #[serde(deny_unknown_fields)]
 pub struct FundingPeriod {
     /// Inclusive accrual start, independent of the CMS observation date.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub accrual_start: Date,
     /// Exclusive accrual end, independent of payment-date adjustment.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub accrual_end: Date,
     /// Contractual payment date after business-day adjustment.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub payment_date: Date,
     /// Floating index observation date; ignored for fixed funding.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -826,6 +820,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
 
 #[cfg(test)]
 mod tests {
+    use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_valuations_core::instruments::Instrument;
 
     fn funding_period(start: Date, end: Date, accrual: f64) -> super::super::types::FundingPeriod {

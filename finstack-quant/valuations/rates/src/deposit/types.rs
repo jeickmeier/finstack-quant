@@ -59,14 +59,12 @@ pub struct Deposit {
     /// Principal amount of the deposit.
     pub notional: Money,
     /// Start date of the deposit period.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start_date: Date,
     /// Maturity date of the deposit period.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -264,41 +262,40 @@ impl Deposit {
     /// This is called automatically during cashflow generation and pricing.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         // Validate raw date ordering first (fast check)
-        validation::validate_date_range_strict_with(
-            self.start_date,
-            self.maturity,
-            |start, maturity| {
-                format!(
-                    "Deposit maturity date ({}) must be after start date ({})",
-                    maturity, start
-                )
-            },
-        )?;
+        validation::require_with(self.maturity > self.start_date, || {
+            format!(
+                "Deposit maturity date ({}) must be after start date ({})",
+                self.maturity, self.start_date
+            )
+        })?;
 
-        validation::validate_money_gt_with(self.notional, 0.0, |amount| {
-            format!("Deposit notional must be positive, got {}", amount)
+        validation::require_with(self.notional.amount() > 0.0, || {
+            format!(
+                "Deposit notional must be positive, got {}",
+                self.notional.amount()
+            )
         })?;
 
         // Validate effective date ordering (catches BDC-induced inversions)
         // This is important when spot lag + calendar adjustments could cause issues
         let effective_start = self.effective_start_date()?;
         let effective_end = self.effective_end_date()?;
-        validation::validate_date_range_strict_with(
-            effective_start,
-            effective_end,
-            |start, end| {
-                format!(
-                    "Deposit effective end date ({}) must be after effective start date ({}) \
+        validation::require_with(effective_end > effective_start, || {
+            format!(
+                "Deposit effective end date ({}) must be after effective start date ({}) \
                  after business day adjustments",
-                    end, start
-                )
-            },
-        )?;
+                effective_end, effective_start
+            )
+        })?;
 
         // Warn about extreme rates (don't fail, as they may be intentional)
         if let Some(r) = self.fixed_rate {
             let r_f64 = r.as_f64();
-            if validation::rate_outside_range(r_f64, MIN_REASONABLE_RATE, MAX_REASONABLE_RATE) {
+            if crate::rate_validation::rate_outside_range(
+                r_f64,
+                MIN_REASONABLE_RATE,
+                MAX_REASONABLE_RATE,
+            ) {
                 tracing::warn!(
                     deposit_id = %self.id,
                     fixed_rate = r_f64,

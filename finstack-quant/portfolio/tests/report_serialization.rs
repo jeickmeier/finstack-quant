@@ -3,7 +3,7 @@
 use finstack_quant_cashflows::builder::CashflowRepresentation;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, Month};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::cashflows::{
     CashflowExtractionIssue, CashflowFxPolicy, PortfolioCashflowEvent,
@@ -14,6 +14,7 @@ use finstack_quant_portfolio::types::PositionId;
 use finstack_quant_valuations::instruments::RatesCurveKind;
 use finstack_quant_valuations::pricer::InstrumentType;
 use indexmap::IndexMap;
+use time::Month;
 
 fn roundtrip_json<T>(value: &T) -> T
 where

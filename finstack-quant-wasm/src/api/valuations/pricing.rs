@@ -811,8 +811,10 @@ pub(super) mod tests {
             "TEST-BOND",
             Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             Rate::from_decimal(0.05).expect("valid rate fixture"),
-            time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
-            time::Date::from_calendar_date(2034, time::Month::January, 1).expect("date"),
+            finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+                .expect("date"),
+            finstack_quant_core::dates::Date::from_calendar_date(2034, time::Month::January, 1)
+                .expect("date"),
             finstack_quant_core::dates::StubKind::ShortFront,
             "USD-OIS",
         )
@@ -1115,7 +1117,9 @@ pub(super) mod tests {
     pub(crate) fn market_context_json() -> String {
         use finstack_quant_core::market_data::context::MarketContext;
         use finstack_quant_core::market_data::term_structures::DiscountCurve;
-        let base = time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date");
+        let base =
+            finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+                .expect("date");
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(base)
             .knots([(0.5, 0.99), (1.0, 0.98), (5.0, 0.90), (10.0, 0.80)])
@@ -1130,7 +1134,9 @@ pub(super) mod tests {
         use finstack_quant_core::market_data::context::MarketContext;
         use finstack_quant_core::market_data::scalars::MarketScalar;
         use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
-        let base = time::Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
+        let base =
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+                .expect("date");
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(base)
             .day_count(DayCount::Act365F)
@@ -1167,7 +1173,9 @@ pub(super) mod tests {
                 .expect("flat Black surface")
         }
 
-        let base = time::Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
+        let base =
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
+                .expect("date");
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(base)
             .day_count(DayCount::Act365F)

@@ -16,7 +16,7 @@ use wasm_bindgen::JsValue;
 ///
 /// The `kind` property is decided by the error's *type*, never by sniffing
 /// its message: every typed Rust error reports its Rust-owned
-/// [`ErrorKind`](finstack_quant_core::error::ErrorKind) (`kind()` on the error,
+/// [`ErrorKind`](finstack_quant_core::ErrorKind) (`kind()` on the error,
 /// or the kind of its fold into [`finstack_quant_core::Error`]), and plain
 /// strings / parse errors are input validation.
 pub trait IntoJsError {
@@ -41,7 +41,7 @@ macro_rules! kinded_js_error {
                 self.kind().as_str()
             }
             fn js_message(&self) -> String {
-                finstack_quant_core::error::format_chain(self)
+                finstack_quant_core::format_chain(self)
             }
         }
     )*};
@@ -83,7 +83,7 @@ impl IntoJsError for finstack_quant_portfolio::Error {
         self.kind().as_str()
     }
     fn js_message(&self) -> String {
-        finstack_quant_core::error::format_chain(self)
+        finstack_quant_core::format_chain(self)
     }
     fn js_code(&self) -> Option<&'static str> {
         self.code()
@@ -100,7 +100,7 @@ impl IntoJsError for finstack_quant_scenarios::Error {
             Error::Core(error) => error.js_message(),
             Error::Statements(error) => error.js_message(),
             Error::Valuations(error) => error.js_message(),
-            other => finstack_quant_core::error::format_chain(other),
+            other => finstack_quant_core::format_chain(other),
         }
     }
 }
@@ -413,8 +413,8 @@ mod tests {
 
     #[test]
     fn core_error_kind_is_selected_from_variant_not_message() {
-        use finstack_quant_core::error::InputError;
         use finstack_quant_core::Error;
+        use finstack_quant_core::InputError;
 
         let cases = [
             // A curve literally named "validation" must still classify as a
@@ -474,14 +474,6 @@ mod tests {
                 Error::Input(InputError::VolatilityConversionFailed {
                     tolerance: 1e-8,
                     residual: 1e-3,
-                }),
-                "computation",
-            ),
-            (
-                Error::Input(InputError::TooLarge {
-                    what: "arena".to_string(),
-                    requested_bytes: 8,
-                    limit_bytes: 4,
                 }),
                 "computation",
             ),

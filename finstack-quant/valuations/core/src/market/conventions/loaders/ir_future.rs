@@ -4,7 +4,7 @@ use crate::market::conventions::defs::{IrFutureConventions, IrFutureReferencePer
 use crate::market::conventions::ids::IrFutureContractId;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::Error;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -91,7 +91,7 @@ impl IrFutureConventionsRecord {
 }
 
 /// Load the IR futures conventions from the embedded JSON registry.
-pub(crate) fn load_registry() -> Result<HashMap<IrFutureContractId, IrFutureConventions>, Error> {
+pub(crate) fn load_registry() -> Result<FxHashMap<IrFutureContractId, IrFutureConventions>, Error> {
     let json = include_str!("../../../../data/conventions/ir_future_conventions.json");
     super::json::parse_and_rekey(
         json,

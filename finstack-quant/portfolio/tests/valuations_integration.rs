@@ -122,13 +122,8 @@ fn portfolio_valuation_stamps_caller_config() {
         .expect("position valuation result");
 
     assert_eq!(
-        result
-            .meta
-            .rounding
-            .get_output_scale_by_currency()
-            .get(&Currency::USD)
-            .copied(),
-        Some(4),
+        result.meta.rounding.output_scale(Currency::USD),
+        4,
         "portfolio pricing must propagate the caller's FinstackConfig",
     );
 }

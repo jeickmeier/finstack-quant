@@ -6,7 +6,7 @@ use super::{
 };
 use crate::types::simm_curvature::{fx_pair, tenor_days};
 use crate::types::{commodity_bucket_id, ordered_tenor_pair, SimmCurvatureSensitivity};
-use finstack_quant_core::{currency::Currency, Error, HashMap, Result};
+use finstack_quant_core::{currency::Currency, Error, FxHashMap, Result};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct FactorKey {
@@ -39,8 +39,8 @@ impl SimmCalculator {
         &self,
         inputs: &[SimmCurvatureSensitivity],
         mut detail: Option<&mut Vec<SimmComponentDetail>>,
-    ) -> Result<HashMap<SimmRiskClass, f64>> {
-        let mut by_factor: HashMap<FactorKey, Vec<f64>> = HashMap::default();
+    ) -> Result<FxHashMap<SimmRiskClass, f64>> {
+        let mut by_factor: FxHashMap<FactorKey, Vec<f64>> = FxHashMap::default();
         for input in inputs {
             input.validate()?;
             let mut factor = input.factor.clone();
@@ -99,8 +99,9 @@ impl SimmCalculator {
                 "SIMM curvature factor sum overflowed".into(),
             ));
         }
-        let mut by_class: HashMap<SimmRiskClass, Vec<BucketMargin>> = HashMap::default();
-        let mut detail_by_class: HashMap<SimmRiskClass, Vec<SimmBucketDetail>> = HashMap::default();
+        let mut by_class: FxHashMap<SimmRiskClass, Vec<BucketMargin>> = FxHashMap::default();
+        let mut detail_by_class: FxHashMap<SimmRiskClass, Vec<SimmBucketDetail>> =
+            FxHashMap::default();
         let mut start = 0;
         while start < factors.len() {
             let first = &factors[start].0;
@@ -145,7 +146,7 @@ impl SimmCalculator {
             });
             start = end;
         }
-        let mut result = HashMap::default();
+        let mut result = FxHashMap::default();
         for (class, buckets) in by_class {
             let mut non_residual = Vec::new();
             let mut residual = 0.0;

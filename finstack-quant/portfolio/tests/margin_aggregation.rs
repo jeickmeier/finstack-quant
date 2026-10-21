@@ -175,7 +175,7 @@ fn run_margin(
         &portfolio,
         &MarketContext::new(),
         as_of,
-        &finstack_quant_core::HashMap::default(),
+        &finstack_quant_core::FxHashMap::default(),
     )
     .expect("margin run should succeed");
     // MO-16 is expected here: this fixture's netting set carries no CSA, so
@@ -324,7 +324,7 @@ fn run_margin_for(
         &portfolio,
         market,
         as_of,
-        &finstack_quant_core::HashMap::default(),
+        &finstack_quant_core::FxHashMap::default(),
     )
     .expect("margin run should succeed");
     let unexpected: Vec<_> = result

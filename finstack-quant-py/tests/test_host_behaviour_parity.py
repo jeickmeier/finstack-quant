@@ -62,7 +62,6 @@ def test_market_context_inserts_update_the_context_in_place_and_return_it() -> N
     curve = DiscountCurve.flat("USD-OIS", dt.date(2025, 1, 2), 0.04)
     assert market.insert(curve) is market
     assert market.insert_price("SPX", 5900.0).insert_price("SPOT", 185.25, "USD") is market
-    assert market.map_collateral("USD-CSA", "USD-OIS") is market
     assert "USD-OIS" in market.curve_ids()
 
 

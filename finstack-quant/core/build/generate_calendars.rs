@@ -68,7 +68,6 @@ enum RuleDef {
     },
     ChineseNewYear,
     QingMing,
-    BuddhasBirthday,
     DragonBoat,
     MidAutumn,
     ChinaBridge {
@@ -78,8 +77,6 @@ enum RuleDef {
         #[serde(default)]
         to_year: Option<i32>,
     },
-    VernalEquinoxJp,
-    AutumnalEquinoxJp,
     HongKongPublicHolidays,
     JapanPublicHolidays,
 }
@@ -351,7 +348,6 @@ impl RuleDef {
             }
             RuleDef::ChineseNewYear => "Rule::ChineseNewYear".to_string(),
             RuleDef::QingMing => "Rule::QingMing".to_string(),
-            RuleDef::BuddhasBirthday => "Rule::BuddhasBirthday".to_string(),
             RuleDef::DragonBoat => "Rule::DragonBoat".to_string(),
             RuleDef::MidAutumn => "Rule::MidAutumn".to_string(),
             RuleDef::ChinaBridge {
@@ -365,8 +361,6 @@ impl RuleDef {
                 );
                 wrap_effective(inner, *from_year, *to_year)
             }
-            RuleDef::VernalEquinoxJp => "Rule::VernalEquinoxJP".to_string(),
-            RuleDef::AutumnalEquinoxJp => "Rule::AutumnalEquinoxJP".to_string(),
             RuleDef::HongKongPublicHolidays => "Rule::HongKongPublicHolidays".to_string(),
             RuleDef::JapanPublicHolidays => "Rule::JapanPublicHolidays".to_string(),
         }
@@ -444,8 +438,16 @@ pub(crate) fn generate() -> io::Result<()> {
                 output.push_str(&format!("/// {line}\n"));
             }
         }
+        // Market calendars are reached by id (`calendar_by_id_strict`); only the
+        // weekends-only fallback is a public static (`dates::WEEKENDS_ONLY`).
+        let visibility = if id == "weekends_only" {
+            "pub"
+        } else {
+            "pub(crate)"
+        };
         output.push_str(&format!(
-            "pub static {}: Calendar = Calendar::new(\n    \"{}\",\n    \"{}\",\n    {},\n    {}_RULES,\n);\n\n",
+            "{} static {}: Calendar = Calendar::new(\n    \"{}\",\n    \"{}\",\n    {},\n    {}_RULES,\n);\n\n",
+            visibility,
             const_name,
             id,
             cal.name,

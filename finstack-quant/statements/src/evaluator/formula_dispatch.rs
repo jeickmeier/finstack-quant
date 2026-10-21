@@ -15,7 +15,7 @@ use crate::evaluator::formula::{
 };
 use crate::evaluator::formula_aggregates::evaluate_historical_function;
 use finstack_quant_core::expr::{Expr, ExprNode, Function};
-use finstack_quant_core::math::{kahan_sum, quantile, ZERO_TOLERANCE};
+use finstack_quant_core::math::{stats::quantile, summation::kahan_sum, ZERO_TOLERANCE};
 
 /// Evaluate a function call.
 ///

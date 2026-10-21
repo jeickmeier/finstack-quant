@@ -26,14 +26,12 @@ pub struct CliquetOption {
     /// Underlying asset ticker symbol
     pub underlying_ticker: String,
     /// Reset dates for periodic return locking
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
     )]
     pub reset_dates: Vec<Date>,
     /// Explicit terminal expiry date for the structure.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -87,7 +85,6 @@ pub struct CliquetOption {
     /// cap/floor applied) and only the remaining future periods are simulated.
     #[builder(default)]
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
@@ -136,14 +133,12 @@ struct CliquetOptionUnchecked {
     /// Underlying asset ticker symbol
     underlying_ticker: String,
     /// Reset dates for periodic return locking
-    #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
     )]
     reset_dates: Vec<Date>,
     /// Explicit terminal expiry date for the structure.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -193,7 +188,6 @@ struct CliquetOptionUnchecked {
     /// returns are computed deterministically from these fixings (with local
     /// cap/floor applied) and only the remaining future periods are simulated.
     #[serde(default)]
-    #[serde(with = "finstack_quant_core::wire::dated_f64_values")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")

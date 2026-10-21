@@ -23,10 +23,6 @@ export type DA33B682660A7Dfa1Ea09 =
        */
       calendar_id?: string | null;
       /**
-       * OIS cut-off (business days) the curve was calibrated under, if any.
-       */
-      calibration_ois_cutoff_days?: number | null;
-      /**
        * Day count convention for discount time basis
        */
       day_count:
@@ -887,12 +883,6 @@ export type DCcdcf39725B3A38D5E6E =
  * Canonical v1 persisted snapshot of a complete market-data context.
  */
 export interface MarketContextStateWire {
-  /**
-   * Collateral CSA mappings
-   */
-  collateral: {
-    [k: string]: string;
-  };
   /**
    * Credit index aggregates (references curves by ID)
    */
@@ -1936,7 +1926,7 @@ export interface D_7Fbd5A62C7C39Ad98666 {
  *     None,
  * ).expect("surface should build");
  *
- * assert_eq!(surface.num_expiries(), 3);
+ * assert_eq!(surface.expiries().len(), 3);
  * assert!((surface.atm_vols()[0] - 0.08).abs() < 1e-12);
  * ```
  */

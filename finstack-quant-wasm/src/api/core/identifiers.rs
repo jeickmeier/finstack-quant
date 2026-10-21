@@ -13,7 +13,7 @@ use wasm_bindgen::prelude::*;
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
 /// const rating = new core.CreditRating("Baa3"); // Moody's spelling
-/// rating.name; // "BBB-"
+/// rating.toString(); // "BBB-"
 /// rating.isInvestmentGrade(); // true
 /// core.CreditRating.bbb().notchesTo("BB"); // 3
 /// ```
@@ -24,14 +24,8 @@ pub struct JsCreditRating {
 }
 
 impl JsCreditRating {
-    const fn wrap(inner: CreditRating) -> Self {
+    const fn from_inner(inner: CreditRating) -> Self {
         Self { inner }
-    }
-
-    fn parse(name: &JsValue, label: &str) -> Result<CreditRating, JsValue> {
-        js_string(name, label)?
-            .parse::<CreditRating>()
-            .map_err(to_js_err)
     }
 }
 
@@ -50,7 +44,10 @@ impl JsCreditRating {
     /// `FinstackError` (kind `validation`) if it is not a rating.
     #[wasm_bindgen(constructor)]
     pub fn new(name: JsValue) -> Result<JsCreditRating, JsValue> {
-        Self::parse(&name, "name").map(Self::wrap)
+        js_string(&name, "name")?
+            .parse()
+            .map(Self::from_inner)
+            .map_err(to_js_err)
     }
 
     /// S&P/Fitch `AAA`, Moody's `Aaa`.
@@ -58,7 +55,7 @@ impl JsCreditRating {
     /// @returns The `AAA` rating.
     #[wasm_bindgen(js_name = aaa)]
     pub fn aaa() -> Self {
-        Self::wrap(CreditRating::AAA)
+        Self::from_inner(CreditRating::AAA)
     }
 
     /// S&P/Fitch `AA+`, Moody's `Aa1`.
@@ -66,7 +63,7 @@ impl JsCreditRating {
     /// @returns The `AA+` rating.
     #[wasm_bindgen(js_name = aaPlus)]
     pub fn aa_plus() -> Self {
-        Self::wrap(CreditRating::AAPlus)
+        Self::from_inner(CreditRating::AAPlus)
     }
 
     /// S&P/Fitch `AA`, Moody's `Aa2`.
@@ -74,7 +71,7 @@ impl JsCreditRating {
     /// @returns The `AA` rating.
     #[wasm_bindgen(js_name = aa)]
     pub fn aa() -> Self {
-        Self::wrap(CreditRating::AA)
+        Self::from_inner(CreditRating::AA)
     }
 
     /// S&P/Fitch `AA-`, Moody's `Aa3`.
@@ -82,7 +79,7 @@ impl JsCreditRating {
     /// @returns The `AA-` rating.
     #[wasm_bindgen(js_name = aaMinus)]
     pub fn aa_minus() -> Self {
-        Self::wrap(CreditRating::AAMinus)
+        Self::from_inner(CreditRating::AAMinus)
     }
 
     /// S&P/Fitch `A+`, Moody's `A1`.
@@ -90,7 +87,7 @@ impl JsCreditRating {
     /// @returns The `A+` rating.
     #[wasm_bindgen(js_name = aPlus)]
     pub fn a_plus() -> Self {
-        Self::wrap(CreditRating::APlus)
+        Self::from_inner(CreditRating::APlus)
     }
 
     /// S&P/Fitch `A`, Moody's `A2`.
@@ -98,7 +95,7 @@ impl JsCreditRating {
     /// @returns The `A` rating.
     #[wasm_bindgen(js_name = a)]
     pub fn a() -> Self {
-        Self::wrap(CreditRating::A)
+        Self::from_inner(CreditRating::A)
     }
 
     /// S&P/Fitch `A-`, Moody's `A3`.
@@ -106,7 +103,7 @@ impl JsCreditRating {
     /// @returns The `A-` rating.
     #[wasm_bindgen(js_name = aMinus)]
     pub fn a_minus() -> Self {
-        Self::wrap(CreditRating::AMinus)
+        Self::from_inner(CreditRating::AMinus)
     }
 
     /// S&P/Fitch `BBB+`, Moody's `Baa1`.
@@ -114,7 +111,7 @@ impl JsCreditRating {
     /// @returns The `BBB+` rating.
     #[wasm_bindgen(js_name = bbbPlus)]
     pub fn bbb_plus() -> Self {
-        Self::wrap(CreditRating::BBBPlus)
+        Self::from_inner(CreditRating::BBBPlus)
     }
 
     /// S&P/Fitch `BBB`, Moody's `Baa2`.
@@ -122,7 +119,7 @@ impl JsCreditRating {
     /// @returns The `BBB` rating.
     #[wasm_bindgen(js_name = bbb)]
     pub fn bbb() -> Self {
-        Self::wrap(CreditRating::BBB)
+        Self::from_inner(CreditRating::BBB)
     }
 
     /// S&P/Fitch `BBB-`, Moody's `Baa3`.
@@ -130,7 +127,7 @@ impl JsCreditRating {
     /// @returns The `BBB-` rating.
     #[wasm_bindgen(js_name = bbbMinus)]
     pub fn bbb_minus() -> Self {
-        Self::wrap(CreditRating::BBBMinus)
+        Self::from_inner(CreditRating::BBBMinus)
     }
 
     /// S&P/Fitch `BB+`, Moody's `Ba1`.
@@ -138,7 +135,7 @@ impl JsCreditRating {
     /// @returns The `BB+` rating.
     #[wasm_bindgen(js_name = bbPlus)]
     pub fn bb_plus() -> Self {
-        Self::wrap(CreditRating::BBPlus)
+        Self::from_inner(CreditRating::BBPlus)
     }
 
     /// S&P/Fitch `BB`, Moody's `Ba2`.
@@ -146,7 +143,7 @@ impl JsCreditRating {
     /// @returns The `BB` rating.
     #[wasm_bindgen(js_name = bb)]
     pub fn bb() -> Self {
-        Self::wrap(CreditRating::BB)
+        Self::from_inner(CreditRating::BB)
     }
 
     /// S&P/Fitch `BB-`, Moody's `Ba3`.
@@ -154,7 +151,7 @@ impl JsCreditRating {
     /// @returns The `BB-` rating.
     #[wasm_bindgen(js_name = bbMinus)]
     pub fn bb_minus() -> Self {
-        Self::wrap(CreditRating::BBMinus)
+        Self::from_inner(CreditRating::BBMinus)
     }
 
     /// S&P/Fitch `B+`, Moody's `B1`.
@@ -162,7 +159,7 @@ impl JsCreditRating {
     /// @returns The `B+` rating.
     #[wasm_bindgen(js_name = bPlus)]
     pub fn b_plus() -> Self {
-        Self::wrap(CreditRating::BPlus)
+        Self::from_inner(CreditRating::BPlus)
     }
 
     /// S&P/Fitch `B`, Moody's `B2`.
@@ -170,7 +167,7 @@ impl JsCreditRating {
     /// @returns The `B` rating.
     #[wasm_bindgen(js_name = b)]
     pub fn b() -> Self {
-        Self::wrap(CreditRating::B)
+        Self::from_inner(CreditRating::B)
     }
 
     /// S&P/Fitch `B-`, Moody's `B3`.
@@ -178,7 +175,7 @@ impl JsCreditRating {
     /// @returns The `B-` rating.
     #[wasm_bindgen(js_name = bMinus)]
     pub fn b_minus() -> Self {
-        Self::wrap(CreditRating::BMinus)
+        Self::from_inner(CreditRating::BMinus)
     }
 
     /// S&P/Fitch `CCC+`, Moody's `Caa1`.
@@ -186,7 +183,7 @@ impl JsCreditRating {
     /// @returns The `CCC+` rating.
     #[wasm_bindgen(js_name = cccPlus)]
     pub fn ccc_plus() -> Self {
-        Self::wrap(CreditRating::CCCPlus)
+        Self::from_inner(CreditRating::CCCPlus)
     }
 
     /// S&P/Fitch `CCC`, Moody's `Caa2`.
@@ -194,7 +191,7 @@ impl JsCreditRating {
     /// @returns The `CCC` rating.
     #[wasm_bindgen(js_name = ccc)]
     pub fn ccc() -> Self {
-        Self::wrap(CreditRating::CCC)
+        Self::from_inner(CreditRating::CCC)
     }
 
     /// S&P/Fitch `CCC-`, Moody's `Caa3`.
@@ -202,7 +199,7 @@ impl JsCreditRating {
     /// @returns The `CCC-` rating.
     #[wasm_bindgen(js_name = cccMinus)]
     pub fn ccc_minus() -> Self {
-        Self::wrap(CreditRating::CCCMinus)
+        Self::from_inner(CreditRating::CCCMinus)
     }
 
     /// S&P/Fitch `CC`, Moody's `Ca`.
@@ -210,7 +207,7 @@ impl JsCreditRating {
     /// @returns The `CC` rating.
     #[wasm_bindgen(js_name = cc)]
     pub fn cc() -> Self {
-        Self::wrap(CreditRating::CC)
+        Self::from_inner(CreditRating::CC)
     }
 
     /// S&P/Fitch `C`, Moody's `C`.
@@ -218,7 +215,7 @@ impl JsCreditRating {
     /// @returns The `C` rating.
     #[wasm_bindgen(js_name = c)]
     pub fn c() -> Self {
-        Self::wrap(CreditRating::C)
+        Self::from_inner(CreditRating::C)
     }
 
     /// Default (`D`): the obligor has failed to pay.
@@ -226,7 +223,7 @@ impl JsCreditRating {
     /// @returns The `D` rating.
     #[wasm_bindgen(js_name = d)]
     pub fn d() -> Self {
-        Self::wrap(CreditRating::D)
+        Self::from_inner(CreditRating::D)
     }
 
     /// Not rated (`NR`): no agency rating is assigned.
@@ -234,13 +231,7 @@ impl JsCreditRating {
     /// @returns The `NR` rating.
     #[wasm_bindgen(js_name = nr)]
     pub fn nr() -> Self {
-        Self::wrap(CreditRating::NR)
-    }
-
-    /// S&P/Fitch spelling of the rating, such as `"BBB-"`.
-    #[wasm_bindgen(getter, js_name = name)]
-    pub fn name(&self) -> String {
-        self.inner.to_string()
+        Self::from_inner(CreditRating::NR)
     }
 
     /// Whether the rating is investment grade (`BBB-` or better).
@@ -280,7 +271,7 @@ impl JsCreditRating {
     /// # Arguments
     ///
     /// * `other` - Rating text to measure against (S&P/Fitch or Moody's
-    ///   spelling; use `rating.name` for a `CreditRating`).
+    ///   spelling; use `rating.toString()` for a `CreditRating`).
     ///
     /// @returns Notches from this rating to `other`: positive when `other` is
     /// weaker, negative when stronger. `NR` sits between `C` and `D`.
@@ -288,7 +279,8 @@ impl JsCreditRating {
     /// `validation`) if it is not a rating.
     #[wasm_bindgen(js_name = notchesTo)]
     pub fn notches_to(&self, other: JsValue) -> Result<i32, JsValue> {
-        Ok(self.inner.notches_to(Self::parse(&other, "other")?))
+        let other = js_string(&other, "other")?.parse().map_err(to_js_err)?;
+        Ok(self.inner.notches_to(other))
     }
 
     /// Serialize to the canonical JSON wire form (the quoted S&P/Fitch spelling).
@@ -312,12 +304,10 @@ impl JsCreditRating {
     /// `validation`) if it is not a quoted rating.
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsCreditRating, JsValue> {
-        serde_json::from_str(&js_string(&json, "json")?)
-            .map(Self::wrap)
-            .map_err(to_js_err)
+        from_js_json(&json, "json").map(Self::from_inner)
     }
 
-    /// S&P/Fitch spelling of the rating (same as `name`).
+    /// S&P/Fitch spelling of the rating, such as `"BBB-"`.
     ///
     /// @returns The rating text accepted by `new CreditRating(name)`.
     #[wasm_bindgen(js_name = toString)]

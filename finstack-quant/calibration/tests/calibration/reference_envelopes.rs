@@ -495,7 +495,9 @@ fn example_11_equity_spots_and_dividends_support_lookup() {
 
     // Dividend schedule for AAPL must be retrievable by schedule ID.
     let aapl_divs = market
-        .get_dividend_schedule("AAPL-DIVS")
+        .dividends_iter()
+        .find(|(id, _)| id.as_str() == "AAPL-DIVS")
+        .map(|(_, schedule)| schedule)
         .expect("AAPL dividend schedule present in source_market.dividends");
     // The schedule should have at least one dividend entry.
     assert!(

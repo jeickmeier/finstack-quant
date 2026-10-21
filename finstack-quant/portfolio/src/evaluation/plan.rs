@@ -9,7 +9,7 @@ use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations::metrics::MetricId;
 use indexmap::IndexMap;
 use std::sync::Arc;
@@ -191,7 +191,7 @@ pub(crate) struct PortfolioEvaluationPlan<'a> {
     markets: Vec<PreparedMarketState<'a>>,
     portfolios: Vec<PreparedPortfolioState<'a>>,
     jobs: Vec<EvaluationJob<'a>>,
-    jobs_by_key: HashMap<EvaluationKey, EvaluationId>,
+    jobs_by_key: FxHashMap<EvaluationKey, EvaluationId>,
 }
 
 pub(crate) struct PortfolioEvaluationOutcome {
@@ -205,7 +205,7 @@ impl<'a> PortfolioEvaluationPlan<'a> {
             markets: Vec::new(),
             portfolios: Vec::new(),
             jobs: Vec::new(),
-            jobs_by_key: HashMap::default(),
+            jobs_by_key: FxHashMap::default(),
         }
     }
 

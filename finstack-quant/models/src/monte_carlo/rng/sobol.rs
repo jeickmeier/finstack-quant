@@ -1,7 +1,7 @@
 //! Sobol RNG re-exported from `finstack_quant_core` with `RandomStream` integration.
 //!
 //! The underlying Joe-Kuo direction table supports dimensions up to
-//! [`MAX_SOBOL_DIMENSION`]. Monte Carlo callers must count every generated
+//! [`MAX_SOBOL_DIMENSION`](finstack_quant_core::math::random::MAX_SOBOL_DIMENSION). Monte Carlo callers must count every generated
 //! normal as one Sobol dimension, usually `num_steps * num_factors` before any
 //! Brownian-bridge reordering. Use [`SobolRng::try_new`] so excessive
 //! dimensions fail explicitly.
@@ -16,7 +16,7 @@
 
 use crate::monte_carlo::traits::RandomStream;
 
-pub use finstack_quant_core::math::random::{SobolRng, MAX_SOBOL_DIMENSION};
+use finstack_quant_core::math::random::SobolRng;
 
 impl RandomStream for SobolRng {
     /// Sobol sequences do not admit independent sub-streams. Always returns

@@ -386,6 +386,35 @@ def test_module_symbol_contract_matches_live_surface(
             f"  unlisted in contract: {sorted(module_all - expected)}"
         )
 
+    stub = _module_stub_path(spec["python_package"]) if crate_name == "core" else None
+    if stub is not None:
+        assert set(_pyi_all_names(stub)) == module_all, (
+            f"{stub} __all__ diverged from the live {spec['python_package']}.__all__"
+        )
+
+
+def _module_stub_path(python_package: str) -> Path | None:
+    """Return the `.pyi` stub that declares ``python_package``, if one exists."""
+    parts = python_package.split(".")[1:]
+    base = CONTRACT_PATH.parent / "finstack_quant" / Path(*parts)
+    for candidate in (base / "__init__.pyi", base.with_suffix(".pyi")):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def test_core_module_rows_match_rust_pub_mods() -> None:
+    """Every Rust ``pub mod`` of finstack-quant-core has exactly one ``modules`` row."""
+    crate = CONTRACT["crates"]["core"]
+    lib = (CONTRACT_PATH.parents[1] / crate["rust_lib"]).read_text()
+    rust_mods = set(re.findall(r"^pub mod (\w+);", lib, re.MULTILINE))
+    rows = set(crate["modules"])
+    assert rows == rust_mods, (
+        "core modules rows diverged from Rust `pub mod` declarations.\n"
+        f"  missing rows: {sorted(rust_mods - rows)}\n"
+        f"  stale rows: {sorted(rows - rust_mods)}"
+    )
+
 
 def test_cashflows_has_no_cross_crate_symbols() -> None:
     """Cashflows must not own helpers from other crates."""
@@ -415,21 +444,6 @@ def test_models_credit_migration_member_pins_resolve() -> None:
         assert cls is not None, f"credit.migration missing class {class_name}"
         assert python_name == canonical_member
         assert hasattr(cls, python_name), f"{class_name} missing pinned member `{python_name}`"
-
-
-def test_core_market_data_public_matches_contract() -> None:
-    """``finstack_quant.core.market_data.__all__`` must match [crates.core.market_data]."""
-    block = CONTRACT["crates"]["core"]["market_data"]
-    expected = block["public"]
-    module = importlib.import_module(block["python_package"])
-    assert module.__all__ == expected, (
-        f"{block['python_package']}.__all__ diverged from contract.\n"
-        f"  missing: {sorted(set(expected) - set(module.__all__))}\n"
-        f"  unlisted: {sorted(set(module.__all__) - set(expected))}"
-    )
-
-    root_stub = CONTRACT_PATH.parent / "finstack_quant" / "core" / "market_data" / "__init__.pyi"
-    assert _pyi_all_names(root_stub) == expected
 
 
 def test_models_correlation_public_matches_contract() -> None:

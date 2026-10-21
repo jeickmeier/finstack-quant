@@ -14,7 +14,7 @@ use crate::monte_carlo::rng::fbm::{
     WindowedConditionalFbmConfig,
 };
 use crate::monte_carlo::rng::volterra::RiemannLiouvilleVolterra;
-use crate::monte_carlo::TimeGrid;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 

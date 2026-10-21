@@ -12,7 +12,7 @@ use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::{
     attributes_from_py, bdc_from_py, builder_repr, day_count_from_py, enum_to_py_string,
-    money_from_py, money_repr, money_to_py, tenor_from_py,
+    money_from_py, money_repr, money_to_py,
 };
 use crate::bindings::valuations::instruments::{
     instrument_expiry, serialize_typed_instrument_json, stub_kind_from_py,
@@ -688,7 +688,7 @@ impl PyRevolvingCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let tenor = tenor_from_py(value, "frequency")?;
+        let tenor = crate::bindings::core::dates::tenor::extract_tenor(value)?;
         builder_set!(
             slf,
             frequency,

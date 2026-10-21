@@ -38,7 +38,7 @@ pub enum Error {
         message: String,
         /// Classification of the failure: the wrapped pricing error's kind, or
         /// the kind of the consistency check that failed.
-        kind: finstack_quant_core::error::ErrorKind,
+        kind: finstack_quant_core::ErrorKind,
     },
 
     /// Scenario application error
@@ -48,7 +48,7 @@ pub enum Error {
         message: String,
         /// Classification of the failure: the scenario engine error's kind,
         /// or the kind of the consistency check that failed.
-        kind: finstack_quant_core::error::ErrorKind,
+        kind: finstack_quant_core::ErrorKind,
     },
 
     /// Missing market data
@@ -90,7 +90,7 @@ impl Error {
     /// * `msg` - Human-readable error detail.
     pub fn valuation(
         position_id: impl Into<PositionId>,
-        kind: finstack_quant_core::error::ErrorKind,
+        kind: finstack_quant_core::ErrorKind,
         msg: impl Into<String>,
     ) -> Self {
         Self::ValuationError {
@@ -107,7 +107,7 @@ impl Error {
     /// * `kind` - Classification of the failure (see [`Error::kind`]): the
     ///   scenario engine error's kind, or the kind of the failed check.
     /// * `msg` - Human-readable error detail.
-    pub fn scenario(kind: finstack_quant_core::error::ErrorKind, msg: impl Into<String>) -> Self {
+    pub fn scenario(kind: finstack_quant_core::ErrorKind, msg: impl Into<String>) -> Self {
         Self::ScenarioError {
             message: msg.into(),
             kind,
@@ -124,11 +124,11 @@ impl Error {
     /// `Core` keeps its own kind; `ValuationError` and `ScenarioError` carry
     /// the kind of the failure they wrap.
     ///
-    /// [`ErrorKind::NotFound`]: finstack_quant_core::error::ErrorKind::NotFound
-    /// [`ErrorKind::Validation`]: finstack_quant_core::error::ErrorKind::Validation
+    /// [`ErrorKind::NotFound`]: finstack_quant_core::ErrorKind::NotFound
+    /// [`ErrorKind::Validation`]: finstack_quant_core::ErrorKind::Validation
     #[must_use]
-    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
-        use finstack_quant_core::error::ErrorKind;
+    pub fn kind(&self) -> finstack_quant_core::ErrorKind {
+        use finstack_quant_core::ErrorKind;
         match self {
             Error::Core(core) => core.kind(),
             Error::ValuationError { kind, .. } | Error::ScenarioError { kind, .. } => *kind,
@@ -186,7 +186,7 @@ impl From<Error> for finstack_quant_core::Error {
     /// lookup misses become `InputError::NotFound`, computation failures
     /// `Internal`, and the rest validation errors with the full message.
     fn from(err: Error) -> Self {
-        use finstack_quant_core::error::{ErrorKind, InputError};
+        use finstack_quant_core::{ErrorKind, InputError};
         if let Error::Core(core) = err {
             return core;
         }
@@ -208,7 +208,7 @@ mod tests {
 
     #[test]
     fn kind_is_preserved_by_the_core_fold() {
-        use finstack_quant_core::error::ErrorKind;
+        use finstack_quant_core::ErrorKind;
         let cases = [
             (
                 Error::FxConversionFailed {

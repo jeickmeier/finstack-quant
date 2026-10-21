@@ -191,7 +191,7 @@ impl ShortRateTree {
     /// | Black-Karasinski (trinomial) | **lowest** rate (j = −j_max) | **highest** rate (j = +j_max) |
     pub fn rate_at_node(&self, step: usize, node: usize) -> Result<f64> {
         if step >= self.rates.len() || node >= self.rates[step].len() {
-            return Err(Error::internal(format!(
+            return Err(Error::Internal(format!(
                 "short-rate tree node out of bounds: step={step}, node={node}"
             )));
         }
@@ -201,7 +201,7 @@ impl ShortRateTree {
     /// Get time at step
     pub fn time_at_step(&self, step: usize) -> Result<f64> {
         if step >= self.time_steps.len() {
-            return Err(Error::internal(format!(
+            return Err(Error::Internal(format!(
                 "short-rate tree time step out of bounds: step={step}"
             )));
         }
@@ -210,7 +210,7 @@ impl ShortRateTree {
 
     pub(super) fn validate_lattice_geometry(&self) -> Result<()> {
         if self.rates.len() != self.config.steps + 1 {
-            return Err(Error::internal(format!(
+            return Err(Error::Internal(format!(
                 "short-rate tree lattice geometry mismatch: expected {} rate rows, got {}",
                 self.config.steps + 1,
                 self.rates.len()
@@ -224,7 +224,9 @@ impl ShortRateTree {
                 self.bk_trinomial
                     .as_ref()
                     .ok_or_else(|| {
-                        Error::internal("Black-Karasinski tree has no calibrated trinomial lattice")
+                        Error::Internal(
+                            "Black-Karasinski tree has no calibrated trinomial lattice".into(),
+                        )
                     })?
                     .j_max,
             ),
@@ -237,7 +239,7 @@ impl ShortRateTree {
         for (step, rates_at_step) in self.rates.iter().enumerate() {
             let expected = expected_width(step);
             if rates_at_step.len() != expected {
-                return Err(Error::internal(format!(
+                return Err(Error::Internal(format!(
                     "short-rate tree lattice geometry mismatch: step {} expected {} nodes, got {}",
                     step,
                     expected,

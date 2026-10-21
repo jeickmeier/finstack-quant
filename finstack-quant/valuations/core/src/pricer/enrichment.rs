@@ -51,7 +51,7 @@ pub(super) fn enrich(
         registry: Some(Arc::clone(&pricer_registry)),
         metric_registry: metric_registry.clone(),
         recalibration_provider: recalibration_provider.clone(),
-        explain: finstack_quant_core::explain::ExplainOpts::disabled(),
+        explain: finstack_quant_core::explain::ExplainOpts::default(),
         instrument_validated: false,
     };
     if let Some((metric_measures, details)) = instrument

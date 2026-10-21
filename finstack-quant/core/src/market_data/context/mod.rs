@@ -62,11 +62,11 @@ use std::sync::Arc;
 
 use crate::currency::Currency;
 use crate::dates::Date;
-use crate::error::InputError;
 use crate::money::fx::{FxMatrix, FxQuery};
 use crate::money::Money;
 use crate::types::CurveId;
-use crate::HashMap;
+use crate::FxHashMap;
+use crate::InputError;
 
 use super::{
     dividends::DividendSchedule,
@@ -79,7 +79,8 @@ use super::{
 /// Outcome of [`MarketContext::convert_money`]: the converted amount and the
 /// FX rate it used, so callers can stamp the applied policy (including whether
 /// the rate was triangulated). `rate` is `None` when no conversion was needed.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConvertedMoney {
     /// The amount in the target currency.
     pub amount: Money,
@@ -104,7 +105,7 @@ pub enum ContextScratchBump {
         /// actually feeds a credit index. `None` means no credit indices were
         /// rebound, so the snapshot is skipped on the common rates path. The
         /// snapshot is a cheap `Arc` clone of the whole map (copy-on-write).
-        previous_credit_indices: Option<Arc<HashMap<CurveId, Arc<CreditIndexData>>>>,
+        previous_credit_indices: Option<Arc<FxHashMap<CurveId, Arc<CreditIndexData>>>>,
     },
     /// A bumped volatility surface.
     Surface {
@@ -133,10 +134,7 @@ pub enum ContextScratchBump {
     },
 }
 
-pub use state_serde::{
-    build_snapshot_fx_matrix, CreditIndexState, CurveState, MarketContextState,
-    MARKET_CONTEXT_STATE_CONTRACT, MARKET_CONTEXT_STATE_VERSION,
-};
+pub use state_serde::{build_snapshot_fx_matrix, CreditIndexState, CurveState, MarketContextState};
 
 /// Unified market data context with enum-based storage.
 ///
@@ -151,37 +149,34 @@ pub struct MarketContext {
     // rehashing every map. Mutators use `Arc::make_mut`, so a bump that touches
     // one map copies only that map (copy-on-write) and leaves the rest shared.
     /// All curves stored in unified enum-based map
-    curves: Arc<HashMap<CurveId, CurveStorage>>,
+    curves: Arc<FxHashMap<CurveId, CurveStorage>>,
 
     /// Foreign-exchange matrix
     fx: Option<Arc<FxMatrix>>,
 
     /// Volatility surfaces
-    surfaces: Arc<HashMap<CurveId, Arc<VolSurface>>>,
+    surfaces: Arc<FxHashMap<CurveId, Arc<VolSurface>>>,
 
     /// Market scalars and prices
-    prices: Arc<HashMap<CurveId, MarketScalar>>,
+    prices: Arc<FxHashMap<CurveId, MarketScalar>>,
 
     /// Generic time series
-    series: Arc<HashMap<CurveId, ScalarTimeSeries>>,
+    series: Arc<FxHashMap<CurveId, ScalarTimeSeries>>,
 
     /// Inflation indices
-    inflation_indices: Arc<HashMap<CurveId, Arc<InflationIndex>>>,
+    inflation_indices: Arc<FxHashMap<CurveId, Arc<InflationIndex>>>,
 
     /// Credit index aggregates
-    credit_indices: Arc<HashMap<CurveId, Arc<CreditIndexData>>>,
+    credit_indices: Arc<FxHashMap<CurveId, Arc<CreditIndexData>>>,
 
     /// Shared dividend schedules keyed by `CurveId` (e.g., "AAPL-DIVS")
-    dividends: Arc<HashMap<CurveId, Arc<DividendSchedule>>>,
+    dividends: Arc<FxHashMap<CurveId, Arc<DividendSchedule>>>,
 
     /// FX delta-quoted volatility surfaces
-    fx_delta_vol_surfaces: Arc<HashMap<CurveId, Arc<FxDeltaVolSurface>>>,
+    fx_delta_vol_surfaces: Arc<FxHashMap<CurveId, Arc<FxDeltaVolSurface>>>,
 
     /// SABR volatility cubes (expiry x tenor x strike)
-    vol_cubes: Arc<HashMap<CurveId, Arc<VolCube>>>,
-
-    /// Collateral CSA code mappings
-    collateral: Arc<HashMap<String, CurveId>>,
+    vol_cubes: Arc<FxHashMap<CurveId, Arc<VolCube>>>,
 
     /// Optional market data hierarchy for organizational grouping.
     hierarchy: Option<MarketDataHierarchy>,
@@ -190,17 +185,7 @@ pub struct MarketContext {
 impl std::fmt::Debug for MarketContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MarketContext")
-            .field("curves", &self.curves.len())
-            .field("fx", &self.fx.as_ref().map(|_| ".."))
-            .field("surfaces", &self.surfaces.len())
-            .field("prices", &self.prices.len())
-            .field("series", &self.series.len())
-            .field("inflation_indices", &self.inflation_indices.len())
-            .field("credit_indices", &self.credit_indices.len())
-            .field("dividends", &self.dividends.len())
-            .field("fx_delta_vol_surfaces", &self.fx_delta_vol_surfaces.len())
-            .field("vol_cubes", &self.vol_cubes.len())
-            .field("collateral", &self.collateral.len())
+            .field("stats", &self.stats())
             .field("hierarchy", &self.hierarchy.is_some())
             .finish()
     }
@@ -331,7 +316,7 @@ impl MarketContext {
         if self.credit_indices.is_empty() {
             return Vec::new();
         }
-        let mut rebuilt = HashMap::default();
+        let mut rebuilt = FxHashMap::default();
         rebuilt.reserve(self.credit_indices.len());
         let mut invalidated = Vec::new();
 
@@ -360,9 +345,9 @@ impl MarketContext {
 mod tests {
     use super::MarketContext;
     use crate::currency::Currency;
-    use crate::error::InputError;
     use crate::money::fx::{FxMatrix, SimpleFxProvider};
     use crate::money::Money;
+    use crate::InputError;
     use std::sync::Arc;
     use time::macros::date;
 
@@ -425,7 +410,7 @@ mod tests {
             .expect("valid rate");
         let ctx = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider)));
         let amount = rust_decimal::Decimal::from_str("10000000000000000.1").expect("valid decimal");
-        let eur = Money::from_decimal(amount, Currency::EUR).expect("representable amount");
+        let eur = Money::from_decimal(amount, Currency::EUR);
 
         let usd = ctx
             .convert_money(eur, Currency::USD, date!(2025 - 01 - 15))

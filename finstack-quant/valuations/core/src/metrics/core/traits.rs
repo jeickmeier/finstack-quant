@@ -173,12 +173,12 @@ pub struct MetricContext {
     recalibration_provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
 
     /// Previously computed metrics (by ID).
-    pub computed: finstack_quant_core::HashMap<MetricId, f64>,
+    pub computed: finstack_quant_core::FxHashMap<MetricId, f64>,
 
     /// Previously computed 1D bucketed metrics (by ID).
     ///
     /// Example: `MetricId::BucketedDv01` -> [("1m", v1), ("3m", v2), ...]
-    pub computed_series: finstack_quant_core::HashMap<MetricId, Vec<(String, f64)>>,
+    pub computed_series: finstack_quant_core::FxHashMap<MetricId, Vec<(String, f64)>>,
 
     /// Cached cashflows for the instrument.
     pub cashflows: Option<Vec<(Date, Money)>>,
@@ -202,7 +202,7 @@ pub struct MetricContext {
     pub internal_schedule: Option<Arc<CashFlowSchedule>>,
 
     /// Family-owned caches keyed by type; see [`MetricContext::ext`].
-    extensions: finstack_quant_core::HashMap<TypeId, Box<dyn Any + Send + Sync>>,
+    extensions: finstack_quant_core::FxHashMap<TypeId, Box<dyn Any + Send + Sync>>,
 
     /// Cached discount curve ID.
     pub discount_curve_id: Option<CurveId>,
@@ -263,12 +263,12 @@ impl MetricContext {
             },
             market_scratch: None,
             recalibration_provider: None,
-            computed: finstack_quant_core::HashMap::default(),
-            computed_series: finstack_quant_core::HashMap::default(),
+            computed: finstack_quant_core::FxHashMap::default(),
+            computed_series: finstack_quant_core::FxHashMap::default(),
             cashflows: None,
             tagged_cashflows: None,
             internal_schedule: None,
-            extensions: finstack_quant_core::HashMap::default(),
+            extensions: finstack_quant_core::FxHashMap::default(),
             discount_curve_id: None,
             day_count: None,
             notional: None,

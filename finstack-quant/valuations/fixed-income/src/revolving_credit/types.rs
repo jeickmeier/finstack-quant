@@ -100,7 +100,6 @@ pub struct RevolvingCredit {
     pub drawn: Money,
 
     /// Date when the facility becomes available.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -108,7 +107,6 @@ pub struct RevolvingCredit {
     pub issue_date: Date,
 
     /// Date when the facility expires.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -405,7 +403,7 @@ impl RevolvingCreditFees {
             if bp > 0.0 {
                 vec![FeeTier {
                     threshold: Decimal::ZERO,
-                    bp: Decimal::try_from(bp).unwrap_or(Decimal::ZERO),
+                    bp: finstack_quant_core::decimal::f64_to_decimal(bp).unwrap_or(Decimal::ZERO),
                 }]
             } else {
                 Vec::new()
@@ -525,14 +523,11 @@ impl RevolvingCreditFees {
 
 /// Tier rate in basis points for a finite utilization.
 fn tier_bp(tiers: &[FeeTier], utilization: f64, label: &str) -> finstack_quant_core::Result<f64> {
-    let util = Decimal::try_from(utilization)
-        .ok()
-        .filter(|_| utilization.is_finite())
-        .ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "RevolvingCredit {label} fee: utilization must be finite, got {utilization}"
-            ))
-        })?;
+    let util = finstack_quant_core::decimal::f64_to_decimal(utilization).map_err(|_| {
+        finstack_quant_core::Error::Validation(format!(
+            "RevolvingCredit {label} fee: utilization must be finite, got {utilization}"
+        ))
+    })?;
     evaluate_fee_tiers(tiers, util)?.to_f64().ok_or_else(|| {
         finstack_quant_core::Error::Validation(format!(
             "RevolvingCredit {label} fee tier rate is not representable as f64"
@@ -561,7 +556,6 @@ pub enum DrawRepaySpec {
 #[serde(deny_unknown_fields)]
 pub struct DrawRepayEvent {
     /// Date of the draw or repayment.
-    #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")

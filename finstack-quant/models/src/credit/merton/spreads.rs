@@ -1,6 +1,6 @@
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
-use finstack_quant_core::math::norm_cdf;
+use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::{Error, Result};
 
 use super::{MertonBarrierType, MertonModel};
@@ -18,7 +18,8 @@ const ACT365F_TO_ACT360: f64 = 365.0 / 360.0;
 /// anchor is immaterial; it exists because `HazardCurveBuilder` rejects the
 /// 1970 sentinel to stop callers from accidentally anchoring real curves
 /// there.
-const CDS_CALIBRATION_ANCHOR: time::Date = time::macros::date!(2000 - 01 - 01);
+const CDS_CALIBRATION_ANCHOR: finstack_quant_core::dates::Date =
+    time::macros::date!(2000 - 01 - 01);
 
 /// ISDA-style CDS par spread implied by a survival curve.
 ///
@@ -288,7 +289,7 @@ impl MertonModel {
 
 #[cfg(test)]
 mod tests {
-    use finstack_quant_core::math::norm_cdf;
+    use finstack_quant_core::math::special_functions::norm_cdf;
 
     use super::super::{AssetDynamics, MertonBarrierType, MertonModel};
 

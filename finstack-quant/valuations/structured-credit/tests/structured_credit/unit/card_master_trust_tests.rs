@@ -9,7 +9,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_structured_credit::structured_credit::{
     run_simulation, AbsExcessSpreadCalculator, AbsPaymentRateCalculator, AssetPool,
@@ -141,11 +141,11 @@ fn no_rules() -> WaterfallRules {
     }
 }
 
-fn simulate(deal: &StructuredCredit) -> HashMap<String, TrancheCashflows> {
+fn simulate(deal: &StructuredCredit) -> FxHashMap<String, TrancheCashflows> {
     run_simulation(deal, &market(), close()).expect("simulation")
 }
 
-fn first_principal(results: &HashMap<String, TrancheCashflows>, id: &str) -> Option<Date> {
+fn first_principal(results: &FxHashMap<String, TrancheCashflows>, id: &str) -> Option<Date> {
     results[id]
         .principal_flows
         .iter()

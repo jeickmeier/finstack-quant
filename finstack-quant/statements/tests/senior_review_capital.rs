@@ -562,7 +562,7 @@ fn plain_evaluate_names_instruments_that_need_market_data() {
     let err = Evaluator::new()
         .evaluate(&model)
         .expect_err("a swap needs a forward curve");
-    assert_eq!(err.kind(), finstack_quant_core::error::ErrorKind::NotFound);
+    assert_eq!(err.kind(), finstack_quant_core::ErrorKind::NotFound);
     let message = err.to_string();
     assert!(message.contains("'IRS'"), "{message}");
     assert!(message.contains("evaluate_with_market"), "{message}");

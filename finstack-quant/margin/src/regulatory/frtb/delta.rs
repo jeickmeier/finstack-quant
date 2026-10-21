@@ -8,7 +8,7 @@ use super::aggregation::{
 };
 use super::params::{self, commodity, csr, equity, fx, girr};
 use super::types::{CorrelationScenario, FrtbRiskClass, FrtbSensitivities};
-use finstack_quant_core::HashMap;
+use finstack_quant_core::FxHashMap;
 use std::collections::BTreeMap;
 
 /// Compute the delta risk charge for a single risk class under one
@@ -87,7 +87,7 @@ fn girr_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
     }
 
     // Group by currency (bucket = currency for GIRR).
-    let mut by_currency: HashMap<_, Vec<(f64, GirrFactor)>> = HashMap::default();
+    let mut by_currency: FxHashMap<_, Vec<(f64, GirrFactor)>> = FxHashMap::default();
     for ((ccy, tenor), delta) in &sens.girr_delta {
         let rw = girr_risk_weight(tenor);
         let ws = delta * rw;
@@ -257,8 +257,9 @@ fn fx_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
 ///
 /// Unknown labels return NaN; engine validation rejects them first.
 fn girr_risk_weight(tenor: &str) -> f64 {
-    static GIRR_RW_BY_TENOR: std::sync::LazyLock<finstack_quant_core::HashMap<&'static str, f64>> =
-        std::sync::LazyLock::new(|| girr::GIRR_DELTA_RISK_WEIGHTS.iter().copied().collect());
+    static GIRR_RW_BY_TENOR: std::sync::LazyLock<
+        finstack_quant_core::FxHashMap<&'static str, f64>,
+    > = std::sync::LazyLock::new(|| girr::GIRR_DELTA_RISK_WEIGHTS.iter().copied().collect());
     GIRR_RW_BY_TENOR.get(tenor).copied().unwrap_or(f64::NAN)
 }
 
@@ -273,7 +274,7 @@ fn girr_risk_weight(tenor: &str) -> f64 {
 ///        * rho_basis(basis_k, basis_l)
 /// ```
 fn csr_bucketed_delta(
-    sensitivities: &HashMap<(String, u8, String, String), f64>,
+    sensitivities: &FxHashMap<(String, u8, String, String), f64>,
     risk_weight_fn: impl Fn(u8) -> f64,
     class: FrtbRiskClass,
     scenario: CorrelationScenario,

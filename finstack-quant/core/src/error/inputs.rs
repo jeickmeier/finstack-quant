@@ -103,17 +103,6 @@ pub enum InputError {
     #[error("Input dimensions do not match")]
     DimensionMismatch,
 
-    /// Requested allocation or data structure exceeds configured limit.
-    #[error("Allocation too large for {what}: requested {requested_bytes} bytes, limit {limit_bytes} bytes")]
-    TooLarge {
-        /// Description of what exceeded the limit (e.g., "expression arena").
-        what: String,
-        /// Number of bytes requested.
-        requested_bytes: usize,
-        /// Configured limit in bytes.
-        limit_bytes: usize,
-    },
-
     /// Consecutive knots are too close together for stable interpolation.
     #[error("Consecutive knots are too close together for stable interpolation")]
     KnotSpacingTooSmall,

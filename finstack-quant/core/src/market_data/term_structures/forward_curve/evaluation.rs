@@ -5,7 +5,7 @@ use crate::market_data::bumps::BumpType;
 use crate::market_data::term_structures::common::{
     validate_pillars, PiecewiseLinearAdjustment, RateShock,
 };
-use crate::math::interp::types::Interp;
+use crate::math::interp::Interp;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]

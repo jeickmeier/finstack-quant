@@ -13,12 +13,7 @@ use crate::engine::ExecutionContext;
 use crate::engine::ScenarioEffect;
 use crate::warning::Warning;
 use finstack_quant_core::market_data::bumps::MarketBump;
-use finstack_quant_core::market_data::term_structures::BASE_CORR_DETACHMENT_MATCH_TOLERANCE;
 use finstack_quant_core::types::CurveId;
-
-fn detachment_matches(requested: f64, detachment: f64) -> bool {
-    (requested - detachment).abs() <= BASE_CORR_DETACHMENT_MATCH_TOLERANCE
-}
 
 /// Clamp and no-match warnings for a base-correlation shock; `op` names the
 /// scenario operation in the warning detail.
@@ -33,21 +28,7 @@ fn bump_warnings(
         return Vec::new();
     };
 
-    let matching: Vec<(f64, f64)> = curve
-        .detachment_points()
-        .iter()
-        .copied()
-        .zip(curve.correlations().iter().copied())
-        .filter(|(detachment, _)| {
-            detachments
-                .map(|requested| {
-                    requested
-                        .iter()
-                        .any(|target| detachment_matches(*target, *detachment))
-                })
-                .unwrap_or(true)
-        })
-        .collect();
+    let matching: Vec<(f64, f64)> = curve.bucket_knots(detachments).collect();
 
     let mut warnings = Vec::new();
     if detachments.is_some_and(|requested| !requested.is_empty()) && matching.is_empty() {
