@@ -84,6 +84,7 @@ use super::super::paths::ProcessParams;
 #[cfg(test)]
 use super::super::traits::state_keys;
 use super::super::traits::{PathState, StateKey, StochasticProcess};
+use super::credit_line::interpolate_rate;
 use crate::monte_carlo::traits::ProcessMetadata;
 use finstack_quant_core::market_data::term_structures::ForwardVarianceCurve;
 use finstack_quant_core::math::fractional::HurstExponent;
@@ -243,31 +244,8 @@ impl CheyetteRoughVolParams {
     /// Uses linear interpolation between knots and flat extrapolation at the
     /// boundaries.
     pub fn phi(&self, t: f64) -> f64 {
-        let n = self.phi_times.len();
-        debug_assert!(n > 0);
-
-        if n == 1 || t <= self.phi_times[0] {
-            return self.phi_values[0];
-        }
-        if t >= self.phi_times[n - 1] {
-            return self.phi_values[n - 1];
-        }
-
-        // Binary search for the containing interval
-        let i = match self
-            .phi_times
-            .binary_search_by(|x| x.partial_cmp(&t).unwrap_or(std::cmp::Ordering::Equal))
-        {
-            Ok(idx) => return self.phi_values[idx],
-            Err(idx) => idx - 1,
-        };
-
-        let t0 = self.phi_times[i];
-        let t1 = self.phi_times[i + 1];
-        let v0 = self.phi_values[i];
-        let v1 = self.phi_values[i + 1];
-        let w = (t - t0) / (t1 - t0);
-        v0 + w * (v1 - v0)
+        debug_assert!(!self.phi_times.is_empty());
+        interpolate_rate(t, &self.phi_times, &self.phi_values)
     }
 
     /// Evaluate the base volatility σ₀(t) at time `t`.

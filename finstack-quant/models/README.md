@@ -481,8 +481,8 @@ assumptions. Override `work_size()` for scratch space, `prepare()` for
 grid-dependent precomputation, `applies_correlation_internally()` when the scheme
 handles correlation itself, and `scheme_id()` for dedicated-scheme pairing.
 
-**New payoff** — implement `Payoff`: `on_path_start()` for per-path random setup,
-`on_event()` to consume each path state, `value()` for the final undiscounted
+**New payoff** — implement `Payoff`: `on_event()` to consume each path state
+(set `needs_uniform_random()` to read the per-step uniform), `value()` for the final undiscounted
 amount, `reset()` to clear per-path state. Emit diagnostics with
 `state.add_cashflow()` / `state.add_typed_cashflow()`, and report the last fixing
 via `max_event_step()` so grid mismatches are caught up front.

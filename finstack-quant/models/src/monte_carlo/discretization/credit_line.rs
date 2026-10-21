@@ -8,6 +8,7 @@
 //! When correlation is present, applies Cholesky decomposition to generate
 //! correlated Brownian motions.
 
+use crate::monte_carlo::discretization::qe_common::qe_step_variance;
 use crate::monte_carlo::process::credit_line::{CreditLineProcess, InterestRateSpec};
 use crate::monte_carlo::traits::Discretization;
 use finstack_quant_core::math::linalg::{cholesky_correlation, CholeskyError};
@@ -230,52 +231,9 @@ impl Discretization<CreditLineProcess> for CreditLineDiscretization {
             }
         }
 
-        // Step 3: Credit spread (CIR process) - QE scheme
-        // We need to use QeCir discretization
-        // Extract CIR state and step it
-        let credit_state = [x[2].max(0.0)];
-        let credit_shock = [z_corr[2]];
-        let _credit_work = [0.0];
-
-        let cir_params = &process.get_params().credit_spread.cir;
-
-        // Apply QE scheme directly
-        let v_t = credit_state[0];
-        let exp_kappa_dt = (-cir_params.kappa * dt).exp();
-        let m = cir_params.theta + (v_t - cir_params.theta) * exp_kappa_dt;
-        let s2 = v_t * cir_params.sigma * cir_params.sigma * exp_kappa_dt * (1.0 - exp_kappa_dt)
-            / cir_params.kappa
-            + cir_params.theta * cir_params.sigma * cir_params.sigma * (1.0 - exp_kappa_dt).powi(2)
-                / (2.0 * cir_params.kappa);
-
-        // When m is near zero, force Case B (exponential/uniform mixture) by
-        // setting psi above the threshold. Setting psi = 0.0 would send
-        // Case A into 2/psi = infinity → NaN (matches canonical QeCir).
-        let psi_c = 1.5;
-        let psi = if m > 1e-10 { s2 / (m * m) } else { psi_c + 1.0 };
-
-        let v_next = if psi <= psi_c {
-            // Case A: Power/gamma approximation
-            let b_squared = 2.0 / psi - 1.0 + (2.0 / psi * (2.0 / psi - 1.0)).sqrt();
-            let a = m / (1.0 + b_squared);
-            a * (credit_shock[0] + b_squared.sqrt()).powi(2).max(0.0)
-        } else {
-            // Case B: Exponential/uniform mixture
-            let p = (psi - 1.0) / (psi + 1.0);
-            let beta = (1.0 - p) / m;
-
-            use finstack_quant_core::math::special_functions::norm_cdf;
-            let u = norm_cdf(credit_shock[0]);
-
-            if u <= p {
-                0.0
-            } else {
-                ((1.0 - p) / (u - p)).ln() / beta
-            }
-            .max(0.0)
-        };
-
-        x[2] = v_next;
+        // Step 3: Credit spread (CIR process): Andersen QE with ψ_c = 1.5.
+        let cir = &process.get_params().credit_spread.cir;
+        x[2] = qe_step_variance(x[2], cir.kappa, cir.theta, cir.sigma, dt, z_corr[2], 1.5);
     }
 
     fn work_size(&self, _process: &CreditLineProcess) -> usize {
@@ -334,6 +292,35 @@ mod tests {
 
         // Credit spread should drift toward mean
         assert!(x[2] > 0.015 && x[2] < 0.02);
+    }
+
+    /// The CIR spread leg's QE Case B (ψ > 1.5, here ψ ≈ 60) must map larger
+    /// shocks to larger spreads (Andersen 2008 eq. 25); an inverted inverse
+    /// CDF keeps the marginal but breaks the shock coupling.
+    #[test]
+    fn credit_spread_case_b_is_increasing_in_the_shock() {
+        let utilization = UtilizationParams::new(0.5, 0.6, 0.1).expect("valid utilization params");
+        let credit_spread = CreditSpreadParams::new(0.3, 0.001, 0.5, 0.001).unwrap();
+        let params = CreditLineProcessParams::new(
+            utilization,
+            InterestRateSpec::Fixed { rate: 0.05 },
+            credit_spread,
+        );
+        let process = CreditLineProcess::new(params);
+        let disc = CreditLineDiscretization::from_process(&process).expect("should succeed");
+        let mut work = vec![0.0; disc.work_size(&process)];
+
+        let mut step = |z: f64| {
+            let mut x = [0.5, 0.05, 0.001];
+            disc.step(&process, 0.0, 0.25, &mut x, &[0.0, 0.0, z], &mut work);
+            x[2]
+        };
+        // Below the atom probability p ≈ 0.97 the draw is exactly zero.
+        assert_eq!(step(0.5), 0.0);
+        let spreads: Vec<f64> = [2.0, 2.5, 3.0, 3.5].into_iter().map(&mut step).collect();
+        for pair in spreads.windows(2) {
+            assert!(pair[1] > pair[0], "spread must increase in z: {spreads:?}");
+        }
     }
 
     /// Item 7 regression: the utilization OU step must use the exact

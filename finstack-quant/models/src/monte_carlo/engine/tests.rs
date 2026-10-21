@@ -173,39 +173,20 @@ impl Payoff for DummyPayoff {
 }
 
 #[derive(Clone, Default)]
-struct PathStartPayoff {
-    start_uniform: Option<f64>,
-}
-
-impl Payoff for PathStartPayoff {
-    fn on_path_start<R: RandomStream>(&mut self, rng: &mut R) {
-        self.start_uniform = Some(rng.next_u01());
-    }
-
-    fn on_event(&mut self, _state: &mut PathState) -> finstack_quant_core::Result<()> {
-        Ok(())
-    }
-
-    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        Money::new(self.start_uniform.unwrap_or(-1.0), currency)
-    }
-
-    fn reset(&mut self) {
-        self.start_uniform = None;
-    }
-}
-
-#[derive(Clone, Default)]
 struct CapturedValuePayoff {
     value: Option<f64>,
 }
 
+/// Pays the per-path uniform drawn at the initial event.
 impl Payoff for CapturedValuePayoff {
-    fn on_path_start<R: RandomStream>(&mut self, rng: &mut R) {
-        self.value = Some(rng.next_u01());
+    fn needs_uniform_random(&self) -> bool {
+        true
     }
 
-    fn on_event(&mut self, _state: &mut PathState) -> finstack_quant_core::Result<()> {
+    fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
+        if state.step == 0 {
+            self.value = Some(state.uniform_random());
+        }
         Ok(())
     }
 
@@ -571,12 +552,11 @@ fn test_engine_rejects_generic_scheme_for_lmm_process() {
 }
 
 #[test]
-fn test_antithetic_mirrors_path_start_randomness() {
-    // `CapturedValuePayoff` pays the uniform it draws in `on_path_start`.
-    // With mirrored path-start randomness the antithetic leg receives
-    // exactly `1 − u`, so every pair averages to ½ and the standard error
-    // collapses to floating-point noise. Independent path-start draws (the
-    // old behavior) leave stderr at the i.i.d. level σ/√n ≈ 0.29/√n.
+fn test_antithetic_mirrors_initial_uniform() {
+    // `CapturedValuePayoff` pays the uniform drawn at the initial event.
+    // The antithetic leg receives exactly `1 − u`, so every pair averages
+    // to ½ and the standard error collapses to floating-point noise.
+    // Independent draws would leave stderr at the i.i.d. level σ/√n ≈ 0.29/√n.
     let engine = McEngine::builder()
         .num_paths(1000)
         .uniform_grid(1.0, 4)
@@ -604,7 +584,7 @@ fn test_antithetic_mirrors_path_start_randomness() {
     );
     assert!(
         result.stderr < 1e-12,
-        "mirrored path-start draws must collapse the stderr, got {}",
+        "mirrored initial uniforms must collapse the stderr, got {}",
         result.stderr
     );
 }
@@ -828,30 +808,6 @@ fn test_price_with_capture_parallel_non_splittable_returns_error() {
             "Expected Err for parallel + non-splittable RNG in price_with_capture, got Ok"
         );
     }
-}
-
-#[test]
-fn test_on_path_start_state_survives_into_simulation() {
-    let engine = McEngine::builder()
-        .num_paths(2)
-        .uniform_grid(1.0, 1)
-        .parallel(false)
-        .build()
-        .expect("McEngine builder should succeed with valid test data");
-
-    let result = engine
-        .price(
-            &DummyRng,
-            &DummyProcess,
-            &DummyDisc,
-            &[100.0],
-            &PathStartPayoff::default(),
-            Currency::USD,
-            1.0,
-        )
-        .expect("pricing should succeed");
-
-    assert_eq!(result.mean.amount(), 0.5);
 }
 
 #[test]

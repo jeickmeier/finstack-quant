@@ -59,5 +59,5 @@ pub use fractional::simulate_path_fractional;
 pub use path_capture::{PathCaptureConfig, PathCaptureMode};
 pub use pricing::McEngine;
 
-pub(crate) use pricing::{build_correlation_factor, validate_discounted_payoff};
+pub(crate) use pricing::{build_correlation_factor, PathInputs, PathScratch};
 pub(crate) use simulation::{fill_shocks, run_path_loop, NoiseHook};

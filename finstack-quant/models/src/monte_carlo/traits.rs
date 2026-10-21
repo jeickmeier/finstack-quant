@@ -155,46 +155,6 @@ pub trait RandomStream: Clone + Send + Sync {
     }
 }
 
-/// Antithetic mirror of a [`RandomStream`].
-///
-/// Reads the same underlying draws as the wrapped stream and mirrors them:
-/// normals are negated and uniforms mapped `u → 1 − u`. The engine hands a
-/// mirror of the primary leg's stream to the antithetic payoff's
-/// [`Payoff::on_path_start`], so per-path payoff randomness (e.g. default
-/// thresholds) stays antithetically coupled across the pair instead of being
-/// drawn independently — independent draws silently destroy the variance
-/// reduction for that randomness while leaving the estimator unbiased.
-#[derive(Clone)]
-pub(crate) struct MirroredStream<R: RandomStream>(pub(crate) R);
-
-impl<R: RandomStream> RandomStream for MirroredStream<R> {
-    fn split(&self, stream_id: u64) -> Option<Self> {
-        self.0.split(stream_id).map(MirroredStream)
-    }
-
-    fn fill_u01(&mut self, out: &mut [f64]) {
-        self.0.fill_u01(out);
-        for x in out {
-            *x = 1.0 - *x;
-        }
-    }
-
-    fn fill_std_normals(&mut self, out: &mut [f64]) {
-        self.0.fill_std_normals(out);
-        for x in out {
-            *x = -*x;
-        }
-    }
-
-    fn supports_splitting(&self) -> bool {
-        self.0.supports_splitting()
-    }
-
-    fn is_quasi_random(&self) -> bool {
-        self.0.is_quasi_random()
-    }
-}
-
 /// Standard named keys for values stored in [`PathState`].
 pub mod state_keys {
     use std::sync::Mutex;
@@ -878,9 +838,8 @@ pub trait Discretization<P: StochasticProcess + ?Sized>: Send + Sync {
 /// For each simulated path, the engine calls methods in this order:
 ///
 /// 1. [`Payoff::reset`] to clear state from the previous path.
-/// 2. [`Payoff::on_path_start`] with the path-local random stream.
-/// 3. [`Payoff::on_event`] at the initial state and after every time step.
-/// 4. [`Payoff::value`] once, after the terminal event.
+/// 2. [`Payoff::on_event`] at the initial state and after every time step.
+/// 3. [`Payoff::value`] once, after the terminal event.
 ///
 /// Implementations should treat [`Payoff::value`] as an undiscounted payoff.
 /// The generic [`crate::monte_carlo::engine::McEngine`] applies the caller-supplied
@@ -976,13 +935,6 @@ pub trait Payoff: Send + Sync + Clone {
     /// averages, random thresholds, and any other state that should not leak
     /// between paths.
     fn reset(&mut self);
-
-    /// Optional hook invoked at the start of each path with access to RNG.
-    ///
-    /// Use this to draw per-path random variables such as default thresholds
-    /// before the first event is processed. Implementations that draw here
-    /// should also clear the drawn value in [`Payoff::reset`].
-    fn on_path_start<R: RandomStream>(&mut self, _rng: &mut R) {}
 
     /// Whether this payoff consumes the per-step uniform random draw exposed via
     /// [`PathState::uniform_random`] (e.g. the Brownian-bridge barrier

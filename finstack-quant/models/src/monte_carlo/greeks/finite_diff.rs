@@ -32,7 +32,7 @@
 //! adaptive stopping and path capture are rejected.
 
 use super::super::engine::McEngine;
-use crate::monte_carlo::engine::build_correlation_factor;
+use crate::monte_carlo::engine::{PathInputs, PathScratch};
 use crate::monte_carlo::traits::Payoff;
 use crate::monte_carlo::traits::{Discretization, RandomStream, StochasticProcess};
 use finstack_quant_core::currency::Currency;
@@ -161,30 +161,16 @@ where
                 .to_string(),
         ));
     }
-    let mut prepared_disc = disc.clone();
-    prepared_disc.prepare(process, &cfg.time_grid);
-    let disc = &prepared_disc;
-    let dim = process.dim();
-    let num_factors = process.num_factors();
-    let work_size = disc.work_size(process);
-
-    let correlation = build_correlation_factor(process, disc)?;
-    let mut payoff_local = payoff.clone();
-    let mut payoff_anti = cfg.antithetic.then(|| payoff.clone());
-    let mut state = vec![0.0; dim];
-    let mut state_anti = vec![0.0; if cfg.antithetic { dim } else { 0 }];
-    let mut z = vec![0.0; num_factors];
-    let mut z_anti = vec![0.0; if cfg.antithetic { num_factors } else { 0 }];
-    let mut z_raw = vec![
-        0.0;
-        if correlation.is_some() {
-            num_factors
-        } else {
-            0
-        }
-    ];
-    let mut work = vec![0.0; work_size];
-    let mut work_anti = vec![0.0; if cfg.antithetic { work_size } else { 0 }];
+    let (disc, correlation) = engine.prepare_run(process, disc)?;
+    let inputs = PathInputs {
+        process,
+        disc: &disc,
+        initial_state: &initial_states[0],
+        correlation: correlation.as_ref(),
+        currency,
+        discount_factor,
+    };
+    let mut scratch = PathScratch::new(inputs, payoff, cfg.antithetic);
 
     let mut per_state_values: Vec<Vec<f64>> = (0..n_states)
         .map(|_| Vec::with_capacity(cfg.num_paths))
@@ -199,55 +185,19 @@ where
             )
         })?;
 
-        for (state_idx, s0) in initial_states.iter().enumerate() {
+        for (s0, values) in initial_states.iter().zip(per_state_values.iter_mut()) {
             let mut path_rng = base_split.clone();
-            payoff_local.reset();
-            let v = if let Some(anti) = payoff_anti.as_mut() {
-                let mut mirror = crate::monte_carlo::traits::MirroredStream(path_rng.clone());
-                payoff_local.on_path_start(&mut path_rng);
-                anti.reset();
-                anti.on_path_start(&mut mirror);
-                engine.simulate_antithetic_pair(
-                    &mut path_rng,
-                    process,
-                    disc,
-                    s0,
-                    &mut payoff_local,
-                    anti,
-                    &mut state,
-                    &mut state_anti,
-                    &mut z,
-                    &mut z_anti,
-                    &mut z_raw,
-                    &mut work,
-                    &mut work_anti,
-                    correlation.as_ref(),
-                    currency,
-                )?
-            } else {
-                payoff_local.on_path_start(&mut path_rng);
-                engine.simulate_path(
-                    &mut path_rng,
-                    process,
-                    disc,
-                    s0,
-                    &mut payoff_local,
-                    &mut state,
-                    &mut z,
-                    &mut z_raw,
-                    &mut work,
-                    correlation.as_ref(),
-                    currency,
-                )?
+            let inputs = PathInputs {
+                initial_state: s0,
+                ..inputs
             };
-            let discounted = v * discount_factor;
-            if !discounted.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "non-finite paired finite-diff payoff on path {path_id}, state index \
-                     {state_idx}: payoff={v}, discount_factor={discount_factor}"
-                )));
-            }
-            per_state_values[state_idx].push(discounted);
+            values.push(engine.simulate_discounted(
+                &mut path_rng,
+                inputs,
+                &mut scratch,
+                path_id,
+                None,
+            )?);
         }
     }
 

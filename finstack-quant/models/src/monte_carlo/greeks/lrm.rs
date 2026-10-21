@@ -44,17 +44,6 @@ pub struct LrmGreeks {
     pub vega: Estimate,
 }
 
-/// Summarize per-path contributions as a mean with its sampling error.
-fn estimate(stats: &OnlineStats) -> Estimate {
-    Estimate::new(
-        stats.mean(),
-        stats.stderr(),
-        stats.confidence_interval(0.05),
-        stats.count(),
-    )
-    .with_std_dev(stats.std_dev())
-}
-
 /// Compute delta using Likelihood Ratio Method for GBM.
 ///
 /// For GBM, when the input is the standardized terminal shock `Z`, the score
@@ -114,7 +103,7 @@ pub fn lrm_delta(
         stats.update(delta_contribution);
     }
 
-    estimate(&stats)
+    Estimate::from_stats(&stats)
 }
 
 /// Compute vega from precomputed per-path log-density score sums.
@@ -157,7 +146,7 @@ pub fn lrm_vega_from_scores(
     for (&payoff, &score) in payoffs.iter().zip(path_scores) {
         stats.update(discount_factor * payoff * score * 0.01);
     }
-    estimate(&stats)
+    Estimate::from_stats(&stats)
 }
 
 #[cfg(test)]
