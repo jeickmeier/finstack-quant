@@ -26,6 +26,7 @@ use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
     serde_to_py,
 };
+use crate::bindings::pydoc::pydoc;
 use crate::errors::display_to_py;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -672,7 +673,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     let m = crate::bindings::module_utils::new_submodule(parent, "instruments")?;
     m.setattr(
         "__doc__",
-        "JSON validation, pricing, metric, and cashflow helpers for valuation workflows.",
+        pydoc!("finstack_quant.valuations.instruments", "__module__"),
     )?;
 
     m.add_function(wrap_pyfunction!(validate_instrument_json, &m)?)?;
@@ -721,7 +722,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        crate::bindings::module_utils::Exposure::Python,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
     Ok(())
 }
@@ -730,7 +731,7 @@ fn register_market(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()>
     let m = crate::bindings::module_utils::new_submodule(parent, "market")?;
     m.setattr(
         "__doc__",
-        "Listed-market product coverage and exchange routing metadata.",
+        pydoc!("finstack_quant.valuations.market", "__module__"),
     )?;
 
     pricing::register_market(py, &m)?;
@@ -743,7 +744,7 @@ fn register_market(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()>
     crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        crate::bindings::module_utils::Exposure::Python,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
     Ok(())
 }

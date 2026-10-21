@@ -454,29 +454,12 @@ pub struct PyCdsIndex {
 }
 
 instrument_envelope_methods!(
-    PyCdsIndex,
+    PyCdsIndex("CdsIndex"),
     CdsIndex,
-    "cds_index",
     builder = PyCdsIndexBuilder("CdsIndexBuilder", fields),
     seed = finstack_quant_valuations::instruments::CdsIndex::builder().constituents(Vec::new()),
-    /// Build the validated CDS index.
-    ///
-    /// Validation is the Rust ``CdsIndex::builder().build()`` invariants
-    /// only; there is no additional binding-side check.
-    ///
-    /// Returns
-    /// -------
-    /// CdsIndex
-    ///     The validated CDS index.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the completed CDS index fails validation.
-    build
 );
-instrument_pricing_methods!(PyCdsIndex);
+instrument_pricing_methods!(PyCdsIndex, "CdsIndex");
 
 #[pymethods]
 impl PyCdsIndex {

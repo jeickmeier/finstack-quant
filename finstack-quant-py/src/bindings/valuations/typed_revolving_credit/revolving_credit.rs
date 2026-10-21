@@ -53,26 +53,12 @@ pub struct PyRevolvingCredit {
 }
 
 instrument_envelope_methods!(
-    PyRevolvingCredit,
+    PyRevolvingCredit("RevolvingCredit"),
     RevolvingCredit,
-    "revolving_credit",
     builder = PyRevolvingCreditBuilder("RevolvingCreditBuilder", fields),
     seed = RevolvingCredit::builder(),
-    /// Consume the builder and validate the facility.
-    ///
-    /// Returns
-    /// -------
-    /// RevolvingCredit
-    ///     The validated facility.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing
-    ///     (the message names the field), or the facility fails validation.
-    build
 );
-instrument_pricing_methods!(PyRevolvingCredit);
+instrument_pricing_methods!(PyRevolvingCredit, "RevolvingCredit");
 
 #[pymethods]
 impl PyRevolvingCredit {

@@ -15,22 +15,11 @@
 /// # Arguments
 ///
 /// * `$registry` - Expression yielding the crate's `ARTIFACTS` slice.
+/// * `$module` - Public dotted path of the schema namespace
+///   (`"finstack_quant.core.schema"`); the three docstrings come from its stub.
 macro_rules! schema_registry_functions {
-    ($registry:expr) => {
-        /// List every JSON Schema this crate publishes.
-        ///
-        /// Returns
-        /// -------
-        /// str
-        ///     Pretty-printed JSON with an ``artifacts`` array. Each row carries
-        ///     ``path``, ``$id``, ``title``, ``type_name`` (the Rust root type), ``summary``, ``bytes`` and ``kind``
-        ///     (``input`` for documents you author, ``output`` for documents the
-        ///     library emits, ``component`` for shared definitions).
-        ///
-        /// Raises
-        /// ------
-        /// ValueError
-        ///     If an artifact cannot be rendered.
+    ($registry:expr, $module:literal) => {
+        #[doc = $crate::bindings::pydoc::pydoc!($module, "index")]
         #[pyfunction]
         #[pyo3(text_signature = "()")]
         fn index() -> PyResult<String> {
@@ -41,32 +30,7 @@ macro_rules! schema_registry_functions {
             })
         }
 
-        /// Fetch one JSON Schema by path, ``$id``, or filename.
-        ///
-        /// Parameters
-        /// ----------
-        /// selector : str
-        ///     A ``path`` or ``$id`` from :func:`index`, or just the trailing
-        ///     filename.
-        ///
-        /// profile : str, optional
-        ///     ``"canonical"`` (default) returns the published contract, which
-        ///     is what :func:`validate` checks against. ``"llm"`` returns the
-        ///     projection: self-contained, unit enums flattened, Rust prose
-        ///     stripped, and shaped for structured-output subsets. The
-        ///     projection is deliberately **not** a validator.
-        ///
-        /// Returns
-        /// -------
-        /// str
-        ///     Pretty-printed JSON Schema text.
-        ///
-        /// Raises
-        /// ------
-        /// KeyError
-        ///     If no artifact matches ``selector``.
-        /// ValueError
-        ///     If ``profile`` is unknown, or the artifact cannot be rendered.
+        #[doc = $crate::bindings::pydoc::pydoc!($module, "get")]
         #[pyfunction]
         #[pyo3(signature = (selector, profile = "canonical"), text_signature = "(selector, profile='canonical')")]
         fn get(selector: &str, profile: &str) -> PyResult<String> {
@@ -81,29 +45,7 @@ macro_rules! schema_registry_functions {
             })
         }
 
-        /// Validate a JSON payload against one published schema.
-        ///
-        /// Parameters
-        /// ----------
-        /// selector : str
-        ///     A ``path`` or ``$id`` from :func:`index`, or just the trailing
-        ///     filename.
-        /// payload : str
-        ///     JSON text to check.
-        ///
-        /// Returns
-        /// -------
-        /// str
-        ///     Pretty-printed JSON array of failures, each with ``pointer`` (a
-        ///     JSON Pointer into the payload) and ``message``. An empty array
-        ///     means the payload validates.
-        ///
-        /// Raises
-        /// ------
-        /// KeyError
-        ///     If no artifact matches ``selector``.
-        /// ValueError
-        ///     If ``payload`` is not valid JSON, or the schema cannot be built.
+        #[doc = $crate::bindings::pydoc::pydoc!($module, "validate")]
         #[pyfunction]
         #[pyo3(text_signature = "(selector, payload)")]
         fn validate(selector: &str, payload: &str) -> PyResult<String> {

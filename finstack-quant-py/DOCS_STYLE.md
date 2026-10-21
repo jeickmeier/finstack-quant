@@ -1,9 +1,14 @@
 # Python binding documentation
 
 Python users see API docs through `.pyi` stubs (IDE hover, signature help,
-mypy) and through PyO3 `///` comments forwarded into `help()`. Stubs are the
-primary IntelliSense surface. Runtime `__doc__` comes from the Rust binding
-comments.
+mypy) and through `help()` / IPython `obj?` at runtime. The stub is the single
+source of every docstring: `build.rs` extracts each stub docstring into
+`$OUT_DIR/pydoc/<module>/<qualname>.txt`, and a PyO3 owner takes it with
+`#[doc = pydoc!("finstack_quant.valuations.market", "ConventionRegistry")]`
+(module docstrings: `pydoc!(module, "__module__")`). Edit the stub, never Rust
+prose, to change what `help()` shows; a key with no stub docstring fails to
+compile. Modules not yet converted still forward PyO3 `///` comments into
+`__doc__`; `tests/test_runtime_docs.py` lists the converted ones.
 
 ## Surfaces
 
@@ -11,12 +16,13 @@ comments.
 |---------|----------|------|
 | Stubs | `finstack-quant-py/finstack_quant/**/*.pyi` | IDE docs, types, doctest examples |
 | Pure-Python modules | `finstack-quant-py/finstack_quant/**/*.py` | Same bar as stubs when there is no `.pyi` |
-| PyO3 rustdoc | `finstack-quant-py/src/bindings/**` | `help()` at the REPL |
+| PyO3 bindings | `finstack-quant-py/src/bindings/**` | `pydoc!` pulls the stub text into `help()`; `///` only in modules not yet converted |
 | Parity contract | `finstack-quant-py/parity_contract.toml` | Public names that must stay in sync |
 | Academic sources | `docs/REFERENCES.md` | Canonical papers and market standards |
 
-Thin re-export shims need only a module docstring; symbol docs live on the
-compiled type or the stub.
+Do not add a `.py` re-export shim for a compiled module: register it with
+`Exposure::Compiled` and put its module docstring in the stub. Keep a `.py`
+only when it adds pure-Python code.
 
 ## Required content
 
@@ -81,7 +87,8 @@ binding is an explicit copy-on-write `with_*` method.
 |-------|---------|
 | Stub completeness | `mise run python-doc` |
 | Stub doctests | `mise run python-test --doctest` |
-| PyO3 placeholder prose | included in `python-doc` |
+| PyO3 placeholder prose (unconverted `///` only) | included in `python-doc` |
+| Runtime `__doc__` equals the stub | `pytest finstack-quant-py/tests/test_runtime_docs.py` |
 
 `python-doc` rejects fabricated generator boilerplate, tautological
 parameter text, and missing `Raises` / “does not raise” notes on every

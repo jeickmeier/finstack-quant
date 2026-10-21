@@ -45,6 +45,7 @@ for this crate.
 | `pandas_utils.rs` | `pub(crate)` | DataFrame/Series construction (`dict_to_dataframe`, `serde_rows_to_dataframe*`, `table_to_dataframe`, `labeled_values_to_series`, `dates_to_datetime_index`, …). Caches the `pandas.DataFrame` / `pandas.Series` constructors in `PyOnceLock` |
 | `date_utils.rs` | `pub(crate)` | `parse_iso_date_py`, `extract_date`, `extract_date_iso` — accept either an ISO string or any date-like Python object |
 | `pickle_support.rs` | `pub(crate)` | `reduce_via_json`: the shared `__reduce__` over `to_json`/`from_json`, with a guard that refuses payloads whose JSON does not round-trip |
+| `pydoc.rs` | `pub(crate)` | `pydoc!(module, qualname)`: the stub docstring `build.rs` extracted, as `&str`, for `#[doc = ...]` and module `__doc__`; a missing key is a compile error |
 | `repr_support.rs` | `pub(crate)` | `repr_from_serde`: renders `Name(field=value, …)` from a value's serde form, eliding past six fields |
 
 The `pub` on the domain directories is documentation, not a boundary: the crate is
@@ -97,9 +98,14 @@ Rules that are load-bearing:
   `tests/test_module_names.py` fails if either choice is wrong.
 - Each root namespace also has a pure-Python shim under `../../finstack_quant/`
   (a package per domain, `schema.py` for the workspace registry) that re-exports
-  the compiled module and owns the docstring and stubs. A new namespace needs both
-  halves; a root namespace without a Python file is not importable until
-  something else has loaded the extension.
+  the compiled module. A new namespace needs both halves; a root namespace
+  without a Python file is not importable until something else has loaded the
+  extension. Below the root, prefer `Exposure::Compiled` with a stub only; keep a
+  `.py` only when it adds pure-Python code.
+- Docstrings come from the `.pyi` stubs: `build.rs` extracts them and an owner
+  takes its text with `#[doc = pydoc!("<module>", "<qualname>")]` (see
+  `pydoc.rs`). Converted modules carry no `///` prose on PyO3 owners;
+  `tests/test_runtime_docs.py` lists them and checks runtime `__doc__` == stub.
 
 ## Wrapper conventions
 

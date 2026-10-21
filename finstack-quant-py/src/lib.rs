@@ -9,6 +9,10 @@
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
+// PyO3 owners take their docs from the `.pyi` stubs (`bindings::pydoc`), which
+// are NumPy-style Python docstrings, not Markdown: a doctest's `>>>` prompt and
+// its output line read as a block quote with a lazy continuation.
+#![allow(clippy::doc_lazy_continuation)]
 #![cfg_attr(
     test,
     allow(

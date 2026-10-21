@@ -66,26 +66,12 @@ pub struct PyAssetBackedFacility {
 }
 
 instrument_envelope_methods!(
-    PyAssetBackedFacility,
+    PyAssetBackedFacility("AssetBackedFacility"),
     AssetBackedFacility,
-    "asset_backed_facility",
     builder = PyAssetBackedFacilityBuilder("AssetBackedFacilityBuilder", no_fields),
     seed = AssetBackedFacility::builder(),
-    /// Build the validated facility.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacility
-    ///     The validated facility.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the facility fails validation.
-    build
 );
-instrument_pricing_methods!(PyAssetBackedFacility);
+instrument_pricing_methods!(PyAssetBackedFacility, "AssetBackedFacility");
 
 #[pymethods]
 impl PyAssetBackedFacility {

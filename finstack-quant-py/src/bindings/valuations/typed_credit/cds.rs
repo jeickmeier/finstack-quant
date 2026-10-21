@@ -59,30 +59,12 @@ pub struct PyCreditDefaultSwap {
 }
 
 instrument_envelope_methods!(
-    PyCreditDefaultSwap,
+    PyCreditDefaultSwap("CreditDefaultSwap"),
     CreditDefaultSwap,
-    "credit_default_swap",
     builder = PyCreditDefaultSwapBuilder("CreditDefaultSwapBuilder", fields),
     seed = finstack_quant_valuations::instruments::CreditDefaultSwap::builder(),
-    /// Build the validated CDS.
-    ///
-    /// Validation is the Rust ``CreditDefaultSwap::builder().build()``
-    /// invariants only; there is no additional binding-side check.
-    ///
-    /// Returns
-    /// -------
-    /// CreditDefaultSwap
-    ///     The validated CDS.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the completed CDS fails validation (recovery outside ``[0, 1]``,
-    ///     upfront currency mismatch, protection date outside the premium period).
-    build
 );
-instrument_pricing_methods!(PyCreditDefaultSwap);
+instrument_pricing_methods!(PyCreditDefaultSwap, "CreditDefaultSwap");
 
 #[pymethods]
 impl PyCreditDefaultSwap {

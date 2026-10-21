@@ -1,4 +1,10 @@
-"""Reject legacy placeholder prose in public PyO3 runtime documentation."""
+"""Reject legacy placeholder prose in public PyO3 runtime documentation.
+
+Only Rust ``///`` blocks are scanned. Owners whose docstring is compiled from the
+``.pyi`` stubs (``#[doc = pydoc!(...)]``) carry no Rust prose and are checked by
+``check_python_api_input_docs.py`` on the stub instead. Retire this script once
+every binding module takes its docstrings from the stubs.
+"""
 
 from __future__ import annotations
 

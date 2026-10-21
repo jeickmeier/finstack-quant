@@ -320,30 +320,12 @@ pub struct PyCdsTranche {
 }
 
 instrument_envelope_methods!(
-    PyCdsTranche,
+    PyCdsTranche("CdsTranche"),
     CdsTranche,
-    "cds_tranche",
     builder = PyCdsTrancheBuilder("CdsTrancheBuilder", fields),
     seed = finstack_quant_valuations::instruments::CdsTranche::builder().realized_loss(0.0),
-    /// Build the validated CDS tranche.
-    ///
-    /// Validation is the Rust ``CdsTranche::builder().build()`` invariants
-    /// only; there is no additional binding-side check.
-    ///
-    /// Returns
-    /// -------
-    /// CdsTranche
-    ///     The validated CDS tranche.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the completed tranche fails validation (``attach_pct >=
-    ///     detach_pct``, fractional attach/detach, loss outside ``[0, 1]``).
-    build
 );
-instrument_pricing_methods!(PyCdsTranche);
+instrument_pricing_methods!(PyCdsTranche, "CdsTranche");
 
 #[pymethods]
 impl PyCdsTranche {

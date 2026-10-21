@@ -63,30 +63,12 @@ pub struct PyInterestRateSwap {
 }
 
 instrument_envelope_methods!(
-    PyInterestRateSwap,
+    PyInterestRateSwap("InterestRateSwap"),
     InterestRateSwap,
-    "interest_rate_swap",
     builder = PyInterestRateSwapBuilder("InterestRateSwapBuilder", fields),
     seed = finstack_quant_valuations::instruments::InterestRateSwap::builder(),
-    /// Build the validated swap.
-    ///
-    /// Runs the same validation as Rust ``InterestRateSwapBuilder::build``
-    /// (structural invariants); pricing-time checks happen in ``price``.
-    ///
-    /// Returns
-    /// -------
-    /// InterestRateSwap
-    ///     The validated swap.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing
-    ///     (the message names the builder and field), or the swap fails
-    ///     validation.
-    build
 );
-instrument_pricing_methods!(PyInterestRateSwap);
+instrument_pricing_methods!(PyInterestRateSwap, "InterestRateSwap");
 
 #[pymethods]
 impl PyInterestRateSwap {
@@ -497,36 +479,12 @@ pub struct PySwaption {
 }
 
 instrument_envelope_methods!(
-    PySwaption,
+    PySwaption("Swaption"),
     Swaption,
-    "swaption",
     builder = PySwaptionBuilder("SwaptionBuilder", fields),
     seed = finstack_quant_valuations::instruments::Swaption::builder(),
-    /// Build the validated swaption.
-    ///
-    /// Runs the same validation as Rust ``SwaptionBuilder::build``
-    /// (structural invariants); pricing-time checks happen in ``price``.
-    ///
-    /// Returns
-    /// -------
-    /// Swaption
-    ///     The validated swaption.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing
-    ///     (the message names the builder and field), or the swaption fails
-    ///     validation.
-    build
 );
-instrument_pricing_methods!(
-    PySwaption,
-    model_doc = [
-        "     Explicit keys include ``\"black76\"``, ``\"normal\"`` and",
-        "     ``\"hull_white_1f\"``.",
-    ]
-);
+instrument_pricing_methods!(PySwaption, "Swaption");
 
 #[pymethods]
 impl PySwaption {
@@ -1032,47 +990,12 @@ pub struct PyCapFloor {
 }
 
 instrument_envelope_methods!(
-    PyCapFloor,
+    PyCapFloor("CapFloor"),
     CapFloor,
-    "cap_floor",
     builder = PyCapFloorBuilder("CapFloorBuilder", fields),
     seed = finstack_quant_valuations::instruments::CapFloor::builder(),
-    builder_doc = [
-        " ",
-        " Notes",
-        " -----",
-        " This factory does not raise; it returns a new instance with the documented defaults.",
-        " Unset ``vol_type`` defaults to ``\"auto\"``: the surface is treated as",
-        " a lognormal quote. Each caplet uses Black-76 when forward and strike",
-        " are positive; otherwise the lognormal vol is converted to an",
-        " equivalent normal vol and priced with Bachelier. A normal-vol",
-        " surface must set ``vol_type`` to ``\"normal\"``.",
-    ],
-    /// Build the validated cap/floor.
-    ///
-    /// Runs the same validation as Rust ``CapFloorBuilder::build``
-    /// (structural invariants); pricing-time checks happen in ``price``.
-    ///
-    /// Returns
-    /// -------
-    /// CapFloor
-    ///     The validated cap/floor.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing
-    ///     (the message names the builder and field), or the cap/floor fails
-    ///     validation.
-    build
 );
-instrument_pricing_methods!(
-    PyCapFloor,
-    model_doc = [
-        "     Explicit keys include ``\"black76\"``, ``\"normal\"`` and",
-        "     ``\"hull_white_1f\"``.",
-    ]
-);
+instrument_pricing_methods!(PyCapFloor, "CapFloor");
 
 #[pymethods]
 impl PyCapFloor {

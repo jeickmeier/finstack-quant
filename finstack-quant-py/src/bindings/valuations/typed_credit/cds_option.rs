@@ -56,30 +56,12 @@ pub struct PyCdsOption {
 }
 
 instrument_envelope_methods!(
-    PyCdsOption,
+    PyCdsOption("CdsOption"),
     CdsOption,
-    "cds_option",
     builder = PyCdsOptionBuilder("CdsOptionBuilder", fields),
     seed = finstack_quant_valuations::instruments::CdsOption::builder(),
-    /// Build the validated CDS option.
-    ///
-    /// Validation is the Rust ``CdsOption::builder().build()`` invariants
-    /// only; there is no additional binding-side check.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOption
-    ///     The validated option.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the completed option fails validation (expiry not before CDS
-    ///     maturity, non-positive notional, inconsistent strike state).
-    build
 );
-instrument_pricing_methods!(PyCdsOption);
+instrument_pricing_methods!(PyCdsOption, "CdsOption");
 
 /// Optional date as ``datetime.date`` or ``None``.
 fn opt_date_to_py<'py>(
