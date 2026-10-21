@@ -624,10 +624,10 @@ pub fn pnl_attribution_sensitivity_step_rows(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::detail::{
+    use crate::AttributionMethod;
+    use crate::{
         CarryDetail, CreditFactorAttribution, LevelPnl, RatesCurvesAttribution, SourceLine,
     };
-    use crate::AttributionMethod;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::create_date;
     use time::Month;

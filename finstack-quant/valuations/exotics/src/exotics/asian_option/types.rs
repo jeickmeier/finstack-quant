@@ -423,10 +423,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         if rolled_fixings.is_empty() {
             return Ok(None);
         }
-        let spot = match market.get_price(&self.spot_id)? {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-        };
+        let spot = crate::exotics::asian_option::pricer::resolve_spot(self, market)?;
         let mut observed = self.clone();
         observed
             .past_fixings

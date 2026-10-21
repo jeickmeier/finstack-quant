@@ -1,10 +1,8 @@
 //! Attribution spec execution dispatch.
 
-use super::spec::{AttributionInputs, AttributionResult, AttributionSpec};
-use super::AttributionMethod;
+use crate::spec::{AttributionInputs, AttributionResult, AttributionSpec};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{currency::Currency, dates::Date, money::Money, Error, Result};
-use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;
@@ -45,38 +43,6 @@ fn probe_rounding_currency(
             value: None,
         }),
     }
-}
-
-/// Returns the configured target only when the completed attribution needs translation.
-fn target_currency_requiring_translation(
-    target_currency: Option<Currency>,
-    attribution: &crate::PnlAttribution,
-) -> Option<Currency> {
-    target_currency.filter(|target| *target != attribution.total_pnl.currency())
-}
-
-/// Resolves the opening value used by target-currency translation.
-fn translation_t0_value(
-    instrument: &Arc<dyn Instrument>,
-    market_t0: &MarketContext,
-    as_of_t0: Date,
-    model_params_t0: Option<&ModelParamsSnapshot>,
-    rounding_probe_value: Option<Money>,
-    num_repricings: &mut usize,
-) -> Result<Money> {
-    if model_params_t0.is_none() {
-        if let Some(value) = rounding_probe_value {
-            return Ok(value);
-        }
-    }
-
-    let t0_instrument = match model_params_t0 {
-        Some(params) => crate::model_params::with_model_params(instrument, params)?,
-        None => Arc::clone(instrument),
-    };
-    let value = t0_instrument.value(market_t0, as_of_t0)?;
-    *num_repricings += 1;
-    Ok(value)
 }
 
 /// Parse configured metric names, rejecting every unknown name at once.
@@ -175,6 +141,14 @@ impl AttributionInputs {
             .and_then(|c| c.execution_policy)
             .unwrap_or_default();
 
+        // A metric the caller named stays unnarrowed and still errors if it is
+        // inapplicable, because that is a genuine request.
+        let metrics = self
+            .config
+            .as_ref()
+            .and_then(|config| config.metrics.as_deref())
+            .map(parse_metric_names)
+            .transpose()?;
         let request = crate::AttributionRequest {
             execution_policy,
             strict_validation,
@@ -182,6 +156,13 @@ impl AttributionInputs {
             model_params_t0: self.model_params_t0.as_ref(),
             credit_factor_model: self.credit_factor_model.as_deref(),
             credit_factor_detail_options: &self.credit_factor_detail_options,
+            target_currency: self
+                .config
+                .as_ref()
+                .and_then(|config| config.target_currency),
+            tolerance_abs: self.config.as_ref().and_then(|config| config.tolerance_abs),
+            tolerance_pct: self.config.as_ref().and_then(|config| config.tolerance_pct),
+            metrics: metrics.as_deref(),
             ..crate::AttributionRequest::new(
                 &instrument_arc,
                 market_t0,
@@ -192,105 +173,8 @@ impl AttributionInputs {
             )
         };
 
-        let configured_metrics = self.config.as_ref().and_then(|cfg| cfg.metrics.as_deref());
-        let mut attribution = match (&self.method, configured_metrics) {
-            // A metric the caller named stays unnarrowed and still errors if
-            // it is inapplicable, because that is a genuine request.
-            (AttributionMethod::MetricsBased, Some(names)) => {
-                crate::metrics_based::attribute_request(&request, Some(parse_metric_names(names)?))?
-            }
-            _ => crate::attribute_pnl(&self.method, &request)?,
-        };
-        attribution.meta.rounding = finstack_quant_core::config::RoundingContext::from(&config);
-        attribution.compute_residual()?;
+        let mut attribution = crate::attribute_pnl(&self.method, &request)?;
         attribution.meta.num_repricings += rounding_probe.successful_valuations();
-
-        if let Some(ref cfg) = self.config {
-            if let Some(tol_abs) = cfg.tolerance_abs {
-                attribution.meta.tolerance_abs = tol_abs;
-            }
-            if let Some(tol_pct) = cfg.tolerance_pct {
-                attribution.meta.tolerance_pct = tol_pct;
-            }
-        }
-
-        // Linear methods back-solve credit-factor detail here; reprice methods
-        // populate it inside the cascade. Additive: `credit_curves_pnl` is unchanged.
-        if let Some(model_ref) = &self.credit_factor_model {
-            let linear_path = matches!(
-                self.method,
-                AttributionMethod::MetricsBased | AttributionMethod::Taylor(_)
-            );
-            if linear_path {
-                let mut detail_notes: Vec<String> = Vec::new();
-                match self.compute_credit_factor_detail(
-                    model_ref,
-                    &instrument_arc,
-                    market_t0,
-                    market_t1,
-                    &attribution,
-                    &mut detail_notes,
-                ) {
-                    Ok(Some(detail)) => {
-                        attribution.credit_factor_detail = Some(detail);
-                        attribution.meta.num_repricings += 2;
-                    }
-                    Ok(None) => {
-                        if detail_notes.is_empty() {
-                            attribution.meta.notes.push(
-                                "credit_factor_model supplied but no resolvable issuer/CS01 \
-                                 on instrument; credit_factor_detail omitted"
-                                    .into(),
-                            );
-                        }
-                    }
-                    Err(e) => {
-                        attribution
-                            .meta
-                            .notes
-                            .push(format!("credit_factor_detail computation failed: {e}"));
-                    }
-                }
-                attribution.meta.notes.extend(detail_notes);
-            }
-
-            if let Err(e) = self.compute_carry_credit_split_and_decomposition(
-                model_ref,
-                &instrument_arc,
-                market_t0,
-                &mut attribution,
-            ) {
-                attribution.meta.notes.push(format!(
-                    "credit_carry_decomposition computation failed: {e}"
-                ));
-            }
-        }
-
-        let configured_target = self
-            .config
-            .as_ref()
-            .and_then(|config| config.target_currency);
-        if let Some(target_currency) =
-            target_currency_requiring_translation(configured_target, &attribution)
-        {
-            let val_t0_native = translation_t0_value(
-                &instrument_arc,
-                market_t0,
-                self.as_of_t0,
-                self.model_params_t0.as_ref(),
-                rounding_probe.value,
-                &mut attribution.meta.num_repricings,
-            )?;
-            crate::translate_to_target_currency(
-                &mut attribution,
-                val_t0_native,
-                target_currency,
-                market_t0,
-                market_t1,
-                self.as_of_t0,
-                self.as_of_t1,
-            )?;
-        }
 
         let results_meta = finstack_quant_core::config::results_meta(&config);
 
@@ -305,6 +189,7 @@ impl AttributionInputs {
 mod tests {
     use super::*;
     use crate::AttributionConfig;
+    use crate::AttributionMethod;
     use finstack_quant_cashflows::builder::{
         CashFlowMeta, CashFlowSchedule, CashflowRepresentation,
     };
@@ -315,7 +200,6 @@ mod tests {
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Attributes;
-    use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
     use finstack_quant_valuations::instruments::{InstrumentJson, MarketDependencies};
     use finstack_quant_valuations::pricer::InstrumentType;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -504,62 +388,9 @@ mod tests {
 
         let probe = probe_rounding_currency(&instrument, &market, date!(2025 - 01 - 01), None)
             .expect("valid probe_rounding_currency fixture");
-        let attribution = crate::PnlAttribution::new(
-            Money::from((10_i64, Currency::EUR)),
-            instrument.id(),
-            date!(2025 - 01 - 01),
-            date!(2025 - 01 - 02),
-            AttributionMethod::Parallel,
-        );
-
         assert_eq!(instrument.valuation_calls(), 0);
         assert_eq!(probe.currency, None);
         assert_eq!(probe.value, None);
-        assert_eq!(
-            target_currency_requiring_translation(Some(Currency::USD), &attribution),
-            Some(Currency::USD)
-        );
-        assert_eq!(
-            target_currency_requiring_translation(Some(Currency::EUR), &attribution),
-            None
-        );
-    }
-
-    #[test]
-    fn reusable_probe_avoids_duplicate_but_model_override_reprices() {
-        let instrument = CurrencyTestInstrument::successful(Currency::EUR);
-        let instrument_arc: Arc<dyn Instrument> = Arc::new(instrument.clone());
-        let market = MarketContext::new();
-        let probe = Money::from((100_i64, Currency::EUR));
-        let mut num_repricings = 1;
-
-        let reused = translation_t0_value(
-            &instrument_arc,
-            &market,
-            date!(2025 - 01 - 01),
-            None,
-            Some(probe),
-            &mut num_repricings,
-        )
-        .expect("probe should be reusable");
-
-        assert_eq!(reused, probe);
-        assert_eq!(instrument.valuation_calls(), 0);
-        assert_eq!(num_repricings, 1);
-
-        let repriced = translation_t0_value(
-            &instrument_arc,
-            &market,
-            date!(2025 - 01 - 01),
-            Some(&ModelParamsSnapshot::None),
-            Some(probe),
-            &mut num_repricings,
-        )
-        .expect("model-parameter path should reprice");
-
-        assert_eq!(repriced.currency(), Currency::EUR);
-        assert_eq!(instrument.valuation_calls(), 1);
-        assert_eq!(num_repricings, 2);
     }
 
     #[test]

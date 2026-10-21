@@ -1,6 +1,6 @@
 """Reject WASM bindings that bypass the structured serializer or error path.
 
-Two rules, both run by `mise run wasm-lint` and the CI Test WASM job:
+Two rules, both run by `mise run wasm-lint` and the `wasm-boundary` pre-commit hook:
 
 - `serde_wasm_bindgen::to_value` emits ES `Map`s that `JSON.stringify`
   silently drops. Every binding returns through `crate::utils::to_js_value`,

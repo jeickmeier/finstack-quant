@@ -19,7 +19,7 @@ use finstack_quant_calibration::hull_white::{
     self as rust_hw, CapFloorCalibrationConfig, CapFloorQuote, PiecewiseSigmaCalibrationConfig,
     SwapFrequency, SwaptionQuote,
 };
-use finstack_quant_models::rates::hull_white::{HullWhiteCalibrationParams, HullWhiteParams};
+use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use wasm_bindgen::prelude::*;
 
 /// An omitted frequency is the Rust default (`SwapFrequency::default()`).
@@ -143,26 +143,6 @@ pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
     )
     .map_err(to_js_err)?;
     to_js_value(&fitted)
-}
-
-/// Short-rate volatility of a piecewise Hull-White parameter set at a model time.
-///
-/// Free-function twin of Python `HullWhiteParams.sigma_at` (Rust
-/// `HullWhiteParams::volatility` read with `PiecewiseConstantCurve::value_at`).
-/// @param params - `HullWhiteParams` object (or JSON): `kappa` and the piecewise `volatility` schedule (`times`, `values`).
-/// @param time - Year fraction at which the left-continuous piecewise sigma is read.
-/// @returns Sigma applying at `time`, in absolute rate units per square-root year.
-///
-/// # Errors
-///
-/// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
-/// a `FinstackError` (`kind: "validation"`) if `params` is not a valid
-/// `HullWhiteParams` object.
-#[wasm_bindgen(js_name = hullWhiteParamsSigmaAt)]
-pub fn hull_white_params_sigma_at(params: JsValue, time: JsValue) -> Result<f64, JsValue> {
-    let params: HullWhiteParams = from_js_json(&params, "params")?;
-    let time = js_f64(&time, "time")?;
-    Ok(params.volatility.value_at(time))
 }
 
 #[cfg(test)]

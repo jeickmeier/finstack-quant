@@ -203,11 +203,6 @@ impl ExecuteError {
             },
         }
     }
-
-    /// Serialize the stable error payload as compact wire JSON.
-    pub fn to_json(&self) -> String {
-        self.details().to_json()
-    }
 }
 
 fn core_error_category(error: &finstack_quant_core::Error) -> String {
@@ -1029,7 +1024,7 @@ mod tests {
         assert_eq!(details.category, "validation");
         assert!(details.cause.contains("missing discount curve"));
         let wire: serde_json::Value =
-            serde_json::from_str(&preflight.to_json()).expect("compact error JSON");
+            serde_json::from_str(&preflight.details().to_json()).expect("compact error JSON");
         assert_eq!(wire["stage"], "preflight");
 
         let solver = ExecuteError::envelope(

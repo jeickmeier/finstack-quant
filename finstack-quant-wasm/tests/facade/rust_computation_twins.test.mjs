@@ -679,7 +679,7 @@ test('calibration content hashes match the Python/Rust hashes', () => {
   );
   assert.equal(
     calibration.calibrationEnvelopeContentHash(envelope),
-    'sha256:0959605bc2b4005f3b8d809eb78c431fe4c6abac03443161fc3a64f35f08843a'
+    'sha256:c71a40f68570b2ef28b67a7809cf7094a4ba3ce9004fac8d9e5101ef57c76cdd'
   );
   // The solved residuals differ from the native build in the last bits
   // (wasm32 libm), so the result hash is pinned against its own JSON text:
@@ -731,7 +731,7 @@ test('pnlBridge and attributePnlMany run the Rust attribution entry points', () 
 
   assert.match(attribution.pnlAttributionExplainText(single), /Total P&L/);
   assert.ok(
-    attribution.pnlAttributionExplainVerboseText(single).length >=
+    attribution.pnlAttributionExplainText(single, true).length >=
       attribution.pnlAttributionExplainText(single).length
   );
   assert.equal(

@@ -981,3 +981,35 @@ fn fi_trs_keeps_completed_unpaid_period_in_pv() {
     trs.fixing_series_id = None;
     assert!(trs.pv_total_return_leg(&market, d(2025, 4, 3)).is_err());
 }
+
+/// Theta across the first financing reset holds the crossed fixings at their
+/// as-of projection (exported with the cashflow schedule); the market carries
+/// no fixing for the reset window. The index level equals the reset level, so
+/// the rolled period in progress values on carry alone.
+#[test]
+fn test_fi_index_trs_theta_across_a_financing_reset() {
+    let market = create_market_context().insert_price("HY-INDEX", MarketScalar::Unitless(100.0));
+    let as_of = as_of_date();
+    for compounding in [
+        finstack_quant_cashflows::builder::FloatingLegCompounding::Simple,
+        finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears {
+            lookback_days: 0,
+        },
+    ] {
+        let mut trs = TestFIIndexTrsBuilder::new().build();
+        assert!(trs.schedule.start > as_of);
+        trs.initial_level = Some(100.0);
+        trs.financing_leg.compounding = compounding;
+        trs.metric_pricing_overrides.theta_period =
+            Some(finstack_quant_core::dates::Tenor::parse("1W").expect("tenor"));
+        let result = trs
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[finstack_quant_valuations::metrics::MetricId::Theta],
+                finstack_quant_valuations::instruments::PricingOptions::default(),
+            )
+            .unwrap_or_else(|err| panic!("{compounding:?} theta across the start reset: {err}"));
+        assert!(result.measures["theta"].is_finite(), "{compounding:?}");
+    }
+}
