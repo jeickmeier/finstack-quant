@@ -34,8 +34,8 @@
 //! legs use the schedule year fraction; overnight legs use the projector
 //! year fraction so `pv_financing_leg = pv_financing_float_only + spread × annuity`.
 
-use crate::instruments::common_impl::parameters::legs::FinancingLegSpec;
-use crate::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;
+use crate::instruments::FinancingLegSpec;
+use crate::instruments::TrsScheduleSpec;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
@@ -593,7 +593,7 @@ impl TrsEngine {
     ///
     /// Returns an error if a required curve is missing, overnight projection
     /// fails, or the computed annuity is below
-    /// [`crate::instruments::common_impl::pricing::swap_legs::ANNUITY_EPSILON`] (1e-12),
+    /// [`crate::instruments::pricing::swap_legs::ANNUITY_EPSILON`] (1e-12),
     /// which would cause divide-by-zero in downstream par spread calculations.
     /// This typically occurs when:
     /// - All periods have already expired (payment dates before as_of)
@@ -659,13 +659,13 @@ impl TrsEngine {
 
         let result = annuity.total() * notional.amount();
 
-        if result.abs() < super::swap_legs::ANNUITY_EPSILON {
+        if result.abs() < crate::instruments::pricing::swap_legs::ANNUITY_EPSILON {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Financing annuity ({:.2e}) is below minimum threshold ({:.2e}). \
                  This may indicate all periods have expired or extreme discounting scenarios. \
                  Cannot compute par spread with near-zero annuity.",
                 result,
-                super::swap_legs::ANNUITY_EPSILON
+                crate::instruments::pricing::swap_legs::ANNUITY_EPSILON
             )));
         }
 
@@ -748,9 +748,9 @@ mod tests {
         financing_period_projection, financing_period_rate, TotalReturnLegParams, TrsEngine,
         TrsReturnModel,
     };
-    use crate::instruments::common_impl::parameters::legs::FinancingLegSpec;
-    use crate::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;
-    use crate::instruments::common_impl::pricing::swap_legs;
+    use crate::instruments::pricing::swap_legs;
+    use crate::instruments::FinancingLegSpec;
+    use crate::instruments::TrsScheduleSpec;
     use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_cashflows::builder::ScheduleParams;
     use finstack_quant_core::currency::Currency;

@@ -4,8 +4,8 @@ use crate::variance_swap::VarianceSwap;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_models::closed_form::bs_price_unchecked;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::variance_replication::carr_madan_forward_variance;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::market::OptionType;
 
 type OhlcVecs = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
 use finstack_quant_core::{
@@ -421,7 +421,7 @@ mod tests {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::macros::date;
 
     fn build_market(as_of: Date) -> MarketContext {
@@ -536,8 +536,8 @@ mod tests {
         use crate::variance_swap::types::PayReceive;
         use finstack_quant_core::dates::{DayCount, Tenor};
         use finstack_quant_core::money::Money;
+        use finstack_quant_core::types::Attributes;
         use finstack_quant_core::types::{CurveId, InstrumentId};
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 
         let as_of = date!(2025 - 01 - 02);
         let maturity = date!(2026 - 01 - 02);
@@ -561,7 +561,7 @@ mod tests {
             .observation_calendar_id("USNY".into())
             .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
             .price_series_policy(
-                finstack_quant_valuations_equity::EquityPriceSeriesPolicy::Adjusted,
+                finstack_quant_valuations_equity::variance_swap::EquityPriceSeriesPolicy::Adjusted,
             )
             .side(PayReceive::Receive)
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -612,8 +612,8 @@ mod tests {
         use crate::variance_swap::types::PayReceive;
         use finstack_quant_core::dates::{DayCount, Tenor};
         use finstack_quant_core::money::Money;
+        use finstack_quant_core::types::Attributes;
         use finstack_quant_core::types::{CurveId, InstrumentId};
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 
         let as_of = date!(2024 - 07 - 01);
         let start = date!(2025 - 01 - 02); // ~6 months forward (business day)
@@ -638,7 +638,7 @@ mod tests {
             .observation_calendar_id("USNY".into())
             .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
             .price_series_policy(
-                finstack_quant_valuations_equity::EquityPriceSeriesPolicy::Adjusted,
+                finstack_quant_valuations_equity::variance_swap::EquityPriceSeriesPolicy::Adjusted,
             )
             .side(PayReceive::Receive)
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -760,8 +760,8 @@ mod tests {
         use finstack_quant_core::dates::{DayCount, Tenor};
         use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
         use finstack_quant_core::money::Money;
+        use finstack_quant_core::types::Attributes;
         use finstack_quant_core::types::{CurveId, InstrumentId};
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 
         // Weekend-skipping daily schedule, ~6 months, valued near maturity.
         let start = date!(2025 - 01 - 06); // Monday
@@ -787,7 +787,7 @@ mod tests {
             .observation_calendar_id("USNY".into())
             .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
             .price_series_policy(
-                finstack_quant_valuations_equity::EquityPriceSeriesPolicy::Adjusted,
+                finstack_quant_valuations_equity::variance_swap::EquityPriceSeriesPolicy::Adjusted,
             )
             .side(PayReceive::Receive)
             .discount_curve_id(CurveId::new("USD-OIS"))

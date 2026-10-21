@@ -375,7 +375,7 @@ fn format_bucket_factor_id(level_idx: usize, dim_path: &str, val_path: &str) -> 
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_factor::matching::parse_bucket_factor_id;
+/// use finstack_quant_factor::parse_bucket_factor_id;
 /// use finstack_quant_factor::FactorId;
 ///
 /// let id = FactorId::new("credit::level1::Rating.Region::IG.EU");

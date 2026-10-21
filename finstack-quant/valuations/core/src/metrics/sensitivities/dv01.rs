@@ -26,8 +26,8 @@
 //! For DV01 calculations, use the [`MetricId::Dv01`] or [`MetricId::BucketedDv01`]
 //! metrics via the [`Instrument::price_with_metrics`] method:
 
-use crate::instruments::common_impl::dependencies::RatesCurveKind;
-use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::Instrument;
+use crate::instruments::RatesCurveKind;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::MetricCalculator;
 use crate::metrics::{MetricContext, MetricId};
@@ -444,7 +444,7 @@ impl UnifiedDv01Calculator {
         context.with_market_scratch(|context, scratch| {
             for (i, &target_time) in buckets.iter().enumerate() {
                 let label =
-                    std::borrow::Cow::Owned(super::config::format_key_rate_label(target_time));
+                    std::borrow::Cow::Owned(crate::metrics::format_key_rate_label(target_time));
                 // Build bucket-shaped bumps with half-triangle wings at the
                 // first and last buckets so the bump-set partitions unity
                 // across the full curve. Using a finite `prev = 0.0` at the

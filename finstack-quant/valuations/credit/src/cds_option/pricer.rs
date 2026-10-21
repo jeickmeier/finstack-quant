@@ -19,13 +19,15 @@
 //!   `docs/REFERENCES.md#isda-cds-standard-model`
 
 use super::bloomberg_quadrature;
-use crate::cds::{CdsValuationConvention, CreditDefaultSwap, PayReceive};
+use crate::cds::CreditDefaultSwap;
 use crate::cds_option::CdsOption;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
 use finstack_quant_valuations_core::pricer::expect_inst;
 
 /// Price the CDS option at `as_of` under the Bloomberg CDSO numerical
@@ -398,7 +400,8 @@ mod settlement_and_sigma_tests {
     use finstack_quant_core::dates::{Date, DateExt};
     use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface, VolSurfaceAxis};
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
-    use finstack_quant_valuations_core::instruments::{CreditParams, OptionType, SettlementType};
+    use finstack_quant_models::types::OptionType;
+    use finstack_quant_valuations_core::instruments::{CreditParams, SettlementType};
     use rust_decimal::Decimal;
     use time::macros::date;
 

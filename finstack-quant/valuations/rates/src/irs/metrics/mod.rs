@@ -49,8 +49,8 @@
 //! # }
 //! ```
 
-use crate::InterestRateSwap;
-use finstack_quant_valuations_core::instruments::common_impl::pricing::swap_legs::ANNUITY_EPSILON;
+use crate::irs::InterestRateSwap;
+use finstack_quant_valuations_core::instruments::pricing::swap_legs::ANNUITY_EPSILON;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricId;
@@ -76,10 +76,10 @@ pub(crate) fn register_irs_metrics(
             (Dv01, dv01::IrsDv01Calculator),
 
             // PV01 per-curve: bump each rate curve individually, store as pv01::{curve}
-            (Pv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_per_curve()
+            (Pv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_per_curve()
                 .with_series_id(finstack_quant_valuations_core::metrics::MetricId::Pv01))),
 
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
 
             (PvFixed, FixedLegPvCalculator),
             (PvFloat, FloatLegPvCalculator),

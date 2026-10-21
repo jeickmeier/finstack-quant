@@ -3,7 +3,7 @@
 use finstack_quant_calibration::api::schema::CalibrationEnvelope;
 use finstack_quant_core::canonical::to_canonical_bytes;
 use finstack_quant_core::contract::LoadLimits;
-use finstack_quant_valuations::instruments::InstrumentEnvelope;
+use finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope;
 
 fn document_with_replacement(document: &str, from: &str, to: &str) -> Vec<u8> {
     serde_json::to_string(

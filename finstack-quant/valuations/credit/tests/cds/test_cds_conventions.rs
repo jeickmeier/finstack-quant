@@ -13,7 +13,7 @@
 
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::{calendar_by_id_strict, DayCount};
-use finstack_quant_valuations_credit::cds::CdsConvention;
+use finstack_quant_valuations_core::market::conventions::CdsConvention;
 use time::Month;
 
 /// Verify that all CDS convention calendar IDs resolve to valid calendars.

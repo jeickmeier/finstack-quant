@@ -12,8 +12,8 @@
 //!
 //! # See Also
 //!
-//! - [`Snowball`] for instrument definition
-//! - [`SnowballVariant`] for variant selection
+//! - [`Snowball`](crate::exotics::snowball::Snowball) for instrument definition
+//! - [`SnowballVariant`](crate::exotics::snowball::SnowballVariant) for variant selection
 
 pub(crate) mod metrics;
 pub(crate) mod pricer;

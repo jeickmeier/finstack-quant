@@ -21,10 +21,11 @@ use finstack_quant_attribution::{
     ExecutionPolicy, TaylorAttributionConfig,
 };
 use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, ConvertibleBond, DividendAdjustment,
-};
+use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::{
+    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
+};
 use finstack_quant_valuations::metrics::MetricId;
 
 fn t0() -> Date {
@@ -88,7 +89,7 @@ fn convertible_with_credit() -> Arc<dyn Instrument> {
                 fixed_coupon,
             ),
         instrument_pricing_overrides:
-            finstack_quant_valuations::instruments::InstrumentPricingOverrides::default(),
+            finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
@@ -329,7 +330,7 @@ fn conversion_change_spec(
         finstack_quant_core::market_data::context::MarketContextState::try_from(&market(150.0))
             .expect("coherent market snapshot");
     finstack_quant_attribution::AttributionSpec {
-        instrument: finstack_quant_valuations::instruments::InstrumentJson::ConvertibleBond(
+        instrument: finstack_quant_valuations::instruments::json_loader::InstrumentJson::ConvertibleBond(
             closing,
         ),
         inputs: finstack_quant_attribution::AttributionInputs {
@@ -391,13 +392,14 @@ fn taylor_market_gamma_uses_opening_conversion_state() {
         ))
         .expect("coherent market snapshot");
     let mut fixed = changed.clone();
-    fixed.instrument = finstack_quant_valuations::instruments::InstrumentJson::ConvertibleBond(
-        convertible_with_credit()
-            .as_any()
-            .downcast_ref::<ConvertibleBond>()
-            .unwrap()
-            .clone(),
-    );
+    fixed.instrument =
+        finstack_quant_valuations::instruments::json_loader::InstrumentJson::ConvertibleBond(
+            convertible_with_credit()
+                .as_any()
+                .downcast_ref::<ConvertibleBond>()
+                .unwrap()
+                .clone(),
+        );
     fixed.inputs.model_params_t0 = None;
     let changed_result = changed.execute().unwrap().attribution;
     let fixed_result = fixed.execute().unwrap().attribution;

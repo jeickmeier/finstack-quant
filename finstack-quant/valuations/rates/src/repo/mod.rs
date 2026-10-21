@@ -1,17 +1,17 @@
 //! Repurchase agreements priced from the cash-lender perspective.
 //!
-//! [`Repo`] supports term, open-with-an-initial-maturity, and overnight
+//! [`Repo`](crate::repo::Repo) supports term, open-with-an-initial-maturity, and overnight
 //! contracts. Its full contractual schedule contains three classified entries
 //! on two business-day-adjusted payment dates: a `Notional` outflow at the
 //! start, then a `Notional` principal repayment and `Fixed` simple repo interest
 //! at maturity. Valuation-date filtering may omit settled entries.
-//! [`CollateralType::Special`] may adjust the repo rate; the haircut determines
+//! [`CollateralType::Special`](crate::repo::CollateralType::Special) may adjust the repo rate; the haircut determines
 //! required collateral but does not change those cashflows or base PV.
 //!
 //! # Margining boundary
 //!
-//! [`Repo`] implements [`finstack_quant_margin::Marginable`] and can carry an
-//! optional [`finstack_quant_margin::RepoMarginSpec`]. Variation-margin MTM
+//! [`Repo`](crate::repo::Repo) implements [`finstack_quant_margin::Marginable`] and can carry an
+//! optional [`finstack_quant_margin::types::RepoMarginSpec`]. Variation-margin MTM
 //! delegates to repo PV, while SIMM returns a simple 3M/6M interest-rate-delta
 //! approximation.
 //!

@@ -1,6 +1,6 @@
 //! Agency CMO (Collateralized Mortgage Obligation) module.
 //!
-//! This module provides the [`AgencyCmo`] instrument for modeling CMO deals
+//! This module provides the [`AgencyCmo`](crate::cmo::AgencyCmo) instrument for modeling CMO deals
 //! backed by agency MBS collateral with multiple tranches.
 //!
 //! # Overview
@@ -102,7 +102,7 @@
 
 pub(crate) mod metrics;
 pub(crate) mod pricer;
-pub mod tranches;
+mod tranches;
 mod types;
 pub mod waterfall;
 

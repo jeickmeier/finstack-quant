@@ -1,7 +1,7 @@
 //! Pricing and metric helpers for equity instruments.
 //!
-use crate::pe_fund::waterfall::{AllocationLedger, EquityWaterfallEngine, FundEventKind};
 use crate::pe_fund::PrivateMarketsFund;
+use crate::pe_fund::{AllocationLedger, EquityWaterfallEngine, FundEventKind};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -89,9 +89,9 @@ pub(crate) fn compute_pv(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pe_fund::waterfall::{FundEvent, PeFundWaterfallSpec};
+    use crate::pe_fund::{FundEvent, PeFundWaterfallSpec};
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::macros::date;
 
     fn fully_realized_fund() -> PrivateMarketsFund {

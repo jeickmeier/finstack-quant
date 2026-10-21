@@ -5,9 +5,8 @@
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_fixed_income::revolving_credit::{
-    CreditSpreadProcessSpec, RevolvingCreditPricer,
-};
+use finstack_quant_valuations_fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer;
+use finstack_quant_valuations_fixed_income::revolving_credit::CreditSpreadProcessSpec;
 
 use crate::support::revolver_draws::{
     market, revolver, widening_hazard_curve, AS_OF, HAZARD_ID, MARGIN_BP,

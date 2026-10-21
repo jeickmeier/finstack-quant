@@ -194,9 +194,10 @@ pub fn pnl_bridge(
     as_of_t1: JsValue,
     target_currency: JsValue,
 ) -> Result<crate::api::core::money::JsMoney, JsValue> {
-    let instrument = finstack_quant_valuations::pricer::json::parse_instrument_from_json(
-        &json_text(&instrument_json, "instrumentJson")?,
-    )
+    let instrument = finstack_quant_valuations::pricer::parse_instrument_from_json(&json_text(
+        &instrument_json,
+        "instrumentJson",
+    )?)
     .map_err(to_js_err)?;
     let instrument: std::sync::Arc<dyn finstack_quant_valuations::instruments::Instrument> =
         std::sync::Arc::from(instrument.into_boxed().map_err(to_js_err)?);
@@ -250,8 +251,7 @@ pub fn attribute_pnl_many(inputs: JsValue, instruments: JsValue) -> Result<JsVal
                 serde_json::Value::String(json) => json,
                 object => object.to_string(),
             };
-            finstack_quant_valuations::pricer::json::parse_instrument_from_json(&json)
-                .map_err(to_js_err)
+            finstack_quant_valuations::pricer::parse_instrument_from_json(&json).map_err(to_js_err)
         })
         .collect::<Result<Vec<_>, JsValue>>()?;
     let attributions =

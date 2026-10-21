@@ -608,7 +608,7 @@ struct TopoSortState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::traits::{Attributes, Instrument};
+    use crate::instruments::Instrument;
     use crate::metrics::core::ids::{MetricGroup, MetricId};
     use crate::metrics::core::traits::{MetricCalculator, MetricContext};
     use crate::pricer::InstrumentType;
@@ -617,6 +617,7 @@ mod tests {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use std::sync::Arc;
 
     // Mock instrument for testing
@@ -644,10 +645,8 @@ mod tests {
         /// Test mock: reads no market data.
         fn market_dependencies(
             &self,
-        ) -> finstack_quant_core::Result<
-            crate::instruments::common_impl::dependencies::MarketDependencies,
-        > {
-            Ok(crate::instruments::common_impl::dependencies::MarketDependencies::new())
+        ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
+            Ok(crate::instruments::MarketDependencies::new())
         }
 
         fn id(&self) -> &str {
@@ -693,7 +692,7 @@ mod tests {
             _market: &MarketContext,
             _as_of: Date,
             _metrics: &[MetricId],
-            _options: crate::instruments::common_impl::traits::PricingOptions,
+            _options: crate::instruments::PricingOptions,
         ) -> crate::Result<ValuationResult> {
             unimplemented!()
         }

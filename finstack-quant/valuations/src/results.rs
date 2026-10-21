@@ -2,7 +2,7 @@
 //!
 //! Defined in `finstack_quant_valuations_core::results` and re-exported here
 //! unchanged: [`ValuationResult`](finstack_quant_valuations_core::results::ValuationResult),
-//! [`ValuationDetails`](finstack_quant_valuations_core::results::ValuationDetails), [`ResultsMeta`](finstack_quant_valuations_core::results::ResultsMeta),
+//! [`ValuationDetails`](finstack_quant_valuations_core::results::ValuationDetails), [`ResultsMeta`](finstack_quant_core::config::ResultsMeta),
 //! provenance and the row exports.
 //!
 //! # Quick Example
@@ -11,9 +11,8 @@
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::types::Rate;
-//! use finstack_quant_valuations::instruments::{
-//!     Bond, BondConvention, Instrument, PricingOptions,
-//! };
+//! use finstack_quant_valuations::instruments::{BondConvention, Instrument, PricingOptions};
+//! use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 //! use finstack_quant_valuations::metrics::MetricId;
 //! use finstack_quant_core::market_data::context::MarketContext;
 //! use finstack_quant_core::market_data::term_structures::DiscountCurve;

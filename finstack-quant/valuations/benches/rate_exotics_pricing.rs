@@ -21,10 +21,12 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::{
-    CallableRangeAccrual, Instrument, InstrumentPricingOverrides, PricingOptions, QuantoSpec,
-    RangeAccrual, Snowball, Tarn,
-};
+use finstack_quant_valuations::instruments::exotics::callable_range_accrual::CallableRangeAccrual;
+use finstack_quant_valuations::instruments::exotics::range_accrual::RangeAccrual;
+use finstack_quant_valuations::instruments::exotics::snowball::Snowball;
+use finstack_quant_valuations::instruments::exotics::tarn::Tarn;
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations::instruments::{Instrument, PricingOptions, QuantoSpec};
 use finstack_quant_valuations::pricer::{
     standard_pricer_registry, InstrumentType, ModelKey, PricerKey,
 };

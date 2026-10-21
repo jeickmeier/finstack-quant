@@ -16,10 +16,9 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::correlation::RecoverySpec as StochasticRecoverySpec;
-use finstack_quant_models::credit::pool::{
-    CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
-};
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_models::credit::pool::StochasticPrepaySpec;
+use finstack_quant_models::credit::pool::{CorrelationStructure, StochasticDefaultSpec};
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
 
 impl StructuredCredit {

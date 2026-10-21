@@ -11,11 +11,12 @@ use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DilutionEvent, DividendAdjustment,
     PriceTrigger,
 };
-use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
 use super::super::convert::{
     attributes_from_py, builder_repr, date_repr, enum_to_py_string, float_repr, money_repr,
@@ -449,7 +450,8 @@ fn call_put_from_py(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<CallPu
 #[derive(Clone)]
 pub struct PyConvertibleBond {
     /// Inner canonical Rust convertible bond.
-    pub(crate) inner: finstack_quant_valuations::instruments::ConvertibleBond,
+    pub(crate) inner:
+        finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond,
 }
 
 impl PyConvertibleBond {
@@ -467,7 +469,7 @@ instrument_envelope_methods!(
     ConvertibleBond,
     "convertible_bond",
     PyConvertibleBondBuilder,
-    finstack_quant_valuations::instruments::ConvertibleBond::builder()
+    finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond::builder()
 );
 instrument_pricing_methods!(PyConvertibleBond);
 
@@ -491,9 +493,10 @@ impl PyConvertibleBond {
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
-        finstack_quant_valuations::instruments::ConvertibleBond::example()
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
+        finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond::example(
+        )
+        .map(|inner| Self { inner })
+        .map_err(core_to_py)
     }
 
     /// Mandatory (PERCS/DECS-style) convertible example.
@@ -515,7 +518,7 @@ impl PyConvertibleBond {
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example_mandatory() -> PyResult<Self> {
-        finstack_quant_valuations::instruments::ConvertibleBond::example_mandatory()
+        finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond::example_mandatory()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }

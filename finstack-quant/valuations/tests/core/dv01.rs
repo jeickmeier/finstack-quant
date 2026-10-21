@@ -1,6 +1,8 @@
 //! Unified DV01 over a built-in swap.
 
-use finstack_quant_valuations::metrics::{Dv01CalculatorConfig, UnifiedDv01Calculator};
+use finstack_quant_valuations::metrics::sensitivities::dv01::{
+    Dv01CalculatorConfig, UnifiedDv01Calculator,
+};
 
 /// A curve that serves as both the discount and the projection curve of a
 /// self-discounting swap must be bumped exactly ONCE per direction, or
@@ -18,7 +20,7 @@ fn collect_curves_never_duplicates_a_dual_role_curve_id() {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations::instruments::InterestRateSwap;
+    use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
     use time::macros::date;
 
     // Self-discounting swap: projection curve id == discount curve id.

@@ -42,7 +42,7 @@ fn test_risk_factor_label() {
 
 #[test]
 fn test_extract_discount_factors_from_bond() -> Result<()> {
-    use finstack_quant_valuations::instruments::Bond;
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 
     let as_of = date!(2024 - 01 - 01);
 
@@ -107,7 +107,7 @@ fn test_extract_discount_factors_from_bond() -> Result<()> {
 
 #[test]
 fn test_extract_factors_empty_market() -> Result<()> {
-    use finstack_quant_valuations::instruments::Bond;
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 
     let as_of = date!(2024 - 01 - 01);
     let bond = Bond::fixed(
@@ -143,8 +143,8 @@ fn test_extract_equity_and_vol_factors() -> Result<()> {
         .id(finstack_quant_core::types::InstrumentId::new("EQO"))
         .underlying_ticker("AAPL".to_string())
         .strike(100.0)
-        .option_type(finstack_quant_valuations::instruments::OptionType::Call)
-        .exercise_style(finstack_quant_valuations::instruments::ExerciseStyle::European)
+        .option_type(finstack_quant_models::types::OptionType::Call)
+        .exercise_style(finstack_quant_models::types::ExerciseStyle::European)
         .expiry(expiry)
         .quantity(100.0)
         .currency(Currency::USD)
@@ -157,9 +157,9 @@ fn test_extract_equity_and_vol_factors() -> Result<()> {
             "EQUITY-DIVYIELD",
         )))
         .instrument_pricing_overrides(
-            finstack_quant_valuations::instruments::InstrumentPricingOverrides::default(),
+            finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
         )
-        .attributes(finstack_quant_valuations::instruments::Attributes::new())
+        .attributes(finstack_quant_core::types::Attributes::new())
         .build()?;
 
     let base_date = date!(2024 - 01 - 01);
@@ -219,12 +219,12 @@ fn test_extract_equity_and_vol_factors() -> Result<()> {
 
 #[test]
 fn test_extract_vol_factors_from_fx_option() -> Result<()> {
+    use finstack_quant_core::types::Attributes;
+    use finstack_quant_models::types::OptionType;
     use finstack_quant_valuations::instruments::fx::fx_option::{
         FxDeltaConvention, FxDeltaConventionKind, FxOption,
     };
-    use finstack_quant_valuations::instruments::{
-        Attributes, InstrumentPricingOverrides, OptionType,
-    };
+    use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 
     let as_of = date!(2024 - 01 - 01);
     let option = FxOption::builder()

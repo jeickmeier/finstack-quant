@@ -7,7 +7,8 @@ use crate::instruments::test_support::credit as test_utils;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::credit_derivatives::cds::{CdsConvention, PayReceive};
+use finstack_quant_valuations::instruments::PayReceive;
+use finstack_quant_valuations::market::conventions::CdsConvention;
 use rust_decimal::Decimal;
 use time::Month;
 
@@ -122,12 +123,10 @@ fn test_convention_custom_defaults() {
 
 #[test]
 fn test_builder_pattern() {
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
-    use finstack_quant_valuations::instruments::credit_derivatives::cds::{
-        PremiumLegSpec, ProtectionLegSpec,
-    };
-    use finstack_quant_valuations::instruments::Attributes;
-    use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+    use finstack_quant_valuations::instruments::{PremiumLegSpec, ProtectionLegSpec};
 
     let start = test_date(2025, Month::January, 1);
     let end = test_date(2030, Month::January, 1);

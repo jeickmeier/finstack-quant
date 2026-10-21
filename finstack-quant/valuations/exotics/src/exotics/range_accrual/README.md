@@ -113,7 +113,7 @@ named (or constructed with `::new()`) from outside the crate:
 use finstack_quant_valuations::instruments::exotics::range_accrual::{
     BoundsType, RangeAccrual, RangeAccrualTerms,
 };
-use finstack_quant_valuations::instruments::Attributes;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::money::Money;

@@ -10,10 +10,10 @@ pub(crate) fn register_equity_future_option_metrics(
         registry: registry,
         instrument: finstack_quant_valuations_core::pricer::InstrumentType::EquityFutureOption,
         metrics: [
-            (Delta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::EquityFutureOption>::delta()),
-            (Gamma, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::EquityFutureOption>::gamma()),
-            (Vega, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::EquityFutureOption>::vega()),
-            (Theta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::EquityFutureOption>::theta()),
+            (Delta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_future_option::EquityFutureOption>::delta()),
+            (Gamma, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_future_option::EquityFutureOption>::gamma()),
+            (Vega, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_future_option::EquityFutureOption>::vega()),
+            (Theta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_future_option::EquityFutureOption>::theta()),
         ]
     }
     Ok(())

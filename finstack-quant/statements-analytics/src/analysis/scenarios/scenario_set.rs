@@ -43,11 +43,11 @@ use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
-use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::evaluator::{Evaluator, StatementResult};
 use finstack_quant_statements::types::{
     AmountOrScalar, FinancialModelSpec, ForecastSpec, NodeType,
 };
+use finstack_quant_statements::{Error, Result};
 use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
 use serde_json::json;

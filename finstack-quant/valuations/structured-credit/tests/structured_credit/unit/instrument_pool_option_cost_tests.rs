@@ -5,13 +5,14 @@
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::dates::Date;
 use finstack_quant_models::credit::pool::StochasticDefaultSpec;
-use finstack_quant_valuations_fixed_income::bond::Bond;
-use finstack_quant_valuations_fixed_income::revolving_credit::{
-    CreditSpreadProcessSpec, RevolvingCreditPricer,
+use finstack_quant_valuations_core::results::structured_credit::{
+    StochasticPricingResult, StructuredCreditPricingMode,
 };
+use finstack_quant_valuations_fixed_income::bond::Bond;
+use finstack_quant_valuations_fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer;
+use finstack_quant_valuations_fixed_income::revolving_credit::CreditSpreadProcessSpec;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    run_simulation_with_diagnostics, CoverageTestSpec, InstrumentCollateral,
-    StochasticPricingResult, StructuredCredit, StructuredCreditPricingMode,
+    run_simulation_with_diagnostics, CoverageTestSpec, InstrumentCollateral, StructuredCredit,
 };
 use time::macros::date;
 

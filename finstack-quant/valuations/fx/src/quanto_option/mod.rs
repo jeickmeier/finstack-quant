@@ -55,7 +55,7 @@
 //!
 //! # See Also
 //!
-//! - [`QuantoOption`] for instrument struct
+//! - [`QuantoOption`](crate::quanto_option::QuantoOption) for instrument struct
 //! - [`models::closed_form::quanto_price`](finstack_quant_models::closed_form::quanto_price) for formulas
 
 pub(crate) mod metrics;

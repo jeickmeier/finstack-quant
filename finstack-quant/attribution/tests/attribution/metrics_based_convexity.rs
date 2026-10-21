@@ -40,7 +40,9 @@ fn build_flat_curve(
 fn test_default_metrics_attribute_long_bond_curve_twist() {
     use finstack_quant_attribution::{AttributionMethod, AttributionSpec};
     use finstack_quant_core::market_data::context::MarketContextState;
-    use finstack_quant_valuations::instruments::{Bond, InstrumentJson, PricingOptions};
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+    use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+    use finstack_quant_valuations::instruments::PricingOptions;
 
     let as_of = date!(2026 - 10 - 01);
     let bond = Bond::fixed(

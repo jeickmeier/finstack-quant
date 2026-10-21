@@ -15,7 +15,7 @@
 //! # Quick Example
 //!
 //! ```rust
-//! use finstack_quant_valuations_fixed_income::term_loan::{TermLoan, RateSpec};
+//! use finstack_quant_valuations_fixed_income::term_loan::TermLoan;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::dates::*;
@@ -35,7 +35,7 @@
 //! # See Also
 //!
 //! - [`RateSpec`] for rate type definitions
-//! - [`super::spec`] module for all specification types
+//! - [`super`] module for the term-loan specification types
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
@@ -45,14 +45,15 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::Decimal;
 
-use super::spec::{DdtlSpec, LoanCallSchedule, OidEirSpec, TermLoanCovenantEvents};
+use super::spec::{DdtlSpec, LoanCallSchedule, TermLoanCovenantEvents};
+use crate::loan_terms::OidEirSpec;
 use crate::loan_terms::UpfrontFee;
 use finstack_quant_cashflows::builder::AmortizationSpec;
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::FloatingRateSpec;
 use finstack_quant_cashflows::builder::RateSpec;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_core::types::Attributes;
+use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
 fn default_settlement_days() -> u32 {
@@ -92,7 +93,7 @@ fn default_settlement_days() -> u32 {
 ///
 /// # Pricing
 ///
-/// Implements [`Instrument::value()`](finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::value)
+/// Implements [`Instrument::value()`](finstack_quant_valuations_core::instruments::Instrument::value)
 /// using deterministic cashflow discounting. PIK interest is capitalized and excluded from PV.
 ///
 /// # Invariants
@@ -191,26 +192,26 @@ pub struct TermLoan {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
 
     /// Optional EIR amortization settings for reporting schedules
     pub oid_eir: Option<OidEirSpec>,
@@ -678,11 +679,11 @@ impl TermLoan {
             availability_start: date!(2024 - 01 - 15),
             availability_end: date!(2025 - 01 - 15),
             draws: vec![
-                super::spec::DrawEvent {
+                crate::loan_terms::DrawEvent {
                     date: date!(2024 - 04 - 15),
                     amount: Money::from((10_000_000_i64, Currency::USD)),
                 },
-                super::spec::DrawEvent {
+                crate::loan_terms::DrawEvent {
                     date: date!(2024 - 07 - 15),
                     amount: Money::from((5_000_000_i64, Currency::USD)),
                 },
@@ -740,7 +741,7 @@ impl TermLoan {
                 super::spec::LoanCall {
                     date: date!(2025 - 01 - 15),
                     price_pct_of_par: 100.0,
-                    call_type: super::spec::LoanCallType::MakeWhole(super::spec::MakeWholeSpec {
+                    call_type: super::spec::LoanCallType::MakeWhole(crate::bond::MakeWholeSpec {
                         reference_curve_id: CurveId::new("USD-OIS"),
                         spread_bp: 50.0,
                     }),
@@ -830,7 +831,7 @@ impl TermLoan {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for TermLoan {
+impl finstack_quant_valuations_core::instruments::Instrument for TermLoan {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::TermLoan,
         crate::FIXED_INCOME
@@ -842,10 +843,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         if let Some(credit_curve_id) = &self.credit_curve_id {
             deps.add_credit_curve(credit_curve_id.clone());
@@ -903,7 +903,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         }
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for TermLoan {

@@ -7,7 +7,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::stats::OnlineCovariance;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -278,12 +278,8 @@ impl AsianOptionMcPricer {
             };
 
             let intrinsic = match inst.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
-                    (average - inst.strike).max(0.0)
-                }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
-                    (inst.strike - average).max(0.0)
-                }
+                finstack_quant_models::types::OptionType::Call => (average - inst.strike).max(0.0),
+                finstack_quant_models::types::OptionType::Put => (inst.strike - average).max(0.0),
             };
             return Money::new(intrinsic * inst.quantity, inst.currency);
         }
@@ -468,7 +464,7 @@ impl AsianOptionMcPricer {
                     &future_fixing_times,
                     matches!(
                         inst.option_type,
-                        finstack_quant_valuations_core::instruments::OptionType::Call
+                        finstack_quant_models::types::OptionType::Call
                     ),
                     Some(drift_schedule.as_ref()),
                     Some(&fixing_multipliers),
@@ -654,12 +650,8 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
             };
 
             let intrinsic = match asian.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
-                    (average - asian.strike).max(0.0)
-                }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
-                    (asian.strike - average).max(0.0)
-                }
+                finstack_quant_models::types::OptionType::Call => (average - asian.strike).max(0.0),
+                finstack_quant_models::types::OptionType::Put => (asian.strike - average).max(0.0),
             };
             return Ok(ValuationResult::stamped(
                 asian.id(),
@@ -696,7 +688,7 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
         let df = (-r * t).exp();
         let is_call = matches!(
             asian.option_type,
-            finstack_quant_valuations_core::instruments::OptionType::Call
+            finstack_quant_models::types::OptionType::Call
         );
         let (drift, multipliers) = asian_drift_and_fixing_multipliers(asian, market, as_of, q)
             .map_err(|error| {
@@ -791,12 +783,8 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
         if t <= 0.0 {
             let average = if count > 0 { sum / count as f64 } else { spot };
             let intrinsic = match asian.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
-                    (average - asian.strike).max(0.0)
-                }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
-                    (asian.strike - average).max(0.0)
-                }
+                finstack_quant_models::types::OptionType::Call => (average - asian.strike).max(0.0),
+                finstack_quant_models::types::OptionType::Put => (asian.strike - average).max(0.0),
             };
             return Ok(ValuationResult::stamped(
                 asian.id(),
@@ -815,12 +803,8 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
             // Deterministic case (all fixings past, but not expired?)
             let average = sum / total_fixings as f64;
             let payoff = match asian.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
-                    (average - asian.strike).max(0.0)
-                }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
-                    (asian.strike - average).max(0.0)
-                }
+                finstack_quant_models::types::OptionType::Call => (average - asian.strike).max(0.0),
+                finstack_quant_models::types::OptionType::Put => (asian.strike - average).max(0.0),
             };
             // Use the date-based DF from inputs
             return Ok(ValuationResult::stamped(
@@ -847,7 +831,7 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
 
         let price = if k_eff < 0.0 {
             match asian.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
+                finstack_quant_models::types::OptionType::Call => {
                     // Deep ITM: PV = DF_T * (Expected_Avg - K)
                     // Expected_Avg = (Past_Sum + Sum(F_i)) / N
                     // F_i = forward price for fixing date i
@@ -875,7 +859,7 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
                     // Use date-based DF for final discounting
                     (expected_avg - k).max(0.0) * df_expiry
                 }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
+                finstack_quant_models::types::OptionType::Put => {
                     // Deep ITM put (k_eff < 0): past fixings already push average above K.
                     // Compute expected average using forwards and return discounted payoff.
                     // PV = DF_T * max(K - Expected_Avg, 0)
@@ -930,7 +914,7 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::exotics::asian_option::{AsianOption, AveragingMethod};
+    use crate::exotics::asian_option::AsianOption;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
     use finstack_quant_core::market_data::scalars::MarketScalar;
@@ -939,7 +923,8 @@ mod tests {
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
     use finstack_quant_models::closed_form::geometric_asian_price;
-    use finstack_quant_valuations_core::instruments::OptionType;
+    use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
+    use finstack_quant_models::types::OptionType;
     use time::Month;
 
     fn date(year: i32, month: u8, day: u8) -> Date {
@@ -2094,7 +2079,7 @@ mod tests {
         let process = GbmProcess::new(GbmParams::new(-df.ln() / t, 0.0, sigma).expect("GBM"))
             .with_drift_schedule(std::sync::Arc::new(drift));
         let payoff = Asian::with_history(
-            finstack_quant_valuations_core::instruments::OptionType::Call,
+            finstack_quant_models::types::OptionType::Call,
             option.strike,
             1.0,
             AveragingMethod::Geometric,

@@ -5,10 +5,10 @@ use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 #[cfg(test)]
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 
 use serde::{Deserialize, Serialize};
 

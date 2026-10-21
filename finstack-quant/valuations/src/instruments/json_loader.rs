@@ -3,6 +3,81 @@
 //! This module provides a tagged union for all instrument types and helpers
 //! for loading instruments from JSON files with strict validation.
 
+use super::commodity::commodity_asian_option::CommodityAsianOption;
+use super::commodity::commodity_forward::CommodityForward;
+use super::commodity::commodity_future::CommodityFuture;
+use super::commodity::commodity_future_option::CommodityFutureOption;
+use super::commodity::commodity_spot_option::CommoditySpotOption;
+use super::commodity::commodity_spread_option::CommoditySpreadOption;
+use super::commodity::commodity_swap::CommoditySwap;
+use super::commodity::commodity_swaption::CommoditySwaption;
+use super::composite::CompositeInstrument;
+use super::credit_derivatives::cds::CreditDefaultSwap;
+use super::credit_derivatives::cds_index::CdsIndex;
+use super::credit_derivatives::cds_option::CdsOption;
+use super::credit_derivatives::cds_tranche::CdsTranche;
+use super::equity::autocallable::Autocallable;
+use super::equity::cliquet_option::CliquetOption;
+use super::equity::dcf_equity::DiscountedCashFlow;
+use super::equity::equity_future::EquityFuture;
+use super::equity::equity_future_option::EquityFutureOption;
+use super::equity::equity_option::EquityOption;
+use super::equity::equity_total_return_future::EquityTotalReturnFuture;
+use super::equity::equity_trs::EquityTotalReturnSwap;
+use super::equity::pe_fund::PrivateMarketsFund;
+use super::equity::real_estate::RealEstateAsset;
+use super::equity::spot::Equity;
+use super::equity::variance_swap::VarianceSwap;
+use super::equity::vol_index_future::VolatilityIndexFuture;
+use super::equity::vol_index_future_option::VolatilityIndexFutureOption;
+use super::exotics::asian_option::AsianOption;
+use super::exotics::barrier_option::BarrierOption;
+use super::exotics::basket::Basket;
+use super::exotics::callable_range_accrual::CallableRangeAccrual;
+use super::exotics::lookback_option::LookbackOption;
+use super::exotics::range_accrual::RangeAccrual;
+use super::exotics::snowball::Snowball;
+use super::exotics::tarn::Tarn;
+use super::fixed_income::asset_backed_facility::AssetBackedFacility;
+use super::fixed_income::bond::Bond;
+use super::fixed_income::bond_future::BondFuture;
+use super::fixed_income::cmo::AgencyCmo;
+use super::fixed_income::convertible::ConvertibleBond;
+use super::fixed_income::dollar_roll::DollarRoll;
+use super::fixed_income::fi_trs::FiIndexTotalReturnSwap;
+use super::fixed_income::inflation_linked_bond::InflationLinkedBond;
+use super::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
+use super::fixed_income::revolving_credit::RevolvingCredit;
+use super::fixed_income::structured_credit::StructuredCredit;
+use super::fixed_income::tba::AgencyTba;
+use super::fixed_income::term_loan::TermLoan;
+use super::fx::fx_barrier_option::FxBarrierOption;
+use super::fx::fx_digital_option::FxDigitalOption;
+use super::fx::fx_forward::FxForward;
+use super::fx::fx_future::FxFuture;
+use super::fx::fx_future_option::FxFutureOption;
+use super::fx::fx_option::FxOption;
+use super::fx::fx_spot::FxSpot;
+use super::fx::fx_swap::FxSwap;
+use super::fx::fx_touch_option::FxTouchOption;
+use super::fx::fx_variance_swap::FxVarianceSwap;
+use super::fx::ndf::Ndf;
+use super::fx::quanto_option::QuantoOption;
+use super::rates::basis_swap::BasisSwap;
+use super::rates::cap_floor::CapFloor;
+use super::rates::cms_option::CmsOption;
+use super::rates::cms_spread_option::CmsSpreadOption;
+use super::rates::cms_swap::CmsSwap;
+use super::rates::deposit::Deposit;
+use super::rates::fra::ForwardRateAgreement;
+use super::rates::inflation_cap_floor::InflationCapFloor;
+use super::rates::inflation_swap::{InflationSwap, YoYInflationSwap};
+use super::rates::ir_future::InterestRateFuture;
+use super::rates::ir_future_option::InterestRateFutureOption;
+use super::rates::irs::InterestRateSwap;
+use super::rates::repo::Repo;
+use super::rates::swaption::{BermudanSwaption, Swaption};
+use super::rates::xccy_swap::XccySwap;
 use super::*;
 use finstack_quant_core::contract::{
     deserialize_json_value, parse_json_value, ContractError, LoadLimits, ValidationReport,
@@ -771,9 +846,11 @@ impl InstrumentEnvelope {
 
 #[cfg(test)]
 mod tests {
+    use finstack_quant_core::types::Attributes;
     use rust_decimal::Decimal;
 
     use super::*;
+    use crate::instruments::rates::{cap_floor::RateOptionType, repo::CollateralSpec};
 
     fn load(json: &str) -> Result<Box<dyn Instrument>> {
         let limits = LoadLimits::default().with_max_bytes(MAX_JSON_BYTES);
@@ -1585,7 +1662,7 @@ mod tests {
         // RevolvingCredit is in the registry but was absent from the old statements
         // `Generic` brute-force list (Bond/IRS/TermLoan/Deposit/FRA/Repo). It must
         // build through the canonical registry.
-        let rcf = crate::instruments::RevolvingCredit::example()
+        let rcf = crate::instruments::fixed_income::revolving_credit::RevolvingCredit::example()
             .expect("example RevolvingCredit should construct");
         let tagged = serde_json::to_value(InstrumentEnvelope::new(
             InstrumentJson::RevolvingCredit(rcf),

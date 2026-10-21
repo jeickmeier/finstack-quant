@@ -7,7 +7,7 @@
 //! Heston parameter bump or an implicit recalibration.
 
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind;
+use finstack_quant_valuations_core::instruments::OptionGreekKind;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Equity's native provider evaluates Black-Scholes. Other registered models
@@ -18,8 +18,8 @@ pub(crate) fn selected_equity_greek(
     kind: OptionGreekKind,
     context: &mut MetricContext,
 ) -> Result<f64> {
-    use crate::EquityOption;
-    use finstack_quant_valuations_core::metrics::{
+    use crate::equity_option::EquityOption;
+    use finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::{
         GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVega, GenericFdVolga,
     };
 
@@ -46,8 +46,8 @@ pub(crate) fn selected_equity_greek(
         OptionGreekKind::Vanna => GenericFdVanna::<EquityOption>::default().calculate(context),
         OptionGreekKind::Volga => GenericFdVolga::<EquityOption>::default().calculate(context),
         OptionGreekKind::Theta => selected_equity_theta(context),
-        OptionGreekKind::Rho => finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(
-            finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_discount_only(),
+        OptionGreekKind::Rho => finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
+            finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_discount_only(),
         )
         .calculate(context),
         OptionGreekKind::ForeignRho => Err(finstack_quant_core::Error::Validation(
@@ -58,7 +58,7 @@ pub(crate) fn selected_equity_greek(
 
 fn selected_equity_theta(context: &MetricContext) -> Result<f64> {
     use std::sync::Arc;
-    let option: &crate::EquityOption = context.instrument_as()?;
+    let option: &crate::equity_option::EquityOption = context.instrument_as()?;
     if context.as_of >= option.expiry
         || option
             .exercise
@@ -110,13 +110,14 @@ fn selected_equity_theta(context: &MetricContext) -> Result<f64> {
 
 #[cfg(test)]
 mod tests {
-    use crate::EquityOption;
+    use crate::equity_option::EquityOption;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::{
         context::MarketContext, scalars::MarketScalar, surfaces::VolSurface,
         term_structures::DiscountCurve,
     };
-    use finstack_quant_valuations_core::instruments::{OptionType, PricingOptions};
+    use finstack_quant_models::types::OptionType;
+    use finstack_quant_valuations_core::instruments::PricingOptions;
     use finstack_quant_valuations_core::metrics::MetricId;
     use finstack_quant_valuations_core::pricer::ModelKey;
     use time::macros::date;
@@ -334,7 +335,7 @@ mod tests {
         let calendar = theta(&option);
         assert!(calendar.abs() > 1e-6);
         option.metric_pricing_overrides.theta_day_basis =
-            Some(finstack_quant_valuations_core::instruments::ThetaDayBasis::Trading252);
+            Some(finstack_quant_valuations_core::instruments::pricing_overrides::ThetaDayBasis::Trading252);
         let trading = theta(&option);
         assert!((trading / calendar - 365.0 / 252.0).abs() < 1e-12);
         // The native equity theta API is per day even when generic carry

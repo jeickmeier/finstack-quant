@@ -6,7 +6,7 @@
 //! rejected.
 
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind;
+use finstack_quant_valuations_core::instruments::OptionGreekKind;
 use finstack_quant_valuations_core::metrics::MetricContext;
 
 /// Commodity delta/gamma retain their published forward-price coordinate.
@@ -15,7 +15,7 @@ pub(crate) fn selected_commodity_greek(
     kind: OptionGreekKind,
     context: &MetricContext,
 ) -> Result<f64> {
-    use crate::CommoditySpotOption;
+    use crate::commodity::commodity_spot_option::CommoditySpotOption;
     if !matches!(kind, OptionGreekKind::Delta | OptionGreekKind::Gamma) {
         return Err(finstack_quant_core::Error::Validation(
             "Schwartz-Smith volatility risk requires explicit sigma_x/sigma_y parameter bumps in the registered model; Black surface vega, vanna and volga are not supported".into(),

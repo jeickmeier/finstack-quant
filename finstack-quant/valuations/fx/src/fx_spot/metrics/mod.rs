@@ -147,7 +147,7 @@ impl MetricCalculator for SpotRateCalculator {
 #[cfg(test)]
 mod tests {
     use super::BaseAmountCalculator;
-    use crate::FxSpot;
+    use crate::fx_spot::FxSpot;
     use finstack_quant_core::{
         currency::Currency, dates::Date, market_data::context::MarketContext, money::Money,
         types::InstrumentId,
@@ -225,7 +225,7 @@ mod base_amount_tests {
         currency::Currency, dates::Date, market_data::context::MarketContext, money::Money,
         types::InstrumentId,
     };
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
     use std::sync::Arc;
     use time::Month;
@@ -256,9 +256,8 @@ mod base_amount_tests {
         let base_value = fx
             .value(&MarketContext::new(), as_of)
             .expect("should succeed");
-        let instrument: Arc<
-            dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument,
-        > = Arc::new(fx);
+        let instrument: Arc<dyn finstack_quant_valuations_core::instruments::Instrument> =
+            Arc::new(fx);
         let mut ctx = MetricContext::new(
             instrument,
             Arc::new(MarketContext::new()),

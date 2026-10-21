@@ -6,107 +6,11 @@
 //! It is intended for settings that users commonly tweak and need to persist for reproducible
 //! pipelines (Tier-3 configuration in the Rust code standards).
 
+use crate::metrics::STANDARD_BUCKETS_YEARS;
 use finstack_quant_core::config::FinstackConfig;
 
 /// Extension section key for sensitivities defaults.
 pub const SENSITIVITIES_CONFIG_KEY_V1: &str = "valuations.sensitivities.v1";
-
-/// Standard risk bucket grid in years used for IR DV01 and credit CS01.
-pub const STANDARD_BUCKETS_YEARS: [f64; 11] =
-    [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0];
-
-/// Standard bucket labels corresponding to [`STANDARD_BUCKETS_YEARS`].
-pub const STANDARD_BUCKET_LABELS: [&str; 11] = [
-    "3m", "6m", "1y", "2y", "3y", "5y", "7y", "10y", "15y", "20y", "30y",
-];
-
-/// Format a bucket time (in years) as a human-readable label.
-///
-/// For standard buckets (0.25, 0.5, 1, 2, 3, 5, 7, 10, 15, 20, 30 years),
-/// returns the canonical label ("3m", "6m", "1y", etc.).
-/// For non-standard buckets, dynamically formats as "{N}m" or "{N}y".
-///
-/// # Arguments
-///
-/// * `years` - Non-negative bucket tenor in years; canonical grid tenors use
-///   stable labels and other tenors are rendered as rounded months or years.
-///
-/// # Examples
-///
-/// ```
-/// use finstack_quant_valuations_core::metrics::format_bucket_label;
-///
-/// assert_eq!(format_bucket_label(0.25), "3m");
-/// assert_eq!(format_bucket_label(1.0), "1y");
-/// assert_eq!(format_bucket_label(10.0), "10y");
-/// assert_eq!(format_bucket_label(0.75), "9m"); // non-standard
-/// ```
-#[inline]
-pub fn format_bucket_label(years: f64) -> String {
-    format_bucket_label_cow(years).into_owned()
-}
-
-/// Same as [`format_bucket_label`] but returns `Cow<'static, str>` to avoid
-/// allocation for the 11 standard buckets (the common case in DV01/CS01 loops).
-#[inline]
-pub fn format_bucket_label_cow(years: f64) -> std::borrow::Cow<'static, str> {
-    for (i, &bucket_time) in STANDARD_BUCKETS_YEARS.iter().enumerate() {
-        if (years - bucket_time).abs() < 0.01 {
-            return std::borrow::Cow::Borrowed(STANDARD_BUCKET_LABELS[i]);
-        }
-    }
-
-    let s = if years < 1.0 {
-        format!("{:.0}m", (years * 12.0).round())
-    } else {
-        format!("{:.0}y", years)
-    };
-    std::borrow::Cow::Owned(s)
-}
-
-/// Format a key-rate coordinate without rounding away its year fraction.
-///
-/// # Arguments
-///
-/// * `years` - Nonnegative finite bucket time in years. Standard coordinates
-///   use their usual month/year names; other coordinates retain their exact
-///   decimal year fraction.
-pub fn format_key_rate_label(years: f64) -> String {
-    let label = format_bucket_label(years);
-    if parse_key_rate_label(&label).ok() == Some(years) {
-        label
-    } else {
-        format!("{years}y")
-    }
-}
-
-/// Recover the year coordinate from a key-rate sensitivity bucket label.
-///
-/// # Arguments
-///
-/// * `label` - Bucket label emitted by [`format_key_rate_label`], using years
-///   (`"1.4y"`) or a standard month coordinate (`"3m"`).
-///
-/// # Errors
-///
-/// Returns a validation error for an unsupported unit, negative or non-finite
-/// coordinate, or an invalid numeric value.
-pub fn parse_key_rate_label(label: &str) -> finstack_quant_core::Result<f64> {
-    let years = if let Some(value) = label.strip_suffix('y') {
-        value.parse::<f64>().ok()
-    } else if let Some(value) = label.strip_suffix('m') {
-        value.parse::<f64>().ok().map(|months| months / 12.0)
-    } else {
-        None
-    };
-    years
-        .filter(|years| years.is_finite() && *years >= 0.0)
-        .ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "invalid sensitivity bucket label '{label}'"
-            ))
-        })
-}
 
 /// Default relative spot bump: 1% of spot (0.01).
 const DEFAULT_SPOT_BUMP_DECIMAL: f64 = 0.01;
@@ -275,7 +179,7 @@ pub fn from_finstack_config_or_default(
 /// Resolve sensitivities defaults and then layer instrument-level pricing overrides.
 pub fn from_context_or_default(
     cfg: &FinstackConfig,
-    pricing_overrides: Option<&crate::instruments::MetricPricingOverrides>,
+    pricing_overrides: Option<&crate::instruments::pricing_overrides::MetricPricingOverrides>,
 ) -> finstack_quant_core::Result<SensitivitiesConfig> {
     let base = from_finstack_config_or_default(cfg)?;
     apply_pricing_overrides(base, pricing_overrides)
@@ -284,7 +188,7 @@ pub fn from_context_or_default(
 /// Apply per-instrument pricing overrides to a resolved sensitivities config.
 pub fn apply_pricing_overrides(
     mut base: SensitivitiesConfig,
-    pricing_overrides: Option<&crate::instruments::MetricPricingOverrides>,
+    pricing_overrides: Option<&crate::instruments::pricing_overrides::MetricPricingOverrides>,
 ) -> finstack_quant_core::Result<SensitivitiesConfig> {
     let Some(po) = pricing_overrides else {
         return Ok(base);
@@ -321,13 +225,16 @@ pub fn apply_pricing_overrides(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::metrics::{
+        format_bucket_label, format_bucket_label_cow, format_key_rate_label, parse_key_rate_label,
+    };
     use serde_json::json;
 
     #[test]
     fn apply_pricing_overrides_prefers_explicit_fields() {
         let base = SensitivitiesConfig::default();
-        let po = crate::instruments::MetricPricingOverrides {
-            bump_config: crate::instruments::BumpConfig::default(),
+        let po = crate::instruments::pricing_overrides::MetricPricingOverrides {
+            bump_config: crate::instruments::pricing_overrides::BumpConfig::default(),
             theta_period: None,
             breakeven_config: None,
             bond_risk_basis: None,
@@ -350,7 +257,8 @@ mod tests {
     fn apply_pricing_overrides_carries_ytm_bump_only_when_set() {
         let base = SensitivitiesConfig::default();
         assert_eq!(base.ytm_bump_bp, None);
-        let po = crate::instruments::MetricPricingOverrides::default().with_ytm_bump_bp(2.5);
+        let po = crate::instruments::pricing_overrides::MetricPricingOverrides::default()
+            .with_ytm_bump_bp(2.5);
         let resolved = apply_pricing_overrides(base, Some(&po)).expect("valid overrides");
         assert_eq!(resolved.ytm_bump_bp, Some(2.5));
     }
@@ -367,7 +275,8 @@ mod tests {
     #[test]
     fn apply_pricing_overrides_rejects_non_positive_values() {
         let base = SensitivitiesConfig::default();
-        let po = crate::instruments::MetricPricingOverrides::default().with_rate_bump_bp(0.0);
+        let po = crate::instruments::pricing_overrides::MetricPricingOverrides::default()
+            .with_rate_bump_bp(0.0);
 
         let err = apply_pricing_overrides(base, Some(&po)).expect_err("must fail");
         assert!(
@@ -511,9 +420,10 @@ mod tests {
                 }),
             )
             .expect("valid extension key");
-        let pricing_overrides = crate::instruments::MetricPricingOverrides::default()
-            .with_rate_bump_bp(4.0)
-            .with_vol_bump_decimal(0.05);
+        let pricing_overrides =
+            crate::instruments::pricing_overrides::MetricPricingOverrides::default()
+                .with_rate_bump_bp(4.0)
+                .with_vol_bump_decimal(0.05);
 
         let resolved = from_context_or_default(&cfg, Some(&pricing_overrides))
             .expect("layered config should parse");

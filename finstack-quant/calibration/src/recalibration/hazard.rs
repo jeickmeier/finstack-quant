@@ -14,11 +14,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{HazardCalibrationRecipe, HazardCurve};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
+use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
 use finstack_quant_valuations_core::market::conventions::{CdsConvention, ConventionRegistry};
 use finstack_quant_valuations_core::recalibration::{
     DealCdsQuoteOverride, HazardSpreadRiskBucket, QuoteBump,
 };
-use finstack_quant_valuations_credit::cds::CdsValuationConvention;
 #[cfg(test)]
 use std::collections::HashMap;
 use std::str::FromStr;

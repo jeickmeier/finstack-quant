@@ -95,11 +95,11 @@
 //!
 //! # Examples
 //!
-//! See [`FxOption`] for construction and usage examples.
+//! See [`FxOption`](crate::fx_option::FxOption) for construction and usage examples.
 //!
 //! # See Also
 //!
-//! - [`FxOption`] for FX option struct
+//! - [`FxOption`](crate::fx_option::FxOption) for FX option struct
 //! - `pricer` for Garman-Kohlhagen pricing calculations
 //! - `FxOptionGreeks` for Greeks computation
 //! - FX option metrics module for risk metrics
@@ -110,5 +110,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::FxUnderlyingParams;
 pub use types::{FxDeltaConvention, FxDeltaConventionKind, FxOption, FxOptionBuilder};

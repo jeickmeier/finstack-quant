@@ -45,8 +45,8 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 
-pub use super::super::bond::MakeWholeSpec;
-pub use super::super::loan_terms::{CommitmentStep, DrawEvent, MarginStep, OidEirSpec};
+use super::super::bond::MakeWholeSpec;
+use super::super::loan_terms::{CommitmentStep, DrawEvent, MarginStep};
 
 /// Original Issue Discount (OID) policy for term loan origination.
 ///
@@ -68,7 +68,7 @@ pub use super::super::loan_terms::{CommitmentStep, DrawEvent, MarginStep, OidEir
 /// - **Withheld**: Reduces initial cash proceeds, increases effective yield
 /// - **Separate**: May be accounted as upfront fee or amortized discount
 ///
-/// For effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].
+/// For effective interest rate (EIR) amortization schedules, see [`OidEirSpec`](crate::loan_terms::OidEirSpec).
 ///
 /// # Variants
 ///
@@ -84,7 +84,7 @@ pub use super::super::loan_terms::{CommitmentStep, DrawEvent, MarginStep, OidEir
 /// # Examples
 ///
 /// ```text
-/// use finstack_quant_valuations_fixed_income::term_loan::spec::OidPolicy;
+/// use finstack_quant_valuations_fixed_income::term_loan::OidPolicy;
 /// use finstack_quant_core::money::Money;
 /// use finstack_quant_core::currency::Currency;
 ///
@@ -396,7 +396,7 @@ pub struct LoanCall {
 /// # Examples
 ///
 /// ```text
-/// use finstack_quant_valuations_fixed_income::term_loan::spec::{LoanCallSchedule, LoanCall};
+/// use finstack_quant_valuations_fixed_income::term_loan::{LoanCallSchedule, LoanCall};
 /// use finstack_quant_core::dates::create_date;
 /// use time::Month;
 ///

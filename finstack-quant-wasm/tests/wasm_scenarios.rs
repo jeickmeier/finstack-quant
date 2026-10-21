@@ -21,7 +21,7 @@ fn empty_model_json() -> String {
     let periods = finstack_quant_core::dates::build_periods("2024Q1..Q1", None)
         .unwrap()
         .periods;
-    let model = finstack_quant_statements::FinancialModelSpec::new("test", periods);
+    let model = finstack_quant_statements::types::FinancialModelSpec::new("test", periods);
     serde_json::to_string(&model).unwrap()
 }
 
@@ -79,7 +79,7 @@ fn apply_scenario_with_model_empty_spec() {
 
 #[wasm_bindgen_test]
 fn apply_scenario_rejects_a_model_without_periods() {
-    let model = finstack_quant_statements::FinancialModelSpec::new("test", vec![]);
+    let model = finstack_quant_statements::types::FinancialModelSpec::new("test", vec![]);
     let err = apply_scenario(
         JsValue::from(&built_scenario_json(None)),
         JsValue::from(&empty_market_json()),
@@ -168,7 +168,10 @@ fn compose_scenarios_rejects_mixed_hazard_bump_modes_as_javascript_error() {
 #[wasm_bindgen_test]
 fn instrument_copies_are_returned_and_missing_inventory_is_rejected() {
     use finstack_quant_scenarios::{OperationSpec, ScenarioSpec};
-    use finstack_quant_valuations::instruments::{instrument_json_of, Bond, InstrumentEnvelope};
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+    use finstack_quant_valuations::instruments::json_loader::{
+        instrument_json_of, InstrumentEnvelope,
+    };
     use finstack_quant_valuations::pricer::InstrumentType;
     let bond = Bond::example().unwrap();
     let inventory = serde_json::to_string(&vec![InstrumentEnvelope::new(

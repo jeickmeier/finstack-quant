@@ -45,7 +45,7 @@ fn spot_bump_decimal(
 pub(crate) fn register_equity_option_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::{
+    use finstack_quant_valuations_core::metrics::sensitivities::cross_factor::{
         make_spot_bumper, make_vol_bumper, CrossFactorCalculator,
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
@@ -54,19 +54,19 @@ pub(crate) fn register_equity_option_metrics(
         registry: registry,
         instrument: InstrumentType::EquityOption,
         metrics: [
-            (Delta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::EquityOption>::delta()),
-            (Gamma, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::EquityOption>::gamma()),
-            (Vega, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::EquityOption>::vega()),
+            (Delta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::delta()),
+            (Gamma, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::gamma()),
+            (Vega, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::vega()),
             (BucketedVega, finstack_quant_valuations_core::metrics::KeyRateVega::<
-                crate::EquityOption,
+                crate::equity_option::EquityOption,
             >::default()),
-            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
-            (Theta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::EquityOption>::theta()),
-            (Rho, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::EquityOption>::rho()),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+            (Theta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::theta()),
+            (Rho, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::rho()),
             (ImpliedVol, ImpliedVolCalculator),
-            (Vanna, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::EquityOption>::vanna()),
-            (Volga, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::EquityOption>::volga()),
+            (Vanna, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::vanna()),
+            (Volga, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::volga()),
             (Charm, charm::CharmCalculator),
             (Color, color::ColorCalculator),
             (Speed, SpeedCalculator),

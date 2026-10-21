@@ -10,10 +10,10 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-use finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::MarketDependencies;
 
 /// Simple equity (spot) instrument.
 ///
@@ -67,26 +67,26 @@ pub struct Equity {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -352,7 +352,7 @@ impl Equity {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for Equity {
+impl finstack_quant_valuations_core::instruments::Instrument for Equity {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Equity,
         crate::EQUITY
@@ -387,7 +387,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         )
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for Equity {
@@ -481,7 +481,7 @@ mod tests {
         let curves = MarketContext::new();
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
 
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
         let value = equity.value(&curves, as_of).expect("should succeed");
         assert_eq!(value.amount(), 15_000.0);
         assert_eq!(value.currency(), Currency::USD);
@@ -508,7 +508,7 @@ mod tests {
         let curves = MarketContext::new();
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
 
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
         let result = equity
             .price_with_metrics(
                 &curves,
@@ -534,7 +534,7 @@ mod lifecycle_tests {
     use finstack_quant_core::market_data::{
         context::MarketContext, term_structures::DiscountCurve,
     };
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::Month;
 
     fn create_test_equity() -> Equity {

@@ -157,9 +157,6 @@ pub use config::{
 /// Solver configuration (Brent/Newton).
 pub use solver::SolverConfig;
 
-/// Validation types for curves and surfaces.
-pub use validation::{RateBounds, RateBoundsPolicy, ValidationConfig, ValidationMode};
-
 /// Calibration diagnostics and results.
 pub use report::{
     CalibrationDiagnostics, CalibrationReport, FittedSlice, FittedSliceParameters, QuoteQuality,

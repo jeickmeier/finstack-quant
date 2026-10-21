@@ -11,15 +11,15 @@ use finstack_quant_core::Error;
 
 use crate::bond::{CallPutSchedule, CashflowSpec};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::convertible::{
+use finstack_quant_core::types::Attributes;
+use finstack_quant_valuations_core::instruments::model_params::ModelParamsSnapshot;
+use finstack_quant_valuations_core::instruments::{
     AntiDilutionPolicy, ConversionEvent, ConversionPolicy, ConversionSpec, DividendAdjustment,
     PriceTrigger,
 };
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
-use finstack_quant_valuations_core::instruments::model_params::ModelParamsSnapshot;
 
 use super::pricing;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
+use finstack_quant_valuations_core::impl_instrument_base;
 
 /// Resolved exercise claim after debt has been converted, called, put, or redeemed.
 ///
@@ -150,26 +150,26 @@ pub struct ConvertibleBond {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -415,7 +415,7 @@ impl ConvertibleBond {
 
     /// Effective conversion ratio after anti-dilution adjustments.
     ///
-    /// Applies all recorded [`DilutionEvent`](super::DilutionEvent)s in chronological order using
+    /// Applies all recorded [`DilutionEvent`](finstack_quant_valuations_core::instruments::DilutionEvent)s in chronological order using
     /// the bond's [`AntiDilutionPolicy`]:
     ///
     /// - **None**: Returns the base conversion ratio unchanged.
@@ -600,9 +600,9 @@ impl ConvertibleBond {
             .spot_id(PriceId::new("INDU"))
             .vol_surface_id(CurveId::new("INDU-VOL"))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides {
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides {
                     market_quotes:
-                        finstack_quant_valuations_core::instruments::MarketQuoteOverrides {
+                        finstack_quant_valuations_core::instruments::pricing_overrides::MarketQuoteOverrides {
                             implied_volatility: Some(0.01),
                             ..Default::default()
                         },
@@ -692,7 +692,7 @@ impl ConvertibleBond {
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
     ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
+        finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
         let spot = self.spot_value(market.get_price(&self.spot_id)?)?;
 
         pricing::calculate_parity(self, spot)
@@ -712,7 +712,7 @@ impl ConvertibleBond {
         market: &finstack_quant_core::market_data::context::MarketContext,
         bond_price: f64,
     ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
+        finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(self)?;
         let spot = self.spot_value(market.get_price(&self.spot_id)?)?;
 
         let conversion_value = pricing::compute_conversion_value(self, spot)?;
@@ -762,9 +762,7 @@ impl ConvertibleBond {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for ConvertibleBond
-{
+impl finstack_quant_valuations_core::instruments::Instrument for ConvertibleBond {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Convertible,
         crate::FIXED_INCOME
@@ -780,12 +778,11 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        use finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency;
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        use finstack_quant_valuations_core::instruments::VolatilityDependency;
 
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         if let Some(credit_curve_id) = &self.credit_curve_id {
             deps.add_credit_curve(credit_curve_id.clone());
@@ -842,9 +839,8 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
     fn with_model_params(
         &self,
         params: &ModelParamsSnapshot,
-    ) -> finstack_quant_core::Result<
-        Box<dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument>,
-    > {
+    ) -> finstack_quant_core::Result<Box<dyn finstack_quant_valuations_core::instruments::Instrument>>
+    {
         match params {
             ModelParamsSnapshot::Convertible { conversion_spec } => {
                 let mut modified = self.clone();
@@ -858,7 +854,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         }
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 fn validate_conversion_date(
@@ -948,8 +944,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
 mod tests {
     use super::*;
     use finstack_quant_cashflows::CashflowProvider;
-    use finstack_quant_valuations_core::instruments::common_impl::parameters::convertible::DilutionEvent;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::DilutionEvent;
+    use finstack_quant_valuations_core::instruments::Instrument;
 
     #[test]
     fn parity_and_conversion_premium_reject_foreign_currency_spot() {

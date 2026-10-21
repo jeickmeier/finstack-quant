@@ -17,8 +17,19 @@ globs:
 
 ### Structure
 
-- Use facade patterns for complex modules (see `market_data` as example)
-- Public re-exports at module root for ergonomic imports
+- **One public path per item.** A module is either a public namespace with
+  nothing in it re-exported by a parent, or a private file whose public items
+  are each re-exported exactly once at the nearest public parent, never both.
+  If a module holds any public item that is not lifted, it stays public and
+  the lifts go. Do not re-export another workspace crate's items (the umbrella
+  crates' whole-module mounts are the exception); import from the defining
+  crate. No `pub use … as …` renames, no `pub use m::*` globs, no preludes.
+  `#[doc(hidden)] pub` modules (such as `valuations_core::instruments::common_impl`)
+  hold only family-internal helpers that other workspace crates need; a public
+  type is defined in a visible module, never inside a hidden one and lifted out.
+  `scripts/check_single_path.py` (rustdoc JSON) measures this; run it with
+  `--compare <base JSON>` after making a module private, because a public item
+  left unnameable produces no compiler warning.
 - **File size: 1000 lines desired, 2000 lines maximum** (measured on source
   lines, excluding colocated `#[cfg(test)]` blocks). Split a submodule out once
   it passes ~1000; treat 2000 as a hard ceiling that needs a deliberate

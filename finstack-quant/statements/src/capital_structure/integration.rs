@@ -37,7 +37,7 @@ use std::sync::Arc;
 pub fn build_instrument_from_spec(
     spec: &crate::types::DebtInstrumentSpec,
 ) -> Result<Arc<dyn Instrument>> {
-    let instrument: finstack_quant_valuations::instruments::InstrumentJson =
+    let instrument: finstack_quant_valuations::instruments::json_loader::InstrumentJson =
         spec.spec.clone().into();
     instrument.into_boxed().map(Arc::from).map_err(|e| {
         crate::error::Error::build(format!(

@@ -10,7 +10,7 @@ use crate::bindings::module_utils::{py_to_json_string, py_to_serde};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, serde_to_py};
 use crate::errors::{core_to_py, display_to_py, value_error};
 use finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope;
-use finstack_quant_valuations::instruments::MetricPricingOverrides;
+use finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides;
 use finstack_quant_valuations::metrics::risk::{MarketHistory, MarketScenario};
 use pyo3::prelude::*;
 use pyo3::types::PyString;
@@ -582,7 +582,7 @@ macro_rules! pricing_override_methods {
                 py: pyo3::Python<'py>,
                 value: &pyo3::Bound<'py, pyo3::PyAny>,
             ) -> pyo3::PyResult<pyo3::PyRefMut<'py, Self>> {
-                let overrides: finstack_quant_valuations::instruments::InstrumentPricingOverrides =
+                let overrides: finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides =
                     $crate::bindings::valuations::instruments::spec_from_py(
                         py,
                         value,
@@ -656,7 +656,7 @@ macro_rules! pricing_override_methods {
                 py: pyo3::Python<'py>,
                 value: &pyo3::Bound<'py, pyo3::PyAny>,
             ) -> pyo3::PyResult<pyo3::PyRefMut<'py, Self>> {
-                let overrides: finstack_quant_valuations::instruments::ScenarioPricingOverrides =
+                let overrides: finstack_quant_valuations::instruments::pricing_overrides::ScenarioPricingOverrides =
                     $crate::bindings::valuations::instruments::spec_from_py(
                         py,
                         value,

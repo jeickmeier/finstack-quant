@@ -149,7 +149,7 @@ fn bond_fixed_to_json_is_tagged_and_matches_rust() {
     assert_eq!(value["instrument"]["spec"]["id"], "BOND-1");
 
     // Same constructor called directly in Rust serializes identically.
-    let rust_bond = finstack_quant_valuations::instruments::Bond::fixed(
+    let rust_bond = finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
         "BOND-1",
         finstack_quant_core::money::Money::new(
             1_000_000.0,
@@ -166,8 +166,8 @@ fn bond_fixed_to_json_is_tagged_and_matches_rust() {
     )
     .unwrap();
     let rust_json = serde_json::to_string(
-        &finstack_quant_valuations::instruments::InstrumentEnvelope::new(
-            finstack_quant_valuations::instruments::InstrumentJson::Bond(rust_bond),
+        &finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope::new(
+            finstack_quant_valuations::instruments::json_loader::InstrumentJson::Bond(rust_bond),
         ),
     )
     .unwrap();

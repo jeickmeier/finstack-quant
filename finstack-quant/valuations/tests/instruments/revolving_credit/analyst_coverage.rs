@@ -15,7 +15,8 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     CreditSpreadProcessSpec, DrawRepayEvent, DrawRepaySpec, McConfig, RevolvingCredit,
     RevolvingCreditFees, StochasticUtilizationSpec, UtilizationProcess,
 };
-use finstack_quant_valuations::instruments::{Instrument, InstrumentPricingOverrides};
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
 use time::macros::date;
@@ -221,7 +222,7 @@ fn payment_dates_in(
 #[test]
 fn calendar_id_is_the_only_way_to_adjust_for_holidays() {
     use finstack_quant_core::dates::BusinessDayConvention;
-    use finstack_quant_valuations::instruments::Attributes;
+    use finstack_quant_core::types::Attributes;
 
     let weekends =
         conventions(None, BusinessDayConvention::ModifiedFollowing, 0, MATURITY).expect("facility");
@@ -441,7 +442,7 @@ fn commitment_step_below_the_drawn_balance_is_rejected() {
 fn stochastic_utilization_books_the_principal_implied_by_a_commitment_step() {
     let facility =
         stepped(5_000_000.0, zero_vol_stochastic_at(0.5), step_to_6m()).expect("facility");
-    let result = finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer::price_with_paths(&facility, &market(), AS_OF)
+    let result = finstack_quant_valuations::instruments::fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer::price_with_paths(&facility, &market(), AS_OF)
         .expect("paths");
     let flows = result.path_results[0].cashflows.get_flows().to_vec();
     let notional: Vec<_> = flows
@@ -860,7 +861,7 @@ fn stochastic_utilization_is_capped_by_outstanding_letters_of_credit() {
         }),
     }));
     let facility = with_lc(spec, lc_spec(2_000_000.0, vec![], 0.0), None).expect("facility");
-    let result = finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer::price_with_paths(&facility, &market_with_forward(), AS_OF)
+    let result = finstack_quant_valuations::instruments::fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer::price_with_paths(&facility, &market_with_forward(), AS_OF)
         .expect("paths");
     for path in &result.path_results {
         let data = path.path_data.as_ref().expect("path data");
@@ -1539,7 +1540,7 @@ fn historical_commitment_steps_book_no_principal() {
     }];
     facility.drawn = usd(5_000_000.0);
     facility.validate().expect("seasoned facility");
-    let result = finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer::price_with_paths(&facility, &market(), AS_OF)
+    let result = finstack_quant_valuations::instruments::fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer::price_with_paths(&facility, &market(), AS_OF)
         .expect("paths");
     let flows = result.path_results[0].cashflows.get_flows().to_vec();
     let notional: Vec<_> = flows

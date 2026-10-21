@@ -13,8 +13,9 @@ use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
 use super::super::convert::{
     attributes_from_py, bdc_from_py, bps_from_py, builder_repr, date_repr, dated_money_from_py,
@@ -337,7 +338,8 @@ impl PyCdsTrancheParams {
 #[derive(Clone)]
 pub struct PyCdsTranche {
     /// Inner canonical Rust CDS tranche.
-    pub(crate) inner: finstack_quant_valuations::instruments::CdsTranche,
+    pub(crate) inner:
+        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche,
 }
 
 impl PyCdsTranche {
@@ -355,7 +357,8 @@ instrument_envelope_methods!(
     CdsTranche,
     "cds_tranche",
     PyCdsTrancheBuilder,
-    finstack_quant_valuations::instruments::CdsTranche::builder().realized_loss(0.0)
+    finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche::builder()
+        .realized_loss(0.0)
 );
 instrument_pricing_methods!(PyCdsTranche);
 
@@ -379,7 +382,7 @@ impl PyCdsTranche {
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
         Ok(Self {
-            inner: finstack_quant_valuations::instruments::CdsTranche::example()
+            inner: finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche::example()
                 .map_err(core_to_py)?,
         })
     }
@@ -422,7 +425,7 @@ impl PyCdsTranche {
         side: &str,
     ) -> PyResult<Self> {
         let side: PayReceive = enum_from_str(side, "side")?;
-        let inner = finstack_quant_valuations::instruments::CdsTranche::standard(
+        let inner = finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche::standard(
             InstrumentId::new(id.to_string()),
             &params.inner,
             CurveId::new(discount_curve_id.to_string()),

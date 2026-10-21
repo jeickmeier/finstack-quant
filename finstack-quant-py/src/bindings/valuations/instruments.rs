@@ -2,8 +2,8 @@
 //! namespace.
 //!
 //! Thin wrappers over the canonical Rust structs
-//! `finstack_quant_valuations::instruments::Bond` and
-//! `finstack_quant_valuations::instruments::TermLoan`. Construction and
+//! `finstack_quant_valuations::instruments::fixed_income::bond::Bond` and
+//! `finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan`. Construction and
 //! validation stay in Rust; the wrappers only convert to and from the canonical
 //! `finstack_quant.instrument/1` envelope accepted by the JSON loader, expose
 //! one getter per public Rust field, and route `price` / `metric` through the
@@ -22,7 +22,8 @@ use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::merton_mc::{PyMertonMcConfig, PyMertonMcResult};
 use crate::errors::{core_to_py, serde_json_to_py, value_error};
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::{Instrument, InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::instruments::Instrument;
 
 use super::convert::{
     attributes_from_py, enum_to_py_string, money_from_py, money_to_py, opt_repr,
@@ -323,7 +324,7 @@ fn bond_convention_from_str(
 #[derive(Clone)]
 pub struct PyBond {
     /// Inner canonical Rust bond.
-    pub(crate) inner: finstack_quant_valuations::instruments::Bond,
+    pub(crate) inner: finstack_quant_valuations::instruments::fixed_income::bond::Bond,
 }
 
 impl PyBond {
@@ -338,7 +339,7 @@ instrument_envelope_methods!(
     Bond,
     "bond",
     PyBondBuilder,
-    finstack_quant_valuations::instruments::Bond::builder()
+    finstack_quant_valuations::instruments::fixed_income::bond::Bond::builder()
 );
 instrument_pricing_methods!(
     PyBond,
@@ -422,7 +423,7 @@ impl PyBond {
         discount_curve_id: &str,
         currency: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = finstack_quant_valuations::instruments::Bond::fixed(
+        let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
             id,
             money_from_py(notional, currency, "notional")?,
             rate_from_py(coupon_rate, "coupon_rate")?,
@@ -541,16 +542,17 @@ impl PyBond {
         discount_curve_id: &str,
         currency: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = finstack_quant_valuations::instruments::Bond::with_convention(
-            id,
-            money_from_py(notional, currency, "notional")?,
-            rate_from_py(coupon_rate, "coupon_rate")?,
-            py_to_date(issue_date)?,
-            py_to_date(maturity)?,
-            bond_convention_from_str(convention)?,
-            discount_curve_id,
-        )
-        .map_err(core_to_py)?;
+        let inner =
+            finstack_quant_valuations::instruments::fixed_income::bond::Bond::with_convention(
+                id,
+                money_from_py(notional, currency, "notional")?,
+                rate_from_py(coupon_rate, "coupon_rate")?,
+                py_to_date(issue_date)?,
+                py_to_date(maturity)?,
+                bond_convention_from_str(convention)?,
+                discount_curve_id,
+            )
+            .map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -632,7 +634,7 @@ impl PyBond {
         discount_curve_id: &str,
         currency: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = finstack_quant_valuations::instruments::Bond::floating(
+        let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating(
             id,
             money_from_py(notional, currency, "notional")?,
             forward_curve_id,
@@ -722,7 +724,7 @@ impl PyBond {
         discount_curve_id: &str,
         currency: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = finstack_quant_valuations::instruments::Bond::floating_with_convention(
+        let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::floating_with_convention(
             id,
             money_from_py(notional, currency, "notional")?,
             forward_curve_id,
@@ -790,7 +792,7 @@ impl PyBond {
         discount_curve_id: &str,
         currency: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = finstack_quant_valuations::instruments::Bond::zero_coupon(
+        let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::zero_coupon(
             id,
             money_from_py(notional, currency, "notional")?,
             py_to_date(issue_date)?,
@@ -821,7 +823,7 @@ impl PyBond {
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
-        finstack_quant_valuations::instruments::Bond::example()
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::example()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }
@@ -846,7 +848,7 @@ impl PyBond {
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example_floating() -> PyResult<Self> {
-        finstack_quant_valuations::instruments::Bond::example_floating()
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::example_floating()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }
@@ -871,7 +873,7 @@ impl PyBond {
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example_callable() -> PyResult<Self> {
-        finstack_quant_valuations::instruments::Bond::example_callable()
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::example_callable()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }
@@ -896,7 +898,7 @@ impl PyBond {
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example_amortizing() -> PyResult<Self> {
-        finstack_quant_valuations::instruments::Bond::example_amortizing()
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::example_amortizing()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }
@@ -1563,7 +1565,7 @@ impl PyBondBuilder {
 #[derive(Clone)]
 pub struct PyTermLoan {
     /// Inner canonical Rust term loan.
-    pub(crate) inner: finstack_quant_valuations::instruments::TermLoan,
+    pub(crate) inner: finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan,
 }
 
 impl PyTermLoan {
@@ -1578,7 +1580,7 @@ instrument_envelope_methods!(
     TermLoan,
     "term_loan",
     PyTermLoanBuilder,
-    finstack_quant_valuations::instruments::TermLoan::builder()
+    finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan::builder()
 );
 instrument_pricing_methods!(PyTermLoan);
 
@@ -1607,7 +1609,7 @@ impl PyTermLoan {
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
-        finstack_quant_valuations::instruments::TermLoan::example()
+        finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan::example()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }
@@ -1633,7 +1635,7 @@ impl PyTermLoan {
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example_floating_with_ddtl() -> PyResult<Self> {
-        finstack_quant_valuations::instruments::TermLoan::example_floating_with_ddtl()
+        finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan::example_floating_with_ddtl()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }
@@ -1658,9 +1660,10 @@ impl PyTermLoan {
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example_callable() -> PyResult<Self> {
-        finstack_quant_valuations::instruments::TermLoan::example_callable()
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
+        finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan::example_callable(
+        )
+        .map(|inner| Self { inner })
+        .map_err(core_to_py)
     }
 
     /// Loan currency (ISO-4217 code).
@@ -2397,7 +2400,7 @@ impl PyTermLoanBuilder {
         py: Python<'py>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spec: finstack_quant_valuations::instruments::fixed_income::term_loan::OidEirSpec =
+        let spec: finstack_quant_valuations::instruments::fixed_income::loan_terms::OidEirSpec =
             spec_from_py(py, value, "oid_eir")?;
         builder_set!(
             slf,

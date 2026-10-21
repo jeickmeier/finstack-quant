@@ -51,7 +51,7 @@
 //! ```
 
 use crate::bond::pricing::quote_conversions::clear_price_driving_overrides;
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 
 fn price_bond_with_context_model(
@@ -146,8 +146,8 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use std::sync::Arc;
     use time::Month;
 

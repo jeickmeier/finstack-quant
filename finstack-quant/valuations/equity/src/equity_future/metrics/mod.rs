@@ -6,7 +6,7 @@ struct FuturesPrice;
 
 impl MetricCalculator for FuturesPrice {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let future: &crate::EquityFuture = context.instrument_as()?;
+        let future: &crate::equity_future::EquityFuture = context.instrument_as()?;
         future.mark_price(&context.curves, context.as_of)
     }
 }
@@ -15,7 +15,7 @@ struct Basis;
 
 impl MetricCalculator for Basis {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let future: &crate::EquityFuture = context.instrument_as()?;
+        let future: &crate::equity_future::EquityFuture = context.instrument_as()?;
         let futures_price = future
             .terms
             .quoted_price
@@ -33,7 +33,7 @@ struct Delta;
 
 impl MetricCalculator for Delta {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let future: &crate::EquityFuture = context.instrument_as()?;
+        let future: &crate::equity_future::EquityFuture = context.instrument_as()?;
         future.spot_delta(&context.curves, context.as_of)
     }
 }
@@ -49,8 +49,8 @@ pub(crate) fn register_equity_future_metrics(
             (FuturesPrice, FuturesPrice),
             (Basis, Basis),
             (Delta, Delta),
-            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
     Ok(())

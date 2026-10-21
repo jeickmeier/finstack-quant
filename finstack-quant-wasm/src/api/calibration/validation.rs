@@ -9,7 +9,7 @@ use crate::api::core::surfaces::JsVolSurface;
 use crate::utils::input::{from_js_json, js_f64_seq};
 use crate::utils::to_js_err;
 use finstack_quant_calibration::validation as rust_validation;
-use finstack_quant_calibration::ValidationConfig;
+use finstack_quant_calibration::validation::ValidationConfig;
 use wasm_bindgen::prelude::*;
 
 /// Run the calendar-spread, butterfly-spread and volatility-bound checks on a surface.

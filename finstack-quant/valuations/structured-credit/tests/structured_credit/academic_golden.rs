@@ -497,8 +497,9 @@ fn test_recovery_rate_golden_industry_standards() {
     // deal-type constructors from the embedded assumptions registry.
     // Reference: Moody's Default Study, S&P Recovery Studies
     use finstack_quant_cashflows::builder::RateSpec;
+    use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
+        StructuredCredit, Tranche, TrancheStructure,
     };
 
     let closing = Date::from_calendar_date(2025, Month::January, 1).unwrap();

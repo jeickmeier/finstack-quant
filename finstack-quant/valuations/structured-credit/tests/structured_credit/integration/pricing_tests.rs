@@ -11,8 +11,9 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
+    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 
@@ -371,7 +372,7 @@ fn test_prepayment01_default01_nonzero_for_curve_specs() {
 #[test]
 fn test_scenario_price_shock_scales_structured_credit_pv_and_dollar_risk_once() {
     use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec};
-    use finstack_quant_valuations_core::instruments::ScenarioPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides;
 
     let mut baseline = StructuredCredit::new_abs(
         "TEST_ABS_SCENARIO_RISK",

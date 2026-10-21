@@ -8,7 +8,7 @@ mod fx_vega;
 
 use crate::quanto_option::QuantoOption;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::bump_scalar_price;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
@@ -27,15 +27,15 @@ pub(crate) fn register_quanto_option_metrics(
         registry: registry,
         instrument: InstrumentType::QuantoOption,
         metrics: [
-            (Delta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::delta()),
-            (Gamma, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::gamma()),
-            (Vega, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::vega()),
-            (Rho, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::rho()),
-            (ForeignRho, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::foreign_rho()),
-            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
-            (Vanna, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::vanna()),
-            (Volga, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::volga()),
+            (Delta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::delta()),
+            (Gamma, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::gamma()),
+            (Vega, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::vega()),
+            (Rho, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::rho()),
+            (ForeignRho, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::foreign_rho()),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+            (Vanna, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::vanna()),
+            (Volga, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::quanto_option::QuantoOption>::volga()),
         ]
     }
 

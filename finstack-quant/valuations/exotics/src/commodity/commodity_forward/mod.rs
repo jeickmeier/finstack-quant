@@ -1,6 +1,6 @@
 //! Commodity forward/futures instrument module.
 //!
-//! This module provides the [`CommodityForward`] instrument for modeling
+//! This module provides the [`CommodityForward`](crate::commodity::commodity_forward::CommodityForward) instrument for modeling
 //! forward contracts on physical commodities (energy, metals, agricultural).
 //!
 //! # Overview
@@ -38,7 +38,6 @@
 mod types;
 
 pub use types::CommodityForward;
-pub use types::SettlementType;
 
 /// Metrics submodule for commodity forward risk measures.
 pub(crate) mod metrics;

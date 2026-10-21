@@ -9,12 +9,12 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
+use finstack_quant_valuations_core::contract_specs::BondFutureSpecs;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};
-use finstack_quant_valuations_fixed_income::bond_future::{
-    BondFuture, BondFutureSpecs, DeliverableBond,
-};
+use finstack_quant_valuations_fixed_income::bond_future::{BondFuture, DeliverableBond};
 use time::Month;
 
 /// Create a test deliverable bond.

@@ -17,7 +17,8 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     DealType, LossAllocationPolicy, LossRecognition, MarketConditions, Metadata, StructuredCredit,
     TrancheDraw, TrancheReadvance, WaterfallRules,
 };
-use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+use finstack_quant_valuations::instruments::Instrument;
 
 use super::super::instruments::{
     enum_from_str, instrument_expiry, serialize_typed_instrument_json,

@@ -51,7 +51,7 @@
 //! # Quick Example
 //!
 //! ```rust
-//! use finstack_quant_valuations::instruments::Bond;
+//! use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 //! use finstack_quant_valuations::instruments::Instrument;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::money::Money;
@@ -137,7 +137,7 @@
 //! # See Also
 //!
 //! - [`crate::instruments::Instrument`] for the core instrument trait
-//! - [`crate::instruments::Attributes`] for tagging and scenario selection
+//! - [`finstack_quant_core::types::Attributes`] for tagging and scenario selection
 //! - [`crate::pricer`] for pricing registry and dispatch
 //! - [`crate::metrics`] for risk metric calculations
 //!
@@ -180,62 +180,4 @@ pub mod rates {
     pub use finstack_quant_valuations_rates::*;
 }
 
-pub use fixed_income::{
-    AgencyCmo, AgencyMbsPassthrough, AgencyProgram, AgencyTba, AssetBackedFacility, Bond,
-    BondFuture, BondFutureBuilder, BondFutureSpecs, BondSettlementConvention, CmoTranche,
-    CmoTrancheType, CmoWaterfall, ConvertibleBond, DeliverableBond, DollarRoll,
-    FiIndexTotalReturnSwap, InflationLinkedBond, PoolType, RevolvingCredit, StructuredCredit,
-    TbaTerm, TermLoan,
-};
-
-pub use rates::{
-    BasisSwap, BermudanSwaption, CapFloor, CmsOption, CmsSpreadOption, CmsSwap, CollateralSpec,
-    CollateralType, Deposit, ForwardRateAgreement, InflationCapFloor, InflationSwap,
-    InterestRateFuture, InterestRateSwap, RateOptionType, Repo, RepoType, Swaption, XccySwap,
-    YoYInflationSwap,
-};
-
-pub use credit_derivatives::{CdsIndex, CdsOption, CdsTranche, CreditDefaultSwap};
-
-pub use equity::{
-    Autocallable, CliquetOption, DiscountedCashFlow, Equity, EquityFuture, EquityFutureOption,
-    EquityOption, EquityPriceSeriesPolicy, EquityTotalReturnFuture, EquityTotalReturnSwap,
-    FinalPayoffType, LeveredRealEstateEquity, PrivateMarketsFund, RealEstateAsset,
-    RealEstateFinancing, RealEstateValuationMethod, TerminalValueSpec, VarianceSwap,
-    VolatilityIndexFuture, VolatilityIndexFutureOption,
-};
-
-pub use fx::FxVarianceSwap;
-pub use fx::{
-    BarrierDirection, DigitalPayoutType, FxDigitalOption, FxTouchOption, PayoutTiming, TouchType,
-};
-pub use fx::{
-    FxBarrierOption, FxForward, FxFuture, FxFutureOption, FxOption, FxSpot, FxSwap, Ndf,
-    QuantoOption,
-};
-
-pub use commodity::{
-    CommodityAsianOption, CommodityForward, CommodityFuture, CommodityFutureFixing,
-    CommodityFutureOption, CommoditySpotOption, CommoditySpotOptionExercise, CommoditySpreadOption,
-    CommoditySwap, CommoditySwaption,
-};
-
-pub use rates::InterestRateFutureOption;
-
-pub use composite::{
-    CompositeExposureReport, CompositeHistoryRow, CompositeInstrument, CompositeLegSpec,
-    CompositeMarketObservation, CompositeRebalanceResult, CompositeSpec, CompositeState,
-    CompositeTrade, CompositeValuationDetails, PrimitiveAggregate, PrimitiveExposure,
-    RebalanceRule, ResolvedCompositeLeg, WeightingMethod,
-};
-
-pub use exotics::{
-    AsianOption, AveragingMethod, BarrierOption, Basket, CallableRangeAccrual, LookbackOption,
-    LookbackType, RangeAccrual, Snowball, SnowballVariant, Tarn,
-};
-
 pub mod json_loader;
-
-pub use json_loader::{
-    instrument_json_of, market_dependencies_of, registry_tags, InstrumentEnvelope, InstrumentJson,
-};

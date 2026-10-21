@@ -1,7 +1,7 @@
 //! Loader for swaption conventions embedded in JSON registries.
 
-use crate::market::conventions::defs::SwaptionConventions;
 use crate::market::conventions::ids::SwaptionConventionId;
+use crate::market::conventions::SwaptionConventions;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
 use finstack_quant_core::Error;
 use finstack_quant_core::FxHashMap;

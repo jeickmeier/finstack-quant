@@ -5,16 +5,18 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use super::{StochasticPricingResult, StructuredCredit};
+use super::StructuredCredit;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{
     MetricId, MetricRegistry, MetricRegistryError, PricerPublishedMetric,
 };
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, register_generic, Family, InstrumentType, ModelKey, Pricer, PricerKey,
-    PricerRegistry, PricingError, PricingErrorContext,
+    expect_inst, Family, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
+    PricingErrorContext,
 };
+use finstack_quant_valuations_core::register_generic;
+use finstack_quant_valuations_core::results::structured_credit::StochasticPricingResult;
 use finstack_quant_valuations_core::results::{ValuationDetails, ValuationResult};
 
 /// Registration unit for the structured-credit instruments.

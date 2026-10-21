@@ -861,12 +861,10 @@ fn seasoned_fi_trs(
     use finstack_quant_cashflows::builder::ScheduleParams;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_valuations::instruments::fixed_income::fi_trs::{
-        FiIndexTotalReturnSwap, TrsScheduleSpec,
-    };
-    use finstack_quant_valuations::instruments::{
-        Attributes, FinancingLegSpec, IndexUnderlyingParams,
-    };
+    use finstack_quant_core::types::Attributes;
+    use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
+    use finstack_quant_valuations::instruments::TrsScheduleSpec;
+    use finstack_quant_valuations::instruments::{FinancingLegSpec, IndexUnderlyingParams};
 
     let trs = FiIndexTotalReturnSwap::builder()
         .id("SEASONED-FI-TRS".into())
@@ -942,7 +940,7 @@ fn fi_trs_period_in_progress_requires_initial_level() {
 #[test]
 fn fi_trs_keeps_completed_unpaid_period_in_pv() {
     use finstack_quant_cashflows::builder::ScheduleParams;
-    use finstack_quant_valuations::instruments::fixed_income::fi_trs::TrsScheduleSpec;
+    use finstack_quant_valuations::instruments::TrsScheduleSpec;
 
     let (mut trs, market) = seasoned_fi_trs(Some(100.0));
     let mut params = ScheduleParams::quarterly_act360();

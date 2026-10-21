@@ -53,7 +53,7 @@ fn test_mc_pricer_stochastic_utilization() {
             },
         )))
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_mc_paths(10_000),
         )
         .discount_curve_id("USD-OIS".into())
@@ -143,7 +143,7 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
             },
         )))
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_mc_paths(5_000),
         )
         .discount_curve_id("USD-OIS".into())
@@ -187,7 +187,7 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
             },
         )))
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_mc_paths(5_000),
         )
         .discount_curve_id("USD-OIS".into())
@@ -230,7 +230,7 @@ fn test_mc_pricer_deterministic_reproducibility() {
             },
         )))
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_mc_paths(1_000),
         )
         .discount_curve_id("USD-OIS".into())
@@ -290,7 +290,7 @@ fn test_mc_pricer_convergence() {
                 },
             )))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_mc_paths(num_paths),
             )
             .discount_curve_id("USD-OIS".into())
@@ -346,7 +346,7 @@ fn test_mc_utilization_mean_reversion() {
             },
         )))
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_mc_paths(5_000),
         )
         .discount_curve_id("USD-OIS".into())
@@ -386,7 +386,7 @@ fn test_mc_utilization_mean_reversion() {
             },
         )))
         .instrument_pricing_overrides(
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_mc_paths(5_000),
         )
         .discount_curve_id("USD-OIS".into())
@@ -419,7 +419,7 @@ fn test_mc_utilization_mean_reversion() {
 fn test_mc_stochastic_floating_rate_index_cap() {
     use finstack_quant_cashflows::builder::FloatingRateSpec;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
-    use finstack_quant_valuations_fixed_income::revolving_credit::RevolvingCreditPricer;
+    use finstack_quant_valuations_fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer;
     use rust_decimal::Decimal;
 
     let val_date = date!(2025 - 01 - 01);
@@ -494,7 +494,7 @@ fn test_mc_stochastic_floating_rate_index_cap() {
                 },
             )))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_mc_paths(1_000),
             )
             .discount_curve_id("USD-OIS".into())
@@ -552,8 +552,9 @@ fn test_mc_stochastic_floating_rate_index_cap() {
 fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
     use finstack_quant_cashflows::builder::FloatingRateSpec;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
+    use finstack_quant_valuations_fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer;
     use finstack_quant_valuations_fixed_income::revolving_credit::{
-        CreditSpreadProcessSpec, InterestRateProcessSpec, McConfig, RevolvingCreditPricer,
+        CreditSpreadProcessSpec, InterestRateProcessSpec, McConfig,
     };
     use rust_decimal::Decimal;
 
@@ -620,7 +621,7 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
                 },
             )))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_mc_paths(64),
             )
             .discount_curve_id("USD-OIS".into())
@@ -646,7 +647,7 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
 
 #[test]
 fn stochastic_utilization_coupon_integral_converges_to_independent_ou_mean() {
-    use finstack_quant_valuations_fixed_income::revolving_credit::RevolvingCreditPricer;
+    use finstack_quant_valuations_fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer;
     let start = date!(2025 - 01 - 01);
     let end = date!(2026 - 01 - 01);
     let market = MarketContext::new().insert(build_flat_discount_curve(0.0, start, "USD-OIS"));

@@ -27,14 +27,15 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
+use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
 use finstack_quant_valuations::instruments::fixed_income::convertible::{
     calculate_convertible_greeks, calculate_parity, price_convertible_bond,
 };
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, ConvertibleBond, DividendAdjustment,
-};
 use finstack_quant_valuations::instruments::GreekBumps;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::{
+    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
+};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations_test_support::assert_parity;
 use finstack_quant_valuations_test_support::parity::ParityConfig;

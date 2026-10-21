@@ -36,12 +36,12 @@
 use crate::EquityPathModel;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::impl_instrument_base;
 use time::macros::date;
 
-pub use finstack_quant_models::monte_carlo::payoff::autocallable::FinalPayoffType;
+pub(crate) use finstack_quant_models::monte_carlo::payoff::autocallable::FinalPayoffType;
 
 /// Autocallable structured product instrument.
 #[derive(
@@ -158,26 +158,26 @@ pub struct Autocallable {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping
     pub attributes: Attributes,
 }
@@ -277,14 +277,15 @@ struct AutocallableUnchecked {
     /// Instrument-owned pricing inputs.
     #[serde(default)]
     instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[serde(default)]
-    metric_pricing_overrides: finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[serde(default)]
     scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping
     attributes: Attributes,
 }
@@ -552,7 +553,7 @@ impl Autocallable {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for Autocallable {
+impl finstack_quant_valuations_core::instruments::Instrument for Autocallable {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Autocallable,
         crate::EQUITY
@@ -568,14 +569,13 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_market_scalar_id(self.spot_id.as_str());
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 Some(self.spot_id.clone()),
                 None,
@@ -618,9 +618,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         as_of: Date,
         rolled_date: Date,
     ) -> finstack_quant_core::Result<
-        Option<
-            Box<dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument>,
-        >,
+        Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>>,
     > {
         let rolled_fixings: Vec<Date> = self
             .observation_dates
@@ -652,7 +650,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Ok(Some(Box::new(observed)))
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 finstack_quant_valuations_core::impl_empty_cashflow_provider!(
@@ -666,7 +664,7 @@ mod validation_tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
-    use finstack_quant_valuations_core::instruments::Attributes;
+    use finstack_quant_core::types::Attributes;
 
     fn base_builder() -> crate::autocallable::types::AutocallableBuilder {
         Autocallable::builder()

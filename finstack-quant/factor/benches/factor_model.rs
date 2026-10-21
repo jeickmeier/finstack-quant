@@ -22,12 +22,12 @@ use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criteri
 use finstack_quant_core::types::Attributes;
 use finstack_quant_factor::credit::calibration::CovarianceStrategy;
 use finstack_quant_factor::credit::decomposition::{decompose_levels, decompose_period};
-use finstack_quant_factor::matching::{
-    DependencyFilter, FactorMatcher, FactorNode, HierarchicalConfig, MappingTableMatcher,
-    MatchingConfig,
-};
 use finstack_quant_factor::{
     CurveType, FactorCovarianceMatrix, FactorId, MarketDependency, SensitivityMatrix,
+};
+use finstack_quant_factor::{
+    DependencyFilter, FactorMatcher, FactorNode, HierarchicalConfig, MappingTableMatcher,
+    MatchingConfig,
 };
 use fixtures::{
     credit_dependency, credit_hierarchical_config, factor_ids, known_issuer_attrs, mapping_rules,
@@ -157,14 +157,14 @@ fn bench_hierarchical_matcher(c: &mut Criterion) {
             if depth == 0 {
                 return FactorNode {
                     factor_id: Some(FactorId::new(format!("{prefix}-leaf"))),
-                    filter: finstack_quant_factor::matching::AttributeFilter::default(),
+                    filter: finstack_quant_factor::AttributeFilter::default(),
                     children: vec![],
                 };
             }
             let children = (0..branching)
                 .map(|i| {
                     let child_prefix = format!("{prefix}-{i}");
-                    let filter = finstack_quant_factor::matching::AttributeFilter {
+                    let filter = finstack_quant_factor::AttributeFilter {
                         tags: vec![format!("sector-{i}")],
                         meta: vec![],
                     };
@@ -175,7 +175,7 @@ fn bench_hierarchical_matcher(c: &mut Criterion) {
                 .collect();
             FactorNode {
                 factor_id: Some(FactorId::new(format!("{prefix}-node"))),
-                filter: finstack_quant_factor::matching::AttributeFilter::default(),
+                filter: finstack_quant_factor::AttributeFilter::default(),
                 children,
             }
         }
@@ -220,23 +220,23 @@ fn bench_hierarchical_matcher(c: &mut Criterion) {
 fn bench_cascade_matcher(c: &mut Criterion) {
     let mut group = c.benchmark_group("cascade_matcher");
 
-    let exact_rules = vec![finstack_quant_factor::matching::MappingRule {
-        dependency_filter: finstack_quant_factor::matching::DependencyFilter {
+    let exact_rules = vec![finstack_quant_factor::MappingRule {
+        dependency_filter: finstack_quant_factor::DependencyFilter {
             dependency_type: Some(finstack_quant_factor::DependencyType::Credit),
             curve_type: None,
             id: Some("ACME-HAZARD".into()),
         },
-        attribute_filter: finstack_quant_factor::matching::AttributeFilter::default(),
+        attribute_filter: finstack_quant_factor::AttributeFilter::default(),
         factor_id: FactorId::new("ACME-Specific"),
     }];
 
-    let fallback_rules = vec![finstack_quant_factor::matching::MappingRule {
-        dependency_filter: finstack_quant_factor::matching::DependencyFilter {
+    let fallback_rules = vec![finstack_quant_factor::MappingRule {
+        dependency_filter: finstack_quant_factor::DependencyFilter {
             dependency_type: Some(finstack_quant_factor::DependencyType::Credit),
             curve_type: None,
             id: None,
         },
-        attribute_filter: finstack_quant_factor::matching::AttributeFilter::default(),
+        attribute_filter: finstack_quant_factor::AttributeFilter::default(),
         factor_id: FactorId::new("Generic-Credit"),
     }];
 

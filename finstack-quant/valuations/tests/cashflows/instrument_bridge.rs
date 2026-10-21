@@ -4,15 +4,16 @@ use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
 use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
-use finstack_quant_valuations::instruments::credit_derivatives::{CdsIndex, CdsTranche};
+use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use finstack_quant_valuations::instruments::fixed_income::bond_future::BondFuture;
+use finstack_quant_valuations::instruments::fixed_income::cmo::AgencyCmo;
 use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
 use finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;
+use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit;
+use finstack_quant_valuations::instruments::fixed_income::tba::AgencyTba;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
-use finstack_quant_valuations::instruments::fixed_income::{
-    AgencyCmo, AgencyMbsPassthrough, AgencyTba,
-};
 use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
 use finstack_quant_valuations::instruments::fx::fx_swap::FxSwap;
 use finstack_quant_valuations::instruments::fx::ndf::Ndf;
@@ -80,9 +81,8 @@ fn bond_future_exposes_cashflow_provider_bridge() {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations::instruments::fixed_income::bond_future::{
-        BondFutureSpecs, DeliverableBond,
-    };
+    use finstack_quant_valuations::contract_specs::BondFutureSpecs;
+    use finstack_quant_valuations::instruments::fixed_income::bond_future::DeliverableBond;
     use finstack_quant_valuations::instruments::ListedFutureTerms;
     use time::Month;
 

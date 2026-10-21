@@ -7,14 +7,18 @@
 
 use super::levered_pricer;
 use super::types::RealEstateAsset;
-use crate::instruments::common_impl::traits::impl_instrument_base;
-use crate::instruments::common_impl::traits::{Attributes, Instrument};
-use crate::instruments::{Bond, Repo, RevolvingCredit, TermLoan};
+use crate::impl_instrument_base;
+use crate::instruments::fixed_income::bond::Bond;
+use crate::instruments::fixed_income::revolving_credit::RevolvingCredit;
+use crate::instruments::fixed_income::term_loan::TermLoan;
+use crate::instruments::rates::repo::Repo;
+use crate::instruments::Instrument;
 use crate::pricer::InstrumentType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::InstrumentId;
 
 /// Financing instruments supported by levered real-estate valuation and metrics.
@@ -91,23 +95,24 @@ pub struct LeveredRealEstateEquity {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "crate::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
-    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    pub instrument_pricing_overrides:
+        crate::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "crate::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "crate::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
-    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    pub metric_pricing_overrides: crate::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "crate::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "crate::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
-    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
+    pub scenario_pricing_overrides: crate::instruments::pricing_overrides::ScenarioPricingOverrides,
 
     /// Attributes for tagging and scenarios.
     #[builder(default)]
@@ -192,9 +197,7 @@ impl Instrument for LeveredRealEstateEquity {
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        crate::instruments::common_impl::dependencies::MarketDependencies,
-    > {
+    ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
         let mut deps = self.asset.market_dependencies()?;
         for financing in &self.financing {
             deps.merge(financing.as_instrument().market_dependencies()?);
@@ -210,7 +213,7 @@ impl Instrument for LeveredRealEstateEquity {
         levered_pricer::compute_pv(self, market, as_of)
     }
 
-    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for LeveredRealEstateEquity {

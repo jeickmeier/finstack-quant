@@ -17,7 +17,7 @@ use pyo3::prelude::*;
 )]
 #[derive(Clone)]
 pub struct PyImCollateralResult {
-    pub(crate) inner: fm::ImCollateralResult,
+    pub(crate) inner: fm::types::ImCollateralResult,
 }
 
 #[pymethods]
@@ -69,7 +69,7 @@ impl PyImCollateralResult {
 )]
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PyImMethodology {
-    pub(crate) inner: fm::ImMethodology,
+    pub(crate) inner: fm::types::ImMethodology,
 }
 
 #[pymethods]
@@ -78,7 +78,7 @@ impl PyImMethodology {
     #[staticmethod]
     fn haircut() -> Self {
         Self {
-            inner: fm::ImMethodology::Haircut,
+            inner: fm::types::ImMethodology::Haircut,
         }
     }
 
@@ -86,7 +86,7 @@ impl PyImMethodology {
     #[staticmethod]
     fn simm() -> Self {
         Self {
-            inner: fm::ImMethodology::Simm,
+            inner: fm::types::ImMethodology::Simm,
         }
     }
 
@@ -94,7 +94,7 @@ impl PyImMethodology {
     #[staticmethod]
     fn schedule() -> Self {
         Self {
-            inner: fm::ImMethodology::Schedule,
+            inner: fm::types::ImMethodology::Schedule,
         }
     }
 
@@ -102,7 +102,7 @@ impl PyImMethodology {
     #[staticmethod]
     fn internal_model() -> Self {
         Self {
-            inner: fm::ImMethodology::InternalModel,
+            inner: fm::types::ImMethodology::InternalModel,
         }
     }
 
@@ -110,7 +110,7 @@ impl PyImMethodology {
     #[staticmethod]
     fn clearing_house() -> Self {
         Self {
-            inner: fm::ImMethodology::ClearingHouse,
+            inner: fm::types::ImMethodology::ClearingHouse,
         }
     }
 
@@ -120,7 +120,7 @@ impl PyImMethodology {
     /// Raises ``ValueError`` for any other spelling, including ``"SIMM"``.
     #[staticmethod]
     fn from_str(s: &str) -> PyResult<Self> {
-        let inner: fm::ImMethodology = s
+        let inner: fm::types::ImMethodology = s
             .parse()
             .map_err(|e: String| crate::errors::value_error(e))?;
         Ok(Self { inner })
@@ -149,7 +149,7 @@ impl PyImMethodology {
 )]
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PyMarginTenor {
-    pub(super) inner: fm::MarginTenor,
+    pub(super) inner: fm::types::MarginTenor,
 }
 
 #[pymethods]
@@ -158,7 +158,7 @@ impl PyMarginTenor {
     #[staticmethod]
     fn daily() -> Self {
         Self {
-            inner: fm::MarginTenor::Daily,
+            inner: fm::types::MarginTenor::Daily,
         }
     }
 
@@ -166,7 +166,7 @@ impl PyMarginTenor {
     #[staticmethod]
     fn weekly() -> Self {
         Self {
-            inner: fm::MarginTenor::Weekly,
+            inner: fm::types::MarginTenor::Weekly,
         }
     }
 
@@ -174,7 +174,7 @@ impl PyMarginTenor {
     #[staticmethod]
     fn monthly() -> Self {
         Self {
-            inner: fm::MarginTenor::Monthly,
+            inner: fm::types::MarginTenor::Monthly,
         }
     }
 
@@ -182,14 +182,14 @@ impl PyMarginTenor {
     #[staticmethod]
     fn on_demand() -> Self {
         Self {
-            inner: fm::MarginTenor::OnDemand,
+            inner: fm::types::MarginTenor::OnDemand,
         }
     }
 
     /// Parse the lower-case wire label; raises ``ValueError`` otherwise.
     #[staticmethod]
     fn from_str(s: &str) -> PyResult<Self> {
-        let inner: fm::MarginTenor = s
+        let inner: fm::types::MarginTenor = s
             .parse()
             .map_err(|e: String| crate::errors::value_error(e))?;
         Ok(Self { inner })
@@ -221,7 +221,7 @@ impl PyMarginTenor {
 )]
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PyMarginCallType {
-    pub(super) inner: fm::MarginCallType,
+    pub(super) inner: fm::types::MarginCallType,
 }
 
 #[pymethods]
@@ -230,7 +230,7 @@ impl PyMarginCallType {
     #[staticmethod]
     fn initial_margin() -> Self {
         Self {
-            inner: fm::MarginCallType::InitialMargin,
+            inner: fm::types::MarginCallType::InitialMargin,
         }
     }
 
@@ -238,7 +238,7 @@ impl PyMarginCallType {
     #[staticmethod]
     fn variation_margin_post() -> Self {
         Self {
-            inner: fm::MarginCallType::VariationMarginPost,
+            inner: fm::types::MarginCallType::VariationMarginPost,
         }
     }
 
@@ -246,7 +246,7 @@ impl PyMarginCallType {
     #[staticmethod]
     fn variation_margin_collect() -> Self {
         Self {
-            inner: fm::MarginCallType::VariationMarginCollect,
+            inner: fm::types::MarginCallType::VariationMarginCollect,
         }
     }
 
@@ -254,7 +254,7 @@ impl PyMarginCallType {
     #[staticmethod]
     fn top_up() -> Self {
         Self {
-            inner: fm::MarginCallType::TopUp,
+            inner: fm::types::MarginCallType::TopUp,
         }
     }
 
@@ -262,14 +262,14 @@ impl PyMarginCallType {
     #[staticmethod]
     fn substitution() -> Self {
         Self {
-            inner: fm::MarginCallType::Substitution,
+            inner: fm::types::MarginCallType::Substitution,
         }
     }
 
     /// Parse the lower-case wire label; raises ``ValueError`` otherwise.
     #[staticmethod]
     fn from_str(s: &str) -> PyResult<Self> {
-        let inner: fm::MarginCallType = s
+        let inner: fm::types::MarginCallType = s
             .parse()
             .map_err(|e: String| crate::errors::value_error(e))?;
         Ok(Self { inner })
@@ -295,7 +295,7 @@ impl PyMarginCallType {
 )]
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PyClearingStatus {
-    pub(super) inner: fm::ClearingStatus,
+    pub(super) inner: fm::types::ClearingStatus,
 }
 
 #[pymethods]
@@ -304,7 +304,7 @@ impl PyClearingStatus {
     #[staticmethod]
     fn bilateral() -> Self {
         Self {
-            inner: fm::ClearingStatus::Bilateral,
+            inner: fm::types::ClearingStatus::Bilateral,
         }
     }
 
@@ -312,7 +312,7 @@ impl PyClearingStatus {
     #[staticmethod]
     fn cleared(ccp: &str) -> Self {
         Self {
-            inner: fm::ClearingStatus::Cleared {
+            inner: fm::types::ClearingStatus::Cleared {
                 ccp: ccp.to_string(),
             },
         }
@@ -321,13 +321,13 @@ impl PyClearingStatus {
     /// Whether this is a bilateral trade.
     #[getter]
     fn is_bilateral(&self) -> bool {
-        matches!(self.inner, fm::ClearingStatus::Bilateral)
+        matches!(self.inner, fm::types::ClearingStatus::Bilateral)
     }
 
     /// Whether this is a cleared trade.
     #[getter]
     fn is_cleared(&self) -> bool {
-        matches!(self.inner, fm::ClearingStatus::Cleared { .. })
+        matches!(self.inner, fm::types::ClearingStatus::Cleared { .. })
     }
 
     fn __repr__(&self) -> String {
@@ -354,7 +354,7 @@ impl PyClearingStatus {
 )]
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PyCollateralAssetClass {
-    pub(super) inner: fm::CollateralAssetClass,
+    pub(super) inner: fm::types::CollateralAssetClass,
 }
 
 #[pymethods]
@@ -363,7 +363,7 @@ impl PyCollateralAssetClass {
     #[staticmethod]
     fn cash() -> Self {
         Self {
-            inner: fm::CollateralAssetClass::Cash,
+            inner: fm::types::CollateralAssetClass::Cash,
         }
     }
 
@@ -371,7 +371,7 @@ impl PyCollateralAssetClass {
     #[staticmethod]
     fn government_bonds() -> Self {
         Self {
-            inner: fm::CollateralAssetClass::GovernmentBonds,
+            inner: fm::types::CollateralAssetClass::GovernmentBonds,
         }
     }
 
@@ -379,7 +379,7 @@ impl PyCollateralAssetClass {
     #[staticmethod]
     fn agency_bonds() -> Self {
         Self {
-            inner: fm::CollateralAssetClass::AgencyBonds,
+            inner: fm::types::CollateralAssetClass::AgencyBonds,
         }
     }
 
@@ -387,7 +387,7 @@ impl PyCollateralAssetClass {
     #[staticmethod]
     fn covered_bonds() -> Self {
         Self {
-            inner: fm::CollateralAssetClass::CoveredBonds,
+            inner: fm::types::CollateralAssetClass::CoveredBonds,
         }
     }
 
@@ -395,7 +395,7 @@ impl PyCollateralAssetClass {
     #[staticmethod]
     fn corporate_bonds() -> Self {
         Self {
-            inner: fm::CollateralAssetClass::CorporateBonds,
+            inner: fm::types::CollateralAssetClass::CorporateBonds,
         }
     }
 
@@ -403,7 +403,7 @@ impl PyCollateralAssetClass {
     #[staticmethod]
     fn equity() -> Self {
         Self {
-            inner: fm::CollateralAssetClass::Equity,
+            inner: fm::types::CollateralAssetClass::Equity,
         }
     }
 
@@ -411,7 +411,7 @@ impl PyCollateralAssetClass {
     #[staticmethod]
     fn gold() -> Self {
         Self {
-            inner: fm::CollateralAssetClass::Gold,
+            inner: fm::types::CollateralAssetClass::Gold,
         }
     }
 
@@ -419,14 +419,15 @@ impl PyCollateralAssetClass {
     #[staticmethod]
     fn mutual_funds() -> Self {
         Self {
-            inner: fm::CollateralAssetClass::MutualFunds,
+            inner: fm::types::CollateralAssetClass::MutualFunds,
         }
     }
 
     /// Parse the lower-case wire label; raises ``ValueError`` otherwise.
     #[staticmethod]
     fn from_str(s: &str) -> PyResult<Self> {
-        let inner: fm::CollateralAssetClass = s.parse().map_err(crate::errors::value_error)?;
+        let inner: fm::types::CollateralAssetClass =
+            s.parse().map_err(crate::errors::value_error)?;
         Ok(Self { inner })
     }
 
@@ -453,7 +454,9 @@ impl PyCollateralAssetClass {
 }
 
 /// Parse a ``CollateralAssetClass | str`` argument.
-pub(super) fn extract_asset_class(obj: &Bound<'_, PyAny>) -> PyResult<fm::CollateralAssetClass> {
+pub(super) fn extract_asset_class(
+    obj: &Bound<'_, PyAny>,
+) -> PyResult<fm::types::CollateralAssetClass> {
     if let Ok(wrapped) = obj.cast::<PyCollateralAssetClass>() {
         return Ok(wrapped.borrow().inner.clone());
     }
@@ -481,7 +484,7 @@ pub(super) fn extract_asset_class(obj: &Bound<'_, PyAny>) -> PyResult<fm::Collat
 )]
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PyNettingSetId {
-    pub(crate) inner: fm::NettingSetId,
+    pub(crate) inner: fm::types::NettingSetId,
 }
 
 #[pymethods]
@@ -490,7 +493,7 @@ impl PyNettingSetId {
     #[staticmethod]
     fn bilateral(counterparty_id: &str, csa_id: &str) -> Self {
         Self {
-            inner: fm::NettingSetId::bilateral(counterparty_id, csa_id),
+            inner: fm::types::NettingSetId::bilateral(counterparty_id, csa_id),
         }
     }
 
@@ -498,7 +501,7 @@ impl PyNettingSetId {
     #[staticmethod]
     fn cleared(ccp_id: &str) -> Self {
         Self {
-            inner: fm::NettingSetId::cleared(ccp_id),
+            inner: fm::types::NettingSetId::cleared(ccp_id),
         }
     }
 
@@ -516,7 +519,7 @@ impl PyNettingSetId {
     /// ``ValueError`` on malformed input.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: fm::NettingSetId = serde_json::from_str(json).map_err(display_to_py)?;
+        let inner: fm::types::NettingSetId = serde_json::from_str(json).map_err(display_to_py)?;
         Ok(Self { inner })
     }
 
@@ -560,7 +563,7 @@ impl PyNettingSetId {
 }
 
 /// Parse a ``NettingSetId`` argument.
-pub(super) fn extract_netting_set_id(obj: &Bound<'_, PyAny>) -> PyResult<fm::NettingSetId> {
+pub(super) fn extract_netting_set_id(obj: &Bound<'_, PyAny>) -> PyResult<fm::types::NettingSetId> {
     obj.cast::<PyNettingSetId>()
         .map(|wrapped| wrapped.borrow().inner.clone())
         .map_err(|_| {
@@ -576,7 +579,7 @@ pub(super) fn extract_netting_set_id(obj: &Bound<'_, PyAny>) -> PyResult<fm::Net
 }
 
 /// Parse an ``ImMethodology | str`` argument.
-fn extract_im_methodology(obj: &Bound<'_, PyAny>) -> PyResult<fm::ImMethodology> {
+fn extract_im_methodology(obj: &Bound<'_, PyAny>) -> PyResult<fm::types::ImMethodology> {
     if let Ok(wrapped) = obj.cast::<PyImMethodology>() {
         return Ok(wrapped.borrow().inner);
     }
@@ -604,7 +607,7 @@ fn extract_im_methodology(obj: &Bound<'_, PyAny>) -> PyResult<fm::ImMethodology>
 )]
 #[derive(Clone)]
 pub struct PyCsaSpec {
-    pub(super) inner: fm::CsaSpec,
+    pub(super) inner: fm::types::CsaSpec,
 }
 
 impl PyCsaSpec {
@@ -622,7 +625,7 @@ impl PyCsaSpec {
     /// the embedded registry cannot be loaded.
     #[staticmethod]
     fn usd_regulatory() -> PyResult<Self> {
-        let inner = fm::CsaSpec::usd_regulatory().map_err(core_to_py)?;
+        let inner = fm::types::CsaSpec::usd_regulatory().map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -630,7 +633,7 @@ impl PyCsaSpec {
     /// the embedded registry cannot be loaded.
     #[staticmethod]
     fn eur_regulatory() -> PyResult<Self> {
-        let inner = fm::CsaSpec::eur_regulatory().map_err(core_to_py)?;
+        let inner = fm::types::CsaSpec::eur_regulatory().map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -652,9 +655,12 @@ impl PyCsaSpec {
     #[staticmethod]
     #[pyo3(signature = (currency, id, collateral_curve))]
     fn regulatory(currency: &str, id: &str, collateral_curve: &str) -> PyResult<Self> {
-        let inner =
-            fm::CsaSpec::regulatory_for_currency(parse_currency(currency)?, id, collateral_curve)
-                .map_err(core_to_py)?;
+        let inner = fm::types::CsaSpec::regulatory_for_currency(
+            parse_currency(currency)?,
+            id,
+            collateral_curve,
+        )
+        .map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -691,7 +697,7 @@ impl PyCsaSpec {
         id: &str,
         collateral_curve: &str,
     ) -> PyResult<Self> {
-        let inner = fm::CsaSpec::regulatory_from_config(
+        let inner = fm::types::CsaSpec::regulatory_from_config(
             &config.inner,
             parse_currency(currency)?,
             id,
@@ -819,7 +825,7 @@ impl PyCsaSpec {
     /// input or a spec that fails Rust-side validation.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: fm::CsaSpec = serde_json::from_str(json).map_err(display_to_py)?;
+        let inner: fm::types::CsaSpec = serde_json::from_str(json).map_err(display_to_py)?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
     }
@@ -1053,7 +1059,7 @@ impl PyCsaSpec {
 )]
 #[derive(Clone)]
 pub struct PyEligibleCollateralSchedule {
-    pub(super) inner: fm::EligibleCollateralSchedule,
+    pub(super) inner: fm::types::EligibleCollateralSchedule,
 }
 
 #[pymethods]
@@ -1061,7 +1067,7 @@ impl PyEligibleCollateralSchedule {
     /// Cash-only schedule. Raises ``ValueError`` if the registry cannot load.
     #[staticmethod]
     fn cash_only() -> PyResult<Self> {
-        let inner = fm::EligibleCollateralSchedule::cash_only().map_err(core_to_py)?;
+        let inner = fm::types::EligibleCollateralSchedule::cash_only().map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -1069,7 +1075,7 @@ impl PyEligibleCollateralSchedule {
     /// registry cannot load.
     #[staticmethod]
     fn bcbs_standard() -> PyResult<Self> {
-        let inner = fm::EligibleCollateralSchedule::bcbs_standard().map_err(core_to_py)?;
+        let inner = fm::types::EligibleCollateralSchedule::bcbs_standard().map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -1077,7 +1083,7 @@ impl PyEligibleCollateralSchedule {
     /// cannot load.
     #[staticmethod]
     fn us_treasuries() -> PyResult<Self> {
-        let inner = fm::EligibleCollateralSchedule::us_treasuries().map_err(core_to_py)?;
+        let inner = fm::types::EligibleCollateralSchedule::us_treasuries().map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -1108,7 +1114,7 @@ impl PyEligibleCollateralSchedule {
         schedule_id: &str,
     ) -> PyResult<Self> {
         let inner =
-            fm::EligibleCollateralSchedule::from_finstack_config(&config.inner, schedule_id)
+            fm::types::EligibleCollateralSchedule::from_finstack_config(&config.inner, schedule_id)
                 .map_err(core_to_py)?;
         Ok(Self { inner })
     }
@@ -1126,7 +1132,7 @@ impl PyEligibleCollateralSchedule {
     /// Deserialize from JSON; raises ``ValueError`` on malformed input.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: fm::EligibleCollateralSchedule =
+        let inner: fm::types::EligibleCollateralSchedule =
             serde_json::from_str(json).map_err(display_to_py)?;
         Ok(Self { inner })
     }
@@ -1211,7 +1217,7 @@ impl PyEligibleCollateralSchedule {
             ("limit", "float64"),
             ("excess", "float64"),
         ];
-        let allocations: Vec<(fm::CollateralAssetClass, f64)> = allocations
+        let allocations: Vec<(fm::types::CollateralAssetClass, f64)> = allocations
             .iter()
             .map(|(asset_class, amount)| Ok((extract_asset_class(asset_class)?, *amount)))
             .collect::<PyResult<_>>()?;

@@ -9,8 +9,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
+use finstack_quant_models::types::ExerciseStyle;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::instruments::{ExerciseStyle, SettlementType};
+use finstack_quant_valuations_core::instruments::SettlementType;
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_rates::cap_floor::{
     CapFloor, CapFloorVolType, OvernightCouponConvention, OvernightSpreadCompounding,

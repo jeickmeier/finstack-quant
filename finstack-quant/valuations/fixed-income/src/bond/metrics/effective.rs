@@ -15,7 +15,7 @@
 //!
 //! where `shock` is the parallel rate bump in decimal (e.g., 0.0025 for 25 bp).
 
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
@@ -162,10 +162,11 @@ mod tests {
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
-    use finstack_quant_valuations_core::instruments::{
-        BondRiskBasis, InstrumentPricingOverrides, PricingOptions,
+    use finstack_quant_valuations_core::instruments::pricing_overrides::{
+        BondRiskBasis, InstrumentPricingOverrides,
     };
+    use finstack_quant_valuations_core::instruments::Instrument;
+    use finstack_quant_valuations_core::instruments::PricingOptions;
     use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
     use finstack_quant_valuations_core::pricer::{
         expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingDispatch,

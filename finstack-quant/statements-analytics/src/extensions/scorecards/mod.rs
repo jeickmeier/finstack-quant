@@ -225,40 +225,34 @@ impl CreditScorecardExtension {
     /// or an invalid explicit period ID.
     pub fn validate_config(config: &ScorecardConfig) -> Result<()> {
         if !is_supported_rating_scale(&config.rating_scale) {
-            return Err(finstack_quant_statements::error::Error::invalid_input(
-                format!(
-                    "Unsupported rating_scale '{}'. Expected one of: S&P, Moody's, Fitch",
-                    config.rating_scale
-                ),
-            ));
+            return Err(finstack_quant_statements::Error::invalid_input(format!(
+                "Unsupported rating_scale '{}'. Expected one of: S&P, Moody's, Fitch",
+                config.rating_scale
+            )));
         }
 
         for metric in &config.metrics {
             if !metric.weight.is_finite() || metric.weight < 0.0 {
-                return Err(finstack_quant_statements::error::Error::invalid_input(
-                    format!(
-                        "Scorecard metric '{}' weight must be finite and non-negative, got {}",
-                        metric.name, metric.weight
-                    ),
-                ));
+                return Err(finstack_quant_statements::Error::invalid_input(format!(
+                    "Scorecard metric '{}' weight must be finite and non-negative, got {}",
+                    metric.name, metric.weight
+                )));
             }
         }
 
         let total_weight: f64 = config.metrics.iter().map(|m| m.weight).sum();
         if total_weight > 0.0 && !(0.01..=100.0).contains(&total_weight) {
-            return Err(finstack_quant_statements::error::Error::invalid_input(
-                format!(
-                    "Total metric weights ({}) should be between 0.01 and 100.0",
-                    total_weight
-                ),
-            ));
+            return Err(finstack_quant_statements::Error::invalid_input(format!(
+                "Total metric weights ({}) should be between 0.01 and 100.0",
+                total_weight
+            )));
         }
 
         if let Some(period) = &config.period {
             period
                 .parse::<finstack_quant_core::dates::PeriodId>()
                 .map_err(|e| {
-                    finstack_quant_statements::error::Error::invalid_input(format!(
+                    finstack_quant_statements::Error::invalid_input(format!(
                         "Invalid scorecard period '{period}': {e}"
                     ))
                 })?;
@@ -275,12 +269,12 @@ impl CreditScorecardExtension {
     ) -> Result<&'m finstack_quant_core::dates::Period> {
         if let Some(period_str) = &config.period {
             let pid: finstack_quant_core::dates::PeriodId = period_str.parse().map_err(|e| {
-                finstack_quant_statements::error::Error::invalid_input(format!(
+                finstack_quant_statements::Error::invalid_input(format!(
                     "Invalid scorecard period '{period_str}': {e}"
                 ))
             })?;
             return model.periods.iter().find(|p| p.id == pid).ok_or_else(|| {
-                finstack_quant_statements::error::Error::invalid_input(format!(
+                finstack_quant_statements::Error::invalid_input(format!(
                     "Scorecard period '{period_str}' not found in model periods"
                 ))
             });
@@ -292,9 +286,7 @@ impl CreditScorecardExtension {
             .rev()
             .find(|p| p.is_actual)
             .or_else(|| model.periods.last())
-            .ok_or_else(|| {
-                finstack_quant_statements::error::Error::invalid_input("No periods in model")
-            })
+            .ok_or_else(|| finstack_quant_statements::Error::invalid_input("No periods in model"))
     }
 
     /// Run scorecard analysis against the provided model and evaluation results.

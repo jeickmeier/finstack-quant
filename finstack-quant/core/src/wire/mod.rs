@@ -11,11 +11,20 @@ mod non_finite;
 #[cfg(test)]
 mod tests;
 
-pub use bounded_f64::*;
-pub use counts_wire::*;
-pub use date_wire::*;
-pub use decimal_wire::*;
-pub use non_finite::*;
+pub use bounded_f64::{
+    deserialize_closed_unit_interval_f64, deserialize_correlation, deserialize_non_negative_f64,
+    deserialize_open_unit_interval_f64, deserialize_optional_positive_f64,
+    deserialize_positive_f64, serialize_closed_unit_interval_f64, serialize_correlation,
+    serialize_non_negative_f64, serialize_open_unit_interval_f64, serialize_optional_positive_f64,
+    serialize_positive_f64, ClosedUnitIntervalF64Wire, CorrelationWire, NonNegativeF64Wire,
+    OpenUnitIntervalF64Wire, PercentageQuantityWire, PositiveF64Wire,
+};
+pub use counts_wire::{count, counts, signed_count};
+pub use date_wire::DateWire;
+pub use decimal_wire::{decimal, optional_decimal, DecimalWire};
+pub use non_finite::{
+    non_finite_f64, non_finite_f64_seq, NonFiniteF64Wire, NonFiniteFields, NonFiniteSentinel,
+};
 
 /// Numeric schema revision for contracts whose sole supported revision is v1.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

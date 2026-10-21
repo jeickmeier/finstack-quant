@@ -2,9 +2,10 @@
 
 use finstack_quant_core::{currency::Currency, market_data::context::MarketContext, money::Money};
 use finstack_quant_margin::Marginable;
-use finstack_quant_valuations::instruments::{
-    EquityTotalReturnSwap, FiIndexTotalReturnSwap, InterestRateSwap, PayReceive,
-};
+use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
+use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
+use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
+use finstack_quant_valuations::instruments::PayReceive;
 
 #[test]
 fn equity_delta_is_one_percent_of_the_directional_trade_exposure() {
@@ -27,12 +28,12 @@ fn equity_delta_is_one_percent_of_the_directional_trade_exposure() {
 #[test]
 fn payer_fixed_rate_proxy_has_positive_rate_sensitivity() {
     let mut swap = InterestRateSwap::example().expect("IRS");
-    swap.side = finstack_quant_valuations::instruments::rates::irs::PayReceive::Pay;
+    swap.side = finstack_quant_valuations::instruments::PayReceive::Pay;
     let payer = swap
         .simm_sensitivities(&MarketContext::new(), swap.fixed_leg.start)
         .expect("payer");
     assert!(payer.total_ir_delta() > 0.0);
-    swap.side = finstack_quant_valuations::instruments::rates::irs::PayReceive::Receive;
+    swap.side = finstack_quant_valuations::instruments::PayReceive::Receive;
     let receiver = swap
         .simm_sensitivities(&MarketContext::new(), swap.fixed_leg.start)
         .expect("receiver");

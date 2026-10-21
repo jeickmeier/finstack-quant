@@ -7,13 +7,14 @@ use crate::instruments::test_support::equity_fx_options as test_utils;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations::instruments::fx::fx_option::{
     FxDeltaConvention, FxDeltaConventionKind, FxOption,
 };
 use finstack_quant_valuations::instruments::FxUnderlyingParams;
-use finstack_quant_valuations::instruments::OptionType;
-use finstack_quant_valuations::instruments::{Attributes, Instrument};
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 

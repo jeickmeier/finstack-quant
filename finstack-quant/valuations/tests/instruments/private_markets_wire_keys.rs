@@ -6,11 +6,12 @@
 //! `hurdle_irr`, `day_count`, `catch_up_mode` and a presence-switched
 //! `clawback`. Each retired key is rejected by `deny_unknown_fields`.
 
+use finstack_quant_valuations::instruments::equity::pe_fund::PrivateMarketsFund;
 use finstack_quant_valuations::instruments::equity::pe_fund::{
     ClawbackSettle, ClawbackSpec, PeFundWaterfallSpec,
 };
-use finstack_quant_valuations::instruments::equity::{
-    LeveredRealEstateEquity, PrivateMarketsFund, RealEstateAsset,
+use finstack_quant_valuations::instruments::equity::real_estate::{
+    LeveredRealEstateEquity, RealEstateAsset,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;

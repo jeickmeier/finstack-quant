@@ -39,7 +39,7 @@
 //! ```
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::types::InstrumentId;
-//! use finstack_quant_valuations_fx::FxSpot;
+//! use finstack_quant_valuations_fx::fx_spot::FxSpot;
 //!
 //! // CCY1 (base) is the currency being priced; CCY2 (quote) is the pricing currency.
 //! let mut eur_usd = FxSpot::new(InstrumentId::from("EURUSD"), Currency::EUR, Currency::USD);
@@ -51,7 +51,7 @@
 //! ```
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::types::InstrumentId;
-//! use finstack_quant_valuations_fx::FxSpot;
+//! use finstack_quant_valuations_fx::fx_spot::FxSpot;
 //!
 //! let eur_usd = FxSpot::new(InstrumentId::from("EURUSD"), Currency::EUR, Currency::USD);
 //! // If quoted_spot = 1.10, this means: 1 EUR = 1.10 USD
@@ -63,10 +63,10 @@ use finstack_quant_core::dates::{BusinessDayConvention, Date};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::impl_instrument_base;
 
 /// FX Spot instrument (1 unit of `base` priced in `quote`).
 ///
@@ -137,26 +137,26 @@ pub struct FxSpot {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Business day convention to apply when adjusting settlement (default: ModifiedFollowing)
     ///
     /// Note: Default changed from `Following` to `ModifiedFollowing` in v0.8.0 to align
@@ -227,14 +227,15 @@ struct FxSpotUnchecked {
     /// Instrument-owned pricing inputs.
     #[serde(default)]
     instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[serde(default)]
-    metric_pricing_overrides: finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[serde(default)]
     scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     attributes: Attributes,
 }
@@ -372,7 +373,7 @@ impl FxSpot {
     ///
     /// ```rust
     /// use finstack_quant_core::{currency::Currency, types::InstrumentId};
-    /// use finstack_quant_valuations_fx::FxSpot;
+    /// use finstack_quant_valuations_fx::fx_spot::FxSpot;
     ///
     /// let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
     ///     .with_quoted_spot(1.10)
@@ -437,7 +438,7 @@ impl FxSpot {
     ///
     /// ```rust
     /// use finstack_quant_core::{currency::Currency, types::InstrumentId};
-    /// use finstack_quant_valuations_fx::FxSpot;
+    /// use finstack_quant_valuations_fx::fx_spot::FxSpot;
     ///
     /// let eur_usd = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
     ///     .with_base_calendar_id("TARGET")    // ECB TARGET calendar for EUR
@@ -537,12 +538,11 @@ impl FxSpot {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for FxSpot {
+impl finstack_quant_valuations_core::instruments::Instrument for FxSpot {
     fn with_bumped_fx_quote(
         &self,
         relative: f64,
-    ) -> Option<Box<dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument>>
-    {
+    ) -> Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>> {
         let mut bumped = self.clone();
         *bumped.quoted_spot.as_mut()? *= 1.0 + relative;
         Some(Box::new(bumped))
@@ -559,10 +559,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         if let Some(discount_curve) = &self.domestic_discount_curve_id {
             deps.add_discount_curve(discount_curve.clone());
         }
@@ -595,7 +594,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         )
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 // Declare canonical market dependencies for the DV01 calculator.
@@ -665,7 +664,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use time::Month;
 
     fn date(year: i32, month: Month, day: u8) -> Date {

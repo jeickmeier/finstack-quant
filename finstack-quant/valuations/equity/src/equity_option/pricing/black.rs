@@ -12,11 +12,10 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::{bs_greeks_unchecked, bs_price_unchecked};
 use finstack_quant_models::trees::binomial_tree::BinomialTree;
+use finstack_quant_models::types::ExerciseStyle;
+use finstack_quant_models::types::{OptionMarketParams, OptionType};
 use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::{
-    OptionMarketParams, OptionType,
-};
-use finstack_quant_valuations_core::instruments::{ExerciseStyle, SettlementType};
+use finstack_quant_valuations_core::instruments::SettlementType;
 use finstack_quant_valuations_core::pricer::expect_inst;
 
 /// Present value using Black–Scholes; result currency is the instrument currency.
@@ -525,14 +524,14 @@ impl finstack_quant_valuations_core::pricer::Pricer for SimpleEquityOptionBlackP
     )]
     fn price_dyn(
         &self,
-        instrument: &dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument,
+        instrument: &dyn finstack_quant_valuations_core::instruments::Instrument,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<
         finstack_quant_valuations_core::results::ValuationResult,
         finstack_quant_valuations_core::pricer::PricingError,
     > {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         // Type-safe downcasting
         let equity_option = expect_inst::<crate::equity_option::EquityOption>(

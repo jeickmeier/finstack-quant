@@ -3,7 +3,7 @@
 //! Defines [`PricingError`] and [`PricingErrorContext`].
 
 use super::{InstrumentType, ModelKey, PricerKey};
-use crate::instruments::common_impl::traits::Instrument as Priceable;
+use crate::instruments::Instrument as Priceable;
 
 /// Context for pricing operations, providing actionable debugging information.
 ///

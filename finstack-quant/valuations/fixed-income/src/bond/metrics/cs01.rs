@@ -46,9 +46,9 @@
 
 use super::risk_view::{active_model_consumes_credit, with_bond_risk_view};
 use crate::bond::metrics::price_yield_spread::z_spread::BondZSpreadPricingKernel;
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use std::borrow::Cow;
 
@@ -195,7 +195,8 @@ impl MetricCalculator for BondCs01Calculator {
 
         if uses_credit {
             return with_bond_risk_view(context, |ctx| {
-                finstack_quant_valuations_core::metrics::GenericParallelCs01.calculate(ctx)
+                finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericParallelCs01
+                    .calculate(ctx)
             });
         }
 
@@ -264,7 +265,8 @@ impl MetricCalculator for BondBucketedCs01Calculator {
 
         if uses_credit {
             return with_bond_risk_view(context, |ctx| {
-                finstack_quant_valuations_core::metrics::GenericBucketedCs01.calculate(ctx)
+                finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericBucketedCs01
+                    .calculate(ctx)
             });
         }
 

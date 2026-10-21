@@ -35,7 +35,8 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::{Instrument, InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::instruments::Instrument;
 use rust_decimal::Decimal;
 use wasm_bindgen::prelude::*;
 

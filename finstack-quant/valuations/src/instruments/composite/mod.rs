@@ -1,11 +1,11 @@
 //! Generic cross-asset composite and synthetic instruments.
 //!
 //! A composite stores self-contained
-//! [`InstrumentJson`] legs and an
+//! [`InstrumentJson`](crate::instruments::json_loader::InstrumentJson) legs and an
 //! immutable resolved-quantity state. Pricing, risk, scenarios, and history
 //! use those quantities exactly as stored. Only
-//! [`CompositeSpec::initialize`], [`CompositeSpec::initialize_fixed`], or
-//! [`CompositeInstrument::rebalance`] may calculate a new state.
+//! [`CompositeSpec::initialize`](crate::instruments::composite::CompositeSpec::initialize), [`CompositeSpec::initialize_fixed`](crate::instruments::composite::CompositeSpec::initialize_fixed), or
+//! [`CompositeInstrument::rebalance`](crate::instruments::composite::CompositeInstrument::rebalance) may calculate a new state.
 //!
 //! # Invariants
 //!
@@ -20,19 +20,19 @@
 //!
 //! # Weighting
 //!
-//! [`WeightingMethod`] converts each leg's signed `score` into a quantity only
+//! [`WeightingMethod`](crate::instruments::composite::WeightingMethod) converts each leg's signed `score` into a quantity only
 //! at initialization or rebalance:
 //!
-//! - [`WeightingMethod::FixedQuantity`]: `quantity = score`.
-//! - [`WeightingMethod::NotionalWeighted`]: allocate a target gross
+//! - [`WeightingMethod::FixedQuantity`](crate::instruments::composite::WeightingMethod::FixedQuantity): `quantity = score`.
+//! - [`WeightingMethod::NotionalWeighted`](crate::instruments::composite::WeightingMethod::NotionalWeighted): allocate a target gross
 //!   reporting-currency notional by absolute score, then divide by each
 //!   leg's unit notional.
-//! - [`WeightingMethod::MetricWeighted`]: scale so each leg's metric
+//! - [`WeightingMethod::MetricWeighted`](crate::instruments::composite::WeightingMethod::MetricWeighted): scale so each leg's metric
 //!   contribution tracks its (optionally neutralized) score relative to
 //!   an anchor quantity.
-//! - [`WeightingMethod::VolatilityWeighted`]: inverse annualized unit-P&L
+//! - [`WeightingMethod::VolatilityWeighted`](crate::instruments::composite::WeightingMethod::VolatilityWeighted): inverse annualized unit-P&L
 //!   volatility versus an anchor quantity.
-//! - [`WeightingMethod::UserDefined`]: one scalar expression per leg,
+//! - [`WeightingMethod::UserDefined`](crate::instruments::composite::WeightingMethod::UserDefined): one scalar expression per leg,
 //!   evaluated against reporting-currency value, FX, optional notional,
 //!   required metrics, and optional unit-P&L volatility.
 //!
@@ -64,7 +64,8 @@
 //!
 //! ```
 //! use finstack_quant_core::market_data::context::MarketContext;
-//! use finstack_quant_valuations::instruments::{CompositeInstrument, Instrument};
+//! use finstack_quant_valuations::instruments::Instrument;
+//! use finstack_quant_valuations::instruments::composite::CompositeInstrument;
 //! use time::macros::date;
 //!
 //! let composite = CompositeInstrument::example()?;
@@ -80,8 +81,8 @@
 //!
 //! # See Also
 //!
-//! - [`CompositeSpec`] for the unresolved definition and weighting policy
-//! - [`CompositeInstrument`] for the priceable resolved state
+//! - [`CompositeSpec`](crate::instruments::composite::CompositeSpec) for the unresolved definition and weighting policy
+//! - [`CompositeInstrument`](crate::instruments::composite::CompositeInstrument) for the priceable resolved state
 //! - [`history()`](crate::instruments::composite::history) / [`history_from_spec`](crate::instruments::composite::history_from_spec) for dated total-return and rebalance history
 //! - [`crate::instruments::Instrument`] for generic pricing and metric dispatch
 //!
@@ -95,8 +96,7 @@ mod types;
 
 pub use history::{history, history_from_spec, CompositeHistoryRow};
 pub use types::{
-    CompositeExposureReport, CompositeInstrument, CompositeLegSpec, CompositeLegValuation,
-    CompositeMarketObservation, CompositeRebalanceResult, CompositeSpec, CompositeState,
-    CompositeTrade, CompositeValuationDetails, PrimitiveAggregate, PrimitiveExposure,
-    RebalanceRule, ResolvedCompositeLeg, WeightingMethod, MAX_COMPOSITE_DEPTH, MAX_COMPOSITE_LEGS,
+    CompositeInstrument, CompositeLegSpec, CompositeMarketObservation, CompositeRebalanceResult,
+    CompositeSpec, CompositeState, CompositeTrade, RebalanceRule, WeightingMethod,
+    MAX_COMPOSITE_DEPTH, MAX_COMPOSITE_LEGS,
 };

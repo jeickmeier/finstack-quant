@@ -11,7 +11,7 @@ instrument_class!(
     /// Typed wrapper for the Rust `InterestRateSwap` instrument (fixed-for-floating swap).
     JsInterestRateSwap,
     "InterestRateSwap",
-    finstack_quant_valuations::instruments::InterestRateSwap
+    finstack_quant_valuations::instruments::rates::irs::InterestRateSwap
 );
 
 instrument_builder_entry!(
@@ -68,7 +68,7 @@ getters!(JsInterestRateSwap, "InterestRateSwap", |i| {
         expiry as expiry => opt_date(Instrument::expiry(i)),
 });
 
-factories!(JsInterestRateSwap, "InterestRateSwap", finstack_quant_valuations::instruments::InterestRateSwap, {
+factories!(JsInterestRateSwap, "InterestRateSwap", finstack_quant_valuations::instruments::rates::irs::InterestRateSwap, {
         /// Canonical 5-year USD pay-fixed swap (mirrors Rust `InterestRateSwap::example`): semi-annual 30/360 fixed vs quarterly ACT/360 `USD-SOFR-3M`, T-2 reset lag, `usny` calendar.
         /// @returns The example swap.
         /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
@@ -157,7 +157,7 @@ instrument_class!(
     /// Typed wrapper for the Rust `Swaption` instrument (European option on a swap).
     JsSwaption,
     "Swaption",
-    finstack_quant_valuations::instruments::Swaption
+    finstack_quant_valuations::instruments::rates::swaption::Swaption
 );
 
 instrument_builder_entry!(JsSwaption, "Swaption", JsSwaptionBuilder);
@@ -228,7 +228,7 @@ accessors!(JsSwaption, "Swaption", |i| {
         get_underlying_maturity as getUnderlyingMaturity => date(i.get_underlying_maturity()),
 });
 
-factories!(JsSwaption, "Swaption", finstack_quant_valuations::instruments::Swaption, {
+factories!(JsSwaption, "Swaption", finstack_quant_valuations::instruments::rates::swaption::Swaption, {
         /// Canonical European 1Yx5Y USD payer swaption (mirrors Rust `Swaption::example`): cash-settled, Black vol, 3% strike on a 5-year swap, vol surface `USD-SWPNVOL`.
         /// @returns The example swaption.
         /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
@@ -341,7 +341,7 @@ instrument_class!(
     /// Typed wrapper for the Rust `CapFloor` instrument (interest-rate cap, floor, caplet or floorlet).
     JsCapFloor,
     "CapFloor",
-    finstack_quant_valuations::instruments::CapFloor
+    finstack_quant_valuations::instruments::rates::cap_floor::CapFloor
 );
 
 instrument_builder_entry!(JsCapFloor, "CapFloor", JsCapFloorBuilder);
@@ -433,7 +433,7 @@ getters!(JsCapFloor, "CapFloor", |i| {
         expiry as expiry => opt_date(Instrument::expiry(i)),
 });
 
-factories!(JsCapFloor, "CapFloor", finstack_quant_valuations::instruments::CapFloor, {
+factories!(JsCapFloor, "CapFloor", finstack_quant_valuations::instruments::rates::cap_floor::CapFloor, {
         /// Canonical 5-year USD 3% cap (mirrors Rust `CapFloor::example`): quarterly ACT/360 on `USD-SOFR-3M` discounted on `USD-OIS` with vol surface `USD-CAPFLOOR-VOL`.
         /// @returns The example cap.
         /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
@@ -624,9 +624,11 @@ impl JsInterestRateSwap {
             discount_curve_id: &discount_curve_id,
             forward_curve_id: &forward_curve_id,
         };
-        finstack_quant_valuations::instruments::InterestRateSwap::from_conventions(params)
-            .map(|inner| Self { inner })
-            .map_err(to_js_err)
+        finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::from_conventions(
+            params,
+        )
+        .map(|inner| Self { inner })
+        .map_err(to_js_err)
     }
 }
 

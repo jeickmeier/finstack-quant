@@ -24,7 +24,7 @@ use crate::utils::input::{
     opt_json_text,
 };
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_statements::FinancialModelSpec;
+use finstack_quant_statements::types::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
 
 /// Parse and semantically validate a `FinancialModelSpec` argument (object or JSON).

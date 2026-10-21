@@ -19,13 +19,13 @@
 //!   European Average Options." `docs/REFERENCES.md#turnbull-wakeman-1991`
 
 use crate::commodity::commodity_asian_option::types::CommodityAsianOption;
-use crate::exotics::asian_option::AveragingMethod;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
-use finstack_quant_valuations_core::instruments::OptionType;
+use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
+use finstack_quant_models::types::OptionType;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
 };
@@ -429,13 +429,13 @@ impl Pricer for CommodityAsianOptionAnalyticalPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::exotics::asian_option::AveragingMethod;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations_core::instruments::common_impl::parameters::CommodityUnderlyingParams;
+    use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
+    use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
     use time::Month;
 
     fn date(year: i32, month: u8, day: u8) -> Date {
@@ -527,9 +527,7 @@ mod tests {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("CL-VOL"))
             .day_count(DayCount::Act365F)
-            .attributes(
-                finstack_quant_valuations_core::instruments::common_impl::traits::Attributes::new(),
-            )
+            .attributes(finstack_quant_core::types::Attributes::new())
             .build()
             .expect("should build")
     }

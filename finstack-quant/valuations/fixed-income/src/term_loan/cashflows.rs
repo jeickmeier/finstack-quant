@@ -48,7 +48,7 @@ pub(crate) fn generate_cashflows(
 
     // DDTL draws or upfront funding
     if let Some(ddtl) = &loan.ddtl {
-        let valid_draws: Vec<&super::spec::DrawEvent> = ddtl
+        let valid_draws: Vec<&crate::loan_terms::DrawEvent> = ddtl
             .draws
             .iter()
             .filter(|ev| {
@@ -625,7 +625,8 @@ pub(crate) fn build_oid_eir_schedule(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::term_loan::spec::{CommitmentFeeBase, DdtlSpec, DrawEvent};
+    use crate::loan_terms::DrawEvent;
+    use crate::term_loan::{CommitmentFeeBase, DdtlSpec};
     use finstack_quant_cashflows::builder::AmortizationSpec;
     use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_core::currency::Currency;

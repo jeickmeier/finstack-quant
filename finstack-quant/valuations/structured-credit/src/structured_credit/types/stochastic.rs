@@ -11,9 +11,8 @@ use crate::structured_credit::pricing::stochastic::calibrations::{
 use finstack_quant_cashflows::builder::DefaultModelSpec;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_core::Result;
-use finstack_quant_models::credit::pool::{
-    CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
-};
+use finstack_quant_models::credit::pool::StochasticPrepaySpec;
+use finstack_quant_models::credit::pool::{CorrelationStructure, StochasticDefaultSpec};
 
 impl StructuredCredit {
     // Stochastic configuration helpers

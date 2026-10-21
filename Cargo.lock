@@ -903,6 +903,7 @@ dependencies = [
  "finstack-quant-core",
  "finstack-quant-factor",
  "finstack-quant-margin",
+ "finstack-quant-models",
  "finstack-quant-scenarios",
  "finstack-quant-valuations",
  "good_lp",

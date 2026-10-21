@@ -17,14 +17,18 @@ use wasm_bindgen::prelude::*;
 fn collateral_asset_class(
     value: &JsValue,
     label: &str,
-) -> Result<fm::CollateralAssetClass, JsValue> {
+) -> Result<fm::types::CollateralAssetClass, JsValue> {
     js_string(value, label)?
-        .parse::<fm::CollateralAssetClass>()
+        .parse::<fm::types::CollateralAssetClass>()
         .map_err(to_js_err)
 }
 
-fn schedule_asset_class(label: &str) -> Result<fm::ScheduleAssetClass, JsValue> {
-    label.parse::<fm::ScheduleAssetClass>().map_err(to_js_err)
+fn schedule_asset_class(
+    label: &str,
+) -> Result<fm::calculators::im::schedule::ScheduleAssetClass, JsValue> {
+    label
+        .parse::<fm::calculators::im::schedule::ScheduleAssetClass>()
+        .map_err(to_js_err)
 }
 
 // ---------------------------------------------------------------------------
@@ -40,7 +44,7 @@ fn schedule_asset_class(label: &str) -> Result<fm::ScheduleAssetClass, JsValue> 
 /// Throws if `result` is malformed.
 #[wasm_bindgen(js_name = vmResultNetMargin)]
 pub fn vm_result_net_margin(result: JsValue) -> Result<f64, JsValue> {
-    let result: fm::VmResult = from_js_json(&result, "result")?;
+    let result: fm::calculators::VmResult = from_js_json(&result, "result")?;
     Ok(result.net_margin().amount())
 }
 
@@ -53,7 +57,7 @@ pub fn vm_result_net_margin(result: JsValue) -> Result<f64, JsValue> {
 /// Throws if `result` is malformed.
 #[wasm_bindgen(js_name = vmResultRequiresCall)]
 pub fn vm_result_requires_call(result: JsValue) -> Result<bool, JsValue> {
-    let result: fm::VmResult = from_js_json(&result, "result")?;
+    let result: fm::calculators::VmResult = from_js_json(&result, "result")?;
     Ok(result.requires_call())
 }
 
@@ -79,7 +83,7 @@ pub fn vm_result_requires_call(result: JsValue) -> Result<bool, JsValue> {
 /// ```
 #[wasm_bindgen(js_name = VmCalculator)]
 pub struct JsVmCalculator {
-    inner: fm::VmCalculator,
+    inner: fm::calculators::VmCalculator,
 }
 
 #[wasm_bindgen(js_class = VmCalculator)]
@@ -94,7 +98,7 @@ impl JsVmCalculator {
     pub fn new(csa: JsValue) -> Result<JsVmCalculator, JsValue> {
         let csa = parse_csa(&csa, "csa")?;
         Ok(Self {
-            inner: fm::VmCalculator::new(csa),
+            inner: fm::calculators::VmCalculator::new(csa),
         })
     }
 
@@ -221,7 +225,7 @@ impl JsVmCalculator {
 #[wasm_bindgen(js_name = ScheduleImCalculator)]
 #[derive(Clone)]
 pub struct JsScheduleImCalculator {
-    inner: fm::ScheduleImCalculator,
+    inner: fm::calculators::im::schedule::ScheduleImCalculator,
 }
 
 #[wasm_bindgen(js_class = ScheduleImCalculator)]
@@ -235,7 +239,8 @@ impl JsScheduleImCalculator {
     #[wasm_bindgen(js_name = bcbsStandard)]
     pub fn bcbs_standard() -> Result<JsScheduleImCalculator, JsValue> {
         Ok(Self {
-            inner: fm::ScheduleImCalculator::bcbs_standard().map_err(to_js_err)?,
+            inner: fm::calculators::im::schedule::ScheduleImCalculator::bcbs_standard()
+                .map_err(to_js_err)?,
         })
     }
 
@@ -250,7 +255,10 @@ impl JsScheduleImCalculator {
     pub fn from_registry_id(schedule_id: JsValue) -> Result<JsScheduleImCalculator, JsValue> {
         let schedule_id = js_string(&schedule_id, "scheduleId")?;
         Ok(Self {
-            inner: fm::ScheduleImCalculator::from_registry_id(&schedule_id).map_err(to_js_err)?,
+            inner: fm::calculators::im::schedule::ScheduleImCalculator::from_registry_id(
+                &schedule_id,
+            )
+            .map_err(to_js_err)?,
         })
     }
 
@@ -267,8 +275,10 @@ impl JsScheduleImCalculator {
         config: &JsFinstackConfig,
     ) -> Result<JsScheduleImCalculator, JsValue> {
         Ok(Self {
-            inner: fm::ScheduleImCalculator::from_finstack_config(&config.inner)
-                .map_err(to_js_err)?,
+            inner: fm::calculators::im::schedule::ScheduleImCalculator::from_finstack_config(
+                &config.inner,
+            )
+            .map_err(to_js_err)?,
         })
     }
 
@@ -393,7 +403,7 @@ impl JsScheduleImCalculator {
 #[wasm_bindgen(js_name = HaircutImCalculator)]
 #[derive(Clone)]
 pub struct JsHaircutImCalculator {
-    inner: fm::HaircutImCalculator,
+    inner: fm::calculators::im::HaircutImCalculator,
 }
 
 #[wasm_bindgen(js_class = HaircutImCalculator)]
@@ -407,7 +417,7 @@ impl JsHaircutImCalculator {
     #[wasm_bindgen(js_name = bcbsStandard)]
     pub fn bcbs_standard() -> Result<JsHaircutImCalculator, JsValue> {
         Ok(Self {
-            inner: fm::HaircutImCalculator::bcbs_standard().map_err(to_js_err)?,
+            inner: fm::calculators::im::HaircutImCalculator::bcbs_standard().map_err(to_js_err)?,
         })
     }
 
@@ -420,7 +430,7 @@ impl JsHaircutImCalculator {
     #[wasm_bindgen(js_name = usTreasuries)]
     pub fn us_treasuries() -> Result<JsHaircutImCalculator, JsValue> {
         Ok(Self {
-            inner: fm::HaircutImCalculator::us_treasuries().map_err(to_js_err)?,
+            inner: fm::calculators::im::HaircutImCalculator::us_treasuries().map_err(to_js_err)?,
         })
     }
 
@@ -433,9 +443,9 @@ impl JsHaircutImCalculator {
     /// Throws if `schedule` is malformed or has unknown fields.
     #[wasm_bindgen(js_name = fromSchedule)]
     pub fn from_schedule(schedule: JsValue) -> Result<JsHaircutImCalculator, JsValue> {
-        let schedule: fm::EligibleCollateralSchedule = from_js_json(&schedule, "schedule")?;
+        let schedule: fm::types::EligibleCollateralSchedule = from_js_json(&schedule, "schedule")?;
         Ok(Self {
-            inner: fm::HaircutImCalculator::new(schedule),
+            inner: fm::calculators::im::HaircutImCalculator::new(schedule),
         })
     }
 

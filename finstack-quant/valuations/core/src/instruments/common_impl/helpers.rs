@@ -58,14 +58,14 @@ pub fn attach_mc_diagnostics(
 /// kernel, and apply the instrument-owned scenario adjustment exactly once.
 pub struct ValidatedPricingLifecycle<'a, I>
 where
-    I: crate::instruments::common_impl::traits::Instrument + ?Sized,
+    I: crate::instruments::Instrument + ?Sized,
 {
     instrument: &'a I,
 }
 
 impl<'a, I> ValidatedPricingLifecycle<'a, I>
 where
-    I: crate::instruments::common_impl::traits::Instrument + ?Sized,
+    I: crate::instruments::Instrument + ?Sized,
 {
     /// Validate the complete instrument pricing boundary.
     pub fn new(instrument: &'a I) -> finstack_quant_core::Result<Self> {
@@ -104,7 +104,7 @@ pub fn apply_scenario_value<I>(
     base_value: Money,
 ) -> finstack_quant_core::Result<Money>
 where
-    I: crate::instruments::common_impl::traits::Instrument + ?Sized,
+    I: crate::instruments::Instrument + ?Sized,
 {
     instrument
         .get_scenario_pricing_overrides()
@@ -121,7 +121,7 @@ where
 #[inline]
 pub fn apply_scenario_raw_value<I>(instrument: &I, base_value: f64) -> f64
 where
-    I: crate::instruments::common_impl::traits::Instrument + ?Sized,
+    I: crate::instruments::Instrument + ?Sized,
 {
     instrument
         .get_scenario_pricing_overrides()
@@ -449,7 +449,7 @@ pub fn resolve_mc_paths(
 #[inline]
 pub fn merged_path_config(
     base: &finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig,
-    overrides: &crate::instruments::InstrumentPricingOverrides,
+    overrides: &crate::instruments::pricing_overrides::InstrumentPricingOverrides,
 ) -> finstack_quant_core::Result<
     finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig,
 > {
@@ -546,7 +546,7 @@ pub struct MetricBuildOptions {
 }
 
 pub fn compute_metrics_dyn(
-    instrument: Arc<dyn crate::instruments::common_impl::traits::Instrument>,
+    instrument: Arc<dyn crate::instruments::Instrument>,
     curves: Arc<MarketContext>,
     as_of: Date,
     base_value: Money,
@@ -669,7 +669,7 @@ pub fn compute_metrics_dyn(
 /// registry and must not construct a parallel `ValuationResult` here.
 #[cfg(test)]
 pub fn build_with_metrics_dyn(
-    instrument: Arc<dyn crate::instruments::common_impl::traits::Instrument>,
+    instrument: Arc<dyn crate::instruments::Instrument>,
     curves: Arc<MarketContext>,
     as_of: Date,
     base_value: Money,
@@ -697,7 +697,7 @@ pub fn build_with_metrics_dyn(
 #[allow(clippy::items_after_test_module)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::traits::{Attributes, Instrument};
+    use crate::instruments::Instrument;
     use crate::metrics::MetricId;
     use crate::pricer::InstrumentType;
     use finstack_quant_cashflows::builder::CashFlowSchedule;
@@ -709,6 +709,7 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::CurveId;
     use std::any::Any;
     use std::sync::Arc;
@@ -820,10 +821,8 @@ mod tests {
         /// Test mock: reads no market data.
         fn market_dependencies(
             &self,
-        ) -> finstack_quant_core::Result<
-            crate::instruments::common_impl::dependencies::MarketDependencies,
-        > {
-            Ok(crate::instruments::common_impl::dependencies::MarketDependencies::new())
+        ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
+            Ok(crate::instruments::MarketDependencies::new())
         }
 
         fn id(&self) -> &str {
@@ -862,14 +861,14 @@ mod tests {
             Box::new(self.clone())
         }
 
-        crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+        crate::impl_focused_pricing_overrides!();
 
         fn price_with_metrics(
             &self,
             market: &MarketContext,
             as_of: Date,
             metrics: &[MetricId],
-            options: crate::instruments::common_impl::traits::PricingOptions,
+            options: crate::instruments::PricingOptions,
         ) -> crate::Result<crate::results::ValuationResult> {
             let base = self.value(market, as_of)?;
             Ok(build_with_metrics_dyn(

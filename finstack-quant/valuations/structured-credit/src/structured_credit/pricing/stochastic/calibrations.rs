@@ -19,9 +19,8 @@
 use crate::structured_credit::assumptions::{embedded_registry_or_panic, required_assumption};
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_core::Result;
-use finstack_quant_models::credit::pool::{
-    CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
-};
+use finstack_quant_models::credit::pool::StochasticPrepaySpec;
+use finstack_quant_models::credit::pool::{CorrelationStructure, StochasticDefaultSpec};
 
 /// RMBS standard calibration parameters.
 ///

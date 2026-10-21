@@ -5,8 +5,10 @@ use crate::bindings::models::credit::{
 };
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{
-    BarrierCrossing, MertonMcCalibrationSpec, MertonMcConfig, MertonMcResult, PathStatistics,
-    PikMode, PikSchedule,
+    MertonMcResult, PathStatistics,
+};
+use finstack_quant_valuations::instruments::{
+    BarrierCrossing, MertonMcCalibrationSpec, MertonMcConfig, PikMode, PikSchedule,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyList;

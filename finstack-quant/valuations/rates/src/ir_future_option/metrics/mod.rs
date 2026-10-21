@@ -7,7 +7,7 @@ struct InterestRateFutureOptionDv01;
 
 impl MetricCalculator for InterestRateFutureOptionDv01 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let option: &crate::InterestRateFutureOption = context.instrument_as()?;
+        let option: &crate::ir_future_option::InterestRateFutureOption = context.instrument_as()?;
         option.rate_dv01(&context.curves, context.as_of)
     }
 }
@@ -20,10 +20,10 @@ pub(crate) fn register_interest_rate_future_option_metrics(
         registry: registry,
         instrument: finstack_quant_valuations_core::pricer::InstrumentType::InterestRateFutureOption,
         metrics: [
-            (Delta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::InterestRateFutureOption>::delta()),
-            (Gamma, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::InterestRateFutureOption>::gamma()),
-            (Vega, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::InterestRateFutureOption>::vega()),
-            (Theta, finstack_quant_valuations_core::metrics::OptionGreekCalculator::<crate::InterestRateFutureOption>::theta()),
+            (Delta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::ir_future_option::InterestRateFutureOption>::delta()),
+            (Gamma, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::ir_future_option::InterestRateFutureOption>::gamma()),
+            (Vega, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::ir_future_option::InterestRateFutureOption>::vega()),
+            (Theta, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::ir_future_option::InterestRateFutureOption>::theta()),
             (Dv01, InterestRateFutureOptionDv01),
         ]
     }

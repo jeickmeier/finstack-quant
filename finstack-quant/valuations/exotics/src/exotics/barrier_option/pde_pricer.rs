@@ -25,7 +25,7 @@ use crate::exotics::barrier_option::types::BarrierOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -250,7 +250,7 @@ impl BarrierOptionPdePricer {
         let barrier_level = inst.barrier;
         let is_call = matches!(
             inst.option_type,
-            finstack_quant_valuations_core::instruments::OptionType::Call
+            finstack_quant_models::types::OptionType::Call
         );
         let is_knock_out = inst.barrier_type.is_knock_out();
         let barrier_is_upper = inst.barrier_type.is_up();
@@ -660,9 +660,10 @@ mod tests {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::BarrierType;
     use finstack_quant_core::types::InstrumentId;
-    use finstack_quant_valuations_core::instruments::{Attributes, OptionType};
+    use finstack_quant_models::types::OptionType;
     use time::Month;
 
     fn date(year: i32, month: u8, day: u8) -> Date {

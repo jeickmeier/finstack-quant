@@ -364,7 +364,7 @@ fn test_revolving_credit_cs01_stochastic_without_credit_curve_errors() {
             },
         )))
         .instrument_pricing_overrides(
-            finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_mc_paths(16),
         )
         .discount_curve_id("USD-OIS".into())
@@ -783,7 +783,7 @@ fn test_deterministic_stochastic_convergence_with_credit_risk() {
         .fees(RevolvingCreditFees::flat(50.0, 0.0, 0.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(stoch_spec)))
         .instrument_pricing_overrides(
-            finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_mc_paths(1_000)
                 .with_mc_antithetic(true),
         )

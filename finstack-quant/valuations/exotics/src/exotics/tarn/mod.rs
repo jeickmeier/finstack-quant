@@ -14,7 +14,7 @@
 //!
 //! # See Also
 //!
-//! - [`Tarn`] for instrument definition
+//! - [`Tarn`](crate::exotics::tarn::Tarn) for instrument definition
 //! - [`finstack_quant_models::rates::hw1f::CumulativeCouponTracker`], the
 //!   cumulative coupon tracker used during MC simulation
 

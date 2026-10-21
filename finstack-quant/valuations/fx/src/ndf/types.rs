@@ -11,11 +11,11 @@ use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::NdfQuoteConvention;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
 
 /// Official NDF fixing source/benchmark.
 ///
@@ -40,7 +40,8 @@ use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes
 /// # Example
 ///
 /// ```rust
-/// use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};
+/// use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource};
+/// use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::money::Money;
@@ -204,7 +205,8 @@ impl std::str::FromStr for NdfFixingSource {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_valuations_fx::ndf::{Ndf, NdfQuoteConvention};
+/// use finstack_quant_valuations_fx::ndf::Ndf;
+/// use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::money::Money;
@@ -305,26 +307,26 @@ pub struct Ndf {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -385,14 +387,15 @@ struct NdfUnchecked {
     /// Instrument-owned pricing inputs.
     #[serde(default)]
     instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[serde(default)]
-    metric_pricing_overrides: finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+    metric_pricing_overrides:
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[serde(default)]
     scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging.
     attributes: Attributes,
 }
@@ -463,7 +466,8 @@ impl Ndf {
     /// # Example
     ///
     /// ```rust
-    /// use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};
+    /// use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource};
+    /// use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::dates::Date;
     /// use finstack_quant_core::money::Money;
@@ -817,12 +821,11 @@ impl Ndf {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for Ndf {
+impl finstack_quant_valuations_core::instruments::Instrument for Ndf {
     fn with_bumped_fx_quote(
         &self,
         relative: f64,
-    ) -> Option<Box<dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument>>
-    {
+    ) -> Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>> {
         let mut bumped = self.clone();
         // An observed fixing settles the contract; the quote no longer prices it.
         if bumped.observed_fixing.is_none() {
@@ -850,10 +853,9 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.domestic_discount_curve_id.clone());
         if let Some(foreign_curve) = &self.foreign_discount_curve_id {
             deps.add_discount_curve(foreign_curve.clone());
@@ -882,7 +884,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Money::new(pv, self.settlement_currency)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
@@ -1047,7 +1049,7 @@ mod tests {
     fn test_ndf_past_fixing_without_rate_errors() {
         use finstack_quant_core::market_data::context::MarketContext;
         use finstack_quant_core::market_data::term_structures::DiscountCurve;
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         // Create a simple market context
         let as_of = Date::from_calendar_date(2025, Month::March, 14).expect("valid date");
@@ -1309,7 +1311,7 @@ mod tests {
     /// mutate the field directly to reach the value path.
     #[test]
     fn test_ndf_value_rejects_fixing_after_maturity() {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid date");
         let market = create_test_market(as_of);

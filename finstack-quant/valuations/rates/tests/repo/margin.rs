@@ -6,11 +6,11 @@
 //! - Margin call scenarios
 
 use finstack_quant_core::{currency::Currency, dates::Date, money::Money, types::CurveId};
-use finstack_quant_margin::{
-    CsaSpec, MarginCallTiming, MarginTenor, RepoMarginSpec, RepoMarginType, VmCalculator,
-    VmParameters,
+use finstack_quant_margin::calculators::VmCalculator;
+use finstack_quant_margin::types::{
+    CsaSpec, MarginCallTiming, MarginTenor, RepoMarginSpec, RepoMarginType, VmParameters,
 };
-use finstack_quant_valuations_rates::{CollateralSpec, Repo};
+use finstack_quant_valuations_rates::repo::{CollateralSpec, Repo};
 use time::Month;
 
 fn test_date() -> Date {

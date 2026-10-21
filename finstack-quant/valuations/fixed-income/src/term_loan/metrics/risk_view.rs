@@ -5,12 +5,16 @@
 //! OAS once so every bump holds that OAS fixed.
 
 use super::oas::oas_decimal_from_quote_overrides;
-use crate::TermLoan;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use crate::term_loan::TermLoan;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::sensitivities::cs01::{
+    GenericBucketedCs01, GenericParallelCs01,
+};
+use finstack_quant_valuations_core::metrics::sensitivities::dv01::{
+    Dv01CalculatorConfig, UnifiedDv01Calculator,
+};
 use finstack_quant_valuations_core::metrics::{
-    quoted_z_spread, Dv01CalculatorConfig, GenericBucketedCs01, GenericParallelCs01,
-    MetricCalculator, MetricContext, UnifiedDv01Calculator, ZSpreadBucketedCs01,
-    ZSpreadParallelCs01,
+    quoted_z_spread, MetricCalculator, MetricContext, ZSpreadBucketedCs01, ZSpreadParallelCs01,
 };
 use finstack_quant_valuations_core::pricer::ModelKey;
 use std::sync::Arc;

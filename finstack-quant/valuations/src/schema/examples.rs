@@ -24,8 +24,8 @@ fn date(year: i32, month: time::Month, day: u8) -> Result<Date> {
 
 /// The instrument union's bond branch.
 pub(super) fn instrument_json() -> Result<Vec<Value>> {
-    example(&crate::instruments::InstrumentJson::Bond(
-        crate::instruments::Bond::example()?,
+    example(&crate::instruments::json_loader::InstrumentJson::Bond(
+        crate::instruments::fixed_income::bond::Bond::example()?,
     ))
 }
 
@@ -61,17 +61,19 @@ pub(super) fn instrument_cashflow() -> Result<Vec<Value>> {
 
 /// 95% historical VaR over a five-scenario P&L distribution.
 pub(super) fn var_result() -> Result<Vec<Value>> {
-    example(&crate::metrics::risk::VarResult::from_distribution(
-        vec![-12_500.0, -4_200.0, 1_800.0, 3_100.0, 6_400.0],
-        0.95,
-    )?)
+    example(
+        &crate::metrics::risk::var_calculator::VarResult::from_distribution(
+            vec![-12_500.0, -4_200.0, 1_800.0, 3_100.0, 6_400.0],
+            0.95,
+        )?,
+    )
 }
 
 /// The canonical composite with one rebalancing trade.
 pub(super) fn composite_rebalance_result() -> Result<Vec<Value>> {
-    example(&crate::instruments::CompositeRebalanceResult {
-        instrument: crate::instruments::CompositeInstrument::example()?,
-        trades: vec![crate::instruments::CompositeTrade {
+    example(&crate::instruments::composite::CompositeRebalanceResult {
+        instrument: crate::instruments::composite::CompositeInstrument::example()?,
+        trades: vec![crate::instruments::composite::CompositeTrade {
             instrument_id: "AAPL".into(),
             instrument_type: "equity".to_string(),
             quantity_delta: 25.0,
@@ -81,7 +83,7 @@ pub(super) fn composite_rebalance_result() -> Result<Vec<Value>> {
 
 /// One dated composite state with no look-through exposures.
 pub(super) fn composite_history_row() -> Result<Vec<Value>> {
-    example_from_json::<crate::instruments::CompositeHistoryRow>(json!({
+    example_from_json::<crate::instruments::composite::CompositeHistoryRow>(json!({
         "date": "2025-01-31",
         "value": {"amount": "1012500", "currency": "USD"},
         "cashflows": {"amount": "0", "currency": "USD"},
@@ -97,7 +99,7 @@ pub(super) fn composite_history_row() -> Result<Vec<Value>> {
 
 /// A 10,000-path revolver valuation with per-path detail omitted.
 pub(super) fn enhanced_monte_carlo_result() -> Result<Vec<Value>> {
-    example_from_json::<crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult>(
+    example_from_json::<crate::instruments::fixed_income::revolving_credit::pricing::unified::EnhancedMonteCarloResult>(
         json!({
             "mc_result": {
                 "estimate": {
@@ -301,7 +303,7 @@ pub(super) fn simulation_diagnostics() -> Result<Vec<Value>> {
 /// The market data the canonical bond needs to price.
 pub(super) fn market_dependencies() -> Result<Vec<Value>> {
     use crate::instruments::Instrument;
-    example(&crate::instruments::Bond::example()?.market_dependencies()?)
+    example(&crate::instruments::fixed_income::bond::Bond::example()?.market_dependencies()?)
 }
 
 pub(super) fn convertible_greeks() -> Result<Vec<Value>> {

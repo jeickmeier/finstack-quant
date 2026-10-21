@@ -18,13 +18,16 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_core::results::structured_credit::{
+    StructuredCreditPricingMode, TrancheSeniority,
+};
 use finstack_quant_valuations_structured_credit::structured_credit::{
     execute_waterfall, run_simulation, run_simulation_with_diagnostics, AllocationMode, AssetPool,
     AssetType, CallAssumption, CardPortfolioSpec, ControlledAccumulationSpec, CoverageRules,
     CoverageTestSpec, DealType, LiquidationSpec, PaymentCalculation, PaymentType, PoolAsset,
     Recipient, RecipientType, ReinvestmentCriteria, ReinvestmentPeriod, StepDownSpec,
-    StepDownTrigger, StructuredCredit, StructuredCreditPricingMode, Tranche, TrancheSeniority,
-    TrancheStructure, Waterfall, WaterfallContext, WaterfallRules, WaterfallTier,
+    StepDownTrigger, StructuredCredit, Tranche, TrancheStructure, Waterfall, WaterfallContext,
+    WaterfallRules, WaterfallTier,
 };
 use time::Month;
 

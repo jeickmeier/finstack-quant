@@ -12,12 +12,11 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations_core::instruments::BondQuoteInput;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_core::pricer::ModelKey;
-use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::{
-    compute_quotes, BondQuoteInput,
-};
+use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::compute_quotes;
 use finstack_quant_valuations_fixed_income::bond::Bond;
 use time::macros::date;
 
@@ -124,7 +123,7 @@ fn test_quote_engine_roundtrip_ytm_and_zspread_fixed_bond() {
 
 #[test]
 fn test_quote_engine_roundtrip_dm_for_frn() {
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 01);
     let maturity = date!(2030 - 01 - 01);
@@ -195,7 +194,7 @@ fn test_quote_engine_roundtrip_dm_for_frn() {
 
 #[test]
 fn test_quote_engine_roundtrip_oas_and_asw_market_fixed_bond() {
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 01);
     let bond = Bond::fixed(
@@ -297,7 +296,7 @@ fn test_quote_engine_roundtrip_oas_and_asw_market_fixed_bond() {
 
 #[test]
 fn test_quote_engine_roundtrip_i_spread_fixed_bond() {
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 01);
     let bond = Bond::fixed(

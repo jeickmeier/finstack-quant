@@ -17,6 +17,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_factor::risk::decompose_factors;
@@ -31,7 +32,7 @@ use finstack_quant_portfolio::sensitivity::{
 };
 use finstack_quant_portfolio::types::DUMMY_ENTITY_ID;
 use finstack_quant_portfolio::Portfolio;
-use finstack_quant_valuations::instruments::{Attributes, Instrument, MarketDependencies};
+use finstack_quant_valuations::instruments::{Instrument, MarketDependencies};
 use finstack_quant_valuations::pricer::InstrumentType;
 use std::sync::Arc;
 use time::macros::date;
@@ -317,8 +318,8 @@ fn bench_delta_based_sensitivities(c: &mut Criterion) {
 // Direct factor stress (only the work consumed by the public workflow is timed).
 
 fn factor_stress_model() -> finstack_quant_portfolio::factor_model::FactorModel {
-    use finstack_quant_factor::matching::{DependencyFilter, MappingRule, MatchingConfig};
     use finstack_quant_factor::{CurveType, DependencyType, FactorModelConfig};
+    use finstack_quant_factor::{DependencyFilter, MappingRule, MatchingConfig};
 
     let factor_id = FactorId::new("rates_stress");
     let covariance = FactorCovarianceMatrix::new(vec![factor_id.clone()], vec![0.04])
@@ -340,7 +341,7 @@ fn factor_stress_model() -> finstack_quant_portfolio::factor_model::FactorModel 
                 curve_type: Some(CurveType::Discount),
                 id: Some(CURVE_ID.to_string()),
             },
-            attribute_filter: finstack_quant_factor::matching::AttributeFilter::default(),
+            attribute_filter: finstack_quant_factor::AttributeFilter::default(),
             factor_id,
         }]),
 

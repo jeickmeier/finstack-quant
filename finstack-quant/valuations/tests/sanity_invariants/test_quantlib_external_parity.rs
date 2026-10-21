@@ -31,9 +31,9 @@ use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result as CoreResult;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::instruments::fx::FxForward;
-use finstack_quant_valuations::instruments::rates::irs::PayReceive;
+use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::PayReceive;
 
 fn fixture_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/quantlib_parity")
@@ -442,7 +442,7 @@ fn external_quantlib_parity_fx_forward_npv() {
         .domestic_discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
         .foreign_discount_curve_id(finstack_quant_core::types::CurveId::new("EUR-OIS"))
         .contract_rate_opt(Some(fixture.spec.strike))
-        .attributes(finstack_quant_valuations::instruments::Attributes::new())
+        .attributes(finstack_quant_core::types::Attributes::new())
         .build()
         .expect("FxForward::builder");
     let instrument: Arc<dyn Instrument> = Arc::new(forward);

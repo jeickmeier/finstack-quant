@@ -3,7 +3,10 @@
 //! These tests provide full coverage of the analytics extensions by executing
 //! them with properly configured parameters via their inherent methods.
 
-use finstack_quant_statements::prelude::*;
+use finstack_quant_core::dates::PeriodId;
+use finstack_quant_statements::builder::ModelBuilder;
+use finstack_quant_statements::evaluator::Evaluator;
+use finstack_quant_statements::types::AmountOrScalar;
 use finstack_quant_statements_analytics::extensions::{
     AccountType, CorkscrewAccount, CorkscrewConfig, CorkscrewExtension, CorkscrewStatus,
     CreditScorecardExtension, ScorecardConfig, ScorecardMetric, ScorecardStatus,

@@ -25,12 +25,12 @@ use finstack_quant_core::dates::{
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::CommodityUnderlyingParams;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
-use finstack_quant_valuations_core::instruments::OptionType;
+use finstack_quant_models::types::OptionType;
+use finstack_quant_valuations_core::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
 
 /// Commodity swaption (option on a fixed-for-floating commodity swap).
 ///
@@ -54,7 +54,7 @@ use finstack_quant_valuations_core::instruments::OptionType;
 /// ```rust
 /// use finstack_quant_valuations_exotics::commodity::commodity_swaption::CommoditySwaption;
 /// use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
-/// use finstack_quant_valuations_core::instruments::OptionType;
+/// use finstack_quant_models::types::OptionType;
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::{Date, Tenor, TenorUnit};
 /// use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -154,26 +154,26 @@ pub struct CommoditySwaption {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging.
     #[builder(default)]
     #[serde(default)]
@@ -485,9 +485,7 @@ impl CommoditySwaption {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for CommoditySwaption
-{
+impl finstack_quant_valuations_core::instruments::Instrument for CommoditySwaption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CommoditySwaption,
         crate::exotics::EXOTICS
@@ -503,14 +501,13 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_forward_curve(self.forward_curve_id.clone());
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 None,
                 Some(self.fixed_price),
@@ -556,31 +553,26 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Some(self.expiry)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeksProvider
-    for CommoditySwaption
-{
+impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for CommoditySwaption {
     fn option_greeks(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        request: &finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeksRequest,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeks,
-    > {
-        let mut greeks =
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreeks::default(
-            );
+        request: &finstack_quant_valuations_core::instruments::OptionGreeksRequest,
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::OptionGreeks>
+    {
+        let mut greeks = finstack_quant_valuations_core::instruments::OptionGreeks::default();
         match request.greek {
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Delta => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Delta => {
                 greeks.delta = self.option_delta(market, as_of, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Gamma => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Gamma => {
                 greeks.gamma = self.option_gamma(market, as_of, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::common_impl::traits::OptionGreekKind::Vega => {
+            finstack_quant_valuations_core::instruments::OptionGreekKind::Vega => {
                 greeks.vega = self.option_vega(market, as_of, request.bumps)?
             }
             _ => {}
@@ -593,7 +585,7 @@ impl CommoditySwaption {
         &self,
         market: &MarketContext,
         as_of: Date,
-        _bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_core::math::special_functions::norm_cdf;
 
@@ -642,12 +634,12 @@ impl CommoditySwaption {
         &self,
         market: &MarketContext,
         as_of: Date,
-        bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_core::market_data::bumps::{
             BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
         };
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
 
         if as_of > self.expiry {
             return Ok(Some(0.0));
@@ -693,7 +685,7 @@ impl CommoditySwaption {
         &self,
         market: &MarketContext,
         as_of: Date,
-        _bumps: finstack_quant_valuations_core::instruments::common_impl::traits::GreekBumps,
+        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_core::math::special_functions::norm_pdf;
 
@@ -754,7 +746,7 @@ finstack_quant_valuations_core::impl_empty_cashflow_provider!(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
 
     // Validation tests
 

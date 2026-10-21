@@ -4,10 +4,10 @@ use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, StubKind};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{Bps, CurveId, InstrumentId, Rate};
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
-use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use time::macros::date;
 
 use super::definitions::{Bond, BondSettlementConvention, CallPut, CallPutSchedule};
@@ -25,7 +25,7 @@ impl Bond {
             Rate::from_decimal(0.0425)?,
             date!(2024 - 01 - 15),
             date!(2034 - 01 - 15),
-            finstack_quant_valuations_core::instruments::common_impl::parameters::BondConvention::UsTreasury,
+            finstack_quant_valuations_core::instruments::BondConvention::UsTreasury,
             "USD-TREASURY",
         )
     }
@@ -33,7 +33,7 @@ impl Bond {
     /// Create a standard fixed-rate bond (most common use case).
     ///
     /// Delegates to [`Self::with_convention`] with
-    /// [`finstack_quant_valuations_core::instruments::common_impl::parameters::BondConvention::UsCorporate`]:
+    /// [`finstack_quant_valuations_core::instruments::BondConvention::UsCorporate`]:
     /// 30/360, semi-annual, T+1, Modified Following, `usny`. For EUR corporates
     /// use `BondConvention::EurCorporate` (ACT/ACT ICMA, annual, T+2, TARGET2).
     ///
@@ -152,7 +152,7 @@ impl Bond {
             coupon_rate,
             issue_date,
             maturity,
-            finstack_quant_valuations_core::instruments::common_impl::parameters::BondConvention::UsCorporate,
+            finstack_quant_valuations_core::instruments::BondConvention::UsCorporate,
             discount_curve_id,
         )?;
         Ok(bond.with_stub(stub))
@@ -214,7 +214,7 @@ impl Bond {
         coupon_rate: impl Into<Rate>,
         issue_date: Date,
         maturity: Date,
-        convention: finstack_quant_valuations_core::instruments::common_impl::parameters::BondConvention,
+        convention: finstack_quant_valuations_core::instruments::BondConvention,
         discount_curve_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
         let coupon_rate = coupon_rate.into();
@@ -288,7 +288,7 @@ impl Bond {
     /// Creates a bond with floating-rate coupons linked to a forward index
     /// (e.g., SOFR, EURIBOR) plus a margin. Settlement, calendar, and
     /// business-day convention come from a currency →
-    /// [`finstack_quant_valuations_core::instruments::common_impl::parameters::BondConvention`] map:
+    /// [`finstack_quant_valuations_core::instruments::BondConvention`] map:
     ///
     /// - `USD` → `UsCorporate` (T+1, Modified Following, `usny`)
     /// - `EUR` → `EurCorporate` (T+2, Modified Following, `target2`)
@@ -356,7 +356,7 @@ impl Bond {
         day_count: DayCount,
         discount_curve_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
-        use finstack_quant_valuations_core::instruments::common_impl::parameters::BondConvention;
+        use finstack_quant_valuations_core::instruments::BondConvention;
         let convention = match notional.currency() {
             Currency::USD => BondConvention::UsCorporate,
             Currency::EUR => BondConvention::EurCorporate,
@@ -439,7 +439,7 @@ impl Bond {
         maturity: Date,
         frequency: finstack_quant_core::dates::Tenor,
         day_count: DayCount,
-        convention: finstack_quant_valuations_core::instruments::common_impl::parameters::BondConvention,
+        convention: finstack_quant_valuations_core::instruments::BondConvention,
         discount_curve_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
         let spread_bp = spread_bp.into();
@@ -570,7 +570,7 @@ impl Bond {
     /// use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams};
-    /// use finstack_quant_valuations_fixed_income::Bond;
+    /// use finstack_quant_valuations_fixed_income::bond::Bond;
     /// use rust_decimal_macros::dec;
     /// use time::macros::date;
     ///

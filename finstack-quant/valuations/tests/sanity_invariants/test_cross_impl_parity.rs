@@ -92,10 +92,11 @@ mod gbm_barrier {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::BarrierType;
     use finstack_quant_core::types::InstrumentId;
+    use finstack_quant_models::types::OptionType;
     use finstack_quant_valuations::instruments::exotics::barrier_option::BarrierOption;
-    use finstack_quant_valuations::instruments::{Attributes, OptionType};
     use finstack_quant_valuations::metrics::MetricId;
     use finstack_quant_valuations::pricer::{
         standard_pricer_registry, InstrumentType, ModelKey, PricerKey,
@@ -531,11 +532,11 @@ mod asian_geometric {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::InstrumentId;
-    use finstack_quant_valuations::instruments::exotics::asian_option::{
-        AsianOption, AveragingMethod,
-    };
-    use finstack_quant_valuations::instruments::{Attributes, OptionType};
+    use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
+    use finstack_quant_models::types::OptionType;
+    use finstack_quant_valuations::instruments::exotics::asian_option::AsianOption;
     use finstack_quant_valuations::pricer::{
         standard_pricer_registry, InstrumentType, ModelKey, PricerKey,
     };

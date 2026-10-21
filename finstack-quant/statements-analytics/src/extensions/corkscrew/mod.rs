@@ -237,7 +237,7 @@ impl CorkscrewExtension {
 
         let config = &self.config;
         if !config.tolerance.is_finite() || config.tolerance < 0.0 {
-            return Err(finstack_quant_statements::error::Error::invalid_input(
+            return Err(finstack_quant_statements::Error::invalid_input(
                 "Corkscrew tolerance must be finite and non-negative",
             ));
         }
@@ -362,7 +362,7 @@ impl CorkscrewExtension {
         };
 
         let balance_values = results.nodes.get(&account.node_id).ok_or_else(|| {
-            finstack_quant_statements::error::Error::missing_data(format!(
+            finstack_quant_statements::Error::missing_data(format!(
                 "Balance account '{}' not found in results",
                 account.node_id
             ))
@@ -379,13 +379,13 @@ impl CorkscrewExtension {
             // Treating it as zero would let an incomplete model pass
             // roll-forward validation.
             let prev_balance = balance_values.get(prev_period).copied().ok_or_else(|| {
-                finstack_quant_statements::error::Error::missing_data(format!(
+                finstack_quant_statements::Error::missing_data(format!(
                     "Balance account '{}' has no value for period '{prev_period}'",
                     account.node_id
                 ))
             })?;
             let curr_balance = balance_values.get(curr_period).copied().ok_or_else(|| {
-                finstack_quant_statements::error::Error::missing_data(format!(
+                finstack_quant_statements::Error::missing_data(format!(
                     "Balance account '{}' has no value for period '{curr_period}'",
                     account.node_id
                 ))
@@ -398,13 +398,13 @@ impl CorkscrewExtension {
             let mut expected_balance = if let Some(beginning_node) = &account.beginning_balance_node
             {
                 let beginning_values = results.nodes.get(beginning_node).ok_or_else(|| {
-                    finstack_quant_statements::error::Error::missing_data(format!(
+                    finstack_quant_statements::Error::missing_data(format!(
                         "Beginning-balance node '{beginning_node}' for account '{}' not found in results",
                         account.node_id
                     ))
                 })?;
                 let beginning = beginning_values.get(curr_period).ok_or_else(|| {
-                    finstack_quant_statements::error::Error::missing_data(format!(
+                    finstack_quant_statements::Error::missing_data(format!(
                         "Beginning-balance node '{beginning_node}' has no value for period '{curr_period}'"
                     ))
                 })?;
@@ -475,13 +475,13 @@ impl CorkscrewExtension {
 
             for account in &config.accounts {
                 let node_values = results.nodes.get(&account.node_id).ok_or_else(|| {
-                    finstack_quant_statements::error::Error::missing_data(format!(
+                    finstack_quant_statements::Error::missing_data(format!(
                         "Articulation account '{}' not found in results",
                         account.node_id
                     ))
                 })?;
                 let balance = node_values.get(period_id).ok_or_else(|| {
-                    finstack_quant_statements::error::Error::missing_data(format!(
+                    finstack_quant_statements::Error::missing_data(format!(
                         "Articulation account '{}' has no value for period '{period_id}'",
                         account.node_id
                     ))
@@ -507,7 +507,7 @@ impl CorkscrewExtension {
 
 fn require_finite(value: f64) -> Result<()> {
     if !value.is_finite() {
-        return Err(finstack_quant_statements::error::Error::invalid_input(
+        return Err(finstack_quant_statements::Error::invalid_input(
             "Corkscrew balances, changes, and reconciliation errors must be finite",
         ));
     }
@@ -526,12 +526,12 @@ fn apply_flow_nodes(
 ) -> Result<()> {
     for node_id in node_ids {
         let values = results.nodes.get(node_id).ok_or_else(|| {
-            finstack_quant_statements::error::Error::missing_data(format!(
+            finstack_quant_statements::Error::missing_data(format!(
                 "{role} node '{node_id}' for account '{account_id}' not found in results"
             ))
         })?;
         let value = values.get(curr_period).ok_or_else(|| {
-            finstack_quant_statements::error::Error::missing_data(format!(
+            finstack_quant_statements::Error::missing_data(format!(
                 "{role} node '{node_id}' has no value for period '{curr_period}'"
             ))
         })?;

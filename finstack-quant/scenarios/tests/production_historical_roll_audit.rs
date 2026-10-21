@@ -13,8 +13,10 @@ use finstack_quant_scenarios::{
     CurveKind, ExecutionContext, HazardBumpMode, OperationSpec, ScenarioEngine, ScenarioSpec,
     TimeRollMode,
 };
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::{
-    instruments::{fixed_income::bond::CashflowSpec, Bond, Instrument},
+    instruments::fixed_income::bond::CashflowSpec,
+    instruments::Instrument,
     metrics::risk::{MarketScenario, RiskFactorShift, RiskFactorType},
 };
 use time::macros::date;

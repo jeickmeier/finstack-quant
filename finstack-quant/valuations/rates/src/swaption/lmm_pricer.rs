@@ -16,8 +16,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::process::lmm::LmmParams;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::SettlementType;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::SettlementType;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -372,8 +372,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
 
         // Strike and payer/receiver flag
         let strike = swaption.strike_f64()?;
-        let is_payer =
-            swaption.option_type == finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType::Call;
+        let is_payer = swaption.option_type == finstack_quant_models::types::OptionType::Call;
         let notional = swaption.notional.amount();
         let currency = swaption.notional.currency();
 
@@ -411,7 +410,8 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, Date, Tenor};
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_valuations_core::instruments::{InstrumentPricingOverrides, OptionType};
+    use finstack_quant_models::types::OptionType;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use rust_decimal::Decimal;
     use time::macros::date;
 

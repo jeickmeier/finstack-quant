@@ -233,7 +233,7 @@ fn iterative_breakeven(
     config: &BreakevenConfig,
 ) -> Result<f64> {
     // Determine the horizon date (same convention as carry decomposition).
-    let period = crate::metrics::theta_period(context);
+    let period = crate::metrics::sensitivities::theta::theta_period(context);
     let expiry_date = context.instrument.expiry();
     let rolled_date = calculate_theta_date(context.as_of, period, expiry_date)?;
 

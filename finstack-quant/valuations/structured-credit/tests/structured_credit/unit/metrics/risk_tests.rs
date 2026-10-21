@@ -180,10 +180,10 @@ mod discount_margin_tests {
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
+    use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
         calculate_tranche_discount_margin, calculate_tranche_metrics, calculate_tranche_z_spread,
-        AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority,
-        TrancheStructure,
+        AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
     };
     use time::Month;
 
@@ -480,9 +480,10 @@ mod breakeven_cdr_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
         calculate_tranche_breakeven_cdr, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche,
-        TrancheSeniority, TrancheStructure,
+        TrancheStructure,
     };
     use time::Month;
 
@@ -585,9 +586,10 @@ mod scenario_table_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
         scenario_table, AssetPool, DealType, PoolAsset, ScenarioGrid, StructuredCredit, Tranche,
-        TrancheSeniority, TrancheStructure,
+        TrancheStructure,
     };
     use time::Month;
 
@@ -725,9 +727,10 @@ mod oas_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use finstack_quant_valuations_structured_credit::structured_credit::{
         calculate_tranche_oas, calculate_tranche_z_spread, AssetPool, DealType, OasConfig,
-        PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
+        PoolAsset, StructuredCredit, Tranche, TrancheStructure,
     };
     use time::Month;
 

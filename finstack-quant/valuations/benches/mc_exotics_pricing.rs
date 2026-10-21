@@ -15,18 +15,22 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::PayoutTiming;
 use finstack_quant_core::types::{BarrierType, CurveId, InstrumentId, PriceId};
-use finstack_quant_valuations::instruments::equity::autocallable::{Autocallable, FinalPayoffType};
-use finstack_quant_valuations::instruments::equity::{CliquetOption, EquityPathModel};
+use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
+use finstack_quant_models::monte_carlo::payoff::autocallable::FinalPayoffType;
+use finstack_quant_models::types::OptionType;
+use finstack_quant_valuations::instruments::equity::autocallable::Autocallable;
+use finstack_quant_valuations::instruments::equity::cliquet_option::CliquetOption;
+use finstack_quant_valuations::instruments::equity::EquityPathModel;
+use finstack_quant_valuations::instruments::exotics::asian_option::AsianOption;
+use finstack_quant_valuations::instruments::exotics::barrier_option::BarrierOption;
 use finstack_quant_valuations::instruments::exotics::lookback_option::{
     LookbackOption, LookbackType,
 };
-use finstack_quant_valuations::instruments::Attributes;
-use finstack_quant_valuations::instruments::{
-    AsianOption, AveragingMethod, BarrierOption, Instrument, InstrumentPricingOverrides,
-    Monitoring, OptionType,
-};
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations::instruments::{Instrument, Monitoring};
 use finstack_quant_valuations::pricer::{
     standard_pricer_registry, InstrumentType, ModelKey, PricerKey,
 };

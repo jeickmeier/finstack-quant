@@ -29,7 +29,7 @@
 //! |--------|------|
 //! | [`types`] | CSA, collateral, repo, SIMM, netting identifiers |
 //! | [`calculators`] | VM and IM engines (SIMM, schedule, haircut, CCP proxy) |
-//! | [`traits`] | `Marginable` for consumer-crate integration |
+//! | [`Marginable`] | trait for consumer-crate integration |
 //! | [`metrics`] | IM/VM metrics, utilization, excess collateral, funding cost, Haircut01 |
 //! | [`regulatory`] | FRTB sensitivity-based approach and SA-CCR EAD |
 //! | [`constants`] | Shared heuristics |
@@ -38,7 +38,7 @@
 //! # Quick Start
 //!
 //! ```no_run
-//! use finstack_quant_margin::{CsaSpec, OtcMarginSpec};
+//! use finstack_quant_margin::types::{CsaSpec, OtcMarginSpec};
 //!
 //! # fn main() -> finstack_quant_core::Result<()> {
 //! let csa = CsaSpec::usd_regulatory()?;
@@ -80,7 +80,7 @@ pub(crate) mod registry;
 pub mod schema;
 pub mod table;
 /// Standalone traits used by the margin crate.
-pub mod traits;
+pub(crate) mod traits;
 /// Margin and collateral domain types.
 pub mod types;
 /// XVA configuration types (`types`) and adjustment formulas.
@@ -89,22 +89,8 @@ pub mod xva;
 /// Regulatory capital frameworks (FRTB SBA, SA-CCR).
 pub mod regulatory;
 
-pub use calculators::im::schedule::{ScheduleAssetClass, BCBS_IOSCO_SCHEDULE_ID};
 pub use calculators::im::simm::SimmVersion;
-pub use calculators::{
-    ClearingHouseImCalculator, HaircutImCalculator, ImCalculator, ImResult, ScheduleImCalculator,
-    SimmBucketDetail, SimmCalculator, SimmComponentDetail, SimmDetail, SimmWeightedSensitivity,
-    VmCalculator, VmResult,
-};
-pub use schema::MarginEnvelope;
 pub use traits::Marginable;
-pub use types::{
-    ClearingStatus, CollateralAssetClass, CollateralEligibility, ConcentrationBreach, CsaSpec,
-    EligibleCollateralSchedule, ImCollateralResult, ImMethodology, ImParameters, MarginCall,
-    MarginCallTiming, MarginCallType, MarginTenor, MaturityConstraints, NettingSetId,
-    OtcMarginSpec, RepoMarginSpec, RepoMarginType, SimmCreditClassification, SimmCreditSector,
-    SimmCurvatureSensitivity, SimmRiskClass, SimmSensitivities, VmParameters, SIMM_TENORS,
-};
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

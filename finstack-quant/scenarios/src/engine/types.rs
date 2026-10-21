@@ -4,10 +4,11 @@ use crate::spec::{CurveKind, HazardBumpMode, RateBindingSpec};
 use crate::warning::Warning;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::types::{CurveId, PriceId};
+use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::NodeId;
-use finstack_quant_statements::FinancialModelSpec;
-use finstack_quant_valuations::instruments::instrument_json_of;
-use finstack_quant_valuations::instruments::{Instrument, InstrumentEnvelope};
+use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
+use finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::recalibration::RecalibrationProvider;
 use indexmap::IndexMap;
 
@@ -21,7 +22,7 @@ use indexmap::IndexMap;
 /// ```
 /// use finstack_quant_scenarios::ExecutionContext;
 /// use finstack_quant_core::market_data::context::MarketContext;
-/// use finstack_quant_statements::FinancialModelSpec;
+/// use finstack_quant_statements::types::FinancialModelSpec;
 /// use time::macros::date;
 ///
 /// let mut market = MarketContext::new();
@@ -552,7 +553,7 @@ impl ApplicationEnvelope {
     pub fn from_contexts(
         report: ApplicationReport,
         market: &finstack_quant_core::market_data::context::MarketContext,
-        model: Option<&finstack_quant_statements::FinancialModelSpec>,
+        model: Option<&finstack_quant_statements::types::FinancialModelSpec>,
         instruments: Option<&[Box<dyn Instrument>]>,
     ) -> serde_json::Result<Self> {
         Ok(Self {

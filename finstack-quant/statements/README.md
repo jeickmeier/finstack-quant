@@ -69,7 +69,11 @@ Item-level detail is in the rustdoc: `cargo doc -p finstack-quant-statements --o
 ## Quick start
 
 ```rust
-use finstack_quant_statements::prelude::*;
+use finstack_quant_core::dates::PeriodId;
+use finstack_quant_statements::Result;
+use finstack_quant_statements::builder::ModelBuilder;
+use finstack_quant_statements::evaluator::{Evaluator, StatementResult};
+use finstack_quant_statements::types::{AmountOrScalar, ForecastMethod, ForecastSpec};
 use indexmap::indexmap;
 
 fn build_and_evaluate() -> Result<StatementResult> {

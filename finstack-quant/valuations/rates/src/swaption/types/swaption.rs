@@ -1,25 +1,26 @@
 //! Pricing and metric helpers for interest-rate instruments.
 //!
-use crate::irs::{FixedLegSpec, FloatLegSpec, InterestRateSwap, PayReceive};
+use crate::irs::InterestRateSwap;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use finstack_quant_core::validation;
 use finstack_quant_core::{Error, Result};
+use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::sabr::SabrParameters;
 use finstack_quant_models::volatility::VolatilityConvention;
+use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::OptionType;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
 use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
     resolve_volatility, validate_sigma, ResolvedVolatility, VolatilityRequest,
 };
 use finstack_quant_valuations_core::instruments::pricing_overrides::VolSurfaceExtrapolation;
+use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec, PayReceive};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
@@ -79,26 +80,26 @@ pub struct Swaption {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Optional SABR volatility model parameters
     pub sabr_params: Option<SabrParameters>,
     /// Attributes for scenario selection and grouping
@@ -164,7 +165,7 @@ pub(super) fn vanilla_underlier(
         end_of_month: false,
     };
     let compounding =
-        finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions::compounding_from_index_id(
+        finstack_quant_valuations_core::instruments::pricing::overnight_conventions::compounding_from_index_id(
             underlier.forward_curve_id.as_str(),
         )
         .ok()
@@ -1049,7 +1050,7 @@ pub struct GreekInputs {
     pub time_to_expiry: f64,
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument for Swaption {
+impl finstack_quant_valuations_core::instruments::Instrument for Swaption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Swaption,
         crate::RATES
@@ -1093,14 +1094,13 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.get_discount_curve_id().clone());
         deps.add_forward_curve(self.get_forward_curve_id().clone());
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 None,
                 Some(self.strike_f64()?),
@@ -1113,7 +1113,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Some(self.expiry)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 // Declare canonical market dependencies for the DV01 calculator.

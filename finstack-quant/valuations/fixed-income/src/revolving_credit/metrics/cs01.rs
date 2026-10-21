@@ -22,13 +22,13 @@
 //! exposure. Supply a `credit_curve_id` to obtain hazard-based CS01.
 //!
 //! [`RevolvingCreditPricer`]: crate::revolving_credit::pricing::RevolvingCreditPricer
-//! [`GenericParallelCs01`]: finstack_quant_valuations_core::metrics::GenericParallelCs01
+//! [`GenericParallelCs01`]: finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericParallelCs01
 //! [`ZSpreadParallelCs01`]: finstack_quant_valuations_core::metrics::ZSpreadParallelCs01
 //! [`ZSpreadBucketedCs01`]: finstack_quant_valuations_core::metrics::ZSpreadBucketedCs01
 
 use crate::revolving_credit::cashflow_engine::CashflowEngine;
 use crate::revolving_credit::types::DrawRepaySpec;
-use crate::RevolvingCredit;
+use crate::revolving_credit::RevolvingCredit;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;

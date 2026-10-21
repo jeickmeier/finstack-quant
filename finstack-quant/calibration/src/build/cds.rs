@@ -9,11 +9,10 @@ use finstack_quant_core::dates::{
     prev_cds_semiannual_roll, BusinessDayConvention, Date, DateExt, Tenor,
 };
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::{
-    Attributes, PayReceive, PremiumLegSpec, ProtectionLegSpec,
-};
+use finstack_quant_valuations_core::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
 use finstack_quant_valuations_core::market::conventions::{CdsConventionSpec, ConventionRegistry};
 use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
 

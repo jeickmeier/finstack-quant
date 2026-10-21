@@ -296,7 +296,7 @@ fn metric_attachment_preserves_the_model_result_envelope() {
 fn bond_discounting_parity_instrument_vs_registry() {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_valuations::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations::instruments::Instrument;
     use time::macros::date;
 
     let as_of: Date = date!(2025 - 01 - 15);
@@ -335,7 +335,7 @@ fn bond_discounting_parity_instrument_vs_registry() {
 
 #[test]
 fn commodity_swaption_default_model_matches_registry() {
-    use finstack_quant_valuations::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations::instruments::Instrument;
     use time::macros::date;
 
     let as_of = date!(2025 - 01 - 15);
@@ -372,7 +372,7 @@ fn commodity_swaption_default_model_matches_registry() {
 
 #[test]
 fn instrument_can_compose_custom_pricer_and_metric_registries() {
-    use finstack_quant_valuations::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::metrics::{
         MetricCalculator, MetricContext, MetricId, MetricRegistry,
     };
@@ -476,7 +476,7 @@ fn non_discounting_risk_only_metrics_preserve_config_metadata() {
 fn structured_credit_parity_instrument_vs_registry() {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_valuations::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations::instruments::Instrument;
     use time::macros::date;
 
     let as_of: Date = date!(2025 - 01 - 15);
@@ -541,9 +541,10 @@ fn structured_credit_parity_instrument_vs_registry() {
 #[test]
 fn composite_reuses_leaf_results_only_within_one_request() {
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_valuations::instruments::{
-        CompositeInstrument, Equity, Instrument, InstrumentJson, PricingOptions,
-    };
+    use finstack_quant_valuations::instruments::composite::CompositeInstrument;
+    use finstack_quant_valuations::instruments::equity::spot::Equity;
+    use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+    use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
     use time::macros::date;
     struct CountingEquity {
         calls: Arc<AtomicUsize>,
@@ -748,7 +749,7 @@ fn bond_hazard_rate_registry_path_succeeds() {
 fn bond_hazard_rate_instrument_override_matches_registry() {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_valuations::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations::instruments::Instrument;
     use time::macros::date;
 
     let as_of: Date = date!(2025 - 01 - 15);
@@ -796,7 +797,7 @@ fn bond_hazard_rate_instrument_override_matches_registry() {
 
 #[test]
 fn instrument_can_use_custom_registry_override() {
-    use finstack_quant_valuations::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations::instruments::Instrument;
     use std::sync::Arc;
     use time::macros::date;
 
@@ -852,7 +853,7 @@ fn instrument_can_use_custom_registry_override() {
 
 #[test]
 fn instrument_model_override_controls_metric_repricing() {
-    use finstack_quant_valuations::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations::instruments::Instrument;
     use std::sync::Arc;
     use time::macros::date;
 
@@ -914,7 +915,7 @@ fn instrument_model_override_controls_metric_repricing() {
 fn empty_metrics_does_not_alter_pv() {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_valuations::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations::instruments::Instrument;
     use time::macros::date;
 
     let as_of: Date = date!(2025 - 01 - 15);

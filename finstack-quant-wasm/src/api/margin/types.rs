@@ -36,7 +36,7 @@ where
 /// Throws a validation error for any other spelling, including `"SIMM"`.
 #[wasm_bindgen(js_name = imMethodologyFromStr)]
 pub fn im_methodology_from_str(s: JsValue) -> Result<String, JsValue> {
-    Ok(parse_label::<fm::ImMethodology>(&s, "s")?.to_string())
+    Ok(parse_label::<fm::types::ImMethodology>(&s, "s")?.to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -52,7 +52,7 @@ pub fn im_methodology_from_str(s: JsValue) -> Result<String, JsValue> {
 /// Throws a validation error for any other spelling.
 #[wasm_bindgen(js_name = marginTenorFromStr)]
 pub fn margin_tenor_from_str(s: JsValue) -> Result<String, JsValue> {
-    Ok(parse_label::<fm::MarginTenor>(&s, "s")?.to_string())
+    Ok(parse_label::<fm::types::MarginTenor>(&s, "s")?.to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -68,7 +68,7 @@ pub fn margin_tenor_from_str(s: JsValue) -> Result<String, JsValue> {
 /// Throws a validation error for any other spelling.
 #[wasm_bindgen(js_name = marginCallTypeFromStr)]
 pub fn margin_call_type_from_str(s: JsValue) -> Result<String, JsValue> {
-    Ok(parse_label::<fm::MarginCallType>(&s, "s")?.to_string())
+    Ok(parse_label::<fm::types::MarginCallType>(&s, "s")?.to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ pub fn margin_call_type_from_str(s: JsValue) -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = clearingStatusCleared)]
 pub fn clearing_status_cleared(ccp: JsValue) -> Result<JsValue, JsValue> {
     let ccp = js_string(&ccp, "ccp")?;
-    to_js_value(&fm::ClearingStatus::Cleared { ccp })
+    to_js_value(&fm::types::ClearingStatus::Cleared { ccp })
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ pub fn clearing_status_cleared(ccp: JsValue) -> Result<JsValue, JsValue> {
 /// Throws a validation error for any other spelling.
 #[wasm_bindgen(js_name = collateralAssetClassFromStr)]
 pub fn collateral_asset_class_from_str(s: JsValue) -> Result<String, JsValue> {
-    Ok(parse_label::<fm::CollateralAssetClass>(&s, "s")?.to_string())
+    Ok(parse_label::<fm::types::CollateralAssetClass>(&s, "s")?.to_string())
 }
 
 /// BCBS-IOSCO standard haircut for a collateral asset class.
@@ -114,7 +114,7 @@ pub fn collateral_asset_class_from_str(s: JsValue) -> Result<String, JsValue> {
 /// registry cannot be loaded.
 #[wasm_bindgen(js_name = collateralAssetClassStandardHaircut)]
 pub fn collateral_asset_class_standard_haircut(asset_class: JsValue) -> Result<f64, JsValue> {
-    parse_label::<fm::CollateralAssetClass>(&asset_class, "assetClass")?
+    parse_label::<fm::types::CollateralAssetClass>(&asset_class, "assetClass")?
         .standard_haircut()
         .map_err(to_js_err)
 }
@@ -129,7 +129,7 @@ pub fn collateral_asset_class_standard_haircut(asset_class: JsValue) -> Result<f
 /// registry cannot be loaded.
 #[wasm_bindgen(js_name = collateralAssetClassFxAddon)]
 pub fn collateral_asset_class_fx_addon(asset_class: JsValue) -> Result<f64, JsValue> {
-    parse_label::<fm::CollateralAssetClass>(&asset_class, "assetClass")?
+    parse_label::<fm::types::CollateralAssetClass>(&asset_class, "assetClass")?
         .fx_addon()
         .map_err(to_js_err)
 }
@@ -153,7 +153,7 @@ pub fn netting_set_id_bilateral(
 ) -> Result<JsValue, JsValue> {
     let counterparty_id = js_string(&counterparty_id, "counterpartyId")?;
     let csa_id = js_string(&csa_id, "csaId")?;
-    to_js_value(&fm::NettingSetId::bilateral(counterparty_id, csa_id))
+    to_js_value(&fm::types::NettingSetId::bilateral(counterparty_id, csa_id))
 }
 
 /// Netting set identifier for trades cleared through one CCP.
@@ -166,7 +166,7 @@ pub fn netting_set_id_bilateral(
 #[wasm_bindgen(js_name = nettingSetIdCleared)]
 pub fn netting_set_id_cleared(ccp_id: JsValue) -> Result<JsValue, JsValue> {
     let ccp_id = js_string(&ccp_id, "ccpId")?;
-    to_js_value(&fm::NettingSetId::cleared(ccp_id))
+    to_js_value(&fm::types::NettingSetId::cleared(ccp_id))
 }
 
 // ---------------------------------------------------------------------------
@@ -174,8 +174,8 @@ pub fn netting_set_id_cleared(ccp_id: JsValue) -> Result<JsValue, JsValue> {
 // ---------------------------------------------------------------------------
 
 /// Deserialize and validate a CSA specification argument.
-pub(super) fn parse_csa(csa: &JsValue, label: &str) -> Result<fm::CsaSpec, JsValue> {
-    let csa: fm::CsaSpec = from_js_json(csa, label)?;
+pub(super) fn parse_csa(csa: &JsValue, label: &str) -> Result<fm::types::CsaSpec, JsValue> {
+    let csa: fm::types::CsaSpec = from_js_json(csa, label)?;
     csa.validate().map_err(to_js_err)?;
     Ok(csa)
 }
@@ -188,7 +188,7 @@ pub(super) fn parse_csa(csa: &JsValue, label: &str) -> Result<fm::CsaSpec, JsVal
 /// Throws if the embedded margin registry cannot be loaded.
 #[wasm_bindgen(js_name = csaSpecUsdRegulatory)]
 pub fn csa_spec_usd_regulatory() -> Result<JsValue, JsValue> {
-    to_js_value(&fm::CsaSpec::usd_regulatory().map_err(to_js_err)?)
+    to_js_value(&fm::types::CsaSpec::usd_regulatory().map_err(to_js_err)?)
 }
 
 /// Standard EUR regulatory CSA specification (BCBS-IOSCO terms, SIMM initial margin).
@@ -199,7 +199,7 @@ pub fn csa_spec_usd_regulatory() -> Result<JsValue, JsValue> {
 /// Throws if the embedded margin registry cannot be loaded.
 #[wasm_bindgen(js_name = csaSpecEurRegulatory)]
 pub fn csa_spec_eur_regulatory() -> Result<JsValue, JsValue> {
-    to_js_value(&fm::CsaSpec::eur_regulatory().map_err(to_js_err)?)
+    to_js_value(&fm::types::CsaSpec::eur_regulatory().map_err(to_js_err)?)
 }
 
 /// Regulatory CSA specification for any supported base currency.
@@ -221,7 +221,7 @@ pub fn csa_spec_regulatory(
     let currency = js_currency(&currency, "currency")?;
     let id = js_string(&id, "id")?;
     let collateral_curve = js_string(&collateral_curve, "collateralCurve")?;
-    let csa = fm::CsaSpec::regulatory_for_currency(currency, &id, &collateral_curve)
+    let csa = fm::types::CsaSpec::regulatory_for_currency(currency, &id, &collateral_curve)
         .map_err(to_js_err)?;
     to_js_value(&csa)
 }
@@ -250,8 +250,9 @@ pub fn csa_spec_regulatory_from_config(
     let currency = js_currency(&currency, "currency")?;
     let id = js_string(&id, "id")?;
     let collateral_curve = js_string(&collateral_curve, "collateralCurve")?;
-    let csa = fm::CsaSpec::regulatory_from_config(&config.inner, currency, &id, &collateral_curve)
-        .map_err(to_js_err)?;
+    let csa =
+        fm::types::CsaSpec::regulatory_from_config(&config.inner, currency, &id, &collateral_curve)
+            .map_err(to_js_err)?;
     to_js_value(&csa)
 }
 
@@ -314,7 +315,7 @@ pub fn csa_spec_with_im(
     segregated: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let csa = parse_csa(&csa, "csa")?;
-    let methodology = parse_label::<fm::ImMethodology>(&methodology, "methodology")?;
+    let methodology = parse_label::<fm::types::ImMethodology>(&methodology, "methodology")?;
     let mpor_days: u32 = js_uint(&mpor_days, "mporDays")?;
     let threshold = base_money(&csa, js_f64(&threshold, "threshold")?)?;
     let mta = base_money(&csa, js_f64(&mta, "mta")?)?;
@@ -369,7 +370,7 @@ pub fn csa_spec_validate(csa: JsValue) -> Result<(), JsValue> {
 fn parse_schedule(
     schedule: &JsValue,
     label: &str,
-) -> Result<fm::EligibleCollateralSchedule, JsValue> {
+) -> Result<fm::types::EligibleCollateralSchedule, JsValue> {
     from_js_json(schedule, label)
 }
 
@@ -381,7 +382,7 @@ fn parse_schedule(
 /// Throws if the embedded margin registry cannot be loaded.
 #[wasm_bindgen(js_name = eligibleCollateralScheduleCashOnly)]
 pub fn eligible_collateral_schedule_cash_only() -> Result<JsValue, JsValue> {
-    to_js_value(&fm::EligibleCollateralSchedule::cash_only().map_err(to_js_err)?)
+    to_js_value(&fm::types::EligibleCollateralSchedule::cash_only().map_err(to_js_err)?)
 }
 
 /// BCBS-IOSCO standard eligible-collateral schedule with regulatory haircuts.
@@ -392,7 +393,7 @@ pub fn eligible_collateral_schedule_cash_only() -> Result<JsValue, JsValue> {
 /// Throws if the embedded margin registry cannot be loaded.
 #[wasm_bindgen(js_name = eligibleCollateralScheduleBcbsStandard)]
 pub fn eligible_collateral_schedule_bcbs_standard() -> Result<JsValue, JsValue> {
-    to_js_value(&fm::EligibleCollateralSchedule::bcbs_standard().map_err(to_js_err)?)
+    to_js_value(&fm::types::EligibleCollateralSchedule::bcbs_standard().map_err(to_js_err)?)
 }
 
 /// Eligible-collateral schedule for US Treasury repo collateral.
@@ -403,7 +404,7 @@ pub fn eligible_collateral_schedule_bcbs_standard() -> Result<JsValue, JsValue> 
 /// Throws if the embedded margin registry cannot be loaded.
 #[wasm_bindgen(js_name = eligibleCollateralScheduleUsTreasuries)]
 pub fn eligible_collateral_schedule_us_treasuries() -> Result<JsValue, JsValue> {
-    to_js_value(&fm::EligibleCollateralSchedule::us_treasuries().map_err(to_js_err)?)
+    to_js_value(&fm::types::EligibleCollateralSchedule::us_treasuries().map_err(to_js_err)?)
 }
 
 /// Named eligible-collateral schedule from a config's margin-registry overlay.
@@ -421,7 +422,7 @@ pub fn eligible_collateral_schedule_from_finstack_config(
 ) -> Result<JsValue, JsValue> {
     let schedule_id = js_string(&schedule_id, "scheduleId")?;
     let schedule =
-        fm::EligibleCollateralSchedule::from_finstack_config(&config.inner, &schedule_id)
+        fm::types::EligibleCollateralSchedule::from_finstack_config(&config.inner, &schedule_id)
             .map_err(to_js_err)?;
     to_js_value(&schedule)
 }
@@ -440,7 +441,7 @@ pub fn eligible_collateral_schedule_is_eligible(
     asset_class: JsValue,
 ) -> Result<bool, JsValue> {
     let schedule = parse_schedule(&schedule, "schedule")?;
-    let asset_class = parse_label::<fm::CollateralAssetClass>(&asset_class, "assetClass")?;
+    let asset_class = parse_label::<fm::types::CollateralAssetClass>(&asset_class, "assetClass")?;
     Ok(schedule.is_eligible(&asset_class))
 }
 
@@ -458,7 +459,7 @@ pub fn eligible_collateral_schedule_haircut_for(
     asset_class: JsValue,
 ) -> Result<Option<f64>, JsValue> {
     let schedule = parse_schedule(&schedule, "schedule")?;
-    let asset_class = parse_label::<fm::CollateralAssetClass>(&asset_class, "assetClass")?;
+    let asset_class = parse_label::<fm::types::CollateralAssetClass>(&asset_class, "assetClass")?;
     Ok(schedule.haircut_for(&asset_class))
 }
 
@@ -478,7 +479,7 @@ pub fn eligible_collateral_schedule_haircut_for_maturity(
     remaining_years: JsValue,
 ) -> Result<Option<f64>, JsValue> {
     let schedule = parse_schedule(&schedule, "schedule")?;
-    let asset_class = parse_label::<fm::CollateralAssetClass>(&asset_class, "assetClass")?;
+    let asset_class = parse_label::<fm::types::CollateralAssetClass>(&asset_class, "assetClass")?;
     let remaining_years = js_f64(&remaining_years, "remainingYears")?;
     Ok(schedule.haircut_for_maturity(&asset_class, remaining_years))
 }
@@ -502,7 +503,7 @@ pub fn eligible_collateral_schedule_check_concentration_limits(
         .into_iter()
         .map(|(asset_class, amount)| {
             asset_class
-                .parse::<fm::CollateralAssetClass>()
+                .parse::<fm::types::CollateralAssetClass>()
                 .map(|asset_class| (asset_class, amount))
                 .map_err(to_js_err)
         })

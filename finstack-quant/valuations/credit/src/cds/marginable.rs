@@ -9,16 +9,16 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_margin::constants::DURATION_APPROXIMATION_FACTOR;
 use finstack_quant_margin::constants::STANDARD_CDS_MATURITY_YEARS;
+use finstack_quant_margin::types::NettingSetId;
+use finstack_quant_margin::types::OtcMarginSpec;
+use finstack_quant_margin::types::SimmSensitivities;
 use finstack_quant_margin::Marginable;
-use finstack_quant_margin::NettingSetId;
-use finstack_quant_margin::OtcMarginSpec;
-use finstack_quant_margin::SimmSensitivities;
 use finstack_quant_valuations_core::instruments::common_impl::margin::add_classified_credit_delta;
 use finstack_quant_valuations_core::instruments::common_impl::margin::assign_credit_tenor_bucket;
 use finstack_quant_valuations_core::instruments::common_impl::margin::extract_reference_entity;
 use finstack_quant_valuations_core::instruments::common_impl::margin::netting_set_id_from_spec;
 use finstack_quant_valuations_core::instruments::common_impl::margin::repriced_metric;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 
 impl Marginable for CreditDefaultSwap {
     fn id(&self) -> &str {
@@ -79,8 +79,8 @@ impl Marginable for CreditDefaultSwap {
             * DURATION_APPROXIMATION_FACTOR;
         let cs01 = self.notional.amount().abs() * risky_duration * ONE_BASIS_POINT;
         let signed_cs01 = match self.side {
-            finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Pay => cs01,
-            finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive::Receive => -cs01,
+            finstack_quant_valuations_core::instruments::PayReceive::Pay => cs01,
+            finstack_quant_valuations_core::instruments::PayReceive::Receive => -cs01,
         };
         add_classified_credit_delta(
             &mut sens,
@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn cds_marginable_uses_explicit_sector_classification() {
-        use finstack_quant_margin::{SimmCreditClassification, SimmCreditSector};
+        use finstack_quant_margin::types::{SimmCreditClassification, SimmCreditSector};
 
         let mut cds = CreditDefaultSwap::example().expect("example");
         cds.margin_spec = Some(
@@ -131,8 +131,9 @@ mod tests {
 
     #[test]
     fn variation_margin_inherits_clean_upfront_side_and_scenario_policy() {
-        use crate::cds::{CdsValuationConvention, PayReceive};
         use finstack_quant_core::market_data::term_structures::HazardCurve;
+        use finstack_quant_valuations_core::instruments::PayReceive;
+        use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
         let as_of = time::macros::date!(2027 - 02 - 15);
         let mut cds = CreditDefaultSwap::example().expect("CDS");
         let market = MarketContext::new()

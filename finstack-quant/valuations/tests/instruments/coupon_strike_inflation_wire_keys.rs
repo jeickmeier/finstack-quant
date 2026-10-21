@@ -21,7 +21,7 @@
 
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_valuations::instruments::instrument_json_of;
+use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::pricer::{parse_boxed_instrument_from_json, price_instrument};
 use serde_json::Value;
@@ -133,7 +133,9 @@ fn contractual_rate_reference(
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_core::types::IndexId;
     use finstack_quant_models::closed_form::black_call;
-    use finstack_quant_valuations::instruments::{CapFloor, ForwardRateAgreement, PayReceive};
+    use finstack_quant_valuations::instruments::rates::cap_floor::CapFloor;
+    use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
+    use finstack_quant_valuations::instruments::PayReceive;
     use finstack_quant_valuations::market::conventions::ConventionRegistry;
     use rust_decimal::prelude::ToPrimitive;
 
@@ -180,7 +182,7 @@ fn contractual_rate_reference(
     assert!(cap.overnight_coupon.is_none(), "reference covers term caps");
     assert_eq!(
         cap.rate_option_type,
-        finstack_quant_valuations::instruments::RateOptionType::Cap
+        finstack_quant_valuations::instruments::rates::cap_floor::RateOptionType::Cap
     );
     let curve = market
         .get_forward(cap.forward_curve_id.as_str())
@@ -329,9 +331,10 @@ fn price_case(
             true
         }
         PvReference::CanonicalRoundtrip => {
-            let canonical_json = finstack_quant_valuations::instruments::InstrumentEnvelope::new(
-                instrument_json_of(parsed.as_instrument()).expect("registered instrument"),
-            );
+            let canonical_json =
+                finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope::new(
+                    instrument_json_of(parsed.as_instrument()).expect("registered instrument"),
+                );
             instrument = serde_json::to_value(canonical_json).expect("canonical contract JSON");
             let canonical = parse_boxed_instrument_from_json(&instrument.to_string(), None)
                 .expect("roundtripped instrument");
@@ -488,7 +491,9 @@ fn assert_rejects_at<T: serde::Serialize + serde::de::DeserializeOwned>(
 #[test]
 // schema-rejection-test: CapFloor `spread`, CmsSwap `cms_spread`, AssetBackedFacility `margin_bp`
 fn retired_margin_keys_are_rejected() {
-    use finstack_quant_valuations::instruments::{AssetBackedFacility, CapFloor, CmsSwap};
+    use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility;
+    use finstack_quant_valuations::instruments::rates::cap_floor::CapFloor;
+    use finstack_quant_valuations::instruments::rates::cms_swap::CmsSwap;
     use serde_json::json;
     assert_rejects_at(
         &CapFloor::example().expect("cap"),
@@ -513,7 +518,7 @@ fn retired_margin_keys_are_rejected() {
 #[test]
 // schema-rejection-test: CmsSwap funding-leg `spread`
 fn retired_cms_funding_spread_is_rejected() {
-    use finstack_quant_valuations::instruments::CmsSwap;
+    use finstack_quant_valuations::instruments::rates::cms_swap::CmsSwap;
     use serde_json::json;
     let mut json = serde_json::to_value(CmsSwap::example().expect("example")).expect("serialize");
     let leg = json["funding_leg"].as_object_mut().expect("funding leg");
@@ -529,7 +534,7 @@ fn retired_cms_funding_spread_is_rejected() {
 #[test]
 // schema-rejection-test: CmsSwap `cms_fixing_dates`, `cms_payment_dates`, `cms_accrual_fractions`, `cms_day_count`
 fn retired_cms_schedule_prefix_is_rejected() {
-    use finstack_quant_valuations::instruments::CmsSwap;
+    use finstack_quant_valuations::instruments::rates::cms_swap::CmsSwap;
     use serde_json::json;
     for (retired, value) in [
         ("cms_fixing_dates", json!(["2025-03-20"])),
@@ -544,7 +549,8 @@ fn retired_cms_schedule_prefix_is_rejected() {
 #[test]
 // schema-rejection-test: ForwardRateAgreement `reset_lag`, Deposit `quote_rate`
 fn retired_lag_and_rate_keys_are_rejected() {
-    use finstack_quant_valuations::instruments::{Deposit, ForwardRateAgreement};
+    use finstack_quant_valuations::instruments::rates::deposit::Deposit;
+    use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
     use serde_json::json;
     assert_rejects_at(
         &ForwardRateAgreement::example().expect("fra"),
@@ -563,7 +569,8 @@ fn retired_lag_and_rate_keys_are_rejected() {
 #[test]
 // schema-rejection-test: Snowball `leverage`, `coupon_dates`; Tarn `coupon_dates`
 fn retired_structured_note_keys_are_rejected() {
-    use finstack_quant_valuations::instruments::{Snowball, Tarn};
+    use finstack_quant_valuations::instruments::exotics::snowball::Snowball;
+    use finstack_quant_valuations::instruments::exotics::tarn::Tarn;
     use serde_json::json;
     let dates = json!(["2026-06-30", "2026-12-31"]);
     assert_rejects_at(
@@ -629,7 +636,8 @@ fn retired_structured_credit_floor_keys_are_rejected() {
 #[test]
 // schema-rejection-test: QuantoOption `equity_strike`, InflationLinkedBond `base_index`
 fn retired_strike_and_base_index_keys_are_rejected() {
-    use finstack_quant_valuations::instruments::{InflationLinkedBond, QuantoOption};
+    use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
+    use finstack_quant_valuations::instruments::fx::quanto_option::QuantoOption;
     use serde_json::json;
     assert_rejects_at(
         &QuantoOption::example().expect("example"),
@@ -648,8 +656,9 @@ fn retired_strike_and_base_index_keys_are_rejected() {
 #[test]
 // schema-rejection-test: `lag_override`, `interpolation_override` on the inflation derivatives
 fn retired_inflation_override_keys_are_rejected() {
-    use finstack_quant_valuations::instruments::{
-        InflationCapFloor, InflationSwap, YoYInflationSwap,
+    use finstack_quant_valuations::instruments::rates::inflation_cap_floor::InflationCapFloor;
+    use finstack_quant_valuations::instruments::rates::inflation_swap::{
+        InflationSwap, YoYInflationSwap,
     };
     use serde_json::json;
     for (retired, value) in [
@@ -682,7 +691,7 @@ fn retired_inflation_override_keys_are_rejected() {
 #[test]
 fn cms_tenor_must_be_month_based() {
     use finstack_quant_core::dates::{Tenor, TenorUnit};
-    use finstack_quant_valuations::instruments::CmsSwap;
+    use finstack_quant_valuations::instruments::rates::cms_swap::CmsSwap;
     let mut swap = CmsSwap::example().expect("example");
     swap.cms_tenor = Tenor::new(2, TenorUnit::Weeks).expect("tenor");
     let err = swap.validate().expect_err("week tenor is rejected");

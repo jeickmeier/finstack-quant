@@ -4,7 +4,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::scalars::InflationLag;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::Attributes;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_rates::inflation_swap::InflationSwapBuilder;
 use finstack_quant_valuations_test_support::inflation::*;

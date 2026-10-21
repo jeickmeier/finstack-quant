@@ -8,8 +8,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
+    CommitmentStep, DrawEvent, OidEirSpec,
+};
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    self, CommitmentStep, DdtlSpec, DrawEvent, OidEirSpec, OidPolicy, TermLoan,
+    self, DdtlSpec, OidPolicy, TermLoan,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
@@ -379,10 +382,12 @@ fn fixed_rate_margin_step_up_changes_coupon_from_effective_period() {
     let step_date = Date::from_calendar_date(2025, time::Month::July, 1).unwrap();
     let maturity = Date::from_calendar_date(2026, time::Month::January, 1).unwrap();
     let covenants = term_loan::TermLoanCovenantEvents {
-        margin_steps: vec![term_loan::MarginStep {
-            date: step_date,
-            delta_bp: rust_decimal_macros::dec!(200),
-        }],
+        margin_steps: vec![
+            finstack_quant_valuations::instruments::fixed_income::loan_terms::MarginStep {
+                date: step_date,
+                delta_bp: rust_decimal_macros::dec!(200),
+            },
+        ],
         ..Default::default()
     };
     let loan = TermLoan::builder()
@@ -580,9 +585,10 @@ fn envelope_with(example: &str, pointer: &str, key: &str, value: serde_json::Val
 }
 
 fn assert_envelope_rejects(json: &str, key: &str) {
-    let err =
-        serde_json::from_str::<finstack_quant_valuations::instruments::InstrumentEnvelope>(json)
-            .expect_err("retired key must be rejected");
+    let err = serde_json::from_str::<
+        finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope,
+    >(json)
+    .expect_err("retired key must be rejected");
     assert!(err.to_string().contains(key), "{err}");
 }
 

@@ -80,9 +80,7 @@ impl<'de> serde::Deserialize<'de> for SimmCreditClassification {
 /// # Example
 ///
 /// ```
-/// use finstack_quant_margin::{
-///     OtcMarginSpec, CsaSpec, SimmCreditClassification, SimmCreditSector,
-/// };
+/// use finstack_quant_margin::types::{OtcMarginSpec, CsaSpec, SimmCreditClassification, SimmCreditSector};
 ///
 /// # fn main() -> finstack_quant_core::Result<()> {
 /// // Bilateral (uncleared) derivative

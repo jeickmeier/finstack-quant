@@ -13,8 +13,8 @@ use finstack_quant_scenarios::{
     CurveKind, ExecutionContext, OperationSpec, RateBindingSpec, ScenarioEngine, ScenarioSpec,
     TimeRollMode,
 };
+use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{AmountOrScalar, NodeSpec, NodeType};
-use finstack_quant_statements::FinancialModelSpec;
 use indexmap::{indexmap, IndexMap};
 use std::sync::Arc;
 use time::Month;

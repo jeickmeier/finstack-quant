@@ -11,14 +11,16 @@ use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::StubKind;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
     CdsOptionParams, CdsOptionStrike,
 };
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
+use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::instruments::{
-    CdsOption, CdsTranche, CreditDefaultSwap, CreditParams, StructuredCredit,
-};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;

@@ -7,7 +7,7 @@
 //!
 //! - VaR and Expected Shortfall interpretation: `docs/REFERENCES.md#mcneil-frey-embrechts-qrm`
 
-use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::Instrument;
 use crate::metrics::risk::MarketHistory;
 use crate::pricer::PricingDispatch;
 use finstack_quant_core::currency::Currency;
@@ -748,14 +748,14 @@ fn calculate_var_taylor(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::traits::Instrument;
-    use crate::instruments::Attributes;
+    use crate::instruments::Instrument;
     use crate::metrics::risk::{MarketScenario, RiskFactorShift, RiskFactorType};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::CurveId;
     use std::sync::Arc;
     use time::macros::date;
@@ -896,10 +896,8 @@ mod tests {
         /// Test mock: reads no market data.
         fn market_dependencies(
             &self,
-        ) -> finstack_quant_core::Result<
-            crate::instruments::common_impl::dependencies::MarketDependencies,
-        > {
-            Ok(crate::instruments::common_impl::dependencies::MarketDependencies::new())
+        ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
+            Ok(crate::instruments::MarketDependencies::new())
         }
 
         fn id(&self) -> &str {

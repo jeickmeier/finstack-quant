@@ -14,7 +14,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -213,7 +213,7 @@ impl Pricer for RevolvingCreditPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::revolving_credit::ThreeFactorPathData;
+    use crate::revolving_credit::cashflow_engine::ThreeFactorPathData;
 
     use crate::revolving_credit::{
         CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit, RevolvingCreditFees,
@@ -580,7 +580,7 @@ mod tests {
                 },
             )))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_mc_paths(8),
             )
             .discount_curve_id("USD-OIS".into())
@@ -642,7 +642,7 @@ mod tests {
                 },
             )))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_mc_paths(1),
             )
             .discount_curve_id("USD-OIS".into())
@@ -698,7 +698,7 @@ mod tests {
                 },
             )))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_mc_paths(4),
             )
             .discount_curve_id("USD-OIS".into())
@@ -813,7 +813,7 @@ mod tests {
                     },
                 )))
                 .instrument_pricing_overrides(
-                    finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                    finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                         .with_mc_paths(32)
                         .with_mc_antithetic(true),
                 )
@@ -906,7 +906,7 @@ mod tests {
                     },
                 )))
                 .instrument_pricing_overrides(
-                    finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                    finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                         .with_mc_paths(2_000)
                         .with_mc_antithetic(true),
                 )
@@ -976,7 +976,7 @@ mod tests {
     }
 
     fn seed_test_facility(
-        model_config: finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        model_config: finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     ) -> finstack_quant_core::Result<RevolvingCredit> {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let end = Date::from_calendar_date(2026, Month::January, 1).expect("date");
@@ -1032,7 +1032,7 @@ mod tests {
     #[test]
     fn revolver_seed_comes_from_model_config_scenario() {
         use crate::revolving_credit::RevolvingCreditMcRun;
-        use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+        use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let market = seed_test_market();
@@ -1086,7 +1086,7 @@ mod tests {
     /// two mirrored paths per estimator and reports the estimator count.
     #[test]
     fn revolver_mc_paths_counts_independent_estimators() {
-        use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+        use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let facility = seed_test_facility(

@@ -3,7 +3,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::FxHashMap;
-use finstack_quant_margin::{
+use finstack_quant_margin::types::{
     ImMethodology, NettingSetId, SimmCreditSector, SimmRiskClass, SimmSensitivities,
 };
 use finstack_quant_portfolio::types::PositionId;
@@ -104,7 +104,7 @@ fn sample_simm_sensitivities() -> SimmSensitivities {
         ),
         77.0,
     );
-    sensitivities.add_curvature(finstack_quant_margin::SimmCurvatureSensitivity {
+    sensitivities.add_curvature(finstack_quant_margin::types::SimmCurvatureSensitivity {
         risk_class: SimmRiskClass::InterestRate,
         bucket: "USD".into(),
         factor: "OIS".into(),

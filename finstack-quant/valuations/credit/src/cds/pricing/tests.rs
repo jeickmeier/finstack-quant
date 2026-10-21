@@ -4,7 +4,7 @@
 
 use super::helpers::{date_from_hazard_time, haz_t, settlement_date, sp_cond_to};
 use super::*;
-use crate::cds::{CdsValuationConvention, CreditDefaultSwap, PayReceive};
+use crate::cds::CreditDefaultSwap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -13,7 +13,9 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::constants::credit;
+use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
+use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
 use rust_decimal::Decimal;
 use time::macros::date;
 use time::Duration;
@@ -29,7 +31,7 @@ fn create_test_cds(
         finstack_quant_core::types::InstrumentId::new(id),
         Money::from((10000000_i64, Currency::USD)),
         PayReceive::Pay,
-        crate::cds::CdsConvention::IsdaNa,
+        finstack_quant_valuations_core::market::conventions::CdsConvention::IsdaNa,
         Decimal::try_from(spread_bp).expect("valid spread_bp"),
         start_date,
         end_date,
@@ -435,9 +437,9 @@ fn test_doc_clause_default_when_omitted() {
         .id(finstack_quant_core::types::InstrumentId::new("CDS-BUILDER"))
         .notional(Money::from((10_000_000_i64, Currency::USD)))
         .side(PayReceive::Pay)
-        .convention(crate::cds::CdsConvention::IsdaNa)
+        .convention(finstack_quant_valuations_core::market::conventions::CdsConvention::IsdaNa)
         .premium_leg(
-            finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PremiumLegSpec {
+            finstack_quant_valuations_core::instruments::PremiumLegSpec {
                 roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
                 start: as_of,
                 end: as_of.add_months(60).expect("valid fixture date"),
@@ -452,7 +454,7 @@ fn test_doc_clause_default_when_omitted() {
             },
         )
         .protection_leg(
-            finstack_quant_valuations_core::instruments::common_impl::parameters::legs::ProtectionLegSpec {
+            finstack_quant_valuations_core::instruments::ProtectionLegSpec {
                 credit_curve_id: finstack_quant_core::types::CurveId::new("TEST-CREDIT"),
                 recovery_rate: 0.40,
                 settlement_delay: 3,
@@ -606,7 +608,7 @@ fn test_full_premium_par_spread_is_below_risky_annuity_par_spread() {
 
 #[test]
 fn test_npv_full_discounts_dated_upfront() {
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
 
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");

@@ -21,7 +21,7 @@
 //! ceil-index estimator rounded the tail outward and produced a VaR / ES pair
 //! that disagreed with the true interpolated tail.
 
-use finstack_quant_valuations::metrics::risk::VarResult;
+use finstack_quant_valuations::metrics::risk::var_calculator::VarResult;
 
 /// A uniform arithmetic progression of `n` losses with step `d` starting at
 /// `start`, returned in DESCENDING order so `VarResult::from_distribution`

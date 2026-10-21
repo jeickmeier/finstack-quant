@@ -656,7 +656,8 @@ mod tests {
     use crate::quotes::MarketQuote;
     use crate::solver::traits::GlobalSolveTarget;
     use crate::targets::util::quote_annuity_proxy;
-    use crate::{RateBounds, ResidualWeightingScheme};
+    use crate::validation::RateBounds;
+    use crate::ResidualWeightingScheme;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::BusinessDayConvention;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -664,8 +665,9 @@ mod tests {
         RateCalibrationMethod, RateCalibrationPillar, RateCalibrationQuote,
     };
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::InstrumentId;
-    use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
+    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::market::conventions::ids::IrFutureContractId;
     use finstack_quant_valuations_core::pricer::InstrumentType;
     use std::any::Any;

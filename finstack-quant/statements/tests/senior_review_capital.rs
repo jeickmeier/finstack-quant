@@ -7,20 +7,26 @@ use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::cashflow::CashFlow;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::dates::{build_periods, Date, DayCount, StubKind};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
+use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::capital_structure::{
     calculate_period_flows, execute_waterfall, CapitalStructureState, CashflowBreakdown,
     EcfSweepSpec, PaymentPriority, PikToggleSpec, WaterfallSpec,
 };
 use finstack_quant_statements::evaluator::EvaluationContext;
-use finstack_quant_statements::prelude::*;
+use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::FinancialStatementInstrument;
+use finstack_quant_statements::types::{AmountOrScalar, NodeId};
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::DrawEvent;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    CommitmentFeeBase, DdtlSpec, DrawEvent, OidPolicy, TermLoan,
+    CommitmentFeeBase, DdtlSpec, OidPolicy, TermLoan,
 };
 use finstack_quant_valuations::instruments::PayReceive;
 use indexmap::IndexMap;
@@ -201,7 +207,8 @@ fn canonical_negative_debt_coupons_are_income() {
     negative_loan.rate = RateSpec::Floating(floating);
     let market = swap_market(-0.01);
     let spec = FinancialStatementInstrument::TermLoan(negative_loan);
-    let instrument: finstack_quant_valuations::instruments::InstrumentJson = spec.clone().into();
+    let instrument: finstack_quant_valuations::instruments::json_loader::InstrumentJson =
+        spec.clone().into();
     let instrument = instrument.into_boxed().expect("valid negative-rate debt");
     let raw = instrument
         .raw_cashflow_schedule(&market, as_of)
@@ -236,7 +243,7 @@ fn canonical_negative_debt_coupons_are_income() {
 
 #[test]
 fn placeholder_rate_option_schedule_is_rejected_explicitly() {
-    let option = finstack_quant_valuations::instruments::CapFloor::example()
+    let option = finstack_quant_valuations::instruments::rates::cap_floor::CapFloor::example()
         .expect("canonical cap/floor fixture");
     let as_of = date!(2025 - 01 - 01);
     let period = build_periods("2025..2025", None)

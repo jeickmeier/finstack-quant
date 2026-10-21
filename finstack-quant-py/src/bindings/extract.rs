@@ -34,7 +34,7 @@ use crate::bindings::valuations::typed_rates::{PyCapFloor, PyInterestRateSwap, P
 use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
 use crate::bindings::valuations::typed_structured_credit::PyStructuredCredit;
 use crate::errors::{display_to_py as to_py, portfolio_to_py};
-use finstack_quant_valuations::instruments::InstrumentJson;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::pricer::ParsedInstrument;
 
 // Instrument — typed-or-JSON extraction
@@ -85,7 +85,7 @@ impl InstrumentArg {
                 Ok(*instrument)
             }
             Self::Envelope(json) => {
-                finstack_quant_valuations::pricer::json::parse_instrument_from_json(&json)
+                finstack_quant_valuations::pricer::parse_instrument_from_json(&json)
             }
         }
     }
@@ -193,11 +193,11 @@ pub fn envelope_json_text(obj: &Bound<'_, PyAny>) -> PyResult<String> {
 /// only when ownership is truly needed (e.g. `goal_seek` which mutates).
 pub enum ModelAccess<'py> {
     Borrowed(PyRef<'py, PyFinancialModelSpec>),
-    Owned(Box<finstack_quant_statements::FinancialModelSpec>),
+    Owned(Box<finstack_quant_statements::types::FinancialModelSpec>),
 }
 
 impl std::ops::Deref for ModelAccess<'_> {
-    type Target = finstack_quant_statements::FinancialModelSpec;
+    type Target = finstack_quant_statements::types::FinancialModelSpec;
     fn deref(&self) -> &Self::Target {
         match self {
             Self::Borrowed(r) => &r.inner,
@@ -209,7 +209,7 @@ impl std::ops::Deref for ModelAccess<'_> {
 impl ModelAccess<'_> {
     /// Consume this access and produce an owned value, cloning only if
     /// the data was borrowed from a Python object.
-    pub fn into_owned(self) -> finstack_quant_statements::FinancialModelSpec {
+    pub fn into_owned(self) -> finstack_quant_statements::types::FinancialModelSpec {
         match self {
             Self::Borrowed(r) => r.inner.clone(),
             Self::Owned(m) => *m,
@@ -250,7 +250,7 @@ pub fn extract_model_ref<'py>(obj: &Bound<'py, PyAny>) -> PyResult<ModelAccess<'
         return Ok(ModelAccess::Borrowed(spec.borrow()));
     }
     let json: String = obj.extract()?;
-    let inner = finstack_quant_statements::FinancialModelSpec::from_json(&json)
+    let inner = finstack_quant_statements::types::FinancialModelSpec::from_json(&json)
         .map_err(crate::errors::statements_to_py)?;
     Ok(ModelAccess::Owned(Box::new(inner)))
 }

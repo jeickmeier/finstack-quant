@@ -31,10 +31,10 @@ pub(crate) fn register_cms_option_metrics(
             (Delta, DeltaCalculator),
             (Vega, VegaCalculator),
             (Rho, RhoCalculator),
-            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (Vanna, VannaCalculator),
             (Volga, VolgaCalculator),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             // Convexity adjustment risk (custom metric)
             (ConvexityAdjustmentRisk, ConvexityAdjustmentRiskCalculator::<CmsOption>(std::marker::PhantomData)),
         ]

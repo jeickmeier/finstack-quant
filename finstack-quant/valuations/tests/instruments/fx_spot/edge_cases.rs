@@ -6,10 +6,8 @@ use finstack_quant_core::{
     currency::Currency, dates::BusinessDayConvention, market_data::context::MarketContext,
     money::Money, types::InstrumentId,
 };
-use finstack_quant_valuations::{
-    instruments::{FxSpot, Instrument},
-    pricer::InstrumentType,
-};
+use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;
+use finstack_quant_valuations::{instruments::Instrument, pricer::InstrumentType};
 
 #[test]
 fn test_same_currency_pair() {

@@ -17,7 +17,7 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::InstrumentJson;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 
 use super::convert::{
     attributes_from_py, enum_to_py_string, money_from_py, money_to_py, rate_decimal_from_py,
@@ -61,7 +61,7 @@ fn decimal_f64(value: rust_decimal::Decimal) -> f64 {
 #[derive(Clone)]
 pub struct PyInterestRateSwap {
     /// Inner canonical Rust swap.
-    pub(crate) inner: finstack_quant_valuations::instruments::InterestRateSwap,
+    pub(crate) inner: finstack_quant_valuations::instruments::rates::irs::InterestRateSwap,
 }
 
 impl PyInterestRateSwap {
@@ -79,7 +79,7 @@ instrument_envelope_methods!(
     InterestRateSwap,
     "interest_rate_swap",
     PyInterestRateSwapBuilder,
-    finstack_quant_valuations::instruments::InterestRateSwap::builder()
+    finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::builder()
 );
 instrument_pricing_methods!(PyInterestRateSwap);
 
@@ -170,8 +170,10 @@ impl PyInterestRateSwap {
             forward_curve_id,
         };
         let inner =
-            finstack_quant_valuations::instruments::InterestRateSwap::from_conventions(params)
-                .map_err(core_to_py)?;
+            finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::from_conventions(
+                params,
+            )
+            .map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -197,7 +199,7 @@ impl PyInterestRateSwap {
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
-        finstack_quant_valuations::instruments::InterestRateSwap::example()
+        finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::example()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }
@@ -539,7 +541,7 @@ impl PyInterestRateSwapBuilder {
 #[derive(Clone)]
 pub struct PySwaption {
     /// Inner canonical Rust swaption.
-    pub(crate) inner: finstack_quant_valuations::instruments::Swaption,
+    pub(crate) inner: finstack_quant_valuations::instruments::rates::swaption::Swaption,
 }
 
 impl PySwaption {
@@ -554,7 +556,7 @@ instrument_envelope_methods!(
     Swaption,
     "swaption",
     PySwaptionBuilder,
-    finstack_quant_valuations::instruments::Swaption::builder()
+    finstack_quant_valuations::instruments::rates::swaption::Swaption::builder()
 );
 instrument_pricing_methods!(
     PySwaption,
@@ -588,7 +590,7 @@ impl PySwaption {
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
         Ok(Self {
-            inner: finstack_quant_valuations::instruments::Swaption::example()
+            inner: finstack_quant_valuations::instruments::rates::swaption::Swaption::example()
                 .map_err(core_to_py)?,
         })
     }
@@ -1119,7 +1121,7 @@ impl PySwaptionBuilder {
 #[derive(Clone)]
 pub struct PyCapFloor {
     /// Inner canonical Rust cap/floor.
-    pub(crate) inner: finstack_quant_valuations::instruments::CapFloor,
+    pub(crate) inner: finstack_quant_valuations::instruments::rates::cap_floor::CapFloor,
 }
 
 impl PyCapFloor {
@@ -1134,7 +1136,7 @@ instrument_envelope_methods!(
     CapFloor,
     "cap_floor",
     PyCapFloorBuilder,
-    finstack_quant_valuations::instruments::CapFloor::builder(),
+    finstack_quant_valuations::instruments::rates::cap_floor::CapFloor::builder(),
     builder_doc = [
         " ",
         " Notes",
@@ -1178,7 +1180,7 @@ impl PyCapFloor {
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
-        finstack_quant_valuations::instruments::CapFloor::example()
+        finstack_quant_valuations::instruments::rates::cap_floor::CapFloor::example()
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }

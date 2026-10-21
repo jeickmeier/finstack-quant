@@ -2,7 +2,7 @@
 //!
 //! Provides parallel and key-rate vega calculators for instruments with volatility surfaces.
 
-use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::Instrument;
 use crate::metrics::core::finite_difference::{
     apply_parallel_surface_bumps_in_place, bumped_volatility_override, min_grid_vol,
     revert_scratch_bumps, volatility_override, VOL_POINTS_PER_ABSOLUTE_VOL,
@@ -270,8 +270,8 @@ fn source_grid(
 #[cfg(test)]
 mod tests {
     use super::KeyRateVega;
-    use crate::instruments::common_impl::dependencies::{MarketDependencies, VolatilityDependency};
-    use crate::instruments::common_impl::traits::{Attributes, Instrument};
+    use crate::instruments::Instrument;
+    use crate::instruments::{MarketDependencies, VolatilityDependency};
     use crate::metrics::{MetricCalculator, MetricContext, MetricId};
     use crate::pricer::InstrumentType;
     use finstack_quant_core::currency::Currency;
@@ -279,6 +279,7 @@ mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::CurveId;
     use std::sync::Arc;
     use time::macros::date;

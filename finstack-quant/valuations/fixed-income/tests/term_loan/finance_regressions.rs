@@ -12,8 +12,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_core::pricer::ModelKey;
+use finstack_quant_valuations_fixed_income::bond::MakeWholeSpec;
 use finstack_quant_valuations_fixed_income::term_loan::{
-    LoanCall, LoanCallSchedule, LoanCallType, MakeWholeSpec, TermLoan,
+    LoanCall, LoanCallSchedule, LoanCallType, TermLoan,
 };
 use time::macros::date;
 use time::{Duration, Weekday};
@@ -150,7 +151,7 @@ fn seasoned_term_reset_still_uses_the_single_contractual_fixing() {
 
 #[test]
 fn seasoned_overnight_preserves_an_intraperiod_balance_change() {
-    use finstack_quant_valuations_fixed_income::term_loan::spec::{
+    use finstack_quant_valuations_fixed_income::term_loan::{
         CashSweepEvent, TermLoanCovenantEvents,
     };
     let (mut loan, market, as_of) =

@@ -4,8 +4,8 @@
 //! and provides utilities to extract them from instruments based on their
 //! market data dependencies.
 
-use crate::instruments::common_impl::traits::Instrument;
-use crate::metrics::sensitivities::config::STANDARD_BUCKETS_YEARS;
+use crate::instruments::Instrument;
+use crate::metrics::STANDARD_BUCKETS_YEARS;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;

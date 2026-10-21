@@ -4,10 +4,10 @@ use super::fixtures::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_valuations::instruments::rates::repo::{
     CollateralSpec, CollateralType, Repo, RepoType,
 };
-use finstack_quant_valuations::instruments::Attributes;
 use rust_decimal::Decimal;
 
 #[allow(unused_imports)]

@@ -231,7 +231,7 @@ fn dcf_model(debt_currency: Currency) -> FinancialModelSpec {
 
 #[test]
 fn dcf_opening_debt_is_available_on_the_inclusive_reporting_date() {
-    use finstack_quant_valuations::instruments::TerminalValueSpec;
+    use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
     let model = dcf_model(Currency::USD);
     for as_of in [
         time::macros::date!(2024 - 12 - 31),

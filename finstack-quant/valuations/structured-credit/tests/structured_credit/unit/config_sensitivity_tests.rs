@@ -13,14 +13,15 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_models::credit::pool::{
-    CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
+use finstack_quant_models::credit::pool::StochasticPrepaySpec;
+use finstack_quant_models::credit::pool::{CorrelationStructure, StochasticDefaultSpec};
+use finstack_quant_valuations_core::results::structured_credit::{
+    StochasticPricingResult, StructuredCreditPricingMode, TrancheSeniority,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
     calculate_tranche_metrics, run_simulation_with_diagnostics, AssetPool, CoverageTestSpec,
     DealType, LossAllocationPolicy, PoolAsset, ReinvestmentCriteria, ReinvestmentPeriod,
-    SimulationRun, StochasticPricingResult, StructuredCredit, StructuredCreditPricingMode, Tranche,
-    TrancheSeniority, TrancheStructure,
+    SimulationRun, StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 

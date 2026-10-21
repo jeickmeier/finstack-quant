@@ -55,17 +55,16 @@ use finstack_quant_core::math::z_spread_discount_factor;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 
-use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::Instrument;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::sensitivities::cs01::{
     sensitivity_central_diff, validate_buckets_strictly_increasing,
 };
+use crate::metrics::sensitivities::cs01::{GenericBucketedCs01, GenericParallelCs01};
 use crate::metrics::sensitivities::cs01_direct_hazard::{
     DirectHazardBucketedCs01, DirectHazardParallelCs01,
 };
-use crate::metrics::{
-    GenericBucketedCs01, GenericParallelCs01, MetricCalculator, MetricContext, MetricId,
-};
+use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 
 /// Cashflow inputs an instrument exposes for z-spread CS01.
 ///
@@ -463,7 +462,7 @@ where
             Vec::with_capacity(buckets.len());
         let mut total = NeumaierAccumulator::new();
         for (b, group) in groups.iter().enumerate() {
-            let label = super::config::format_bucket_label_cow(buckets[b]);
+            let label = crate::metrics::format_bucket_label_cow(buckets[b]);
             let cs01 = if group.is_empty() {
                 0.0
             } else {

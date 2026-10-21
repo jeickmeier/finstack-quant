@@ -5,7 +5,7 @@
 
 use crate::cliquet_option::CliquetOption;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
@@ -16,7 +16,7 @@ use finstack_quant_valuations_core::metrics::MetricRegistry;
 pub(crate) fn register_cliquet_option_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::{
+    use finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::{
         GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVolga,
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
@@ -26,14 +26,14 @@ pub(crate) fn register_cliquet_option_metrics(
             registry: registry,
             instrument: InstrumentType::CliquetOption,
             metrics: [
-                (Vega, finstack_quant_valuations_core::metrics::GenericFdVega::<crate::CliquetOption>::default()),
+                (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega::<crate::cliquet_option::CliquetOption>::default()),
                 (Rho, RhoCalculator),
-                (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
-                (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
-                (Delta, GenericFdDelta::<crate::CliquetOption>::default()),
-                (Gamma, GenericFdGamma::<crate::CliquetOption>::default()),
-                (Vanna, GenericFdVanna::<crate::CliquetOption>::default()),
-                (Volga, GenericFdVolga::<crate::CliquetOption>::default()),
+                (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
+                (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+                (Delta, GenericFdDelta::<crate::cliquet_option::CliquetOption>::default()),
+                (Gamma, GenericFdGamma::<crate::cliquet_option::CliquetOption>::default()),
+                (Vanna, GenericFdVanna::<crate::cliquet_option::CliquetOption>::default()),
+                (Volga, GenericFdVolga::<crate::cliquet_option::CliquetOption>::default()),
             ]
         }
     }
@@ -96,11 +96,10 @@ mod rho_tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-    use finstack_quant_valuations_core::instruments::common_impl::traits::{
-        Attributes, Instrument,
-    };
-    use finstack_quant_valuations_core::instruments::MetricPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
     use std::sync::Arc;
     use time::Month;

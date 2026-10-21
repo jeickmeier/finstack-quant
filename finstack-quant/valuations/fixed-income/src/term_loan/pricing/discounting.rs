@@ -53,7 +53,7 @@ use finstack_quant_core::cashflow::npv;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
 };
@@ -609,9 +609,7 @@ mod tests {
             .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .oid_eir_opt(None)
             .call_schedule_opt(None)
-            .attributes(
-                finstack_quant_valuations_core::instruments::common_impl::traits::Attributes::new(),
-            )
+            .attributes(finstack_quant_core::types::Attributes::new())
             .build()
             .expect("floating loan for fixing tests")
     }
@@ -742,7 +740,7 @@ mod tests {
         let as_of = date(2025, 4, 15);
         let mut loan = floating_loan_for_fixings();
         loan.covenants = Some(crate::term_loan::TermLoanCovenantEvents {
-            margin_steps: vec![crate::term_loan::MarginStep {
+            margin_steps: vec![crate::loan_terms::MarginStep {
                 date: date(2025, 1, 1),
                 delta_bp: rust_decimal::Decimal::from(200),
             }],

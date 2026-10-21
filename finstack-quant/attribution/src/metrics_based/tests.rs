@@ -6,7 +6,7 @@ mod test_utils {
     ));
 }
 
-use finstack_quant_valuations::instruments::RateOptionType;
+use finstack_quant_valuations::instruments::rates::cap_floor::RateOptionType;
 
 use super::shifts::*;
 use super::*;
@@ -69,13 +69,12 @@ impl Instrument for SpotVolTestInstrument {
         self
     }
 
-    fn attributes(&self) -> &finstack_quant_valuations::instruments::Attributes {
-        static ATTRS: OnceLock<finstack_quant_valuations::instruments::Attributes> =
-            OnceLock::new();
-        ATTRS.get_or_init(finstack_quant_valuations::instruments::Attributes::default)
+    fn attributes(&self) -> &finstack_quant_core::types::Attributes {
+        static ATTRS: OnceLock<finstack_quant_core::types::Attributes> = OnceLock::new();
+        ATTRS.get_or_init(finstack_quant_core::types::Attributes::default)
     }
 
-    fn attributes_mut(&mut self) -> &mut finstack_quant_valuations::instruments::Attributes {
+    fn attributes_mut(&mut self) -> &mut finstack_quant_core::types::Attributes {
         unreachable!("SpotVolTestInstrument::attributes_mut should not be called")
     }
 
@@ -1380,13 +1379,12 @@ impl Instrument for CreditVolTestInstrument {
         self
     }
 
-    fn attributes(&self) -> &finstack_quant_valuations::instruments::Attributes {
-        static ATTRS: OnceLock<finstack_quant_valuations::instruments::Attributes> =
-            OnceLock::new();
-        ATTRS.get_or_init(finstack_quant_valuations::instruments::Attributes::default)
+    fn attributes(&self) -> &finstack_quant_core::types::Attributes {
+        static ATTRS: OnceLock<finstack_quant_core::types::Attributes> = OnceLock::new();
+        ATTRS.get_or_init(finstack_quant_core::types::Attributes::default)
     }
 
-    fn attributes_mut(&mut self) -> &mut finstack_quant_valuations::instruments::Attributes {
+    fn attributes_mut(&mut self) -> &mut finstack_quant_core::types::Attributes {
         unreachable!("CreditVolTestInstrument::attributes_mut should not be called")
     }
 
@@ -1579,13 +1577,12 @@ impl Instrument for CreditCurvesTestInstrument {
         self
     }
 
-    fn attributes(&self) -> &finstack_quant_valuations::instruments::Attributes {
-        static ATTRS: OnceLock<finstack_quant_valuations::instruments::Attributes> =
-            OnceLock::new();
-        ATTRS.get_or_init(finstack_quant_valuations::instruments::Attributes::default)
+    fn attributes(&self) -> &finstack_quant_core::types::Attributes {
+        static ATTRS: OnceLock<finstack_quant_core::types::Attributes> = OnceLock::new();
+        ATTRS.get_or_init(finstack_quant_core::types::Attributes::default)
     }
 
-    fn attributes_mut(&mut self) -> &mut finstack_quant_valuations::instruments::Attributes {
+    fn attributes_mut(&mut self) -> &mut finstack_quant_core::types::Attributes {
         unreachable!("CreditCurvesTestInstrument::attributes_mut should not be called")
     }
 
@@ -1728,13 +1725,12 @@ impl Instrument for MultiSpotTestInstrument {
         self
     }
 
-    fn attributes(&self) -> &finstack_quant_valuations::instruments::Attributes {
-        static ATTRS: OnceLock<finstack_quant_valuations::instruments::Attributes> =
-            OnceLock::new();
-        ATTRS.get_or_init(finstack_quant_valuations::instruments::Attributes::default)
+    fn attributes(&self) -> &finstack_quant_core::types::Attributes {
+        static ATTRS: OnceLock<finstack_quant_core::types::Attributes> = OnceLock::new();
+        ATTRS.get_or_init(finstack_quant_core::types::Attributes::default)
     }
 
-    fn attributes_mut(&mut self) -> &mut finstack_quant_valuations::instruments::Attributes {
+    fn attributes_mut(&mut self) -> &mut finstack_quant_core::types::Attributes {
         unreachable!("MultiSpotTestInstrument::attributes_mut should not be called")
     }
 

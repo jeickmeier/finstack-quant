@@ -8,8 +8,8 @@ use finstack_quant_core::math::Compounding;
 use finstack_quant_scenarios::{
     ExecutionContext, OperationSpec, RateBindingSpec, ScenarioEngine, ScenarioSpec, Warning,
 };
+use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{AmountOrScalar, NodeSpec, NodeType};
-use finstack_quant_statements::FinancialModelSpec;
 use indexmap::IndexMap;
 use time::Month;
 

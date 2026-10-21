@@ -25,8 +25,8 @@
 //!
 //! # See Also
 //!
-//! - [`AsianOption`] for instrument struct
-//! - [`AveragingMethod`] for geometric vs arithmetic
+//! - [`AsianOption`](crate::exotics::asian_option::AsianOption) for instrument struct
+//! - `AveragingMethod` for geometric vs arithmetic
 //! - [`models::closed_form::geometric_asian_price`](finstack_quant_models::closed_form::geometric_asian_price) for pricing formulas
 
 pub(crate) mod metrics;
@@ -36,4 +36,4 @@ pub(crate) mod types;
 pub(crate) mod heston_mc_pricer;
 
 pub use pricer::{AsianOptionAnalyticalGeometricPricer, AsianOptionSemiAnalyticalTwPricer};
-pub use types::{AsianOption, AsianOptionBuilder, AveragingMethod};
+pub use types::{AsianOption, AsianOptionBuilder};

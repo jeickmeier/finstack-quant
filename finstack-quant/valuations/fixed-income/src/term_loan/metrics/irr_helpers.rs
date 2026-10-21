@@ -8,7 +8,7 @@
 
 use std::sync::Arc;
 
-use crate::TermLoan;
+use crate::term_loan::TermLoan;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::cashflow::{xirr_with_daycount, CFKind};
 use finstack_quant_core::dates::Date;

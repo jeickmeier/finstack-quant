@@ -127,8 +127,12 @@ jobs:
           # master's cache.
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
+      # Test Python is the single writer of the uv cache; both jobs sync the
+      # same uv.lock, so they share one key and concurrent saves would race.
       - name: Install uv
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          save-cache: false
 
       - name: Ensure rustfmt and clippy components
         run: rustup component add rustfmt clippy
@@ -262,6 +266,8 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          save-cache: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Set up Python environment
         run: |

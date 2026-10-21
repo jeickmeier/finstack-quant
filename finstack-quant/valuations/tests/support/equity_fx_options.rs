@@ -1,15 +1,19 @@
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::{
     currency::Currency,
     dates::Date,
     money::Money,
     types::{CurveId, InstrumentId},
 };
+use finstack_quant_models::types::{ExerciseStyle, OptionType};
+use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
+use finstack_quant_valuations::instruments::fx::fx_option::FxOption;
 use finstack_quant_valuations::instruments::fx::fx_option::{
     FxDeltaConvention, FxDeltaConventionKind,
 };
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::{
-    Attributes, EquityOption, EquityUnderlyingParams, ExerciseStyle, FxOption, FxUnderlyingParams,
-    InstrumentPricingOverrides, OptionType, SettlementType,
+    EquityUnderlyingParams, FxUnderlyingParams, SettlementType,
 };
 
 /// Create an Equity European call option using the builder pattern.

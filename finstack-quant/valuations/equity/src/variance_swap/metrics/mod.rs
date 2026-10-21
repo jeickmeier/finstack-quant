@@ -12,7 +12,7 @@ use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::MetricRegistry;
@@ -28,7 +28,7 @@ pub(crate) fn register_variance_swap_metrics(
         metrics: [
             (Vega, VegaCalculator),
             (Dv01, Dv01Calculator),
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             (VarianceVega, VarianceVegaCalculator),
             (ExpectedVariance, ExpectedVarianceCalculator),
             (RealizedVariance, RealizedVarianceCalculator),
@@ -180,10 +180,9 @@ mod expected_variance_tests {
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations_core::instruments::common_impl::traits::{
-        Attributes, Instrument,
-    };
+    use finstack_quant_valuations_core::instruments::Instrument;
     use std::sync::Arc;
     use time::macros::date;
 
@@ -216,7 +215,7 @@ mod expected_variance_tests {
             .observation_calendar_id("USNY".into())
             .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
             .price_series_policy(
-                finstack_quant_valuations_equity::EquityPriceSeriesPolicy::Adjusted,
+                finstack_quant_valuations_equity::variance_swap::EquityPriceSeriesPolicy::Adjusted,
             )
             .side(PayReceive::Receive)
             .discount_curve_id(CurveId::new("USD-OIS"))

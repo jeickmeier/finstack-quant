@@ -5,7 +5,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
 use finstack_quant_scenarios::{ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec};
-use finstack_quant_statements::FinancialModelSpec;
+use finstack_quant_statements::types::FinancialModelSpec;
 use time::Month;
 
 #[test]

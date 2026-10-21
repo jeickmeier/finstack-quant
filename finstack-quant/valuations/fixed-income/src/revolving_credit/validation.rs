@@ -460,7 +460,7 @@ impl RevolvingCredit {
                         .to_string()
                 })?;
                 let _ = finstack_quant_cashflows::builder::FloatingRateParams::try_from(spec)?;
-                let _ = finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions::resolved_overnight_compounding(
+                let _ = finstack_quant_valuations_core::instruments::pricing::overnight_conventions::resolved_overnight_compounding(
                     spec.forward_curve_id.as_str(),
                     spec.compounding.as_ref(),
                 )?;

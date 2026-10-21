@@ -270,10 +270,10 @@ mod tests {
     use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_core::{dates::Date, money::Money};
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::pricer::{ModelKey, PricingError};
     use finstack_quant_valuations_core::results::ValuationDetails;
     use time::Month;
@@ -291,7 +291,7 @@ mod tests {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(Some(CurveId::new("USD-CREDIT")))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default(),
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
             )
             .attributes(Attributes::new())
             .build()
@@ -331,7 +331,7 @@ mod tests {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(Some(CurveId::new("USD-CREDIT")))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default(),
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
             )
             .attributes(Attributes::new())
             .build()
@@ -388,7 +388,7 @@ mod tests {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(Some(CurveId::new("USD-CREDIT")))
             .instrument_pricing_overrides(
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default(),
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
             )
             .attributes(Attributes::new())
             .build()
@@ -902,7 +902,8 @@ mod tests {
 
     #[test]
     fn quote_engine_works_for_bond_with_hazard_curve() {
-        use crate::bond::pricing::quote_conversions::{compute_quotes, BondQuoteInput};
+        use crate::bond::pricing::quote_conversions::compute_quotes;
+        use finstack_quant_valuations_core::instruments::BondQuoteInput;
         let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
         let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("Valid test date");
 

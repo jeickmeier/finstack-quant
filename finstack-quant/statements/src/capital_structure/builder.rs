@@ -10,7 +10,9 @@ use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
-use finstack_quant_valuations::instruments::{Bond, FixedLegSpec, FloatLegSpec, InterestRateSwap};
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
+use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec};
 use rust_decimal::Decimal;
 
 /// Inputs for appending a bond with a regional market convention.

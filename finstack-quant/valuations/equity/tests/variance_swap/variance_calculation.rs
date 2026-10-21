@@ -7,10 +7,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::stats::{realized_variance, RealizedVarMethod};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_equity::variance_swap::{PayReceive, VarianceSwap};
+use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_equity::variance_swap::VarianceSwap;
 
 #[test]
 fn first_ohlc_bar_contributes_to_realized_and_seasoned_variance() {
@@ -466,7 +467,9 @@ fn ohlc_swap(method: RealizedVarMethod) -> VarianceSwap {
         .observation_frequency(Tenor::daily())
         .observation_calendar_id("USNY".into())
         .realized_var_method(method)
-        .price_series_policy(finstack_quant_valuations_equity::EquityPriceSeriesPolicy::Adjusted)
+        .price_series_policy(
+            finstack_quant_valuations_equity::variance_swap::EquityPriceSeriesPolicy::Adjusted,
+        )
         .open_series_id("SPX-OPEN".to_string())
         .high_series_id("SPX-HIGH".to_string())
         .low_series_id("SPX-LOW".to_string())
@@ -538,7 +541,9 @@ fn test_ohlc_missing_series_id_returns_error() {
         .observation_frequency(Tenor::daily())
         .observation_calendar_id("USNY".into())
         .realized_var_method(RealizedVarMethod::Parkinson)
-        .price_series_policy(finstack_quant_valuations_equity::EquityPriceSeriesPolicy::Adjusted)
+        .price_series_policy(
+            finstack_quant_valuations_equity::variance_swap::EquityPriceSeriesPolicy::Adjusted,
+        )
         // Intentionally omit open/high/low series IDs
         .side(PayReceive::Receive)
         .discount_curve_id(CurveId::new(DISC_ID))

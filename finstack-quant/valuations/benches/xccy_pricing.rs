@@ -24,11 +24,10 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations::instruments::rates::xccy_swap::{
-    NotionalExchange, XccySwap, XccySwapLeg,
-};
+use finstack_quant_valuations::instruments::rates::xccy_swap::{XccySwap, XccySwapLeg};
 use finstack_quant_valuations::instruments::FloatLegSpec;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::NotionalExchange;
 use finstack_quant_valuations::instruments::PayReceive;
 use rust_decimal::Decimal;
 use std::hint::black_box;

@@ -9,6 +9,7 @@ mod replay_tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_portfolio::position::{Position, PositionUnit};
     use finstack_quant_portfolio::replay::{
         ReplayConfig, ReplayErrorPolicy, ReplayMode, ReplayTimeline,
@@ -19,7 +20,7 @@ mod replay_tests {
         valuation::PortfolioValuationOptions, valuation::RequestedMetrics,
     };
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-    use finstack_quant_valuations::instruments::{Attributes, Instrument, PricingOptions};
+    use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
     use finstack_quant_valuations::metrics::MetricId;
     use finstack_quant_valuations::pricer::InstrumentType;
     use finstack_quant_valuations::results::ValuationResult;
@@ -324,7 +325,7 @@ mod replay_tests {
     fn replay_labels_mtm_separately_from_cash_inclusive_attribution() {
         let before = date!(2024 - 06 - 20);
         let after = date!(2024 - 07 - 05);
-        let bond = finstack_quant_valuations::instruments::Bond::fixed(
+        let bond = finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
             "COUPON",
             Money::from((1_000_000_i64, Currency::USD)),
             finstack_quant_core::types::Rate::from_decimal(0.05).unwrap(),

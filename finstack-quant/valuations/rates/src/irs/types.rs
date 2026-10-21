@@ -14,20 +14,20 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::Decimal;
 
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::validation;
 use finstack_quant_margin::types::OtcMarginSpec;
-use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight_conventions;
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
+use finstack_quant_valuations_core::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::pricing::overnight_conventions;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive;
+pub(crate) use finstack_quant_valuations_core::instruments::PayReceive;
 
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FixedLegSpec;
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::FloatLegSpec;
+pub(crate) use finstack_quant_valuations_core::instruments::FixedLegSpec;
+pub(crate) use finstack_quant_valuations_core::instruments::FloatLegSpec;
 
 /// Leg-level conventions for building a vanilla fixed-vs-float IRS.
 ///
@@ -172,26 +172,26 @@ pub struct InterestRateSwap {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -530,7 +530,7 @@ impl InterestRateSwap {
             .id(InstrumentId::new("IRS-5Y-USD-STD"))
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(PayReceive::Pay)
-            .fixed_leg(finstack_quant_valuations_core::instruments::common_impl::parameters::FixedLegSpec {
+            .fixed_leg(finstack_quant_valuations_core::instruments::FixedLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
                 rate: Decimal::try_from(0.04_f64).expect("valid literal"),
                 frequency: Tenor::semi_annual(),
@@ -544,7 +544,7 @@ impl InterestRateSwap {
                 payment_lag_days: 0,
                 end_of_month: false,
             })
-            .float_leg(finstack_quant_valuations_core::instruments::common_impl::parameters::FloatLegSpec {
+            .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 spread_bp: Decimal::ZERO,
@@ -571,9 +571,7 @@ impl InterestRateSwap {
 // Explicit trait implementations for modern instrument style
 // Attributable implementation is provided by the impl_instrument! macro
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for InterestRateSwap
-{
+impl finstack_quant_valuations_core::instruments::Instrument for InterestRateSwap {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Irs,
         crate::RATES
@@ -637,14 +635,13 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Some(self.fixed_leg.end)
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.fixed_leg.discount_curve_id.clone());
         deps.add_discount_curve(self.float_leg.discount_curve_id.clone());
         if !self.is_single_curve_ois() {

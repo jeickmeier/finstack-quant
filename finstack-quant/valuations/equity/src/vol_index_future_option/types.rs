@@ -2,14 +2,13 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations_core::instruments::common_impl::listed::{
+use finstack_quant_models::types::{ExerciseStyle, OptionType};
+use finstack_quant_valuations_core::instruments::Position;
+use finstack_quant_valuations_core::instruments::{
     FutureOptionModel, FutureOptionPremiumStyle, FutureOptionSettlement, FutureOptionTerms,
 };
-use finstack_quant_valuations_core::instruments::common_impl::parameters::{
-    ExerciseStyle, OptionType,
-};
-use finstack_quant_valuations_core::instruments::{Attributes, Position};
 
 /// Exchange-listed option on a volatility-index futures contract.
 #[derive(
@@ -33,26 +32,26 @@ pub struct VolatilityIndexFutureOption {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for selection and reporting.
     #[builder(default)]
     #[serde(default)]
@@ -102,14 +101,14 @@ impl VolatilityIndexFutureOption {
             .build()?;
         Ok(Self {
             instrument_pricing_overrides:
-                finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+                finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                     .with_implied_volatility(0.50),
             ..Self::new(InstrumentId::new("VSTOXX-FUTURE-OPTION-EXAMPLE"), terms)?
         })
     }
 }
 
-finstack_quant_valuations_core::instruments::common_impl::listed::impl_future_option_instrument!(
+finstack_quant_valuations_core::impl_future_option_instrument!(
     VolatilityIndexFutureOption,
     finstack_quant_valuations_core::pricer::InstrumentType::VolatilityIndexFutureOption,
     crate::EQUITY

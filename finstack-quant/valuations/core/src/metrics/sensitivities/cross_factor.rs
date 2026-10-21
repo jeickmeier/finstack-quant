@@ -5,7 +5,7 @@
 //! concrete market dependencies at runtime from `MetricContext`, then applies
 //! a four-corner central mixed difference.
 
-use crate::instruments::common_impl::dependencies::FxPair;
+use crate::instruments::FxPair;
 use crate::metrics::core::finite_difference::{
     bump_scalar_price, central_mixed, min_grid_vol, volatility_override,
 };
@@ -21,51 +21,6 @@ use finstack_quant_core::Result;
 use std::sync::Arc;
 
 const NO_DEPS: &[MetricId] = &[];
-
-/// Identifies which two risk factors are crossed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum CrossFactorPair {
-    /// Parallel rates against parallel credit spreads.
-    RatesCredit,
-    /// Parallel rates against parallel volatility shifts.
-    RatesVol,
-    /// Spot/underlying against parallel volatility shifts.
-    SpotVol,
-    /// Spot/underlying against parallel credit spreads.
-    SpotCredit,
-    /// FX spot against parallel volatility shifts.
-    FxVol,
-    /// FX spot against parallel interest-rate shifts.
-    FxRates,
-    /// Parallel credit spreads against parallel volatility shifts.
-    CreditVol,
-}
-
-impl CrossFactorPair {
-    /// All currently supported cross-factor pairs.
-    pub const ALL: &'static [Self] = &[
-        Self::RatesCredit,
-        Self::RatesVol,
-        Self::SpotVol,
-        Self::SpotCredit,
-        Self::FxVol,
-        Self::FxRates,
-        Self::CreditVol,
-    ];
-
-    /// Returns the standard `MetricId` associated with this pair.
-    pub fn metric_id(self) -> MetricId {
-        match self {
-            Self::RatesCredit => MetricId::CrossGammaRatesCredit,
-            Self::RatesVol => MetricId::CrossGammaRatesVol,
-            Self::SpotVol => MetricId::CrossGammaSpotVol,
-            Self::SpotCredit => MetricId::CrossGammaSpotCredit,
-            Self::FxVol => MetricId::CrossGammaFxVol,
-            Self::FxRates => MetricId::CrossGammaFxRates,
-            Self::CreditVol => MetricId::CrossGammaCreditVol,
-        }
-    }
-}
 
 pub trait FactorBumper: Send + Sync {
     fn bump_market(
@@ -630,7 +585,8 @@ mod tests {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::types::CurveId;
 
-    use super::{CrossFactorPair, FactorBumper, VolParallelBumper};
+    use super::{FactorBumper, VolParallelBumper};
+    use crate::metrics::CrossFactorPair;
 
     fn flat_surface(id: &str, vol: f64) -> VolSurface {
         VolSurface::builder(id)

@@ -52,7 +52,7 @@ fn flat_curve(id: &str, rate: f64, as_of: finstack_quant_core::dates::Date) -> D
 /// Attach the Hull-White short-rate model the tree prices the floor with.
 fn with_short_rate_model(mut loan: Bond) -> Bond {
     loan.instrument_pricing_overrides =
-        finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+        finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides::default()
             .with_hw1f_mean_reversion(0.03)
             .with_hw1f_sigma(0.01);
     loan

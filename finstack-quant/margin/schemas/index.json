@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/im_result.schema.json",
-      "bytes": 33810,
+      "bytes": 33817,
       "kind": "output",
       "path": "schemas/margin/1/im_result.schema.json",
       "summary": "Initial margin calculation result.",
@@ -119,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/margin.schema.json",
-      "bytes": 54301,
+      "bytes": 54313,
       "kind": "input",
       "path": "schemas/margin/1/margin.schema.json",
       "summary": "One of three closed root shapes: an OTC margin spec, a CSA spec, or a margin call.",
@@ -164,7 +164,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/repo_margin_spec.schema.json",
-      "bytes": 10947,
+      "bytes": 10954,
       "kind": "input",
       "path": "schemas/margin/1/repo_margin_spec.schema.json",
       "summary": "GMRA 2011 compliant repo margin specification.",

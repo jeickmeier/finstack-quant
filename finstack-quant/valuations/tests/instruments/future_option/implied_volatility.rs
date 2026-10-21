@@ -10,10 +10,16 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::special_functions::{norm_cdf, norm_pdf};
+use finstack_quant_models::types::ExerciseStyle;
+use finstack_quant_valuations::instruments::commodity::commodity_future_option::CommodityFutureOption;
+use finstack_quant_valuations::instruments::equity::equity_future_option::EquityFutureOption;
+use finstack_quant_valuations::instruments::equity::vol_index_future_option::VolatilityIndexFutureOption;
+use finstack_quant_valuations::instruments::fx::fx_future_option::FxFutureOption;
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations::instruments::rates::ir_future_option::InterestRateFutureOption;
 use finstack_quant_valuations::instruments::{
-    CommodityFutureOption, EquityFutureOption, ExerciseStyle, FutureOptionModel,
-    FutureOptionPremiumStyle, FutureOptionSettlement, FutureOptionTerms, FxFutureOption,
-    Instrument, InstrumentPricingOverrides, InterestRateFutureOption, VolatilityIndexFutureOption,
+    FutureOptionModel, FutureOptionPremiumStyle, FutureOptionSettlement, FutureOptionTerms,
+    Instrument,
 };
 use time::macros::date;
 

@@ -7,10 +7,17 @@
 //! `swap_fixed_day_count`. Each retired spelling is rejected by
 //! `deny_unknown_fields`.
 
-use finstack_quant_valuations::instruments::{
-    Bond, CmsOption, CmsSpreadOption, CmsSwap, CommodityFuture, CommoditySwap, InterestRateFuture,
-    RangeAccrual, Snowball, Tarn, TermLoan,
-};
+use finstack_quant_valuations::instruments::commodity::commodity_future::CommodityFuture;
+use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
+use finstack_quant_valuations::instruments::exotics::range_accrual::RangeAccrual;
+use finstack_quant_valuations::instruments::exotics::snowball::Snowball;
+use finstack_quant_valuations::instruments::exotics::tarn::Tarn;
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
+use finstack_quant_valuations::instruments::rates::cms_option::CmsOption;
+use finstack_quant_valuations::instruments::rates::cms_spread_option::CmsSpreadOption;
+use finstack_quant_valuations::instruments::rates::cms_swap::CmsSwap;
+use finstack_quant_valuations::instruments::rates::ir_future::InterestRateFuture;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::Value;

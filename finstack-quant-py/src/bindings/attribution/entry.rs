@@ -16,7 +16,7 @@ use finstack_quant_attribution::{
     AttributionConfig, AttributionEnvelope, AttributionInputs, AttributionMethod, AttributionSpec,
 };
 use finstack_quant_core::market_data::context::MarketContextState;
-use finstack_quant_valuations::instruments::InstrumentJson;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use pyo3::prelude::*;
 
 /// The validated instrument payload of a typed instrument wrapper or a

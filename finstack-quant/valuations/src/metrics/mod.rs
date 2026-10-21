@@ -14,9 +14,8 @@
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::types::Rate;
-//! use finstack_quant_valuations::instruments::{
-//!     Bond, BondConvention, Instrument, PricingOptions,
-//! };
+//! use finstack_quant_valuations::instruments::{BondConvention, Instrument, PricingOptions};
+//! use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 //! use finstack_quant_valuations::metrics::MetricId;
 //! use finstack_quant_core::market_data::context::MarketContext;
 //! use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -61,7 +60,8 @@
 //! ## Example 2: Computing Parallel DV01 for an Interest Rate Swap
 //!
 //! ```
-//! use finstack_quant_valuations::instruments::{Instrument, InterestRateSwap, PricingOptions};
+//! use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
+//! use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
 //! use finstack_quant_valuations::metrics::MetricId;
 //! use finstack_quant_core::market_data::context::MarketContext;
 //! use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
@@ -112,7 +112,9 @@
 //! ## Example 3: Computing Theta (Time Decay) for an Option
 //!
 //! ```
-//! use finstack_quant_valuations::instruments::{EquityOption, Instrument, OptionType, PricingOptions};
+//! use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
+//! use finstack_quant_models::types::OptionType;
+//! use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 //! use finstack_quant_valuations::metrics::MetricId;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::dates::create_date;
@@ -175,7 +177,9 @@
 //! ## Example 4: Computing Multiple Greeks for an Option
 //!
 //! ```
-//! use finstack_quant_valuations::instruments::{EquityOption, Instrument, OptionType, PricingOptions};
+//! use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
+//! use finstack_quant_models::types::OptionType;
+//! use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 //! use finstack_quant_valuations::metrics::MetricId;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::dates::create_date;

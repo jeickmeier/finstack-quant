@@ -6,7 +6,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -243,7 +243,7 @@ impl Pricer for BarrierOptionMcPricer {
 
     fn price_dyn(
         &self,
-        instrument: &dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument,
+        instrument: &dyn finstack_quant_valuations_core::instruments::Instrument,
         market: &MarketContext,
         as_of: Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
@@ -304,12 +304,8 @@ pub(crate) fn price_expired_barrier(
     })?;
 
     let intrinsic = match inst.option_type {
-        finstack_quant_valuations_core::instruments::OptionType::Call => {
-            (spot - inst.strike).max(0.0) * quantity
-        }
-        finstack_quant_valuations_core::instruments::OptionType::Put => {
-            (inst.strike - spot).max(0.0) * quantity
-        }
+        finstack_quant_models::types::OptionType::Call => (spot - inst.strike).max(0.0) * quantity,
+        finstack_quant_models::types::OptionType::Put => (inst.strike - spot).max(0.0) * quantity,
     };
     let rebate = inst.rebate.map(|m| m.amount()).unwrap_or(0.0);
 
@@ -504,11 +500,12 @@ mod tests {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::BarrierType as AnalyticalBarrierType;
     use finstack_quant_core::types::InstrumentId;
     use finstack_quant_core::types::{BarrierType, PayoutTiming};
     use finstack_quant_models::closed_form::{barrier_price, barrier_rebate, BarrierParams};
-    use finstack_quant_valuations_core::instruments::{Attributes, OptionType};
+    use finstack_quant_models::types::OptionType;
     use time::Month;
 
     fn date(year: i32, month: u8, day: u8) -> Date {

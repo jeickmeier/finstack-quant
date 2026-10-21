@@ -831,7 +831,9 @@ fn test_par_spread_annuity_relationship() {
 // and non-zero when a dividend-yield curve is present, exactly zero when none
 // is referenced, and flip sign between the receive-TR and pay-TR sides.
 
-fn dividend01(trs: &finstack_quant_valuations::instruments::EquityTotalReturnSwap) -> f64 {
+fn dividend01(
+    trs: &finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap,
+) -> f64 {
     let market = create_market_context();
     let as_of = as_of_date();
     *trs.price_with_metrics(

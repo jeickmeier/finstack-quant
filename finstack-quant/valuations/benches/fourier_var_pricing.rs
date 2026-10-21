@@ -12,9 +12,11 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::metrics::risk::var_calculator::{
+    calculate_var, VarConfig, VarMethod,
+};
 use finstack_quant_valuations::metrics::risk::{
-    calculate_var, MarketHistory, MarketScenario, RiskFactorShift, RiskFactorType, VarConfig,
-    VarMethod,
+    MarketHistory, MarketScenario, RiskFactorShift, RiskFactorType,
 };
 use finstack_quant_valuations::pricer::PricingDispatch;
 use std::hint::black_box;

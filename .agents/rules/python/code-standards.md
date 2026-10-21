@@ -31,8 +31,8 @@ Two documented deviations from strict crate-mirroring, both recorded in
   matrix/statistical helpers (`validate_correlation_matrix`,
   `nearest_correlation`) live in `finstack_quant_core::math::linalg`;
   copulas, recovery and portfolio-loss models live in
-  `finstack_quant_models::correlation`, which re-exports the core helpers. Both
-  are bound under `finstack_quant.models.correlation` (the core helpers as
+  `finstack_quant_models::correlation` (Rust does not re-export the core
+  helpers there; each has one path in `core`). Both are bound under `finstack_quant.models.correlation` (the core helpers as
   `validate_correlation_matrix` and `nearest_correlation`); `finstack_quant.analytics`
   exposes only `Performance`, its result types and the scalar free functions.
   There is no `valuations.correlation` namespace.

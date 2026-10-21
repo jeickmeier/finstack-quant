@@ -115,7 +115,7 @@
 //! # See Also
 //!
 //! - [`crate::instruments::Instrument`] for the core instrument trait
-//! - [`crate::instruments::Attributes`] for tagging and scenario selection
+//! - [`finstack_quant_core::types::Attributes`] for tagging and scenario selection
 //! - [`crate::pricer`] for pricing registry and dispatch
 //! - [`crate::metrics`] for risk metric calculations
 //!
@@ -129,18 +129,10 @@
 #[macro_use]
 #[doc(hidden)]
 pub mod common_impl;
+mod legs;
 
 /// Shared pricing helpers used by this crate and `finstack-quant-calibration`.
-pub mod pricing {
-    pub use super::common_impl::pricing::heston_market;
-    pub use super::common_impl::pricing::hw1f_params;
-    pub use super::common_impl::pricing::overnight::default_rate_calendar_id;
-    pub use super::common_impl::pricing::overnight_conventions;
-    pub use super::common_impl::pricing::swap_legs;
-    pub use super::common_impl::pricing::term_fixings;
-    #[doc(hidden)]
-    pub use super::common_impl::pricing::GenericInstrumentPricer;
-}
+pub mod pricing;
 
 /// The persisted instrument-envelope contract: schema marker, size cap,
 /// load-error mapping.
@@ -156,7 +148,7 @@ pub mod cashflow_export;
 pub mod model_params;
 
 /// Canonical long/short position direction.
-pub mod position;
+pub(crate) mod position;
 pub use position::Position;
 
 mod breakeven;
@@ -164,31 +156,53 @@ pub use breakeven::{BreakevenConfig, BreakevenMode, BreakevenTarget};
 pub use common_impl::dependencies::{
     FxPair, InstrumentCurves, MarketDependencies, RatesCurveKind, VolatilityDependency,
 };
-pub use common_impl::pricing::{TotalReturnLegParams, TrsEngine, TrsReturnModel};
+pub use common_impl::pricing::trs::{TotalReturnLegParams, TrsEngine, TrsReturnModel};
 pub use common_impl::traits::{
-    Attributes, GreekBumps, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
+    GreekBumps, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
     OptionGreeksRequest, PricingOptions,
 };
 
-pub use common_impl::parameters::{
-    BermudanCallProvision, BondConvention, CommodityUnderlyingParams, CreditParams,
-    EquityUnderlyingParams, ExerciseStyle, FinancingLegSpec, FixedLegSpec, FloatLegSpec,
-    FxUnderlyingParams, IndexUnderlyingParams, Monitoring, OptionMarketParams, OptionType,
-    PayReceive, PremiumLegSpec, ProtectionLegSpec, QuantoSpec, SettlementType, TotalReturnLegSpec,
-    VolatilityModel,
-};
+pub use common_impl::parameters::bermudan_call::BermudanCallProvision;
+pub use common_impl::parameters::conventions::BondConvention;
+pub use common_impl::parameters::conventions::NdfQuoteConvention;
+pub use common_impl::parameters::conventions::NotionalExchange;
+pub use common_impl::parameters::conventions::ResettingSide;
+pub use common_impl::parameters::market::CreditParams;
+pub use common_impl::parameters::market::SettlementType;
+pub use common_impl::parameters::monitoring::Monitoring;
+pub use common_impl::parameters::quanto::QuantoSpec;
+pub use common_impl::parameters::underlying::CommodityUnderlyingParams;
+pub use common_impl::parameters::underlying::EquityUnderlyingParams;
+pub use common_impl::parameters::underlying::FxUnderlyingParams;
+pub use common_impl::parameters::underlying::IndexUnderlyingParams;
+pub use common_impl::parameters::volatility::VolatilityModel;
+pub use legs::FinancingLegSpec;
+pub use legs::FixedLegSpec;
+pub use legs::FloatLegSpec;
+pub use legs::PayReceive;
+pub use legs::PremiumLegSpec;
+pub use legs::ProtectionLegSpec;
+pub use legs::TotalReturnLegSpec;
 
+pub use common_impl::parameters::bond_quote::BondQuoteInput;
+pub use common_impl::parameters::convertible::{
+    AntiDilutionPolicy, ConversionEvent, ConversionPolicy, ConversionSpec, DilutionEvent,
+    DividendAdjustment, PriceTrigger,
+};
+pub use common_impl::parameters::merton_mc::{
+    BarrierCrossing, CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, PikMode,
+    PikSchedule,
+};
 pub use common_impl::parameters::trs_common::TrsScheduleSpec;
 
-pub use common_impl::listed::{
-    FutureOptionExercise, FutureOptionModel, FutureOptionPremiumStyle, FutureOptionSettlement,
-    FutureOptionTerms, ListedDeliveryObligation, ListedFutureSettlement, ListedFutureTerms,
-};
+pub use common_impl::listed::future_option::FutureOptionExercise;
+pub use common_impl::listed::future_option::FutureOptionModel;
+pub use common_impl::listed::future_option::FutureOptionPremiumStyle;
+pub use common_impl::listed::future_option::FutureOptionSettlement;
+pub use common_impl::listed::future_option::FutureOptionTerms;
+pub use common_impl::listed::terms::ListedDeliveryObligation;
+pub use common_impl::listed::terms::ListedFutureSettlement;
+pub use common_impl::listed::terms::ListedFutureTerms;
 
 /// Pricing overrides module.
 pub mod pricing_overrides;
-pub use pricing_overrides::{
-    BondRiskBasis, BumpConfig, InstrumentPricingOverrides, MarketQuoteOverrides,
-    MetricPricingOverrides, ModelConfig, ScenarioPricingOverrides, ShortRateTreeModel,
-    ThetaDayBasis,
-};

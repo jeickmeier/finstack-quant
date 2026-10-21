@@ -515,9 +515,10 @@ mod examples;
 #[cfg(feature = "json-schema")]
 use crate::instruments::json_loader::instrument_registry;
 #[cfg(feature = "json-schema")]
-use crate::instruments::{
-    InstrumentEnvelope, InstrumentPricingOverrides, MetricPricingOverrides,
-    ScenarioPricingOverrides,
+use crate::instruments::json_loader::InstrumentEnvelope;
+#[cfg(feature = "json-schema")]
+use crate::instruments::pricing_overrides::{
+    InstrumentPricingOverrides, MetricPricingOverrides, ScenarioPricingOverrides,
 };
 #[cfg(feature = "json-schema")]
 use finstack_quant_core::schema::{SchemaArtifact, SchemaKind};
@@ -721,25 +722,26 @@ pub fn artifacts_slice() -> &'static [SchemaArtifact] {
 #[must_use]
 pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::instruments::cashflow_export::InstrumentCashflowEnvelope;
+    use crate::instruments::composite::{CompositeHistoryRow, CompositeRebalanceResult};
     use crate::instruments::credit_derivatives::cds_index::CdsIndexParams;
     use crate::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
     use crate::instruments::fixed_income::asset_backed_facility::FacilityProjection;
     use crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcResult;
     use crate::instruments::fixed_income::convertible::ConvertibleGreeks;
-    use crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
+    use crate::instruments::fixed_income::revolving_credit::pricing::unified::EnhancedMonteCarloResult;
     use crate::instruments::fixed_income::structured_credit::{
         BorrowingBaseReport, EquityMetrics, OasResult, PoolStats, ScenarioTable,
         SimulationDiagnostics, TrancheCashflows, TrancheMetrics,
     };
-    use crate::instruments::{
-        CompositeHistoryRow, CompositeRebalanceResult, InstrumentJson, MarketDependencies,
-    };
+    use crate::instruments::json_loader::InstrumentJson;
+    use crate::instruments::MarketDependencies;
     use crate::market::conventions::{
         CdsConventionSpec, InflationSwapConventions, IrFutureConventions, RateIndexConventions,
         SwaptionConventions, XccyConventions,
     };
     use crate::market::listed::ListedProductCoverage;
-    use crate::metrics::risk::{MarketHistory, VarResult};
+    use crate::metrics::risk::var_calculator::VarResult;
+    use crate::metrics::risk::MarketHistory;
     use crate::pricer::MetricMetadata;
     use crate::results::ValuationResult;
     use finstack_quant_core::contract::{Diagnostic, ValidationReport};

@@ -7,7 +7,9 @@
 
 use super::{parse_model_key, shared_standard_registry, ModelKey};
 use crate::instruments::json_loader::{instrument_load_error, MAX_JSON_BYTES};
-use crate::instruments::{Instrument, InstrumentEnvelope, InstrumentJson, MetricPricingOverrides};
+use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+use crate::instruments::pricing_overrides::MetricPricingOverrides;
+use crate::instruments::Instrument;
 use crate::metrics::MetricId;
 use crate::results::ValuationResult;
 use finstack_quant_core::contract::{parse_json_value, LoadLimits};
@@ -221,7 +223,7 @@ pub fn instrument_envelope_from_spec(
 ///
 /// * `json` - Required canonical v1 instrument envelope whose `type` must be
 ///   the discriminator of `T` (for example `"bond"` for
-///   [`crate::instruments::Bond`]).
+///   [`crate::instruments::fixed_income::bond::Bond`]).
 ///
 /// # Errors
 ///
@@ -823,7 +825,7 @@ mod tests {
     use crate::instruments::fixed_income::revolving_credit::RevolvingCredit;
     use crate::instruments::fixed_income::structured_credit::StructuredCredit;
     use crate::instruments::fixed_income::term_loan::TermLoan;
-    use crate::instruments::fx::FxOption;
+    use crate::instruments::fx::fx_option::FxOption;
     use crate::instruments::rates::ir_future::InterestRateFuture;
     use crate::instruments::rates::swaption::Swaption;
     use crate::metrics::{MetricCalculator, MetricContext, MetricRegistry};
@@ -1068,11 +1070,12 @@ mod tests {
                 .expect("canonical fx spot"),
         )
         .expect("json");
-        let spot: crate::instruments::FxSpot =
+        let spot: crate::instruments::fx::fx_spot::FxSpot =
             parse_typed_instrument_json(&fx_spot).expect("typed fx spot");
         assert_eq!(spot.id.as_str(), "EURUSD-SPOT");
-        let err = parse_typed_instrument_json::<crate::instruments::FxForward>(&fx_spot)
-            .expect_err("wrong envelope type should be rejected");
+        let err =
+            parse_typed_instrument_json::<crate::instruments::fx::fx_forward::FxForward>(&fx_spot)
+                .expect_err("wrong envelope type should be rejected");
         assert!(matches!(err, Error::Validation(_)));
         assert!(err
             .to_string()
@@ -1168,15 +1171,15 @@ mod tests {
 
     #[test]
     fn composite_metric_pricing_overrides_merge_into_root() {
-        let composite =
-            crate::instruments::CompositeInstrument::example().expect("composite example");
+        let composite = crate::instruments::composite::CompositeInstrument::example()
+            .expect("composite example");
         let json = envelope_json(InstrumentJson::Composite(Box::new(composite)));
         let merged = instrument_json_for_pricing(
             &json,
             Some(r#"{"theta_period":{"count":1,"unit":"months"}}"#),
         )
         .expect("merge");
-        let envelope: crate::instruments::InstrumentEnvelope =
+        let envelope: crate::instruments::json_loader::InstrumentEnvelope =
             serde_json::from_str(merged.as_ref()).expect("merged composite must still parse");
         let InstrumentJson::Composite(parsed) = envelope.instrument else {
             panic!("expected composite");
@@ -1224,7 +1227,7 @@ mod tests {
     #[test]
     fn validate_instrument_json_rejects_credit_and_convertible_invariants() {
         let mut cds_option = CdsOption::example().expect("CDS option");
-        cds_option.exercise_style = crate::instruments::ExerciseStyle::American;
+        cds_option.exercise_style = finstack_quant_models::types::ExerciseStyle::American;
         let json = envelope_json(InstrumentJson::CdsOption(cds_option));
         assert!(validate_instrument_json(&json, None)
             .expect_err("unsupported exercise style must fail")

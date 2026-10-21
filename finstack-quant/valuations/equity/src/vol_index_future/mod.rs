@@ -49,7 +49,7 @@
 //!
 //! # See Also
 //!
-//! - [`VolatilityIndexFuture`] for instrument struct
+//! - [`VolatilityIndexFuture`](crate::vol_index_future::VolatilityIndexFuture) for instrument struct
 //! - [`crate::equity_option`] for cash-settled volatility-index options
 
 pub(crate) mod metrics;

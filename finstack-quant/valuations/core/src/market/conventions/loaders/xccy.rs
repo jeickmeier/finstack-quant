@@ -1,7 +1,7 @@
 //! Loader for cross-currency swap conventions embedded in JSON registries.
 
-use crate::market::conventions::defs::XccyConventions;
 use crate::market::conventions::ids::XccyConventionId;
+use crate::market::conventions::XccyConventions;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
 use finstack_quant_core::types::IndexId;
@@ -21,7 +21,7 @@ struct XccyConventionRecord {
     business_day_convention: BusinessDayConvention,
     base_calendar_id: String,
     quote_calendar_id: String,
-    notional_exchange: crate::instruments::common_impl::parameters::NotionalExchange,
+    notional_exchange: crate::instruments::NotionalExchange,
 }
 
 impl XccyConventionRecord {
@@ -75,7 +75,7 @@ pub(crate) fn load_registry() -> Result<FxHashMap<XccyConventionId, XccyConventi
 #[cfg(test)]
 mod mtm_reset_loader_tests {
     use super::*;
-    use crate::instruments::common_impl::parameters::{NotionalExchange, ResettingSide};
+    use crate::instruments::{NotionalExchange, ResettingSide};
 
     #[test]
     fn eur_usd_xccy_convention_defaults_to_mtm_resetting_on_usd_leg2() {

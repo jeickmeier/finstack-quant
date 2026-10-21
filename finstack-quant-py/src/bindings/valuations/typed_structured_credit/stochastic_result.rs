@@ -6,7 +6,7 @@ use crate::bindings::core::money::PyMoney;
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, serde_to_py};
 use crate::bindings::valuations::convert::money_to_py;
 use crate::errors::{display_to_py, serde_json_to_py};
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::StochasticPricingResult;
+use finstack_quant_valuations::results::structured_credit::StochasticPricingResult;
 
 /// Stochastic (scenario-waterfall) pricing result of a structured-credit deal
 /// (``StructuredCredit.price_stochastic``'s return value).

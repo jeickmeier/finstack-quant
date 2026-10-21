@@ -54,7 +54,7 @@
 //! # Quick Example
 //!
 //! ```
-//! use finstack_quant_valuations_credit::CreditDefaultSwap;
+//! use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
 //!
 //! // Canonical 5-year investment-grade CDS with standard ISDA conventions.
 //! let cds = CreditDefaultSwap::example().expect("example");
@@ -68,9 +68,9 @@
 //!
 //! # See Also
 //!
-//! - [`CreditDefaultSwap`] for single-name CDS
-//! - [`CdsIndex`] for credit indices
-//! - [`CdsTranche`] for synthetic CDO tranches
+//! - [`CreditDefaultSwap`](crate::cds::CreditDefaultSwap) for single-name CDS
+//! - [`CdsIndex`](crate::cds_index::CdsIndex) for credit indices
+//! - [`CdsTranche`](crate::cds_tranche::CdsTranche) for synthetic CDO tranches
 //! - hazard curve calibration targets in `calibration::targets::hazard`
 
 /// CDS module - Single-name credit default swaps.
@@ -85,11 +85,6 @@ pub(crate) mod cs01;
 
 mod family;
 pub use family::CREDIT;
-
-pub use cds::CreditDefaultSwap;
-pub use cds_index::CdsIndex;
-pub use cds_option::{CdsOption, CdsOptionStrike, CdsOptionStrikeKind};
-pub use cds_tranche::CdsTranche;
 
 extern crate self as finstack_quant_valuations_credit;
 

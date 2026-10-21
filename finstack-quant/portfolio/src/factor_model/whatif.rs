@@ -425,12 +425,12 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{Attributes, CurveId};
-    use finstack_quant_factor::matching::{DependencyFilter, MappingRule, MatchingConfig};
     use finstack_quant_factor::SensitivityMatrix;
     use finstack_quant_factor::{
         CurveType, DependencyType, FactorCovarianceMatrix, FactorDefinition, FactorId,
         FactorModelConfig, FactorType, MarketMapping, RiskMeasure, UnmatchedPolicy,
     };
+    use finstack_quant_factor::{DependencyFilter, MappingRule, MatchingConfig};
     use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::MarketDependencies;
     use finstack_quant_valuations::pricer::InstrumentType;
@@ -806,7 +806,7 @@ mod tests {
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
-        use finstack_quant_factor::matching::{CreditHierarchicalConfig, ISSUER_ID_META_KEY};
+        use finstack_quant_factor::{CreditHierarchicalConfig, ISSUER_ID_META_KEY};
         use std::collections::BTreeMap;
 
         let as_of = date!(2024 - 01 - 01);
@@ -871,7 +871,7 @@ mod tests {
         })
         .map(|model| model.with_custom_sensitivity_engine(FixedSensitivityEngine))
         .expect("model");
-        let mut bond = finstack_quant_valuations::instruments::Bond::fixed(
+        let mut bond = finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
             "BOND-ISSUER-B",
             Money::from((1_000_000_i64, Currency::USD)),
             finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
@@ -1028,7 +1028,7 @@ mod tests {
                     curve_type: Some(CurveType::Discount),
                     id: None,
                 },
-                attribute_filter: finstack_quant_factor::matching::AttributeFilter::default(),
+                attribute_filter: finstack_quant_factor::AttributeFilter::default(),
                 factor_id: FactorId::new("Rates"),
             }]),
 

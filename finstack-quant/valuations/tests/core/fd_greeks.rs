@@ -2,7 +2,9 @@
 
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::{GenericFdVanna, GenericFdVega, GenericFdVolga};
+use finstack_quant_valuations::metrics::sensitivities::fd_greeks::{
+    GenericFdVanna, GenericFdVega, GenericFdVolga,
+};
 use std::sync::Arc;
 use time::macros::date;
 
@@ -10,7 +12,7 @@ use time::macros::date;
 fn generic_greeks_follow_the_active_override_without_a_surface() {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::{surfaces::VolSurface, term_structures::DiscountCurve};
-    use finstack_quant_valuations::instruments::EquityOption;
+    use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
     use finstack_quant_valuations::metrics::{MetricCalculator, MetricContext};
     let as_of = date!(2025 - 01 - 01);
     let mut option = EquityOption::example().expect("option");

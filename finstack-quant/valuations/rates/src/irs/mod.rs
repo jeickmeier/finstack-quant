@@ -82,11 +82,11 @@
 //!
 //! # Examples
 //!
-//! See [`InterestRateSwap`] for construction and usage examples.
+//! See [`InterestRateSwap`](crate::irs::InterestRateSwap) for construction and usage examples.
 //!
 //! # See Also
 //!
-//! - [`InterestRateSwap`] for the main swap struct
+//! - [`InterestRateSwap`](crate::irs::InterestRateSwap) for the main swap struct
 //! - `FixedLegSpec` for fixed leg specification
 //! - `FloatLegSpec` for floating leg specification
 //! - `PayReceive` for swap direction
@@ -100,8 +100,7 @@ pub(crate) mod pricer;
 mod types;
 
 pub use types::{
-    ConventionSwapParams, FixedLegSpec, FloatLegSpec, InterestRateSwap, InterestRateSwapBuilder,
-    IrsLegConventions, PayReceive,
+    ConventionSwapParams, InterestRateSwap, InterestRateSwapBuilder, IrsLegConventions,
 };
 
-pub(crate) use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::simple_average_unsupported;
+pub(crate) use finstack_quant_valuations_core::instruments::common_impl::parameters::simple_average_unsupported;

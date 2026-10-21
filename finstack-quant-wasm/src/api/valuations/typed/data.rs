@@ -17,13 +17,11 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndexParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AmortizationEvent;
-use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{
-    MertonMcConfig, PikSchedule,
-};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, CoverageRules, CoverageTestSpec, PenaltyStep, PoolAsset, PrepaymentPenalty,
     ScenarioTable, Tranche, TrancheStructure, Waterfall,
 };
+use finstack_quant_valuations::instruments::{MertonMcConfig, PikSchedule};
 use wasm_bindgen::prelude::*;
 
 /// An optional ISO-8601 date argument; `null` and `undefined` mean absent.

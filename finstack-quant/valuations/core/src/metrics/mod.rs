@@ -54,13 +54,20 @@
 // Internal submodules (organized by concern)
 
 mod aggregation;
+mod buckets;
 mod core;
+mod cross_factor_pair;
+pub(crate) mod period_cash;
 pub mod risk;
 #[doc(hidden)]
 pub mod sensitivities;
 
 // Core surface (supported)
 pub use aggregation::is_additive_metric;
+pub use buckets::{
+    format_bucket_label, format_bucket_label_cow, format_key_rate_label, parse_key_rate_label,
+    STANDARD_BUCKETS_YEARS, STANDARD_BUCKET_LABELS,
+};
 pub use core::finite_difference::bump_surface_vol_absolute;
 #[doc(hidden)]
 pub use core::ids::closest_metric_names;
@@ -69,15 +76,8 @@ pub use core::registry::{MetricRegistry, MetricRegistryError};
 pub use core::traits::{MetricCalculator, MetricContext};
 #[doc(hidden)]
 pub use core::universal::{register_universal_metrics, PricerPublishedMetric};
-/// Format a standard risk bucket (years) as a human-readable label.
-pub use sensitivities::config::{
-    format_bucket_label, format_key_rate_label, parse_key_rate_label, STANDARD_BUCKETS_YEARS,
-    STANDARD_BUCKET_LABELS,
-};
-#[doc(hidden)]
-pub use sensitivities::cross_factor::CrossFactorCalculator;
-pub use sensitivities::cross_factor::CrossFactorPair;
-pub use sensitivities::theta::{collect_cashflows_in_period, collect_period_cash, PeriodCash};
+pub use cross_factor_pair::CrossFactorPair;
+pub use period_cash::{collect_cashflows_in_period, collect_period_cash, PeriodCash};
 
 // Family-facing calculators and helpers.
 //
@@ -95,29 +95,11 @@ pub use core::finite_difference::{
     VOL_POINTS_PER_ABSOLUTE_VOL,
 };
 #[doc(hidden)]
-pub use sensitivities::carry_decomposition::{CarryDecompositionCalculator, YieldClock};
-#[doc(hidden)]
-pub use sensitivities::cross_factor::{
-    make_credit_bumper, make_fx_bumper, make_rates_bumper, make_spot_bumper, make_vol_bumper,
-};
-#[doc(hidden)]
-pub use sensitivities::cs01::{GenericBucketedCs01, GenericParallelCs01};
-#[doc(hidden)]
 pub use sensitivities::cs01_z_spread::{
     quoted_z_spread, ZSpreadBucketedCs01, ZSpreadCs01, ZSpreadCs01Inputs, ZSpreadParallelCs01,
 };
 #[doc(hidden)]
-pub use sensitivities::dv01::{Dv01CalculatorConfig, UnifiedDv01Calculator};
-#[doc(hidden)]
-pub use sensitivities::fd_greeks::{
-    GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVega, GenericFdVolga,
-};
-#[doc(hidden)]
-pub use sensitivities::option_greeks::OptionGreekCalculator;
-#[doc(hidden)]
 pub use sensitivities::rf_component_dv01::{RfComponentDv01Calculator, RfComponentPriced};
-#[doc(hidden)]
-pub use sensitivities::theta::{calculate_theta_date, theta_period};
 #[doc(hidden)]
 pub use sensitivities::vega::KeyRateVega;
 

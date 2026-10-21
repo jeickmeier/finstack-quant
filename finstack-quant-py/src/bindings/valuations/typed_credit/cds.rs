@@ -7,10 +7,11 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::{core_to_py, value_error};
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_valuations::instruments::credit_derivatives::cds::CdsValuationConvention;
-use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations::market::conventions::CdsConvention;
+use finstack_quant_valuations::market::conventions::CdsValuationConvention;
 use rust_decimal::prelude::ToPrimitive;
 
 use super::super::convert::{
@@ -70,7 +71,8 @@ pub(crate) fn cds_convention_from_str(value: &str) -> PyResult<CdsConvention> {
 #[derive(Clone)]
 pub struct PyCreditDefaultSwap {
     /// Inner canonical Rust CDS.
-    pub(crate) inner: finstack_quant_valuations::instruments::CreditDefaultSwap,
+    pub(crate) inner:
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap,
 }
 
 impl PyCreditDefaultSwap {
@@ -88,7 +90,7 @@ instrument_envelope_methods!(
     CreditDefaultSwap,
     "credit_default_swap",
     PyCreditDefaultSwapBuilder,
-    finstack_quant_valuations::instruments::CreditDefaultSwap::builder()
+    finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap::builder()
 );
 instrument_pricing_methods!(PyCreditDefaultSwap);
 
@@ -113,7 +115,7 @@ impl PyCreditDefaultSwap {
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
         Ok(Self {
-            inner: finstack_quant_valuations::instruments::CreditDefaultSwap::example()
+            inner: finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap::example()
                 .map_err(core_to_py)?,
         })
     }

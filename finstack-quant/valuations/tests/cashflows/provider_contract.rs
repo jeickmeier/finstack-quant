@@ -195,7 +195,7 @@ fn minimal_market() -> MarketContext {
 
 mod bond_contract {
     use super::*;
-    use finstack_quant_valuations::instruments::Bond;
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 
     #[test]
     fn fixed_bond_satisfies_contract() {
@@ -258,7 +258,7 @@ mod bond_contract {
 
 mod irs_contract {
     use super::*;
-    use finstack_quant_valuations::instruments::rates::irs::PayReceive;
+    use finstack_quant_valuations::instruments::PayReceive;
 
     #[test]
     fn usd_swap_pay_fixed_satisfies_contract() {
@@ -337,15 +337,19 @@ mod repo_contract {
 
 mod empty_schedule_contract {
     use super::*;
+    use finstack_quant_valuations::instruments::commodity::commodity_future::CommodityFuture;
+    use finstack_quant_valuations::instruments::commodity::commodity_future_option::CommodityFutureOption;
+    use finstack_quant_valuations::instruments::equity::equity_future::EquityFuture;
+    use finstack_quant_valuations::instruments::equity::equity_future_option::EquityFutureOption;
+    use finstack_quant_valuations::instruments::equity::equity_total_return_future::EquityTotalReturnFuture;
     use finstack_quant_valuations::instruments::equity::spot::Equity;
     use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
     use finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;
+    use finstack_quant_valuations::instruments::fx::fx_future::FxFuture;
+    use finstack_quant_valuations::instruments::fx::fx_future_option::FxFutureOption;
     use finstack_quant_valuations::instruments::fx::fx_variance_swap::FxVarianceSwap;
     use finstack_quant_valuations::instruments::rates::ir_future::InterestRateFuture;
-    use finstack_quant_valuations::instruments::{
-        CommodityFuture, CommodityFutureOption, EquityFuture, EquityFutureOption,
-        EquityTotalReturnFuture, FxFuture, FxFutureOption, InterestRateFutureOption,
-    };
+    use finstack_quant_valuations::instruments::rates::ir_future_option::InterestRateFutureOption;
 
     #[test]
     fn no_residual_products_emit_empty_no_residual_schedules() {
@@ -444,7 +448,7 @@ mod empty_schedule_contract {
 
 mod term_loan_contract {
     use super::*;
-    use finstack_quant_valuations::instruments::TermLoan;
+    use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 
     #[test]
     fn example_term_loan_satisfies_contract() {

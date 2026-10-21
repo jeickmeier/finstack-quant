@@ -20,15 +20,17 @@ fn parse_simm_version(version: &str) -> PyResult<fm::SimmVersion> {
         .map_err(crate::errors::value_error)
 }
 
-fn parse_credit_sector(sector: &str) -> PyResult<fm::SimmCreditSector> {
+fn parse_credit_sector(sector: &str) -> PyResult<fm::types::SimmCreditSector> {
     sector
-        .parse::<fm::SimmCreditSector>()
+        .parse::<fm::types::SimmCreditSector>()
         .map_err(crate::errors::value_error)
 }
 
-fn parse_schedule_asset_class(asset_class: &str) -> PyResult<fm::ScheduleAssetClass> {
+fn parse_schedule_asset_class(
+    asset_class: &str,
+) -> PyResult<fm::calculators::im::schedule::ScheduleAssetClass> {
     asset_class
-        .parse::<fm::ScheduleAssetClass>()
+        .parse::<fm::calculators::im::schedule::ScheduleAssetClass>()
         .map_err(crate::errors::value_error)
 }
 
@@ -49,7 +51,7 @@ fn parse_schedule_asset_class(asset_class: &str) -> PyResult<fm::ScheduleAssetCl
 )]
 #[derive(Clone)]
 pub struct PySimmSensitivities {
-    pub(crate) inner: fm::SimmSensitivities,
+    pub(crate) inner: fm::types::SimmSensitivities,
 }
 
 #[pymethods]
@@ -60,7 +62,7 @@ impl PySimmSensitivities {
     #[pyo3(signature = (base_currency))]
     fn new(base_currency: &str) -> PyResult<Self> {
         Ok(Self {
-            inner: fm::SimmSensitivities::new(parse_currency(base_currency)?),
+            inner: fm::types::SimmSensitivities::new(parse_currency(base_currency)?),
         })
     }
 
@@ -78,7 +80,7 @@ impl PySimmSensitivities {
     /// malformed input.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner = fm::SimmSensitivities::from_json(json).map_err(core_to_py)?;
+        let inner = fm::types::SimmSensitivities::from_json(json).map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -114,7 +116,7 @@ impl PySimmSensitivities {
     #[staticmethod]
     #[pyo3(signature = (frame, base_currency))]
     fn from_dataframe(frame: &Bound<'_, PyAny>, base_currency: &str) -> PyResult<Self> {
-        let inner = fm::SimmSensitivities::from_rows(
+        let inner = fm::types::SimmSensitivities::from_rows(
             parse_currency(base_currency)?,
             &sensitivity_rows(frame)?,
         )
@@ -380,7 +382,7 @@ impl PySimmSensitivities {
 )]
 #[derive(Clone)]
 pub struct PySimmCalculator {
-    pub(super) inner: fm::SimmCalculator,
+    pub(super) inner: fm::calculators::im::SimmCalculator,
 }
 
 #[pymethods]
@@ -398,7 +400,7 @@ impl PySimmCalculator {
             Some(version) => parse_simm_version(version)?,
             None => fm::SimmVersion::default(),
         };
-        let mut inner = fm::SimmCalculator::new(version).map_err(core_to_py)?;
+        let mut inner = fm::calculators::im::SimmCalculator::new(version).map_err(core_to_py)?;
         if let Some(days) = mpor_days {
             inner = inner.with_mpor(days);
         }
@@ -430,9 +432,11 @@ impl PySimmCalculator {
     #[staticmethod]
     #[pyo3(signature = (version, config))]
     fn from_finstack_config(version: &str, config: PyRef<'_, PyFinstackConfig>) -> PyResult<Self> {
-        let inner =
-            fm::SimmCalculator::from_finstack_config(parse_simm_version(version)?, &config.inner)
-                .map_err(core_to_py)?;
+        let inner = fm::calculators::im::SimmCalculator::from_finstack_config(
+            parse_simm_version(version)?,
+            &config.inner,
+        )
+        .map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -509,7 +513,7 @@ impl PySimmCalculator {
 )]
 #[derive(Clone)]
 pub struct PyScheduleImCalculator {
-    inner: fm::ScheduleImCalculator,
+    inner: fm::calculators::im::schedule::ScheduleImCalculator,
 }
 
 #[pymethods]
@@ -519,7 +523,8 @@ impl PyScheduleImCalculator {
     #[staticmethod]
     fn bcbs_standard() -> PyResult<Self> {
         Ok(Self {
-            inner: fm::ScheduleImCalculator::bcbs_standard().map_err(core_to_py)?,
+            inner: fm::calculators::im::schedule::ScheduleImCalculator::bcbs_standard()
+                .map_err(core_to_py)?,
         })
     }
 
@@ -529,7 +534,10 @@ impl PyScheduleImCalculator {
     #[staticmethod]
     fn from_registry_id(schedule_id: &str) -> PyResult<Self> {
         Ok(Self {
-            inner: fm::ScheduleImCalculator::from_registry_id(schedule_id).map_err(core_to_py)?,
+            inner: fm::calculators::im::schedule::ScheduleImCalculator::from_registry_id(
+                schedule_id,
+            )
+            .map_err(core_to_py)?,
         })
     }
 
@@ -557,8 +565,10 @@ impl PyScheduleImCalculator {
     #[pyo3(signature = (config))]
     fn from_finstack_config(config: PyRef<'_, PyFinstackConfig>) -> PyResult<Self> {
         Ok(Self {
-            inner: fm::ScheduleImCalculator::from_finstack_config(&config.inner)
-                .map_err(core_to_py)?,
+            inner: fm::calculators::im::schedule::ScheduleImCalculator::from_finstack_config(
+                &config.inner,
+            )
+            .map_err(core_to_py)?,
         })
     }
 
@@ -684,7 +694,7 @@ impl PyScheduleImCalculator {
 )]
 #[derive(Clone)]
 pub struct PyHaircutImCalculator {
-    inner: fm::HaircutImCalculator,
+    inner: fm::calculators::im::HaircutImCalculator,
 }
 
 #[pymethods]
@@ -694,7 +704,7 @@ impl PyHaircutImCalculator {
     #[staticmethod]
     fn bcbs_standard() -> PyResult<Self> {
         Ok(Self {
-            inner: fm::HaircutImCalculator::bcbs_standard().map_err(core_to_py)?,
+            inner: fm::calculators::im::HaircutImCalculator::bcbs_standard().map_err(core_to_py)?,
         })
     }
 
@@ -703,7 +713,7 @@ impl PyHaircutImCalculator {
     #[staticmethod]
     fn us_treasuries() -> PyResult<Self> {
         Ok(Self {
-            inner: fm::HaircutImCalculator::us_treasuries().map_err(core_to_py)?,
+            inner: fm::calculators::im::HaircutImCalculator::us_treasuries().map_err(core_to_py)?,
         })
     }
 
@@ -711,7 +721,7 @@ impl PyHaircutImCalculator {
     #[staticmethod]
     fn from_schedule(schedule: &PyEligibleCollateralSchedule) -> Self {
         Self {
-            inner: fm::HaircutImCalculator::new(schedule.inner.clone()),
+            inner: fm::calculators::im::HaircutImCalculator::new(schedule.inner.clone()),
         }
     }
 

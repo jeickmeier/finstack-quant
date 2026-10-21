@@ -99,10 +99,6 @@ pub const MAX_RECOVERY_RATE: f64 = 1.0;
 pub const MC_CLOCK_DAY_COUNT: finstack_quant_core::dates::DayCount =
     finstack_quant_core::dates::DayCount::Act365F;
 
-pub use cashflow_engine::{PathAwareCashflowSchedule, ThreeFactorPathData};
-pub use pricing::unified::EnhancedMonteCarloResult;
-pub use pricing::unified::PathResult;
-pub use pricing::unified::RevolvingCreditPricer;
 pub use types::{
     DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditBuilder, RevolvingCreditFees,
     UtilizationProcess,

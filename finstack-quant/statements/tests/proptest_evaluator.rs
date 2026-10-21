@@ -2,7 +2,10 @@
 //!
 //! Verifies that evaluation produces consistent results.
 
-use finstack_quant_statements::prelude::*;
+use finstack_quant_core::dates::PeriodId;
+use finstack_quant_statements::builder::ModelBuilder;
+use finstack_quant_statements::evaluator::Evaluator;
+use finstack_quant_statements::types::{AmountOrScalar, ForecastSpec};
 use proptest::prelude::*;
 
 proptest! {

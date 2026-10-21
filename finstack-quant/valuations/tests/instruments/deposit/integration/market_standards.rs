@@ -294,7 +294,7 @@ fn test_usd_deposit_friday_trade_with_nyse_calendar() {
         .day_count(DayCount::Act360)
         .fixed_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
         .discount_curve_id(CurveId::new("USD-OIS"))
-        .attributes(finstack_quant_valuations::instruments::Attributes::new())
+        .attributes(finstack_quant_core::types::Attributes::new())
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(Some("nyse".into()))
         .build()
@@ -367,7 +367,7 @@ fn test_deposit_without_spot_lag_uses_raw_dates() {
         .day_count(DayCount::Act360)
         .fixed_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
         .discount_curve_id(CurveId::new("USD-OIS"))
-        .attributes(finstack_quant_valuations::instruments::Attributes::new())
+        .attributes(finstack_quant_core::types::Attributes::new())
         .build()
         .expect("Valid deposit");
 
@@ -400,7 +400,7 @@ fn test_gbp_deposit_t0_settlement() {
         .day_count(DayCount::Act365F) // GBP uses Act/365
         .fixed_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
         .discount_curve_id(CurveId::new("GBP-OIS"))
-        .attributes(finstack_quant_valuations::instruments::Attributes::new())
+        .attributes(finstack_quant_core::types::Attributes::new())
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .build()
         .expect("Valid deposit");
@@ -451,7 +451,7 @@ fn test_modified_following_eom_adjustment() {
         .day_count(DayCount::Act360)
         .fixed_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
         .discount_curve_id(CurveId::new("USD-OIS"))
-        .attributes(finstack_quant_valuations::instruments::Attributes::new())
+        .attributes(finstack_quant_core::types::Attributes::new())
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(Some("nyse".into()))
         .build()

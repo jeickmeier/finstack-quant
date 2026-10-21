@@ -111,7 +111,8 @@ the market, the valuation date, the requested metric IDs, and a `PricingOptions`
 ```rust,no_run
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_valuations::instruments::{Bond, Instrument, PricingOptions};
+use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 

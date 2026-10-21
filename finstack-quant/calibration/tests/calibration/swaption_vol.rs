@@ -26,9 +26,10 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::FxHashMap;
-use finstack_quant_valuations_core::instruments::{OptionType, SettlementType, VolatilityModel};
+use finstack_quant_models::types::OptionType;
+use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec};
+use finstack_quant_valuations_core::instruments::{SettlementType, VolatilityModel};
 use finstack_quant_valuations_core::market::conventions::ids::SwaptionConventionId;
-use finstack_quant_valuations_rates::irs::{FixedLegSpec, FloatLegSpec};
 use finstack_quant_valuations_rates::swaption::{CashSettlementMethod, Swaption};
 use rust_decimal::Decimal;
 

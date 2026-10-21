@@ -18,9 +18,10 @@ use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     AbsChargeOffCalculator, AbsCreditEnhancementCalculator, AssetPool, CmbsDscrCalculator,
-    DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
+    DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
 };
 use std::sync::Arc;
 use time::Month;

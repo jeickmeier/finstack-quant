@@ -18,6 +18,7 @@ use finstack_quant_core::market_data::hierarchy::HierarchyTarget;
 use finstack_quant_scenarios::{
     CurveKind, OperationSpec, ScenarioEngine, ScenarioSpec, TimeRollMode,
 };
+use finstack_quant_valuations::pricer::InstrumentType;
 use fixtures::{
     apply_market, apply_with_instruments, compose_specs, hierarchy_hazard_market, hierarchy_market,
     lean_market, sample_bonds, spec, USD_SOFR,
@@ -158,7 +159,7 @@ fn scaling_instrument_spread(c: &mut Criterion) {
     let scenario = spec(
         "spread",
         vec![OperationSpec::InstrumentSpreadBpByType {
-            instrument_types: vec![finstack_quant_valuations::pricer::InstrumentType::Bond],
+            instrument_types: vec![InstrumentType::Bond],
             bp: 25.0,
         }],
     );

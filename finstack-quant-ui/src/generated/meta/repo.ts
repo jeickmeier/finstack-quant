@@ -367,7 +367,7 @@ export default [
   {
     "path": "#/$defs/d_10afa2c48803544dc415",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PikSchedule",
-    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_core::instruments::common_impl::parameters::merton_mc::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
+    "description": "Time-varying PIK schedule for the MC engine.\n\nControls per-coupon PIK behavior, either uniformly or as a step\nfunction over time.\n\n# Examples\n\n```\nuse finstack_quant_valuations_core::instruments::{PikMode, PikSchedule};\n\n// All coupons PIK\nlet uniform = PikSchedule::Uniform(PikMode::Pik);\n\n// PIK for first 2 years, then cash\nlet stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);\n\n// Toggle for 3 years, then mandatory cash\nlet toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);\n```"
   },
   {
     "path": "#/$defs/d_10afa2c48803544dc415/oneOf/0",
@@ -2605,7 +2605,7 @@ export default [
   {
     "path": "#/$defs/d_b0a5fc543381da6a5722",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MarketQuoteOverrides",
-    "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price_pct` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)"
+    "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price_pct` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)"
   },
   {
     "path": "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -2688,7 +2688,7 @@ export default [
   {
     "path": "#/$defs/d_b32008096bd7f5db3ef6",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/repo.schema.json#/$defs/EligibleCollateralSchedule",
-    "description": "Eligible collateral schedule with haircuts.\n\nDefines the complete set of collateral types accepted under a CSA\nor margin agreement, along with associated haircuts and constraints.\n\n# Example\n\n```\nuse finstack_quant_margin::{CollateralEligibility, EligibleCollateralSchedule};\n\n// Start from a standard schedule (BCBS-IOSCO compliant)\nlet schedule = EligibleCollateralSchedule::bcbs_standard()?;\n# let _ = schedule;\n# Ok::<(), finstack_quant_core::Error>(())\n```"
+    "description": "Eligible collateral schedule with haircuts.\n\nDefines the complete set of collateral types accepted under a CSA\nor margin agreement, along with associated haircuts and constraints.\n\n# Example\n\n```\nuse finstack_quant_margin::types::{CollateralEligibility, EligibleCollateralSchedule};\n\n// Start from a standard schedule (BCBS-IOSCO compliant)\nlet schedule = EligibleCollateralSchedule::bcbs_standard()?;\n# let _ = schedule;\n# Ok::<(), finstack_quant_core::Error>(())\n```"
   },
   {
     "path": "#/$defs/d_b32008096bd7f5db3ef6/properties/default_haircut",
@@ -3689,7 +3689,7 @@ export default [
   {
     "path": "#/$defs/d_bffef9e684ff0c351c83",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcOverride",
-    "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
+    "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
     "ref": "#/$defs/MertonMcConfig",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig"
   },
@@ -4126,7 +4126,7 @@ export default [
   {
     "path": "#/$defs/d_deef56e3a9e2f83fbb27",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/repo.schema.json#/$defs/RepoMarginSpec",
-    "description": "GMRA 2011 compliant repo margin specification.\n\nDefines margin maintenance parameters for repurchase agreements\nfollowing GMRA 2011 standards.\n\n# Example\n\n```\nuse finstack_quant_margin::{EligibleCollateralSchedule, MarginTenor, RepoMarginSpec, RepoMarginType};\n\nlet margin_spec = RepoMarginSpec {\n    margin_type: RepoMarginType::MarkToMarket,\n    margin_ratio: 1.02,           // 2% over-collateralization\n    margin_call_threshold: 0.01,  // 1% deviation triggers call\n    call_frequency: MarginTenor::Daily,\n    settlement_lag: 1,\n    pays_margin_interest: true,\n    margin_interest_rate: Some(0.05),\n    substitution_allowed: true,\n    eligible_substitutes: Some(EligibleCollateralSchedule::us_treasuries()?),\n};\n# Ok::<(), finstack_quant_core::Error>(())\n```\n\n# GMRA 2011 References\n\n- Paragraph 4: Margin Maintenance\n- Paragraph 5: Income Payments\n- Paragraph 8: Substitution\n- Annex I: Margin Ratio and Haircut"
+    "description": "GMRA 2011 compliant repo margin specification.\n\nDefines margin maintenance parameters for repurchase agreements\nfollowing GMRA 2011 standards.\n\n# Example\n\n```\nuse finstack_quant_margin::types::{EligibleCollateralSchedule, MarginTenor, RepoMarginSpec, RepoMarginType};\n\nlet margin_spec = RepoMarginSpec {\n    margin_type: RepoMarginType::MarkToMarket,\n    margin_ratio: 1.02,           // 2% over-collateralization\n    margin_call_threshold: 0.01,  // 1% deviation triggers call\n    call_frequency: MarginTenor::Daily,\n    settlement_lag: 1,\n    pays_margin_interest: true,\n    margin_interest_rate: Some(0.05),\n    substitution_allowed: true,\n    eligible_substitutes: Some(EligibleCollateralSchedule::us_treasuries()?),\n};\n# Ok::<(), finstack_quant_core::Error>(())\n```\n\n# GMRA 2011 References\n\n- Paragraph 4: Margin Maintenance\n- Paragraph 5: Income Payments\n- Paragraph 8: Substitution\n- Annex I: Margin Ratio and Haircut"
   },
   {
     "path": "#/$defs/d_deef56e3a9e2f83fbb27/properties/call_frequency",
@@ -4391,7 +4391,7 @@ export default [
   {
     "path": "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp",
     "source": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#/properties/scenario_spread_shock_bp",
-    "description": "Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).\n\nApplied as an additional flat Z-spread during valuation by pricers that\nsupport spread-based revaluation. Currently consumed by `Bond::base_value`\nfor bonds without embedded options, without an assigned credit curve, and\nwithout a price-pinning quote override other than `quoted_z_spread`\n(where the shock is additive on the quoted spread). See\n[`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).\n\nSetting this on an unsupported configuration produces a validation error\nat pricing time rather than a silent no-op. For hazard-priced (credit\ncurve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).",
+    "description": "Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).\n\nApplied as an additional flat Z-spread during valuation by pricers that\nsupport spread-based revaluation. Currently consumed by `Bond::base_value`\nfor bonds without embedded options, without an assigned credit curve, and\nwithout a price-pinning quote override other than `quoted_z_spread`\n(where the shock is additive on the quoted spread). See\n[`Instrument::scenario_spread_shock_supported`](crate::instruments::Instrument::scenario_spread_shock_supported).\n\nSetting this on an unsupported configuration produces a validation error\nat pricing time rather than a silent no-op. For hazard-priced (credit\ncurve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).",
     "format": "double"
   },
   {

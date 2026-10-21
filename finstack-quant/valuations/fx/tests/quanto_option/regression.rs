@@ -9,10 +9,11 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
+use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::{
-    Attributes, Instrument, OptionGreekKind, OptionGreeksProvider, OptionGreeksRequest, OptionType,
-    PricingOptions,
+    Instrument, OptionGreekKind, OptionGreeksProvider, OptionGreeksRequest, PricingOptions,
 };
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_fx::quanto_option::QuantoOption;

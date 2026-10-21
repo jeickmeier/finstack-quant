@@ -4,18 +4,19 @@
 //! including equities, bonds, ETFs, and other instruments by leveraging existing
 //! pricing infrastructure.
 
-use crate::instruments::common_impl::traits::{Attributes, Instrument};
+use crate::instruments::Instrument;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::{fx::FxConversionPolicy, Money};
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{InstrumentId, PriceId};
 use finstack_quant_core::validation;
 use finstack_quant_core::Result;
 
 use crate::instruments::json_loader::InstrumentJson;
 
-use crate::instruments::common_impl::traits::impl_instrument_base;
+use crate::impl_instrument_base;
 use serde::{Deserialize, Serialize};
 
 /// Type of asset in the basket
@@ -129,23 +130,24 @@ pub struct Basket {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "crate::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
-    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    pub instrument_pricing_overrides:
+        crate::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "crate::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "crate::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
-    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    pub metric_pricing_overrides: crate::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "crate::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "crate::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
-    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
+    pub scenario_pricing_overrides: crate::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
     /// Pricing configuration
@@ -328,16 +330,14 @@ impl Instrument for Basket {
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        crate::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
+        let mut deps = crate::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         for constituent in &self.constituents {
             match &constituent.reference {
-                ConstituentReference::Instrument(instrument) => {
-                    deps.merge(crate::instruments::market_dependencies_of(instrument)?)
-                }
+                ConstituentReference::Instrument(instrument) => deps.merge(
+                    crate::instruments::json_loader::market_dependencies_of(instrument)?,
+                ),
                 ConstituentReference::MarketData { price_id, .. } => {
                     deps.add_market_scalar_id(price_id.as_str());
                 }
@@ -354,7 +354,7 @@ impl Instrument for Basket {
         Money::new(scaled, self.notional.currency())
     }
 
-    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    crate::impl_focused_pricing_overrides!();
 }
 
 // Declare canonical market dependencies for the DV01 calculator.
@@ -470,7 +470,7 @@ mod tests {
         BasketConstituent {
             id: id.to_string(),
             reference: ConstituentReference::Instrument(Box::new(InstrumentJson::Equity(
-                crate::instruments::Equity::new(id, id, Currency::USD)
+                crate::instruments::equity::spot::Equity::new(id, id, Currency::USD)
                     .with_quantity(1.0)
                     .with_quoted_spot(spot),
             ))),

@@ -22,9 +22,8 @@
 //! therefore reprice instead of failing on the unpublished fixing.
 
 use crate::instruments::common_impl::pricing::coupon_period::icma_reference_period;
-use crate::metrics::sensitivities::theta::{
-    calculate_theta_date, collect_period_cash_cached, theta_termination_date,
-};
+use crate::metrics::period_cash::collect_period_cash_cached;
+use crate::metrics::sensitivities::theta::{calculate_theta_date, theta_termination_date};
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::traits::Discounting;
@@ -127,7 +126,7 @@ impl CarryDecompositionCalculator {
 impl MetricCalculator for CarryDecompositionCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let expiry_date = theta_termination_date(context)?;
-        let period = crate::metrics::theta_period(context);
+        let period = crate::metrics::sensitivities::theta::theta_period(context);
 
         let rolled_date = calculate_theta_date(context.as_of, period, expiry_date)?;
 
@@ -171,7 +170,8 @@ impl MetricCalculator for CarryDecompositionCalculator {
             // bond over a full coupon period this is ~0; for a zero-coupon
             // bond it is the full accretion.
             let accretion = self.clock.accretion_factor(context, ytm, rolled_date)?;
-            let payments = super::theta::period_cash_by_date_cached(context, rolled_date)?;
+            let payments =
+                crate::metrics::period_cash::period_cash_by_date_cached(context, rolled_date)?;
             let mut intermediate_accretion = 0.0;
             for (payment_date, amount) in payments {
                 let at_payment = self.clock.accretion_factor(context, ytm, payment_date)?;

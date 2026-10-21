@@ -32,9 +32,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IssuerId};
 use finstack_quant_core::Result;
 use finstack_quant_factor::credit::hierarchy::{CreditFactorModel, IssuerBetaRow};
-use finstack_quant_factor::matching::{
-    bucket_factor_id, CREDIT_GENERIC_FACTOR_ID, ISSUER_ID_META_KEY,
-};
+use finstack_quant_factor::{bucket_factor_id, CREDIT_GENERIC_FACTOR_ID, ISSUER_ID_META_KEY};
 
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::recalibration::{
@@ -723,18 +721,19 @@ mod tests {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::term_structures::HazardCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_factor::credit::hierarchy::{
         AdderVolSource, CreditCalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec,
         DateRange, FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
         IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
     };
-    use finstack_quant_factor::matching::MatchingConfig;
+    use finstack_quant_factor::MatchingConfig;
     use finstack_quant_factor::{
         FactorCovarianceMatrix, FactorDefinition, FactorId, FactorModelConfig, FactorType,
         MarketMapping,
     };
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     use finstack_quant_valuations::instruments::Instrument;
-    use finstack_quant_valuations::instruments::{Attributes, Bond};
     use time::Month;
 
     fn empty_factor_config() -> FactorModelConfig {

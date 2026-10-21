@@ -104,7 +104,7 @@ fn test_yf_scales_with_period_length() {
 fn test_yf_zero_period() {
     // Setup - same start and end date is invalid
     let base = date(2025, 1, 1);
-    let result = finstack_quant_valuations::instruments::Deposit::builder()
+    let result = finstack_quant_valuations::instruments::rates::deposit::Deposit::builder()
         .id(finstack_quant_core::types::InstrumentId::new("DEP-ZERO-YF"))
         .notional(
             finstack_quant_core::money::Money::new(

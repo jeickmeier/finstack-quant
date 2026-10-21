@@ -25,7 +25,7 @@ pub(crate) mod z_spread;
 
 use crate::bond::pricing::quote_conversions::japanese_simple_yield;
 use crate::bond::pricing::settlement::QuoteDateContext;
-use crate::Bond;
+use crate::bond::Bond;
 pub(crate) use asw::{AssetSwapMarketCalculator, AssetSwapParCalculator};
 pub use dm::DiscountMarginCalculator;
 pub(crate) use embedded_option_value::EmbeddedOptionValueCalculator;

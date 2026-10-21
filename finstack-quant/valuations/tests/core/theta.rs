@@ -1,7 +1,7 @@
 //! Period cash collection over built-in money-market instruments.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_valuations::instruments::Deposit;
+use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::metrics::collect_period_cash;
 use time::macros::date;
 

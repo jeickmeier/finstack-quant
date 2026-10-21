@@ -41,7 +41,7 @@
 //!
 //! # See Also
 //!
-//! - [`FxTouchOption`] for the instrument struct
+//! - [`FxTouchOption`](crate::fx_touch_option::FxTouchOption) for the instrument struct
 //! - `pricer::compute_pv` for pricing calculations
 
 /// FX touch option risk metrics
@@ -50,4 +50,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
-pub use types::{BarrierDirection, FxTouchOption, PayoutTiming, TouchType};
+pub use types::{FxTouchOption, TouchType};

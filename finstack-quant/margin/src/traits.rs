@@ -3,8 +3,8 @@
 //! Defines the common interface for instruments that support margin calculations,
 //! enabling uniform margin metric calculation and portfolio aggregation.
 
-use crate::types::repo_margin::RepoMarginSpec;
 use crate::types::OtcMarginSpec;
+use crate::types::RepoMarginSpec;
 use crate::types::{NettingSetId, SimmSensitivities};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -27,7 +27,7 @@ use finstack_quant_core::Result;
 ///   MtM unless that is explicitly the regulatory exposure input for the
 ///   instrument.
 /// - [`Self::simm_sensitivities`] must return sensitivities in the units
-///   documented by [`crate::SimmSensitivities`], especially for DV01/CS01-style
+///   documented by [`crate::types::SimmSensitivities`], especially for DV01/CS01-style
 ///   inputs where decimal-vs-basis-point mistakes materially change IM.
 pub trait Marginable: Send + Sync {
     /// Get the instrument's unique identifier.
@@ -56,7 +56,7 @@ pub trait Marginable: Send + Sync {
     /// # Returns
     ///
     /// A [`SimmSensitivities`] value whose buckets use the conventions in
-    /// [`crate::SimmSensitivities`]. In particular, delta and vega values should
+    /// [`crate::types::SimmSensitivities`]. In particular, delta and vega values should
     /// already be expressed in currency amounts per the SIMM risk measure being
     /// populated rather than raw quote moves.
     ///

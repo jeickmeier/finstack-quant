@@ -16,10 +16,10 @@ use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder};
 use finstack_quant_statements::capital_structure::{
     BondConventionParams, SwapConventions, SwapParams, WaterfallSpec,
 };
+use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{
     AmountOrScalar, FinancialStatementInstrument, ForecastSpec, NodeSpec,
 };
-use finstack_quant_statements::FinancialModelSpec;
 use indexmap::IndexMap;
 use wasm_bindgen::prelude::*;
 
@@ -591,7 +591,7 @@ impl JsModelBuilder {
     #[wasm_bindgen(js_name = addDebt)]
     pub fn add_debt(&mut self, id: JsValue, instrument: JsValue) -> Result<(), JsValue> {
         let id = js_string(&id, "id")?;
-        let spec = finstack_quant_valuations::pricer::json::parse_instrument_from_json(&json_text(
+        let spec = finstack_quant_valuations::pricer::parse_instrument_from_json(&json_text(
             &instrument,
             "instrument",
         )?)

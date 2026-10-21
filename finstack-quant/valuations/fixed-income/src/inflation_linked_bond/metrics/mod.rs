@@ -14,7 +14,7 @@ use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
@@ -34,9 +34,9 @@ pub(crate) fn register_ilb_metrics(
             (IndexRatio, IndexRatioCalculator),
             (RealDuration, RealDurationCalculator),
             (BreakevenInflation, BreakevenInflationCalculator),
-            (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             // Theta is now registered universally in crate::FIXED_INCOME.metrics()
-            (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             // Custom metric: projected inflation-rate sensitivity per 1bp.
             (Inflation01, Inflation01Calculator),
             // Custom metric: InflationConvexity (second-order inflation sensitivity)
@@ -180,8 +180,9 @@ mod inflation_convexity_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
-    use finstack_quant_valuations_core::instruments::{InstrumentPricingOverrides, PricingOptions};
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::Instrument;
+    use finstack_quant_valuations_core::instruments::PricingOptions;
     use finstack_quant_valuations_core::metrics::MetricId;
     use time::macros::date;
 

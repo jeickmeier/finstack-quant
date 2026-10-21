@@ -3,7 +3,7 @@
 //!
 use crate::types::PositionId;
 use finstack_quant_core::types::Attributes;
-use finstack_quant_factor::matching::FactorMatcher;
+use finstack_quant_factor::FactorMatcher;
 use finstack_quant_factor::{FactorId, MarketDependency};
 
 /// Assignment results for a portfolio-level factor mapping pass.
@@ -48,7 +48,7 @@ pub struct UnmatchedEntry {
 ///
 /// # Errors
 ///
-/// Propagates [`finstack_quant_factor::matching::FactorMatchError`] (as a
+/// Propagates [`finstack_quant_factor::FactorMatchError`] (as a
 /// validation error) when the matcher recognises a dependency but cannot
 /// produce a deterministic answer (e.g. a required issuer tag is missing),
 /// matching the fail-loud behavior of the sensitivity path.
@@ -93,7 +93,7 @@ pub(crate) fn assign_position_factors(
 mod tests {
     use super::*;
     use finstack_quant_core::types::{Attributes, CurveId};
-    use finstack_quant_factor::matching::{
+    use finstack_quant_factor::{
         AttributeFilter, DependencyFilter, FactorMatchEntry, FactorMatchError, MappingRule,
         MappingTableMatcher,
     };

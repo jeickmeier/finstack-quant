@@ -3,7 +3,7 @@
 //! Computes IRR to fixed horizons (2y, 3y, 4y) using kind-aware cashflow
 //! filtering and outstanding principal at the horizon date for redemption.
 
-use crate::TermLoan;
+use crate::term_loan::TermLoan;
 use finstack_quant_core::dates::Date;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 

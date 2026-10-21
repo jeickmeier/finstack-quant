@@ -5,10 +5,10 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
+use finstack_quant_margin::types::NettingSetId;
+use finstack_quant_margin::types::OtcMarginSpec;
+use finstack_quant_margin::types::SimmSensitivities;
 use finstack_quant_margin::Marginable;
-use finstack_quant_margin::NettingSetId;
-use finstack_quant_margin::OtcMarginSpec;
-use finstack_quant_margin::SimmSensitivities;
 use finstack_quant_valuations_core::instruments::common_impl::margin::netting_set_id_from_spec;
 use finstack_quant_valuations_core::instruments::PayReceive;
 
@@ -48,7 +48,7 @@ impl Marginable for EquityTotalReturnSwap {
     }
 
     fn mtm_for_vm(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+        use finstack_quant_valuations_core::instruments::Instrument;
         self.value(market, as_of)
     }
 }

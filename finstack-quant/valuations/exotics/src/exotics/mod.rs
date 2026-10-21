@@ -11,7 +11,7 @@
 //! - **Barrier Options**: Knock-in/knock-out based on barrier crossing
 //! - **Lookback Options**: Payoff based on path extremum (max or min)
 //! - **Range Accruals**: Coupons accruing only while an index stays in a range,
-//!   with an optional issuer call ([`CallableRangeAccrual`])
+//!   with an optional issuer call ([`CallableRangeAccrual`](crate::exotics::callable_range_accrual::CallableRangeAccrual))
 //! - **Structured Rate Notes**: TARNs and snowball / inverse floater notes
 //!   priced under Hull-White one-factor Monte Carlo
 //!   ([`finstack_quant_models::rates::hw1f`])
@@ -34,7 +34,8 @@
 //! # Quick Example
 //!
 //! ```rust
-//! use finstack_quant_valuations_exotics::exotics::{AsianOption, AveragingMethod};
+//! use finstack_quant_valuations_exotics::exotics::asian_option::AsianOption;
+//! use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 //!
 //! // Use the example Asian option (arithmetic average call)
 //! let asian = AsianOption::example().unwrap();
@@ -43,8 +44,9 @@
 //! Or build a custom option:
 //!
 //! ```
-//! use finstack_quant_valuations_exotics::exotics::{AsianOption, AveragingMethod};
-//! use finstack_quant_valuations_core::instruments::OptionType;
+//! use finstack_quant_valuations_exotics::exotics::asian_option::AsianOption;
+//! use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
+//! use finstack_quant_models::types::OptionType;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::dates::DayCount;
 //! use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -86,9 +88,9 @@
 //!
 //! # See Also
 //!
-//! - [`AsianOption`] for average price options
-//! - [`BarrierOption`] for knock-in/knock-out options
-//! - [`LookbackOption`] for path extremum options
+//! - [`AsianOption`](crate::exotics::asian_option::AsianOption) for average price options
+//! - [`BarrierOption`](crate::exotics::barrier_option::BarrierOption) for knock-in/knock-out options
+//! - [`LookbackOption`](crate::exotics::lookback_option::LookbackOption) for path extremum options
 //! - [`finstack_quant_models::closed_form`] for analytical formulas
 
 /// Asian option module - Average price/strike options.
@@ -108,11 +110,3 @@ pub mod tarn;
 
 mod family;
 pub use family::EXOTICS;
-
-pub use asian_option::{AsianOption, AveragingMethod};
-pub use barrier_option::BarrierOption;
-pub use callable_range_accrual::CallableRangeAccrual;
-pub use lookback_option::{LookbackOption, LookbackType};
-pub use range_accrual::RangeAccrual;
-pub use snowball::{Snowball, SnowballVariant};
-pub use tarn::Tarn;

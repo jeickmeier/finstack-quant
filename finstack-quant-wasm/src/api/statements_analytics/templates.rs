@@ -6,7 +6,7 @@ use crate::utils::input::{
 };
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_statements::builder::ModelBuilder;
-use finstack_quant_statements::FinancialModelSpec;
+use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements_analytics::templates::{real_estate, roll_forward, vintage};
 use wasm_bindgen::prelude::*;
 

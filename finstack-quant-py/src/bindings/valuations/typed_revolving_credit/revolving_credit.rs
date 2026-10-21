@@ -24,10 +24,11 @@ use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_valuations::instruments::fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    DrawRepaySpec, RevolvingCredit, RevolvingCreditFees, RevolvingCreditPricer,
+    DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
-use finstack_quant_valuations::instruments::InstrumentJson;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 
 use super::PyEnhancedMonteCarloResult;
 

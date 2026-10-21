@@ -10,7 +10,7 @@ use finstack_quant_valuations_core::metrics::MetricRegistry;
 pub(crate) fn register_autocallable_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::{
+    use finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::{
         GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVolga,
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
@@ -20,15 +20,15 @@ pub(crate) fn register_autocallable_metrics(
             registry: registry,
             instrument: InstrumentType::Autocallable,
             metrics: [
-                (Vega, finstack_quant_valuations_core::metrics::GenericFdVega::<crate::Autocallable>::default()),
-                (Rho, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
-                (Dv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::parallel_combined())),
-                (BucketedDv01, finstack_quant_valuations_core::metrics::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+                (Vega, finstack_quant_valuations_core::metrics::sensitivities::fd_greeks::GenericFdVega::<crate::autocallable::Autocallable>::default()),
+                (Rho, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
+                (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
+                (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
                 // Theta is now registered universally in crate::EQUITY.metrics(),
-                (Delta, GenericFdDelta::<crate::Autocallable>::default()),
-                (Gamma, GenericFdGamma::<crate::Autocallable>::default()),
-                (Vanna, GenericFdVanna::<crate::Autocallable>::default()),
-                (Volga, GenericFdVolga::<crate::Autocallable>::default()),
+                (Delta, GenericFdDelta::<crate::autocallable::Autocallable>::default()),
+                (Gamma, GenericFdGamma::<crate::autocallable::Autocallable>::default()),
+                (Vanna, GenericFdVanna::<crate::autocallable::Autocallable>::default()),
+                (Volga, GenericFdVolga::<crate::autocallable::Autocallable>::default()),
             ]
         }
     }

@@ -10,10 +10,12 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::market_dependencies_of;
+use finstack_quant_valuations::instruments::fx::fx_digital_option::FxDigitalOption;
+use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
+use finstack_quant_valuations::instruments::json_loader::market_dependencies_of;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::instruments::FxPair;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::{FxDigitalOption, FxForward, InstrumentJson};
 use std::sync::Arc;
 use time::macros::date;
 

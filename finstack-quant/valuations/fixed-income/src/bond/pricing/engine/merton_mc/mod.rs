@@ -32,10 +32,6 @@ pub mod calibration;
 
 pub(crate) use engine::MertonBondTerms;
 pub use engine::MertonMcEngine;
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::merton_mc::{
-    BarrierCrossing, CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, PikMode,
-    PikSchedule,
-};
 pub use types::{MertonMcResult, MertonMcRun, PathStatistics};
 
 pub(crate) use pricer::SimpleBondMertonMcPricer;

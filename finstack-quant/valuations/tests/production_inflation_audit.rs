@@ -8,7 +8,9 @@ use finstack_quant_core::market_data::scalars::{
 };
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::{InflationLinkedBond, InflationSwap, Repo};
+use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
+use finstack_quant_valuations::instruments::rates::inflation_swap::InflationSwap;
+use finstack_quant_valuations::instruments::rates::repo::Repo;
 use finstack_quant_valuations::market::conventions::{
     ids::{CdsConventionKey, CdsDocClause, InflationSwapConventionId, XccyConventionId},
     ConventionRegistry,
@@ -184,9 +186,7 @@ fn b20_asian_cds_premiums_use_actual_360() {
 
 #[test]
 fn b20_eurusd_mtm_convention_resets_the_usd_leg() {
-    use finstack_quant_valuations::instruments::rates::xccy_swap::{
-        NotionalExchange, ResettingSide,
-    };
+    use finstack_quant_valuations::instruments::{NotionalExchange, ResettingSide};
     let convention = ConventionRegistry::try_global()
         .expect("registry")
         .require_xccy(&XccyConventionId::new("EUR/USD-XCCY"))

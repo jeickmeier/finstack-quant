@@ -2,7 +2,7 @@
 //!
 use crate::bond::pricing::engine::tree::{bond_tree_config, TreeModelChoice};
 use crate::bond::pricing::quote_conversions::clear_price_driving_overrides;
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_valuations_core::pricer::ModelKey;
@@ -154,7 +154,7 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use std::sync::Arc;
     use time::macros::date;
 

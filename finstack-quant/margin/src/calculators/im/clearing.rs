@@ -11,8 +11,8 @@
 
 use crate::calculators::traits::{ImCalculator, ImResult};
 use crate::registry::{embedded_registry_or_panic, CcpParams, MarginRegistry};
-use crate::traits::Marginable;
 use crate::types::ImMethodology;
+use crate::Marginable;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -150,13 +150,15 @@ impl CcpMethodology {
 /// # Example
 ///
 /// ```no_run
-/// use finstack_quant_margin::{ClearingHouseImCalculator, ImCalculator, Marginable};
+/// use finstack_quant_margin::Marginable;
+/// use finstack_quant_margin::calculators::im::ClearingHouseImCalculator;
+/// use finstack_quant_margin::calculators::ImCalculator;
 /// use finstack_quant_core::market_data::context::MarketContext;
 /// use finstack_quant_core::dates::Date;
 /// use time::macros::date;
 ///
 /// # fn main() -> finstack_quant_core::Result<()> {
-/// let calc = ClearingHouseImCalculator::new(finstack_quant_margin::calculators::CcpMethodology::LchSwapClear);
+/// let calc = ClearingHouseImCalculator::new(finstack_quant_margin::calculators::im::CcpMethodology::LchSwapClear);
 /// # let cleared_trade: &dyn Marginable = todo!("provide a cleared marginable instrument");
 /// # let context = MarketContext::new();
 /// # let as_of: Date = date!(2025-01-01);
@@ -383,11 +385,11 @@ mod tests {
             &self.id
         }
 
-        fn margin_spec(&self) -> Option<&crate::OtcMarginSpec> {
+        fn margin_spec(&self) -> Option<&crate::types::OtcMarginSpec> {
             None
         }
 
-        fn netting_set_id(&self) -> Option<crate::NettingSetId> {
+        fn netting_set_id(&self) -> Option<crate::types::NettingSetId> {
             None
         }
 
@@ -395,8 +397,8 @@ mod tests {
             &self,
             _market: &MarketContext,
             _as_of: Date,
-        ) -> Result<crate::SimmSensitivities> {
-            Ok(crate::SimmSensitivities::new(self.value.currency()))
+        ) -> Result<crate::types::SimmSensitivities> {
+            Ok(crate::types::SimmSensitivities::new(self.value.currency()))
         }
 
         fn mtm_for_vm(&self, _market: &MarketContext, _as_of: Date) -> Result<Money> {
@@ -419,24 +421,27 @@ mod tests {
 
     #[test]
     fn conservative_rates() {
-        let lch = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::LchSwapClear);
+        let lch =
+            ClearingHouseImCalculator::new(crate::calculators::im::CcpMethodology::LchSwapClear);
         let ice =
-            ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::IceClearCredit);
+            ClearingHouseImCalculator::new(crate::calculators::im::CcpMethodology::IceClearCredit);
         assert_eq!(lch.params().conservative_rate, 0.02);
         assert_eq!(ice.params().conservative_rate, 0.10);
     }
 
     #[test]
     fn mpor_days() {
-        let lch = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::LchSwapClear);
-        let cme = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::Cme);
+        let lch =
+            ClearingHouseImCalculator::new(crate::calculators::im::CcpMethodology::LchSwapClear);
+        let cme = ClearingHouseImCalculator::new(crate::calculators::im::CcpMethodology::Cme);
         assert_eq!(lch.params().mpor_days, 5);
         assert_eq!(cme.params().mpor_days, 5);
     }
 
     #[test]
     fn conservative_calculation() {
-        let calc = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::LchSwapClear);
+        let calc =
+            ClearingHouseImCalculator::new(crate::calculators::im::CcpMethodology::LchSwapClear);
         let notional = Money::from((100_000_000_i64, Currency::USD));
         let im = calc
             .calculate_conservative(notional)
@@ -449,7 +454,7 @@ mod tests {
     #[test]
     fn ice_clear_credit_calculation() {
         let calc =
-            ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::IceClearCredit);
+            ClearingHouseImCalculator::new(crate::calculators::im::CcpMethodology::IceClearCredit);
         let notional = Money::from((50_000_000_i64, Currency::USD));
         let im = calc
             .calculate_conservative(notional)
@@ -498,11 +503,12 @@ mod tests {
 
     #[test]
     fn uses_ccp_input_source_when_available() {
-        let calc = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::LchSwapClear)
-            .with_input_source(Arc::new(TestInputSource {
-                amount: Money::from((3_000_000_i64, Currency::USD)),
-                mpor_days: 7,
-            }));
+        let calc =
+            ClearingHouseImCalculator::new(crate::calculators::im::CcpMethodology::LchSwapClear)
+                .with_input_source(Arc::new(TestInputSource {
+                    amount: Money::from((3_000_000_i64, Currency::USD)),
+                    mpor_days: 7,
+                }));
         let notional = Money::from((100_000_000_i64, Currency::USD));
         let fallback = calc
             .calculate_conservative(notional)
@@ -520,7 +526,8 @@ mod tests {
 
     #[test]
     fn fails_closed_without_external_source_or_exposure_base() {
-        let calc = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::LchSwapClear);
+        let calc =
+            ClearingHouseImCalculator::new(crate::calculators::im::CcpMethodology::LchSwapClear);
         let instrument = TestInstrument::new(Money::from((0_i64, Currency::USD)));
         let market = MarketContext::new();
         let as_of = Date::from_calendar_date(2024, time::Month::January, 1).expect("valid date");
@@ -541,7 +548,8 @@ mod tests {
         // No external source: the calculator scales the exposure base by the
         // conservative rate. That number is a proxy, not SPAN/VaR — the result
         // must say so.
-        let calc = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::LchSwapClear);
+        let calc =
+            ClearingHouseImCalculator::new(crate::calculators::im::CcpMethodology::LchSwapClear);
         let notional = Money::from((100_000_000_i64, Currency::USD));
         let mut inst = TestInstrument::new(notional);
         inst.exposure_base = Some(notional);
@@ -558,11 +566,12 @@ mod tests {
 
     #[test]
     fn external_source_amount_is_not_marked_as_approximation() {
-        let calc = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::LchSwapClear)
-            .with_input_source(Arc::new(TestInputSource {
-                amount: Money::from((3_000_000_i64, Currency::USD)),
-                mpor_days: 7,
-            }));
+        let calc =
+            ClearingHouseImCalculator::new(crate::calculators::im::CcpMethodology::LchSwapClear)
+                .with_input_source(Arc::new(TestInputSource {
+                    amount: Money::from((3_000_000_i64, Currency::USD)),
+                    mpor_days: 7,
+                }));
         let inst = TestInstrument::new(Money::from((100_000_000_i64, Currency::USD)));
         let market = MarketContext::new();
         let as_of = Date::from_calendar_date(2024, time::Month::January, 1).expect("valid date");

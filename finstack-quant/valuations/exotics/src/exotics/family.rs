@@ -3,8 +3,9 @@
 
 use finstack_quant_valuations_core::metrics::{MetricRegistry, MetricRegistryError};
 use finstack_quant_valuations_core::pricer::{
-    register_generic, Family, InstrumentType, ModelKey, PricerRegistry, PricingError,
+    Family, InstrumentType, ModelKey, PricerRegistry, PricingError,
 };
+use finstack_quant_valuations_core::register_generic;
 
 /// Registration unit for the exotic and commodity instruments.
 pub static EXOTICS: Family = Family::new("exotics", register_pricers, register_metrics);
@@ -47,27 +48,27 @@ fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
     register_generic!(
         registry,
         InstrumentType::CommodityFuture,
-        crate::CommodityFuture
+        crate::commodity::commodity_future::CommodityFuture
     );
     register_generic!(
         registry,
         InstrumentType::CommodityFutureOption,
-        crate::CommodityFutureOption
+        crate::commodity::commodity_future_option::CommodityFutureOption
     );
     register_generic!(
         registry,
         InstrumentType::CommodityForward,
-        crate::CommodityForward
+        crate::commodity::commodity_forward::CommodityForward
     );
     register_generic!(
         registry,
         InstrumentType::CommoditySwap,
-        crate::CommoditySwap
+        crate::commodity::commodity_swap::CommoditySwap
     );
     register_generic!(
         registry,
         InstrumentType::CommoditySpotOption,
-        crate::CommoditySpotOption,
+        crate::commodity::commodity_spot_option::CommoditySpotOption,
         ModelKey::Black76
     );
     registry.register(
@@ -76,14 +77,14 @@ fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
     register_generic!(
         registry,
         InstrumentType::CommoditySwaption,
-        crate::CommoditySwaption,
+        crate::commodity::commodity_swaption::CommoditySwaption,
         ModelKey::Black76
     );
     // Kirk's approximation.
     register_generic!(
         registry,
         InstrumentType::CommoditySpreadOption,
-        crate::CommoditySpreadOption,
+        crate::commodity::commodity_spread_option::CommoditySpreadOption,
         ModelKey::Black76
     );
     // Monte Carlo Schwartz-Smith spot option.

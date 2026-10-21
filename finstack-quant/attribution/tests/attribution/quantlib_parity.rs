@@ -31,7 +31,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::{Bond, Instrument, PricingOptions};
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 
 /// Shared fixtures live with the base valuation parity tests in valuations;
@@ -300,15 +301,13 @@ fn build_irs(
     fixed_rate: f64,
     start: Date,
     end: Date,
-) -> finstack_quant_valuations::instruments::InterestRateSwap {
+) -> finstack_quant_valuations::instruments::rates::irs::InterestRateSwap {
     use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount as DC, StubKind, Tenor};
     use finstack_quant_core::decimal::f64_to_decimal;
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations::instruments::rates::irs::{
-        FixedLegSpec, FloatLegSpec, PayReceive,
-    };
-    use finstack_quant_valuations::instruments::InterestRateSwap;
+    use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
+    use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec, PayReceive};
     use rust_decimal::Decimal;
 
     let fixed = FixedLegSpec {
@@ -552,8 +551,8 @@ const FX_FWD_FACTOR_TOLERANCE_USD: f64 = 5.0;
 
 #[test]
 fn quantlib_parity_metrics_based_fx_forward_attribution() {
-    use finstack_quant_valuations::instruments::Attributes;
-    use finstack_quant_valuations::instruments::FxForward;
+    use finstack_quant_core::types::Attributes;
+    use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
 
     let fixture: FxForwardFixture = load_fixture("fx_forward_1y_eurusd.json");
     assert_eq!(fixture.instrument, "FxForward");

@@ -9,11 +9,14 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-use finstack_quant_valuations::instruments::{Bond, Instrument};
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::risk::var_calculator::relevant_taylor_scenario;
+use finstack_quant_valuations::metrics::risk::var_calculator::{
+    calculate_var, VarConfig, VarMethod,
+};
 use finstack_quant_valuations::metrics::risk::{
-    calculate_var, MarketHistory, MarketScenario, RiskFactorShift, RiskFactorType, VarConfig,
-    VarMethod,
+    MarketHistory, MarketScenario, RiskFactorShift, RiskFactorType,
 };
 use finstack_quant_valuations::pricer::PricingDispatch;
 use std::sync::Arc;
@@ -82,7 +85,7 @@ fn history_from_scenarios(
 
 #[test]
 fn taylor_equity_pnl_uses_market_spot_ids_and_aggregates_shared_spots() -> Result<()> {
-    use finstack_quant_valuations::instruments::Equity;
+    use finstack_quant_valuations::instruments::equity::spot::Equity;
 
     let as_of = sample_as_of();
     let mut a = Equity::new("position-a", "DISPLAY-A", Currency::USD)
@@ -153,11 +156,14 @@ fn taylor_equity_pnl_uses_market_spot_ids_and_aggregates_shared_spots() -> Resul
 #[test]
 fn taylor_quoted_equity_has_no_market_spot_sensitivity() -> Result<()> {
     let as_of = sample_as_of();
-    let mut equity =
-        finstack_quant_valuations::instruments::Equity::new("position", "DISPLAY", Currency::USD)
-            .with_quantity(10.0)
-            .with_spot_id("SPOT")
-            .with_quoted_spot(120.0);
+    let mut equity = finstack_quant_valuations::instruments::equity::spot::Equity::new(
+        "position",
+        "DISPLAY",
+        Currency::USD,
+    )
+    .with_quantity(10.0)
+    .with_spot_id("SPOT")
+    .with_quoted_spot(120.0);
     equity.discount_curve_id = "USD-OIS".into();
     let market = usd_ois_market(as_of)?.insert_price("SPOT", MarketScalar::Unitless(100.0));
     let history = MarketHistory::new(
@@ -189,7 +195,7 @@ fn taylor_quoted_equity_has_no_market_spot_sensitivity() -> Result<()> {
 #[test]
 fn taylor_multifactor_instrument_accepts_empty_direction() -> Result<()> {
     let as_of = sample_as_of();
-    let basket = finstack_quant_valuations::instruments::Basket::example()?;
+    let basket = finstack_quant_valuations::instruments::exotics::basket::Basket::example()?;
     let market = usd_ois_market(as_of)?
         .insert_price("AAPL-SPOT", MarketScalar::Unitless(100.0))
         .insert_price("UST10Y-PRICE", MarketScalar::Unitless(100.0));
@@ -211,15 +217,16 @@ fn taylor_multifactor_instrument_accepts_empty_direction() -> Result<()> {
 #[test]
 fn historical_vol_point_revaluation_matches_manual_surface() -> Result<()> {
     let as_of = sample_as_of();
-    let option = finstack_quant_valuations::instruments::EquityOption::european(
-        "call",
-        "DISPLAY",
-        105.0,
-        date!(2025 - 01 - 01),
-        1.0,
-        Currency::USD,
-        finstack_quant_valuations::instruments::OptionType::Call,
-    )?;
+    let option =
+        finstack_quant_valuations::instruments::equity::equity_option::EquityOption::european(
+            "call",
+            "DISPLAY",
+            105.0,
+            date!(2025 - 01 - 01),
+            1.0,
+            Currency::USD,
+            finstack_quant_models::types::OptionType::Call,
+        )?;
     let base_surface = VolSurface::builder("EQUITY-VOL")
         .expiries(&[0.5, 1.5])
         .strikes(&[100.0, 110.0])

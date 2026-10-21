@@ -7,7 +7,7 @@ use crate::cap_floor::pricing::projection::resolve_optioned_coupon;
 use crate::cap_floor::CapFloor;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::Result;
-use finstack_quant_valuations_core::metrics::calculate_theta_date;
+use finstack_quant_valuations_core::metrics::sensitivities::theta::calculate_theta_date;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Theta calculator (bump-and-reprice with customizable period)
@@ -18,7 +18,8 @@ impl MetricCalculator for ThetaCalculator {
         let option: &CapFloor = context.instrument_as()?;
 
         // Get theta period from pricing overrides, default to "1D"
-        let period = finstack_quant_valuations_core::metrics::theta_period(context);
+        let period =
+            finstack_quant_valuations_core::metrics::sensitivities::theta::theta_period(context);
 
         let expiry_date = next_option_theta_expiry(option, context.curves.as_ref(), context.as_of)?;
 
@@ -74,8 +75,8 @@ fn next_option_theta_expiry(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cap_floor::RateOptionType;
     use crate::cap_floor::{OvernightCouponConvention, OvernightSpreadCompounding};
-    use crate::RateOptionType;
     use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;

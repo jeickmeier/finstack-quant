@@ -1,7 +1,7 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
 use crate::bond::pricing::settlement::QuoteDateContext;
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::money::Money;
@@ -123,7 +123,7 @@ mod tests {
         )
         .expect("bond");
         bond.instrument_pricing_overrides =
-            finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::default()
+            finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
                 .with_quoted_clean_price_pct(100.0);
 
         let curve = DiscountCurve::builder("USD-OIS")

@@ -5,9 +5,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::error::{Error, Result};
 use crate::types::PositionId;
 use finstack_quant_factor::credit::hierarchy::{dimension_key, CreditFactorModel};
-use finstack_quant_factor::matching::{parse_bucket_factor_id, CREDIT_GENERIC_FACTOR_ID};
+use finstack_quant_factor::parse_bucket_factor_id;
 use finstack_quant_factor::risk::RiskDecomposition;
 use finstack_quant_factor::RiskMeasure;
+use finstack_quant_factor::CREDIT_GENERIC_FACTOR_ID;
 
 /// Aggregated credit risk grouped by hierarchy level.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

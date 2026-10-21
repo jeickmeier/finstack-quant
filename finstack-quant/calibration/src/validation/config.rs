@@ -19,7 +19,7 @@ pub(crate) fn default_rate_bounds_policy_for_serde() -> RateBoundsPolicy {
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_calibration::RateBounds;
+/// use finstack_quant_calibration::validation::RateBounds;
 /// use finstack_quant_core::currency::Currency;
 ///
 /// // Use currency-specific defaults

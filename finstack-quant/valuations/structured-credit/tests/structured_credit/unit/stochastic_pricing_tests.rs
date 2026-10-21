@@ -7,15 +7,17 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_models::credit::pool::{
-    CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
+use finstack_quant_models::credit::pool::StochasticPrepaySpec;
+use finstack_quant_models::credit::pool::{CorrelationStructure, StochasticDefaultSpec};
+use finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::results::structured_credit::{
+    StructuredCreditPricingMode, TrancheSeniority,
 };
-use finstack_quant_valuations_core::instruments::{Instrument, ScenarioPricingOverrides};
 use finstack_quant_valuations_structured_credit::structured_credit::{
     calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
     calculate_tranche_oas, generate_cashflows, run_simulation, scenario_table, AssetPool, DealType,
-    HedgeSwap, OasConfig, PoolAsset, ScenarioGrid, StructuredCredit, StructuredCreditPricingMode,
-    Tranche, TrancheSeniority, TrancheStructure,
+    HedgeSwap, OasConfig, PoolAsset, ScenarioGrid, StructuredCredit, Tranche, TrancheStructure,
 };
 use time::Month;
 
@@ -46,7 +48,7 @@ fn single_tranche_structure(balance: f64) -> TrancheStructure {
         "SENIOR",
         0.0,
         100.0,
-        finstack_quant_valuations_structured_credit::structured_credit::TrancheSeniority::Senior,
+        finstack_quant_valuations_core::results::structured_credit::TrancheSeniority::Senior,
         Money::new(balance, Currency::USD).expect("valid money fixture"),
         RateSpec::Fixed { rate: 0.05 },
         legal_maturity(),
@@ -772,7 +774,7 @@ fn explicit_monte_carlo_mode_prices_canonical_deal() {
 // see docs/audits/2026-09-08-production-remediation-progress.md, slice 14.
 // ---------------------------------------------------------------------------
 
-use finstack_quant_valuations_structured_credit::structured_credit::{
+use finstack_quant_valuations_core::results::structured_credit::{
     StochasticPricingResult, TranchePricingResult,
 };
 

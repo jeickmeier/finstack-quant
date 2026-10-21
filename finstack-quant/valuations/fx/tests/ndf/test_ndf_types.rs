@@ -3,10 +3,12 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, Tenor};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
 use finstack_quant_valuations_core::pricer::InstrumentType;
-use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};
+use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource};
 use time::Month;
 
 #[test]

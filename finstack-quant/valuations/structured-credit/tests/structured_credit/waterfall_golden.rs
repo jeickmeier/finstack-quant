@@ -20,13 +20,13 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::CoverageTestSpec;
 use finstack_quant_valuations_structured_credit::structured_credit::WaterfallContext;
 use finstack_quant_valuations_structured_credit::structured_credit::WaterfallDistribution;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     AllocationMode, AssetPool, DealType, ManagementFeeType, PaymentCalculation, PaymentType,
-    Recipient, RecipientType, Tranche, TrancheSeniority, TrancheStructure, Waterfall,
-    WaterfallTier,
+    Recipient, RecipientType, Tranche, TrancheStructure, Waterfall, WaterfallTier,
 };
 use time::Duration;
 

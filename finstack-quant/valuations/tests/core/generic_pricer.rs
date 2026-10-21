@@ -1,6 +1,6 @@
 //! The generic instrument pricer over built-in instruments.
 
-use finstack_quant_valuations::instruments::pricing::GenericInstrumentPricer;
+use finstack_quant_valuations::instruments::common_impl::pricing::GenericInstrumentPricer;
 use finstack_quant_valuations::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
 };
@@ -13,19 +13,17 @@ use time::macros::date;
 #[test]
 fn test_generic_pricer_keys() {
     // Test the new discounting() convenience method
-    let bond_pricer =
-        GenericInstrumentPricer::<finstack_quant_valuations::instruments::Bond>::discounting(
-            InstrumentType::Bond,
-        );
+    let bond_pricer = GenericInstrumentPricer::<
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond,
+    >::discounting(InstrumentType::Bond);
     assert_eq!(
         bond_pricer.key(),
         PricerKey::new(InstrumentType::Bond, ModelKey::Discounting)
     );
 
-    let deposit_pricer =
-        GenericInstrumentPricer::<finstack_quant_valuations::instruments::Deposit>::discounting(
-            InstrumentType::Deposit,
-        );
+    let deposit_pricer = GenericInstrumentPricer::<
+        finstack_quant_valuations::instruments::rates::deposit::Deposit,
+    >::discounting(InstrumentType::Deposit);
     assert_eq!(
         deposit_pricer.key(),
         PricerKey::new(InstrumentType::Deposit, ModelKey::Discounting)
@@ -35,10 +33,9 @@ fn test_generic_pricer_keys() {
 #[test]
 fn test_generic_instrument_pricer_with_model_key() {
     // Test that GenericInstrumentPricer works with any model key
-    let pricer = GenericInstrumentPricer::<finstack_quant_valuations::instruments::Bond>::new(
-        InstrumentType::Bond,
-        ModelKey::HazardRate,
-    );
+    let pricer = GenericInstrumentPricer::<
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond,
+    >::new(InstrumentType::Bond, ModelKey::HazardRate);
     assert_eq!(
         pricer.key(),
         PricerKey::new(InstrumentType::Bond, ModelKey::HazardRate)
@@ -47,7 +44,7 @@ fn test_generic_instrument_pricer_with_model_key() {
 
 #[test]
 fn generic_pricer_attaches_instrument_and_model_context_to_failures() {
-    let bond = finstack_quant_valuations::instruments::Bond::fixed(
+    let bond = finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
         "GENERIC-CTX",
         Money::from((100_i64, Currency::USD)),
         finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
@@ -57,10 +54,9 @@ fn generic_pricer_attaches_instrument_and_model_context_to_failures() {
         "USD-OIS",
     )
     .expect("bond");
-    let pricer =
-        GenericInstrumentPricer::<finstack_quant_valuations::instruments::Bond>::discounting(
-            InstrumentType::Bond,
-        );
+    let pricer = GenericInstrumentPricer::<
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond,
+    >::discounting(InstrumentType::Bond);
 
     let err = pricer
         .price_dyn(&bond, &MarketContext::new(), date!(2025 - 01 - 01))
@@ -89,7 +85,7 @@ fn generic_pricer_attaches_instrument_and_model_context_to_failures() {
 
 #[test]
 fn generic_pricer_raw_path_attaches_context_to_failures() {
-    let bond = finstack_quant_valuations::instruments::Bond::fixed(
+    let bond = finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
         "GENERIC-RAW-CTX",
         Money::from((100_i64, Currency::USD)),
         finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
@@ -99,10 +95,9 @@ fn generic_pricer_raw_path_attaches_context_to_failures() {
         "USD-OIS",
     )
     .expect("bond");
-    let pricer =
-        GenericInstrumentPricer::<finstack_quant_valuations::instruments::Bond>::discounting(
-            InstrumentType::Bond,
-        );
+    let pricer = GenericInstrumentPricer::<
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond,
+    >::discounting(InstrumentType::Bond);
 
     let err = pricer
         .price_raw_dyn(&bond, &MarketContext::new(), date!(2025 - 01 - 01))

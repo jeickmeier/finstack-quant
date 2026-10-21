@@ -10,7 +10,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
 };
@@ -247,8 +247,8 @@ mod tests {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
     use time::macros::date;
 
     /// Item 3 regression: `r_dom`/`r_for` must be recovered from *date-based*
@@ -314,7 +314,7 @@ mod tests {
             .id(InstrumentId::new("QUANTO-DISC"))
             .underlying_ticker("NKY".to_string())
             .strike(35_000.0)
-            .option_type(finstack_quant_valuations_core::instruments::OptionType::Call)
+            .option_type(finstack_quant_models::types::OptionType::Call)
             .expiry(expiry)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .base_currency(Currency::JPY)
@@ -418,7 +418,7 @@ mod tests {
             .id(InstrumentId::new("QUANTO-EXPIRY"))
             .underlying_ticker("NKY".to_string())
             .strike(35_000.0)
-            .option_type(finstack_quant_valuations_core::instruments::OptionType::Call)
+            .option_type(finstack_quant_models::types::OptionType::Call)
             .expiry(expiry)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .base_currency(Currency::JPY)
@@ -451,7 +451,7 @@ mod tests {
 
         // OTM put on the same fixture is worthless at expiry.
         let mut put = quanto;
-        put.option_type = finstack_quant_valuations_core::instruments::OptionType::Put;
+        put.option_type = finstack_quant_models::types::OptionType::Put;
         let put_result = QuantoOptionAnalyticalPricer::new()
             .price_dyn(&put, &market, as_of)
             .expect("expiry-day put valuation");
@@ -522,7 +522,7 @@ mod tests {
             .id(InstrumentId::new("QUANTO-ATM"))
             .underlying_ticker("AAPL".to_string())
             .strike(100.0)
-            .option_type(finstack_quant_valuations_core::instruments::OptionType::Call)
+            .option_type(finstack_quant_models::types::OptionType::Call)
             .expiry(expiry)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .base_currency(Currency::EUR)

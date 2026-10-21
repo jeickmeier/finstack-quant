@@ -3,10 +3,11 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
-use finstack_quant_valuations_core::instruments::{Monitoring, OptionType};
+use finstack_quant_models::types::OptionType;
+use finstack_quant_valuations_core::impl_instrument_base;
+use finstack_quant_valuations_core::instruments::Monitoring;
 
 use finstack_quant_core::types::{BarrierType, PayoutTiming};
 
@@ -99,26 +100,26 @@ pub struct BarrierOption {
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::InstrumentPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::InstrumentPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::MetricPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::MetricPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
     /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
-        skip_serializing_if = "finstack_quant_valuations_core::instruments::ScenarioPricingOverrides::is_empty"
+        skip_serializing_if = "finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
+        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping
     pub attributes: Attributes,
 }
@@ -137,7 +138,7 @@ impl BarrierOption {
             .strike(4500.0)
             .barrier(5000.0)
             .rebate(Money::from((50_i64, Currency::USD)))
-            .option_type(finstack_quant_valuations_core::instruments::OptionType::Call)
+            .option_type(finstack_quant_models::types::OptionType::Call)
             .barrier_type(BarrierType::UpAndOut)
             .expiry(date!(2024 - 12 - 20))
             .expiry_fixing_opt(None)
@@ -198,9 +199,7 @@ impl BarrierOption {
     }
 }
 
-impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrument
-    for BarrierOption
-{
+impl finstack_quant_valuations_core::instruments::Instrument for BarrierOption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::BarrierOption,
         crate::exotics::EXOTICS
@@ -255,14 +254,13 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
 
     fn market_dependencies(
         &self,
-    ) -> finstack_quant_core::Result<
-        finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies,
-    > {
-        let mut deps = finstack_quant_valuations_core::instruments::common_impl::dependencies::MarketDependencies::new();
+    ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
+    {
+        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_market_scalar_id(self.spot_id.as_str());
         deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::common_impl::dependencies::VolatilityDependency::new(
+            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 Some(self.spot_id.clone()),
                 Some(self.strike),
@@ -317,9 +315,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         as_of: Date,
         rolled_date: Date,
     ) -> finstack_quant_core::Result<
-        Option<
-            Box<dyn finstack_quant_valuations_core::instruments::common_impl::traits::Instrument>,
-        >,
+        Option<Box<dyn finstack_quant_valuations_core::instruments::Instrument>>,
     > {
         if self.observed_barrier_breached.is_some() || as_of >= self.expiry {
             return Ok(None);
@@ -344,7 +340,7 @@ impl finstack_quant_valuations_core::instruments::common_impl::traits::Instrumen
         Ok(Some(Box::new(observed)))
     }
 
-    finstack_quant_valuations_core::instruments::common_impl::traits::impl_focused_pricing_overrides!();
+    finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
 finstack_quant_valuations_core::impl_empty_cashflow_provider!(
@@ -389,13 +385,12 @@ mod tests {
                 MarketScalar::Price(Money::from((5100_i64, Currency::USD))),
             );
 
-        let err =
-            finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::value(
-                &option,
-                &market,
-                option.expiry,
-            )
-            .expect_err("expired barrier should require observed barrier state");
+        let err = finstack_quant_valuations_core::instruments::Instrument::value(
+            &option,
+            &market,
+            option.expiry,
+        )
+        .expect_err("expired barrier should require observed barrier state");
         assert!(
             format!("{err}").contains("observed_barrier_breached"),
             "unexpected error: {err}"

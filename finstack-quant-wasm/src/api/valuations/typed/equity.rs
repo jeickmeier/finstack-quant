@@ -11,7 +11,7 @@ instrument_class!(
     /// Typed wrapper for the Rust `EquityOption` instrument (vanilla option on one equity or index).
     JsEquityOption,
     "EquityOption",
-    finstack_quant_valuations::instruments::EquityOption
+    finstack_quant_valuations::instruments::equity::equity_option::EquityOption
 );
 
 instrument_builder_entry!(JsEquityOption, "EquityOption", JsEquityOptionBuilder);
@@ -88,7 +88,7 @@ getters!(JsEquityOption, "EquityOption", |i| {
         exercise_dates as exerciseDates => opt_dates(i.exercise_dates),
 });
 
-factories!(JsEquityOption, "EquityOption", finstack_quant_valuations::instruments::EquityOption, {
+factories!(JsEquityOption, "EquityOption", finstack_quant_valuations::instruments::equity::equity_option::EquityOption, {
         /// Canonical SPX 4500 European call expiring 2024-06-21 (mirrors Rust `EquityOption::example`): 100 units in USD, curve `USD-OIS`, spot `EQUITY-SPOT`, surface `EQUITY-VOL`, dividend yield `EQUITY-DIVYIELD`.
         /// @returns The example option.
         /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
@@ -272,7 +272,7 @@ impl JsEquityOption {
         currency: &JsCurrency,
         option_type: JsValue,
     ) -> Result<JsEquityOption, JsValue> {
-        finstack_quant_valuations::instruments::EquityOption::european(
+        finstack_quant_valuations::instruments::equity::equity_option::EquityOption::european(
             js_string(&id, "id")?,
             js_string(&ticker, "ticker")?,
             super::arg::num(&strike, "strike")?,
@@ -358,7 +358,7 @@ impl JsEquityOptionBuilder {
         settlement_date: JsValue,
         exercised: JsValue,
     ) -> Result<JsEquityOptionBuilder, JsValue> {
-        let exercise = finstack_quant_valuations::instruments::equity::EquityOptionExercise::new(
+        let exercise = finstack_quant_valuations::instruments::equity::equity_option::EquityOptionExercise::new(
             super::arg::date(&date, "date")?,
             super::arg::num(&spot, "spot")?,
             super::arg::date(&settlement_date, "settlementDate")?,

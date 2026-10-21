@@ -661,7 +661,7 @@ export type Pillar =
 /**
  * Stable identifier for an Interest Rate Future contract (e.g., "CME:SR3").
  *
- * Used to look up [`IrFutureConventions`](crate::market::conventions::defs::IrFutureConventions)
+ * Used to look up [`IrFutureConventions`](crate::market::conventions::IrFutureConventions)
  * from the convention registry.
  */
 export type IrFutureContractId = string;
@@ -677,7 +677,7 @@ export type CdsDocClause =
 /**
  * Identifier for Inflation Swap market conventions (e.g., "USD-CPI", "UK-RPI").
  *
- * Used to look up [`InflationSwapConventions`](crate::market::conventions::defs::InflationSwapConventions)
+ * Used to look up [`InflationSwapConventions`](crate::market::conventions::InflationSwapConventions)
  * from the convention registry.
  */
 export type InflationSwapConventionId = string;
@@ -688,7 +688,7 @@ export type OptionType = "call" | "put";
 /**
  * Identifier for Swaption market conventions (e.g., "USD", "EUR").
  *
- * Used to look up [`SwaptionConventions`](crate::market::conventions::defs::SwaptionConventions)
+ * Used to look up [`SwaptionConventions`](crate::market::conventions::SwaptionConventions)
  * from the convention registry.
  */
 export type SwaptionConventionId = string;
@@ -5013,7 +5013,7 @@ export interface CalibrationEnvelope {
  * Key to look up CDS conventions (Currency + DocClause).
  *
  * CDS conventions are identified by both currency and documentation clause, as different
- * clauses have different market conventions. Used to look up [`CdsConventionSpec`](crate::market::conventions::defs::CdsConventionSpec)
+ * clauses have different market conventions. Used to look up [`CdsConventionSpec`](crate::market::conventions::CdsConventionSpec)
  * from the convention registry.
  */
 export interface CdsConventionKey {

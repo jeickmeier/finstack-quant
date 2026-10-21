@@ -22,7 +22,7 @@ use finstack_quant_core::market_data::term_structures::HazardCurve;
 
 use super::config as sens_config;
 use super::cs01::{cs01_reval, reprice_with_hazard, sensitivity_central_diff};
-use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::Instrument;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 
 /// Parallel hazard-rate bump CS01.
@@ -143,7 +143,7 @@ where
             let cs01 = hazard_bump_sensitivity(context, &hazard, hazard_bp, |curve, bp| {
                 curve.with_tenor_hazard_rate_bumps_bp(&[(tenor, bp)])
             })? * (hazard_bp / bump_bp);
-            series.push((sens_config::format_bucket_label_cow(tenor), cs01));
+            series.push((crate::metrics::format_bucket_label_cow(tenor), cs01));
             total += cs01;
         }
         context.store_bucketed_series(

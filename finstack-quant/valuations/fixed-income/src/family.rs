@@ -9,8 +9,9 @@ use finstack_quant_valuations_core::metrics::{
     MetricId, MetricRegistry, MetricRegistryError, PricerPublishedMetric,
 };
 use finstack_quant_valuations_core::pricer::{
-    register_generic, Family, InstrumentType, ModelKey, PricerRegistry, PricingError,
+    Family, InstrumentType, ModelKey, PricerRegistry, PricingError,
 };
+use finstack_quant_valuations_core::register_generic;
 
 /// Registration unit for the fixed-income instruments.
 pub static FIXED_INCOME: Family = Family::new("fixed_income", register_pricers, register_metrics);

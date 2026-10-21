@@ -30,8 +30,8 @@
 //!
 //! # See Also
 //!
-//! - [`LookbackOption`] for instrument struct
-//! - [`LookbackType`] for fixed vs floating strike
+//! - [`LookbackOption`](crate::exotics::lookback_option::LookbackOption) for instrument struct
+//! - [`LookbackType`](crate::exotics::lookback_option::LookbackType) for fixed vs floating strike
 //! - [`models::closed_form::fixed_strike_lookback_call`](finstack_quant_models::closed_form::fixed_strike_lookback_call) for formulas
 
 pub(crate) mod metrics;

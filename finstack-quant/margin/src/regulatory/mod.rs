@@ -16,12 +16,3 @@
 
 pub mod frtb;
 pub mod sa_ccr;
-
-pub use frtb::{
-    frtb_sba_charge, CorrelationScenario, DrcPosition, DrcSector, DrcSeniority, FrtbRiskClass,
-    FrtbSbaEngine, FrtbSbaResult, FrtbScenarioCharges, FrtbSensitivities, RraoPosition,
-};
-pub use sa_ccr::{
-    saccr_ead, EadResult, SaCcrAssetClass, SaCcrEngine, SaCcrNettingSetConfig, SaCcrOptionType,
-    SaCcrTrade,
-};

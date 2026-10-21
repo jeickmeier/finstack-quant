@@ -10,8 +10,9 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::instruments::{CreditDefaultSwap, Instrument};
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::pricer::*;
 use std::collections::BTreeMap;
 use std::str::FromStr;
@@ -302,7 +303,7 @@ fn test_registry_price_with_unknown_pricer() {
 
 #[test]
 fn removed_option_discounting_aliases_return_unknown_pricer() {
-    use finstack_quant_valuations::instruments::commodity::CommoditySpotOption;
+    use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOption;
     use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
     use finstack_quant_valuations::instruments::rates::swaption::Swaption;
 

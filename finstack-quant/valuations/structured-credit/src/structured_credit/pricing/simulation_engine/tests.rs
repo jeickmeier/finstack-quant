@@ -2,9 +2,7 @@
 mod cases {
     use super::super::*;
 
-    use crate::structured_credit::{
-        AssetPool, DealType, PoolAsset, Tranche, TrancheSeniority, TrancheStructure,
-    };
+    use crate::structured_credit::{AssetPool, DealType, PoolAsset, Tranche, TrancheStructure};
     use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_cashflows::builder::{
         DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
@@ -12,6 +10,7 @@ mod cases {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::fixings::fixing_series_id;
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+    use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
     use time::Month;
 
     #[test]

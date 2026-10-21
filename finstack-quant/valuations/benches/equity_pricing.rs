@@ -23,22 +23,25 @@ use finstack_quant_core::market_data::term_structures::{
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::math::stats::RealizedVarMethod;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
+use finstack_quant_models::types::{ExerciseStyle, OptionType};
+use finstack_quant_valuations::instruments::equity::equity_future::EquityFuture;
+use finstack_quant_valuations::instruments::equity::equity_future_option::EquityFutureOption;
 use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
-use finstack_quant_valuations::instruments::equity::variance_swap::{PayReceive, VarianceSwap};
+use finstack_quant_valuations::instruments::equity::spot::Equity;
+use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
 use finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;
-use finstack_quant_valuations::instruments::equity::Equity;
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::Position;
 use finstack_quant_valuations::instruments::{
-    Attributes, ExerciseStyle, InstrumentPricingOverrides, OptionType,
-};
-use finstack_quant_valuations::instruments::{
-    EquityFuture, EquityFutureOption, FutureOptionModel, FutureOptionPremiumStyle,
-    FutureOptionSettlement, FutureOptionTerms, ListedFutureTerms,
-};
-use finstack_quant_valuations::instruments::{
     EquityUnderlyingParams, FinancingLegSpec, TrsScheduleSpec,
+};
+use finstack_quant_valuations::instruments::{
+    FutureOptionModel, FutureOptionPremiumStyle, FutureOptionSettlement, FutureOptionTerms,
+    ListedFutureTerms,
 };
 use rust_decimal::Decimal;
 use std::hint::black_box;
@@ -164,7 +167,7 @@ fn equity_trs(tenor_years: i32) -> EquityTotalReturnSwap {
         .schedule(schedule)
         .side(PayReceive::Receive)
         .dividend_settlement(
-            finstack_quant_valuations::instruments::equity::TrsDividendSettlement::OnDividendDate,
+            finstack_quant_valuations::instruments::equity::equity_trs::TrsDividendSettlement::OnDividendDate,
         )
         .build()
         .unwrap()
@@ -213,7 +216,7 @@ fn variance_swap(months: i64) -> VarianceSwap {
         .observation_calendar_id("USNY".into())
         .realized_var_method(RealizedVarMethod::CloseToClose)
         .price_series_policy(
-            finstack_quant_valuations::instruments::EquityPriceSeriesPolicy::Adjusted,
+            finstack_quant_valuations::instruments::equity::variance_swap::EquityPriceSeriesPolicy::Adjusted,
         )
         .side(PayReceive::Pay)
         .discount_curve_id(CurveId::new("USD-OIS"))

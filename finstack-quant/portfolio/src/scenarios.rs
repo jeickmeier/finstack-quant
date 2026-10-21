@@ -1,6 +1,6 @@
 //! Scenario application for portfolios.
 //!
-//! Applies [`ScenarioSpec`](finstack_quant_scenarios::ScenarioSpec) to a
+//! Applies [`ScenarioSpec`] to a
 //! cloned market context and a borrowed-or-owned portfolio state, then
 //! optionally re-values with the stressed data.
 
@@ -594,9 +594,10 @@ mod tests {
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Attributes;
     use finstack_quant_scenarios::{CurveKind, OperationSpec};
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-    use finstack_quant_valuations::instruments::{Attributes, Instrument};
+    use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::pricer::InstrumentType;
     use std::any::Any;
     use std::sync::{

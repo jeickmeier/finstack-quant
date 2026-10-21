@@ -58,7 +58,6 @@ pub(crate) mod metrics;
 pub(crate) mod pricing_helper;
 mod types;
 
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::FxUnderlyingParams;
 pub use types::FxSwap;
 
 // Builder provided by FinancialBuilder derive

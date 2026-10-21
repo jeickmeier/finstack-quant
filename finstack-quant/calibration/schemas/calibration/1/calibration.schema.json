@@ -1314,7 +1314,7 @@
       "unevaluatedProperties": false
     },
     "CdsConventionKey": {
-      "description": "Key to look up CDS conventions (Currency + DocClause).\n\nCDS conventions are identified by both currency and documentation clause, as different\nclauses have different market conventions. Used to look up [`CdsConventionSpec`](crate::market::conventions::defs::CdsConventionSpec)\nfrom the convention registry.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};\nuse finstack_quant_core::currency::Currency;\n\nlet key = CdsConventionKey {\n    currency: Currency::USD,\n    doc_clause: CdsDocClause::Cr14,\n};\n```",
+      "description": "Key to look up CDS conventions (Currency + DocClause).\n\nCDS conventions are identified by both currency and documentation clause, as different\nclauses have different market conventions. Used to look up [`CdsConventionSpec`](crate::market::conventions::CdsConventionSpec)\nfrom the convention registry.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};\nuse finstack_quant_core::currency::Currency;\n\nlet key = CdsConventionKey {\n    currency: Currency::USD,\n    doc_clause: CdsDocClause::Cr14,\n};\n```",
       "properties": {
         "currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -2101,7 +2101,7 @@
       "type": "object"
     },
     "InflationSwapConventionId": {
-      "description": "Identifier for Inflation Swap market conventions (e.g., \"USD-CPI\", \"UK-RPI\").\n\nUsed to look up [`InflationSwapConventions`](crate::market::conventions::defs::InflationSwapConventions)\nfrom the convention registry.",
+      "description": "Identifier for Inflation Swap market conventions (e.g., \"USD-CPI\", \"UK-RPI\").\n\nUsed to look up [`InflationSwapConventions`](crate::market::conventions::InflationSwapConventions)\nfrom the convention registry.",
       "type": "string"
     },
     "InterpRollState": {
@@ -2170,7 +2170,7 @@
       ]
     },
     "IrFutureContractId": {
-      "description": "Stable identifier for an Interest Rate Future contract (e.g., \"CME:SR3\").\n\nUsed to look up [`IrFutureConventions`](crate::market::conventions::defs::IrFutureConventions)\nfrom the convention registry.",
+      "description": "Stable identifier for an Interest Rate Future contract (e.g., \"CME:SR3\").\n\nUsed to look up [`IrFutureConventions`](crate::market::conventions::IrFutureConventions)\nfrom the convention registry.",
       "type": "string"
     },
     "MarketDataHierarchy": {
@@ -4398,7 +4398,7 @@
     },
     "RateBounds": {
       "additionalProperties": false,
-      "description": "Configurable bounds for forward/zero rates during calibration.\n\nDifferent market regimes require different rate bounds:\n- Developed markets (USD, EUR, GBP): typically [-2%, 50%]\n- Negative rate environments (EUR, JPY, CHF): [-5%, 20%]\n- Emerging markets (TRY, ARS, BRL): [-5%, 200%]\n\n# Examples\n\n```\nuse finstack_quant_calibration::RateBounds;\nuse finstack_quant_core::currency::Currency;\n\n// Use currency-specific defaults\nlet usd_bounds = RateBounds::for_currency(Currency::USD);\nassert!(usd_bounds.min_rate < 0.0);\n\n// Or customize for specific scenarios\nlet em_bounds = RateBounds::emerging_markets();\nassert!(em_bounds.max_rate > 1.0);\n```",
+      "description": "Configurable bounds for forward/zero rates during calibration.\n\nDifferent market regimes require different rate bounds:\n- Developed markets (USD, EUR, GBP): typically [-2%, 50%]\n- Negative rate environments (EUR, JPY, CHF): [-5%, 20%]\n- Emerging markets (TRY, ARS, BRL): [-5%, 200%]\n\n# Examples\n\n```\nuse finstack_quant_calibration::validation::RateBounds;\nuse finstack_quant_core::currency::Currency;\n\n// Use currency-specific defaults\nlet usd_bounds = RateBounds::for_currency(Currency::USD);\nassert!(usd_bounds.min_rate < 0.0);\n\n// Or customize for specific scenarios\nlet em_bounds = RateBounds::emerging_markets();\nassert!(em_bounds.max_rate > 1.0);\n```",
       "properties": {
         "max_rate": {
           "description": "Maximum allowed rate (decimal, e.g., 0.50 for 50%)",
@@ -5064,7 +5064,7 @@
       ]
     },
     "SwaptionConventionId": {
-      "description": "Identifier for Swaption market conventions (e.g., \"USD\", \"EUR\").\n\nUsed to look up [`SwaptionConventions`](crate::market::conventions::defs::SwaptionConventions)\nfrom the convention registry.",
+      "description": "Identifier for Swaption market conventions (e.g., \"USD\", \"EUR\").\n\nUsed to look up [`SwaptionConventions`](crate::market::conventions::SwaptionConventions)\nfrom the convention registry.",
       "type": "string"
     },
     "SwaptionVolConvention": {

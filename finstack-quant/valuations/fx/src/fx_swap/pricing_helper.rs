@@ -222,6 +222,7 @@ mod tests {
 
     #[test]
     fn future_near_defaults_use_date_based_outright_forwards() {
+        use finstack_quant_core::types::Attributes;
         use finstack_quant_core::{
             currency::Currency,
             market_data::term_structures::DiscountCurve,
@@ -231,7 +232,7 @@ mod tests {
             },
             types::InstrumentId,
         };
-        use finstack_quant_valuations_core::instruments::{Attributes, Instrument, PricingOptions};
+        use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
         use finstack_quant_valuations_core::metrics::MetricId;
         use std::sync::Arc;
         use time::macros::date;
@@ -361,8 +362,8 @@ mod tests {
         use finstack_quant_core::market_data::term_structures::DiscountCurve;
         use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
         use finstack_quant_core::money::Money;
+        use finstack_quant_core::types::Attributes;
         use finstack_quant_core::types::{CurveId, InstrumentId};
-        use finstack_quant_valuations_core::instruments::common_impl::traits::Attributes;
         use std::sync::Arc;
         use time::macros::date;
 

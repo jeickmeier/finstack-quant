@@ -173,10 +173,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::{cashflow::CFKind, currency::Currency, money::Money};
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::DrawEvent;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    CommitmentFeeBase, DdtlSpec, DrawEvent, TermLoan,
+    CommitmentFeeBase, DdtlSpec, TermLoan,
 };
-use finstack_quant_valuations::instruments::Bond;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
@@ -330,7 +331,7 @@ fn b12_dm_inversion_applies_settlement_once() {
     let dirty = price_from_dm(&bond, &market, as_of, target).expect("DM price");
     let quotes = finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::compute_quotes(
         &bond, &market, as_of,
-        finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::BondQuoteInput::DiscountMargin(target),
+        finstack_quant_valuations::instruments::BondQuoteInput::DiscountMargin(target),
         PricingOptions::default()).expect("DM quote normalization");
     assert!((quotes.dirty_price_currency - dirty).abs() < 1e-8);
     assert!(quotes.asw_par.is_none() && quotes.asw_market.is_none());
@@ -638,10 +639,11 @@ fn b3_shifted_swaption_prices_shifted_positive_rates() {
     use finstack_quant_core::dates::{BusinessDayConvention, StubKind, Tenor};
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_core::types::{CurveId, InstrumentId};
+    use finstack_quant_models::types::OptionType;
     use finstack_quant_models::volatility::sabr::SabrParameters;
-    use finstack_quant_valuations::instruments::rates::irs::{FixedLegSpec, FloatLegSpec};
     use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
-    use finstack_quant_valuations::instruments::{OptionType, SettlementType, VolatilityModel};
+    use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec};
+    use finstack_quant_valuations::instruments::{SettlementType, VolatilityModel};
     use rust_decimal::Decimal;
     let as_of = date!(2024 - 01 - 02);
     let curve = DiscountCurve::builder("DISC")
@@ -769,8 +771,8 @@ fn m4_inflation_zero_strike_requires_normal_quotes_without_fabricated_conversion
         surfaces::{VolQuoteType, VolSurface},
         term_structures::InflationCurve,
     };
+    use finstack_quant_valuations::instruments::rates::cap_floor::RateOptionType;
     use finstack_quant_valuations::instruments::rates::inflation_cap_floor::InflationCapFloor;
-    use finstack_quant_valuations::instruments::RateOptionType;
     use finstack_quant_valuations::pricer::ModelKey;
     let as_of = date!(2024 - 01 - 15);
     let mut option = InflationCapFloor::example().expect("example");

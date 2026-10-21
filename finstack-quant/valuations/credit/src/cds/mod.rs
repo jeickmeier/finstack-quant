@@ -125,7 +125,7 @@
 //!
 //! # Examples
 //!
-//! See [`CreditDefaultSwap`] for construction and usage examples.
+//! See [`CreditDefaultSwap`](crate::cds::CreditDefaultSwap) for construction and usage examples.
 //!
 //! # See Also
 //!
@@ -141,11 +141,5 @@ pub(crate) mod metrics;
 pub mod pricing;
 mod types;
 
-pub use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
-pub use finstack_quant_valuations_core::market::conventions::CdsConvention;
-pub use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
 pub use types::CreditDefaultSwap;
 pub use types::CreditDefaultSwapBuilder;
-pub use types::PayReceive;
-pub use types::PremiumLegSpec;
-pub use types::ProtectionLegSpec;

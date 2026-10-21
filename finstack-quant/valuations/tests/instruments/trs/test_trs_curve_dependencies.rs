@@ -4,9 +4,9 @@
 //! risk calculators (DV01, bucketed DV01, etc.) can correctly bump all relevant
 //! rate curves (discount + forward) in line with market convention.
 
-use finstack_quant_valuations::instruments::{
-    EquityTotalReturnSwap, FiIndexTotalReturnSwap, Instrument,
-};
+use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
+use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
+use finstack_quant_valuations::instruments::Instrument;
 
 #[test]
 fn equity_trs_declares_discount_and_forward_curves() {

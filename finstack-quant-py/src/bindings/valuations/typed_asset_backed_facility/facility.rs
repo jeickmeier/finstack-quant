@@ -26,12 +26,13 @@ use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::{
-    AmortizationEvent, AssetBackedFacility, BorrowingBaseRules, FacilityProjection, TermOutSpec,
+    AmortizationEvent, AssetBackedFacility, FacilityProjection, TermOutSpec,
 };
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::DrawEvent;
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::BorrowingBaseRules;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::CreditModelConfig;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::DealFees;
-use finstack_quant_valuations::instruments::InstrumentJson;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 
 type FacilityBuilderInner =
     finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacilityBuilder;

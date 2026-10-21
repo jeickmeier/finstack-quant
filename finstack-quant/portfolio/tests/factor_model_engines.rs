@@ -289,7 +289,7 @@ fn portfolio_wrap_uses_scale_factor_weight_for_eur_fx_factor() -> Result<()> {
     let model = FactorModel::from_config(FactorModelConfig {
         factors: vec![factor],
         covariance,
-        matching: finstack_quant_factor::matching::MatchingConfig::MappingTable(vec![]),
+        matching: finstack_quant_factor::MatchingConfig::MappingTable(vec![]),
 
         risk_measure: RiskMeasure::Variance,
         bump_config: None,
@@ -404,7 +404,8 @@ fn equity_vol_factor() -> FactorDefinition {
 #[test]
 fn vol_factor_delta_matches_equity_option_vega() -> Result<()> {
     use finstack_quant_core::math::special_functions::norm_pdf;
-    use finstack_quant_valuations::instruments::{EquityOption, OptionType};
+    use finstack_quant_models::types::OptionType;
+    use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 
     let as_of = make_date(2025, Month::January, 2)?;
     let expiry = make_date(2025, Month::July, 2)?;

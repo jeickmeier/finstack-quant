@@ -193,21 +193,22 @@ impl MetricCalculator for OasCalculator {
 mod tests {
     use std::sync::Arc;
 
-    use crate::convertible::{
-        AntiDilutionPolicy, ConversionPolicy, ConversionSpec, ConvertibleBond, DividendAdjustment,
-    };
+    use crate::convertible::ConvertibleBond;
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations_core::instruments::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
+    use finstack_quant_valuations_core::instruments::{
+        AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
+    };
     use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
     use time::Month;
 
     use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec};
-    use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+    use finstack_quant_valuations_core::instruments::Instrument;
 
     fn make_bond_with_quote(notional_usd: f64, quoted_clean_pct: f64) -> ConvertibleBond {
         let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
