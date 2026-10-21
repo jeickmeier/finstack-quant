@@ -188,7 +188,7 @@ impl JsMasterScale {
     }
 
     /// Map a credit-scoring result to a grade through its implied PD.
-    /// @param result - `ScoringResult` object or JSON, as returned by the `models.credit` scoring functions.
+    /// @param result - `ScoringResult` object or JSON, as returned by the `models.credit.scoring` functions.
     /// @returns The `MasterScaleResult` object for the score's implied PD.
     ///
     /// # Errors

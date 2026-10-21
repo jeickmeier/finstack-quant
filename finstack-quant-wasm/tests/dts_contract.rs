@@ -1163,8 +1163,11 @@ fn models_and_valuations_dts_expose_owned_credit_namespaces() {
     assert!(model_credit.contains("ToggleExerciseModel: ToggleExerciseModelConstructor;"));
     assert!(!dts.contains("mertonModelJson("));
     assert!(!dts.contains("creditStateJson("));
-    assert!(model_credit.contains("analyzeExchangeOffer("));
-    assert!(model_credit.contains("analyzeLme("));
+    assert!(model_credit.contains("liabilityManagement: CreditLiabilityManagementNamespace;"));
+    assert!(!model_credit.contains("analyzeExchangeOffer("));
+    let liability_management = interface_block(&dts, "CreditLiabilityManagementNamespace");
+    assert!(liability_management.contains("analyzeExchangeOffer("));
+    assert!(liability_management.contains("analyzeLme("));
     assert!(!core.contains("analyzeExchangeOffer("));
     assert!(!core.contains("analyzeLme("));
     assert!(!dts.contains("export interface CreditDerivativesNamespace"));

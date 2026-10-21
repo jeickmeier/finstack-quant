@@ -2584,47 +2584,20 @@
     "kind": "namespace",
     "keys": [
       "AssetDynamics",
-      "BetaRecovery",
-      "DownturnLgd",
       "DynamicRecoverySpec",
-      "EadCalculator",
       "EndogenousHazardSpec",
-      "GeneratorMatrix",
-      "MasterScale",
       "MertonBarrierType",
       "MertonModel",
-      "MigrationSimulator",
       "RatingFactorTable",
-      "RatingPath",
-      "RatingPaths",
-      "RatingScale",
       "SimulatedPaths",
       "ToggleExerciseModel",
-      "TransitionMatrix",
-      "WorkoutCosts",
-      "WorkoutLgd",
-      "WorkoutLgdBuilder",
-      "allocateRecovery",
-      "altmanEmScore",
-      "altmanZDoublePrime",
-      "altmanZPrime",
-      "altmanZScore",
-      "analyzeExchangeOffer",
-      "analyzeLme",
-      "applyBaselIrbPdFloor",
-      "baselIrbPdFloor",
-      "centralTendency",
-      "collateralPieceLiquidationValue",
+      "lgd",
+      "liabilityManagement",
+      "migration",
       "moodysWarfFactor",
-      "ohlsonOScore",
-      "pitToTtc",
-      "project",
-      "recoveryClaimTotalClaim",
-      "seniorityRecoveryStats",
-      "tenderRecommendationHurdle",
-      "ttcToPit",
-      "workoutLgd",
-      "zmijewskiScore"
+      "pd",
+      "recoveryWaterfall",
+      "scoring"
     ]
   },
   "models.credit.MertonModel": {
@@ -2715,34 +2688,39 @@
   "models.credit.moodysWarfFactor": {
     "kind": "function"
   },
-  "models.credit.analyzeExchangeOffer": {
-    "kind": "function"
+  "models.credit.lgd": {
+    "kind": "namespace",
+    "keys": [
+      "BetaRecovery",
+      "DownturnLgd",
+      "EadCalculator",
+      "WorkoutCosts",
+      "WorkoutLgd",
+      "WorkoutLgdBuilder",
+      "collateralPieceLiquidationValue",
+      "seniorityRecoveryStats",
+      "workoutLgd"
+    ]
   },
-  "models.credit.analyzeLme": {
-    "kind": "function"
-  },
-  "models.credit.tenderRecommendationHurdle": {
-    "kind": "function"
-  },
-  "models.credit.BetaRecovery": {
+  "models.credit.lgd.BetaRecovery": {
     "kind": "class",
     "statics": ["fromJson"],
     "methods": ["free", "quantile", "sampleSeeded", "toJson"],
     "getters": ["alpha", "betaParam", "mean", "meanLgd", "mode", "stdDev", "variance"]
   },
-  "models.credit.WorkoutCosts": {
+  "models.credit.lgd.WorkoutCosts": {
     "kind": "class",
     "statics": ["fromJson", "standard", "zero"],
     "methods": ["free", "toJson"],
     "getters": ["directCostRate", "indirectCostRate", "totalRate"]
   },
-  "models.credit.WorkoutLgd": {
+  "models.credit.lgd.WorkoutLgd": {
     "kind": "class",
     "statics": ["builder", "fromJson"],
     "methods": ["evaluate", "free", "netRecovery", "toJson"],
     "getters": ["collateral", "costs", "discountRate", "workoutYears"]
   },
-  "models.credit.WorkoutLgdBuilder": {
+  "models.credit.lgd.WorkoutLgdBuilder": {
     "kind": "class",
     "statics": [],
     "methods": [
@@ -2756,7 +2734,7 @@
     ],
     "getters": []
   },
-  "models.credit.DownturnLgd": {
+  "models.credit.lgd.DownturnLgd": {
     "kind": "class",
     "statics": [
       "baselSecured",
@@ -2769,43 +2747,47 @@
     "methods": ["adjust", "free", "toJson"],
     "getters": ["method", "params"]
   },
-  "models.credit.EadCalculator": {
+  "models.credit.lgd.EadCalculator": {
     "kind": "class",
     "statics": ["fromJson", "revolver", "termLoan"],
     "methods": ["free", "leqFromObservedEad", "toJson"],
     "getters": ["ead", "totalCommitment", "utilization"]
   },
-  "models.credit.seniorityRecoveryStats": {
+  "models.credit.lgd.seniorityRecoveryStats": {
     "kind": "function"
   },
-  "models.credit.workoutLgd": {
+  "models.credit.lgd.workoutLgd": {
     "kind": "function"
   },
-  "models.credit.collateralPieceLiquidationValue": {
+  "models.credit.lgd.collateralPieceLiquidationValue": {
     "kind": "function"
   },
-  "models.credit.MasterScale": {
-    "kind": "class",
-    "statics": ["fromJson", "fromRegistryId", "moodysAssumptions", "spAssumptions"],
-    "methods": ["free", "mapPd", "mapPds", "mapScore", "toJson"],
-    "getters": ["grades", "nGrades"]
+  "models.credit.liabilityManagement": {
+    "kind": "namespace",
+    "keys": ["analyzeExchangeOffer", "analyzeLme", "tenderRecommendationHurdle"]
   },
-  "models.credit.baselIrbPdFloor": {
+  "models.credit.liabilityManagement.analyzeExchangeOffer": {
     "kind": "function"
   },
-  "models.credit.applyBaselIrbPdFloor": {
+  "models.credit.liabilityManagement.analyzeLme": {
     "kind": "function"
   },
-  "models.credit.pitToTtc": {
+  "models.credit.liabilityManagement.tenderRecommendationHurdle": {
     "kind": "function"
   },
-  "models.credit.ttcToPit": {
-    "kind": "function"
+  "models.credit.migration": {
+    "kind": "namespace",
+    "keys": [
+      "GeneratorMatrix",
+      "MigrationSimulator",
+      "RatingPath",
+      "RatingPaths",
+      "RatingScale",
+      "TransitionMatrix",
+      "project"
+    ]
   },
-  "models.credit.centralTendency": {
-    "kind": "function"
-  },
-  "models.credit.RatingScale": {
+  "models.credit.migration.RatingScale": {
     "kind": "class",
     "statics": ["custom", "customWithDefault", "fromJson", "notched", "standard", "standardWithNr"],
     "methods": [
@@ -2821,7 +2803,7 @@
     ],
     "getters": ["nStates"]
   },
-  "models.credit.TransitionMatrix": {
+  "models.credit.migration.TransitionMatrix": {
     "kind": "class",
     "statics": ["fromJson"],
     "methods": [
@@ -2836,13 +2818,13 @@
     ],
     "getters": ["horizon", "nStates", "scale"]
   },
-  "models.credit.GeneratorMatrix": {
+  "models.credit.migration.GeneratorMatrix": {
     "kind": "class",
     "statics": ["fromJson", "fromTransitionMatrix", "fromTransitionMatrixWithTol"],
     "methods": ["exitRate", "free", "intensity", "toJson", "toMatrix"],
     "getters": ["nStates", "regularizationL1", "roundTripError", "scale"]
   },
-  "models.credit.RatingPath": {
+  "models.credit.migration.RatingPath": {
     "kind": "class",
     "statics": ["fromJson"],
     "methods": [
@@ -2857,43 +2839,90 @@
     ],
     "getters": ["horizon", "scale"]
   },
-  "models.credit.RatingPaths": {
+  "models.credit.migration.RatingPaths": {
     "kind": "class",
     "statics": ["fromJson"],
     "methods": ["free", "toJson"],
     "getters": ["defaultRate", "length", "paths"]
   },
-  "models.credit.MigrationSimulator": {
+  "models.credit.migration.MigrationSimulator": {
     "kind": "class",
     "statics": ["fromJson"],
     "methods": ["empiricalMatrix", "free", "simulate", "toJson"],
     "getters": ["generator", "horizon"]
   },
-  "models.credit.project": {
+  "models.credit.migration.project": {
     "kind": "function"
   },
-  "models.credit.altmanZScore": {
+  "models.credit.pd": {
+    "kind": "namespace",
+    "keys": [
+      "MasterScale",
+      "applyBaselIrbPdFloor",
+      "baselIrbPdFloor",
+      "centralTendency",
+      "pitToTtc",
+      "ttcToPit"
+    ]
+  },
+  "models.credit.pd.MasterScale": {
+    "kind": "class",
+    "statics": ["fromJson", "fromRegistryId", "moodysAssumptions", "spAssumptions"],
+    "methods": ["free", "mapPd", "mapPds", "mapScore", "toJson"],
+    "getters": ["grades", "nGrades"]
+  },
+  "models.credit.pd.baselIrbPdFloor": {
     "kind": "function"
   },
-  "models.credit.altmanZPrime": {
+  "models.credit.pd.applyBaselIrbPdFloor": {
     "kind": "function"
   },
-  "models.credit.altmanZDoublePrime": {
+  "models.credit.pd.pitToTtc": {
     "kind": "function"
   },
-  "models.credit.altmanEmScore": {
+  "models.credit.pd.ttcToPit": {
     "kind": "function"
   },
-  "models.credit.ohlsonOScore": {
+  "models.credit.pd.centralTendency": {
     "kind": "function"
   },
-  "models.credit.zmijewskiScore": {
+  "models.credit.recoveryWaterfall": {
+    "kind": "namespace",
+    "keys": ["allocateRecovery", "recoveryClaimTotalClaim"]
+  },
+  "models.credit.recoveryWaterfall.allocateRecovery": {
     "kind": "function"
   },
-  "models.credit.allocateRecovery": {
+  "models.credit.recoveryWaterfall.recoveryClaimTotalClaim": {
     "kind": "function"
   },
-  "models.credit.recoveryClaimTotalClaim": {
+  "models.credit.scoring": {
+    "kind": "namespace",
+    "keys": [
+      "altmanEmScore",
+      "altmanZDoublePrime",
+      "altmanZPrime",
+      "altmanZScore",
+      "ohlsonOScore",
+      "zmijewskiScore"
+    ]
+  },
+  "models.credit.scoring.altmanZScore": {
+    "kind": "function"
+  },
+  "models.credit.scoring.altmanZPrime": {
+    "kind": "function"
+  },
+  "models.credit.scoring.altmanZDoublePrime": {
+    "kind": "function"
+  },
+  "models.credit.scoring.altmanEmScore": {
+    "kind": "function"
+  },
+  "models.credit.scoring.ohlsonOScore": {
+    "kind": "function"
+  },
+  "models.credit.scoring.zmijewskiScore": {
     "kind": "function"
   },
   "models.factor": {
@@ -2908,6 +2937,21 @@
       "schema",
       "validateFactorModelConfig"
     ]
+  },
+  "models.factor.factorVariance": {
+    "kind": "function"
+  },
+  "models.factor.factorCovariance": {
+    "kind": "function"
+  },
+  "models.factor.factorCorrelation": {
+    "kind": "function"
+  },
+  "models.factor.factorCovarianceRows": {
+    "kind": "function"
+  },
+  "models.factor.validateFactorModelConfig": {
+    "kind": "function"
   },
   "models.factor.credit": {
     "kind": "namespace",
@@ -2976,21 +3020,6 @@
     "kind": "function"
   },
   "models.factor.credit.decomposePeriod": {
-    "kind": "function"
-  },
-  "models.factor.factorVariance": {
-    "kind": "function"
-  },
-  "models.factor.factorCovariance": {
-    "kind": "function"
-  },
-  "models.factor.factorCorrelation": {
-    "kind": "function"
-  },
-  "models.factor.factorCovarianceRows": {
-    "kind": "function"
-  },
-  "models.factor.validateFactorModelConfig": {
     "kind": "function"
   },
   "models.factor.risk": {

@@ -1087,10 +1087,10 @@ note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, 
 #     RNG (hosts always use the seeded canonical Pcg64); RatingPaths is a
 #     host-side collection over Vec<RatingPath>, not a Rust type
 # WASM binds the same typed handles under `models.credit` (MertonModel, the
-# PIK specifications, ToggleExerciseModel, RatingFactorTable and the lgd / pd /
-# migration / scoring / recovery_waterfall families, flattened into the one
-# namespace); CreditState and the result types cross as plain objects. The
-# [parity] ledger pins the per-name accounting.
+# PIK specifications, ToggleExerciseModel, RatingFactorTable) and nests the
+# submodules like Rust and Python (`models.credit.{lgd, liabilityManagement,
+# migration, pd, recoveryWaterfall, scoring}`); CreditState and the result
+# types cross as plain objects. The [parity] ledger pins the per-name accounting.
 [crates.models.credit]
 python_package = "finstack_quant.models.credit"
 public = [
@@ -2022,26 +2022,26 @@ js = "models.credit"
 types = { CreditState = "CreditState" }
 
 [parity.modules."finstack_quant.models.credit.lgd"]
-js = "models.credit"
+js = "models.credit.lgd"
 types = { CollateralPiece = "CollateralPiece", WorkoutLgdResult = "WorkoutLgdResult" }
 
 [parity.modules."finstack_quant.models.credit.liability_management"]
-js = "models.credit"
+js = "models.credit.liabilityManagement"
 types = { ExchangeOfferAnalysis = "ExchangeOfferAnalysis", LeverageImpact = "LeverageImpact", LmeAnalysis = "LmeAnalysis" }
 
 [parity.modules."finstack_quant.models.credit.migration"]
-js = "models.credit"
+js = "models.credit.migration"
 
 [parity.modules."finstack_quant.models.credit.pd"]
-js = "models.credit"
+js = "models.credit.pd"
 types = { MasterScaleGrade = "MasterScaleGrade", MasterScaleResult = "MasterScaleResult" }
 
 [parity.modules."finstack_quant.models.credit.recovery_waterfall"]
-js = "models.credit"
+js = "models.credit.recoveryWaterfall"
 types = { RecoveryAllocation = "RecoveryAllocation", RecoveryClaim = "RecoveryClaim", RecoveryWaterfallResult = "RecoveryWaterfallResult" }
 
 [parity.modules."finstack_quant.models.credit.scoring"]
-js = "models.credit"
+js = "models.credit.scoring"
 types = { ScoringResult = "ScoringResult" }
 
 [parity.modules."finstack_quant.models.factor"]
@@ -2324,8 +2324,10 @@ vmResultRequiresCall = "twin of the Python property VmResult.requires_call (Rust
 [parity.js."models".wasm_only]
 bsGreeksIsValid = "free-function twin of Python BsGreeks.is_valid: the type is a plain object in WASM"
 
-[parity.js."models.credit".wasm_only]
+[parity.js."models.credit.lgd".wasm_only]
 collateralPieceLiquidationValue = "free-function twin of the Python property CollateralPiece.liquidation_value (Rust CollateralPiece::liquidation_value), which is not serialized: the type is a plain object in WASM"
+
+[parity.js."models.credit.recoveryWaterfall".wasm_only]
 recoveryClaimTotalClaim = "free-function twin of the Python property RecoveryClaim.total_claim (Rust RecoveryClaim::total_claim), which is not serialized: the type is a plain object in WASM"
 
 [parity.js."models.factor".wasm_only]
@@ -2835,10 +2837,10 @@ total_violations = "literal"
 grid_shape = "literal"
 
 [parity.members."finstack_quant.models.credit.lgd.CollateralPiece".renames]
-liquidation_value = { js = "models.credit.collateralPieceLiquidationValue", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+liquidation_value = { js = "models.credit.lgd.collateralPieceLiquidationValue", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
 
 [parity.members."finstack_quant.models.credit.recovery_waterfall.RecoveryClaim".renames]
-total_claim = { js = "models.credit.recoveryClaimTotalClaim", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+total_claim = { js = "models.credit.recoveryWaterfall.recoveryClaimTotalClaim", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
 
 [parity.members."finstack_quant.models.liquidity.LiquidityProfile".renames]
 half_spread = { js = "models.liquidity.liquidityProfileHalfSpread", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }

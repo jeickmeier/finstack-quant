@@ -382,7 +382,7 @@ impl JsWorkoutLgdBuilder {
 /// import init, { models } from "finstack-quant-wasm";
 /// await init();
 /// const piece = { collateral_type: "real_estate" as const, book_value: 800_000, haircut: 0.25 };
-/// console.log(models.credit.collateralPieceLiquidationValue(piece)); // 600000
+/// console.log(models.credit.lgd.collateralPieceLiquidationValue(piece)); // 600000
 /// ```
 ///
 /// # Errors

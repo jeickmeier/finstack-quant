@@ -25489,7 +25489,7 @@ export interface BetaRecovery extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const recovery = new models.credit.BetaRecovery(0.4, 0.2);
+ * const recovery = new models.credit.lgd.BetaRecovery(0.4, 0.2);
  * console.log(recovery.alpha, recovery.quantile(0.05), recovery.sampleSeeded(3, 42));
  * recovery.free();
  * ```
@@ -25553,7 +25553,7 @@ export interface DownturnLgd extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const downturn = models.credit.DownturnLgd.regulatoryFloor(0.08, 0.1);
+ * const downturn = models.credit.lgd.DownturnLgd.regulatoryFloor(0.08, 0.1);
  * console.log(downturn.method, downturn.adjust(0.35));
  * downturn.free();
  * ```
@@ -25762,7 +25762,7 @@ export interface EadCalculator extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const ead = new models.credit.EadCalculator(600, 400, 0.75);
+ * const ead = new models.credit.lgd.EadCalculator(600, 400, 0.75);
  * console.log(ead.ead, ead.utilization, ead.totalCommitment);
  * ead.free();
  * ```
@@ -25966,13 +25966,13 @@ export interface GeneratorMatrix extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
- * const generator = new models.credit.GeneratorMatrix(scale, [
+ * const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+ * const generator = new models.credit.migration.GeneratorMatrix(scale, [
  *   [-0.1, 0.08, 0.02],
  *   [0.1, -0.2, 0.1],
  *   [0, 0, 0],
  * ]);
- * console.log(generator.exitRate("A"), models.credit.project(generator, 2).probability("A", "D"));
+ * console.log(generator.exitRate("A"), models.credit.migration.project(generator, 2).probability("A", "D"));
  * ```
  */
 export interface GeneratorMatrixConstructor {
@@ -26037,7 +26037,7 @@ export interface MasterScale extends WasmOwned {
   mapPds(pds: NumericArray): generated.models.MasterScaleResult[];
   /**
    * Map a credit-scoring result to a grade through its implied PD.
-   * @param result - `ScoringResult` object or JSON, as returned by the `models.credit` scoring functions.
+   * @param result - `ScoringResult` object or JSON, as returned by the `models.credit.scoring` functions.
    * @returns The `MasterScaleResult` object for the score's implied PD.
    * @throws Error - Throws a `validation` error if the result is malformed, has no implied PD, or its PD is non-finite.
    */
@@ -26065,7 +26065,7 @@ export interface MasterScale extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const scale = new models.credit.MasterScale([
+ * const scale = new models.credit.pd.MasterScale([
  *   { label: "A", upper_pd: 0.01, central_pd: 0.005 },
  *   { label: "B", upper_pd: 0.1, central_pd: 0.04 },
  *   { label: "C", upper_pd: 1.0, central_pd: 0.3 },
@@ -26528,9 +26528,9 @@ export interface MigrationSimulator extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
- * const generator = new models.credit.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
- * const simulator = new models.credit.MigrationSimulator(generator, 5);
+ * const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+ * const generator = new models.credit.migration.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
+ * const simulator = new models.credit.migration.MigrationSimulator(generator, 5);
  * console.log(simulator.simulate(0, 100, 7).defaultRate);
  * console.log(simulator.empiricalMatrix(200, 7).probability("A", "D"));
  * ```
@@ -26697,10 +26697,10 @@ export interface RatingPath extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
- * const generator = new models.credit.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
- * const path = new models.credit.MigrationSimulator(generator, 5).simulate(0, 1, 7).paths[0];
- * const copy = models.credit.RatingPath.fromJson(path.toJson());
+ * const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+ * const generator = new models.credit.migration.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
+ * const path = new models.credit.migration.MigrationSimulator(generator, 5).simulate(0, 1, 7).paths[0];
+ * const copy = models.credit.migration.RatingPath.fromJson(path.toJson());
  * console.log(copy.labelAt(5), copy.defaulted());
  * ```
  */
@@ -26753,10 +26753,10 @@ export interface RatingPaths extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
- * const generator = new models.credit.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
- * const batch = new models.credit.MigrationSimulator(generator, 5).simulate(0, 100, 7);
- * const copy = models.credit.RatingPaths.fromJson(batch.toJson());
+ * const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+ * const generator = new models.credit.migration.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
+ * const batch = new models.credit.migration.MigrationSimulator(generator, 5).simulate(0, 100, 7);
+ * const copy = models.credit.migration.RatingPaths.fromJson(batch.toJson());
  * console.log(copy.length, copy.defaultRate);
  * ```
  */
@@ -26846,7 +26846,7 @@ export interface RatingScale extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
+ * const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
  * console.log(scale.nStates, scale.labels(), scale.defaultState());
  * scale.free();
  * ```
@@ -27160,8 +27160,8 @@ export interface TransitionMatrix extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
- * const matrix = new models.credit.TransitionMatrix(
+ * const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+ * const matrix = new models.credit.migration.TransitionMatrix(
  *   scale,
  *   [[0.9, 0.08, 0.02], [0.1, 0.8, 0.1], [0, 0, 1]],
  *   1.0,
@@ -27227,8 +27227,8 @@ export interface WorkoutCosts extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const costs = new models.credit.WorkoutCosts(0.05, 0.03);
- * console.log(costs.totalRate, models.credit.WorkoutCosts.zero().totalRate);
+ * const costs = new models.credit.lgd.WorkoutCosts(0.05, 0.03);
+ * console.log(costs.totalRate, models.credit.lgd.WorkoutCosts.zero().totalRate);
  * costs.free();
  * ```
  */
@@ -27318,11 +27318,11 @@ export interface WorkoutLgd extends WasmOwned {
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const workout = models.credit.WorkoutLgd.builder()
+ * const workout = models.credit.lgd.WorkoutLgd.builder()
  *   .collateral({ collateral_type: "real_estate", book_value: 800000, haircut: 0.3 })
  *   .workoutYears(2)
  *   .discountRate(0.05)
- *   .costs(new models.credit.WorkoutCosts(0.05, 0.03))
+ *   .costs(new models.credit.lgd.WorkoutCosts(0.05, 0.03))
  *   .build();
  * console.log(workout.evaluate(1000000).lgd, workout.evaluate(1000000).recovery_rate);
  * workout.free();
@@ -27416,11 +27416,173 @@ export interface WorkoutLgdBuilderClass {
  * import init, { models } from "finstack-quant-wasm";
  * await init();
  * const model = new models.credit.MertonModel(100, 0.25, 60, 0.03);
- * console.log(model.defaultProbability(1), models.credit.pitToTtc(0.02, 0.15, -1.0));
+ * console.log(model.defaultProbability(1), models.credit.pd.pitToTtc(0.02, 0.15, -1.0));
  * model.free();
  * ```
  */
 export interface ModelCreditNamespace {
+  /**
+   * Asset-value dynamics: geometric Brownian, jump-diffusion or CreditGrades.
+   */
+  AssetDynamics: AssetDynamicsConstructor;
+  /**
+   * Notional-dependent recovery specification for PIK instruments.
+   */
+  DynamicRecoverySpec: DynamicRecoverySpecConstructor;
+  /**
+   * Leverage-dependent hazard-rate specification for PIK instruments.
+   */
+  EndogenousHazardSpec: EndogenousHazardSpecConstructor;
+  /**
+   * Loss given default and exposure at default (Rust `credit::lgd`).
+   */
+  lgd: CreditLgdNamespace;
+  /**
+   * Liability-management analytics (Rust `credit::liability_management`).
+   */
+  liabilityManagement: CreditLiabilityManagementNamespace;
+  /**
+   * Default-barrier monitoring rule: terminal or first-passage.
+   */
+  MertonBarrierType: MertonBarrierTypeConstructor;
+  /**
+   * Structural (Merton-family) credit model of one firm.
+   */
+  MertonModel: MertonModelConstructor;
+  /**
+   * Rating migration (Rust `credit::migration`).
+   */
+  migration: CreditMigrationNamespace;
+  /**
+   * Moody's WARF rating factor for one credit rating.
+   * @param rating - Rating label such as `"Baa3"`, `"BBB-"` or `"B2"`; agency notches are normalized by the Rust parser.
+   * @returns The Moody's weighted-average rating factor for that rating (for example 610 for Baa3).
+   * @throws Error - Throws a `TypeError` if `rating` is not a string, and a `validation` error if it is not a recognized rating or has no factor in the Moody's table.
+   */
+  moodysWarfFactor(rating: string): number;
+  /**
+   * PD calibration (Rust `credit::pd`).
+   */
+  pd: CreditPdNamespace;
+  /**
+   * Rating-to-factor table for WARF-style portfolio credit quality.
+   */
+  RatingFactorTable: RatingFactorTableConstructor;
+  /**
+   * Recovery waterfall (Rust `credit::recovery_waterfall`).
+   */
+  recoveryWaterfall: CreditRecoveryWaterfallNamespace;
+  /**
+   * Accounting-based credit scoring (Rust `credit::scoring`).
+   */
+  scoring: CreditScoringNamespace;
+  /**
+   * Monte Carlo asset-value paths returned by `MertonModel.simulatePaths`.
+   */
+  SimulatedPaths: SimulatedPathsConstructor;
+  /**
+   * PIK/cash toggle exercise rule.
+   */
+  ToggleExerciseModel: ToggleExerciseModelConstructor;
+}
+
+/**
+ * Loss given default and exposure at default: Beta recovery, workout LGD, downturn LGD and EAD.
+ * Mirrors Rust `credit::lgd`.
+ *
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const recovery = new models.credit.lgd.BetaRecovery(0.4, 0.2);
+ * console.log(recovery.quantile(0.95));
+ * recovery.free();
+ * ```
+ */
+export interface CreditLgdNamespace {
+  /**
+   * Beta-distributed recovery rate.
+   */
+  BetaRecovery: BetaRecoveryConstructor;
+  /**
+   * Net liquidation value of a collateral piece after its haircut.
+   *
+   * Twin of the Rust `CollateralPiece::liquidation_value` and the Python
+   * property `CollateralPiece.liquidation_value`.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const piece = { collateral_type: "real_estate" as const, book_value: 800_000, haircut: 0.25 };
+   * console.log(models.credit.lgd.collateralPieceLiquidationValue(piece)); // 600000
+   * ```
+   * @param piece - `CollateralPiece` object or JSON (`collateral_type`, `book_value`, `haircut`), as held by `WorkoutLgd.collateral`.
+   * @returns `book_value * (1 - haircut)`, in the book value's monetary units.
+   * @throws Error - Throws a `TypeError` if `piece` is neither a string nor a plain object, and a `validation` error if it is malformed, the book value is negative or non-finite, or the haircut is outside `[0, 1]`.
+   */
+  collateralPieceLiquidationValue(piece: generated.models.CollateralPiece | string): number;
+  /**
+   * Downturn LGD adjustment.
+   */
+  DownturnLgd: DownturnLgdConstructor;
+  /**
+   * Exposure-at-default calculator.
+   */
+  EadCalculator: EadCalculatorConstructor;
+  /**
+   * Historical Beta recovery distribution for a debt seniority class.
+   * @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
+   * @param ratingAgency - Agency whose calibration to use, such as `"moodys"` or `"sp"`; omitted uses the registry default.
+   * @returns The calibrated `BetaRecovery` handle.
+   * @throws Error - Throws a `validation` error if the seniority or agency is not recognized.
+   */
+  seniorityRecoveryStats(seniority: string, ratingAgency?: string): BetaRecovery;
+  /**
+   * Direct and indirect workout cost rates.
+   */
+  WorkoutCosts: WorkoutCostsConstructor;
+  /**
+   * Workout LGD model: collateral waterfall, costs and time value.
+   */
+  WorkoutLgd: WorkoutLgdConstructor;
+  /**
+   * One-call workout LGD from collateral tuples and cost assumptions.
+   * @param ead - Exposure at default in monetary units; positive.
+   * @param collateral - Array of `[collateralType, bookValue, haircut]` tuples, such as `[["real_estate", 800000, 0.3]]`.
+   * @param directCostPct - Direct workout costs as a fraction of EAD.
+   * @param indirectCostPct - Indirect workout costs as a fraction of EAD.
+   * @param timeToResolutionYears - Expected workout duration in years.
+   * @param discountRate - Annual discount rate over the workout period, as a decimal.
+   * @returns The `WorkoutLgdResult` object (`net_recovery`, `lgd`, `recovery_rate`).
+   * @throws Error - Throws a `validation` error if any input is out of range or a collateral type is not recognized.
+   */
+  workoutLgd(
+    ead: number,
+    collateral: readonly (readonly [string, number, number])[] | string,
+    directCostPct: number,
+    indirectCostPct: number,
+    timeToResolutionYears: number,
+    discountRate: number
+  ): generated.models.WorkoutLgdResult;
+  /**
+   * Fluent builder returned by `WorkoutLgd.builder()`.
+   */
+  WorkoutLgdBuilder: WorkoutLgdBuilderClass;
+}
+
+/**
+ * Liability-management analytics: exchange offers and LME transactions.
+ * Mirrors Rust `credit::liability_management`.
+ *
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const hurdle = models.credit.liabilityManagement.tenderRecommendationHurdle();
+ * console.log(hurdle); // 0.02
+ * ```
+ */
+export interface CreditLiabilityManagementNamespace {
   /**
    * Compare hold-versus-tender economics for a distressed exchange offer.
    * Tendering is recommended only when total consideration exceeds the
@@ -27458,53 +27620,46 @@ export interface ModelCreditNamespace {
     ebitda?: number | null
   ): LmeAnalysis;
   /**
-   * Asset-value dynamics: geometric Brownian, jump-diffusion or CreditGrades.
+   * Minimum NPV ratio at which a tender is recommended. Twin of the Rust and
+   * Python constant `TENDER_RECOMMENDATION_HURDLE`: a holder is advised to
+   * tender when the tender NPV is at least `old_npv` times this hurdle.
+   * @returns The dimensionless hurdle multiple.
    */
-  AssetDynamics: AssetDynamicsConstructor;
-  /**
-   * Beta-distributed recovery rate.
-   */
-  BetaRecovery: BetaRecoveryConstructor;
-  /**
-   * Downturn LGD adjustment.
-   */
-  DownturnLgd: DownturnLgdConstructor;
-  /**
-   * Notional-dependent recovery specification for PIK instruments.
-   */
-  DynamicRecoverySpec: DynamicRecoverySpecConstructor;
-  /**
-   * Exposure-at-default calculator.
-   */
-  EadCalculator: EadCalculatorConstructor;
-  /**
-   * Leverage-dependent hazard-rate specification for PIK instruments.
-   */
-  EndogenousHazardSpec: EndogenousHazardSpecConstructor;
+  tenderRecommendationHurdle(): number;
+}
+
+/**
+ * Rating scales, transition and generator matrices, and rating-migration simulation.
+ * Mirrors Rust `credit::migration`.
+ *
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const scale = models.credit.migration.RatingScale.custom(["A", "B", "D"]);
+ * const generator = new models.credit.migration.GeneratorMatrix(scale, [
+ *   -0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0,
+ * ]);
+ * console.log(models.credit.migration.project(generator, 2).probability("A", "D"));
+ * ```
+ */
+export interface CreditMigrationNamespace {
   /**
    * Continuous-time Markov-chain generator matrix.
    */
   GeneratorMatrix: GeneratorMatrixConstructor;
   /**
-   * Rating master scale mapping PDs to grades.
-   */
-  MasterScale: MasterScaleConstructor;
-  /**
-   * Default-barrier monitoring rule: terminal or first-passage.
-   */
-  MertonBarrierType: MertonBarrierTypeConstructor;
-  /**
-   * Structural (Merton-family) credit model of one firm.
-   */
-  MertonModel: MertonModelConstructor;
-  /**
    * Gillespie simulator of rating migration.
    */
   MigrationSimulator: MigrationSimulatorConstructor;
   /**
-   * Rating-to-factor table for WARF-style portfolio credit quality.
+   * Transition matrix implied by a generator over a horizon, `exp(Q * t)`.
+   * @param generator - `GeneratorMatrix` handle to exponentiate.
+   * @param t - Horizon in years; positive and finite.
+   * @returns The projected `TransitionMatrix` with horizon `t`.
+   * @throws Error - Throws a `validation` error if `t` is not positive and finite, and a `computation` error if the matrix exponential fails.
    */
-  RatingFactorTable: RatingFactorTableConstructor;
+  project(generator: GeneratorMatrix, t: number): TransitionMatrix;
   /**
    * One simulated rating trajectory.
    */
@@ -27518,29 +27673,91 @@ export interface ModelCreditNamespace {
    */
   RatingScale: RatingScaleConstructor;
   /**
-   * Monte Carlo asset-value paths returned by `MertonModel.simulatePaths`.
-   */
-  SimulatedPaths: SimulatedPathsConstructor;
-  /**
-   * PIK/cash toggle exercise rule.
-   */
-  ToggleExerciseModel: ToggleExerciseModelConstructor;
-  /**
    * Rating transition matrix over a fixed horizon.
    */
   TransitionMatrix: TransitionMatrixConstructor;
+}
+
+/**
+ * PD calibration: master scales, PIT/TTC conversion, central tendency and the Basel IRB PD floor.
+ * Mirrors Rust `credit::pd`.
+ *
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * console.log(models.credit.pd.pitToTtc(0.02, 0.15, -1.0), models.credit.pd.baselIrbPdFloor());
+ * ```
+ */
+export interface CreditPdNamespace {
   /**
-   * Direct and indirect workout cost rates.
+   * Apply the Basel IRB regulatory PD floor.
+   * @param pd - Default probability as a decimal.
+   * @returns `max(pd, 0.0003)`.
+   * @throws Error - Throws a `TypeError` if `pd` is not a number.
    */
-  WorkoutCosts: WorkoutCostsConstructor;
+  applyBaselIrbPdFloor(pd: number): number;
   /**
-   * Workout LGD model: collateral waterfall, costs and time value.
+   * Basel IRB regulatory PD floor (0.03%), as a decimal. Twin of the Rust and
+   * Python constant `BASEL_IRB_PD_FLOOR`.
+   * @returns The floor, `0.0003`.
    */
-  WorkoutLgd: WorkoutLgdConstructor;
+  baselIrbPdFloor(): number;
   /**
-   * Fluent builder returned by `WorkoutLgd.builder()`.
+   * Long-run central-tendency PD from a history of annual default rates.
+   * @param annualDefaultRates - Annual default rates as decimals in `[0, 1]`, as a `number[]` or `Float64Array`; non-empty.
+   * @returns The central-tendency default probability.
+   * @throws Error - Throws a `validation` error if the series is empty or a rate is non-finite or outside `[0, 1]`.
    */
-  WorkoutLgdBuilder: WorkoutLgdBuilderClass;
+  centralTendency(annualDefaultRates: NumericArray): number;
+  /**
+   * Rating master scale mapping PDs to grades.
+   */
+  MasterScale: MasterScaleConstructor;
+  /**
+   * Convert a point-in-time PD to through-the-cycle under the Vasicek single-factor model.
+   * @param pdPit - Point-in-time default probability, strictly between 0 and 1.
+   * @param assetCorrelation - Asset correlation with the systematic factor, strictly between 0 and 1.
+   * @param cycleIndex - Standardized credit-cycle index; positive in benign conditions, negative in stress.
+   * @returns The through-the-cycle default probability.
+   * @throws Error - Throws a `validation` error if the PD or correlation is outside `(0, 1)` or an input is non-finite.
+   */
+  pitToTtc(pdPit: number, assetCorrelation: number, cycleIndex: number): number;
+  /**
+   * Convert a through-the-cycle PD to point-in-time under the Vasicek single-factor model.
+   * @param pdTtc - Through-the-cycle default probability, strictly between 0 and 1.
+   * @param assetCorrelation - Asset correlation with the systematic factor, strictly between 0 and 1.
+   * @param cycleIndex - Standardized credit-cycle index; positive in benign conditions, negative in stress.
+   * @returns The point-in-time default probability.
+   * @throws Error - Throws a `validation` error if the PD or correlation is outside `(0, 1)` or an input is non-finite.
+   */
+  ttcToPit(pdTtc: number, assetCorrelation: number, cycleIndex: number): number;
+}
+
+/**
+ * Absolute-priority recovery waterfall over a bankruptcy estate.
+ * Mirrors Rust `credit::recovery_waterfall`.
+ *
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const result = models.credit.recoveryWaterfall.allocateRecovery(80, [
+ *   {
+ *     id: "TL-B",
+ *     seniority: "senior_secured",
+ *     priority: 1,
+ *     principal: 100,
+ *     accrued: 0,
+ *     penalties: 0,
+ *     collateral_value: null,
+ *     collateral_haircut: 0,
+ *   },
+ * ]);
+ * console.log(result.total_distributed); // 80
+ * ```
+ */
+export interface CreditRecoveryWaterfallNamespace {
   /**
    * Allocate a bankruptcy estate across claims under the absolute priority rule.
    *
@@ -27556,6 +27773,47 @@ export interface ModelCreditNamespace {
     estateValue: number,
     claims: readonly generated.models.RecoveryClaim[] | string
   ): generated.models.RecoveryWaterfallResult;
+  /**
+   * Total allowed amount of a recovery claim: principal plus accrued amounts
+   * and penalties.
+   *
+   * Twin of the Rust `RecoveryClaim::total_claim` and the Python property
+   * `RecoveryClaim.total_claim`.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const claim = {
+   *   id: "TL-B",
+   *   seniority: "senior_secured",
+   *   priority: 1,
+   *   principal: 100,
+   *   accrued: 5,
+   *   penalties: 1,
+   *   collateral_value: null,
+   *   collateral_haircut: 0,
+   * };
+   * console.log(models.credit.recoveryWaterfall.recoveryClaimTotalClaim(claim)); // 106
+   * ```
+   * @param claim - `RecoveryClaim` object or JSON, as passed to `allocateRecovery`.
+   * @returns `principal + accrued + penalties`, in the claim's monetary units.
+   * @throws Error - Throws a `TypeError` if `claim` is neither a string nor a plain object, and a `validation` error if it is malformed.
+   */
+  recoveryClaimTotalClaim(claim: generated.models.RecoveryClaim | string): number;
+}
+
+/**
+ * Accounting-based credit scores: Altman Z / Z' / Z'' / EM, Ohlson O-Score and Zmijewski.
+ * Mirrors Rust `credit::scoring`.
+ *
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * console.log(models.credit.scoring.zmijewskiScore(0.05, 0.6, 1.5).implied_pd);
+ * ```
+ */
+export interface CreditScoringNamespace {
   /**
    * Altman emerging-market score: the Z''-Score plus a constant of 3.25.
    * @param workingCapitalToTotalAssets - Working capital divided by total assets (ratio X1).
@@ -27621,52 +27879,6 @@ export interface ModelCreditNamespace {
     salesToTotalAssets: number
   ): generated.models.ScoringResult;
   /**
-   * Apply the Basel IRB regulatory PD floor.
-   * @param pd - Default probability as a decimal.
-   * @returns `max(pd, 0.0003)`.
-   * @throws Error - Throws a `TypeError` if `pd` is not a number.
-   */
-  applyBaselIrbPdFloor(pd: number): number;
-  /**
-   * Basel IRB regulatory PD floor (0.03%), as a decimal. Twin of the Rust and
-   * Python constant `BASEL_IRB_PD_FLOOR`.
-   * @returns The floor, `0.0003`.
-   */
-  baselIrbPdFloor(): number;
-
-  /**
-   * Long-run central-tendency PD from a history of annual default rates.
-   * @param annualDefaultRates - Annual default rates as decimals in `[0, 1]`, as a `number[]` or `Float64Array`; non-empty.
-   * @returns The central-tendency default probability.
-   * @throws Error - Throws a `validation` error if the series is empty or a rate is non-finite or outside `[0, 1]`.
-   */
-  centralTendency(annualDefaultRates: NumericArray): number;
-  /**
-   * Net liquidation value of a collateral piece after its haircut.
-   *
-   * Twin of the Rust `CollateralPiece::liquidation_value` and the Python
-   * property `CollateralPiece.liquidation_value`.
-   * @example
-   * ```typescript
-   * import init, { models } from "finstack-quant-wasm";
-   * await init();
-   * const piece = { collateral_type: "real_estate" as const, book_value: 800_000, haircut: 0.25 };
-   * console.log(models.credit.collateralPieceLiquidationValue(piece)); // 600000
-   * ```
-   * @param piece - `CollateralPiece` object or JSON (`collateral_type`, `book_value`, `haircut`), as held by `WorkoutLgd.collateral`.
-   * @returns `book_value * (1 - haircut)`, in the book value's monetary units.
-   * @throws Error - Throws a `TypeError` if `piece` is neither a string nor a plain object, and a `validation` error if it is malformed, the book value is negative or non-finite, or the haircut is outside `[0, 1]`.
-   */
-  collateralPieceLiquidationValue(piece: generated.models.CollateralPiece | string): number;
-
-  /**
-   * Moody's WARF rating factor for one credit rating.
-   * @param rating - Rating label such as `"Baa3"`, `"BBB-"` or `"B2"`; agency notches are normalized by the Rust parser.
-   * @returns The Moody's weighted-average rating factor for that rating (for example 610 for Baa3).
-   * @throws Error - Throws a `TypeError` if `rating` is not a string, and a `validation` error if it is not a recognized rating or has no factor in the Moody's table.
-   */
-  moodysWarfFactor(rating: string): number;
-  /**
    * Ohlson (1980) O-Score logit bankruptcy model.
    * @param logTotalAssetsAdjusted - Natural log of total assets deflated by the GNP price-level index.
    * @param totalLiabilitiesToTotalAssets - Total liabilities divided by total assets.
@@ -27691,93 +27903,6 @@ export interface ModelCreditNamespace {
     negativeNetIncomeTwoYears: number,
     netIncomeChange: number
   ): generated.models.ScoringResult;
-  /**
-   * Convert a point-in-time PD to through-the-cycle under the Vasicek single-factor model.
-   * @param pdPit - Point-in-time default probability, strictly between 0 and 1.
-   * @param assetCorrelation - Asset correlation with the systematic factor, strictly between 0 and 1.
-   * @param cycleIndex - Standardized credit-cycle index; positive in benign conditions, negative in stress.
-   * @returns The through-the-cycle default probability.
-   * @throws Error - Throws a `validation` error if the PD or correlation is outside `(0, 1)` or an input is non-finite.
-   */
-  pitToTtc(pdPit: number, assetCorrelation: number, cycleIndex: number): number;
-  /**
-   * Transition matrix implied by a generator over a horizon, `exp(Q * t)`.
-   * @param generator - `GeneratorMatrix` handle to exponentiate.
-   * @param t - Horizon in years; positive and finite.
-   * @returns The projected `TransitionMatrix` with horizon `t`.
-   * @throws Error - Throws a `validation` error if `t` is not positive and finite, and a `computation` error if the matrix exponential fails.
-   */
-  project(generator: GeneratorMatrix, t: number): TransitionMatrix;
-  /**
-   * Total allowed amount of a recovery claim: principal plus accrued amounts
-   * and penalties.
-   *
-   * Twin of the Rust `RecoveryClaim::total_claim` and the Python property
-   * `RecoveryClaim.total_claim`.
-   * @example
-   * ```typescript
-   * import init, { models } from "finstack-quant-wasm";
-   * await init();
-   * const claim = {
-   *   id: "TL-B",
-   *   seniority: "senior_secured",
-   *   priority: 1,
-   *   principal: 100,
-   *   accrued: 5,
-   *   penalties: 1,
-   *   collateral_value: null,
-   *   collateral_haircut: 0,
-   * };
-   * console.log(models.credit.recoveryClaimTotalClaim(claim)); // 106
-   * ```
-   * @param claim - `RecoveryClaim` object or JSON, as passed to `allocateRecovery`.
-   * @returns `principal + accrued + penalties`, in the claim's monetary units.
-   * @throws Error - Throws a `TypeError` if `claim` is neither a string nor a plain object, and a `validation` error if it is malformed.
-   */
-  recoveryClaimTotalClaim(claim: generated.models.RecoveryClaim | string): number;
-  /**
-   * Historical Beta recovery distribution for a debt seniority class.
-   * @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
-   * @param ratingAgency - Agency whose calibration to use, such as `"moodys"` or `"sp"`; omitted uses the registry default.
-   * @returns The calibrated `BetaRecovery` handle.
-   * @throws Error - Throws a `validation` error if the seniority or agency is not recognized.
-   */
-  seniorityRecoveryStats(seniority: string, ratingAgency?: string): BetaRecovery;
-  /**
-   * Minimum NPV ratio at which a tender is recommended. Twin of the Rust and
-   * Python constant `TENDER_RECOMMENDATION_HURDLE`: a holder is advised to
-   * tender when the tender NPV is at least `old_npv` times this hurdle.
-   * @returns The dimensionless hurdle multiple.
-   */
-  tenderRecommendationHurdle(): number;
-  /**
-   * Convert a through-the-cycle PD to point-in-time under the Vasicek single-factor model.
-   * @param pdTtc - Through-the-cycle default probability, strictly between 0 and 1.
-   * @param assetCorrelation - Asset correlation with the systematic factor, strictly between 0 and 1.
-   * @param cycleIndex - Standardized credit-cycle index; positive in benign conditions, negative in stress.
-   * @returns The point-in-time default probability.
-   * @throws Error - Throws a `validation` error if the PD or correlation is outside `(0, 1)` or an input is non-finite.
-   */
-  ttcToPit(pdTtc: number, assetCorrelation: number, cycleIndex: number): number;
-  /**
-   * One-call workout LGD from collateral tuples and cost assumptions.
-   * @param ead - Exposure at default in monetary units; positive.
-   * @param collateral - Array of `[collateralType, bookValue, haircut]` tuples, such as `[["real_estate", 800000, 0.3]]`.
-   * @param directCostPct - Direct workout costs as a fraction of EAD.
-   * @param indirectCostPct - Indirect workout costs as a fraction of EAD.
-   * @param timeToResolutionYears - Expected workout duration in years.
-   * @param discountRate - Annual discount rate over the workout period, as a decimal.
-   * @returns The `WorkoutLgdResult` object (`net_recovery`, `lgd`, `recovery_rate`).
-   * @throws Error - Throws a `validation` error if any input is out of range or a collateral type is not recognized.
-   */
-  workoutLgd(
-    ead: number,
-    collateral: readonly (readonly [string, number, number])[] | string,
-    directCostPct: number,
-    indirectCostPct: number,
-    timeToResolutionYears: number,
-    discountRate: number
-  ): generated.models.WorkoutLgdResult;
   /**
    * Zmijewski (1984) probit financial-distress model.
    * @param netIncomeToTotalAssets - Net income divided by total assets.
