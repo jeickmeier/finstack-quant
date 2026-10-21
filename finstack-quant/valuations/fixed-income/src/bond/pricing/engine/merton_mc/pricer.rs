@@ -1,5 +1,4 @@
 use super::calibration::calibrate_parameter_to_market;
-use super::MertonMcConfig;
 use crate::bond::pricing::time_basis::{
     bond_cashflow_dfs_on_model_grid, bond_model_schedule, implied_flat_discount_rate_from_curve,
     BondModelSchedule,
@@ -9,6 +8,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::MertonMcConfig;
 use finstack_quant_valuations_core::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };

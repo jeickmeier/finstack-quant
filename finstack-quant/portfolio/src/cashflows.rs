@@ -511,7 +511,7 @@ mod tests {
     use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
     use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex;
     use finstack_quant_valuations::instruments::fixed_income::bond;
-    use finstack_quant_valuations::instruments::fixed_income::AgencyMbsPassthrough;
+    use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
     use finstack_quant_valuations::instruments::rates::swaption::Swaption;
     use finstack_quant_valuations::instruments::Instrument as InternalInstrument;
     use finstack_quant_valuations::pricer::InstrumentType;

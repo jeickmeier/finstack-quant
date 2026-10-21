@@ -181,13 +181,18 @@ pub mod rates {
 }
 
 pub use fixed_income::asset_backed_facility::AssetBackedFacility;
+pub use fixed_income::bond::{Bond, BondSettlementConvention};
+pub use fixed_income::bond_future::{BondFuture, BondFutureBuilder, DeliverableBond};
 pub use fixed_income::cmo::{AgencyCmo, CmoTranche, CmoTrancheType, CmoWaterfall};
+pub use fixed_income::convertible::ConvertibleBond;
+pub use fixed_income::dollar_roll::DollarRoll;
+pub use fixed_income::fi_trs::FiIndexTotalReturnSwap;
+pub use fixed_income::inflation_linked_bond::InflationLinkedBond;
+pub use fixed_income::mbs_passthrough::{AgencyMbsPassthrough, AgencyProgram, PoolType};
+pub use fixed_income::revolving_credit::RevolvingCredit;
 pub use fixed_income::structured_credit::StructuredCredit;
-pub use fixed_income::{
-    AgencyMbsPassthrough, AgencyProgram, AgencyTba, Bond, BondFuture, BondFutureBuilder,
-    BondFutureSpecs, BondSettlementConvention, ConvertibleBond, DeliverableBond, DollarRoll,
-    FiIndexTotalReturnSwap, InflationLinkedBond, PoolType, RevolvingCredit, TbaTerm, TermLoan,
-};
+pub use fixed_income::tba::{AgencyTba, TbaTerm};
+pub use fixed_income::term_loan::TermLoan;
 
 pub use rates::basis_swap::BasisSwap;
 pub use rates::cap_floor::{CapFloor, RateOptionType};

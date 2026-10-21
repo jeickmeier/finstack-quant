@@ -17,6 +17,5 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 pub(crate) mod types;
 
-pub use finstack_quant_valuations_core::contract_specs::BondFutureSpecs;
 pub use pricer::BondFuturePricer;
 pub use types::{BondFuture, BondFutureBuilder, DeliverableBond};

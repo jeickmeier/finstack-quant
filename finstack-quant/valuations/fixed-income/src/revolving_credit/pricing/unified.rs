@@ -213,7 +213,7 @@ impl Pricer for RevolvingCreditPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::revolving_credit::ThreeFactorPathData;
+    use crate::revolving_credit::cashflow_engine::ThreeFactorPathData;
 
     use crate::revolving_credit::{
         CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit, RevolvingCreditFees,

@@ -2397,7 +2397,7 @@ impl PyTermLoanBuilder {
         py: Python<'py>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spec: finstack_quant_valuations::instruments::fixed_income::term_loan::OidEirSpec =
+        let spec: finstack_quant_valuations::instruments::fixed_income::loan_terms::OidEirSpec =
             spec_from_py(py, value, "oid_eir")?;
         builder_set!(
             slf,

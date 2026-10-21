@@ -12,8 +12,9 @@
 use finstack_quant_models::credit::{
     AssetDynamics, DynamicRecoverySpec, EndogenousHazardSpec, MertonBarrierType, MertonModel,
 };
+use finstack_quant_valuations_core::instruments::{MertonMcConfig, PikMode, PikSchedule};
 use finstack_quant_valuations_fixed_income::bond::pricing::engine::merton_mc::{
-    MertonMcConfig, MertonMcEngine, MertonMcRun, PikMode, PikSchedule,
+    MertonMcEngine, MertonMcRun,
 };
 
 /// Build a standard Merton model for tests: V=200, sigma=0.25, B=100, r=0.04.

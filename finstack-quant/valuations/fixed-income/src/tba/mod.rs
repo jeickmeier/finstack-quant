@@ -1,6 +1,6 @@
 //! Agency TBA (To-Be-Announced) forward instrument module.
 //!
-//! This module provides the [`AgencyTba`] instrument for modeling TBA
+//! This module provides the [`AgencyTba`](crate::tba::AgencyTba) instrument for modeling TBA
 //! forward contracts on agency MBS.
 //!
 //! # Overview

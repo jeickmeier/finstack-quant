@@ -40,9 +40,7 @@ use finstack_quant_valuations::instruments::equity::equity_option::{
 use finstack_quant_valuations::instruments::equity::spot::Equity;
 use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, ConvertibleBond, DividendAdjustment,
-};
+use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
 use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::{
     DeflationProtection, IndexationMethod, InflationLinkedBond,
 };
@@ -60,6 +58,9 @@ use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMeth
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::EquityUnderlyingParams;
+use finstack_quant_valuations::instruments::{
+    AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
+};
 use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType, SettlementType};
 use finstack_quant_valuations::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
 use finstack_quant_valuations::market::conventions::{CdsConvention, CdsValuationConvention};

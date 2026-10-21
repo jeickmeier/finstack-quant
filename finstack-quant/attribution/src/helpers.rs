@@ -1410,10 +1410,10 @@ mod tests {
 
     #[test]
     fn instrument_at_t0_rejects_parameters_of_another_instrument_type() {
-        use finstack_quant_valuations::instruments::fixed_income::convertible::{
+        use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
+        use finstack_quant_valuations::instruments::{
             AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
         };
-        use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
 
         let instrument: Arc<dyn Instrument> =
             Arc::new(StructuredCredit::example().expect("example"));

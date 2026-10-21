@@ -17,7 +17,10 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use finstack_quant_models::credit::{MertonBarrierType, MertonModel};
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{
-    BarrierCrossing, MertonMcConfig, MertonMcEngine, MertonMcRun, PikMode, PikSchedule,
+    MertonMcEngine, MertonMcRun,
+};
+use finstack_quant_valuations::instruments::{
+    BarrierCrossing, MertonMcConfig, PikMode, PikSchedule,
 };
 use std::hint::black_box;
 

@@ -726,7 +726,7 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::instruments::fixed_income::asset_backed_facility::FacilityProjection;
     use crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcResult;
     use crate::instruments::fixed_income::convertible::ConvertibleGreeks;
-    use crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
+    use crate::instruments::fixed_income::revolving_credit::pricing::unified::EnhancedMonteCarloResult;
     use crate::instruments::fixed_income::structured_credit::{
         BorrowingBaseReport, EquityMetrics, OasResult, PoolStats, ScenarioTable,
         SimulationDiagnostics, TrancheCashflows, TrancheMetrics,

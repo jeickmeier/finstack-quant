@@ -5,6 +5,7 @@ use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations_core::instruments::BondQuoteInput;
 use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_valuations_core::pricer::{

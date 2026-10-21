@@ -2,7 +2,7 @@
 
 use crate::bond::pricing::quote_conversions::{df_from_yield, YieldCompounding};
 use crate::bond::pricing::time_basis::{act365l_year_fraction, bond_coupon_periods};
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::common_impl::pricing::coupon_period::icma_reference_period;
@@ -56,8 +56,8 @@ impl YieldClock for BondYieldClock {
 mod tests {
     use super::BondYieldClock;
     use crate::bond::pricing::quote_conversions::{df_from_yield, YieldCompounding};
+    use crate::bond::Bond;
     use crate::bond::CashflowSpec;
-    use crate::Bond;
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, DayCountContext, Tenor};

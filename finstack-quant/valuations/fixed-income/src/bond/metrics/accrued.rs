@@ -1,7 +1,7 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
 use crate::bond::pricing::settlement::settlement_date;
-use crate::Bond;
+use crate::bond::Bond;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Calculates settlement-date accrued interest for bonds.

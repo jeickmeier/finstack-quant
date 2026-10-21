@@ -23,9 +23,10 @@ use finstack_quant_valuations_core::instruments::{
     Instrument, InstrumentPricingOverrides, PricingOptions,
 };
 use finstack_quant_valuations_core::metrics::MetricId;
+use finstack_quant_valuations_fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer;
 use finstack_quant_valuations_fixed_income::revolving_credit::{
     CreditSpreadProcessSpec, DrawRepaySpec, InterestRateProcessSpec, McConfig, RevolvingCredit,
-    RevolvingCreditFees, RevolvingCreditPricer, StochasticUtilizationSpec, UtilizationProcess,
+    RevolvingCreditFees, StochasticUtilizationSpec, UtilizationProcess,
 };
 use time::macros::date;
 
@@ -427,7 +428,7 @@ fn stochastic_hull_white_rates_keep_the_index_basis() {
         RevolvingCreditPricer::price_with_paths(&hw_mode, &market, as_of).expect("HW pricing");
 
     let first_rate =
-        |r: &finstack_quant_valuations_fixed_income::revolving_credit::EnhancedMonteCarloResult| {
+        |r: &finstack_quant_valuations_fixed_income::revolving_credit::pricing::unified::EnhancedMonteCarloResult| {
             r.path_results[0]
                 .cashflows
                 .get_flows()
