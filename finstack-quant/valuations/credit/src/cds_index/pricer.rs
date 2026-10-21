@@ -11,7 +11,7 @@
 //! risky PV01, and leg PVs. Heavy numerical work is delegated to
 //! `crate::cds::pricing::CdsPricer`.
 
-use crate::cds::pricing::{date_from_hazard_time, CdsPricer, CdsPricerConfig};
+use crate::cds::pricing::{date_from_hazard_time, CdsPricer};
 use crate::cds::CreditDefaultSwap;
 use crate::cds_index::{CdsIndex, IndexPricing};
 use finstack_quant_cashflows::builder::merge_cashflow_schedules;
@@ -29,9 +29,10 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::constants::credit;
 use finstack_quant_valuations_core::instruments::PayReceive;
-use finstack_quant_valuations_core::recalibration::{
-    HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump, RecalibrationProvider,
+use finstack_quant_valuations_core::metrics::sensitivities::cs01::{
+    compute_parallel_cs01_with_provider_raw, require_hazard_replay, Cs01Request,
 };
+use finstack_quant_valuations_core::recalibration::RecalibrationProvider;
 use std::sync::Arc;
 
 /// Tolerance applied to the constituent weight sum when validating that ∑w ≈ 1.
@@ -42,13 +43,6 @@ const WEIGHT_SUM_TOL: f64 = 1e-6;
 
 /// Tolerance for validating index_factor consistency with defaulted weights.
 const INDEX_FACTOR_CONSISTENCY_TOL: f64 = 1e-6;
-
-/// Single-name CDS pricer used for every resolved index position, with the
-/// default ISDA-compliant configuration. The informational flow projection
-/// reads the same configuration so the two stay in sync.
-fn cds_pricer() -> CdsPricer {
-    CdsPricer::with_config(CdsPricerConfig::default())
-}
 
 #[derive(Debug, Clone, Copy)]
 struct ResolvedConstituent<'a> {
@@ -204,7 +198,7 @@ impl CdsIndex {
         // aggregation paths; without this the SingleCurve branch builds the
         // synthetic CDS directly and silently prices e.g. index_factor > 1.
         index.validate()?;
-        let pricer = cds_pricer();
+        let pricer = CdsPricer::new();
         match index.pricing {
             IndexPricing::SingleCurve => {
                 let cds = index.to_synthetic_cds()?;
@@ -361,64 +355,20 @@ impl CdsIndex {
         provider: &dyn RecalibrationProvider,
         bump_bp: f64,
     ) -> Result<f64> {
-        sum_f64(self, curves, as_of, |_, cds, _, _| {
-            compute_cds_cs01(cds, curves, as_of, provider, bump_bp)
+        let market = Arc::new(curves.clone());
+        sum_f64(self, curves, as_of, |pricer, cds, disc, _| {
+            let hazard = curves.get_hazard(&cds.protection_leg.credit_curve_id)?;
+            require_hazard_replay(hazard.as_ref(), "CDS index CS01")?;
+            compute_parallel_cs01_with_provider_raw(
+                provider,
+                hazard,
+                Arc::clone(&market),
+                Arc::clone(&market),
+                &Cs01Request::generic(bump_bp, cds.premium_leg.discount_curve_id.clone()),
+                |bumped| pricer.npv_full(cds, disc, bumped.as_ref(), as_of),
+            )
         })
     }
-}
-
-fn compute_cds_cs01(
-    cds: &CreditDefaultSwap,
-    curves: &MarketContext,
-    as_of: Date,
-    provider: &dyn RecalibrationProvider,
-    bump_bp: f64,
-) -> Result<f64> {
-    let credit_id = &cds.protection_leg.credit_curve_id;
-    let discount_id = &cds.premium_leg.discount_curve_id;
-
-    let pricer = cds_pricer();
-    let hazard = curves.get_hazard(credit_id)?;
-    finstack_quant_valuations_core::metrics::sensitivities::cs01::require_hazard_replay(
-        hazard.as_ref(),
-        "CDS index CS01",
-    )?;
-    let market = Arc::new(curves.clone());
-
-    let bump_hazard_for = |bp: f64| -> Result<_> {
-        provider
-            .rebuild_hazard_curve(&HazardRecalibrationRequest {
-                hazard: Arc::clone(&hazard),
-                source_market: Arc::clone(&market),
-                target_market: Arc::clone(&market),
-                discount_curve_id: discount_id.clone(),
-                doc_clause: None,
-                cds_valuation_convention: None,
-                deal_quote_override: None,
-                action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(bp)),
-            })
-            .map_err(|e| finstack_quant_core::Error::Calibration {
-                message: format!(
-                    "CDS index CS01: par-spread re-bootstrap failed for curve '{}' ({e})",
-                    credit_id
-                ),
-                category: "cs01_rebootstrap".to_string(),
-            })
-    };
-
-    let bumped_up = bump_hazard_for(bump_bp)?;
-    let ctx_up = curves.clone().insert(bumped_up);
-    let disc_up = ctx_up.get_discount(discount_id)?;
-    let surv_up = ctx_up.get_hazard(credit_id)?;
-    let pv_up = pricer.npv_full(cds, disc_up.as_ref(), surv_up.as_ref(), as_of)?;
-
-    let bumped_down = bump_hazard_for(-bump_bp)?;
-    let ctx_down = curves.clone().insert(bumped_down);
-    let disc_down = ctx_down.get_discount(discount_id)?;
-    let surv_down = ctx_down.get_hazard(credit_id)?;
-    let pv_down = pricer.npv_full(cds, disc_down.as_ref(), surv_down.as_ref(), as_of)?;
-
-    Ok((pv_up - pv_down) / (2.0 * bump_bp))
 }
 
 fn visit_positions(
@@ -431,7 +381,7 @@ fn visit_positions(
     if as_of >= index.premium_leg.end {
         return Ok(());
     }
-    let pricer = cds_pricer();
+    let pricer = CdsPricer::new();
     // `to_synthetic_cds()` already applies `index_factor` to notional and
     // leaves the synthetic CDS without an upfront: the index applies its
     // own upfront once at the aggregate level in `npv`.
@@ -658,7 +608,6 @@ fn project_cds_flows(
     let conditioning_survival = prev_survival.max(f64::EPSILON);
     let mut projected_flows = Vec::with_capacity(schedule.get_flows().len() * 2);
     let mut previous_premium_date = as_of;
-    let include_accrual_on_default = CdsPricerConfig::default().include_accrual_on_default;
 
     for flow in schedule.into_flows() {
         if matches!(flow.kind, CFKind::Fixed | CFKind::Stub) {
@@ -671,11 +620,8 @@ fn project_cds_flows(
             let delta_default = (prev_survival - current_survival).max(0.0);
             let conditional_default = delta_default / conditioning_survival;
             let conditional_survival = current_survival / conditioning_survival;
-            let projected_survival = if include_accrual_on_default {
-                conditional_survival + 0.5 * conditional_default
-            } else {
-                conditional_survival
-            };
+            // Mid-period default credits half the coupon (accrual on default).
+            let projected_survival = conditional_survival + 0.5 * conditional_default;
             let projected_premium = flow.amount.amount().abs() * projected_survival;
             if projected_premium.abs() > f64::EPSILON {
                 let mut projected_flow = flow.clone();

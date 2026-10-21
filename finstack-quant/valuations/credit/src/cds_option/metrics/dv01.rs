@@ -9,14 +9,12 @@
 //! so CDS and CDS-option IR DV01 share a single unit and sign convention and
 //! can be aggregated across a portfolio regardless of how the curve was built.
 
+use crate::cds::metrics::dv01::discount_bumped_market;
 use crate::cds_option::CdsOption;
-use finstack_quant_core::market_data::bumps::BumpSpec;
-use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::sensitivity_central_diff;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_valuations_core::recalibration::{DiscountCurveRecalibrationRequest, QuoteBump};
 
 const MIN_BUMP_BP: f64 = 1e-10;
 
@@ -31,32 +29,11 @@ impl CdsOptionDv01Calculator {
         context: &MetricContext,
         bump_bp: f64,
     ) -> Result<f64> {
-        let mut bumped_market: MarketContext = context.curves.as_ref().clone();
-        let base_discount = context
-            .curves
-            .get_discount(option.discount_curve_id.as_str())?;
         // Prefer the market-standard swap-quote bump when the curve records its
         // calibration; otherwise bump the discount factors directly so a
         // directly-specified curve still yields a well-defined IR DV01 (matches
         // `CdsDv01Calculator`).
-        if let Some(calibration) = base_discount.rate_calibration() {
-            let bumped_discount = context.rebuild_discount_curve(
-                DiscountCurveRecalibrationRequest {
-                    curve: std::sync::Arc::clone(&base_discount),
-                    recipe: calibration.clone(),
-                    market: std::sync::Arc::clone(&context.curves),
-                    bump: QuoteBump::ParallelBp(bump_bp),
-                },
-                "dv01",
-            )?;
-            bumped_market = bumped_market.insert(bumped_discount.as_ref().clone());
-        } else {
-            bumped_market.apply_curve_bump_in_place(
-                &option.discount_curve_id,
-                BumpSpec::parallel_bp(bump_bp),
-            )?;
-        }
-
+        let bumped_market = discount_bumped_market(context, &option.discount_curve_id, bump_bp)?;
         context.reprice_raw(&bumped_market, context.as_of)
     }
 }

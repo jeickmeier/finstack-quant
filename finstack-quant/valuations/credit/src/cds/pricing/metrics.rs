@@ -2,7 +2,6 @@
 //! full NPV on `CdsPricer`.
 
 use super::engine::{AodInputs, CdsPricer, CouponPeriod};
-use super::helpers::sp_cond_to;
 use crate::cds::CreditDefaultSwap;
 use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_core::dates::{
@@ -235,8 +234,7 @@ impl CdsPricer {
     ///
     /// # ISDA Standard Par Spread Definition
     ///
-    /// By default (when `par_spread_uses_full_premium = false`), this implements
-    /// the **ISDA standard definition**:
+    /// By default this implements the **ISDA standard definition**:
     ///
     /// ```text
     /// Par Spread = Protection_PV / Risky_Annuity
@@ -247,8 +245,9 @@ impl CdsPricer {
     ///
     /// # Par Spread with Full Premium Leg
     ///
-    /// When `par_spread_uses_full_premium = true`, the denominator includes the
-    /// full premium leg PV (with accrual-on-default) per basis point. This matches
+    /// When the instrument's valuation convention uses the full-premium
+    /// denominator, it includes the full premium leg PV (with
+    /// accrual-on-default) per unit spread. This matches
     /// Bloomberg CDSW-style calculations and is appropriate for distressed credits
     /// where accrual-on-default has material impact (typically 2-5 bp for hazard > 3%).
     ///
@@ -257,10 +256,10 @@ impl CdsPricer {
     /// Par spread in basis points (bp).
     /// Per-unit-notional, per-unit-spread denominator used by [`Self::par_spread`].
     ///
-    /// Selects the right convention based on `config.par_spread_uses_full_premium`
-    /// and the instrument's `valuation_convention`:
+    /// Selects the convention from the instrument's `valuation_convention`:
     ///
-    /// * `par_spread_uses_full_premium = true` → full premium leg PV per unit
+    /// * full-premium denominator (`BloombergCdswCleanFullPremium`,
+    ///   `QuantLibIsdaParity`) → full premium leg PV per unit
     ///   spread including accrual-on-default (Bloomberg CDSW
     ///   `BloombergCdswCleanFullPremium` and QuantLib parity behaviour).
     /// * `cds.uses_clean_price()` → clean-price denominator (premium leg per unit
@@ -278,45 +277,8 @@ impl CdsPricer {
         surv: &HazardCurve,
         as_of: Date,
     ) -> Result<f64> {
-        if self.config.par_spread_uses_full_premium {
-            let periods = self.coupon_periods(cds, as_of)?;
-            let calendar = cds
-                .premium_leg
-                .calendar_id
-                .as_deref()
-                .map(finstack_quant_core::dates::calendar_by_id_strict)
-                .transpose()?;
-            let mut ann = 0.0;
-            for period in periods {
-                let start_date = period.accrual_start;
-                let end_date = period.accrual_end;
-                let payment_date = period.payment_date;
-                if payment_date <= as_of {
-                    continue;
-                }
-                let accrual = self.coupon_accrual(cds, &period)?;
-                let df = disc.df_between_dates(as_of, payment_date)?;
-                let sp = if end_date <= as_of {
-                    1.0
-                } else {
-                    sp_cond_to(surv, as_of, end_date)?
-                };
-                let unit_spread = 1.0;
-                ann += unit_spread * accrual * sp * df;
-                ann += self.accrual_on_default_isda_standard_model_cond(AodInputs {
-                    cds,
-                    spread: unit_spread,
-                    accrual_start_date: start_date,
-                    start_date: start_date.max(as_of),
-                    end_date,
-                    settlement_delay: cds.protection_leg.settlement_delay,
-                    calendar,
-                    as_of,
-                    disc,
-                    surv,
-                })?;
-            }
-            Ok(ann)
+        if cds.uses_full_premium_par_spread_denominator() {
+            self.premium_leg_annuity(cds, disc, surv, as_of, 1.0, true)
         } else if cds.uses_clean_price() {
             self.clean_par_spread_denominator(cds, disc, surv, as_of)
         } else {
@@ -353,7 +315,8 @@ impl CdsPricer {
         Ok(protection_pv.amount() / (denom * cds.notional.amount()) * BASIS_POINTS_PER_UNIT)
     }
 
-    /// Premium leg PV per 1 bp of spread, including accrual-on-default if configured.
+    /// Premium leg PV per 1 bp of spread per unit notional, including
+    /// accrual-on-default.
     ///
     /// Uses proper time-axis conventions for discounting and survival.
     #[must_use = "premium leg calculation is pure computation"]
@@ -364,13 +327,52 @@ impl CdsPricer {
         surv: &HazardCurve,
         as_of: Date,
     ) -> Result<f64> {
+        self.premium_leg_annuity(cds, disc, surv, as_of, ONE_BASIS_POINT, true)
+    }
+
+    /// Risky annuity: survival-weighted duration of premium payments.
+    ///
+    /// This is the sum of `DF(t) × SP(t) × YearFrac` across all coupon periods.
+    /// Used as the denominator in ISDA standard par spread calculation.
+    ///
+    /// Uses proper time-axis conventions for discounting and survival.
+    #[must_use = "risky annuity calculation is pure computation"]
+    pub(crate) fn risky_annuity(
+        &self,
+        cds: &CreditDefaultSwap,
+        disc: &DiscountCurve,
+        surv: &HazardCurve,
+        as_of: Date,
+    ) -> Result<f64> {
+        self.premium_leg_annuity(cds, disc, surv, as_of, 1.0, false)
+    }
+
+    /// Premium leg PV per unit notional at a running `spread` (decimal),
+    /// `Σ spread · τ · DF · SP` over unsettled coupons, plus the
+    /// accrual-on-default integral when `include_aod` is set.
+    ///
+    /// Discounting is `df(t_pay) / df(as_of)` on the discount curve's day
+    /// count; survival is conditional on no default before `as_of`. Completed
+    /// coupons are certain receivables even below the survival floor.
+    pub(super) fn premium_leg_annuity(
+        &self,
+        cds: &CreditDefaultSwap,
+        disc: &DiscountCurve,
+        surv: &HazardCurve,
+        as_of: Date,
+        spread: f64,
+        include_aod: bool,
+    ) -> Result<f64> {
         let periods = self.coupon_periods(cds, as_of)?;
-        let calendar = cds
-            .premium_leg
-            .calendar_id
-            .as_deref()
-            .map(finstack_quant_core::dates::calendar_by_id_strict)
-            .transpose()?;
+        let calendar = if include_aod {
+            cds.premium_leg
+                .calendar_id
+                .as_deref()
+                .map(finstack_quant_core::dates::calendar_by_id_strict)
+                .transpose()?
+        } else {
+            None
+        };
 
         // Pre-compute year fractions once to avoid repeated day-count calls.
         let disc_day_count = disc.day_count();
@@ -386,7 +388,7 @@ impl CdsPricer {
         let sp_floor = credit::SURVIVAL_PROBABILITY_FLOOR;
         let sp_cond_denom = (sp_asof > sp_floor).then_some(sp_asof);
 
-        let mut per_bp_pv = 0.0;
+        let mut annuity = 0.0;
         for period in periods {
             let start_date = period.accrual_start;
             let end_date = period.accrual_end;
@@ -420,12 +422,12 @@ impl CdsPricer {
                 0.0
             };
 
-            per_bp_pv += ONE_BASIS_POINT * accrual * sp * df;
+            annuity += spread * accrual * sp * df;
 
-            if self.config.include_accrual_on_default {
-                per_bp_pv += self.accrual_on_default_isda_standard_model_cond(AodInputs {
+            if include_aod {
+                annuity += self.accrual_on_default_isda_standard_model_cond(AodInputs {
                     cds,
-                    spread: ONE_BASIS_POINT,
+                    spread,
                     accrual_start_date: start_date,
                     start_date: start_date.max(as_of),
                     end_date,
@@ -436,74 +438,6 @@ impl CdsPricer {
                     surv,
                 })?;
             }
-        }
-        Ok(per_bp_pv)
-    }
-
-    /// Risky annuity: survival-weighted duration of premium payments.
-    ///
-    /// This is the sum of `DF(t) × SP(t) × YearFrac` across all coupon periods.
-    /// Used as the denominator in ISDA standard par spread calculation.
-    ///
-    /// Uses proper time-axis conventions for discounting and survival.
-    #[must_use = "risky annuity calculation is pure computation"]
-    pub(crate) fn risky_annuity(
-        &self,
-        cds: &CreditDefaultSwap,
-        disc: &DiscountCurve,
-        surv: &HazardCurve,
-        as_of: Date,
-    ) -> Result<f64> {
-        let periods = self.coupon_periods(cds, as_of)?;
-
-        // Pre-compute year fractions once to avoid repeated day-count calls.
-        let disc_day_count = disc.day_count();
-        let disc_base = disc.base_date();
-        let haz_day_count = surv.day_count();
-        let haz_base = surv.base_date();
-        let t_asof_disc =
-            disc_day_count.year_fraction(disc_base, as_of, DayCountContext::default())?;
-        let t_asof_haz =
-            haz_day_count.year_fraction(haz_base, as_of, DayCountContext::default())?;
-        let df_asof = disc.df(t_asof_disc);
-        let sp_asof = surv.sp(t_asof_haz);
-        let sp_floor = credit::SURVIVAL_PROBABILITY_FLOOR;
-        let sp_cond_denom = (sp_asof > sp_floor).then_some(sp_asof);
-
-        let mut annuity = 0.0;
-        for period in periods {
-            let end_date = period.accrual_end;
-            let payment_date = period.payment_date;
-
-            // Payments on as_of are treated as settled.
-            if payment_date <= as_of {
-                continue;
-            }
-
-            // Accrual uses instrument day-count
-            let accrual = self.coupon_accrual(cds, &period)?;
-
-            // Discount factor: df(payment) / df(as_of)
-            let t_pay = disc_day_count.year_fraction(
-                disc_base,
-                payment_date,
-                DayCountContext::default(),
-            )?;
-            let df = disc.df(t_pay) / df_asof;
-
-            // Completed coupons are fixed receivables even if historical
-            // absolute survival lies below the conditional-ratio floor.
-            let sp = if end_date <= as_of {
-                1.0
-            } else if let Some(denom) = sp_cond_denom {
-                let t_end =
-                    haz_day_count.year_fraction(haz_base, end_date, DayCountContext::default())?;
-                surv.sp(t_end) / denom
-            } else {
-                0.0
-            };
-
-            annuity += accrual * sp * df;
         }
         Ok(annuity)
     }

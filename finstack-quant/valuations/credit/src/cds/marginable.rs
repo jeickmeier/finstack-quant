@@ -18,7 +18,84 @@ use finstack_quant_valuations_core::instruments::common_impl::margin::assign_cre
 use finstack_quant_valuations_core::instruments::common_impl::margin::extract_reference_entity;
 use finstack_quant_valuations_core::instruments::common_impl::margin::netting_set_id_from_spec;
 use finstack_quant_valuations_core::instruments::common_impl::margin::repriced_metric;
-use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::{Instrument, PayReceive};
+
+/// Credit terms of a CDS-like trade that drive its SIMM credit delta.
+pub(crate) struct CreditSimmTerms<'a> {
+    /// SIMM credit qualifier: the reference entity or the index name.
+    pub(crate) qualifier: &'a str,
+    /// Protection end date, which sets the SIMM tenor bucket.
+    pub(crate) maturity: Date,
+    /// Recovery rate (decimal) used by the risky-duration fallback.
+    pub(crate) recovery_rate: f64,
+    /// Trade notional; its currency is the sensitivities' currency.
+    pub(crate) notional: Money,
+    /// Protection side; buying protection (`Pay`) is long credit risk.
+    pub(crate) side: PayReceive,
+}
+
+/// SIMM credit delta of a CDS or CDS index: the repriced CS01 metric in its
+/// tenor bucket, or a flat risky-duration proxy when CS01 is unavailable.
+pub(crate) fn credit_simm_sensitivities<I: Instrument + Marginable>(
+    instrument: &I,
+    market: &MarketContext,
+    as_of: Date,
+    terms: CreditSimmTerms<'_>,
+) -> Result<SimmSensitivities> {
+    let mut sens = SimmSensitivities::new(terms.notional.currency());
+
+    let days_to_maturity = (terms.maturity - as_of).whole_days().max(0) as f64;
+    let years_to_maturity = days_to_maturity / CALENDAR_DAYS_PER_YEAR;
+    let years_to_maturity = if years_to_maturity <= 0.0 {
+        STANDARD_CDS_MATURITY_YEARS
+    } else {
+        years_to_maturity
+    };
+    let tenor = assign_credit_tenor_bucket(years_to_maturity);
+
+    // Preferred path: repriced CS01 (respects the survival curve, discount
+    // curve, recovery and premium schedule). The metric is computed on the
+    // actual trade, so its sign already reflects the protection side.
+    if let Some(cs01) = repriced_metric(
+        instrument,
+        market,
+        as_of,
+        finstack_quant_valuations_core::metrics::MetricId::Cs01,
+    ) {
+        add_classified_credit_delta(
+            &mut sens,
+            Marginable::margin_spec(instrument),
+            terms.qualifier,
+            tenor,
+            cs01,
+        )?;
+        return Ok(sens);
+    }
+
+    // Fallback: flat risky-duration proxy when the survival curve / pricer
+    // is unavailable.
+    tracing::warn!(
+        instrument_id = Marginable::id(instrument),
+        "SIMM credit delta falling back to risky-duration proxy: repriced \
+         CS01 unavailable (missing survival curve?)"
+    );
+    let risky_duration =
+        years_to_maturity * (1.0 - terms.recovery_rate) * DURATION_APPROXIMATION_FACTOR;
+    let cs01 = terms.notional.amount().abs() * risky_duration * ONE_BASIS_POINT;
+    let signed_cs01 = match terms.side {
+        PayReceive::Pay => cs01,
+        PayReceive::Receive => -cs01,
+    };
+    add_classified_credit_delta(
+        &mut sens,
+        instrument.margin_spec(),
+        terms.qualifier,
+        tenor,
+        signed_cs01,
+    )?;
+
+    Ok(sens)
+}
 
 impl Marginable for CreditDefaultSwap {
     fn id(&self) -> &str {
@@ -34,63 +111,19 @@ impl Marginable for CreditDefaultSwap {
     }
 
     fn simm_sensitivities(&self, market: &MarketContext, as_of: Date) -> Result<SimmSensitivities> {
-        let currency = self.notional.currency();
-        let mut sens = SimmSensitivities::new(currency);
-
-        let days_to_maturity = (self.premium_leg.end - as_of).whole_days().max(0) as f64;
-        let years_to_maturity = days_to_maturity / CALENDAR_DAYS_PER_YEAR;
-        let years_to_maturity = if years_to_maturity <= 0.0 {
-            STANDARD_CDS_MATURITY_YEARS
-        } else {
-            years_to_maturity
-        };
-
-        let ref_entity = extract_reference_entity(self.protection_leg.credit_curve_id.as_str())?;
-        let tenor = assign_credit_tenor_bucket(years_to_maturity);
-
-        // Preferred path: repriced CS01 (respects the survival curve, discount
-        // curve, recovery and premium schedule). The metric is computed on the
-        // actual CDS, so its sign already reflects the protection side.
-        if let Some(cs01) = repriced_metric(
+        let qualifier = extract_reference_entity(self.protection_leg.credit_curve_id.as_str())?;
+        credit_simm_sensitivities(
             self,
             market,
             as_of,
-            finstack_quant_valuations_core::metrics::MetricId::Cs01,
-        ) {
-            add_classified_credit_delta(
-                &mut sens,
-                self.margin_spec.as_ref(),
-                ref_entity,
-                tenor,
-                cs01,
-            )?;
-            return Ok(sens);
-        }
-
-        // Fallback: flat risky-duration proxy when the survival curve / pricer
-        // is unavailable.
-        tracing::warn!(
-            instrument_id = self.id.as_str(),
-            "SIMM credit delta falling back to risky-duration proxy: repriced \
-             CS01 unavailable (missing survival curve?)"
-        );
-        let risky_duration = years_to_maturity
-            * (1.0 - self.protection_leg.recovery_rate)
-            * DURATION_APPROXIMATION_FACTOR;
-        let cs01 = self.notional.amount().abs() * risky_duration * ONE_BASIS_POINT;
-        let signed_cs01 = match self.side {
-            finstack_quant_valuations_core::instruments::PayReceive::Pay => cs01,
-            finstack_quant_valuations_core::instruments::PayReceive::Receive => -cs01,
-        };
-        add_classified_credit_delta(
-            &mut sens,
-            self.margin_spec.as_ref(),
-            ref_entity,
-            tenor,
-            signed_cs01,
-        )?;
-
-        Ok(sens)
+            CreditSimmTerms {
+                qualifier,
+                maturity: self.premium_leg.end,
+                recovery_rate: self.protection_leg.recovery_rate,
+                notional: self.notional,
+                side: self.side,
+            },
+        )
     }
 
     fn mtm_for_vm(&self, market: &MarketContext, as_of: Date) -> Result<Money> {

@@ -16,12 +16,11 @@
 //! - Jump to default LGD only (excludes accrued premium)
 
 mod cs_gamma;
-mod dv01;
+pub(crate) mod dv01;
 mod jump_to_default;
-mod recovery01;
+pub(crate) mod recovery01;
 
 use crate::cds::pricing::CdsPricer;
-use crate::cds::pricing::CdsPricerConfig;
 use crate::cds::CreditDefaultSwap;
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::Result;
@@ -194,7 +193,7 @@ impl MetricCalculator for ParSpreadCalculator {
         let surv = context
             .curves
             .get_hazard(&cds.protection_leg.credit_curve_id)?;
-        let pricer = CdsPricer::with_config(CdsPricerConfig::from_cds(cds));
+        let pricer = CdsPricer::new();
         pricer.par_spread(cds, disc.as_ref(), surv.as_ref(), context.as_of)
     }
 }
