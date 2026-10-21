@@ -1767,10 +1767,6 @@ fn result_types_use_rust_names_from_the_generated_contract() {
         "export type RollingGreeks = WithFields<generated.analytics.RollingGreeks,",
     ));
     assert!(dts.contains("alphas: Float64Array;"));
-    assert!(contains_ignoring_ws(
-        &dts,
-        "export type FxInstrumentSpec = Record<string, unknown>;"
-    ));
 }
 
 /// The thrown error objects are declared with the Rust-owned kind vocabulary.

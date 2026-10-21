@@ -20594,11 +20594,6 @@ export interface CdsOption extends WasmOwned {
    */
   readonly optionType: generated.valuations.CdsOption['option_type'];
   /**
-   * Exercise style; only European prices.
-   * @returns `"european"`, `"american"` or `"bermudan"`.
-   */
-  readonly exerciseStyle: generated.valuations.CdsOption['exercise_style'];
-  /**
    * Legal option expiry date.
    * @returns ISO-8601 expiry date.
    */
@@ -20618,11 +20613,6 @@ export interface CdsOption extends WasmOwned {
    * @returns `"cash"` or `"physical"`.
    */
   readonly settlement: generated.valuations.CdsOption['settlement'];
-  /**
-   * Explicit option premium payment date.
-   * @returns The date, or `null` for the convention settlement lag.
-   */
-  readonly premiumSettlementDate: string | null;
   /**
    * Explicit exercise proceeds payment date.
    * @returns The date, or `null` for legal expiry.
@@ -20789,7 +20779,7 @@ export interface CdsOptionConstructor {
 /**
  * Fluent builder for `CdsOption`; one setter per Rust `FinancialBuilder` setter.
  *
- * Required: `id`, `strike`, `optionType`, `exerciseStyle`, `expiry`, `underlyingMaturity`, `notional`, `settlement`, `recoveryRate`, `discountCurveId`, `creditCurveId`, `volSurfaceId` and `underlyingIsIndex`. Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ * Required: `id`, `strike`, `optionType`, `expiry`, `underlyingMaturity`, `notional`, `settlement`, `recoveryRate`, `discountCurveId`, `creditCurveId`, `volSurfaceId` and `underlyingIsIndex`. Every setter returns the builder, so calls chain; `build()` validates and consumes it.
  */
 export interface CdsOptionBuilder extends WasmOwned {
   /**
@@ -20822,13 +20812,6 @@ export interface CdsOptionBuilder extends WasmOwned {
    */
   optionType(value: 'call' | 'put'): CdsOptionBuilder;
   /**
-   * Set the exercise style.
-   * @param value - `"european"`, `"american"` or `"bermudan"`; pricing supports European only.
-   * @returns The builder, for chaining.
-   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-   */
-  exerciseStyle(value: generated.valuations.CdsOption['exercise_style']): CdsOptionBuilder;
-  /**
    * Set the option expiry date.
    * @param value - Legal expiry as an ISO-8601 string; must precede the underlying maturity.
    * @returns The builder, for chaining.
@@ -20856,13 +20839,6 @@ export interface CdsOptionBuilder extends WasmOwned {
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
   settlement(value: generated.valuations.CdsOption['settlement']): CdsOptionBuilder;
-  /**
-   * Set the option premium payment date.
-   * @param value - Premium payment date as an ISO-8601 string; when never set the CDS convention settlement lag applies.
-   * @returns The builder, for chaining.
-   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-   */
-  premiumSettlementDate(value: string): CdsOptionBuilder;
   /**
    * Set the exercise proceeds payment date.
    * @param value - On or after expiry and before CDS maturity, as an ISO-8601 string; when never set legal expiry is used.
@@ -20982,7 +20958,6 @@ export interface CdsOptionBuilder extends WasmOwned {
  *   .id("CDSO-1")
  *   .strike({ spread: "0.0125" })
  *   .optionType("put")
- *   .exerciseStyle("european")
  *   .expiry("2025-06-20")
  *   .underlyingMaturity("2030-06-20")
  *   .notional(new core.Money(5_000_000, new core.Currency("USD")))
@@ -24221,14 +24196,6 @@ export interface ValuationInstrumentsNamespace {
 }
 
 /**
- * Bare FX instrument spec object for one exact FX instrument type.
- *
- * Tagged payloads, envelopes and JSON strings are rejected; use `fromJson` for
- * a canonical envelope string.
- */
-export type FxInstrumentSpec = Record<string, unknown>;
-
-/**
  * FX instrument handle priced against a market context.
  */
 export interface FxInstrument extends WasmOwned {
@@ -24792,12 +24759,13 @@ export interface FxBarrierOptionInstrument extends FxTouchOptionInstrument {
 }
 
 /**
- * Constructors and factories for typed FX instrument handles.
+ * Factories for typed FX instrument handles. A bare spec becomes a handle
+ * through `fromJson(valuations.instruments.instrumentEnvelopeFromSpec(type, spec))`.
  * @example
  * ```typescript
  * import init, { valuations } from "finstack-quant-wasm";
  * await init();
- * const spot = new valuations.fx.FxSpot({
+ * const envelope = valuations.instruments.instrumentEnvelopeFromSpec("fx_spot", {
  *   id: "EURUSD-SPOT",
  *   base_currency: "EUR",
  *   quote_currency: "USD",
@@ -24806,18 +24774,16 @@ export interface FxBarrierOptionInstrument extends FxTouchOptionInstrument {
  *   notional: { amount: "1000000", currency: "EUR" },
  *   attributes: {},
  * });
+ * const spot = valuations.fx.FxSpot.fromJson(envelope);
  * console.log(JSON.parse(spot.toJson()).instrument.type);
  * spot.free();
  * ```
  */
 export interface FxInstrumentConstructor<T extends FxInstrument> {
   /**
-   * Construct an FX instrument from a bare spec object.
-   * @param spec - Bare FX instrument spec object for this exact instrument type (not a JSON string, tagged payload, or envelope; use `fromJson` for canonical envelope JSON).
-   * @returns A typed FX instrument handle.
-   * @throws Error - Throws a `FinstackError` with kind `validation` when `spec` is not a bare spec object or does not describe this instrument type.
+   * JavaScript prototype of the FX class; instances come from the static factories, not `new`.
    */
-  new (spec: FxInstrumentSpec): T;
+  readonly prototype: T;
   /**
    * Parse a `FxInstrument` value from canonical JSON.
    * @param json - Canonical FX instrument JSON accepted by `fromJson`.
@@ -24948,16 +24914,17 @@ export interface FxOptionConstructor extends FxInstrumentConstructor<FxVanillaOp
  * ```typescript
  * import init, { valuations } from "finstack-quant-wasm";
  * await init();
- * const Spot = valuations.fx.FxSpot;
- * const spot = new Spot({
- *   id: "EURUSD-SPOT",
- *   base_currency: "EUR",
- *   quote_currency: "USD",
- *   settlement_date: "2025-01-17",
- *   quoted_spot: 1.1,
- *   notional: { amount: "1000000", currency: "EUR" },
- *   attributes: {},
- * });
+ * const spot = valuations.fx.FxSpot.fromJson(
+ *   valuations.instruments.instrumentEnvelopeFromSpec("fx_spot", {
+ *     id: "EURUSD-SPOT",
+ *     base_currency: "EUR",
+ *     quote_currency: "USD",
+ *     settlement_date: "2025-01-17",
+ *     quoted_spot: 1.1,
+ *     notional: { amount: "1000000", currency: "EUR" },
+ *     attributes: {},
+ *   }),
+ * );
  * console.log(spot.toJson());
  * spot.free();
  * ```

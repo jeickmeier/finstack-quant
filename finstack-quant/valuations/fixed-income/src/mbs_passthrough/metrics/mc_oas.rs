@@ -49,41 +49,79 @@ use finstack_quant_models::monte_carlo::traits::RandomStream;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use finstack_quant_models::rates::hw1f::{initial_short_rate_from_curve, prepare_hw1f_params};
 
-/// Configuration for Monte Carlo OAS calculation.
+/// Default number of Monte Carlo paths when `model_config.mc_paths` is unset.
+const DEFAULT_NUM_PATHS: usize = 512;
+
+/// Brent solver tolerance for the OAS root-find (decimal spread).
+const OAS_TOLERANCE: f64 = 1e-7;
+
+/// Hull-White mean reversion κ used when the pool supplies no override.
+const DEFAULT_HW1F_MEAN_REVERSION: f64 = 0.05;
+
+/// Hull-White short-rate volatility σ used when the pool supplies no override.
+const DEFAULT_HW1F_SIGMA: f64 = 0.01;
+
+/// Monte Carlo OAS sampling and model parameters resolved for one pool.
+///
+/// Each path simulates the pool's WAM in monthly steps, and prepayment uses
+/// the module-shared [`super::PREPAY_RATE_SENSITIVITY`].
 #[derive(Debug, Clone)]
 pub(crate) struct McOasConfig {
-    /// Number of simulation paths (default: 512).
+    /// Number of simulation paths.
     pub num_paths: usize,
-    /// Number of monthly time steps per path (default: WAM).
-    /// If None, uses the MBS WAM.
-    pub num_steps: Option<usize>,
-    /// Hull-White mean reversion speed κ (default: 0.05).
+    /// Hull-White mean reversion speed κ.
     pub hw1f_mean_reversion: f64,
-    /// Hull-White short-rate volatility σ (default: 0.01).
+    /// Hull-White short-rate volatility σ.
     pub hw1f_sigma: f64,
-    /// Prepayment rate sensitivity to interest rates β
-    /// (default: [`super::PREPAY_RATE_SENSITIVITY`] ≈ 69.3, the same
-    /// refi-incentive doubling per 100 bp used by the effective
-    /// duration/convexity engine). Higher values make prepayment more
-    /// sensitive to rate changes.
-    pub prepay_rate_sensitivity: f64,
-    /// Random seed for reproducibility (default: 42).
+    /// Root RNG seed for the rate paths.
     pub seed: u64,
-    /// Solver tolerance for OAS root-finding (default: 1e-7).
-    pub tolerance: f64,
 }
 
-impl Default for McOasConfig {
-    fn default() -> Self {
-        Self {
-            num_paths: 512,
-            num_steps: None,
-            hw1f_mean_reversion: 0.05,
-            hw1f_sigma: 0.01,
-            prepay_rate_sensitivity: super::PREPAY_RATE_SENSITIVITY,
-            seed: 42,
-            tolerance: 1e-7,
+impl McOasConfig {
+    /// Resolve the configuration from the pool's
+    /// `instrument_pricing_overrides.model_config`.
+    ///
+    /// `mc_paths` defaults to 512 paths (capped by the workspace path limit);
+    /// the seed is `model_config.mc_seed(&mbs.id)`, so bump-and-reprice uses
+    /// common random numbers. `hw1f_mean_reversion` and `hw1f_sigma` must be
+    /// supplied together; without them κ = 5% and σ = 1%.
+    ///
+    /// # Arguments
+    ///
+    /// * `mbs` - Pool whose identifier seeds the paths and whose model
+    ///   overrides supply the path count and Hull-White parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for a `hw1f_sigma_schedule`, a partial
+    /// Hull-White pair, or a path count above the workspace cap.
+    pub(crate) fn resolve(mbs: &AgencyMbsPassthrough) -> Result<Self> {
+        let model = &mbs.instrument_pricing_overrides.model_config;
+        if model.hw1f_sigma_schedule.is_some() {
+            return Err(Error::Validation(
+                "MBS MC-OAS takes a scalar hw1f_sigma; hw1f_sigma_schedule is not supported".into(),
+            ));
         }
+        let (hw1f_mean_reversion, hw1f_sigma) = match (model.hw1f_mean_reversion, model.hw1f_sigma)
+        {
+            (None, None) => (DEFAULT_HW1F_MEAN_REVERSION, DEFAULT_HW1F_SIGMA),
+            (Some(kappa), Some(sigma)) => (kappa, sigma),
+            _ => {
+                return Err(Error::Validation(
+                    "MBS MC-OAS requires hw1f_mean_reversion and hw1f_sigma together".into(),
+                ))
+            }
+        };
+        Ok(Self {
+            num_paths:
+                finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_mc_paths(
+                    model.mc_paths,
+                    DEFAULT_NUM_PATHS,
+                )?,
+            hw1f_mean_reversion,
+            hw1f_sigma,
+            seed: model.mc_seed(&mbs.id),
+        })
     }
 }
 
@@ -372,7 +410,7 @@ fn price_on_path(
 /// };
 ///
 /// let mbs = AgencyMbsPassthrough::example().unwrap();
-/// let config = McOasConfig { num_paths: 1024, ..Default::default() };
+/// let config = McOasConfig { num_paths: 1024, ..McOasConfig::resolve(&mbs)? };
 /// let oas = calculate_mc_oas(&mbs, 98.5, &market, as_of, &config)?;
 /// println!("MC OAS: {:.0} bp", oas * 10_000.0);
 /// ```
@@ -392,7 +430,7 @@ pub(crate) fn calculate_mc_oas(
         + settlement_accrued_interest(mbs, as_of)?;
 
     let discount_curve = market.get_discount(&mbs.discount_curve_id)?;
-    let num_steps = config.num_steps.unwrap_or(mbs.wam_months as usize);
+    let num_steps = mbs.wam_months as usize;
     // Validate the calendar horizon before allocating rate paths.
     let steps = mc_step_schedule(mbs, as_of, num_steps, discount_curve.day_count())?;
 
@@ -427,7 +465,7 @@ pub(crate) fn calculate_mc_oas(
                 path,
                 initial_rate,
                 oas,
-                config.prepay_rate_sensitivity,
+                super::PREPAY_RATE_SENSITIVITY,
                 &steps,
             )
         };
@@ -447,7 +485,7 @@ pub(crate) fn calculate_mc_oas(
 
     // Solve for OAS using Brent's method
     let solver = BrentSolver::new()
-        .tolerance(config.tolerance)
+        .tolerance(OAS_TOLERANCE)
         .max_iterations(200)
         .bracket_bounds(-0.10, 0.20)
         .initial_bracket_size(Some(0.05));
@@ -651,7 +689,7 @@ mod tests {
         // `calculate_mc_oas` uses internally.
         let config = McOasConfig {
             num_paths: 64, // Fewer paths for speed in test
-            ..Default::default()
+            ..McOasConfig::resolve(&mbs).expect("config")
         };
 
         let curve = market.get_discount(&mbs.discount_curve_id).expect("curve");
@@ -669,7 +707,7 @@ mod tests {
                     path,
                     initial_rate,
                     0.0,
-                    config.prepay_rate_sensitivity,
+                    crate::mbs_passthrough::metrics::PREPAY_RATE_SENSITIVITY,
                     &steps,
                 )
             })
@@ -738,7 +776,7 @@ mod tests {
 
         let config = McOasConfig {
             num_paths: 64,
-            ..Default::default()
+            ..McOasConfig::resolve(&mbs).expect("config")
         };
 
         // Discount price should give positive OAS
@@ -972,7 +1010,7 @@ mod tests {
         let config = McOasConfig {
             num_paths: 32,
             seed: 12345,
-            ..Default::default()
+            ..McOasConfig::resolve(&mbs).expect("config")
         };
 
         let oas1 = calculate_mc_oas(&mbs, 95.0, &market, as_of, &config).expect("mc oas 1");
@@ -1017,7 +1055,7 @@ mod production_mortgage_audit {
         let config = McOasConfig {
             num_paths: 2,
             hw1f_sigma: 1e-10,
-            ..McOasConfig::default()
+            ..McOasConfig::resolve(&mbs).expect("config")
         };
         let oas = calculate_mc_oas(&mbs, clean, &market, as_of, &config).expect("oas");
         assert!(oas.abs() < 1e-8, "oas {oas}");
@@ -1046,7 +1084,7 @@ mod production_mortgage_audit {
         let config = McOasConfig {
             num_paths: 2,
             hw1f_sigma: 1e-10,
-            ..McOasConfig::default()
+            ..McOasConfig::resolve(&mbs).expect("config")
         };
         let oas_at = |as_of: Date| {
             let market = MarketContext::new().insert(

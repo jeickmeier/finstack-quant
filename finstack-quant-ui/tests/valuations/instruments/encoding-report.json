@@ -5405,7 +5405,6 @@
           "#/$defs/AgencyCmo/properties/collateral_wam_months",
           "#/$defs/CdsIndex/properties/num_constituents",
           "#/$defs/FxSpot/properties/settlement_days",
-          "#/$defs/CommoditySpotOption/properties/premium_settlement_days",
           "#/$defs/CommodityForward/properties/settlement_days",
           "#/$defs/CommoditySwap/properties/index_lag_days",
           "#/$defs/RangeAccrual/properties/past_observations_in_range",
@@ -6103,10 +6102,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/CdsOption/properties/premium_settlement_date",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/CdsOption/properties/underlying_start_date",
             "keyword": "anyOf"
           },
@@ -6232,10 +6227,6 @@
           },
           {
             "pointer": "#/$defs/QuantoOption/properties/fx_vol_surface_id",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/CommoditySpotOption/properties/convention",
             "keyword": "anyOf"
           },
           {
@@ -6975,11 +6966,9 @@
           "#/$defs/CmoTranche/properties/priority",
           "#/$defs/ImParameters/properties/mpor_days",
           "#/$defs/VmParameters/properties/settlement_lag",
-          "#/$defs/BermudanSchedule/properties/notice_days",
           "#/$defs/RepoMarginSpec/properties/settlement_lag",
           "#/$defs/CdsIndex/properties/num_constituents",
           "#/$defs/FxSpot/properties/settlement_days",
-          "#/$defs/CommoditySpotOption/properties/premium_settlement_days",
           "#/$defs/CommodityForward/properties/settlement_days",
           "#/$defs/CallAssumption/properties/after_early_amortization_months",
           "#/$defs/EligibilityRule/properties/max_days_past_due",
@@ -7525,7 +7514,6 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_bb0c4c397737a24ff8ed/properties/notice_days",
           "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
@@ -10818,10 +10806,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_fcc5a617e836258c508e/properties/premium_settlement_date",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/d_fcc5a617e836258c508e/properties/underlying_start_date",
             "keyword": "anyOf"
           }
@@ -10845,7 +10829,6 @@
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
-          { "pointer": "#/$defs/d_e96c399d588508b4c77b", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_02a11b30ee627630f221", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_948cdc4db846a21357a4", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_4ac4dad3ab3a5d25d3f9", "keyword": "oneOf" },
@@ -14608,8 +14591,7 @@
         ],
         "nullable-integer": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
-          "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
-          "#/$defs/d_6990e6c5e63d5457943c/properties/premium_settlement_days"
+          "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "nullable-number": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -14649,10 +14631,6 @@
           "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario"
         ],
         "nullable-union": [
-          {
-            "pointer": "#/$defs/d_6990e6c5e63d5457943c/properties/convention",
-            "keyword": "anyOf"
-          },
           {
             "pointer": "#/$defs/d_6990e6c5e63d5457943c/properties/exercise",
             "keyword": "anyOf"
@@ -14726,11 +14704,9 @@
         ],
         "uint32": [
           "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
-          "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
-          "#/$defs/d_6990e6c5e63d5457943c/properties/premium_settlement_days"
+          "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "unit-union": [
-          { "pointer": "#/$defs/d_132c0970533550baccde", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_be98333e68c25ab5ae57", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_c0401254ec268b317b65", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_ed594b756b5481bfccc3", "keyword": "oneOf" },
@@ -17058,7 +17034,6 @@
           "#/$defs/AgencyCmo/properties/collateral_wam_months",
           "#/$defs/CdsIndex/properties/num_constituents",
           "#/$defs/FxSpot/properties/settlement_days",
-          "#/$defs/CommoditySpotOption/properties/premium_settlement_days",
           "#/$defs/CommodityForward/properties/settlement_days",
           "#/$defs/CommoditySwap/properties/index_lag_days",
           "#/$defs/RangeAccrual/properties/past_observations_in_range",
@@ -17756,10 +17731,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/CdsOption/properties/premium_settlement_date",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/CdsOption/properties/underlying_start_date",
             "keyword": "anyOf"
           },
@@ -17885,10 +17856,6 @@
           },
           {
             "pointer": "#/$defs/QuantoOption/properties/fx_vol_surface_id",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/CommoditySpotOption/properties/convention",
             "keyword": "anyOf"
           },
           {
@@ -18628,11 +18595,9 @@
           "#/$defs/CmoTranche/properties/priority",
           "#/$defs/ImParameters/properties/mpor_days",
           "#/$defs/VmParameters/properties/settlement_lag",
-          "#/$defs/BermudanSchedule/properties/notice_days",
           "#/$defs/RepoMarginSpec/properties/settlement_lag",
           "#/$defs/CdsIndex/properties/num_constituents",
           "#/$defs/FxSpot/properties/settlement_days",
-          "#/$defs/CommoditySpotOption/properties/premium_settlement_days",
           "#/$defs/CommodityForward/properties/settlement_days",
           "#/$defs/CallAssumption/properties/after_early_amortization_months",
           "#/$defs/EligibilityRule/properties/max_days_past_due",

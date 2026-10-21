@@ -301,59 +301,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PikMode"
   },
   {
-    "path": "#/$defs/d_132c0970533550baccde",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention",
-    "description": "Standard commodity market conventions by product type.\n\nEach variant provides market-standard defaults for settlement days,\nbusiness day convention, and calendar. Use when constructing commodity\nforwards, options, or swaps without explicitly specifying these parameters.\n\n# Market Standards Reference\n\n| Convention | Settlement | BDC | Calendar | Exchange |\n|------------|------------|-----|----------|----------|\n| WTI Crude | T+2 | Following | NYMEX | NYMEX/CME |\n| Brent Crude | T+2 | Following | ICE | ICE |\n| Natural Gas | T+2 | Following | NYMEX | NYMEX/CME |\n| Gold | T+2 | Modified Following | COMEX | CME |\n| Silver | T+2 | Modified Following | COMEX | CME |\n| Copper | T+2 | Following | LME | LME |\n| Corn/Wheat | T+2 | Following | CBOT | CME |\n| Power | T+1 | Modified Following | NERC | Various |\n\n# Sources\n\n- CME Group rulebooks\n- ICE Futures exchange rules\n- LME trading procedures"
-  },
-  {
-    "path": "#/$defs/d_132c0970533550baccde/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention/oneOf/0",
-    "const": "wti_crude",
-    "description": "WTI Crude Oil: T+2, Following, NYMEX calendar"
-  },
-  {
-    "path": "#/$defs/d_132c0970533550baccde/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention/oneOf/1",
-    "const": "brent_crude",
-    "description": "Brent Crude Oil: T+2, Following, ICE calendar"
-  },
-  {
-    "path": "#/$defs/d_132c0970533550baccde/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention/oneOf/2",
-    "const": "natural_gas",
-    "description": "Henry Hub Natural Gas: T+2, Following, NYMEX calendar"
-  },
-  {
-    "path": "#/$defs/d_132c0970533550baccde/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention/oneOf/3",
-    "const": "gold",
-    "description": "COMEX Gold: T+2, Modified Following, COMEX calendar"
-  },
-  {
-    "path": "#/$defs/d_132c0970533550baccde/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention/oneOf/4",
-    "const": "silver",
-    "description": "COMEX Silver: T+2, Modified Following, COMEX calendar"
-  },
-  {
-    "path": "#/$defs/d_132c0970533550baccde/oneOf/5",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention/oneOf/5",
-    "const": "copper",
-    "description": "LME Copper: T+2, Following, LME calendar"
-  },
-  {
-    "path": "#/$defs/d_132c0970533550baccde/oneOf/6",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention/oneOf/6",
-    "const": "agricultural",
-    "description": "CBOT Agricultural (Corn, Wheat, Soybeans): T+2, Following, CBOT calendar"
-  },
-  {
-    "path": "#/$defs/d_132c0970533550baccde/oneOf/7",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention/oneOf/7",
-    "const": "power",
-    "description": "Power/Electricity: T+1, Modified Following, NERC calendar"
-  },
-  {
     "path": "#/$defs/d_16451e0bf3b6b78178d8",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/DynamicRecoverySpec",
     "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`DynamicRecoveryModel`].\nDeserialization enforces the same parameter invariants as the constructors."
@@ -1081,21 +1028,6 @@ export default [
     "description": "Commodity type (e.g., \"Energy\", \"Metal\", \"Agricultural\")"
   },
   {
-    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/convention",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/convention",
-    "description": "Optional market convention for this commodity.\n\nWhen set, provides default premium settlement days and calendar."
-  },
-  {
-    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/convention/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/convention/anyOf/0",
-    "ref": "#/$defs/CommodityConvention",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommodityConvention"
-  },
-  {
-    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/convention/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/convention/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_6990e6c5e63d5457943c/properties/currency",
     "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/currency",
     "description": "Base currency for pricing",
@@ -1199,13 +1131,6 @@ export default [
     "description": "Option type (call or put).",
     "ref": "#/$defs/OptionType",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/OptionType"
-  },
-  {
-    "path": "#/$defs/d_6990e6c5e63d5457943c/properties/premium_settlement_days",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spot_option.schema.json#/$defs/CommoditySpotOption/properties/premium_settlement_days",
-    "description": "Premium settlement lag in business days after trade date.\n\nStandard: T+1 for most exchange-traded options, T+2 for OTC.\nIf not set and `convention` is provided, uses convention default.\nOtherwise defaults to 1 (T+1).",
-    "format": "uint32",
-    "minimum": 0
   },
   {
     "path": "#/$defs/d_6990e6c5e63d5457943c/properties/quantity",

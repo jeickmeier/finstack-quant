@@ -11,9 +11,7 @@ use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithPa
 use finstack_quant_models::trees::binomial_tree::BinomialTree;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
-use finstack_quant_valuations_core::instruments::{
-    CommodityConvention, CommodityUnderlyingParams, OptionMarketParams,
-};
+use finstack_quant_valuations_core::instruments::{CommodityUnderlyingParams, OptionMarketParams};
 use finstack_quant_valuations_core::instruments::{ExerciseStyle, OptionType, SettlementType};
 
 /// Monte Carlo configuration for commodity option pricing.
@@ -207,18 +205,6 @@ pub struct CommoditySpotOption {
     )]
     pub scenario_pricing_overrides:
         finstack_quant_valuations_core::instruments::ScenarioPricingOverrides,
-    /// Optional market convention for this commodity.
-    ///
-    /// When set, provides default premium settlement days and calendar.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub convention: Option<CommodityConvention>,
-    /// Premium settlement lag in business days after trade date.
-    ///
-    /// Standard: T+1 for most exchange-traded options, T+2 for OTC.
-    /// If not set and `convention` is provided, uses convention default.
-    /// Otherwise defaults to 1 (T+1).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub premium_settlement_days: Option<u32>,
     /// Attributes for tagging and selection.
     #[builder(default)]
     #[serde(default)]
@@ -482,18 +468,6 @@ impl CommoditySpotOption {
                 .get_price_curve(&self.forward_curve_id)?
                 .price_on_date(self.expiry)?,
         })
-    }
-
-    /// Get the effective premium settlement lag in business days.
-    ///
-    /// Resolution order:
-    /// 1. `premium_settlement_days` if explicitly set
-    /// 2. `convention.settlement_days()` if convention is set
-    /// 3. Default: 1 (T+1, standard for exchange-traded options)
-    pub fn effective_premium_settlement_days(&self) -> u32 {
-        self.premium_settlement_days
-            .or_else(|| self.convention.map(|c| c.settlement_days()))
-            .unwrap_or(1)
     }
 
     /// Price commodity option using Monte Carlo with Schwartz-Smith dynamics.

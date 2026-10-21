@@ -127,9 +127,6 @@ impl BermudanSwaptionLmmPricer {
         {
             return Err(unsupported("requires physical co-terminal settlement"));
         }
-        if swaption.exercise_schedule.notice_days != 0 {
-            return Err(unsupported("requires zero notice days"));
-        }
         if !float.spread_bp.is_zero()
             || float.reset_lag_days != 0
             || float.compounding != FloatingLegCompounding::Simple
@@ -636,7 +633,6 @@ mod tests {
             ("exercise", |s| {
                 s.exercise_schedule.exercise_dates[0] += time::Duration::days(1)
             }),
-            ("notice", |s| s.exercise_schedule.notice_days = 2),
             ("payment dates", |s| {
                 s.underlying_fixed_leg.business_day_convention = BusinessDayConvention::Following;
                 s.underlying_float_leg.business_day_convention = BusinessDayConvention::Following;

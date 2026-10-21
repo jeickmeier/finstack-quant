@@ -12,7 +12,6 @@ export default [
             "coupon_bp": null,
             "credit_curve_id": "CORP-HAZARD",
             "discount_curve_id": "USD-OIS",
-            "exercise_style": "european",
             "expiry": "2025-06-20",
             "id": "CDSOPT-CALL-CORP-5Y",
             "index_factor": 1,
@@ -3737,29 +3736,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/VarConfig/properties/reporting_currency/anyOf/1"
   },
   {
-    "path": "#/$defs/d_e96c399d588508b4c77b",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/ExerciseStyle",
-    "description": "Exercise schedule convention for option models."
-  },
-  {
-    "path": "#/$defs/d_e96c399d588508b4c77b/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/ExerciseStyle/oneOf/0",
-    "const": "european",
-    "description": "Exercise only at expiry."
-  },
-  {
-    "path": "#/$defs/d_e96c399d588508b4c77b/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/ExerciseStyle/oneOf/1",
-    "const": "american",
-    "description": "Exercise at any eligible time through expiry."
-  },
-  {
-    "path": "#/$defs/d_e96c399d588508b4c77b/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/ExerciseStyle/oneOf/2",
-    "const": "bermudan",
-    "description": "Exercise on a finite schedule of eligible dates."
-  },
-  {
     "path": "#/$defs/d_ec4e993309e09fe83294",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/TenorUnit",
     "description": "Unit of a tenor period."
@@ -3954,13 +3930,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/exercise_settlement_date/anyOf/1"
   },
   {
-    "path": "#/$defs/d_fcc5a617e836258c508e/properties/exercise_style",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/exercise_style",
-    "description": "Exercise style",
-    "ref": "#/$defs/ExerciseStyle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/ExerciseStyle"
-  },
-  {
     "path": "#/$defs/d_fcc5a617e836258c508e/properties/expiry",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/expiry",
     "description": "Option expiry date",
@@ -4014,21 +3983,6 @@ export default [
     "description": "Option type (Call = right to buy protection, Put = right to sell protection)",
     "ref": "#/$defs/OptionType",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/OptionType"
-  },
-  {
-    "path": "#/$defs/d_fcc5a617e836258c508e/properties/premium_settlement_date",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/premium_settlement_date",
-    "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
-  },
-  {
-    "path": "#/$defs/d_fcc5a617e836258c508e/properties/premium_settlement_date/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/premium_settlement_date/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_fcc5a617e836258c508e/properties/premium_settlement_date/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json#/$defs/CdsOption/properties/premium_settlement_date/anyOf/1"
   },
   {
     "path": "#/$defs/d_fcc5a617e836258c508e/properties/protection_start_convention",

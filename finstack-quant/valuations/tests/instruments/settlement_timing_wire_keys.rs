@@ -1,10 +1,9 @@
 //! Settlement and payment timing use one spelling per concept on the wire:
 //! `settlement_date` for a date, `settlement_days` for the T+N lag,
 //! `payment_lag_days` for the business-day payment lag, `stated_delay_days`
-//! for the agency MBS calendar-day delay, `premium_settlement_date` for an
-//! option premium payment date and `fixing` for a commodity future's
-//! final-settlement price rule. Each retired spelling is rejected by
-//! `deny_unknown_fields`.
+//! for the agency MBS calendar-day delay and `fixing` for a commodity
+//! future's final-settlement price rule. A CDS option carries no premium
+//! payment date. Each retired spelling is rejected by `deny_unknown_fields`.
 
 use finstack_quant_valuations::instruments::rates::cap_floor::OvernightCouponConvention;
 use finstack_quant_valuations::instruments::{
@@ -35,15 +34,12 @@ fn assert_rejects<T: Serialize + DeserializeOwned>(
 }
 
 #[test]
-// schema-rejection-test: CdsOption `cash_settlement_date`
-fn cds_option_retired_cash_settlement_date_is_rejected() {
+// schema-rejection-test: CdsOption `cash_settlement_date` and `premium_settlement_date`
+fn cds_option_retired_premium_date_keys_are_rejected() {
     let option = CdsOption::example().expect("example");
-    assert_rejects(
-        &option,
-        "premium_settlement_date",
-        "cash_settlement_date",
-        serde_json::json!("2026-05-12"),
-    );
+    for retired in ["cash_settlement_date", "premium_settlement_date"] {
+        assert_rejects(&option, retired, retired, serde_json::json!("2026-05-12"));
+    }
 }
 
 #[test]

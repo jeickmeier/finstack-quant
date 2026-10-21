@@ -280,51 +280,6 @@
         }
       ]
     },
-    "d_132c0970533550baccde": {
-      "description": "Standard commodity market conventions by product type.\n\nEach variant provides market-standard defaults for settlement days,\nbusiness day convention, and calendar. Use when constructing commodity\nforwards, options, or swaps without explicitly specifying these parameters.\n\n# Market Standards Reference\n\n| Convention | Settlement | BDC | Calendar | Exchange |\n|------------|------------|-----|----------|----------|\n| WTI Crude | T+2 | Following | NYMEX | NYMEX/CME |\n| Brent Crude | T+2 | Following | ICE | ICE |\n| Natural Gas | T+2 | Following | NYMEX | NYMEX/CME |\n| Gold | T+2 | Modified Following | COMEX | CME |\n| Silver | T+2 | Modified Following | COMEX | CME |\n| Copper | T+2 | Following | LME | LME |\n| Corn/Wheat | T+2 | Following | CBOT | CME |\n| Power | T+1 | Modified Following | NERC | Various |\n\n# Sources\n\n- CME Group rulebooks\n- ICE Futures exchange rules\n- LME trading procedures",
-      "oneOf": [
-        {
-          "const": "wti_crude",
-          "description": "WTI Crude Oil: T+2, Following, NYMEX calendar",
-          "type": "string"
-        },
-        {
-          "const": "brent_crude",
-          "description": "Brent Crude Oil: T+2, Following, ICE calendar",
-          "type": "string"
-        },
-        {
-          "const": "natural_gas",
-          "description": "Henry Hub Natural Gas: T+2, Following, NYMEX calendar",
-          "type": "string"
-        },
-        {
-          "const": "gold",
-          "description": "COMEX Gold: T+2, Modified Following, COMEX calendar",
-          "type": "string"
-        },
-        {
-          "const": "silver",
-          "description": "COMEX Silver: T+2, Modified Following, COMEX calendar",
-          "type": "string"
-        },
-        {
-          "const": "copper",
-          "description": "LME Copper: T+2, Following, LME calendar",
-          "type": "string"
-        },
-        {
-          "const": "agricultural",
-          "description": "CBOT Agricultural (Corn, Wheat, Soybeans): T+2, Following, CBOT calendar",
-          "type": "string"
-        },
-        {
-          "const": "power",
-          "description": "Power/Electricity: T+1, Modified Following, NERC calendar",
-          "type": "string"
-        }
-      ]
-    },
     "d_16451e0bf3b6b78178d8": {
       "additionalProperties": false,
       "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`DynamicRecoveryModel`].\nDeserialization enforces the same parameter invariants as the constructors.",
@@ -1118,17 +1073,6 @@
           "description": "Commodity type (e.g., \"Energy\", \"Metal\", \"Agricultural\")",
           "type": "string"
         },
-        "convention": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_132c0970533550baccde"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional market convention for this commodity.\n\nWhen set, provides default premium settlement days and calendar."
-        },
         "currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
           "description": "Base currency for pricing"
@@ -1195,15 +1139,6 @@
         "option_type": {
           "$ref": "#/$defs/d_93c0349e3a5a9763e83f",
           "description": "Option type (call or put)."
-        },
-        "premium_settlement_days": {
-          "description": "Premium settlement lag in business days after trade date.\n\nStandard: T+1 for most exchange-traded options, T+2 for OTC.\nIf not set and `convention` is provided, uses convention default.\nOtherwise defaults to 1 (T+1).",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
         },
         "quantity": {
           "$ref": "#/$defs/d_5a4a97342eade5678c12",

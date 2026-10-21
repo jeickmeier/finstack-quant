@@ -54,7 +54,6 @@ pub(crate) fn delta_with_provider(
     as_of: finstack_quant_core::dates::Date,
     provider: Option<&dyn RecalibrationProvider>,
 ) -> Result<f64> {
-    option.validate_supported_configuration()?;
     let t = option.time_to_expiry(as_of)?;
     if t <= 0.0 {
         return Ok(0.0);

@@ -2686,12 +2686,12 @@ export default [
   {
     "path": "#/$defs/BermudanSchedule",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BermudanSchedule",
-    "description": "Bermudan exercise schedule specification.\n\nDefines the exercise dates and constraints for a Bermudan swaption.\nExercise dates are typically aligned with swap coupon dates."
+    "description": "Bermudan exercise schedule specification.\n\nDefines the exercise dates and constraints for a Bermudan swaption.\nExercise dates are typically aligned with swap coupon dates.\n\nEach exercise date is the notification (decision) date on which the holder\nelects to exercise, as in QuantLib's `BermudanExercise`; any contractual\nnotice period is already reflected in where the dates sit, so the schedule\ncarries no separate notice lag."
   },
   {
     "path": "#/$defs/BermudanSchedule/properties/exercise_dates",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BermudanSchedule/properties/exercise_dates",
-    "description": "Exercise dates (must be sorted, typically on swap coupon dates)"
+    "description": "Exercise notification (decision) dates, sorted; typically one notice\nperiod before the swap coupon dates they enter on."
   },
   {
     "path": "#/$defs/BermudanSchedule/properties/exercise_dates/items",
@@ -2714,13 +2714,6 @@ export default [
   {
     "path": "#/$defs/BermudanSchedule/properties/lockout_end/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BermudanSchedule/properties/lockout_end/anyOf/1"
-  },
-  {
-    "path": "#/$defs/BermudanSchedule/properties/notice_days",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BermudanSchedule/properties/notice_days",
-    "description": "Notice period in business days before exercise",
-    "format": "uint32",
-    "minimum": 0
   },
   {
     "path": "#/$defs/BermudanSwaption",
@@ -4592,13 +4585,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/exercise_settlement_date/anyOf/1"
   },
   {
-    "path": "#/$defs/CdsOption/properties/exercise_style",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/exercise_style",
-    "description": "Exercise style",
-    "ref": "#/$defs/ExerciseStyle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExerciseStyle"
-  },
-  {
     "path": "#/$defs/CdsOption/properties/expiry",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/expiry",
     "description": "Option expiry date",
@@ -4652,21 +4638,6 @@ export default [
     "description": "Option type (Call = right to buy protection, Put = right to sell protection)",
     "ref": "#/$defs/OptionType",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OptionType"
-  },
-  {
-    "path": "#/$defs/CdsOption/properties/premium_settlement_date",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/premium_settlement_date",
-    "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
-  },
-  {
-    "path": "#/$defs/CdsOption/properties/premium_settlement_date/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/premium_settlement_date/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/CdsOption/properties/premium_settlement_date/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsOption/properties/premium_settlement_date/anyOf/1"
   },
   {
     "path": "#/$defs/CdsOption/properties/protection_start_convention",
@@ -7003,21 +6974,6 @@ export default [
     "description": "Commodity type (e.g., \"Energy\", \"Metal\", \"Agricultural\")"
   },
   {
-    "path": "#/$defs/CommoditySpotOption/properties/convention",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommoditySpotOption/properties/convention",
-    "description": "Optional market convention for this commodity.\n\nWhen set, provides default premium settlement days and calendar."
-  },
-  {
-    "path": "#/$defs/CommoditySpotOption/properties/convention/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommoditySpotOption/properties/convention/anyOf/0",
-    "ref": "#/$defs/CommodityConvention",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommodityConvention"
-  },
-  {
-    "path": "#/$defs/CommoditySpotOption/properties/convention/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommoditySpotOption/properties/convention/anyOf/1"
-  },
-  {
     "path": "#/$defs/CommoditySpotOption/properties/currency",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommoditySpotOption/properties/currency",
     "description": "Base currency for pricing",
@@ -7121,13 +7077,6 @@ export default [
     "description": "Option type (call or put).",
     "ref": "#/$defs/OptionType",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OptionType"
-  },
-  {
-    "path": "#/$defs/CommoditySpotOption/properties/premium_settlement_days",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommoditySpotOption/properties/premium_settlement_days",
-    "description": "Premium settlement lag in business days after trade date.\n\nStandard: T+1 for most exchange-traded options, T+2 for OTC.\nIf not set and `convention` is provided, uses convention default.\nOtherwise defaults to 1 (T+1).",
-    "format": "uint32",
-    "minimum": 0
   },
   {
     "path": "#/$defs/CommoditySpotOption/properties/quantity",
@@ -30769,7 +30718,7 @@ export default [
   {
     "path": "#/$defs/VolatilityIndexFuture",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/VolatilityIndexFuture",
-    "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]; `terms.settlement_price` is the official\nSpecial Opening Quotation (SOQ) in index points.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_equity::vol_index_future::VolatilityIndexFuture;\nuse finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .terms(\n        ListedFutureTerms::new(\n            5.0,\n            1_000.0,\n            Currency::USD,\n            21.50,\n            settlement,\n            settlement,\n            Position::Long,\n        )\n        .unwrap(),\n    )\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```"
+    "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]; `terms.settlement_price` is the official\nSpecial Opening Quotation (SOQ) in index points.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_equity::vol_index_future::VolatilityIndexFuture;\nuse finstack_quant_valuations_core::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .terms(\n        ListedFutureTerms::new(\n            5.0,\n            1_000.0,\n            Currency::USD,\n            21.50,\n            settlement,\n            settlement,\n            Position::Long,\n        )\n        .unwrap(),\n    )\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```"
   },
   {
     "path": "#/$defs/VolatilityIndexFuture/properties/attributes",
@@ -30778,13 +30727,6 @@ export default [
     "description": "Attributes for scenario selection and tagging",
     "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
-  },
-  {
-    "path": "#/$defs/VolatilityIndexFuture/properties/discount_curve_id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/VolatilityIndexFuture/properties/discount_curve_id",
-    "description": "Discount curve identifier. **Unused in PV**: the future is daily\nmargined so the mark-to-market is undiscounted, and no Dv01 is\nregistered. Retained for market-data identification/scenario plumbing.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/VolatilityIndexFuture/properties/id",

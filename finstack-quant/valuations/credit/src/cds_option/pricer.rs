@@ -37,7 +37,6 @@ pub(crate) fn npv(
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<Money> {
     ensure_valuation_not_after_expiry(option, as_of)?;
-    option.validate_supported_configuration()?;
     let sigma = resolve_sigma(option, curves, as_of)?;
     let cds = synthetic_underlying_cds(option, as_of)?;
     bloomberg_quadrature::npv(option, &cds, curves, sigma, as_of)
@@ -70,7 +69,6 @@ pub(crate) fn theta(
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<f64> {
     ensure_valuation_not_after_expiry(option, as_of)?;
-    option.validate_supported_configuration()?;
     let sigma = resolve_sigma(option, curves, as_of)?;
     let cds = synthetic_underlying_cds(option, as_of)?;
     bloomberg_quadrature::theta(option, &cds, curves, sigma, as_of)
@@ -123,7 +121,6 @@ pub(crate) fn implied_vol(
     if option.expiry <= as_of {
         return Ok(0.0);
     }
-    option.validate_supported_configuration()?;
 
     let cds = synthetic_underlying_cds(option, as_of)?;
     // The first NPV error aborts the solve and is surfaced as-is.

@@ -5,7 +5,6 @@
       "coupon_bp": null,
       "credit_curve_id": "CORP-HAZARD",
       "discount_curve_id": "USD-OIS",
-      "exercise_style": "european",
       "expiry": "2025-06-20",
       "id": "CDSOPT-CALL-CORP-5Y",
       "index_factor": 1.0,

@@ -10,7 +10,6 @@
           "coupon_bp": null,
           "credit_curve_id": "CORP-HAZARD",
           "discount_curve_id": "USD-OIS",
-          "exercise_style": "european",
           "expiry": "2025-06-20",
           "id": "CDSOPT-CALL-CORP-5Y",
           "index_factor": 1,
@@ -3531,26 +3530,6 @@
       },
       "type": "object"
     },
-    "d_e96c399d588508b4c77b": {
-      "description": "Exercise schedule convention for option models.",
-      "oneOf": [
-        {
-          "const": "european",
-          "description": "Exercise only at expiry.",
-          "type": "string"
-        },
-        {
-          "const": "american",
-          "description": "Exercise at any eligible time through expiry.",
-          "type": "string"
-        },
-        {
-          "const": "bermudan",
-          "description": "Exercise on a finite schedule of eligible dates.",
-          "type": "string"
-        }
-      ]
-    },
     "d_ec4e993309e09fe83294": {
       "description": "Unit of a tenor period.",
       "oneOf": [
@@ -3725,10 +3704,6 @@
           ],
           "description": "Payment date of the exercise proceeds, defaulting to legal expiry.\nMust be on or after expiry and before CDS maturity. Discounting uses\nthis date; spread variance ends at legal expiry."
         },
-        "exercise_style": {
-          "$ref": "#/$defs/d_e96c399d588508b4c77b",
-          "description": "Exercise style"
-        },
         "expiry": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
           "description": "Option expiry date"
@@ -3763,17 +3738,6 @@
         "option_type": {
           "$ref": "#/$defs/d_26f382ea2a7c2f4d93f5",
           "description": "Option type (Call = right to buy protection, Put = right to sell protection)"
-        },
-        "premium_settlement_date": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
         },
         "protection_start_convention": {
           "$ref": "#/$defs/d_0a1f66e612f0a56116f2",
@@ -3845,7 +3809,6 @@
         "id",
         "strike",
         "option_type",
-        "exercise_style",
         "expiry",
         "underlying_maturity",
         "notional",

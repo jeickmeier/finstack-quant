@@ -2,15 +2,9 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
- * Discount curve identifier. **Unused in PV**: the future is daily
- * margined so the mark-to-market is undiscounted, and no Dv01 is
- * registered. Retained for market-data identification/scenario plumbing.
- */
-export type Id = string;
-/**
  * Unique identifier.
  */
-export type Id1 = string;
+export type Id = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -452,7 +446,7 @@ export type Date1 = string;
 /**
  * Volatility index forward curve identifier.
  */
-export type Id2 = string;
+export type Id1 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -503,7 +497,6 @@ export interface DE1Bd96Bcaa7Ce74B7D1D {
  *         )
  *         .unwrap(),
  *     )
- *     .discount_curve_id(CurveId::new("USD-OIS"))
  *     .vol_index_curve_id(CurveId::new("VIX"))
  *     .build()
  *     .expect("Valid future");
@@ -511,13 +504,12 @@ export interface DE1Bd96Bcaa7Ce74B7D1D {
  */
 export interface DF5452489Af2759Ebedff {
   attributes?: Attributes;
-  discount_curve_id: Id;
-  id: Id1;
+  id: Id;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   terms: DE985818D0Dd0Fa2D4259;
-  vol_index_curve_id: Id2;
+  vol_index_curve_id: Id1;
 }
 /**
  * Attributes for scenario selection and tagging

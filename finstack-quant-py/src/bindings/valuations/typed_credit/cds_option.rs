@@ -135,12 +135,6 @@ impl PyCdsOption {
         date_to_py(py, self.inner.underlying_maturity)
     }
 
-    /// Option premium payment date, or ``None`` for the convention default.
-    #[getter]
-    fn premium_settlement_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        opt_date_to_py(py, self.inner.premium_settlement_date)
-    }
-
     /// Exercise proceeds payment date, or ``None`` for legal expiry.
     #[getter]
     fn exercise_settlement_date<'py>(
@@ -181,9 +175,6 @@ impl PyCdsOption {
 crate::bindings::macros::py_getters!(PyCdsOption |s| {
     /// ``"call"`` (right to buy protection) or ``"put"`` (right to sell protection).
     option_type -> PyResult<String> = enum_to_py_string(&s.inner.option_type);
-
-    /// Exercise style (only ``"european"`` prices).
-    exercise_style -> PyResult<String> = enum_to_py_string(&s.inner.exercise_style);
 
     /// Option notional.
     notional -> PyMoney = money_to_py(s.inner.notional);
@@ -229,8 +220,8 @@ crate::bindings::macros::py_getters!(PyCdsOption |s| {
 /// Fluent builder for ``CdsOption``; wraps the Rust ``FinancialBuilder``
 /// builder (consuming setters).
 ///
-/// Required: ``id``, ``strike``, ``option_type``, ``exercise_style``,
-/// ``expiry``, ``underlying_maturity``, ``notional``, ``settlement``,
+/// Required: ``id``, ``strike``, ``option_type``, ``expiry``,
+/// ``underlying_maturity``, ``notional``, ``settlement``,
 /// ``recovery_rate``, ``discount_curve_id``, ``credit_curve_id``,
 /// ``vol_surface_id`` and ``underlying_is_index``. Builders are consumed by
 /// ``build()``; create a new builder per instrument.
@@ -242,7 +233,7 @@ crate::bindings::macros::py_getters!(PyCdsOption |s| {
 /// >>> from finstack_quant.core.money import Money
 /// >>> from finstack_quant.valuations.instruments import CdsOption
 /// >>> option = (CdsOption.builder().id("CDSO-1").strike({"spread": "0.0125"})
-/// ...     .option_type("put").exercise_style("european")
+/// ...     .option_type("put")
 /// ...     .expiry(datetime.date(2025, 6, 20)).underlying_maturity(datetime.date(2030, 6, 20))
 /// ...     .notional(Money(5_000_000, Currency("USD"))).settlement("physical")
 /// ...     .recovery_rate(0.4).discount_curve_id("USD-OIS").credit_curve_id("CORP-HAZARD")
@@ -347,36 +338,6 @@ impl PyCdsOptionBuilder {
         )
     }
 
-    /// Set the exercise style.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"european", "american", "bermudan"}
-    ///     Exercise style; pricing supports ``"european"`` only.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized exercise style.
-    #[pyo3(text_signature = "($self, value)")]
-    fn exercise_style<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        value: &str,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let parsed = enum_from_str(value, "exercise_style")?;
-        builder_set!(
-            slf,
-            exercise_style,
-            format!("{value:?}"),
-            |b: CdsOptionBuilderInner| b.exercise_style(parsed)
-        )
-    }
-
     /// Set the option expiry date.
     ///
     /// Parameters
@@ -472,32 +433,6 @@ impl PyCdsOptionBuilder {
             settlement,
             format!("{value:?}"),
             |b: CdsOptionBuilderInner| b.settlement(parsed)
-        )
-    }
-
-    /// Set the option premium payment date.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : datetime.date | str
-    ///     Premium payment date; when never set, the underlying CDS
-    ///     convention's settlement lag after the valuation date applies.
-    ///
-    /// Returns
-    /// -------
-    /// CdsOptionBuilder
-    ///     ``self``, for chaining.
-    #[pyo3(text_signature = "($self, value)")]
-    fn premium_settlement_date<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        value: &Bound<'_, PyAny>,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = py_to_date(value)?;
-        builder_set!(
-            slf,
-            premium_settlement_date,
-            date_repr(date),
-            |b: CdsOptionBuilderInner| b.premium_settlement_date(date)
         )
     }
 

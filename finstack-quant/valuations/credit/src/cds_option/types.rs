@@ -34,7 +34,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::instruments::Attributes;
 use finstack_quant_valuations_core::instruments::CreditParams;
-use finstack_quant_valuations_core::instruments::{ExerciseStyle, OptionType, SettlementType};
+use finstack_quant_valuations_core::instruments::{OptionType, SettlementType};
 use rust_decimal::Decimal;
 
 use super::parameters::CdsOptionParams;
@@ -92,8 +92,6 @@ pub struct CdsOption {
     pub strike: super::strike::CdsOptionStrike,
     /// Option type (Call = right to buy protection, Put = right to sell protection)
     pub option_type: OptionType,
-    /// Exercise style
-    pub exercise_style: ExerciseStyle,
     /// Option expiry date
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -112,17 +110,6 @@ pub struct CdsOption {
     pub notional: Money,
     /// Settlement type
     pub settlement: SettlementType,
-    /// Payment date of the option premium, returned by the settlement-date
-    /// accessor. This does not change variance time or front-end protection;
-    /// the option value excludes the separately agreed trade premium.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde(with = "finstack_quant_core::wire::optional_date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
-    )]
-    #[builder(default)]
-    pub premium_settlement_date: Option<Date>,
     /// Payment date of the exercise proceeds, defaulting to legal expiry.
     /// Must be on or after expiry and before CDS maturity. Discounting uses
     /// this date; spread variance ends at legal expiry.
@@ -260,21 +247,6 @@ pub struct CdsOption {
 }
 
 impl CdsOption {
-    pub(crate) fn validate_supported_configuration(&self) -> finstack_quant_core::Result<()> {
-        if self.exercise_style != ExerciseStyle::European {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "CDS options currently support only European exercise; got {:?}",
-                self.exercise_style
-            )));
-        }
-
-        // Cash and physical settlement carry the same pre-expiry
-        // cash-equivalent model value; both route through the same
-        // quadrature. Post-expiry physical exercise lifecycle is rejected in
-        // the pricer's valuation-date guard.
-        Ok(())
-    }
-
     /// Validate the CdsOption parameters.
     fn validate(&self) -> finstack_quant_core::Result<()> {
         use finstack_quant_core::validation;
@@ -289,16 +261,6 @@ impl CdsOption {
         validation::validate_money_finite(self.notional, "CDS option notional")?;
         validation::validate_money_gt(self.notional, 0.0, "CDS option notional")?;
 
-        if let (Some(cash_settlement), Some(exercise_settlement)) =
-            (self.premium_settlement_date, self.exercise_settlement_date)
-        {
-            if exercise_settlement <= cash_settlement {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "exercise_settlement_date ({}) must be after premium_settlement_date ({})",
-                    exercise_settlement, cash_settlement
-                )));
-            }
-        }
         if let Some(exercise_settlement) = self.exercise_settlement_date {
             if exercise_settlement < self.expiry {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -489,12 +451,10 @@ impl CdsOption {
             id: id.into(),
             strike: option_params.strike,
             option_type: option_params.option_type,
-            exercise_style: ExerciseStyle::European,
             expiry: option_params.expiry,
             underlying_maturity: option_params.underlying_maturity,
             notional: option_params.notional,
             settlement: option_params.settlement,
-            premium_settlement_date: None,
             exercise_settlement_date: None,
             underlying_start_date: None,
             protection_start_convention: option_params.protection_start_convention,
@@ -701,8 +661,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for CdsOption {
     );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
-        self.validate()?;
-        self.validate_supported_configuration()
+        self.validate()
     }
 
     fn market_dependencies(
@@ -822,7 +781,7 @@ mod tests {
     }
 
     #[test]
-    fn pricing_boundary_rejects_non_finite_and_unsupported_terms() {
+    fn pricing_boundary_rejects_non_finite_terms() {
         let mut option = CdsOption::example().expect("example");
         option.recovery_rate = f64::NAN;
         assert!(option
@@ -830,14 +789,6 @@ mod tests {
             .expect_err("NaN recovery must fail")
             .to_string()
             .contains("finite"));
-
-        option.recovery_rate = 0.4;
-        option.exercise_style = ExerciseStyle::American;
-        assert!(option
-            .validate_for_pricing()
-            .expect_err("American CDS option must fail")
-            .to_string()
-            .contains("European"));
     }
 
     #[test]

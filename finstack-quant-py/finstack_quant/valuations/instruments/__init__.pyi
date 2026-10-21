@@ -10025,21 +10025,6 @@ class CdsOption:
         """
         ...
     @property
-    def exercise_style(self) -> str:
-        """
-        Exercise style of the option.
-
-        Returns
-        -------
-        str
-            ``"european"``, ``"american"`` or ``"bermudan"``; only European prices.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-    @property
     def expiry(self) -> datetime.date:
         """
         Legal option expiry date.
@@ -10093,21 +10078,6 @@ class CdsOption:
         -------
         str
             ``"cash"`` or ``"physical"``.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-    @property
-    def premium_settlement_date(self) -> datetime.date | None:
-        """
-        Explicit option premium payment date.
-
-        Returns
-        -------
-        datetime.date | None
-            The date, or ``None`` for the convention settlement lag.
 
         Notes
         -----
@@ -10330,8 +10300,8 @@ class CdsOptionBuilder:
     Fluent builder for :class:`CdsOption`; wraps the Rust ``FinancialBuilder``
     output one setter for one setter.
 
-    Required: ``id``, ``strike``, ``option_type``, ``exercise_style``,
-    ``expiry``, ``underlying_maturity``, ``notional``, ``settlement``,
+    Required: ``id``, ``strike``, ``option_type``, ``expiry``,
+    ``underlying_maturity``, ``notional``, ``settlement``,
     ``recovery_rate``, ``discount_curve_id``, ``credit_curve_id``,
     ``vol_surface_id`` and ``underlying_is_index``. Builders are consumed by
     ``build()``; create a new builder per instrument.
@@ -10348,7 +10318,6 @@ class CdsOptionBuilder:
     ...     .id("CDSO-1")
     ...     .strike({"spread": "0.0125"})
     ...     .option_type("put")
-    ...     .exercise_style("european")
     ...     .expiry(datetime.date(2025, 6, 20))
     ...     .underlying_maturity(datetime.date(2030, 6, 20))
     ...     .notional(Money(5_000_000, Currency("USD")))
@@ -10422,26 +10391,6 @@ class CdsOptionBuilder:
         ------
         ValueError
             If ``value`` is not a recognized option type.
-        """
-        ...
-    def exercise_style(self, value: str) -> CdsOptionBuilder:
-        """
-        Set the exercise style.
-
-        Parameters
-        ----------
-        value : str
-            ``"european"``, ``"american"`` or ``"bermudan"``; pricing supports European only.
-
-        Returns
-        -------
-        CdsOptionBuilder
-            ``self``, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If ``value`` is not a recognized exercise style.
         """
         ...
     def expiry(self, value: datetime.date | str) -> CdsOptionBuilder:
@@ -10522,26 +10471,6 @@ class CdsOptionBuilder:
         ------
         ValueError
             If ``value`` is not a recognized settlement type.
-        """
-        ...
-    def premium_settlement_date(self, value: datetime.date | str) -> CdsOptionBuilder:
-        """
-        Set the option premium payment date.
-
-        Parameters
-        ----------
-        value : datetime.date | str
-            Premium payment date; when never set the CDS convention settlement lag applies.
-
-        Returns
-        -------
-        CdsOptionBuilder
-            ``self``, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If ``value`` is not a date.
         """
         ...
     def exercise_settlement_date(self, value: datetime.date | str) -> CdsOptionBuilder:

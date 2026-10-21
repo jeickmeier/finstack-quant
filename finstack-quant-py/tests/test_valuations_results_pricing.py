@@ -656,7 +656,7 @@ def test_cds_option_typed_wrapper_round_trips_and_matches_example_json() -> None
     assert CdsOption.from_json(option.to_json()).to_json() == option.to_json()
     assert pickle.loads(pickle.dumps(option)).to_json() == option.to_json()  # noqa: S301
     assert option.strike == {"spread": "0.01"}
-    assert (option.option_type, option.settlement, option.exercise_style) == ("call", "cash", "european")
+    assert (option.option_type, option.settlement) == ("call", "cash")
     assert option.expiry == datetime.date(2025, 6, 20)
     assert option.notional.amount == 10_000_000.0
     assert option.coupon_bp is None
@@ -674,7 +674,6 @@ def test_cds_option_builder_sets_every_field_and_validates() -> None:
         .id("CDXO-1")
         .strike({"clean_price_pct": "107.0"})
         .option_type("put")
-        .exercise_style("european")
         .expiry("2025-06-20")
         .underlying_maturity(datetime.date(2030, 6, 20))
         .notional(Money(25_000_000.0, Currency("USD")))

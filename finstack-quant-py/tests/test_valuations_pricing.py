@@ -446,7 +446,6 @@ def _bermudan_swaption_json() -> str:
             "exercise_schedule": {
                 "exercise_dates": ["2029-01-17", "2030-01-17"],
                 "lockout_end": None,
-                "notice_days": 0,
             },
             "bermudan_type": "co_terminal",
             "attributes": {},

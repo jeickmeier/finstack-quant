@@ -2,34 +2,6 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
- * Standard commodity market conventions by product type.
- *
- * Each variant provides market-standard defaults for settlement days,
- * business day convention, and calendar. Use when constructing commodity
- * forwards, options, or swaps without explicitly specifying these parameters.
- *
- * # Market Standards Reference
- *
- * | Convention | Settlement | BDC | Calendar | Exchange |
- * |------------|------------|-----|----------|----------|
- * | WTI Crude | T+2 | Following | NYMEX | NYMEX/CME |
- * | Brent Crude | T+2 | Following | ICE | ICE |
- * | Natural Gas | T+2 | Following | NYMEX | NYMEX/CME |
- * | Gold | T+2 | Modified Following | COMEX | CME |
- * | Silver | T+2 | Modified Following | COMEX | CME |
- * | Copper | T+2 | Following | LME | LME |
- * | Corn/Wheat | T+2 | Following | CBOT | CME |
- * | Power | T+1 | Modified Following | NERC | Various |
- *
- * # Sources
- *
- * - CME Group rulebooks
- * - ICE Futures exchange rules
- * - LME trading procedures
- */
-export type D_132C0970533550Baccde =
-  "wti_crude" | "brent_crude" | "natural_gas" | "gold" | "silver" | "copper" | "agricultural" | "power";
-/**
  * Base currency for pricing
  */
 export type Currency =
@@ -567,12 +539,6 @@ export interface D_6990E6C5E63D5457943C {
    * Commodity type (e.g., "Energy", "Metal", "Agricultural")
    */
   commodity_type: string;
-  /**
-   * Optional market convention for this commodity.
-   *
-   * When set, provides default premium settlement days and calendar.
-   */
-  convention?: D_132C0970533550Baccde | null;
   currency: Currency;
   day_count?: DayCount;
   discount_curve_id: Id;
@@ -603,14 +569,6 @@ export interface D_6990E6C5E63D5457943C {
    * Option type (call or put).
    */
   option_type: "call" | "put";
-  /**
-   * Premium settlement lag in business days after trade date.
-   *
-   * Standard: T+1 for most exchange-traded options, T+2 for OTC.
-   * If not set and `convention` is provided, uses convention default.
-   * Otherwise defaults to 1 (T+1).
-   */
-  premium_settlement_days?: number | null;
   /**
    * Contract quantity in units.
    */
