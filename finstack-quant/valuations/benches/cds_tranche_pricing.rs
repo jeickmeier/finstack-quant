@@ -19,9 +19,10 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
+use finstack_quant_models::correlation::copula::CopulaSpec;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CdsTranche, CdsTranchePricer, CopulaSpec,
+    CdsTranche, CdsTranchePricer,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PayReceive;

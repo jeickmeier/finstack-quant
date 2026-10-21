@@ -16,12 +16,12 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::credit_derivatives::cds::PayReceive;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
     CdsIndex, CdsIndexConstituent, CdsIndexParams, IndexPricing,
 };
 use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::metrics::MetricId;
 use std::hint::black_box;
 use time::Month;

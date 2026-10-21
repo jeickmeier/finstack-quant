@@ -39,9 +39,9 @@
 //! ## Example
 //! - CDX IG (125 names): $10M index with 40% recovery → JTD ≈ $48K per name default
 
-use crate::cds::PayReceive;
 use crate::cds_index::{CdsIndex, IndexPricing};
 use finstack_quant_core::{Error, Result};
+use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 /// Jump-to-default calculator for CDS Index.
