@@ -1025,7 +1025,7 @@ export interface DCdb8Fddc0106047270C4 {
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
  *
  * This is a wrapper around
- * [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
+ * [`crate::instruments::MertonMcConfig`]
  * that allows the pricer registry to access the MC configuration from
  * [`InstrumentPricingOverrides`].
  */
@@ -1461,9 +1461,7 @@ export interface D_8A837E6F142B34E8Cfd4 {
  * # Example
  *
  * ```
- * use finstack_quant_margin::{
- *     OtcMarginSpec, CsaSpec, SimmCreditClassification, SimmCreditSector,
- * };
+ * use finstack_quant_margin::types::{OtcMarginSpec, CsaSpec, SimmCreditClassification, SimmCreditSector};
  *
  * # fn main() -> finstack_quant_core::Result<()> {
  * // Bilateral (uncleared) derivative
@@ -1653,7 +1651,7 @@ export interface DA6A52A2D0Eee1C0D30Ba {
  * # Example
  *
  * ```
- * use finstack_quant_margin::{ImMethodology, ImParameters};
+ * use finstack_quant_margin::types::{ImMethodology, ImParameters};
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::money::Money;
  *
@@ -3187,7 +3185,7 @@ export interface ScenarioPricingOverrides {
    * for bonds without embedded options, without an assigned credit curve, and
    * without a price-pinning quote override other than `quoted_z_spread`
    * (where the shock is additive on the quoted spread). See
-   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::Instrument::scenario_spread_shock_supported).
    *
    * Setting this on an unsupported configuration produces a validation error
    * at pricing time rather than a silent no-op. For hazard-priced (credit

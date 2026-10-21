@@ -1288,7 +1288,7 @@ export type Date20 = string;
  * - **Withheld**: Reduces initial cash proceeds, increases effective yield
  * - **Separate**: May be accounted as upfront fee or amortized discount
  *
- * For effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].
+ * For effective interest rate (EIR) amortization schedules, see [`OidEirSpec`](crate::loan_terms::OidEirSpec).
  *
  * # Variants
  *
@@ -1304,7 +1304,7 @@ export type Date20 = string;
  * # Examples
  *
  * ```text
- * use finstack_quant_valuations_fixed_income::term_loan::spec::OidPolicy;
+ * use finstack_quant_valuations_fixed_income::term_loan::OidPolicy;
  * use finstack_quant_core::money::Money;
  * use finstack_quant_core::currency::Currency;
  *
@@ -2158,7 +2158,7 @@ export interface DCdb8Fddc0106047270C4 {
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
  *
  * This is a wrapper around
- * [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
+ * [`crate::instruments::MertonMcConfig`]
  * that allows the pricer registry to access the MC configuration from
  * [`InstrumentPricingOverrides`].
  */
@@ -2754,7 +2754,7 @@ export interface ScenarioPricingOverrides {
    * for bonds without embedded options, without an assigned credit curve, and
    * without a price-pinning quote override other than `quoted_z_spread`
    * (where the shock is additive on the quoted spread). See
-   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::Instrument::scenario_spread_shock_supported).
    *
    * Setting this on an unsupported configuration produces a validation error
    * at pricing time rather than a silent no-op. For hazard-priced (credit
@@ -4641,7 +4641,7 @@ export interface ScenarioPricingOverrides1 {
    * for bonds without embedded options, without an assigned credit curve, and
    * without a price-pinning quote override other than `quoted_z_spread`
    * (where the shock is additive on the quoted spread). See
-   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::Instrument::scenario_spread_shock_supported).
    *
    * Setting this on an unsupported configuration produces a validation error
    * at pricing time rather than a silent no-op. For hazard-priced (credit
@@ -4683,7 +4683,7 @@ export interface ScenarioPricingOverrides1 {
  *
  * # Pricing
  *
- * Implements [`Instrument::value()`](finstack_quant_valuations_core::instruments::common_impl::traits::Instrument::value)
+ * Implements [`Instrument::value()`](finstack_quant_valuations_core::instruments::Instrument::value)
  * using deterministic cashflow discounting. PIK interest is capitalized and excluded from PV.
  *
  * # Invariants
@@ -4858,7 +4858,7 @@ export interface Attributes3 {
  * # Examples
  *
  * ```text
- * use finstack_quant_valuations_fixed_income::term_loan::spec::{LoanCallSchedule, LoanCall};
+ * use finstack_quant_valuations_fixed_income::term_loan::{LoanCallSchedule, LoanCall};
  * use finstack_quant_core::dates::create_date;
  * use time::Month;
  *
@@ -6240,7 +6240,7 @@ export interface ScenarioPricingOverrides2 {
    * for bonds without embedded options, without an assigned credit curve, and
    * without a price-pinning quote override other than `quoted_z_spread`
    * (where the shock is additive on the quoted spread). See
-   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::Instrument::scenario_spread_shock_supported).
    *
    * Setting this on an unsupported configuration produces a validation error
    * at pricing time rather than a silent no-op. For hazard-priced (credit
@@ -7822,7 +7822,7 @@ export interface ScenarioPricingOverrides3 {
    * for bonds without embedded options, without an assigned credit curve, and
    * without a price-pinning quote override other than `quoted_z_spread`
    * (where the shock is additive on the quoted spread). See
-   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::Instrument::scenario_spread_shock_supported).
    *
    * Setting this on an unsupported configuration produces a validation error
    * at pricing time rather than a silent no-op. For hazard-priced (credit
@@ -8284,7 +8284,7 @@ export interface InstrumentPricingOverrides4 {
  * # Example
  *
  * ```
- * use finstack_quant_margin::{EligibleCollateralSchedule, MarginTenor, RepoMarginSpec, RepoMarginType};
+ * use finstack_quant_margin::types::{EligibleCollateralSchedule, MarginTenor, RepoMarginSpec, RepoMarginType};
  *
  * let margin_spec = RepoMarginSpec {
  *     margin_type: RepoMarginType::MarkToMarket,
@@ -8370,7 +8370,7 @@ export interface D_2A56C8E7799710Ddfef1 {
  * # Example
  *
  * ```
- * use finstack_quant_margin::{CollateralEligibility, EligibleCollateralSchedule};
+ * use finstack_quant_margin::types::{CollateralEligibility, EligibleCollateralSchedule};
  *
  * // Start from a standard schedule (BCBS-IOSCO compliant)
  * let schedule = EligibleCollateralSchedule::bcbs_standard()?;
@@ -8508,7 +8508,7 @@ export interface ScenarioPricingOverrides4 {
    * for bonds without embedded options, without an assigned credit curve, and
    * without a price-pinning quote override other than `quoted_z_spread`
    * (where the shock is additive on the quoted spread). See
-   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::Instrument::scenario_spread_shock_supported).
    *
    * Setting this on an unsupported configuration produces a validation error
    * at pricing time rather than a silent no-op. For hazard-priced (credit
@@ -8573,7 +8573,7 @@ export interface ScenarioPricingOverrides5 {
    * for bonds without embedded options, without an assigned credit curve, and
    * without a price-pinning quote override other than `quoted_z_spread`
    * (where the shock is additive on the quoted spread). See
-   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::Instrument::scenario_spread_shock_supported).
    *
    * Setting this on an unsupported configuration produces a validation error
    * at pricing time rather than a silent no-op. For hazard-priced (credit

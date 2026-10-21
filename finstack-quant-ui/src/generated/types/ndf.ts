@@ -196,7 +196,8 @@ export type Date = string;
  * # Example
  *
  * ```rust
- * use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};
+ * use finstack_quant_valuations_fx::ndf::{Ndf, NdfFixingSource};
+ * use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::money::Money;
@@ -719,7 +720,8 @@ export interface DCb133E56Ebd239Cdb4Ee {
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations_fx::ndf::{Ndf, NdfQuoteConvention};
+ * use finstack_quant_valuations_fx::ndf::Ndf;
+ * use finstack_quant_valuations_core::instruments::NdfQuoteConvention;
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
  * use finstack_quant_core::money::Money;
@@ -1157,7 +1159,7 @@ export interface DCdb8Fddc0106047270C4 {
  * Merton Monte Carlo configuration stored on the bond for registry-based pricing.
  *
  * This is a wrapper around
- * [`crate::instruments::common_impl::parameters::merton_mc::MertonMcConfig`]
+ * [`crate::instruments::MertonMcConfig`]
  * that allows the pricer registry to access the MC configuration from
  * [`InstrumentPricingOverrides`].
  */
@@ -1928,7 +1930,7 @@ export interface ScenarioPricingOverrides {
    * for bonds without embedded options, without an assigned credit curve, and
    * without a price-pinning quote override other than `quoted_z_spread`
    * (where the shock is additive on the quoted spread). See
-   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::Instrument::scenario_spread_shock_supported).
    *
    * Setting this on an unsupported configuration produces a validation error
    * at pricing time rather than a silent no-op. For hazard-priced (credit
