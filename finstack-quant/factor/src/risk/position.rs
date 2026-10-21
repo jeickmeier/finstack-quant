@@ -1007,42 +1007,6 @@ pub fn historical_var_decomposition(
     })
 }
 
-/// Flatten a row-major nested matrix after validating squareness against `n`.
-///
-/// # Errors
-///
-/// Returns [`finstack_quant_core::Error::Validation`] when the matrix has the
-/// wrong number of rows or any row has the wrong number of columns.
-///
-/// # Arguments
-///
-/// * `matrix` - Row-major nested vector with one inner vector per row.
-/// * `n` - Expected square dimension.
-/// * `label` - Caller-provided label included in validation messages.
-pub fn flatten_square_matrix(
-    matrix: Vec<Vec<f64>>,
-    n: usize,
-    label: &str,
-) -> finstack_quant_core::Result<Vec<f64>> {
-    if matrix.len() != n {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "{label} must have {n} rows, got {}",
-            matrix.len()
-        )));
-    }
-    let mut flat = Vec::with_capacity(n * n);
-    for (index, row) in matrix.into_iter().enumerate() {
-        if row.len() != n {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "{label} row {index} must have {n} columns, got {}",
-                row.len()
-            )));
-        }
-        flat.extend(row);
-    }
-    Ok(flat)
-}
-
 /// Flatten per-position scenario P&Ls into a scenario-major buffer.
 ///
 /// # Errors
@@ -1090,17 +1054,6 @@ mod tests {
     use super::*;
 
     type TestResult = finstack_quant_core::Result<()>;
-
-    #[test]
-    fn flatten_square_matrix_validates_shape() {
-        let flat = flatten_square_matrix(vec![vec![1.0, 2.0], vec![3.0, 4.0]], 2, "cov")
-            .expect("valid matrix");
-        assert_eq!(flat, vec![1.0, 2.0, 3.0, 4.0]);
-        assert!(flatten_square_matrix(vec![vec![1.0, 2.0]], 2, "cov").is_err());
-        assert!(
-            flatten_square_matrix(vec![vec![1.0, 2.0, 3.0], vec![1.0, 2.0]], 2, "cov").is_err()
-        );
-    }
 
     fn entry_point_inputs() -> (Vec<String>, Vec<f64>, Vec<f64>, Vec<f64>, usize) {
         let ids: Vec<String> = vec!["A".into(), "B".into(), "C".into()];

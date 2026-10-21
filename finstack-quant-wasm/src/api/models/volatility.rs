@@ -5,13 +5,14 @@
 //!
 //! Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr.
 
-use crate::api::core::surfaces::{JsFxDeltaVolSurface, JsVolCube};
+use crate::api::core::surfaces::{
+    JsFxDeltaVolSurface, JsVolCube, JsVolCubeExpirySlice, JsVolSurface,
+};
 use crate::utils::input::{
-    from_js_json, invalid_type, js_bool, js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_uint,
+    from_js_json, js_bool, js_f64, js_f64_matrix, js_f64_seq, js_json_value, js_opt_f64, js_uint,
 };
 use crate::utils::wire::js_wire;
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_core::market_data::surfaces::{VolCubeExpirySlice, VolSurface};
 use finstack_quant_models::volatility as vol;
 use finstack_quant_models::volatility::arbitrage as model_arbitrage;
 use finstack_quant_models::volatility::local_vol::LocalVolSurface;
@@ -19,6 +20,7 @@ use finstack_quant_models::volatility::sabr::{
     SabrCalibrator, SabrParameters, SabrShift, SabrSmile,
 };
 use finstack_quant_models::volatility::svi::SviParams;
+use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 
 /// SABR model parameters `(alpha, beta, nu, rho)` with optional `shift`.
@@ -603,26 +605,23 @@ impl JsSabrCalibrator {
     ///
     /// # Errors
     ///
-    /// Throws a `FinstackError` (`kind: "validation"`) for a string other than
-    /// `"auto"` (parsed by the Rust `SabrShift`), and a `TypeError`
-    /// (`kind: "invalid_type"`) for any other non-null, non-number value such
-    /// as a boolean.
+    /// Throws a `FinstackError` (`kind: "validation"`) for a boolean, a string
+    /// other than `"auto"` or any other shape the Rust `SabrShift` wire form
+    /// rejects, and a `TypeError` (`kind: "invalid_type"`) for a non-finite
+    /// number or a value JSON cannot represent.
     #[wasm_bindgen(js_name = withShift)]
     pub fn with_shift(&self, shift: JsValue) -> Result<JsSabrCalibrator, JsValue> {
-        // Host-union conversion only: null → None, number → Fixed, string →
-        // the Rust `SabrShift` keyword parser.
-        let policy = if shift.is_null() || shift.is_undefined() {
-            SabrShift::None
-        } else if let Some(value) = shift.as_f64() {
-            SabrShift::Fixed(value)
-        } else if let Some(text) = shift.as_string() {
-            text.parse::<SabrShift>().map_err(to_js_err)?
+        // `undefined` is the omitted argument: the same as `null`.
+        let wire = if shift.is_undefined() {
+            serde_json::Value::Null
         } else {
-            return Err(invalid_type(
-                "shift",
-                "expected null, a number, or the string \"auto\"",
-            ));
+            js_json_value(&shift, "shift")?
         };
+        let policy: SabrShift = serde_json::from_value(wire).map_err(|error| {
+            to_js_err(finstack_quant_core::Error::Validation(format!(
+                "shift: {error}"
+            )))
+        })?;
         Ok(Self {
             inner: self.inner.clone().with_shift(policy),
         })
@@ -656,12 +655,8 @@ impl JsSabrCalibrator {
     /// Displacement policy: `null` (no shift), a fixed numeric shift in the
     /// forward's units, or `"auto"` — the same forms `withShift` accepts.
     #[wasm_bindgen(getter)]
-    pub fn shift(&self) -> JsValue {
-        match self.inner.shift() {
-            SabrShift::None => JsValue::NULL,
-            SabrShift::Fixed(value) => JsValue::from(value),
-            SabrShift::Auto => JsValue::from(SabrShift::Auto.to_string()),
-        }
+    pub fn shift(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.shift())
     }
 
     /// Whether alpha is pinned to the interpolated ATM volatility.
@@ -1081,23 +1076,20 @@ pub fn svi_durrleman_g(params: JsValue, k: JsValue) -> Result<f64, JsValue> {
 /// variance at each node of the implied grid is `(dw/dT) / g` in total
 /// variance `w = sigma^2 T` and log-moneyness `k = ln(K / F_T)` (Gatheral
 /// 2006, eq. 1.10), with the time derivative taken at fixed `k`.
-/// @param surface - `VolSurface` object or JSON in the canonical wire form: unshifted Black implied volatilities (decimals) on expiries in years and positive cash strikes, at least two expiries and three strikes.
+/// @param surface - `core.VolSurface` handle of unshifted Black implied volatilities (decimals) on expiries in years and positive cash strikes, at least two expiries and three strikes.
 /// @param forwards - Forward price of the underlying for each surface expiry, in strike units and in the order of `surface.expiries`; finite and positive. For a flat carry, `F(T) = S * exp((r - q) * T)`.
 /// @returns The `LocalVolSurface` object: `expiries` in years, `strikes`, and `local_vols` as annualized decimals in row-major order (`local_vols[i * strikes.length + j]` for expiry `i`, strike `j`).
 ///
 /// @example
 /// ```typescript
-/// import init, { models } from "finstack-quant-wasm";
+/// import init, { core, models } from "finstack-quant-wasm";
 /// await init();
-/// const implied = {
-///   id: "FLAT",
-///   expiries: [0.5, 1.0],
-///   strikes: [90, 100, 110],
-///   vols_row_major: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
-///   secondary_axis: "strike" as const,
-///   interpolation_mode: "vol" as const,
-///   quote_type: "black_lognormal" as const,
-/// };
+/// const implied = new core.VolSurface(
+///   "FLAT",
+///   [0.5, 1.0],
+///   [90, 100, 110],
+///   [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+/// );
 /// const local = models.volatility.localVolFromImpliedVol(implied, [100, 100]);
 /// console.log(local.expiries, local.strikes); // [0.5, 1] [90, 100, 110]
 /// console.log(local.local_vols.every((v) => Math.abs(v - 0.2) < 1e-12)); // true
@@ -1106,15 +1098,17 @@ pub fn svi_durrleman_g(params: JsValue, k: JsValue) -> Result<f64, JsValue> {
 /// # Errors
 ///
 /// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
-/// `validation` error if `surface` is malformed, has fewer than two expiries
-/// or three strikes, is not an unshifted Black strike surface, `forwards` has
+/// `validation` error if `surface` has fewer than two expiries or three
+/// strikes, is not an unshifted Black strike surface, `forwards` has
 /// the wrong length or a non-positive entry, or the surface has butterfly or
 /// calendar arbitrage at a node (the message names the node).
 #[wasm_bindgen(js_name = localVolFromImpliedVol)]
-pub fn local_vol_from_implied_vol(surface: JsValue, forwards: JsValue) -> Result<JsValue, JsValue> {
-    let surface: VolSurface = from_js_json(&surface, "surface")?;
+pub fn local_vol_from_implied_vol(
+    surface: &JsVolSurface,
+    forwards: JsValue,
+) -> Result<JsValue, JsValue> {
     let forwards = js_f64_seq(&forwards, "forwards")?;
-    let local = LocalVolSurface::from_implied_vol(&surface, &forwards).map_err(to_js_err)?;
+    let local = LocalVolSurface::from_implied_vol(&surface.inner, &forwards).map_err(to_js_err)?;
     to_js_value(&local)
 }
 
@@ -1124,24 +1118,21 @@ pub fn local_vol_from_implied_vol(surface: JsValue, forwards: JsValue) -> Result
 /// Twin of the Rust and Python `LocalVolSurface.from_implied_vol_smoothed`.
 /// Smoothing regularises the second strike derivative, the usual source of a
 /// non-positive Dupire density on market-calibrated grids.
-/// @param surface - `VolSurface` object or JSON, as for `localVolFromImpliedVol`.
+/// @param surface - `core.VolSurface` handle, as for `localVolFromImpliedVol`.
 /// @param forwards - One forward per surface expiry, as for `localVolFromImpliedVol`.
 /// @param sigma_strikes - Standard deviation of the Gaussian kernel in strike (price) units, non-negative; zero disables smoothing.
 /// @returns The `LocalVolSurface` object on the grid of `surface`.
 ///
 /// @example
 /// ```typescript
-/// import init, { models } from "finstack-quant-wasm";
+/// import init, { core, models } from "finstack-quant-wasm";
 /// await init();
-/// const implied = {
-///   id: "FLAT",
-///   expiries: [0.5, 1.0],
-///   strikes: [90, 100, 110],
-///   vols_row_major: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
-///   secondary_axis: "strike" as const,
-///   interpolation_mode: "vol" as const,
-///   quote_type: "black_lognormal" as const,
-/// };
+/// const implied = new core.VolSurface(
+///   "FLAT",
+///   [0.5, 1.0],
+///   [90, 100, 110],
+///   [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+/// );
 /// const local = models.volatility.localVolFromImpliedVolSmoothed(implied, [100, 100], 5.0);
 /// console.log(local.local_vols.length); // 6
 /// ```
@@ -1153,15 +1144,15 @@ pub fn local_vol_from_implied_vol(surface: JsValue, forwards: JsValue) -> Result
 /// error of `localVolFromImpliedVol` on the smoothed surface.
 #[wasm_bindgen(js_name = localVolFromImpliedVolSmoothed)]
 pub fn local_vol_from_implied_vol_smoothed(
-    surface: JsValue,
+    surface: &JsVolSurface,
     forwards: JsValue,
     sigma_strikes: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let surface: VolSurface = from_js_json(&surface, "surface")?;
     let forwards = js_f64_seq(&forwards, "forwards")?;
     let sigma_strikes = js_f64(&sigma_strikes, "sigmaStrikes")?;
-    let local = LocalVolSurface::from_implied_vol_smoothed(&surface, &forwards, sigma_strikes)
-        .map_err(to_js_err)?;
+    let local =
+        LocalVolSurface::from_implied_vol_smoothed(&surface.inner, &forwards, sigma_strikes)
+            .map_err(to_js_err)?;
     to_js_value(&local)
 }
 
@@ -1325,20 +1316,22 @@ pub fn check_surface_grid(
 }
 
 /// Interpolate a volatility surface; coordinates outside the grid are rejected.
-/// @param surface - `VolSurface` object or JSON in the canonical wire form (`id`, `expiries`, `strikes`, `vols_row_major`, ...), such as a `materializeCube*` result.
+/// @param surface - `core.VolSurface` handle, such as a `materializeCubeTenorSlice` or `materializeFxDeltaSurface` result.
 /// @param expiry - Option expiry in years, within the surface grid.
 /// @param strike - Strike in the surface's own units, within the surface grid.
 /// @returns The interpolated volatility, as a decimal.
 ///
 /// # Errors
 ///
-/// Throws a `validation` error if `surface` is malformed or a coordinate is
-/// outside the grid.
+/// Throws a `validation` error if a coordinate is outside the grid.
 #[wasm_bindgen(js_name = getSurfaceVol)]
-pub fn get_surface_vol(surface: JsValue, expiry: JsValue, strike: JsValue) -> Result<f64, JsValue> {
-    let surface: VolSurface = from_js_json(&surface, "surface")?;
+pub fn get_surface_vol(
+    surface: &JsVolSurface,
+    expiry: JsValue,
+    strike: JsValue,
+) -> Result<f64, JsValue> {
     vol::get_surface_vol(
-        &surface,
+        &surface.inner,
         js_f64(&expiry, "expiry")?,
         js_f64(&strike, "strike")?,
     )
@@ -1346,23 +1339,23 @@ pub fn get_surface_vol(surface: JsValue, expiry: JsValue, strike: JsValue) -> Re
 }
 
 /// Interpolate a volatility surface with flat clamping to the grid edges.
-/// @param surface - `VolSurface` object or JSON in the canonical wire form.
+/// @param surface - `core.VolSurface` handle.
 /// @param expiry - Option expiry in years; clamped to the surface grid.
 /// @param strike - Strike in the surface's own units; clamped to the surface grid.
 /// @returns The interpolated volatility, as a decimal; `NaN` for non-finite coordinates.
 ///
 /// # Errors
 ///
-/// Throws a `validation` error if `surface` is malformed.
+/// Throws a `TypeError` (`kind: "invalid_type"`) if `expiry` or `strike`
+/// is not a number.
 #[wasm_bindgen(js_name = getSurfaceVolClamped)]
 pub fn get_surface_vol_clamped(
-    surface: JsValue,
+    surface: &JsVolSurface,
     expiry: JsValue,
     strike: JsValue,
 ) -> Result<f64, JsValue> {
-    let surface: VolSurface = from_js_json(&surface, "surface")?;
     Ok(vol::get_surface_vol_clamped(
-        &surface,
+        &surface.inner,
         js_f64(&expiry, "expiry")?,
         js_f64(&strike, "strike")?,
     ))
@@ -1372,7 +1365,7 @@ pub fn get_surface_vol_clamped(
 /// @param cube - `core.VolCube` handle.
 /// @param tenor - Underlying tenor in years, within the cube grid.
 /// @param strikes - Strictly increasing strikes of the output surface.
-/// @returns The expiry by strike `VolSurface` object in its canonical wire form.
+/// @returns The expiry by strike `core.VolSurface` handle.
 ///
 /// # Errors
 ///
@@ -1383,21 +1376,21 @@ pub fn materialize_cube_tenor_slice(
     cube: &JsVolCube,
     tenor: JsValue,
     strikes: JsValue,
-) -> Result<JsValue, JsValue> {
+) -> Result<JsVolSurface, JsValue> {
     let surface = vol::materialize_cube_tenor_slice(
         &cube.inner,
         js_f64(&tenor, "tenor")?,
         &js_f64_seq(&strikes, "strikes")?,
     )
     .map_err(to_js_err)?;
-    to_js_value(&surface)
+    Ok(JsVolSurface::from_inner(Arc::new(surface)))
 }
 
 /// Materialize the normal (Bachelier) volatility slice of a SABR cube at one underlying tenor.
 /// @param cube - `core.VolCube` handle.
 /// @param tenor - Underlying tenor in years, within the cube grid.
 /// @param strikes - Strictly increasing strikes of the output surface.
-/// @returns The expiry by strike `VolSurface` object of normal volatilities.
+/// @returns The expiry by strike `core.VolSurface` handle of normal volatilities.
 ///
 /// # Errors
 ///
@@ -1408,21 +1401,21 @@ pub fn materialize_cube_tenor_slice_normal(
     cube: &JsVolCube,
     tenor: JsValue,
     strikes: JsValue,
-) -> Result<JsValue, JsValue> {
+) -> Result<JsVolSurface, JsValue> {
     let surface = vol::materialize_cube_tenor_slice_normal(
         &cube.inner,
         js_f64(&tenor, "tenor")?,
         &js_f64_seq(&strikes, "strikes")?,
     )
     .map_err(to_js_err)?;
-    to_js_value(&surface)
+    Ok(JsVolSurface::from_inner(Arc::new(surface)))
 }
 
 /// Materialize the Black volatility slice of a SABR cube at one option expiry.
 /// @param cube - `core.VolCube` handle.
 /// @param expiry - Option expiry in years, within the cube grid.
 /// @param strikes - Strictly increasing strikes of the output surface.
-/// @returns The tenor by strike `VolCubeExpirySlice` object in its canonical wire form (`id`, `expiry`, `tenors`, `strikes`, `vols_row_major`, `quote_type`, optional `displacements`).
+/// @returns The tenor by strike `core.VolCubeExpirySlice` handle.
 ///
 /// # Errors
 ///
@@ -1433,21 +1426,23 @@ pub fn materialize_cube_expiry_slice(
     cube: &JsVolCube,
     expiry: JsValue,
     strikes: JsValue,
-) -> Result<JsValue, JsValue> {
+) -> Result<JsVolCubeExpirySlice, JsValue> {
     let surface = vol::materialize_cube_expiry_slice(
         &cube.inner,
         js_f64(&expiry, "expiry")?,
         &js_f64_seq(&strikes, "strikes")?,
     )
     .map_err(to_js_err)?;
-    to_js_value(&surface)
+    Ok(JsVolCubeExpirySlice {
+        inner: Arc::new(surface),
+    })
 }
 
 /// Materialize the normal (Bachelier) volatility slice of a SABR cube at one option expiry.
 /// @param cube - `core.VolCube` handle.
 /// @param expiry - Option expiry in years, within the cube grid.
 /// @param strikes - Strictly increasing strikes of the output surface.
-/// @returns The tenor by strike `VolCubeExpirySlice` object of normal volatilities.
+/// @returns The tenor by strike `core.VolCubeExpirySlice` handle of normal volatilities.
 ///
 /// # Errors
 ///
@@ -1458,55 +1453,60 @@ pub fn materialize_cube_expiry_slice_normal(
     cube: &JsVolCube,
     expiry: JsValue,
     strikes: JsValue,
-) -> Result<JsValue, JsValue> {
+) -> Result<JsVolCubeExpirySlice, JsValue> {
     let surface = vol::materialize_cube_expiry_slice_normal(
         &cube.inner,
         js_f64(&expiry, "expiry")?,
         &js_f64_seq(&strikes, "strikes")?,
     )
     .map_err(to_js_err)?;
-    to_js_value(&surface)
+    Ok(JsVolCubeExpirySlice {
+        inner: Arc::new(surface),
+    })
 }
 
 /// Interpolate a fixed-expiry cube slice; coordinates outside the grid are rejected.
-/// @param slice - `VolCubeExpirySlice` object or JSON in the canonical wire form, such as a `materializeCubeExpirySlice` result or `core.VolCubeExpirySlice.toJson()`.
+/// @param slice - `core.VolCubeExpirySlice` handle, such as a `materializeCubeExpirySlice` result.
 /// @param tenor - Underlying tenor in years, within the slice's tenor axis.
 /// @param strike - Strike in forward-rate units, within the slice's strike axis.
 /// @returns The bilinearly interpolated volatility in the slice's quote convention.
 ///
 /// # Errors
 ///
-/// Throws a `validation` error if `slice` is malformed or a coordinate is
-/// non-finite or outside the grid.
+/// Throws a `validation` error if a coordinate is non-finite or outside the
+/// grid.
 #[wasm_bindgen(js_name = getCubeExpirySliceVol)]
 pub fn get_cube_expiry_slice_vol(
-    slice: JsValue,
+    slice: &JsVolCubeExpirySlice,
     tenor: JsValue,
     strike: JsValue,
 ) -> Result<f64, JsValue> {
-    let slice: VolCubeExpirySlice = from_js_json(&slice, "slice")?;
-    vol::get_cube_expiry_slice_vol(&slice, js_f64(&tenor, "tenor")?, js_f64(&strike, "strike")?)
-        .map_err(to_js_err)
+    vol::get_cube_expiry_slice_vol(
+        &slice.inner,
+        js_f64(&tenor, "tenor")?,
+        js_f64(&strike, "strike")?,
+    )
+    .map_err(to_js_err)
 }
 
 /// Interpolate a fixed-expiry cube slice with flat clamping to the grid edges.
-/// @param slice - `VolCubeExpirySlice` object or JSON in the canonical wire form.
+/// @param slice - `core.VolCubeExpirySlice` handle.
 /// @param tenor - Underlying tenor in years; clamped to the slice's tenor axis.
 /// @param strike - Strike in forward-rate units; clamped to the slice's strike axis.
 /// @returns The interpolated volatility in the slice's quote convention; `NaN` for non-finite coordinates.
 ///
 /// # Errors
 ///
-/// Throws a `validation` error if `slice` is malformed.
+/// Throws a `TypeError` (`kind: "invalid_type"`) if `tenor` or `strike`
+/// is not a number.
 #[wasm_bindgen(js_name = getCubeExpirySliceVolClamped)]
 pub fn get_cube_expiry_slice_vol_clamped(
-    slice: JsValue,
+    slice: &JsVolCubeExpirySlice,
     tenor: JsValue,
     strike: JsValue,
 ) -> Result<f64, JsValue> {
-    let slice: VolCubeExpirySlice = from_js_json(&slice, "slice")?;
     Ok(vol::get_cube_expiry_slice_vol_clamped(
-        &slice,
+        &slice.inner,
         js_f64(&tenor, "tenor")?,
         js_f64(&strike, "strike")?,
     ))
@@ -1517,7 +1517,7 @@ pub fn get_cube_expiry_slice_vol_clamped(
 /// @param spot - FX spot rate (domestic per unit of foreign); positive.
 /// @param domestic_rate - Continuously compounded domestic rate, as a decimal.
 /// @param foreign_rate - Continuously compounded foreign rate, as a decimal.
-/// @returns The strike-space `VolSurface` object in its canonical wire form.
+/// @returns The strike-space `core.VolSurface` handle.
 ///
 /// # Errors
 ///
@@ -1529,15 +1529,15 @@ pub fn materialize_fx_delta_surface(
     spot: JsValue,
     domestic_rate: JsValue,
     foreign_rate: JsValue,
-) -> Result<JsValue, JsValue> {
-    let surface = vol::materialize_fx_delta_surface(
+) -> Result<JsVolSurface, JsValue> {
+    let materialized = vol::materialize_fx_delta_surface(
         &surface.inner,
         js_f64(&spot, "spot")?,
         js_f64(&domestic_rate, "domesticRate")?,
         js_f64(&foreign_rate, "foreignRate")?,
     )
     .map_err(to_js_err)?;
-    to_js_value(&surface)
+    Ok(JsVolSurface::from_inner(Arc::new(materialized)))
 }
 
 #[cfg(test)]

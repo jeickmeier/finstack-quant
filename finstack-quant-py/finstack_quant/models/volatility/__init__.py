@@ -42,7 +42,6 @@ materialize_cube_tenor_slice = _volatility.materialize_cube_tenor_slice
 materialize_cube_tenor_slice_normal = _volatility.materialize_cube_tenor_slice_normal
 materialize_fx_delta_surface = _volatility.materialize_fx_delta_surface
 strike_to_delta = _volatility.strike_to_delta
-surface_to_dataframe = _volatility.surface_to_dataframe
 
 __all__ = [
     "ArbitrageReport",
@@ -76,5 +75,4 @@ __all__ = [
     "materialize_cube_tenor_slice_normal",
     "materialize_fx_delta_surface",
     "strike_to_delta",
-    "surface_to_dataframe",
 ]

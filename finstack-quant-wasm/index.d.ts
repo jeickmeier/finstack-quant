@@ -7002,7 +7002,7 @@ export interface CreditIndexDataConstructor {
  *   [90, 100, 110],
  *   [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
  * );
- * models.volatility.getSurfaceVol(surface.toJson(), 0.75, 100); // 0.205
+ * models.volatility.getSurfaceVol(surface, 0.75, 100); // 0.205
  * surface.gridShape; // [2, 3]
  * ```
  */
@@ -7101,7 +7101,7 @@ export interface VolSurfaceOptions {
  *   [90, 100, 110],
  *   [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
  * );
- * models.volatility.getSurfaceVol(surface.toJson(), 0.75, 100); // 0.205
+ * models.volatility.getSurfaceVol(surface, 0.75, 100); // 0.205
  * surface.gridShape; // [2, 3]
  * ```
  */
@@ -7139,7 +7139,7 @@ export interface VolSurfaceConstructor {
  * Volatility grid at one fixed option expiry, indexed by underlying tenor and strike.
  *
  * The fixed-expiry slice of a SABR cube: `models.volatility.materializeCubeExpirySlice`
- * returns its wire object, and `fromJson` turns that object into a handle.
+ * returns this handle, and `fromJson` loads one from its canonical JSON.
  * Shifted-Black quotes carry one displacement per tenor, in strike units.
  *
  * @example
@@ -7203,7 +7203,7 @@ export interface VolCubeExpirySlice extends WasmOwned {
  * Volatility grid at one fixed option expiry, indexed by underlying tenor and strike.
  *
  * The fixed-expiry slice of a SABR cube: `models.volatility.materializeCubeExpirySlice`
- * returns its wire object, and `fromJson` turns that object into a handle.
+ * returns this handle, and `fromJson` loads one from its canonical JSON.
  * Shifted-Black quotes carry one displacement per tenor, in strike units.
  *
  * @example
@@ -7249,7 +7249,7 @@ export interface VolCubeExpirySliceConstructor {
    * Deserialize from the canonical JSON wire form shared with Python
    * `VolCubeExpirySlice.to_json`.
    *
-   * @param json - Canonical VolCubeExpirySlice JSON text or plain object, such as a `materializeCubeExpirySlice` result; unknown fields are rejected and the grid is re-validated.
+   * @param json - Canonical VolCubeExpirySlice JSON text or plain object, such as `toJson()` output; unknown fields are rejected and the grid is re-validated.
    * @returns The validated `VolCubeExpirySlice`.
    * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it does not match the schema or fails grid validation.
    */
@@ -25230,7 +25230,7 @@ export interface SabrCalibrator extends WasmOwned {
    * preserving all other settings.
    * @returns A `SabrCalibrator` handle.
    * @param shift - `null`/`undefined` fits the quotes as-is; a number is a fixed additive shift in the forward's units (decimal rate or price); `"auto"` picks the smallest standardized shift (1-4%) that leaves 10bp of headroom above the most negative forward or strike, or none when every input is non-negative. The shift used is stored on the fitted `SabrParameters`.
-   * @throws Error - Throws a `FinstackError` (`kind: "validation"`) for a string other than `"auto"` (parsed by the Rust `SabrShift`), and a `TypeError` (`kind: "invalid_type"`) for any other non-null, non-number value such as a boolean.
+   * @throws Error - Throws a `FinstackError` (`kind: "validation"`) for a boolean, a string other than `"auto"` or any other shape the Rust `SabrShift` wire form rejects, and a `TypeError` (`kind: "invalid_type"`) for a non-finite number or a value JSON cannot represent.
    */
   withShift(shift: number | 'auto' | null | undefined): SabrCalibrator;
   /**
@@ -28754,27 +28754,27 @@ export interface VolatilityNamespace {
   getCubeVolClamped(cube: VolCube, expiry: number, tenor: number, strike: number): number;
   /**
    * Interpolate a fixed-expiry cube slice; coordinates outside the grid are rejected.
-   * @param slice - `VolCubeExpirySlice` object or JSON in the canonical wire form, such as a `materializeCubeExpirySlice` result or `core.VolCubeExpirySlice.toJson()`.
+   * @param slice - `core.VolCubeExpirySlice` handle, such as a `materializeCubeExpirySlice` result.
    * @param tenor - Underlying tenor in years, within the slice's tenor axis.
    * @param strike - Strike in forward-rate units, within the slice's strike axis.
    * @returns The bilinearly interpolated volatility in the slice's quote convention.
-   * @throws Error - Throws a `validation` error if `slice` is malformed or a coordinate is non-finite or outside the grid.
+   * @throws Error - Throws a `validation` error if a coordinate is non-finite or outside the grid.
    */
   getCubeExpirySliceVol(
-    slice: generated.core.VolCubeExpirySlice | string,
+    slice: VolCubeExpirySlice,
     tenor: number,
     strike: number
   ): number;
   /**
    * Interpolate a fixed-expiry cube slice with flat clamping to the grid edges.
-   * @param slice - `VolCubeExpirySlice` object or JSON in the canonical wire form.
+   * @param slice - `core.VolCubeExpirySlice` handle.
    * @param tenor - Underlying tenor in years; clamped to the slice's tenor axis.
    * @param strike - Strike in forward-rate units; clamped to the slice's strike axis.
    * @returns The interpolated volatility in the slice's quote convention; `NaN` for non-finite coordinates.
-   * @throws Error - Throws a `validation` error if `slice` is malformed.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `tenor` or `strike` is not a number.
    */
   getCubeExpirySliceVolClamped(
-    slice: generated.core.VolCubeExpirySlice | string,
+    slice: VolCubeExpirySlice,
     tenor: number,
     strike: number
   ): number;
@@ -28923,28 +28923,25 @@ export interface VolatilityNamespace {
    * Twin of the Rust and Python `LocalVolSurface.from_implied_vol`. The local variance at each node of the implied grid is `(dw/dT) / g` in total variance `w = sigma^2 T` and log-moneyness `k = ln(K / F_T)` (Gatheral 2006, eq. 1.10), with the time derivative taken at fixed `k`.
    * @example
    * ```typescript
-   * import init, { models } from "finstack-quant-wasm";
+   * import init, { core, models } from "finstack-quant-wasm";
    * await init();
-   * const implied = {
-   *   id: "FLAT",
-   *   expiries: [0.5, 1.0],
-   *   strikes: [90, 100, 110],
-   *   vols_row_major: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
-   *   secondary_axis: "strike" as const,
-   *   interpolation_mode: "vol" as const,
-   *   quote_type: "black_lognormal" as const,
-   * };
+   * const implied = new core.VolSurface(
+   *   "FLAT",
+   *   [0.5, 1.0],
+   *   [90, 100, 110],
+   *   [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+   * );
    * const local = models.volatility.localVolFromImpliedVol(implied, [100, 100]);
    * console.log(local.expiries, local.strikes); // [0.5, 1] [90, 100, 110]
    * console.log(local.local_vols.every((v) => Math.abs(v - 0.2) < 1e-12)); // true
    * ```
-   * @param surface - `VolSurface` object or JSON in the canonical wire form: unshifted Black implied volatilities (decimals) on expiries in years and positive cash strikes, at least two expiries and three strikes.
+   * @param surface - `core.VolSurface` handle of unshifted Black implied volatilities (decimals) on expiries in years and positive cash strikes, at least two expiries and three strikes.
    * @param forwards - Forward price of the underlying for each surface expiry, in strike units and in the order of `surface.expiries`; finite and positive. For a flat carry, `F(T) = S * exp((r - q) * T)`.
    * @returns The `LocalVolSurface` object: `expiries` in years, `strikes`, and `local_vols` as annualized decimals in row-major order (`local_vols[i * strikes.length + j]` for expiry `i`, strike `j`).
-   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `surface` is malformed, has fewer than two expiries or three strikes, is not an unshifted Black strike surface, `forwards` has the wrong length or a non-positive entry, or the surface has butterfly or calendar arbitrage at a node (the message names the node).
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `surface` has fewer than two expiries or three strikes, is not an unshifted Black strike surface, `forwards` has the wrong length or a non-positive entry, or the surface has butterfly or calendar arbitrage at a node (the message names the node).
    */
   localVolFromImpliedVol(
-    surface: generated.core.VolSurface | string,
+    surface: VolSurface,
     forwards: NumericArray
   ): generated.models.LocalVolSurface;
   /**
@@ -28953,28 +28950,25 @@ export interface VolatilityNamespace {
    * Twin of the Rust and Python `LocalVolSurface.from_implied_vol_smoothed`. Smoothing regularises the second strike derivative, the usual source of a non-positive Dupire density on market-calibrated grids.
    * @example
    * ```typescript
-   * import init, { models } from "finstack-quant-wasm";
+   * import init, { core, models } from "finstack-quant-wasm";
    * await init();
-   * const implied = {
-   *   id: "FLAT",
-   *   expiries: [0.5, 1.0],
-   *   strikes: [90, 100, 110],
-   *   vols_row_major: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
-   *   secondary_axis: "strike" as const,
-   *   interpolation_mode: "vol" as const,
-   *   quote_type: "black_lognormal" as const,
-   * };
+   * const implied = new core.VolSurface(
+   *   "FLAT",
+   *   [0.5, 1.0],
+   *   [90, 100, 110],
+   *   [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+   * );
    * const local = models.volatility.localVolFromImpliedVolSmoothed(implied, [100, 100], 5.0);
    * console.log(local.local_vols.length); // 6
    * ```
-   * @param surface - `VolSurface` object or JSON, as for `localVolFromImpliedVol`.
+   * @param surface - `core.VolSurface` handle, as for `localVolFromImpliedVol`.
    * @param forwards - One forward per surface expiry, as for `localVolFromImpliedVol`.
    * @param sigmaStrikes - Standard deviation of the Gaussian kernel in strike (price) units, non-negative; zero disables smoothing.
    * @returns The `LocalVolSurface` object on the grid of `surface`.
    * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `sigmaStrikes` is negative or non-finite, or for any error of `localVolFromImpliedVol` on the smoothed surface.
    */
   localVolFromImpliedVolSmoothed(
-    surface: generated.core.VolSurface | string,
+    surface: VolSurface,
     forwards: NumericArray,
     sigmaStrikes: number
   ): generated.models.LocalVolSurface;
@@ -29069,27 +29063,27 @@ export interface VolatilityNamespace {
   ): generated.models.ArbitrageReport;
   /**
    * Interpolate a volatility surface; coordinates outside the grid are rejected.
-   * @param surface - `VolSurface` object or JSON in the canonical wire form (`id`, `expiries`, `strikes`, `vols_row_major`, ...), such as a `materializeCube*` result.
+   * @param surface - `core.VolSurface` handle, such as a `materializeCubeTenorSlice` or `materializeFxDeltaSurface` result.
    * @param expiry - Option expiry in years, within the surface grid.
    * @param strike - Strike in the surface's own units, within the surface grid.
    * @returns The interpolated volatility, as a decimal.
-   * @throws Error - Throws a `validation` error if `surface` is malformed or a coordinate is outside the grid.
+   * @throws Error - Throws a `validation` error if a coordinate is outside the grid.
    */
   getSurfaceVol(
-    surface: generated.core.VolSurface | string,
+    surface: VolSurface,
     expiry: number,
     strike: number
   ): number;
   /**
    * Interpolate a volatility surface with flat clamping to the grid edges.
-   * @param surface - `VolSurface` object or JSON in the canonical wire form.
+   * @param surface - `core.VolSurface` handle.
    * @param expiry - Option expiry in years; clamped to the surface grid.
    * @param strike - Strike in the surface's own units; clamped to the surface grid.
    * @returns The interpolated volatility, as a decimal; `NaN` for non-finite coordinates.
-   * @throws Error - Throws a `validation` error if `surface` is malformed.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `expiry` or `strike` is not a number.
    */
   getSurfaceVolClamped(
-    surface: generated.core.VolSurface | string,
+    surface: VolSurface,
     expiry: number,
     strike: number
   ): number;
@@ -29098,60 +29092,60 @@ export interface VolatilityNamespace {
    * @param cube - `core.VolCube` handle.
    * @param expiry - Option expiry in years, within the cube grid.
    * @param strikes - Strictly increasing strikes of the output surface.
-   * @returns The tenor by strike `VolCubeExpirySlice` object in its canonical wire form (`id`, `expiry`, `tenors`, `strikes`, `vols_row_major`, `quote_type`, optional `displacements`).
+   * @returns The tenor by strike `core.VolCubeExpirySlice` handle.
    * @throws Error - Throws a `validation` error if the expiry is outside the cube, the strikes are invalid, or a SABR evaluation fails.
    */
   materializeCubeExpirySlice(
     cube: VolCube,
     expiry: number,
     strikes: NumericArray
-  ): generated.core.VolCubeExpirySlice;
+  ): VolCubeExpirySlice;
   /**
    * Materialize the normal (Bachelier) volatility slice of a SABR cube at one option expiry.
    * @param cube - `core.VolCube` handle.
    * @param expiry - Option expiry in years, within the cube grid.
    * @param strikes - Strictly increasing strikes of the output surface.
-   * @returns The tenor by strike `VolCubeExpirySlice` object of normal volatilities.
+   * @returns The tenor by strike `core.VolCubeExpirySlice` handle of normal volatilities.
    * @throws Error - Throws a `validation` error if the expiry is outside the cube, the strikes are invalid, or a SABR evaluation fails.
    */
   materializeCubeExpirySliceNormal(
     cube: VolCube,
     expiry: number,
     strikes: NumericArray
-  ): generated.core.VolCubeExpirySlice;
+  ): VolCubeExpirySlice;
   /**
    * Materialize the Black volatility slice of a SABR cube at one underlying tenor.
    * @param cube - `core.VolCube` handle.
    * @param tenor - Underlying tenor in years, within the cube grid.
    * @param strikes - Strictly increasing strikes of the output surface.
-   * @returns The expiry by strike `VolSurface` object in its canonical wire form.
+   * @returns The expiry by strike `core.VolSurface` handle.
    * @throws Error - Throws a `validation` error if the tenor is outside the cube, the strikes are invalid, or a SABR evaluation fails.
    */
   materializeCubeTenorSlice(
     cube: VolCube,
     tenor: number,
     strikes: NumericArray
-  ): generated.core.VolSurface;
+  ): VolSurface;
   /**
    * Materialize the normal (Bachelier) volatility slice of a SABR cube at one underlying tenor.
    * @param cube - `core.VolCube` handle.
    * @param tenor - Underlying tenor in years, within the cube grid.
    * @param strikes - Strictly increasing strikes of the output surface.
-   * @returns The expiry by strike `VolSurface` object of normal volatilities.
+   * @returns The expiry by strike `core.VolSurface` handle of normal volatilities.
    * @throws Error - Throws a `validation` error if the tenor is outside the cube, the strikes are invalid, or a SABR evaluation fails.
    */
   materializeCubeTenorSliceNormal(
     cube: VolCube,
     tenor: number,
     strikes: NumericArray
-  ): generated.core.VolSurface;
+  ): VolSurface;
   /**
    * Materialize an FX delta-quoted surface as an expiry by strike volatility surface.
    * @param surface - `core.FxDeltaVolSurface` handle.
    * @param spot - FX spot rate (domestic per unit of foreign); positive.
    * @param domesticRate - Continuously compounded domestic rate, as a decimal.
    * @param foreignRate - Continuously compounded foreign rate, as a decimal.
-   * @returns The strike-space `VolSurface` object in its canonical wire form.
+   * @returns The strike-space `core.VolSurface` handle.
    * @throws Error - Throws a `validation` error if an input is non-finite or out of range or a delta-to-strike conversion fails.
    */
   materializeFxDeltaSurface(
@@ -29159,7 +29153,7 @@ export interface VolatilityNamespace {
     spot: number,
     domesticRate: number,
     foreignRate: number
-  ): generated.core.VolSurface;
+  ): VolSurface;
   /**
    * Durrleman's function `g(k)` of an SVI slice; the slice is free of butterfly
    * arbitrage where `g(k) >= 0`.

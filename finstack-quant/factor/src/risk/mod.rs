@@ -15,10 +15,10 @@ pub use budget::{
 };
 pub use parametric::decompose_factors;
 pub use position::{
-    build_stress_attribution, flatten_position_pnls, flatten_square_matrix,
-    historical_var_decomposition, parametric_var_decomposition, DecompositionMethod,
-    PositionEsContribution, PositionRiskDecomposition, PositionVarContribution, StressAttribution,
-    StressPositionEntry, TailScenarioBreakdown,
+    build_stress_attribution, flatten_position_pnls, historical_var_decomposition,
+    parametric_var_decomposition, DecompositionMethod, PositionEsContribution,
+    PositionRiskDecomposition, PositionVarContribution, StressAttribution, StressPositionEntry,
+    TailScenarioBreakdown,
 };
 pub use residual::apply_residual_contributions;
 pub use types::{

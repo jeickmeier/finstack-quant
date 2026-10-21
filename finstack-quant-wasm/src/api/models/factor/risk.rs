@@ -43,7 +43,8 @@ pub fn parametric_var_decomposition(
     compute_incremental: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
-    use finstack_quant_factor::risk::{flatten_square_matrix, parametric_var_decomposition};
+    use finstack_quant_core::math::linalg::flatten_square_matrix;
+    use finstack_quant_factor::risk::parametric_var_decomposition;
     let ids = js_string_seq(&position_ids, "positionIds")?;
     let weights = js_f64_seq(&weights, "weights")?;
     let covariance = js_f64_matrix(&covariance, "covariance")?;

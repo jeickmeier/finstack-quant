@@ -8,7 +8,7 @@ use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, serde_object_to_single_row_dataframe_with_schema,
 };
-use crate::errors::{core_to_py, correlation_to_py, value_error};
+use crate::errors::{core_to_py, correlation_to_py};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule, PyType};
 
@@ -1258,18 +1258,12 @@ wire_methods!(
 );
 impl_repr_html_via_dataframe!(PyTrancheLossStatistics);
 
-fn record_item<'py>(record: &Bound<'py, PyDict>, key: &str) -> PyResult<Bound<'py, PyAny>> {
-    record
-        .get_item(key)?
-        .ok_or_else(|| value_error(format!("exposure record is missing `{key}`")))
-}
-
 /// Read exposures from a ``list[CreditExposure]`` or a ``pandas.DataFrame``.
 ///
-/// DataFrame records need ``id``, ``notional``, ``lgd``, a PD column named
-/// ``pd`` or ``default_probability``, and loadings as either
-/// ``factor_loading`` (one scalar per name) or ``factor_loadings`` (a list
-/// per name).
+/// A DataFrame's columns are the ``CreditExposure`` serde field names
+/// (``id``, ``notional``, ``default_probability``, ``lgd`` and
+/// ``factor_loadings`` holding one list per name); each record is
+/// deserialized through the Rust type.
 fn extract_exposures(exposures: &Bound<'_, PyAny>) -> PyResult<Vec<CreditExposure>> {
     if let Ok(typed) = exposures.extract::<Vec<PyCreditExposure>>() {
         return Ok(typed.into_iter().map(|exposure| exposure.inner).collect());
@@ -1279,70 +1273,18 @@ fn extract_exposures(exposures: &Bound<'_, PyAny>) -> PyResult<Vec<CreditExposur
     if !exposures.is_instance(&df_type)? {
         return Err(pyo3::exceptions::PyTypeError::new_err(
             "exposures must be a list of CreditExposure or a pandas DataFrame with columns \
-             id, notional, pd (or default_probability), lgd and factor_loading(s)",
+             id, notional, default_probability, lgd and factor_loadings",
         ));
     }
-    let columns: Vec<String> = exposures
-        .getattr("columns")?
-        .call_method0("tolist")?
-        .extract()?;
-    let has = |name: &str| columns.iter().any(|column| column == name);
-    let pd_column = if has("pd") {
-        "pd"
-    } else if has("default_probability") {
-        "default_probability"
-    } else {
-        return Err(value_error(
-            "exposures DataFrame needs a `pd` or `default_probability` column",
-        ));
-    };
-    for required in ["id", "notional", "lgd"] {
-        if !has(required) {
-            return Err(value_error(format!(
-                "exposures DataFrame is missing the `{required}` column"
-            )));
-        }
-    }
-    let loadings_column = if has("factor_loadings") {
-        "factor_loadings"
-    } else if has("factor_loading") {
-        "factor_loading"
-    } else {
-        return Err(value_error(
-            "exposures DataFrame needs a `factor_loading` (scalar) or `factor_loadings` (list) column",
-        ));
-    };
-    let records: Vec<Bound<'_, PyDict>> =
-        exposures.call_method1("to_dict", ("records",))?.extract()?;
-    records
-        .iter()
-        .map(|record| {
-            let get = |key: &str| record_item(record, key);
-            let loadings_value = get(loadings_column)?;
-            let factor_loadings = match loadings_value.extract::<f64>() {
-                Ok(scalar) => vec![scalar],
-                Err(_) => loadings_value.extract::<Vec<f64>>().map_err(|_| {
-                    value_error(format!(
-                        "`{loadings_column}` must hold a float or a list of floats per exposure"
-                    ))
-                })?,
-            };
-            Ok(CreditExposure {
-                id: get("id")?.str()?.to_string(),
-                notional: get("notional")?.extract()?,
-                default_probability: get(pd_column)?.extract()?,
-                lgd: get("lgd")?.extract()?,
-                factor_loadings,
-            })
-        })
-        .collect()
+    let records = exposures.call_method1("to_dict", ("records",))?;
+    crate::bindings::module_utils::py_to_serde(py, &records, "exposures")
 }
 
 /// Simulate a finite portfolio's loss-positive credit-loss distribution.
 ///
 /// ``exposures`` is a ``list[CreditExposure]`` or a ``pandas.DataFrame`` with
-/// columns ``id``, ``notional``, ``pd`` (or ``default_probability``), ``lgd``
-/// and ``factor_loading`` (scalar) or ``factor_loadings`` (list).
+/// the ``CreditExposure`` field names as columns: ``id``, ``notional``,
+/// ``default_probability``, ``lgd`` and ``factor_loadings`` (a list per name).
 ///
 /// Raises ``TypeError`` for other exposure containers, ``ValueError`` for
 /// missing columns or invalid simulation inputs.

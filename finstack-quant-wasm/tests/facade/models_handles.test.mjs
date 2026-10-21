@@ -347,6 +347,15 @@ test('factor handles and helpers follow the Rust accessors', () => {
   const forecast = new factorCredit.FactorCovarianceForecast(model);
   const covariance = forecast.covarianceAt(factorCredit.VolHorizon.oneStep().toString());
   assert.deepEqual(covariance.factor_ids, model.factorIds());
+  // A horizon handle is read through its public `toString()` and stays
+  // usable; the descriptor's JSON object form is accepted as well.
+  const twoSteps = factorCredit.VolHorizon.nSteps(2);
+  const viaHandle = forecast.covarianceAt(twoSteps);
+  assert.deepEqual(forecast.covarianceAt(twoSteps), viaHandle);
+  assert.equal(twoSteps.n, 2);
+  assert.deepEqual(forecast.covarianceAt('{"n_steps": 2}'), viaHandle);
+  assert.deepEqual(forecast.covarianceAt({ n_steps: 2 }), viaHandle);
+  assert.throws(() => forecast.covarianceAt({ n_steps: 'two' }), kind('validation'));
   // A unit `RiskMeasure` variant is its bare wire label; the quoted JSON text
   // of the same label is equivalent.
   const oneStep = factorCredit.VolHorizon.oneStep().toString();
@@ -578,21 +587,24 @@ test('volatility helpers take a VolSurface in its canonical wire form', () => {
     [0.02, 0.5, -0.2, 0.4, Number.NaN, 0.03, 0.5, -0.1, 0.3, Number.NaN],
     [0.03, 0.035]
   );
+  // Materialized surfaces are `core.VolSurface` handles, the type the
+  // surface evaluators take.
   const surface = volatility.materializeCubeTenorSlice(cube, 5, [0.02, 0.03, 0.04]);
-  assert.deepEqual(surface.expiries, [1, 2]);
-  assert.deepEqual(surface.strikes, [0.02, 0.03, 0.04]);
-  assert.equal(surface.vols_row_major.length, 6);
+  assert.ok(surface instanceof core.VolSurface);
+  assert.deepEqual(Array.from(surface.expiries), [1, 2]);
+  assert.deepEqual(Array.from(surface.strikes), [0.02, 0.03, 0.04]);
+  assert.equal(surface.vols.length, 6);
   assert.equal(
     volatility.getSurfaceVol(surface, 1, 0.03),
-    volatility.getSurfaceVol(JSON.stringify(surface), 1, 0.03)
+    volatility.getSurfaceVol(core.VolSurface.fromJson(surface.toJson()), 1, 0.03)
   );
-  assert.equal(volatility.getSurfaceVol(surface, 1, 0.03), surface.vols_row_major[1]);
+  assert.equal(volatility.getSurfaceVol(surface, 1, 0.03), surface.vols[1]);
   assert.throws(() => volatility.getSurfaceVol(surface, 9, 0.03), kind('validation'));
   assert.equal(
     volatility.getSurfaceVolClamped(surface, 9, 0.03),
     volatility.getSurfaceVol(surface, 2, 0.03)
   );
-  assert.throws(() => volatility.getSurfaceVol({ id: 'x' }, 1, 0.03), kind('validation'));
+  assert.throws(() => volatility.getSurfaceVol({ id: 'x' }, 1, 0.03));
   assert.throws(
     () => volatility.materializeCubeTenorSlice(cube, 5, [0.04, 0.03]),
     kind('validation')
@@ -639,7 +651,7 @@ test('LGD replay and uncorrelated factors use checked Rust construction', () => 
 
 test('local volatility is a plain object with free-function twins', () => {
   const smile = [0.24, 0.22, 0.2, 0.19, 0.185];
-  const implied = (rows) => ({
+  const impliedWire = (rows) => ({
     id: 'IMPLIED',
     expiries: [0.25, 0.5, 1.0, 2.0],
     strikes: [80, 90, 100, 110, 120],
@@ -648,6 +660,7 @@ test('local volatility is a plain object with free-function twins', () => {
     interpolation_mode: 'vol',
     quote_type: 'black_lognormal',
   });
+  const implied = (rows) => core.VolSurface.fromJson(impliedWire(rows));
   const forwards = [100.5, 101.0, 102.0, 104.0];
 
   // A flat implied volatility is its own local volatility, under any forwards.
@@ -666,7 +679,10 @@ test('local volatility is a plain object with free-function twins', () => {
   const value = (surface, strike) => volatility.localVolValue(surface, 1.0, strike);
   assert.ok(value(local, 90) - value(local, 110) > 0.22 - 0.19);
   assert.equal(value(local, 100), local.local_vols[2 * 5 + 2]);
-  assert.deepEqual(volatility.localVolFromImpliedVol(JSON.stringify(skew), forwards), local);
+  assert.deepEqual(
+    volatility.localVolFromImpliedVol(core.VolSurface.fromJson(skew.toJson()), forwards),
+    local
+  );
   assert.equal(volatility.localVolValue(JSON.stringify(local), 1.0, 100), value(local, 100));
   const smoothed = volatility.localVolFromImpliedVolSmoothed(skew, forwards, 10.0);
   assert.ok(value(smoothed, 80) - value(smoothed, 120) < value(local, 80) - value(local, 120));
@@ -690,23 +706,25 @@ test('local volatility is a plain object with free-function twins', () => {
     () => volatility.localVolFromImpliedVolSmoothed(skew, forwards, -1),
     message(/sigma_strikes/)
   );
-  const calendar = {
-    ...implied([Array(5).fill(0.25), Array(5).fill(0.25), Array(5).fill(0.15)]),
+  const calendar = core.VolSurface.fromJson({
+    ...impliedWire([Array(5).fill(0.25), Array(5).fill(0.25), Array(5).fill(0.15)]),
     expiries: [0.5, 1.0, 2.0],
-  };
+  });
   assert.throws(
     () => volatility.localVolFromImpliedVol(calendar, [100, 100, 100]),
     message(/calendar arbitrage/)
   );
+  const normalWire = { ...impliedWire(Array(4).fill(smile)), quote_type: 'normal' };
   assert.throws(
-    () => volatility.localVolFromImpliedVol({ ...skew, quote_type: 'normal' }, forwards),
+    () => volatility.localVolFromImpliedVol(core.VolSurface.fromJson(normalWire), forwards),
     kind('validation')
   );
-  assert.throws(
-    () => volatility.localVolFromImpliedVol({ ...skew, extra: 1 }, forwards),
-    kind('validation')
+  // The surface argument is a `core.VolSurface` handle; wire objects are
+  // loaded with `core.VolSurface.fromJson` first.
+  assert.throws(() =>
+    volatility.localVolFromImpliedVol(impliedWire(Array(4).fill(smile)), forwards)
   );
-  assert.throws(() => volatility.localVolFromImpliedVol(42, forwards), invalidType);
+  assert.throws(() => volatility.localVolFromImpliedVol(42, forwards));
   assert.throws(() => volatility.localVolFromImpliedVol(skew, 'forwards'), invalidType);
   assert.throws(() => volatility.localVolFromImpliedVolSmoothed(skew, forwards, '5'), invalidType);
   assert.throws(() => volatility.localVolValue(grid, '1', 100), invalidType);

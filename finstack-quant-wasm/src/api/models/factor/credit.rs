@@ -313,31 +313,19 @@ pub struct JsFactorCovarianceForecast {
     model: finstack_quant_factor::credit::hierarchy::CreditFactorModel,
 }
 
+/// A forecast horizon argument: a `VolHorizon` handle, its descriptor string,
+/// or the descriptor's JSON object form (`{"n_steps": 5}`).
+///
+/// A handle is read through its public `toString()` (the Rust descriptor),
+/// never through wasm-bindgen internals, and the handle stays usable.
 fn parse_vol_horizon(value: &JsValue, label: &str) -> Result<VolHorizon, JsValue> {
-    if value.is_object() {
-        let ptr =
-            js_sys::Reflect::get(value, &JsValue::from("__wbg_ptr")).unwrap_or(JsValue::UNDEFINED);
-        if ptr.as_f64().is_some_and(|p| p > 0.0) {
-            let kind = js_sys::Reflect::get(value, &JsValue::from("kind"))
-                .ok()
-                .and_then(|v| v.as_string());
-            match kind.as_deref() {
-                Some("one_step") => return Ok(VolHorizon::OneStep),
-                Some("unconditional") => return Ok(VolHorizon::Unconditional),
-                Some("n_steps") => {
-                    let n_val = js_sys::Reflect::get(value, &JsValue::from("n"))?;
-                    return Ok(VolHorizon::NSteps(js_uint(&n_val, label)?));
-                }
-                Some("years") => {
-                    let y_val = js_sys::Reflect::get(value, &JsValue::from("yearsValue"))?;
-                    return VolHorizon::years(js_f64(&y_val, label)?).map_err(to_js_err);
-                }
-                _ => {}
-            }
+    if let Some(object) = value.dyn_ref::<js_sys::Object>() {
+        let descriptor = String::from(object.to_string());
+        if let Ok(horizon) = VolHorizon::parse(&descriptor) {
+            return Ok(horizon);
         }
     }
-    let horizon_json = json_text(value, label)?;
-    VolHorizon::parse(&horizon_json).map_err(to_js_err)
+    VolHorizon::parse(&json_text(value, label)?).map_err(to_js_err)
 }
 
 #[wasm_bindgen(js_class = FactorCovarianceForecast)]

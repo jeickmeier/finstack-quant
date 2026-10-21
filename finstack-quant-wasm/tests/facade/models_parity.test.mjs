@@ -280,7 +280,7 @@ const cube = () =>
     [0.02, 0.5, -0.2, 0.4, Number.NaN, 0.03, 0.5, -0.1, 0.3, Number.NaN],
     [0.03, 0.035]
   );
-const surfaceVols = (surface) => surface.vols_row_major;
+const surfaceVols = (surface) => Array.from(surface.vols);
 const discountCurve = (rate) =>
   new core.DiscountCurve({
     id: 'USD-OIS',
@@ -711,12 +711,19 @@ const CASES = {
   },
 
   'volatility.local_vol': () => {
-    const localVol = volatility.localVolFromImpliedVol(LV_IMPLIED, LV_FORWARDS);
+    const localVol = volatility.localVolFromImpliedVol(
+      core.VolSurface.fromJson(LV_IMPLIED),
+      LV_FORWARDS
+    );
     return [
       localVol,
       volatility.localVolValue(localVol, 0.75, 95.0),
       volatility.localVolValue(localVol, 5.0, 60.0),
-      volatility.localVolFromImpliedVolSmoothed(LV_IMPLIED, LV_FORWARDS, 10.0),
+      volatility.localVolFromImpliedVolSmoothed(
+        core.VolSurface.fromJson(LV_IMPLIED),
+        LV_FORWARDS,
+        10.0
+      ),
     ];
   },
   'volatility.svi': () => [
@@ -739,7 +746,7 @@ const CASES = {
       surfaceVols(volatility.materializeCubeExpirySlice(cube(), 1.0, strikes)),
       surfaceVols(volatility.materializeCubeExpirySliceNormal(cube(), 1.0, strikes)),
       volatility.getSurfaceVol(tenorSlice, 1.5, 0.025),
-      volatility.getSurfaceVolClamped(JSON.stringify(tenorSlice), 9.0, 0.5),
+      volatility.getSurfaceVolClamped(tenorSlice, 9.0, 0.5),
     ];
   },
   'volatility.cube_expiry_slice': () => {
@@ -750,14 +757,14 @@ const CASES = {
       [2.0, 5.0],
       [0.02, 0.03, 0.04],
       [0.3, 0.25, 0.27, 0.28, 0.24, 0.26]
-    ).toJson();
+    );
     return [
-      expirySlice,
+      json(expirySlice),
       volatility.getCubeExpirySliceVol(expirySlice, 5.0, 0.025),
-      volatility.getCubeExpirySliceVolClamped(JSON.stringify(expirySlice), 9.0, 0.5),
+      volatility.getCubeExpirySliceVolClamped(expirySlice, 9.0, 0.5),
       volatility.getCubeExpirySliceVol(gridSlice, 3.0, 0.025),
       volatility.getCubeExpirySliceVolClamped(gridSlice, 0.5, 0.01),
-      volatility.getCubeExpirySliceVolClamped(JSON.parse(gridSlice), 9.0, 0.035),
+      volatility.getCubeExpirySliceVolClamped(gridSlice, 9.0, 0.035),
     ];
   },
   'volatility.fx_delta_surface': () =>

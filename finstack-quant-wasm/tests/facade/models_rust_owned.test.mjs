@@ -103,7 +103,15 @@ test('SabrSmile single-strike vol and arbitrage verdict come from Rust', () => {
 test('SabrCalibrator.withShift parses "auto" in Rust and rejects booleans', () => {
   const { SabrCalibrator } = models.volatility;
   new SabrCalibrator().withShift('auto').free();
-  assert.throws(() => new SabrCalibrator().withShift(true), kind('invalid_type', /^shift:/));
+  // The host union is the Rust `SabrShift` serde form: null, a number or "auto".
+  assert.throws(
+    () => new SabrCalibrator().withShift(true),
+    kind('validation', /shift: .*got bool/)
+  );
+  assert.throws(() => new SabrCalibrator().withShift(Number.NaN), kind('invalid_type', /^shift:/));
+  const fixed = new SabrCalibrator().withShift(0.02);
+  assert.equal(fixed.shift, 0.02);
+  assert.equal(fixed.withShift(undefined).shift, null);
   assert.throws(
     () => new SabrCalibrator().withShift('AUTO'),
     kind('validation', /SABR shift must be null\/None, a number, or "auto"/)

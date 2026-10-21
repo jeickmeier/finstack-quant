@@ -246,11 +246,11 @@ impl SabrShift {
     pub const AUTO_KEYWORD: &'static str = "auto";
 }
 
-/// Parse the host keyword form of a shift policy.
+/// Parse the keyword form of a shift policy.
 ///
-/// Only [`SabrShift::AUTO_KEYWORD`] (`"auto"`, case-sensitive) is a keyword;
-/// hosts map their null/None to [`SabrShift::None`] and numbers to
-/// [`SabrShift::Fixed`] themselves.
+/// Only [`SabrShift::AUTO_KEYWORD`] (`"auto"`, case-sensitive) is a keyword.
+/// The full host union (`null`, a number, or `"auto"`) is the serde form; see
+/// the `Deserialize` impl.
 ///
 /// # Examples
 ///
@@ -285,6 +285,91 @@ impl std::fmt::Display for SabrShift {
             Self::Fixed(shift) => write!(f, "{shift}"),
             Self::Auto => f.write_str(Self::AUTO_KEYWORD),
         }
+    }
+}
+
+/// Wire form: `null` for [`SabrShift::None`], the number for
+/// [`SabrShift::Fixed`], and `"auto"` for [`SabrShift::Auto`] — the union the
+/// Python and WASM bindings accept and return.
+impl serde::Serialize for SabrShift {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        match self {
+            Self::None => serializer.serialize_unit(),
+            Self::Fixed(shift) => serializer.serialize_f64(*shift),
+            Self::Auto => serializer.serialize_str(Self::AUTO_KEYWORD),
+        }
+    }
+}
+
+/// Reads the wire form written by `Serialize`: `null`, any number, or the
+/// `"auto"` keyword (through [`std::str::FromStr`]); booleans and every
+/// other shape are rejected.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_models::volatility::sabr::SabrShift;
+///
+/// let parse = |json: &str| serde_json::from_str::<SabrShift>(json);
+/// assert_eq!(parse("null")?, SabrShift::None);
+/// assert_eq!(parse("0.02")?, SabrShift::Fixed(0.02));
+/// assert_eq!(parse("\"auto\"")?, SabrShift::Auto);
+/// assert!(parse("true").is_err());
+/// assert_eq!(serde_json::to_string(&SabrShift::Auto)?, "\"auto\"");
+/// # Ok::<(), serde_json::Error>(())
+/// ```
+impl<'de> serde::Deserialize<'de> for SabrShift {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        struct ShiftVisitor;
+
+        impl serde::de::Visitor<'_> for ShiftVisitor {
+            type Value = SabrShift;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("null, a number, or \"auto\"")
+            }
+
+            fn visit_unit<E: serde::de::Error>(self) -> std::result::Result<SabrShift, E> {
+                Ok(SabrShift::None)
+            }
+
+            fn visit_none<E: serde::de::Error>(self) -> std::result::Result<SabrShift, E> {
+                Ok(SabrShift::None)
+            }
+
+            fn visit_f64<E: serde::de::Error>(self, v: f64) -> std::result::Result<SabrShift, E> {
+                Ok(SabrShift::Fixed(v))
+            }
+
+            fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<SabrShift, E> {
+                Ok(SabrShift::Fixed(v as f64))
+            }
+
+            fn visit_u64<E: serde::de::Error>(self, v: u64) -> std::result::Result<SabrShift, E> {
+                Ok(SabrShift::Fixed(v as f64))
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<SabrShift, E> {
+                v.parse().map_err(E::custom)
+            }
+
+            fn visit_bool<E: serde::de::Error>(
+                self,
+                _v: bool,
+            ) -> std::result::Result<SabrShift, E> {
+                Err(E::custom(format!(
+                    "SABR shift must be null/None, a number, or {:?}; got bool",
+                    SabrShift::AUTO_KEYWORD
+                )))
+            }
+        }
+
+        deserializer.deserialize_any(ShiftVisitor)
     }
 }
 

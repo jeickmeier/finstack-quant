@@ -779,6 +779,55 @@ pub fn unflatten_square(
     Ok(flat.chunks_exact(n).map(<[f64]>::to_vec).collect())
 }
 
+/// Flatten a row-major nested matrix after validating squareness against `n`.
+///
+/// The inverse of [`unflatten_square`]: host bindings use it to turn a
+/// nested `n x n` list into the row-major buffer the matrix kernels take.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] when the matrix has the
+/// wrong number of rows or any row has the wrong number of columns.
+///
+/// # Arguments
+///
+/// * `matrix` - Row-major nested vector with one inner vector per row.
+/// * `n` - Expected square dimension.
+/// * `label` - Caller-provided label included in validation messages.
+///
+/// # Examples
+///
+/// ```
+/// use finstack_quant_core::math::linalg::flatten_square_matrix;
+/// let flat = flatten_square_matrix(vec![vec![1.0, 2.0], vec![3.0, 4.0]], 2, "cov")?;
+/// assert_eq!(flat, vec![1.0, 2.0, 3.0, 4.0]);
+/// assert!(flatten_square_matrix(vec![vec![1.0, 2.0]], 2, "cov").is_err());
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn flatten_square_matrix(
+    matrix: Vec<Vec<f64>>,
+    n: usize,
+    label: &str,
+) -> crate::Result<Vec<f64>> {
+    if matrix.len() != n {
+        return Err(crate::Error::Validation(format!(
+            "{label} must have {n} rows, got {}",
+            matrix.len()
+        )));
+    }
+    let mut flat = Vec::with_capacity(n * n);
+    for (index, row) in matrix.into_iter().enumerate() {
+        if row.len() != n {
+            return Err(crate::Error::Validation(format!(
+                "{label} row {index} must have {n} columns, got {}",
+                row.len()
+            )));
+        }
+        flat.extend(row);
+    }
+    Ok(flat)
+}
+
 /// Copy a dense matrix into nested rows (`rows[i][j] == matrix[(i, j)]`).
 ///
 /// The row-major nested form is the shape the host bindings exchange and the
@@ -1404,6 +1453,17 @@ pub fn ledoit_wolf_shrinkage(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn flatten_square_matrix_validates_shape() {
+        let flat = flatten_square_matrix(vec![vec![1.0, 2.0], vec![3.0, 4.0]], 2, "cov")
+            .expect("valid matrix");
+        assert_eq!(flat, vec![1.0, 2.0, 3.0, 4.0]);
+        assert!(flatten_square_matrix(vec![vec![1.0, 2.0]], 2, "cov").is_err());
+        assert!(
+            flatten_square_matrix(vec![vec![1.0, 2.0, 3.0], vec![1.0, 2.0]], 2, "cov").is_err()
+        );
+    }
 
     /// A dimension whose square overflows `usize` on this target, so an
     /// unchecked `n * n` wraps (to 0 for `2^(BITS/2)`) and a wrong-length
