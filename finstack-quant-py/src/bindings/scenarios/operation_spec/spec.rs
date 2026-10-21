@@ -146,7 +146,7 @@ impl PyOperationSpec {
     /// Node-level basis-point shifts on a curve.
     ///
     /// ``nodes`` is a list of ``(tenor, bp)`` pairs; ``match_mode``
-    /// (``TenorMatchMode | str``) defaults to ``"exact"``.
+    /// (``TenorMatchMode | str``) defaults to ``"interpolate"``.
     #[classmethod]
     #[pyo3(signature = (curve_kind, curve_id, nodes, match_mode=None, discount_curve_id=None))]
     fn curve_node_bp(
@@ -183,7 +183,7 @@ impl PyOperationSpec {
     /// Node-level shocks to a volatility-index curve in absolute index points.
     ///
     /// ``nodes`` is a list of ``(tenor, points)`` pairs; ``match_mode``
-    /// (``TenorMatchMode | str``) defaults to ``"exact"``.
+    /// (``TenorMatchMode | str``) defaults to ``"interpolate"``.
     #[classmethod]
     #[pyo3(signature = (curve_id, nodes, match_mode=None))]
     fn vol_index_node_pts(

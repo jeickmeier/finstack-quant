@@ -20,7 +20,10 @@ fn detachment_matches(requested: f64, detachment: f64) -> bool {
     (requested - detachment).abs() <= BASE_CORR_DETACHMENT_MATCH_TOLERANCE
 }
 
+/// Clamp and no-match warnings for a base-correlation shock; `op` names the
+/// scenario operation in the warning detail.
 fn bump_warnings(
+    op: &str,
     ctx: &ExecutionContext,
     surface_id: &CurveId,
     detachments: Option<&[f64]>,
@@ -62,7 +65,7 @@ fn bump_warnings(
             Some(Warning::CorrelationClamped {
                 instrument_id: surface_id.as_str().to_string(),
                 detail: format!(
-                    "BaseCorrBucketPts on {surface_id} detachment {detachment:.10} clamped \
+                    "{op} on {surface_id} detachment {detachment:.10} clamped \
                      correlation from requested {bumped:.10} to {clamped:.10}",
                 ),
             })
@@ -76,8 +79,10 @@ fn bump_warnings(
 ///
 /// `detachment_bp` restricts the shock to those detachment points (basis
 /// points, `300` = 3%); `None` shocks every bucket, which is the parallel
-/// shock.
+/// shock. `op` is the scenario operation name reported in warnings
+/// (`"BaseCorrParallelPts"` or `"BaseCorrBucketPts"`).
 pub(crate) fn base_corr_effects(
+    op: &str,
     surface_id: &CurveId,
     detachment_bp: Option<&[i32]>,
     points: f64,
@@ -97,7 +102,7 @@ pub(crate) fn base_corr_effects(
 
     let mut effects = vec![ScenarioEffect::MarketBump(bump)];
     effects.extend(
-        bump_warnings(ctx, surface_id, dets.as_deref(), points)
+        bump_warnings(op, ctx, surface_id, dets.as_deref(), points)
             .into_iter()
             .map(ScenarioEffect::Warning),
     );

@@ -3023,7 +3023,8 @@ class OperationSpec:
             curves).
         match_mode : TenorMatchMode | str, optional
             Tenor alignment strategy (``"exact"`` or ``"interpolate"``).
-            Defaults to exact matching.
+            Defaults to ``"interpolate"`` (key-rate bump at the requested
+            tenor); ``"exact"`` requires a matching pillar.
         discount_curve_id : str, optional
             Discount curve used when re-bootstrapping shocked ParCDS quotes.
 
@@ -3092,6 +3093,8 @@ class OperationSpec:
             List of ``(tenor, points)`` pairs.
         match_mode : TenorMatchMode | str, optional
             Tenor alignment strategy (``"exact"`` or ``"interpolate"``).
+            Defaults to ``"interpolate"`` (key-rate bump at the requested
+            tenor); ``"exact"`` requires a matching pillar.
 
         Returns
         -------
