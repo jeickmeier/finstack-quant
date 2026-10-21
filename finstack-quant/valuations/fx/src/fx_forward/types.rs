@@ -591,8 +591,6 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxForward {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        self.validate()?;
-
         // End-of-day policy: the settlement legs remain live on maturity.
         if crate::shared::event_has_occurred(self.maturity, as_of) {
             return Ok(finstack_quant_core::money::Money::from((
@@ -626,27 +624,15 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxForward {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
-        // Project invariant: FX-policy visibility per layer. Record whether
-        // the spot was a direct quote or triangulated through the matrix
-        // pivot. `quoted_spot` short-circuits the matrix lookup, so
-        // there is no triangulation to report in that case.
-        use finstack_quant_core::money::fx::FxQuery;
-        let fx_triangulated = if self.quoted_spot.is_some() {
-            None
-        } else {
-            market
-                .fx()
-                .and_then(|fx| {
-                    fx.rate(FxQuery::new(self.base_currency, self.quote_currency, as_of))
-                        .ok()
-                })
-                .map(|q| q.triangulated)
-        };
-        Some(
-            finstack_quant_valuations_core::results::ValuationDetails::Fx(
-                finstack_quant_valuations_core::results::FxValuationDetails { fx_triangulated },
-            ),
-        )
+        // FX-policy visibility per layer; `quoted_spot` short-circuits the
+        // matrix lookup, so triangulation does not apply then.
+        Some(crate::shared::fx_valuation_details(
+            market,
+            self.base_currency,
+            self.quote_currency,
+            as_of,
+            self.quoted_spot.is_some(),
+        ))
     }
 
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
@@ -660,18 +646,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         self.validate()?;
         if crate::shared::event_has_occurred(self.maturity, as_of) {
-            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
-                Vec::new(),
-                finstack_quant_core::dates::DayCount::Act365F,
-                finstack_quant_cashflows::ScheduleBuildOpts {
-                    notional_hint: Some(Money::from((0_i64, self.base_currency))),
-                    meta: finstack_quant_cashflows::builder::CashFlowMeta {
-                        representation:
-                            finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual,
-                        ..Default::default()
-                    },
-                },
-            ));
+            return Ok(crate::shared::settled_schedule(Some(Money::from((
+                0_i64,
+                self.base_currency,
+            )))));
         }
         let contract_rate = self.contractual_forward_rate(market, as_of)?;
         let base_amount = Money::new(self.notional.amount(), self.base_currency)?;

@@ -253,6 +253,8 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxDigitalOption
 }
 
 impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxDigitalOption {
+    // Batch the five closed-form greeks through one pricer call; the metric
+    // layer reads the requested field.
     fn option_greeks(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -260,71 +262,27 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxDig
         request: &finstack_quant_valuations_core::instruments::OptionGreeksRequest,
     ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::OptionGreeks>
     {
-        let mut greeks = finstack_quant_valuations_core::instruments::OptionGreeks::default();
+        use finstack_quant_valuations_core::instruments::{OptionGreekKind, OptionGreeks};
+
         match request.greek {
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Delta => {
-                greeks.delta = self.option_delta(market, as_of, request.bumps)?
+            OptionGreekKind::Delta
+            | OptionGreekKind::Gamma
+            | OptionGreekKind::Vega
+            | OptionGreekKind::Theta
+            | OptionGreekKind::Rho => {
+                let greeks = pricer::compute_greeks(self, market, as_of)?;
+                Ok(OptionGreeks {
+                    delta: Some(greeks.delta),
+                    gamma: Some(greeks.gamma),
+                    vega: Some(greeks.vega),
+                    theta: Some(greeks.theta),
+                    // Rho domestic per 1bp.
+                    rho_bp: Some(greeks.rho_domestic / 100.0),
+                    ..OptionGreeks::default()
+                })
             }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Gamma => {
-                greeks.gamma = self.option_gamma(market, as_of, request.bumps)?
-            }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Vega => {
-                greeks.vega = self.option_vega(market, as_of, request.bumps)?
-            }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Theta => {
-                greeks.theta = self.option_theta(market, as_of, request.bumps)?
-            }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Rho => {
-                greeks.rho_bp = self.option_rho_bp(market, as_of, request.bumps)?
-            }
-            _ => {}
+            _ => Ok(OptionGreeks::default()),
         }
-        Ok(greeks)
-    }
-}
-impl FxDigitalOption {
-    fn option_delta(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(Some(pricer::compute_greeks(self, market, as_of)?.delta))
-    }
-    fn option_gamma(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(Some(pricer::compute_greeks(self, market, as_of)?.gamma))
-    }
-    fn option_vega(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(Some(pricer::compute_greeks(self, market, as_of)?.vega))
-    }
-    fn option_theta(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(Some(pricer::compute_greeks(self, market, as_of)?.theta))
-    }
-    fn option_rho_bp(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        // Rho domestic per 1bp
-        Ok(Some(
-            pricer::compute_greeks(self, market, as_of)?.rho_domestic / 100.0,
-        ))
     }
 }
 

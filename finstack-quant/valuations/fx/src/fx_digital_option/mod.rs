@@ -52,7 +52,7 @@
 //! # See Also
 //!
 //! - [`FxDigitalOption`](crate::fx_digital_option::FxDigitalOption) for the instrument struct
-//! - `pricer::FxDigitalOptionCalculator` for pricing calculations
+//! - `pricer::compute_pv` and `pricer::compute_greeks` for pricing calculations
 
 /// FX digital option risk metrics
 pub(crate) mod metrics;

@@ -10,8 +10,7 @@
 //!   `GenericFx01Calculator`
 //! - DV01 (domestic) and DV01 (foreign)
 
-mod ir01_domestic;
-mod ir01_foreign;
+mod ir01;
 
 use crate::fx_swap::pricing_helper::FxSwapPricingContext;
 use crate::fx_swap::FxSwap;
@@ -34,8 +33,8 @@ pub(crate) fn register_fx_swap_metrics(
         metrics: [
             (Fx01, GenericFx01Calculator),
             (FxDelta, GenericFx01Calculator),
-            (Dv01Domestic, ir01_domestic::DomesticIR01),
-            (Dv01Foreign, ir01_foreign::ForeignIR01),
+            (Dv01Domestic, ir01::FxSwapIr01(ir01::Ir01Curve::Domestic)),
+            (Dv01Foreign, ir01::FxSwapIr01(ir01::Ir01Curve::Foreign)),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
         ],

@@ -369,8 +369,6 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxSwap {
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         use super::pricing_helper::FxSwapPricingContext;
 
-        self.validate()?;
-
         // End-of-day policy: far-leg settlement remains live on its event date.
         if crate::shared::event_has_occurred(self.far_date, as_of) {
             return Ok(finstack_quant_core::money::Money::from((
@@ -403,18 +401,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
 
         self.validate()?;
         if crate::shared::event_has_occurred(self.far_date, as_of) {
-            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
-                Vec::new(),
-                finstack_quant_core::dates::DayCount::Act365F,
-                finstack_quant_cashflows::ScheduleBuildOpts {
-                    notional_hint: Some(Money::from((0_i64, self.base_currency))),
-                    meta: finstack_quant_cashflows::builder::CashFlowMeta {
-                        representation:
-                            finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual,
-                        ..Default::default()
-                    },
-                },
-            ));
+            return Ok(crate::shared::settled_schedule(Some(Money::from((
+                0_i64,
+                self.base_currency,
+            )))));
         }
 
         let ctx = FxSwapPricingContext::build(self, curves, as_of)?;

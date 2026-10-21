@@ -67,28 +67,21 @@ fn collect_quanto_inputs(
         let fx_vol_surface = curves.get_surface(fx_vol_surface_id.as_str())?;
         fx_vol_surface.require_quote_type(VolQuoteType::BlackLognormal)?;
         fx_vol_surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
-        let fx_spot = resolve_quanto_fx_spot(inst, curves, as_of);
-        match fx_spot {
-            Some(s_fx) if s_fx.is_finite() && s_fx > 0.0 => {
-                let atm_fwd_fx = s_fx * ((r_dom - r_for) * t).exp();
-                debug_assert!(
-                    atm_fwd_fx.is_finite() && atm_fwd_fx > 0.0,
-                    "ATM forward FX must be positive finite, got {atm_fwd_fx} \
-                     (spot={s_fx}, r_dom={r_dom}, r_for={r_for}, t={t})"
-                );
-                finstack_quant_models::volatility::get_surface_vol_clamped(
-                    &fx_vol_surface,
-                    t,
-                    atm_fwd_fx,
-                )
-            }
-            _ => {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "QuantoOption '{}': FX spot is required to select ATM-forward FX volatility; configure fx_spot_id or populate the FX matrix",
-                    inst.id
-                )));
-            }
-        }
+        let s_fx = crate::shared::resolve_fx_spot(
+            curves,
+            as_of,
+            inst.base_currency,
+            inst.quote_currency,
+            inst.fx_spot_id.as_ref(),
+            "QuantoOption",
+        )?;
+        let atm_fwd_fx = s_fx * ((r_dom - r_for) * t).exp();
+        debug_assert!(
+            atm_fwd_fx.is_finite() && atm_fwd_fx > 0.0,
+            "ATM forward FX must be positive finite, got {atm_fwd_fx} \
+             (spot={s_fx}, r_dom={r_dom}, r_for={r_for}, t={t})"
+        );
+        finstack_quant_models::volatility::get_surface_vol_clamped(&fx_vol_surface, t, atm_fwd_fx)
     } else {
         return Err(finstack_quant_core::Error::from(
             finstack_quant_core::InputError::NotFound {
@@ -98,22 +91,6 @@ fn collect_quanto_inputs(
     };
 
     Ok((spot, r_dom, r_for, q, sigma_equity, sigma_fx, t))
-}
-
-/// Resolve the FX spot for the quanto's base/quote pair, preferring an
-/// explicit scalar id (`fx_spot_id`) over the market `FxMatrix`. Returns
-/// `None` when neither source is available, letting the caller decide
-/// whether to fall back to a moneyness-1.0 lookup.
-fn resolve_quanto_fx_spot(inst: &QuantoOption, curves: &MarketContext, as_of: Date) -> Option<f64> {
-    use finstack_quant_core::money::fx::FxQuery;
-    if let Some(fx_id) = &inst.fx_spot_id {
-        if let Ok(scalar) = curves.get_price(fx_id) {
-            return Some(finstack_quant_valuations_core::metrics::scalar_numeric_value(scalar));
-        }
-    }
-    let fx = curves.fx()?;
-    let quote = FxQuery::new(inst.base_currency, inst.quote_currency, as_of);
-    fx.rate(quote).ok().map(|q| q.rate)
 }
 
 fn payoff_scale(inst: &QuantoOption) -> finstack_quant_core::Result<f64> {
@@ -130,6 +107,23 @@ fn payoff_scale(inst: &QuantoOption) -> finstack_quant_core::Result<f64> {
                 .to_string(),
         )),
     }
+}
+
+/// Expiry value: the foreign-currency intrinsic converted at the contractual
+/// fixed FX rate via [`payoff_scale`].
+fn quanto_intrinsic(quanto: &QuantoOption, spot: f64) -> std::result::Result<Money, PricingError> {
+    let scale = payoff_scale(quanto)?;
+    let strike = quanto.strike;
+    let intrinsic_unit = match quanto.option_type {
+        finstack_quant_valuations_core::instruments::OptionType::Call => (spot - strike).max(0.0),
+        finstack_quant_valuations_core::instruments::OptionType::Put => (strike - spot).max(0.0),
+    };
+    Money::new(intrinsic_unit * scale, quanto.quote_currency).map_err(|error| {
+        PricingError::from_core(
+            error,
+            finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(quanto),
+        )
+    })
 }
 
 /// Quanto option analytical pricer.
@@ -156,29 +150,14 @@ impl Pricer for QuantoOptionAnalyticalPricer {
             ));
         }
 
-        if as_of >= quanto.expiry {
+        if as_of == quanto.expiry {
             let spot = finstack_quant_valuations_core::metrics::scalar_numeric_value(
                 market.get_price(&quanto.spot_id)?,
             );
-            let scale = payoff_scale(quanto)?;
-            let strike = quanto.strike;
-            let intrinsic_unit = match quanto.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
-                    (spot - strike).max(0.0)
-                }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
-                    (strike - spot).max(0.0)
-                }
-            };
             return Ok(ValuationResult::stamped(
                 quanto.id(),
                 as_of,
-                Money::new(intrinsic_unit * scale, quanto.quote_currency).map_err(|error| {
-                    finstack_quant_valuations_core::pricer::PricingError::from_core(
-                        error,
-                        finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(quanto),
-                    )
-                })?,
+                quanto_intrinsic(quanto, spot)?,
             ));
         }
 
@@ -186,29 +165,13 @@ impl Pricer for QuantoOptionAnalyticalPricer {
             collect_quanto_inputs(quanto, market, as_of)?;
 
         if t <= 0.0 {
-            // Expiry convention: settle at intrinsic (consistent with the
-            // FxOption/digital/barrier siblings) rather than returning 0.
-            // The quanto payoff converts the foreign-currency intrinsic at
-            // the contractual fixed FX rate via `payoff_scale`.
-            let scale = payoff_scale(quanto)?;
-            let strike = quanto.strike;
-            let intrinsic_unit = match quanto.option_type {
-                finstack_quant_valuations_core::instruments::OptionType::Call => {
-                    (spot - strike).max(0.0)
-                }
-                finstack_quant_valuations_core::instruments::OptionType::Put => {
-                    (strike - spot).max(0.0)
-                }
-            };
+            // Zero year fraction before expiry (e.g. 30/360 month ends):
+            // settle at intrinsic, consistent with the FxOption/digital/barrier
+            // siblings, rather than returning 0.
             return Ok(ValuationResult::stamped(
                 quanto.id(),
                 as_of,
-                Money::new(intrinsic_unit * scale, quanto.quote_currency).map_err(|error| {
-                    finstack_quant_valuations_core::pricer::PricingError::from_core(
-                        error,
-                        finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(quanto),
-                    )
-                })?,
+                quanto_intrinsic(quanto, spot)?,
             ));
         }
 
