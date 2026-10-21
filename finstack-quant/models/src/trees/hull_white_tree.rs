@@ -779,96 +779,6 @@ impl HullWhiteTree {
         (p_0_tt / p_0_t) * (-b * (x + shift) - var_term).exp()
     }
 
-    /// Compute forward swap rate S(t) at node (step, node_idx).
-    ///
-    /// The forward swap rate is computed as:
-    /// ```text
-    /// S(t) = [P(t, T_start) - P(t, T_end)] / A(t)
-    /// ```
-    ///
-    /// where A(t) = Σᵢ τᵢ P(t, Tᵢ) is the annuity.
-    ///
-    /// # Arguments
-    ///
-    /// * `step` - Current time step
-    /// * `node_idx` - Node index
-    /// * `swap_start_time` - Swap start time (year fraction)
-    /// * `swap_end_time` - Swap end time (year fraction)
-    /// * `payment_times` - Payment date times (year fractions)
-    /// * `accrual_fractions` - Accrual fractions for each period
-    /// * `discount_curve` - Initial yield curve
-    #[allow(clippy::too_many_arguments)]
-    pub fn forward_swap_rate(
-        &self,
-        step: usize,
-        node_idx: usize,
-        swap_start_time: f64,
-        swap_end_time: f64,
-        payment_times: &[f64],
-        accrual_fractions: &[f64],
-        discount_curve: &dyn Discounting,
-    ) -> f64 {
-        let t = self.time_at_step(step);
-
-        let remaining: Vec<_> = payment_times
-            .iter()
-            .zip(accrual_fractions.iter())
-            .filter(|(&pay_t, _)| pay_t > t)
-            .collect();
-
-        if remaining.is_empty() {
-            return 0.0;
-        }
-
-        // Start discount factor (or 1.0 if already started)
-        let p_start = if swap_start_time > t {
-            self.bond_price(step, node_idx, swap_start_time, discount_curve)
-        } else {
-            1.0
-        };
-
-        let p_end = self.bond_price(step, node_idx, swap_end_time, discount_curve);
-
-        let annuity = self.annuity(
-            step,
-            node_idx,
-            payment_times,
-            accrual_fractions,
-            discount_curve,
-        );
-
-        if annuity.abs() < 1e-12 {
-            return 0.0;
-        }
-
-        (p_start - p_end) / annuity
-    }
-
-    /// Compute annuity (PV01) at node (step, node_idx).
-    ///
-    /// ```text
-    /// A(t) = Σᵢ τᵢ P(t, Tᵢ)
-    /// ```
-    ///
-    /// Only includes payments occurring after time t.
-    pub fn annuity(
-        &self,
-        step: usize,
-        node_idx: usize,
-        payment_times: &[f64],
-        accrual_fractions: &[f64],
-        discount_curve: &dyn Discounting,
-    ) -> f64 {
-        let t = self.time_at_step(step);
-
-        payment_times
-            .iter()
-            .zip(accrual_fractions.iter())
-            .filter(|(&pay_t, _)| pay_t > t)
-            .map(|(&pay_t, &tau)| tau * self.bond_price(step, node_idx, pay_t, discount_curve))
-            .sum()
-    }
-
     /// Price an instrument using backward induction.
     ///
     /// # Arguments
@@ -1256,8 +1166,12 @@ mod tests {
         let payment_times: Vec<f64> = (1..=10).map(|period| period as f64 * 0.5).collect();
         let accrual_fractions = [0.5; 10];
 
-        let tree_forward =
-            tree.forward_swap_rate(0, 0, 0.0, 5.0, &payment_times, &accrual_fractions, &curve);
+        let tree_annuity: f64 = payment_times
+            .iter()
+            .zip(accrual_fractions.iter())
+            .map(|(&payment_time, &accrual)| accrual * tree.bond_price(0, 0, payment_time, &curve))
+            .sum();
+        let tree_forward = (1.0 - tree.bond_price(0, 0, 5.0, &curve)) / tree_annuity;
         let market_annuity: f64 = payment_times
             .iter()
             .zip(accrual_fractions.iter())

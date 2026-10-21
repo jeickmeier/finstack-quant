@@ -48,16 +48,25 @@ impl Discretization<GbmProcess> for ExactGbm {
 
         // Drift component: ∫(r−q) − ½σ²Δt
         let drift = drift_increment - 0.5 * params.sigma * params.sigma * dt;
-
-        // Diffusion component: σ√Δt Z
-        let diffusion = params.sigma * dt.sqrt() * z[0];
-
-        x[0] *= (drift + diffusion).exp();
+        x[0] *= gbm_growth(drift, params.sigma, dt, z[0]);
     }
 
     fn work_size(&self, _process: &GbmProcess) -> usize {
         0 // No workspace needed
     }
+}
+
+/// Exact one-step GBM growth factor `exp(drift + σ√Δt·z)`.
+///
+/// # Arguments
+///
+/// * `drift` - Log-drift over the step, `∫(r−q)dt − ½σ²Δt`, as a decimal.
+/// * `sigma` - Annualized volatility over the step.
+/// * `dt` - Step length in years.
+/// * `z` - Standard normal shock.
+#[inline]
+pub(crate) fn gbm_growth(drift: f64, sigma: f64, dt: f64, z: f64) -> f64 {
+    (drift + sigma * dt.sqrt() * z).exp()
 }
 
 /// Exact discretization for multi-factor GBM.
