@@ -5,15 +5,13 @@ use pyo3::prelude::*;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::module_utils::opt_spec_from_py;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::{enum_to_py_string, money_to_py};
-use crate::errors::value_error;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetType, BalloonSpec, LiquidationSpec, PoolAsset, PrepaymentPenalty, SpecialServicingSpec,
 };
-
-use super::super::instruments::enum_from_str;
 
 /// One loan-level collateral row of an [`AssetPool`](super::PyAssetPool):
 /// the contractual terms (balance, coupon or index + spread, maturity, day
@@ -67,17 +65,6 @@ fn opt_date(
     value: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Option<finstack_quant_core::dates::Date>> {
     value.map(py_to_date).transpose()
-}
-
-/// Deserialize an optional dict / JSON string sub-spec.
-fn opt_spec<T: serde::de::DeserializeOwned + Send>(
-    py: Python<'_>,
-    value: Option<&Bound<'_, PyAny>>,
-    label: &str,
-) -> PyResult<Option<T>> {
-    value
-        .map(|obj| crate::bindings::module_utils::py_to_serde(py, obj, label))
-        .transpose()
 }
 
 crate::bindings::macros::wire_methods!(PyPoolAsset, PoolAsset, "PoolAsset", to_dict);
@@ -244,14 +231,15 @@ impl PyPoolAsset {
         let asset_type: AssetType =
             crate::bindings::module_utils::py_to_serde(py, asset_type, "asset_type")?;
         let rating: Option<CreditRating> = rating
-            .map(|value| enum_from_str(value, "rating"))
+            .map(|value| value.parse().map_err(crate::errors::core_to_py))
             .transpose()?;
-        let balloon: Option<BalloonSpec> = opt_spec(py, balloon, "balloon")?;
+        let balloon: Option<BalloonSpec> = opt_spec_from_py(py, balloon, "balloon")?;
         let prepayment_penalty: Option<PrepaymentPenalty> =
-            opt_spec(py, prepayment_penalty, "prepayment_penalty")?;
+            opt_spec_from_py(py, prepayment_penalty, "prepayment_penalty")?;
         let special_servicing: Option<SpecialServicingSpec> =
-            opt_spec(py, special_servicing, "special_servicing")?;
-        let liquidation: Option<LiquidationSpec> = opt_spec(py, liquidation, "liquidation")?;
+            opt_spec_from_py(py, special_servicing, "special_servicing")?;
+        let liquidation: Option<LiquidationSpec> =
+            opt_spec_from_py(py, liquidation, "liquidation")?;
         let inner = PoolAsset {
             id: InstrumentId::new(id.to_string()),
             asset_type,
@@ -579,31 +567,3 @@ crate::bindings::macros::py_getters!(PyPoolAsset |s| {
     /// Annual net operating income, or ``None``.
     noi -> Option<PyMoney> = s.inner.noi.map(money_to_py);
 });
-
-/// Coerce ``Sequence[PoolAsset | dict] | str`` into Rust asset rows.
-pub(crate) fn pool_assets_from_py(
-    py: Python<'_>,
-    value: &Bound<'_, PyAny>,
-) -> PyResult<Vec<PoolAsset>> {
-    if let Ok(json) = value.extract::<std::borrow::Cow<'_, str>>() {
-        return serde_json::from_str(&json)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid assets JSON"));
-    }
-    let items = value.try_iter().map_err(|_| {
-        value_error(
-            "assets: expected a sequence of PoolAsset objects or dicts, or a JSON array string",
-        )
-    })?;
-    let mut assets = Vec::new();
-    for item in items {
-        let item = item?;
-        if let Ok(asset) = item.cast::<PyPoolAsset>() {
-            assets.push(asset.borrow().inner.clone());
-        } else {
-            assets.push(crate::bindings::module_utils::py_to_serde(
-                py, &item, "assets",
-            )?);
-        }
-    }
-    Ok(assets)
-}

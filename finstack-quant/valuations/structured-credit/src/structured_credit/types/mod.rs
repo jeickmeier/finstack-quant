@@ -28,6 +28,7 @@ pub(crate) mod tranches;
 pub(crate) mod waterfall;
 
 mod constructors;
+pub use constructors::StandardDealParams;
 mod instrument;
 mod pricing_methods;
 mod resolved;

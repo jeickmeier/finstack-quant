@@ -29,7 +29,7 @@ pub mod structured;
 use crate::api::core::currency::JsCurrency;
 use crate::api::core::dates::{JsDayCount, JsTenor};
 use crate::api::core::money::JsMoney;
-use crate::utils::input::{js_string, json_text};
+use crate::utils::input::js_string;
 use crate::utils::{date_to_iso, parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
@@ -129,31 +129,20 @@ pub(super) mod get {
 }
 
 /// JavaScript argument → Rust setter type conversions used by the setter macro.
+///
+/// The macro dispatches `arg::$conv`, so each conversion has a one-word name;
+/// most are the `utils` input helpers themselves. Code outside the macros
+/// calls `utils::input` / `utils::wire` directly.
 pub(super) mod arg {
     use super::*;
-    use crate::utils::input::{from_js_json, js_bool, js_f64, js_uint};
-    pub(crate) use crate::utils::wire::js_wire;
-    use serde::de::DeserializeOwned;
-
-    fn invalid(label: &str, error: impl std::fmt::Display) -> JsValue {
-        to_js_err(finstack_quant_core::Error::Validation(format!(
-            "{label}: {error}"
-        )))
-    }
+    pub(crate) use crate::utils::input::{
+        from_js_json as json, js_bool as flag, js_f64 as num, js_string as text, js_uint as uint,
+    };
+    pub(crate) use crate::utils::wire::{js_date as date, js_wire as en};
 
     /// A string identifier (instrument, curve, calendar or price id).
     pub(crate) fn id<T: From<String>>(value: &JsValue, label: &str) -> Result<T, JsValue> {
         js_string(value, label).map(T::from)
-    }
-
-    /// A plain string.
-    pub(crate) fn text(value: &JsValue, label: &str) -> Result<String, JsValue> {
-        js_string(value, label)
-    }
-
-    /// An ISO-8601 date string.
-    pub(crate) fn date(value: &JsValue, label: &str) -> Result<Date, JsValue> {
-        parse_iso_date(&js_string(value, label)?)
     }
 
     /// An array of ISO-8601 date strings.
@@ -164,47 +153,15 @@ pub(super) mod arg {
             .collect()
     }
 
-    /// A JavaScript number.
-    pub(crate) fn num(value: &JsValue, label: &str) -> Result<f64, JsValue> {
-        js_f64(value, label)
-    }
-
     /// A JavaScript number stored as an exact `Decimal`.
     pub(crate) fn dec(value: &JsValue, label: &str) -> Result<Decimal, JsValue> {
-        finstack_quant_core::decimal::f64_to_decimal(js_f64(value, label)?)
-            .map_err(|error| invalid(label, error))
+        finstack_quant_core::decimal::f64_to_decimal(crate::utils::input::js_f64(value, label)?)
+            .map_err(|error| {
+                to_js_err(finstack_quant_core::Error::Validation(format!(
+                    "{label}: {error}"
+                )))
+            })
     }
-
-    /// A non-negative whole number.
-    pub(crate) fn uint<T: TryFrom<u64>>(value: &JsValue, label: &str) -> Result<T, JsValue> {
-        js_uint(value, label)
-    }
-
-    /// A boolean.
-    pub(crate) fn flag(value: &JsValue, label: &str) -> Result<bool, JsValue> {
-        js_bool(value, label)
-    }
-
-    /// A serde string enum (for example `"pay"` or `"act_360"`).
-    pub(crate) fn en<T: DeserializeOwned>(value: &JsValue, label: &str) -> Result<T, JsValue> {
-        serde_json::from_value(serde_json::Value::String(js_string(value, label)?))
-            .map_err(|error| invalid(label, error))
-    }
-
-    /// A nested spec as a plain object or JSON string.
-    pub(crate) fn json<T: DeserializeOwned>(value: &JsValue, label: &str) -> Result<T, JsValue> {
-        from_js_json(value, label)
-    }
-}
-
-/// Parse a market-context argument (JSON string or plain object).
-pub(super) fn market(market_json: &JsValue) -> Result<MarketContext, JsValue> {
-    serde_json::from_str(&json_text(market_json, "marketJson")?).map_err(to_js_err)
-}
-
-/// Parse the `asOf` valuation date argument.
-pub(super) fn as_of(as_of: &JsValue) -> Result<Date, JsValue> {
-    parse_iso_date(&js_string(as_of, "asOf")?)
 }
 
 /// The instrument as its compact canonical v1 envelope.
@@ -229,7 +186,7 @@ pub(super) fn metric_value(
     let instrument =
         finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(instrument, None)
             .map_err(to_js_err)?;
-    let market = market(market_json)?;
+    let market = super::pricing::parse_market(market_json)?;
     let as_of = js_string(as_of, "asOf")?;
     let model = crate::utils::input::js_opt_string(model, "model")?;
     finstack_quant_valuations::pricer::metric_value(

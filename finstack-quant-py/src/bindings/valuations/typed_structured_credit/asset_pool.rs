@@ -2,18 +2,17 @@ use pyo3::prelude::*;
 
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::valuations::convert::{
-    currency_from_py, enum_to_py_string, money_from_py, money_to_py,
+    currency_from_py, enum_to_py_string, money_from_py, money_to_py, typed_list_from_py,
 };
 use crate::bindings::valuations::instruments::{PyBond, PyTermLoan};
 use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
 use crate::errors::serde_json_to_py;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, CallExercisePolicy, DealType, InstrumentCollateral, InstrumentExerciseOverride,
-    PutExercisePolicy, ReinvestmentPeriod, ReserveInterestDestination,
+    PutExercisePolicy, ReinvestmentPeriod,
 };
 
 use super::super::instruments::enum_from_str;
-use super::pool_asset::pool_assets_from_py;
 use super::{PyPoolAsset, PyRepLine};
 
 /// Parse an internally tagged policy/destination enum from a bare variant
@@ -149,7 +148,9 @@ impl PyAssetPool {
     ///     If ``value`` does not match the ``PoolAsset`` list shape.
     #[pyo3(text_signature = "($self, value)")]
     fn with_assets(&self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let assets = pool_assets_from_py(py, value)?;
+        let assets = typed_list_from_py(py, value, "assets", |asset: &PyPoolAsset| {
+            asset.inner.clone()
+        })?;
         let mut inner = self.inner.clone();
         inner.assets = assets;
         Ok(Self { inner })
@@ -319,16 +320,16 @@ impl PyAssetPool {
         reserve_interest_destination: Option<&Bound<'_, PyAny>>,
         currency: Option<&str>,
     ) -> PyResult<Self> {
-        let mut inner = self.inner.clone();
-        inner.reserve_account = money_from_py(reserve_account, currency, "reserve_account")?;
-        inner.reserve_account_rate = reserve_account_rate;
-        inner.reserve_target = reserve_target
-            .map(|value| money_from_py(value, currency, "reserve_target"))
-            .transpose()?;
-        inner.reserve_interest_destination = match reserve_interest_destination {
-            Some(value) => tagged_enum_from_py(py, value, "kind", "reserve_interest_destination")?,
-            None => ReserveInterestDestination::default(),
-        };
+        let inner = self.inner.clone().with_reserve(
+            money_from_py(reserve_account, currency, "reserve_account")?,
+            reserve_account_rate,
+            reserve_target
+                .map(|value| money_from_py(value, currency, "reserve_target"))
+                .transpose()?,
+            reserve_interest_destination
+                .map(|value| tagged_enum_from_py(py, value, "kind", "reserve_interest_destination"))
+                .transpose()?,
+        );
         Ok(Self { inner })
     }
 

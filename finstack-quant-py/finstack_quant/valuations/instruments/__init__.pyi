@@ -11894,9 +11894,7 @@ class CdsIndexBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()`` or a dict/JSON entry does not match the constituent shape.
-        TypeError
-            If ``value`` is neither a list nor a string.
+            If the builder was already consumed by ``build()``, ``value`` is neither a sequence nor a string, or a dict/JSON entry does not match the constituent shape.
         """
         ...
     def num_constituents(self, value: int) -> CdsIndexBuilder:

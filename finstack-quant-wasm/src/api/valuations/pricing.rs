@@ -35,8 +35,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::results::ValuationResult;
 use wasm_bindgen::prelude::*;
 
-pub(super) fn parse_market_json(market_json: &str) -> Result<MarketContext, JsValue> {
-    serde_json::from_str(market_json).map_err(to_js_err)
+/// Parse a market-context argument (JSON string or plain object).
+pub(super) fn parse_market(market_json: &JsValue) -> Result<MarketContext, JsValue> {
+    serde_json::from_str(&json_text(market_json, "marketJson")?).map_err(to_js_err)
 }
 
 pub(super) fn parse_pricing_instrument_json(
@@ -275,7 +276,6 @@ pub fn price_instrument(
 ) -> Result<JsValue, JsValue> {
     let instrument_json = json_text(&instrument_json, "instrumentJson")?;
     let mut request = PriceRequest::from_js(
-        &market_json,
         &as_of,
         model.as_ref(),
         metrics.as_ref(),
@@ -283,14 +283,14 @@ pub fn price_instrument(
         market_history.as_ref(),
     )?;
     request.explain = js_opt_bool(explain.as_ref(), "explain")?.unwrap_or(false);
-    request.price(&instrument_json)
+    // Parse the instrument before the market so instrument errors surface first.
+    let instrument = request.instrument(&instrument_json)?;
+    request.price(&instrument, &parse_market(&market_json)?)
 }
 
 /// The converted arguments shared by `priceInstrument` and the typed
 /// instrument classes' `price` methods.
 pub(super) struct PriceRequest {
-    /// Canonical market-context JSON text.
-    pub(super) market_json: String,
     /// ISO-8601 valuation date.
     pub(super) as_of: String,
     /// Pricing-model identifier; `None` selects the instrument default.
@@ -308,7 +308,6 @@ pub(super) struct PriceRequest {
 impl PriceRequest {
     /// Convert the JavaScript pricing arguments, rejecting wrong types.
     pub(super) fn from_js(
-        market_json: &JsValue,
         as_of: &JsValue,
         model: Option<&JsValue>,
         metrics: Option<&JsValue>,
@@ -316,7 +315,6 @@ impl PriceRequest {
         market_history: Option<&JsValue>,
     ) -> Result<Self, JsValue> {
         Ok(Self {
-            market_json: json_text(market_json, "marketJson")?,
             as_of: js_string(as_of, "asOf")?,
             model: js_opt_string(model, "model")?,
             metrics: js_opt_string_seq(metrics, "metrics")?.unwrap_or_default(),
@@ -329,36 +327,35 @@ impl PriceRequest {
         })
     }
 
-    /// Price `instrument_json`, validating the instrument before the market.
-    pub(super) fn price(self, instrument_json: &str) -> Result<JsValue, JsValue> {
-        let instrument = parse_pricing_instrument_json(
-            instrument_json,
-            self.metric_pricing_overrides.as_deref(),
-        )?;
-        self.price_prepared(instrument)
+    /// Parse `instrument_json` with this request's metric-pricing overrides.
+    pub(super) fn instrument(
+        &self,
+        instrument_json: &str,
+    ) -> Result<finstack_quant_valuations::pricer::ParsedInstrument, JsValue> {
+        parse_pricing_instrument_json(instrument_json, self.metric_pricing_overrides.as_deref())
     }
 
-    /// Prepare a native Rust instrument before market conversion.
-    pub(super) fn price_typed(
-        self,
+    /// Prepare a native Rust instrument with this request's metric-pricing overrides.
+    pub(super) fn typed_instrument(
+        &self,
         instrument: Box<dyn finstack_quant_valuations::instruments::Instrument>,
-    ) -> Result<JsValue, JsValue> {
-        let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
+    ) -> Result<finstack_quant_valuations::pricer::ParsedInstrument, JsValue> {
+        finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
             instrument,
             self.metric_pricing_overrides.as_deref(),
         )
-        .map_err(to_js_err)?;
-        self.price_prepared(instrument)
+        .map_err(to_js_err)
     }
 
-    fn price_prepared(
+    /// Price a prepared instrument against `market`.
+    pub(super) fn price(
         self,
-        instrument: finstack_quant_valuations::pricer::ParsedInstrument,
+        instrument: &finstack_quant_valuations::pricer::ParsedInstrument,
+        market: &MarketContext,
     ) -> Result<JsValue, JsValue> {
-        let market = parse_market_json(&self.market_json)?;
         let result = price_result_with_context(
-            &instrument,
-            &market,
+            instrument,
+            market,
             &self.as_of,
             self.model.as_deref().unwrap_or("default"),
             self.metrics,
@@ -396,12 +393,11 @@ pub fn instrument_cashflows(
     model: JsValue,
 ) -> Result<JsValue, JsValue> {
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
     let model: &str = &js_string(&model, "model")?;
     // Parse the instrument before the market so instrument errors surface first.
     let instrument = parse_pricing_instrument_json(instrument_json, None)?;
-    let market = parse_market_json(market_json)?;
+    let market = parse_market(&market_json)?;
     to_js_value(
         &finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
             instrument.as_instrument(),
@@ -568,25 +564,17 @@ pub fn price_instrument_with_market(
     market_history: Option<JsValue>,
     explain: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
-    let model = js_opt_string(model.as_ref(), "model")?;
-    let metric_pricing_overrides =
-        opt_json_text(metric_pricing_overrides.as_ref(), "metricPricingOverrides")?;
-    let market_history = opt_json_text(market_history.as_ref(), "marketHistory")?;
-    let instrument =
-        parse_pricing_instrument_json(instrument_json, metric_pricing_overrides.as_deref())?;
-    let metric_strs = js_opt_string_seq(metrics.as_ref(), "metrics")?.unwrap_or_default();
-    let result = price_result_with_context(
-        &instrument,
-        market.inner(),
-        as_of,
-        model.as_deref().unwrap_or("default"),
-        metric_strs,
-        market_history.as_deref(),
-        js_opt_bool(explain.as_ref(), "explain")?.unwrap_or(false),
+    let instrument_json = json_text(&instrument_json, "instrumentJson")?;
+    let mut request = PriceRequest::from_js(
+        &as_of,
+        model.as_ref(),
+        metrics.as_ref(),
+        metric_pricing_overrides.as_ref(),
+        market_history.as_ref(),
     )?;
-    valuation_result_value(&result)
+    request.explain = js_opt_bool(explain.as_ref(), "explain")?.unwrap_or(false);
+    let instrument = request.instrument(&instrument_json)?;
+    request.price(&instrument, market.inner())
 }
 
 /// Per-flow cashflow envelope using a pre-parsed `MarketContext` handle, as a
@@ -667,7 +655,7 @@ pub(super) mod tests {
         model: Option<&str>,
     ) -> Result<ValuationResult, JsValue> {
         let instrument = parse_pricing_instrument_json(instrument_json, None)?;
-        let market = parse_market_json(market_json)?;
+        let market: MarketContext = serde_json::from_str(market_json).map_err(to_js_err)?;
         price_result_with_context(
             &instrument,
             &market,
@@ -682,7 +670,6 @@ pub(super) mod tests {
     /// A request whose market, date and model are all invalid.
     pub(crate) fn not_a_market_request() -> PriceRequest {
         PriceRequest {
-            market_json: "not-market-json".to_string(),
             as_of: "not-a-date".to_string(),
             model: Some("not-a-model".to_string()),
             metrics: Vec::new(),
@@ -737,7 +724,7 @@ pub(super) mod tests {
 
     #[test]
     fn public_json_routes_validate_instrument_before_market_json() {
-        assert!(not_a_market_request().price("{}").is_err());
+        assert!(not_a_market_request().instrument("{}").is_err());
         assert!(parse_pricing_instrument_json("{}", None).is_err());
     }
 
@@ -1237,7 +1224,7 @@ pub(super) mod tests {
     #[test]
     fn parsed_market_prices_and_exports_cashflows() {
         let inst = bond_instrument_json();
-        let market = parse_market_json(&market_context_json()).expect("market");
+        let market = serde_json::from_str::<MarketContext>(&market_context_json()).expect("market");
         let instrument = parse_pricing_instrument_json(&inst, None).expect("parsed instrument");
 
         let priced = price_result_with_context(
@@ -1447,7 +1434,7 @@ pub(super) mod tests {
         // Price and check the four return metrics via the internal helper
         // (avoids serde_wasm_bindgen which requires a wasm32 target).
         let mkt = return_floor_market_json();
-        let market = parse_market_json(&mkt).expect("market");
+        let market = serde_json::from_str::<MarketContext>(&mkt).expect("market");
         let metrics = vec![
             "moic".to_string(),
             "moic_to_worst".to_string(),
@@ -1496,7 +1483,7 @@ pub(super) mod tests {
         });
         let inst = return_floor_bond_instrument_json(floor_spec);
         let mkt = return_floor_market_json();
-        let market = parse_market_json(&mkt).expect("market");
+        let market = serde_json::from_str::<MarketContext>(&mkt).expect("market");
         let metrics = vec!["xirr".to_string(), "xirr_to_worst".to_string()];
         let result_json = price_instrument_with_context(
             &inst,

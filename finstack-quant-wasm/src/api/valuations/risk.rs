@@ -4,9 +4,10 @@
 //! `finstack_quant_valuations::metrics::risk::calculate_var`,
 //! returning the `VarResult` plain object.
 
-use super::pricing::parse_market_json;
-use crate::utils::input::{from_js_json, js_opt_string, js_string, json_text};
-use crate::utils::{parse_iso_date, to_js_err, to_js_value};
+use crate::api::valuations::pricing::parse_market;
+use crate::utils::input::{from_js_json, js_opt_string, json_text};
+use crate::utils::wire::js_date;
+use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::metrics::risk::{MarketHistory, VarConfig};
 use finstack_quant_valuations::pricer::PricingDispatch;
 use wasm_bindgen::prelude::*;
@@ -41,9 +42,9 @@ pub fn calculate_var(
         "instrumentsJson",
     )?)
     .map_err(to_js_err)?;
-    let market = parse_market_json(&json_text(&market_json, "marketJson")?)?;
+    let market = parse_market(&market_json)?;
     let history: MarketHistory = from_js_json(&history_json, "historyJson")?;
-    let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
+    let as_of = js_date(&as_of, "asOf")?;
     let config: VarConfig = match config.as_ref() {
         Some(value) if !(value.is_null() || value.is_undefined()) => from_js_json(value, "config")?,
         _ => VarConfig::default(),

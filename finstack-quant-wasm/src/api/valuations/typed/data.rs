@@ -9,11 +9,10 @@
 //! amounts, tenors and day counts are their serde shapes here
 //! (`{ amount, currency }`, `"act_360"`), not WASM handles.
 
-use super::arg;
 use super::structured::JsTrancheBuilder;
-use crate::utils::input::{js_opt_f64, js_opt_string, js_string};
+use crate::utils::input::{from_js_json, js_f64, js_opt_f64, js_opt_string, js_string, js_uint};
+use crate::utils::wire::{js_date, js_opt_date, js_wire};
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_core::dates::Date;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndexParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AmortizationEvent;
@@ -23,13 +22,6 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 };
 use finstack_quant_valuations::instruments::{MertonMcConfig, PikSchedule};
 use wasm_bindgen::prelude::*;
-
-/// An optional ISO-8601 date argument; `null` and `undefined` mean absent.
-fn opt_date(value: Option<&JsValue>, label: &str) -> Result<Option<Date>, JsValue> {
-    js_opt_string(value, label)?
-        .map(|text| crate::utils::parse_iso_date(&text))
-        .transpose()
-}
 
 // ---------------------------------------------------------------------------
 // Merton Monte Carlo configuration
@@ -56,8 +48,8 @@ impl JsMertonMcConfig {
     #[wasm_bindgen(constructor)]
     pub fn new(merton: JsValue, recovery_rate: JsValue) -> Result<JsMertonMcConfig, JsValue> {
         MertonMcConfig::new(
-            arg::json(&merton, "merton")?,
-            arg::num(&recovery_rate, "recoveryRate")?,
+            from_js_json(&merton, "merton")?,
+            js_f64(&recovery_rate, "recoveryRate")?,
         )
         .map(|inner| Self { inner })
         .map_err(to_js_err)
@@ -69,7 +61,7 @@ impl JsMertonMcConfig {
     /// @throws Error - Throws with kind `validation` if `s` does not match the `PikSchedule` schema.
     #[wasm_bindgen(js_name = pikSchedule)]
     pub fn pik_schedule(&self, s: JsValue) -> Result<JsMertonMcConfig, JsValue> {
-        let schedule = arg::json(&s, "s")?;
+        let schedule = from_js_json(&s, "s")?;
         Ok(Self {
             inner: self.inner.clone().pik_schedule(schedule),
         })
@@ -81,7 +73,7 @@ impl JsMertonMcConfig {
     /// @throws Error - Throws with kind `invalid_type` if `n` is not a non-negative whole number.
     #[wasm_bindgen(js_name = stepsPerYear)]
     pub fn steps_per_year(&self, n: JsValue) -> Result<JsMertonMcConfig, JsValue> {
-        let steps = arg::uint(&n, "n")?;
+        let steps = js_uint(&n, "n")?;
         Ok(Self {
             inner: self.inner.clone().steps_per_year(steps),
         })
@@ -93,7 +85,7 @@ impl JsMertonMcConfig {
     /// @throws Error - Throws with kind `validation` if `p` is not a known barrier-crossing name.
     #[wasm_bindgen(js_name = barrierCrossing)]
     pub fn barrier_crossing(&self, p: JsValue) -> Result<JsMertonMcConfig, JsValue> {
-        let crossing = arg::en(&p, "p")?;
+        let crossing = js_wire(&p, "p")?;
         Ok(Self {
             inner: self.inner.clone().barrier_crossing(crossing),
         })
@@ -107,7 +99,7 @@ impl JsMertonMcConfig {
     pub fn recovery_rate(&self, r: JsValue) -> Result<JsMertonMcConfig, JsValue> {
         self.inner
             .clone()
-            .recovery_rate(arg::num(&r, "r")?)
+            .recovery_rate(js_f64(&r, "r")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
     }
@@ -118,7 +110,7 @@ impl JsMertonMcConfig {
     /// @throws Error - Throws with kind `validation` if `h` does not match the `EndogenousHazardSpec` schema.
     #[wasm_bindgen(js_name = endogenousHazard)]
     pub fn endogenous_hazard(&self, h: JsValue) -> Result<JsMertonMcConfig, JsValue> {
-        let hazard = arg::json(&h, "h")?;
+        let hazard = from_js_json(&h, "h")?;
         Ok(Self {
             inner: self.inner.clone().endogenous_hazard(hazard),
         })
@@ -130,7 +122,7 @@ impl JsMertonMcConfig {
     /// @throws Error - Throws with kind `validation` if `r` does not match the `DynamicRecoverySpec` schema.
     #[wasm_bindgen(js_name = dynamicRecovery)]
     pub fn dynamic_recovery(&self, r: JsValue) -> Result<JsMertonMcConfig, JsValue> {
-        let recovery = arg::json(&r, "r")?;
+        let recovery = from_js_json(&r, "r")?;
         Ok(Self {
             inner: self.inner.clone().dynamic_recovery(recovery),
         })
@@ -142,7 +134,7 @@ impl JsMertonMcConfig {
     /// @throws Error - Throws with kind `validation` if `t` does not match the `ToggleExerciseModel` schema.
     #[wasm_bindgen(js_name = toggleModel)]
     pub fn toggle_model(&self, t: JsValue) -> Result<JsMertonMcConfig, JsValue> {
-        let toggle = arg::json(&t, "t")?;
+        let toggle = from_js_json(&t, "t")?;
         Ok(Self {
             inner: self.inner.clone().toggle_model(toggle),
         })
@@ -160,7 +152,7 @@ impl JsMertonMcConfig {
     /// @returns A new configuration; the receiver is not modified.
     /// @throws Error - Throws with kind `validation` if `spec` does not match the `MertonMcCalibrationSpec` schema.
     pub fn calibration(&self, spec: JsValue) -> Result<JsMertonMcConfig, JsValue> {
-        let spec = arg::json(&spec, "spec")?;
+        let spec = from_js_json(&spec, "spec")?;
         Ok(Self {
             inner: self.inner.clone().calibration(spec),
         })
@@ -176,7 +168,7 @@ impl JsMertonMcConfig {
     /// @throws Error - Throws with kind `validation` if `dfs` is not an array of number pairs.
     #[wasm_bindgen(js_name = cashflowDfs)]
     pub fn cashflow_dfs(&self, dfs: JsValue) -> Result<JsMertonMcConfig, JsValue> {
-        let dfs = arg::json(&dfs, "dfs")?;
+        let dfs = from_js_json(&dfs, "dfs")?;
         Ok(Self {
             inner: self.inner.clone().cashflow_dfs(dfs),
         })
@@ -197,7 +189,7 @@ impl JsMertonMcConfig {
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsMertonMcConfig, JsValue> {
         Ok(Self {
-            inner: arg::json(&json, "json")?,
+            inner: from_js_json(&json, "json")?,
         })
     }
 
@@ -217,8 +209,8 @@ impl JsMertonMcConfig {
 /// @throws Error - Throws with kind `validation` if `schedule` does not match the `PikSchedule` schema, and kind `invalid_type` if `t` is not a number.
 #[wasm_bindgen(js_name = pikScheduleModeAt)]
 pub fn pik_schedule_mode_at(schedule: JsValue, t: JsValue) -> Result<JsValue, JsValue> {
-    let schedule: PikSchedule = arg::json(&schedule, "schedule")?;
-    to_js_value(&schedule.mode_at(arg::num(&t, "t")?))
+    let schedule: PikSchedule = from_js_json(&schedule, "schedule")?;
+    to_js_value(&schedule.mode_at(js_f64(&t, "t")?))
 }
 
 // ---------------------------------------------------------------------------
@@ -241,7 +233,7 @@ pub fn tranche_builder() -> JsTrancheBuilder {
 /// @throws Error - Throws with kind `validation` if a tranche does not match the `Tranche` schema or the structure is invalid (empty, mixed currencies, duplicate ids).
 #[wasm_bindgen(js_name = trancheStructureFromBalances)]
 pub fn tranche_structure_from_balances(tranches: JsValue) -> Result<JsValue, JsValue> {
-    let tranches: Vec<Tranche> = arg::json(&tranches, "tranches")?;
+    let tranches: Vec<Tranche> = from_js_json(&tranches, "tranches")?;
     to_js_value(&TrancheStructure::from_balances(tranches).map_err(to_js_err)?)
 }
 
@@ -263,10 +255,10 @@ pub fn pool_asset_fixed_rate_bond(
 ) -> Result<JsValue, JsValue> {
     to_js_value(&PoolAsset::fixed_rate_bond(
         js_string(&id, "id")?,
-        arg::json(&balance, "balance")?,
-        arg::num(&rate, "rate")?,
-        arg::date(&maturity, "maturity")?,
-        arg::en(&day_count, "dayCount")?,
+        from_js_json(&balance, "balance")?,
+        js_f64(&rate, "rate")?,
+        js_date(&maturity, "maturity")?,
+        js_wire(&day_count, "dayCount")?,
     ))
 }
 
@@ -290,11 +282,11 @@ pub fn pool_asset_floating_rate_loan(
 ) -> Result<JsValue, JsValue> {
     to_js_value(&PoolAsset::floating_rate_loan(
         js_string(&id, "id")?,
-        arg::json(&balance, "balance")?,
+        from_js_json(&balance, "balance")?,
         js_string(&forward_curve_id, "forwardCurveId")?,
-        arg::num(&spread_bp, "spreadBp")?,
-        arg::date(&maturity, "maturity")?,
-        arg::en(&day_count, "dayCount")?,
+        js_f64(&spread_bp, "spreadBp")?,
+        js_date(&maturity, "maturity")?,
+        js_wire(&day_count, "dayCount")?,
     ))
 }
 
@@ -314,17 +306,19 @@ pub fn asset_pool_with_reserve(
     reserve_target: Option<JsValue>,
     reserve_interest_destination: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let mut pool: AssetPool = arg::json(&pool, "pool")?;
-    pool.reserve_account = arg::json(&reserve_account, "reserveAccount")?;
-    pool.reserve_account_rate = arg::num(&reserve_account_rate, "reserveAccountRate")?;
-    pool.reserve_target = present(reserve_target.as_ref())
-        .map(|value| arg::json(value, "reserveTarget"))
-        .transpose()?;
-    pool.reserve_interest_destination = present(reserve_interest_destination.as_ref())
-        .map(|value| arg::json(value, "reserveInterestDestination"))
-        .transpose()?
-        .unwrap_or_default();
-    to_js_value(&pool)
+    let pool: AssetPool = from_js_json(&pool, "pool")?;
+    to_js_value(
+        &pool.with_reserve(
+            from_js_json(&reserve_account, "reserveAccount")?,
+            js_f64(&reserve_account_rate, "reserveAccountRate")?,
+            present(reserve_target.as_ref())
+                .map(|value| from_js_json(value, "reserveTarget"))
+                .transpose()?,
+            present(reserve_interest_destination.as_ref())
+                .map(|value| from_js_json(value, "reserveInterestDestination"))
+                .transpose()?,
+        ),
+    )
 }
 
 /// Current balance of the whole pool (mirrors Rust `AssetPool::total_balance`).
@@ -336,7 +330,7 @@ pub fn asset_pool_with_reserve(
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, carries both asset rows and representative lines, or mixes currencies.
 #[wasm_bindgen(js_name = assetPoolTotalBalance)]
 pub fn asset_pool_total_balance(pool: JsValue) -> Result<JsValue, JsValue> {
-    let pool: AssetPool = arg::json(&pool, "pool")?;
+    let pool: AssetPool = from_js_json(&pool, "pool")?;
     to_js_value(&pool.total_balance().map_err(to_js_err)?)
 }
 
@@ -346,7 +340,7 @@ pub fn asset_pool_total_balance(pool: JsValue) -> Result<JsValue, JsValue> {
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema or its representation or currencies are inconsistent.
 #[wasm_bindgen(js_name = assetPoolPerformingBalance)]
 pub fn asset_pool_performing_balance(pool: JsValue) -> Result<JsValue, JsValue> {
-    let pool: AssetPool = arg::json(&pool, "pool")?;
+    let pool: AssetPool = from_js_json(&pool, "pool")?;
     to_js_value(&pool.performing_balance().map_err(to_js_err)?)
 }
 
@@ -356,7 +350,7 @@ pub fn asset_pool_performing_balance(pool: JsValue) -> Result<JsValue, JsValue> 
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
 #[wasm_bindgen(js_name = assetPoolWac)]
 pub fn asset_pool_wac(pool: JsValue) -> Result<f64, JsValue> {
-    let pool: AssetPool = arg::json(&pool, "pool")?;
+    let pool: AssetPool = from_js_json(&pool, "pool")?;
     Ok(pool.wac())
 }
 
@@ -366,7 +360,7 @@ pub fn asset_pool_wac(pool: JsValue) -> Result<f64, JsValue> {
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
 #[wasm_bindgen(js_name = assetPoolWeightedAvgSpreadBp)]
 pub fn asset_pool_weighted_avg_spread_bp(pool: JsValue) -> Result<f64, JsValue> {
-    let pool: AssetPool = arg::json(&pool, "pool")?;
+    let pool: AssetPool = from_js_json(&pool, "pool")?;
     Ok(pool.weighted_avg_spread_bp())
 }
 
@@ -377,8 +371,8 @@ pub fn asset_pool_weighted_avg_spread_bp(pool: JsValue) -> Result<f64, JsValue> 
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, or the pool balances are inconsistent.
 #[wasm_bindgen(js_name = assetPoolWeightedAvgMaturity)]
 pub fn asset_pool_weighted_avg_maturity(pool: JsValue, as_of: JsValue) -> Result<f64, JsValue> {
-    let pool: AssetPool = arg::json(&pool, "pool")?;
-    pool.weighted_avg_maturity(arg::date(&as_of, "asOf")?)
+    let pool: AssetPool = from_js_json(&pool, "pool")?;
+    pool.weighted_avg_maturity(js_date(&as_of, "asOf")?)
         .map_err(to_js_err)
 }
 
@@ -388,7 +382,7 @@ pub fn asset_pool_weighted_avg_maturity(pool: JsValue, as_of: JsValue) -> Result
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
 #[wasm_bindgen(js_name = assetPoolDiversityScore)]
 pub fn asset_pool_diversity_score(pool: JsValue) -> Result<f64, JsValue> {
-    let pool: AssetPool = arg::json(&pool, "pool")?;
+    let pool: AssetPool = from_js_json(&pool, "pool")?;
     Ok(pool.diversity_score())
 }
 
@@ -402,7 +396,7 @@ pub fn asset_pool_assets_by_obligor(
     pool: JsValue,
     obligor_id: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let pool: AssetPool = arg::json(&pool, "pool")?;
+    let pool: AssetPool = from_js_json(&pool, "pool")?;
     to_js_value(&pool.assets_by_obligor(&js_string(&obligor_id, "obligorId")?))
 }
 
@@ -413,7 +407,7 @@ pub fn asset_pool_assets_by_obligor(
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, and kind `invalid_type` if `industry` is not a string.
 #[wasm_bindgen(js_name = assetPoolAssetsByIndustry)]
 pub fn asset_pool_assets_by_industry(pool: JsValue, industry: JsValue) -> Result<JsValue, JsValue> {
-    let pool: AssetPool = arg::json(&pool, "pool")?;
+    let pool: AssetPool = from_js_json(&pool, "pool")?;
     to_js_value(&pool.assets_by_industry(&js_string(&industry, "industry")?))
 }
 
@@ -424,11 +418,11 @@ pub fn asset_pool_assets_by_industry(pool: JsValue, industry: JsValue) -> Result
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, or the pool balances are inconsistent.
 #[wasm_bindgen(js_name = calculatePoolStats)]
 pub fn calculate_pool_stats(pool: JsValue, as_of: JsValue) -> Result<JsValue, JsValue> {
-    let pool: AssetPool = arg::json(&pool, "pool")?;
+    let pool: AssetPool = from_js_json(&pool, "pool")?;
     to_js_value(
         &finstack_quant_valuations::instruments::fixed_income::structured_credit::calculate_pool_stats(
             &pool,
-            arg::date(&as_of, "asOf")?,
+            js_date(&as_of, "asOf")?,
         )
         .map_err(to_js_err)?,
     )
@@ -452,7 +446,7 @@ fn penalty(value: PrepaymentPenalty) -> Result<JsValue, JsValue> {
 #[wasm_bindgen(js_name = prepaymentPenaltyLockout)]
 pub fn prepayment_penalty_lockout(through: Option<JsValue>) -> Result<JsValue, JsValue> {
     penalty(PrepaymentPenalty::Lockout {
-        through: opt_date(through.as_ref(), "through")?,
+        through: js_opt_date(through.as_ref(), "through")?,
     })
 }
 
@@ -467,8 +461,8 @@ pub fn prepayment_penalty_fixed(
     through: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     penalty(PrepaymentPenalty::Fixed {
-        pct: arg::num(&pct, "pct")?,
-        through: opt_date(through.as_ref(), "through")?,
+        pct: js_f64(&pct, "pct")?,
+        through: js_opt_date(through.as_ref(), "through")?,
     })
 }
 
@@ -478,7 +472,7 @@ pub fn prepayment_penalty_fixed(
 /// @throws Error - Throws with kind `validation` if `schedule` is not an array of `[string, number]` pairs, a date is malformed, or the schedule is empty, unordered or has a negative percentage.
 #[wasm_bindgen(js_name = prepaymentPenaltyStepDown)]
 pub fn prepayment_penalty_step_down(schedule: JsValue) -> Result<JsValue, JsValue> {
-    let rows: Vec<(String, f64)> = arg::json(&schedule, "schedule")?;
+    let rows: Vec<(String, f64)> = from_js_json(&schedule, "schedule")?;
     let schedule = rows
         .into_iter()
         .map(|(through, pct)| {
@@ -510,7 +504,7 @@ pub fn prepayment_penalty_yield_maintenance(
             .map(Into::into),
         reinvestment_rate: js_opt_f64(reinvestment_rate.as_ref(), "reinvestmentRate")?,
         floor_pct: js_opt_f64(floor_pct.as_ref(), "floorPct")?,
-        through: opt_date(through.as_ref(), "through")?,
+        through: js_opt_date(through.as_ref(), "through")?,
     })
 }
 
@@ -530,7 +524,7 @@ pub fn coverage_rules_clo_standard() -> Result<JsValue, JsValue> {
 /// @throws Error - Throws with kind `validation` if `rules` does not match the `CoverageRules` schema or a haircut, threshold or carry value is out of range.
 #[wasm_bindgen(js_name = coverageRulesValidate)]
 pub fn coverage_rules_validate(rules: JsValue) -> Result<(), JsValue> {
-    let rules: CoverageRules = arg::json(&rules, "rules")?;
+    let rules: CoverageRules = from_js_json(&rules, "rules")?;
     rules.validate().map_err(to_js_err)
 }
 
@@ -540,7 +534,7 @@ pub fn coverage_rules_validate(rules: JsValue) -> Result<(), JsValue> {
 /// @throws Error - Throws with kind `validation` if `waterfall` does not match the `Waterfall` schema.
 #[wasm_bindgen(js_name = waterfallCoverageTests)]
 pub fn waterfall_coverage_tests(waterfall: JsValue) -> Result<JsValue, JsValue> {
-    let waterfall: Waterfall = arg::json(&waterfall, "waterfall")?;
+    let waterfall: Waterfall = from_js_json(&waterfall, "waterfall")?;
     let tests: Vec<&CoverageTestSpec> = waterfall.coverage_tests().collect();
     to_js_value(&tests)
 }
@@ -551,7 +545,7 @@ pub fn waterfall_coverage_tests(waterfall: JsValue) -> Result<JsValue, JsValue> 
 /// @throws Error - Throws with kind `validation` if `table` does not match the `ScenarioTable` schema.
 #[wasm_bindgen(js_name = scenarioTableCells)]
 pub fn scenario_table_cells(table: JsValue) -> Result<JsValue, JsValue> {
-    let table: ScenarioTable = arg::json(&table, "table")?;
+    let table: ScenarioTable = from_js_json(&table, "table")?;
     to_js_value(&table.cells)
 }
 
@@ -572,7 +566,7 @@ fn amortization_event(event: AmortizationEvent) -> Result<JsValue, JsValue> {
 #[wasm_bindgen(js_name = amortizationEventDate)]
 pub fn amortization_event_date(date: JsValue) -> Result<JsValue, JsValue> {
     amortization_event(AmortizationEvent::Date {
-        date: arg::date(&date, "date")?,
+        date: js_date(&date, "date")?,
     })
 }
 
@@ -585,7 +579,7 @@ pub fn amortization_event_cumulative_loss(
     max_cumulative_loss: JsValue,
 ) -> Result<JsValue, JsValue> {
     amortization_event(AmortizationEvent::CumulativeLoss {
-        max_cumulative_loss: arg::num(&max_cumulative_loss, "maxCumulativeLoss")?,
+        max_cumulative_loss: js_f64(&max_cumulative_loss, "maxCumulativeLoss")?,
     })
 }
 
@@ -596,7 +590,7 @@ pub fn amortization_event_cumulative_loss(
 #[wasm_bindgen(js_name = amortizationEventExcessSpread)]
 pub fn amortization_event_excess_spread(min_excess_spread_3m: JsValue) -> Result<JsValue, JsValue> {
     amortization_event(AmortizationEvent::ExcessSpread {
-        min_excess_spread_3m: arg::num(&min_excess_spread_3m, "minExcessSpread3m")?,
+        min_excess_spread_3m: js_f64(&min_excess_spread_3m, "minExcessSpread3m")?,
     })
 }
 
@@ -616,9 +610,9 @@ macro_rules! index_preset {
         #[wasm_bindgen(js_name = $js_name)]
         pub fn $name(series: JsValue, version: JsValue, coupon_bp: JsValue) -> Result<JsValue, JsValue> {
             to_js_value(&CdsIndexParams::$preset(
-                arg::uint(&series, "series")?,
-                arg::uint(&version, "version")?,
-                arg::num(&coupon_bp, "couponBp")?,
+                js_uint(&series, "series")?,
+                js_uint(&version, "version")?,
+                js_f64(&coupon_bp, "couponBp")?,
             ))
         }
     };
@@ -658,10 +652,10 @@ macro_rules! tranche_preset {
         ) -> Result<JsValue, JsValue> {
             to_js_value(&CdsTrancheParams::$preset(
                 js_string(&index_name, "indexName")?,
-                arg::uint(&series, "series")?,
-                arg::json(&notional, "notional")?,
-                arg::date(&maturity, "maturity")?,
-                arg::num(&coupon_bp, "couponBp")?,
+                js_uint(&series, "series")?,
+                from_js_json(&notional, "notional")?,
+                js_date(&maturity, "maturity")?,
+                js_f64(&coupon_bp, "couponBp")?,
             ))
         }
     };

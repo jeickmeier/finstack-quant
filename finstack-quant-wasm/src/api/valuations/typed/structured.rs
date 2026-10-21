@@ -14,16 +14,17 @@
 
 use crate::api::core::dates::{JsDayCount, JsTenor};
 use crate::api::core::money::JsMoney;
-use crate::api::valuations::pricing::parse_market_json;
+use crate::api::valuations::pricing::parse_market;
 use crate::utils::input::{
-    js_f64, js_opt_f64, js_opt_string_seq, js_string, json_text, opt_json_text,
+    from_js_json, js_f64, js_opt_f64, js_opt_string_seq, js_string, json_text, opt_json_text,
 };
-use crate::utils::{parse_iso_date, to_js_err, to_js_value};
+use crate::utils::wire::js_date;
+use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
-    calculate_tranche_oas, scenario_table, AssetPool, OasConfig, ScenarioGrid, StructuredCredit,
-    TrancheStructure,
+    calculate_tranche_oas, scenario_table, AssetPool, DealType, OasConfig, ScenarioGrid,
+    StandardDealParams, StructuredCredit, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
@@ -68,11 +69,9 @@ pub fn structured_credit_tranche_discount_margin(
     let market_price_pct = js_f64(&market_price_pct, "marketPricePct")?;
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
     let deal = parse_structured_credit(instrument_json)?;
-    let market = parse_market_json(market_json)?;
-    let as_of = parse_iso_date(as_of)?;
+    let market = parse_market(&market_json)?;
+    let as_of = js_date(&as_of, "asOf")?;
     calculate_tranche_discount_margin(&deal, tranche_id, &market, as_of, market_price_pct)
         .map_err(to_js_err)
 }
@@ -99,11 +98,9 @@ pub fn structured_credit_tranche_breakeven_cdr(
 ) -> Result<f64, JsValue> {
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
     let deal = parse_structured_credit(instrument_json)?;
-    let market = parse_market_json(market_json)?;
-    let as_of = parse_iso_date(as_of)?;
+    let market = parse_market(&market_json)?;
+    let as_of = js_date(&as_of, "asOf")?;
     calculate_tranche_breakeven_cdr(&deal, tranche_id, &market, as_of).map_err(to_js_err)
 }
 
@@ -145,12 +142,10 @@ pub fn structured_credit_tranche_oas(
     let market_price_pct = js_f64(&market_price_pct, "marketPricePct")?;
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
     let config_json = opt_json_text(config_json.as_ref(), "configJson")?;
     let deal = parse_structured_credit(instrument_json)?;
-    let market = parse_market_json(market_json)?;
-    let as_of = parse_iso_date(as_of)?;
+    let market = parse_market(&market_json)?;
+    let as_of = js_date(&as_of, "asOf")?;
     let config: OasConfig = match config_json.as_deref() {
         Some(json) => parse_json_arg(json, "OAS config")?,
         None => OasConfig::default(),
@@ -193,12 +188,10 @@ pub fn structured_credit_tranche_scenario_table(
 ) -> Result<JsValue, JsValue> {
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
     let grid_json: &str = &json_text(&grid_json, "gridJson")?;
     let deal = parse_structured_credit(instrument_json)?;
-    let market = parse_market_json(market_json)?;
-    let as_of = parse_iso_date(as_of)?;
+    let market = parse_market(&market_json)?;
+    let as_of = js_date(&as_of, "asOf")?;
     let grid: ScenarioGrid = parse_json_arg(grid_json, "scenario grid")?;
     let result = scenario_table(&deal, tranche_id, &market, as_of, &grid).map_err(to_js_err)?;
     to_js_value(&result)
@@ -252,11 +245,9 @@ pub fn structured_credit_tranche_metrics(
         .map_err(to_js_err)?;
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
     let deal = parse_structured_credit(instrument_json)?;
-    let market = parse_market_json(market_json)?;
-    let as_of = parse_iso_date(as_of)?;
+    let market = parse_market(&market_json)?;
+    let as_of = js_date(&as_of, "asOf")?;
     let result = calculate_tranche_metrics(
         &deal,
         tranche_id,
@@ -271,7 +262,7 @@ pub fn structured_credit_tranche_metrics(
 
 /// A deal-type constructor `(id, pool, tranches, closingDate, maturity, discountCurveId, calendarId?)`.
 macro_rules! deal_constructor {
-    ($(#[$doc:meta])* $name:ident as $js_name:ident) => {
+    ($(#[$doc:meta])* $name:ident as $js_name:ident, $deal_type:ident) => {
         #[wasm_bindgen(js_class = StructuredCredit)]
         impl JsStructuredCredit {
             $(#[$doc])*
@@ -295,24 +286,24 @@ macro_rules! deal_constructor {
                 discount_curve_id: JsValue,
                 calendar_id: Option<JsValue>,
             ) -> Result<JsStructuredCredit, JsValue> {
-                let pool: AssetPool = super::arg::json(&pool, "pool")?;
-                let tranches: TrancheStructure = super::arg::json(&tranches, "tranches")?;
-                let mut inner = StructuredCredit::$name(
-                    js_string(&id, "id")?,
+                let pool: AssetPool = from_js_json(&pool, "pool")?;
+                let tranches: TrancheStructure = from_js_json(&tranches, "tranches")?;
+                let params = StandardDealParams {
+                    id: js_string(&id, "id")?.into(),
                     pool,
                     tranches,
-                    super::arg::date(&closing_date, "closingDate")?,
-                    super::arg::date(&maturity, "maturity")?,
-                    js_string(&discount_curve_id, "discountCurveId")?,
-                )
-                .map_err(to_js_err)?;
-                if let Some(calendar_id) =
-                    crate::utils::input::js_opt_string(calendar_id.as_ref(), "calendarId")?
-                {
-                    inner = inner.with_calendar_id(calendar_id);
-                }
-                inner.validate_for_pricing().map_err(to_js_err)?;
-                Ok(Self { inner })
+                    closing_date: js_date(&closing_date, "closingDate")?,
+                    maturity: js_date(&maturity, "maturity")?,
+                    discount_curve_id: js_string(&discount_curve_id, "discountCurveId")?.into(),
+                    calendar_id: crate::utils::input::js_opt_string(
+                        calendar_id.as_ref(),
+                        "calendarId",
+                    )?
+                    .map(Into::into),
+                };
+                StructuredCredit::new_standard(DealType::$deal_type, params)
+                    .map(|inner| Self { inner })
+                    .map_err(to_js_err)
             }
         }
     };
@@ -787,19 +778,19 @@ handle_setters!(JsTrancheBuilder, "TrancheBuilder", {
 
 deal_constructor!(
     /// Create an asset-backed security deal (mirrors Rust `StructuredCredit::new_abs`).
-    new_abs as newAbs
+    new_abs as newAbs, Abs
 );
 deal_constructor!(
     /// Create a collateralized loan obligation (mirrors Rust `StructuredCredit::new_clo`).
-    new_clo as newClo
+    new_clo as newClo, Clo
 );
 deal_constructor!(
     /// Create a commercial mortgage-backed security deal (mirrors Rust `StructuredCredit::new_cmbs`).
-    new_cmbs as newCmbs
+    new_cmbs as newCmbs, Cmbs
 );
 deal_constructor!(
     /// Create a residential mortgage-backed security deal (mirrors Rust `StructuredCredit::new_rmbs`).
-    new_rmbs as newRmbs
+    new_rmbs as newRmbs, Rmbs
 );
 
 #[wasm_bindgen(js_class = StructuredCredit)]
@@ -870,8 +861,8 @@ impl JsStructuredCredit {
         as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
         let tranche_id = js_string(&tranche_id, "trancheId")?;
-        let market = super::market(&market_json)?;
-        let as_of = super::as_of(&as_of)?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
         to_js_value(
             &self
                 .inner
@@ -893,8 +884,8 @@ impl JsStructuredCredit {
         as_of: JsValue,
         purchase_price_pct: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let market = super::market(&market_json)?;
-        let as_of = super::as_of(&as_of)?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
         let purchase_price_pct =
             crate::utils::input::js_opt_f64(purchase_price_pct.as_ref(), "purchasePricePct")?;
         to_js_value(
@@ -926,8 +917,8 @@ impl JsStructuredCredit {
         num_paths: Option<JsValue>,
         antithetic: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let market = super::market(&market_json)?;
-        let as_of = super::as_of(&as_of)?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
         let num_paths = crate::utils::input::js_opt_uint(num_paths.as_ref(), "numPaths")?;
         let antithetic = crate::utils::input::js_opt_bool(antithetic.as_ref(), "antithetic")?;
         crate::utils::to_js_value(
@@ -951,8 +942,8 @@ impl JsStructuredCredit {
         market_json: JsValue,
         as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
-        let market = super::market(&market_json)?;
-        let as_of = super::as_of(&as_of)?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
         let run = finstack_quant_valuations::instruments::fixed_income::structured_credit::run_simulation_with_diagnostics(
             &self.inner,
             &market,
@@ -983,7 +974,7 @@ impl JsTrancheBuilder {
     /// @throws Error - Throws with kind `invalid_type` if `rate` is not a number, and kind `validation` if the builder was already consumed by `build()`.
     #[wasm_bindgen(js_name = couponFixed)]
     pub fn coupon_fixed(&self, rate: JsValue) -> Result<JsTrancheBuilder, JsValue> {
-        let rate = super::arg::num(&rate, "rate")?;
+        let rate = js_f64(&rate, "rate")?;
         let inner = self.inner.apply(|b| b.coupon(RateSpec::Fixed { rate }))?;
         Ok(Self { inner })
     }

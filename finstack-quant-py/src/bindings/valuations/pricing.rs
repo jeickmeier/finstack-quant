@@ -6,7 +6,9 @@
 
 use super::PyValuationResult;
 use crate::bindings::extract::{extract_instrument, extract_market};
-use crate::bindings::module_utils::{py_to_json_string, py_to_serde};
+use crate::bindings::module_utils::{
+    opt_spec_from_py, py_to_json_string, py_to_serde, spec_from_py,
+};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, serde_to_py};
 use crate::errors::{core_to_py, display_to_py, value_error};
 use finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope;
@@ -70,18 +72,6 @@ pub(crate) struct PyMetricPricingOverrides {
     pub(crate) inner: MetricPricingOverrides,
 }
 
-fn opt_serde_from_py<T: serde::de::DeserializeOwned + Send>(
-    py: Python<'_>,
-    obj: Option<&Bound<'_, PyAny>>,
-    label: &str,
-) -> PyResult<Option<T>> {
-    match obj {
-        None => Ok(None),
-        Some(value) if value.is_none() => Ok(None),
-        Some(value) => py_to_serde(py, value, label).map(Some),
-    }
-}
-
 #[pymethods]
 impl PyMetricPricingOverrides {
     #[new]
@@ -105,9 +95,9 @@ impl PyMetricPricingOverrides {
             _ => None,
         };
         let inner = MetricPricingOverrides {
-            bump_config: opt_serde_from_py(py, bump_config, "bump_config")?.unwrap_or_default(),
+            bump_config: opt_spec_from_py(py, bump_config, "bump_config")?.unwrap_or_default(),
             theta_period,
-            breakeven_config: opt_serde_from_py(py, breakeven_config, "breakeven_config")?,
+            breakeven_config: opt_spec_from_py(py, breakeven_config, "breakeven_config")?,
             bond_risk_basis: bond_risk_basis
                 .map(|name| {
                     serde_json::from_value(serde_json::Value::String(name.to_string())).map_err(
@@ -130,7 +120,7 @@ impl PyMetricPricingOverrides {
                     )
                 })
                 .transpose()?,
-            var_config: opt_serde_from_py(py, var_config, "var_config")?,
+            var_config: opt_spec_from_py(py, var_config, "var_config")?,
         };
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
@@ -473,7 +463,7 @@ pub(crate) fn metric_pricing_overrides_from_py(
     if let Ok(typed) = obj.cast::<PyMetricPricingOverrides>() {
         return Ok(typed.borrow().inner.clone());
     }
-    super::instruments::spec_from_py(py, obj, "metric_pricing_overrides")
+    spec_from_py(py, obj, "metric_pricing_overrides")
 }
 
 /// Coerce ``dict | str | MarketHistory | None`` into the JSON the Rust

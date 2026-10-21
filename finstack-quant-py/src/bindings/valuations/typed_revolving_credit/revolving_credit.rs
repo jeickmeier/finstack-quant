@@ -9,6 +9,7 @@ use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
+use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::{
     attributes_from_py, bdc_from_py, day_count_from_py, enum_to_py_string, money_from_py,
@@ -18,7 +19,7 @@ use crate::bindings::valuations::instruments::{instrument_expiry, stub_kind_from
 use crate::bindings::valuations::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -30,19 +31,6 @@ use super::PyEnhancedMonteCarloResult;
 
 type RevolvingCreditBuilderInner =
     finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditBuilder;
-
-/// Parse a nested spec from a ``dict`` (serde shape) or a JSON ``str``.
-fn spec_from_py<T: serde::de::DeserializeOwned + Send>(
-    py: Python<'_>,
-    value: &Bound<'_, PyAny>,
-    label: &str,
-) -> PyResult<T> {
-    if let Ok(json) = value.extract::<String>() {
-        return serde_json::from_str(&json)
-            .map_err(|err| serde_json_to_py(err, &format!("invalid {label} JSON")));
-    }
-    crate::bindings::module_utils::py_to_serde(py, value, label)
-}
 
 /// Typed wrapper for the Rust `RevolvingCredit` instrument.
 ///
@@ -791,7 +779,7 @@ impl PyRevolvingCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: Option<
             finstack_quant_valuations::instruments::fixed_income::loan_terms::OidEirSpec,
-        > = value.map(|v| spec_from_py(py, v, "oid_eir")).transpose()?;
+        > = opt_spec_from_py(py, value, "oid_eir")?;
         let repr = if spec.is_some() { "{..}" } else { "None" };
         builder_set!(
             slf,
@@ -832,7 +820,7 @@ impl PyRevolvingCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let lc: Option<
             finstack_quant_valuations::instruments::fixed_income::loan_terms::LetterOfCreditSpec,
-        > = value.map(|v| spec_from_py(py, v, "lc")).transpose()?;
+        > = opt_spec_from_py(py, value, "lc")?;
         let repr = if lc.is_some() { "{..}" } else { "None" };
         builder_set!(
             slf,

@@ -19,7 +19,6 @@
 use crate::api::core::currency::JsCurrency;
 use crate::api::core::dates::JsDayCount;
 use crate::api::core::money::JsMoney;
-use crate::api::valuations::pricing::parse_market_json;
 use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, json_text};
 use crate::utils::to_js_err;
 use finstack_quant_valuations::instruments::Instrument;
@@ -168,6 +167,8 @@ macro_rules! fx_option {
     };
 }
 
+use crate::api::valuations::pricing::parse_market;
+use crate::utils::wire::{js_date, js_wire};
 use finstack_quant_valuations::instruments;
 
 fx_class!(JsFxSpot, "FxSpot", "fx_spot", instruments::FxSpot);
@@ -310,7 +311,7 @@ impl JsFxForward {
             js_string(&id, "id")?,
             parse_currency(&base_currency, "baseCurrency")?,
             parse_currency(&quote_currency, "quoteCurrency")?,
-            crate::utils::parse_iso_date(&js_string(&trade_date, "tradeDate")?)?,
+            js_date(&trade_date, "tradeDate")?,
             tenor.inner,
             notional.inner,
             js_string(&domestic_discount_curve_id, "domesticDiscountCurveId")?,
@@ -457,7 +458,7 @@ impl JsFxOption {
             parse_currency(&base_currency, "baseCurrency")?,
             parse_currency(&quote_currency, "quoteCurrency")?,
             js_f64(&strike, "strike")?,
-            crate::utils::parse_iso_date(&js_string(&expiry, "expiry")?)?,
+            js_date(&expiry, "expiry")?,
             notional.inner,
             js_string(&vol_surface_id, "volSurfaceId")?,
             js_string(&option_type, "optionType")?
@@ -484,8 +485,8 @@ impl JsFxOption {
         as_of: JsValue,
         target_price: JsValue,
     ) -> Result<f64, JsValue> {
-        let market = parse_market_json(&json_text(&market_json, "marketJson")?)?;
-        let as_of = crate::utils::parse_iso_date(&js_string(&as_of, "asOf")?)?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
         self.inner
             .implied_vol(&market, as_of, js_f64(&target_price, "targetPrice")?)
             .map_err(to_js_err)
@@ -512,7 +513,7 @@ mod tests {
     fn public_json_routes_validate_instrument_before_market_json() {
         assert!(
             crate::api::valuations::pricing::tests::not_a_market_request()
-                .price("{}")
+                .instrument("{}")
                 .is_err()
         );
         assert!(super::super::option_greeks(
@@ -825,7 +826,7 @@ impl JsFxOptionBuilder {
     ) -> Result<JsFxOptionBuilder, JsValue> {
         let convention =
             finstack_quant_valuations::instruments::fx::fx_option::FxDeltaConvention::new(
-                super::arg::en(&kind, "kind")?,
+                js_wire(&kind, "kind")?,
                 premium_currency.inner,
                 crate::utils::input::js_string(&venue, "venue")?,
             )

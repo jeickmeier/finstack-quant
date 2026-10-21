@@ -18,8 +18,9 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::{core_to_py, display_to_py};
 
-use super::convert::{bps_from_py, enum_to_py_string, opt_repr, rate_decimal_from_py};
+use super::convert::{enum_to_py_string, opt_repr};
 use super::instruments::{decimal_from_f64, enum_from_str, stub_kind_from_py};
+use crate::bindings::extract::{extract_basis_points, extract_rate_decimal};
 
 type FloatingLegCompounding = finstack_quant_cashflows::builder::FloatingLegCompounding;
 
@@ -138,7 +139,7 @@ payment_lag_days=0, end_of_month=False)"
         payment_lag_days: i32,
         end_of_month: bool,
     ) -> PyResult<Self> {
-        let rate = rate_decimal_from_py(rate, "rate")?;
+        let rate = extract_rate_decimal(rate, "rate")?;
         let inner = finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: finstack_quant_core::types::CurveId::new(
                 discount_curve_id.to_string(),
@@ -398,7 +399,7 @@ reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_day
         payment_lag_days: i32,
         end_of_month: bool,
     ) -> PyResult<Self> {
-        let spread_bp = bps_from_py(spread_bp, "spread_bp")?;
+        let spread_bp = extract_basis_points(spread_bp, "spread_bp")?;
         let compounding = match compounding {
             Some(obj) if !obj.is_none() => compounding_from_py(py, obj)?,
             _ => FloatingLegCompounding::default(),
@@ -666,7 +667,7 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
         business_day_convention: &str,
         calendar_id: Option<String>,
     ) -> PyResult<Self> {
-        let coupon_bp = bps_from_py(coupon_bp, "coupon_bp")?;
+        let coupon_bp = extract_basis_points(coupon_bp, "coupon_bp")?;
         let inner = finstack_quant_valuations::instruments::PremiumLegSpec {
             roll_rule: roll_rule.inner,
             start: py_to_date(start)?,

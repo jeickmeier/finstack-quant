@@ -121,15 +121,18 @@ macro_rules! instrument_pricing {
                 metric_pricing_overrides: Option<JsValue>,
                 market_history: Option<JsValue>,
             ) -> Result<JsValue, JsValue> {
-                $crate::api::valuations::pricing::PriceRequest::from_js(
-                    &market_json,
+                let request = $crate::api::valuations::pricing::PriceRequest::from_js(
                     &as_of,
                     model.as_ref(),
                     metrics.as_ref(),
                     metric_pricing_overrides.as_ref(),
                     market_history.as_ref(),
-                )?
-                .price_typed(Box::new(self.inner.clone()))
+                )?;
+                let instrument = request.typed_instrument(Box::new(self.inner.clone()))?;
+                request.price(
+                    &instrument,
+                    &$crate::api::valuations::pricing::parse_market(&market_json)?,
+                )
             }
 
             /// Compute one metric of the instrument against a market snapshot.
@@ -232,8 +235,8 @@ macro_rules! market_metrics {
                 $(#[$doc])*
                 #[wasm_bindgen(js_name = $js_name)]
                 pub fn $name(&self, market_json: JsValue, as_of: JsValue) -> Result<f64, JsValue> {
-                    let market = $crate::api::valuations::typed::market(&market_json)?;
-                    let as_of = $crate::api::valuations::typed::as_of(&as_of)?;
+                    let market = $crate::api::valuations::pricing::parse_market(&market_json)?;
+                    let as_of = $crate::utils::wire::js_date(&as_of, "asOf")?;
                     self.inner
                         .$name(&market, as_of)
                         .map_err(crate::utils::to_js_err)
@@ -444,7 +447,7 @@ macro_rules! dated_money_setter {
                 amount: &crate::api::core::money::JsMoney,
             ) -> Result<$bty, JsValue> {
                 let value = (
-                    $crate::api::valuations::typed::arg::date(&payment_date, "paymentDate")?,
+                    $crate::utils::wire::js_date(&payment_date, "paymentDate")?,
                     amount.inner,
                 );
                 let inner = self.inner.apply(|b| b.$name(value))?;

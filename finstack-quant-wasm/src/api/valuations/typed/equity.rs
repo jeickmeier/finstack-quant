@@ -2,8 +2,10 @@
 
 use crate::api::core::currency::JsCurrency;
 use crate::api::core::dates::JsDayCount;
-use crate::utils::input::js_string;
+use crate::api::valuations::pricing::parse_market;
+use crate::utils::input::{from_js_json, js_bool, js_f64, js_string};
 use crate::utils::to_js_err;
+use crate::utils::wire::{js_date, js_wire};
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
 
@@ -241,11 +243,11 @@ impl JsEquityOption {
         finstack_quant_valuations::instruments::EquityOption::european(
             js_string(&id, "id")?,
             js_string(&ticker, "ticker")?,
-            super::arg::num(&strike, "strike")?,
-            super::arg::date(&expiry, "expiry")?,
-            super::arg::num(&quantity, "quantity")?,
+            js_f64(&strike, "strike")?,
+            js_date(&expiry, "expiry")?,
+            js_f64(&quantity, "quantity")?,
             currency.inner,
-            super::arg::en(&option_type, "optionType")?,
+            js_wire(&option_type, "optionType")?,
         )
         .map(|inner| Self { inner })
         .map_err(to_js_err)
@@ -266,9 +268,9 @@ impl JsEquityOption {
         as_of: JsValue,
         target_price: JsValue,
     ) -> Result<f64, JsValue> {
-        let market = super::market(&market_json)?;
-        let as_of = super::as_of(&as_of)?;
-        let target_price = super::arg::num(&target_price, "targetPrice")?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
+        let target_price = js_f64(&target_price, "targetPrice")?;
         self.inner
             .implied_vol(&market, as_of, target_price)
             .map_err(to_js_err)
@@ -318,10 +320,10 @@ impl JsEquityOptionBuilder {
         exercised: JsValue,
     ) -> Result<JsEquityOptionBuilder, JsValue> {
         let exercise = finstack_quant_valuations::instruments::equity::equity_option::EquityOptionExercise::new(
-            super::arg::date(&date, "date")?,
-            super::arg::num(&spot, "spot")?,
-            super::arg::date(&settlement_date, "settlementDate")?,
-            super::arg::flag(&exercised, "exercised")?,
+            js_date(&date, "date")?,
+            js_f64(&spot, "spot")?,
+            js_date(&settlement_date, "settlementDate")?,
+            js_bool(&exercised, "exercised")?,
         );
         let inner = self.inner.apply(|b| b.exercise(exercise))?;
         Ok(Self { inner })
@@ -333,7 +335,7 @@ impl JsEquityOptionBuilder {
     /// @throws Error - Throws with kind `invalid_type` if `value` is not an array of `[string, number]` pairs, and kind `validation` if a date is malformed or the builder was already consumed by `build()`.
     #[wasm_bindgen(js_name = discreteDividends)]
     pub fn discrete_dividends(&self, value: JsValue) -> Result<JsEquityOptionBuilder, JsValue> {
-        let rows: Vec<(String, f64)> = super::arg::json(&value, "value")?;
+        let rows: Vec<(String, f64)> = from_js_json(&value, "value")?;
         let dividends = rows
             .into_iter()
             .map(|(date, amount)| Ok((crate::utils::parse_iso_date(&date)?, amount)))

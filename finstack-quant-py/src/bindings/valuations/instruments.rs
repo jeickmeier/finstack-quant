@@ -17,17 +17,15 @@ use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::extract::extract_market;
+use crate::bindings::extract::{extract_basis_points, extract_market, extract_rate_decimal};
+use crate::bindings::module_utils::spec_from_py;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::merton_mc::{PyMertonMcConfig, PyMertonMcResult};
 use crate::errors::{core_to_py, serde_json_to_py, value_error};
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::{Instrument, InstrumentEnvelope, InstrumentJson};
 
-use super::convert::{
-    attributes_from_py, enum_to_py_string, money_from_py, money_to_py, opt_repr,
-    rate_decimal_from_py,
-};
+use super::convert::{attributes_from_py, enum_to_py_string, money_from_py, money_to_py, opt_repr};
 use super::pricing::{market_history_json, metric_pricing_overrides_json};
 use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
 use super::PyValuationResult;
@@ -74,30 +72,6 @@ pub(crate) fn decimal_from_f64(value: f64, what: &str) -> PyResult<rust_decimal:
         .map_err(|err| value_error(format!("invalid {what}: {err}")))
 }
 
-/// Parse a JSON sub-field string into a typed Rust spec value.
-///
-/// Used by ``*_json`` builder setters for deep nested config (margin specs,
-/// waterfall rules, conversion terms) per the nested-spec rule in the plan.
-pub(crate) fn json_field<T: serde::de::DeserializeOwned>(json: &str, what: &str) -> PyResult<T> {
-    serde_json::from_str(json).map_err(|err| serde_json_to_py(err, &format!("invalid {what} JSON")))
-}
-
-/// Coerce `dict | str` to a serde-backed Rust spec value.
-///
-/// A `str` is parsed as JSON; any other object is round-tripped through
-/// `json.dumps`. Used for nested specs that have no typed Python twin yet
-/// (cashflow specs, call schedules, margin specs, amortization, …).
-pub(crate) fn spec_from_py<T: serde::de::DeserializeOwned + Send>(
-    py: Python<'_>,
-    obj: &Bound<'_, PyAny>,
-    what: &str,
-) -> PyResult<T> {
-    if let Ok(json) = obj.extract::<&str>() {
-        return json_field(json, what);
-    }
-    crate::bindings::module_utils::py_to_serde(py, obj, what)
-}
-
 /// Coerce `StubKind | str | None` to a Rust stub rule (`None` → short front).
 pub(crate) fn stub_kind_from_py(
     obj: Option<&Bound<'_, PyAny>>,
@@ -121,37 +95,27 @@ pub(crate) fn stub_kind_from_py(
     )))
 }
 
-/// Coerce `float | int | Rate` to a core `Rate` (decimal units).
+/// Coerce `float | int | Rate | Bps` to a core `Rate` (decimal units).
 pub(crate) fn rate_from_py(
     obj: &Bound<'_, PyAny>,
     what: &str,
 ) -> PyResult<finstack_quant_core::types::Rate> {
-    rate_decimal_from_py(obj, what).and_then(|value| {
+    extract_rate_decimal(obj, what).and_then(|value| {
         finstack_quant_core::types::Rate::from_decimal(value).map_err(crate::errors::core_to_py)
     })
 }
 
-/// Coerce `float | int | Bps` to a core `Bps`.
+/// Coerce `float | int | Bps | Rate` to a core `Bps`.
 ///
-/// A `Bps` hands over its Rust value unchanged; a number goes through the
-/// Rust `Bps::try_new`, which rejects non-finite, fractional and out-of-range
-/// basis points (`ValueError`), exactly as WASM `Bps` does.
+/// The basis points go through the Rust `Bps::try_new`, which rejects
+/// non-finite, fractional and out-of-range basis points (`ValueError`),
+/// exactly as WASM `Bps` does; a `Bps` object round-trips unchanged.
 pub(crate) fn bps_value_from_py(
     obj: &Bound<'_, PyAny>,
     what: &str,
 ) -> PyResult<finstack_quant_core::types::Bps> {
-    if let Ok(bps) = obj.cast::<crate::bindings::core::types::PyBps>() {
-        return Ok(bps.borrow().inner);
-    }
-    let bp: f64 = obj.extract().map_err(|_| {
-        pyo3::exceptions::PyTypeError::new_err(format!(
-            "{what}: expected basis points as float or finstack_quant.core.types.Bps, got {}",
-            obj.get_type()
-                .name()
-                .map_or_else(|_| "object".to_string(), |name| name.to_string())
-        ))
-    })?;
-    finstack_quant_core::types::Bps::try_new(bp).map_err(core_to_py)
+    extract_basis_points(obj, what)
+        .and_then(|bp| finstack_quant_core::types::Bps::try_new(bp).map_err(core_to_py))
 }
 
 /// Price an instrument envelope through the canonical Rust pricer.
@@ -2142,15 +2106,14 @@ impl PyTermLoanBuilder {
         py: Python<'py>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
+        // A bare name (`"bullet"`) is a unit variant; JSON text, dicts and
+        // typed specs go through the shared spec coercer.
         let spec: finstack_quant_cashflows::builder::AmortizationSpec =
-            if let Ok(name) = value.extract::<&str>() {
-                if name.trim_start().starts_with('{') || name.trim_start().starts_with('"') {
-                    json_field(name, "amortization")?
-                } else {
+            match value.extract::<&str>() {
+                Ok(name) if !name.trim_start().starts_with(['{', '"']) => {
                     enum_from_str(name, "amortization")?
                 }
-            } else {
-                spec_from_py(py, value, "amortization")?
+                _ => spec_from_py(py, value, "amortization")?,
             };
         builder_set!(
             slf,

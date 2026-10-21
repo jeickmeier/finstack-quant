@@ -15,17 +15,16 @@ use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
+use crate::bindings::module_utils::spec_from_py;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 
-use super::convert::{
-    attributes_from_py, enum_to_py_string, money_from_py, money_to_py, rate_decimal_from_py,
-};
+use super::convert::{attributes_from_py, enum_to_py_string, money_from_py, money_to_py};
 use super::typed_legs::{PyFixedLegSpec, PyFloatLegSpec};
+use crate::bindings::extract::extract_rate_decimal;
 use crate::bindings::valuations::convert::money_repr;
 use crate::bindings::valuations::instruments::{
-    decimal_from_f64, enum_from_str, instrument_expiry, opt_serde_to_py, spec_from_py,
-    stub_kind_from_py,
+    decimal_from_f64, enum_from_str, instrument_expiry, opt_serde_to_py, stub_kind_from_py,
 };
 use crate::bindings::valuations::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
@@ -168,7 +167,7 @@ impl PyInterestRateSwap {
             id: InstrumentId::new(id.to_string()),
             notional: money_from_py(notional, currency, "notional")?,
             side: enum_from_str(side, "side")?,
-            fixed_rate: rate_decimal_from_py(fixed_rate, "fixed_rate")?,
+            fixed_rate: extract_rate_decimal(fixed_rate, "fixed_rate")?,
             start_date: py_to_date(start_date)?,
             maturity: py_to_date(maturity)?,
             index_id,
@@ -1325,7 +1324,7 @@ impl PyCapFloorBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let strike = rate_decimal_from_py(value, "strike")?;
+        let strike = extract_rate_decimal(value, "strike")?;
         let strike = decimal_from_f64(strike, "strike")?;
         builder_set!(
             slf,
@@ -1359,7 +1358,7 @@ impl PyCapFloorBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spread_bp = crate::bindings::valuations::convert::bps_from_py(value, "spread_bp")?;
+        let spread_bp = crate::bindings::extract::extract_basis_points(value, "spread_bp")?;
         let spread_bp = decimal_from_f64(spread_bp, "spread_bp")?;
         builder_set!(
             slf,

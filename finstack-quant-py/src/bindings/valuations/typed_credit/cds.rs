@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
-use crate::errors::{core_to_py, value_error};
+use crate::errors::core_to_py;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::market::conventions::ids::CdsDocClause;
@@ -25,20 +25,6 @@ use super::super::typed_macros::{
 
 type CdsBuilderInner =
     finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwapBuilder;
-
-/// Parse a CDS regional convention, listing the accepted strings on failure.
-///
-/// `"isda_na"` is the SNAC / post-Big-Bang North American standard and the
-/// Rust default; analysts who type `"snac"` or `"isda_2014"` get the list.
-pub(crate) fn cds_convention_from_str(value: &str) -> PyResult<CdsConvention> {
-    enum_from_str::<CdsConvention>(value, "convention").map_err(|_| {
-        value_error(format!(
-            "invalid convention {value:?}: expected one of 'isda_na' (SNAC / post-Big-Bang \
-             North American standard: ACT/360, quarterly IMM, T+3), 'isda_eu' (European: \
-             T+1, TARGET2), 'isda_as' (Asian: ACT/365F, Tokyo) or 'custom'"
-        ))
-    })
-}
 
 /// Single-name credit default swap (typed wrapper for Rust ``CreditDefaultSwap``).
 ///
@@ -353,7 +339,7 @@ impl PyCreditDefaultSwapBuilder {
     ///     If ``value`` is not one of the accepted strings; the message lists them.
     #[pyo3(text_signature = "($self, value)")]
     fn convention<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let convention = cds_convention_from_str(value)?;
+        let convention = enum_from_str::<CdsConvention>(value, "convention")?;
         builder_set!(
             slf,
             convention,

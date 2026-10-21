@@ -9,17 +9,18 @@ use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;
+use finstack_quant_valuations::market::conventions::CdsConvention;
 use rust_decimal::Decimal;
 
 use super::super::convert::{
     attributes_from_py, bool_repr, date_repr, enum_to_py_string, float_repr, money_repr,
     money_to_py,
 };
-use super::super::instruments::{enum_from_str, spec_from_py};
+use super::super::instruments::enum_from_str;
 use super::super::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
-use super::cds::cds_convention_from_str;
+use crate::bindings::module_utils::spec_from_py;
 
 type CdsOptionBuilderInner =
     finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionBuilder;
@@ -721,7 +722,7 @@ impl PyCdsOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let convention = cds_convention_from_str(value)?;
+        let convention = enum_from_str::<CdsConvention>(value, "convention")?;
         builder_set!(
             slf,
             underlying_convention,

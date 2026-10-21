@@ -6,6 +6,7 @@
 //! TypeScript types.
 
 use crate::utils::input::js_string;
+use crate::utils::wire::js_wire;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::market::conventions::ids::{
     CdsConventionKey, InflationSwapConventionId, IrFutureContractId, SwaptionConventionId,
@@ -55,8 +56,8 @@ impl JsConventionRegistry {
     #[wasm_bindgen(js_name = resolveCds)]
     pub fn resolve_cds(&self, currency: JsValue, doc_clause: JsValue) -> Result<JsValue, JsValue> {
         let key = CdsConventionKey {
-            currency: super::typed::arg::en(&currency, "currency")?,
-            doc_clause: super::typed::arg::en(&doc_clause, "docClause")?,
+            currency: js_wire(&currency, "currency")?,
+            doc_clause: js_wire(&doc_clause, "docClause")?,
         };
         to_js_value(registry()?.resolve_cds(&key).map_err(to_js_err)?)
     }
@@ -67,7 +68,7 @@ impl JsConventionRegistry {
     /// @throws Error - Throws with kind `validation` if `currency` is not an ISO-4217 code, and kind `invalid_type` if it is not a string.
     #[wasm_bindgen(js_name = primaryCdsFamily)]
     pub fn primary_cds_family(&self, currency: JsValue) -> Result<JsValue, JsValue> {
-        let currency = super::typed::arg::en(&currency, "currency")?;
+        let currency = js_wire(&currency, "currency")?;
         to_js_value(&registry()?.primary_cds_family(currency))
     }
 

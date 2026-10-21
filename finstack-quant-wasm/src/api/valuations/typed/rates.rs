@@ -3,7 +3,9 @@
 
 use crate::api::core::dates::{JsDayCount, JsTenor};
 use crate::api::core::money::JsMoney;
+use crate::utils::input::js_f64;
 use crate::utils::to_js_err;
+use crate::utils::wire::{js_date, js_wire};
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
 
@@ -514,10 +516,10 @@ impl JsInterestRateSwap {
         let params = finstack_quant_valuations::instruments::rates::irs::ConventionSwapParams {
             id: super::arg::id(&id, "id")?,
             notional: notional.inner,
-            side: super::arg::en(&side, "side")?,
-            fixed_rate: super::arg::num(&fixed_rate, "fixedRate")?,
-            start_date: super::arg::date(&start_date, "startDate")?,
-            maturity: super::arg::date(&maturity, "maturity")?,
+            side: js_wire(&side, "side")?,
+            fixed_rate: js_f64(&fixed_rate, "fixedRate")?,
+            start_date: js_date(&start_date, "startDate")?,
+            maturity: js_date(&maturity, "maturity")?,
             index_id: &index_id,
             discount_curve_id: &discount_curve_id,
             forward_curve_id: &forward_curve_id,

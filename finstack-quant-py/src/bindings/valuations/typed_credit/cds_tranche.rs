@@ -17,14 +17,14 @@ use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PayReceive;
 
 use super::super::convert::{
-    attributes_from_py, bdc_from_py, bps_from_py, date_repr, dated_money_from_py,
-    day_count_from_py, enum_to_py_string, float_repr, money_from_py, money_repr, money_to_py,
-    tenor_from_py,
+    attributes_from_py, bdc_from_py, date_repr, dated_money_from_py, day_count_from_py,
+    enum_to_py_string, float_repr, money_from_py, money_repr, money_to_py, tenor_from_py,
 };
 use super::super::instruments::{enum_from_str, stub_kind_from_py};
 use super::super::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
+use crate::bindings::extract::extract_basis_points;
 
 type CdsTrancheBuilderInner =
     finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheBuilder;
@@ -129,7 +129,7 @@ impl PyCdsTrancheParams {
             detach_pct,
             money_from_py(notional, None, "notional")?,
             py_to_date(maturity)?,
-            bps_from_py(coupon_bp, "coupon_bp")?,
+            extract_basis_points(coupon_bp, "coupon_bp")?,
         )
         .with_realized_loss(realized_loss)
         .map_err(core_to_py)?;
@@ -185,7 +185,7 @@ impl PyCdsTrancheParams {
                 series,
                 money_from_py(notional, None, "notional")?,
                 py_to_date(maturity)?,
-                bps_from_py(coupon_bp, "coupon_bp")?,
+                extract_basis_points(coupon_bp, "coupon_bp")?,
             ),
         })
     }
@@ -239,7 +239,7 @@ impl PyCdsTrancheParams {
                 series,
                 money_from_py(notional, None, "notional")?,
                 py_to_date(maturity)?,
-                bps_from_py(coupon_bp, "coupon_bp")?,
+                extract_basis_points(coupon_bp, "coupon_bp")?,
             ),
         })
     }
@@ -778,7 +778,7 @@ impl PyCdsTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let bp = bps_from_py(value, "coupon_bp")?;
+        let bp = extract_basis_points(value, "coupon_bp")?;
         builder_set!(
             slf,
             coupon_bp,
