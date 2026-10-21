@@ -17,7 +17,8 @@
 //! an effective measure would reprice through the cashflow engine at ±Δy. Units
 //! are years².
 
-use finstack_quant_core::dates::{Date, DayCountContext};
+use crate::structured_credit::metrics::discounted_flows;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
@@ -40,7 +41,7 @@ pub(crate) const DEFAULT_CONVEXITY_YTM_BUMP_BP: f64 = 10.0;
 /// * `discount_curve` - The discount curve for PV calculation.
 /// * `as_of` - The valuation date.
 /// * `ytm_bump_bp` - Continuously compounded yield shock Δy in basis points
-///   (1.0 = 1bp); must be finite and positive. [`ConvexityCalculator`] passes
+///   (1.0 = 1bp); must be finite and positive. The registry `Convexity` metric passes
 ///   `metric_pricing_overrides.bump_config.ytm_bump_bp`, defaulting to 10bp.
 ///
 /// # Returns
@@ -63,18 +64,12 @@ pub fn calculate_tranche_convexity(
         )));
     }
     let bump = ytm_bump_bp / BASIS_POINTS_PER_UNIT;
-    let day_count = crate::structured_credit::metrics::METRIC_TIME_BASIS;
     let mut pv0 = NeumaierAccumulator::new();
     let mut pv_up = NeumaierAccumulator::new();
     let mut pv_dn = NeumaierAccumulator::new();
 
-    for (date, amount) in cashflows {
-        if *date <= as_of {
-            continue;
-        }
-        let t = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
-        let df = discount_curve.df_between_dates(as_of, *date)?;
-        let base = amount.amount() * df;
+    for (t, df, amount) in discounted_flows(cashflows, discount_curve, as_of)? {
+        let base = amount * df;
         pv0.add(base);
         // Higher rate -> lower PV: bump up multiplies by exp(-Δy·t).
         pv_up.add(base * (-bump * t).exp());
@@ -106,7 +101,7 @@ pub fn calculate_tranche_convexity(
 /// Reads the tranche's projected cashflows and discount curve from the metric
 /// context and returns convexity in years² via
 /// [`calculate_tranche_convexity`].
-pub struct ConvexityCalculator;
+pub(crate) struct ConvexityCalculator;
 
 impl MetricCalculator for ConvexityCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {

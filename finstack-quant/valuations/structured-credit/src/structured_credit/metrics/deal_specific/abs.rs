@@ -8,7 +8,7 @@ use finstack_quant_valuations_core::metrics::MetricContext;
 /// ABS delinquency rate: the pool's delinquent balance (every
 /// `PoolAsset::delinquency_buckets` entry) as a percent of the total pool
 /// balance at the valuation date.
-pub struct AbsDelinquencyCalculator;
+pub(crate) struct AbsDelinquencyCalculator;
 
 impl finstack_quant_valuations_core::metrics::MetricCalculator for AbsDelinquencyCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {

@@ -29,12 +29,7 @@ pub(crate) fn calculate_tranche_zspread(
     market: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
-    let tranche = cmo.reference_tranche().ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!(
-            "Tranche {} not found",
-            cmo.reference_tranche_id
-        ))
-    })?;
+    let tranche = cmo.reference_tranche()?;
 
     // The clean quote plus accrued buys the settlement-month accrual onward;
     // the collateral's prior-month in-flight P&I belongs to the seller.

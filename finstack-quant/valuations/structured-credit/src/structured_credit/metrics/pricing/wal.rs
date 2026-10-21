@@ -52,7 +52,7 @@ pub fn calculate_tranche_wal(cashflows: &TrancheCashflows, as_of: Date) -> Resul
 /// - **RMBS**: Typically 3-7 years (highly sensitive to PSA speed)
 /// - **CMBS**: Typically 4-8 years
 ///
-pub struct WalCalculator;
+pub(crate) struct WalCalculator;
 
 impl MetricCalculator for WalCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {

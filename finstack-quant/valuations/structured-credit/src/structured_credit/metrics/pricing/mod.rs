@@ -9,15 +9,16 @@ use crate::structured_credit::StructuredCredit;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
-pub use prices::{CleanPriceCalculator, DirtyPriceCalculator};
-pub use wal::{calculate_tranche_wal, WalCalculator};
+pub(crate) use prices::{CleanPriceCalculator, DirtyPriceCalculator};
+pub use wal::calculate_tranche_wal;
+pub(crate) use wal::WalCalculator;
 
 /// Calculates current-period contractual accrued interest in note currency.
 ///
 /// Opening balances precede projected defaults and principal distributions.
 /// Prior deferred coupons and equity residual distributions do not create
 /// additional current-period accrued interest.
-pub struct AccruedCalculator;
+pub(crate) struct AccruedCalculator;
 
 impl MetricCalculator for AccruedCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {

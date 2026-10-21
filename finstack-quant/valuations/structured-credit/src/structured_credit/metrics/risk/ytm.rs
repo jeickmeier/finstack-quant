@@ -77,7 +77,7 @@ struct StructuredCreditYtmConfigV1 {
 /// For structured credit, **Z-spread is generally more important than YTM**
 /// because it properly accounts for the term structure of rates.
 ///
-pub struct YtmCalculator;
+pub(crate) struct YtmCalculator;
 
 impl YtmCalculator {
     fn compounding_from_config(

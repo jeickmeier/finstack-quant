@@ -6,9 +6,9 @@
 //! assembles the same metrics **per tranche**, from that tranche's own projected
 //! cashflows, reusing the standalone calculators the registry wraps.
 
+use crate::structured_credit::metrics::risk::calculate_tranche_spread_convexity;
 use crate::structured_credit::metrics::{
-    calculate_tranche_cs01, calculate_tranche_spread_convexity, calculate_tranche_wal,
-    calculate_tranche_z_spread,
+    calculate_tranche_cs01, calculate_tranche_wal, calculate_tranche_z_spread,
 };
 use crate::structured_credit::{
     CallAssumption, CallScope, StructuredCredit, TrancheAccrualPeriod, TrancheCashflows,

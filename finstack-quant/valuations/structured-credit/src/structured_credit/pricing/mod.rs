@@ -18,7 +18,6 @@ pub(crate) mod waterfall;
 
 pub use waterfall::execute_waterfall;
 
-use crate::structured_credit::pricing::simulation_engine::DeterministicPoolFlowSource;
 use crate::structured_credit::types::{StructuredCredit, TrancheCashflows};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -68,9 +67,5 @@ pub fn run_simulation_with_diagnostics(
     let lifecycle =
         finstack_quant_valuations_core::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(instrument)?;
     let effective_as_of = lifecycle.effective_as_of(market, as_of);
-    if instrument.pool.instruments.is_some() {
-        return simulation_engine::simulate_instrument_pool(instrument, market, effective_as_of);
-    }
-    let mut source = DeterministicPoolFlowSource;
-    simulation_engine::simulate_with_source(instrument, market, effective_as_of, &mut source)
+    simulation_engine::simulate_with_source(instrument, market, effective_as_of, None)
 }

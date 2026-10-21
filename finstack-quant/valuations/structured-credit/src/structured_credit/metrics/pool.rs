@@ -45,7 +45,7 @@ impl finstack_quant_valuations_core::metrics::MetricCalculator for CloWarfCalcul
 /// defaulted assets — see [`AssetPool::weighted_avg_spread_bp`].
 ///
 /// [`AssetPool::weighted_avg_spread_bp`]: crate::structured_credit::types::AssetPool::weighted_avg_spread_bp
-pub struct CloWasCalculator;
+pub(crate) struct CloWasCalculator;
 
 impl finstack_quant_valuations_core::metrics::MetricCalculator for CloWasCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
@@ -73,7 +73,7 @@ impl finstack_quant_valuations_core::metrics::MetricCalculator for CloWasCalcula
 /// - **RMBS**: 25-30 years (legal maturity, much longer than WAL)
 /// - **CMBS**: 7-10 years
 ///
-pub struct WamCalculator;
+pub(crate) struct WamCalculator;
 
 impl MetricCalculator for WamCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {

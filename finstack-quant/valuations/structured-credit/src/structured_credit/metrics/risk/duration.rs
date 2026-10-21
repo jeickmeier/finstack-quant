@@ -1,7 +1,8 @@
 //! Duration calculators for structured credit.
 
+use crate::structured_credit::metrics::discounted_flows;
 use finstack_quant_cashflows::DatedFlows;
-use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
@@ -31,7 +32,7 @@ use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 /// - **RMBS (fixed)**: Typically 3-6 years (depends on prepayments)
 /// - **CMBS (fixed)**: Typically 4-7 years
 ///
-pub struct MacaulayDurationCalculator;
+pub(crate) struct MacaulayDurationCalculator;
 
 impl MetricCalculator for MacaulayDurationCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
@@ -49,21 +50,11 @@ impl MetricCalculator for MacaulayDurationCalculator {
         // Duration is combined with convexity in the second-order price
         // expansion, and convexity measures time in Act/365F — mixing the two
         // made `D` and `C` incommensurable. See `METRIC_TIME_BASIS`.
-        let day_count = crate::structured_credit::metrics::METRIC_TIME_BASIS;
-
         let mut weighted_pv = 0.0;
         let mut total_pv = 0.0;
 
-        for (date, amount) in flows {
-            if *date <= settlement {
-                continue;
-            }
-
-            let years = day_count.year_fraction(settlement, *date, DayCountContext::default())?;
-
-            let df = disc.df_between_dates(settlement, *date)?;
-
-            let pv = amount.amount() * df;
+        for (years, df, amount) in discounted_flows(flows, &disc, settlement)? {
+            let pv = amount * df;
 
             weighted_pv += pv * years;
             total_pv += pv;
@@ -94,7 +85,7 @@ impl MetricCalculator for MacaulayDurationCalculator {
 /// A modified duration of 3.5 means that for a 1% (100bp) increase in yield,
 /// the price would decrease by approximately 3.5%.
 ///
-pub struct ModifiedDurationCalculator;
+pub(crate) struct ModifiedDurationCalculator;
 
 impl MetricCalculator for ModifiedDurationCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
@@ -129,9 +120,9 @@ pub(crate) const DEFAULT_DURATION_YTM_BUMP_BP: f64 = 1.0;
 ///
 /// True modified duration: `-(1/P)·dP/dy` measured by bumping the
 /// continuously-compounded discounting of the tranche's cashflows by
-/// `ytm_bump_bp` (the same approach as [`ModifiedDurationCalculator`]). The previous
-/// implementation returned the Macaulay duration (PV-weighted time) under
-/// this name.
+/// `ytm_bump_bp` (the same approach as the registry `DurationMod` metric). The
+/// previous implementation returned the Macaulay duration (PV-weighted time)
+/// under this name.
 ///
 /// # Arguments
 ///
@@ -140,8 +131,8 @@ pub(crate) const DEFAULT_DURATION_YTM_BUMP_BP: f64 = 1.0;
 /// * `as_of` - The valuation date
 /// * `pv` - The present value of the tranche (guards the degenerate case)
 /// * `ytm_bump_bp` - Continuously compounded yield shock in basis points
-///   (1.0 = 1bp); must be finite and positive. `ModifiedDurationCalculator`
-///   passes `metric_pricing_overrides.bump_config.ytm_bump_bp`, defaulting to
+///   (1.0 = 1bp); must be finite and positive. The registry `DurationMod`
+///   metric passes `metric_pricing_overrides.bump_config.ytm_bump_bp`, defaulting to
 ///   1bp.
 ///
 /// # Returns
@@ -163,21 +154,13 @@ pub fn calculate_tranche_duration(
         return Ok(0.0);
     }
 
-    let day_count = crate::structured_credit::metrics::METRIC_TIME_BASIS;
     let yield_shift = ytm_bump_bp / BASIS_POINTS_PER_UNIT;
 
     let mut base_pv = 0.0;
     let mut shifted_pv = 0.0;
 
-    for (date, amount) in cashflows {
-        if *date <= as_of {
-            continue;
-        }
-
-        let years = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
-
-        let df = discount_curve.df_between_dates(as_of, *date)?;
-        let flow_pv = amount.amount() * df;
+    for (years, df, amount) in discounted_flows(cashflows, discount_curve, as_of)? {
+        let flow_pv = amount * df;
 
         base_pv += flow_pv;
         shifted_pv += flow_pv * (-yield_shift * years).exp();
