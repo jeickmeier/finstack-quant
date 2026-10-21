@@ -121,8 +121,8 @@ impl InterestRateSwap {
             if flow.date > as_of
                 && matches!(
                     flow.kind,
-                    finstack_quant_cashflows::primitives::CFKind::Fixed
-                        | finstack_quant_cashflows::primitives::CFKind::Stub
+                    finstack_quant_core::cashflow::CFKind::Fixed
+                        | finstack_quant_core::cashflow::CFKind::Stub
                 )
             {
                 let discount = disc.df_between_dates(as_of, flow.date)?;

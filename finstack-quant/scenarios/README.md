@@ -33,11 +33,12 @@ instrument effects — live in `finstack-quant-statements-analytics` instead.
 | `envelope` | `ScenarioEnvelope`, `ScenarioSchema`, `SCENARIO_CONTRACT` for strict versioned persistence |
 | `Warning`, `Error`, `Result` | Structured non-fatal warnings and the crate error type |
 
-Supporting types re-exported at the crate root: `CurveKind` (`Discount`,
-`Forward`, `ParCDS`, `Inflation`, `Commodity`), `TimeRollMode`
-(`BusinessDays`, `CalendarDays`, `Approximate`), `TenorMatchMode` (`Exact`,
-`Interpolate`) and `Compounding` are owned by this crate;
-`HierarchyTarget` comes from `finstack_quant_core::market_data::hierarchy`,
+Supporting types at the crate root: `CurveKind` (`Discount`, `Forward`,
+`ParCDS`, `Inflation`, `Commodity`), `TimeRollMode` (`BusinessDays`,
+`CalendarDays`, `Approximate`) and `TenorMatchMode` (`Exact`, `Interpolate`).
+Operation fields also use types this crate does not re-export; import them from
+their owning crate: `Compounding` from `finstack_quant_core::math`,
+`HierarchyTarget` from `finstack_quant_core::market_data::hierarchy`,
 `InstrumentType` from `finstack_quant_valuations::pricer`, and `NodeId` from
 `finstack_quant_statements::types`.
 
@@ -150,7 +151,7 @@ Five historical stress templates are embedded as JSON from
 can take the whole scenario or just one leg.
 
 ```rust
-use finstack_quant_scenarios::templates::TemplateRegistry;
+use finstack_quant_scenarios::TemplateRegistry;
 
 fn rates_leg() -> finstack_quant_scenarios::Result<()> {
     let registry = TemplateRegistry::embedded_builtins()?;

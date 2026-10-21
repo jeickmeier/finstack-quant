@@ -443,7 +443,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
     ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         // Settlement at start of accrual period; if already settled, no flows
         if self.start_date <= as_of {
-            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
+            return finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 self.day_count,
                 finstack_quant_cashflows::ScheduleBuildOpts {
@@ -454,7 +454,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
                         ..Default::default()
                     },
                 },
-            ));
+            );
         }
 
         let flows = {
@@ -467,13 +467,13 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
 
         let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
             flows,
-            finstack_quant_cashflows::primitives::CFKind::Fixed,
+            finstack_quant_core::cashflow::CFKind::Fixed,
             self.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: self.notional()?,
                 ..Default::default()
             },
-        );
+        )?;
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
         ))

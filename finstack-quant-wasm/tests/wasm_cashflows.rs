@@ -19,7 +19,7 @@ fn accrued_interest(
         cashflows::schedule::JsCashFlowSchedule::from_json(JsValue::from(schedule_json))?;
     let config = config_json.map(js_sys::JSON::parse).transpose()?;
     let money =
-        cashflows::accrual::accrued_interest_amount_js(&schedule, JsValue::from(as_of), config)?;
+        cashflows::accrual::accrued_interest_amount(&schedule, JsValue::from(as_of), config)?;
     let text: String = js_sys::JSON::stringify(&money)?.into();
     let money: serde_json::Value = serde_json::from_str(&text).unwrap();
     Ok(match &money["amount"] {

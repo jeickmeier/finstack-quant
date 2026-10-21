@@ -7,7 +7,7 @@ use crate::mbs_passthrough::AgencyProgram;
 use crate::tba::{AgencyTba, TbaTerm};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
-use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, SifmaSettlementClass};
 use finstack_quant_core::money::Money;
@@ -460,7 +460,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for DollarRoll {
                     ..Default::default()
                 },
             },
-        );
+        )?;
         Ok(schedule)
     }
 }

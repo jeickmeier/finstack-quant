@@ -16,7 +16,7 @@ use crate::bond::pricing::engine::tree::BondValuator;
 use crate::bond::{
     Bond, CallPut, CallPutSchedule, ProtectionWindow, ReturnFloorKind, ReturnFloorSpec,
 };
-use finstack_quant_cashflows::primitives::CFKind;
+use finstack_quant_core::cashflow::CFKind;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// One candidate redemption date with the cash paid at it and the running state.
@@ -471,7 +471,7 @@ mod tests {
     #[test]
     fn seasoned_pik_and_amortization_follow_canonical_balance_path() {
         use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-        use finstack_quant_cashflows::primitives::CashFlow;
+        use finstack_quant_core::cashflow::CashFlow;
 
         let issue = date!(2024 - 01 - 01);
         let pik_date = date!(2024 - 07 - 01);

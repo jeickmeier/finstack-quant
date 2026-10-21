@@ -153,7 +153,7 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     module.add_class::<schedule::PyCashFlowMeta>()?;
     module.add_class::<schedule::PyCashFlowSchedule>()?;
     module.add_function(wrap_pyfunction!(
-        schedule::py_merge_cashflow_schedules,
+        schedule::merge_cashflow_schedules,
         &module
     )?)?;
     module.add_function(wrap_pyfunction!(abs_to_smm, &module)?)?;

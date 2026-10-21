@@ -8,7 +8,7 @@ and compute accrued interest.
 Examples
 --------
 >>> import datetime
->>> from finstack_quant.cashflows.primitives import CFKind, CashFlow
+>>> from finstack_quant.core.cashflow import CFKind, CashFlow
 >>> from finstack_quant.core.money import Money
 >>> CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED, 0.0).amount.amount
 100.0
@@ -23,14 +23,13 @@ import datetime
 
 from finstack_quant.cashflows import accrual as accrual
 from finstack_quant.cashflows.builder import CashFlowMeta, CashFlowSchedule
-from finstack_quant.cashflows.primitives import CashFlow, CFKind
+from finstack_quant.core.cashflow import CashFlow, CFKind
 from finstack_quant.core.dates import DayCount
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.cashflows import aggregation as aggregation
 from finstack_quant.cashflows import builder as builder
 from finstack_quant.cashflows import fixings as fixings
-from finstack_quant.cashflows import primitives as primitives
 from finstack_quant.cashflows import schema as schema
 
 __all__ = [
@@ -43,7 +42,6 @@ __all__ = [
     "fixings",
     "dated_flows",
     "dated_flows_json",
-    "primitives",
     "schedule_from_classified_flows",
     "schedule_from_dated_flows",
     "schema",
@@ -289,7 +287,7 @@ def schedule_from_classified_flows(
     --------
     >>> import datetime
     >>> from finstack_quant.cashflows import schedule_from_classified_flows
-    >>> from finstack_quant.cashflows.primitives import CashFlow, CFKind
+    >>> from finstack_quant.core.cashflow import CashFlow, CFKind
     >>> from finstack_quant.core.dates import DayCount
     >>> from finstack_quant.core.money import Money
     >>> flow = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.PIK, 0.0)

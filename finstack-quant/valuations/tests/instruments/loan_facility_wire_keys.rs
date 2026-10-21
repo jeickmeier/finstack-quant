@@ -564,10 +564,9 @@ fn retired_facility_limit_keys_are_rejected() {
 #[test]
 // schema-rejection-test: RateSpec fixed `rate_bp`, TermLoan amortization `bp`, LoanCallType make_whole `treasury_spread_bp`
 fn retired_term_loan_keys_are_rejected() {
+    use finstack_quant_cashflows::builder::AmortizationSpec;
     use finstack_quant_cashflows::builder::RateSpec;
-    use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-        AmortizationSpec, LoanCallType,
-    };
+    use finstack_quant_valuations::instruments::fixed_income::term_loan::LoanCallType;
     use serde_json::json;
     let err = serde_json::from_value::<RateSpec>(json!({"fixed": {"rate_bp": 600}}))
         .expect_err("rate_bp is retired");

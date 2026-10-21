@@ -743,10 +743,12 @@ fn scenarios_dts_matches_structured_surface() {
         "applyScenario(scenarioJson: JsonInput, marketJson: JsonInput, asOf: string, modelJson?: JsonInput, instrumentsJson?: JsonInput, configJson?: JsonInput): ApplicationEnvelope;",
     ));
     assert!(!dts.contains("buildScenarioSpec("));
-    // Free-function twins of the Python OperationSpec / HorizonResult members:
-    // the omitted trailing arguments resolve to the Rust defaults.
+    // Free-function twins of the Python OperationSpec / HorizonResult members
+    // that compute in Rust: the omitted trailing arguments resolve to the Rust
+    // defaults. Variant constructors are TypeScript literals, not functions.
+    assert!(!dts.contains("operationSpecCurveParallelBp("));
     for signature in [
-        "operationSpecCurveParallelBp(curveKind: CurveKind, curveId: string, bp: number, discountCurveId?: string): OperationSpec;",
+        "parallelBpMany(curveKind: CurveKind, curveIds: string[], bp: number, discountCurveId?: string): OperationSpec[];",
         "operationSpecTimeRollForward(period: string, applyShocks?: boolean, rollMode?: TimeRollMode): OperationSpec;",
         "horizonResultExplainText(result: HorizonReport | HorizonResult | string): string;",
         "horizonResultFactorContribution(result: HorizonReport | HorizonResult | string, factor: AttributionFactor): number;",
@@ -1859,7 +1861,7 @@ fn typed_cashflows_and_covenants_surface_is_declared() {
         "build(market?: MarketContext | null): CashFlowSchedule;",
         "buildCashflowSchedule(spec: generated.cashflows.CashflowScheduleBuildSpec | string, market?: MarketContext | null): CashFlowSchedule;",
         "scaleAmounts(scale: number): CashFlowSchedule;",
-        "pvByPeriod(periods: readonly generated.statements.Period[], market: MarketContext, discCurveId: string, base: string, dayCount?: generated.core.DayCount | null, creditCurveId?: string | null): generated.cashflows.PeriodAggregation;",
+        "pvByPeriod(periods: readonly generated.core.Period[], market: MarketContext, discCurveId: string, base: string, creditCurveId?: string | null): generated.cashflows.PeriodAggregation;",
         "fixedToFloat(switchDate: string, fixed: generated.cashflows.FixedCouponSpec, floating: generated.cashflows.FloatingCouponSpec): CashFlowBuilder;",
         "accruedInterestAmount(schedule: CashFlowSchedule, asOf: string, config?: generated.cashflows.AccrualConfig | null): MoneyValue;",
         "accruedAt(asOf: string): MoneyValue;",

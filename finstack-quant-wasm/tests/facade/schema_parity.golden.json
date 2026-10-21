@@ -823,7 +823,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 216089
+            "bytes": 216966
           },
           {
             "path": "schemas/calibration/1/calibration_result.schema.json",
@@ -872,7 +872,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/step_params.schema.json",
             "type_name": "StepParams",
             "kind": "component",
-            "bytes": 61295
+            "bytes": 61598
           },
           {
             "path": "schemas/market/1/cds_quote.schema.json",
@@ -1128,7 +1128,7 @@
             "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
             "type_name": "CashflowScheduleBuildSpec",
             "kind": "input",
-            "bytes": 78273
+            "bytes": 78396
           },
           {
             "path": "schemas/cashflow/1/coupon_specs.schema.json",
@@ -1149,7 +1149,7 @@
             "$id": "https://finstack_quant.dev/schemas/cashflow/1/fee_specs.schema.json",
             "type_name": "FeeSpec",
             "kind": "component",
-            "bytes": 8090
+            "bytes": 8213
           },
           {
             "path": "schemas/cashflow/1/floating_coupon_spec.schema.json",
@@ -2027,14 +2027,14 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario.schema.json",
             "type_name": "ScenarioEnvelope",
             "kind": "input",
-            "bytes": 103053
+            "bytes": 103113
           },
           {
             "path": "schemas/scenarios/1/template_metadata.schema.json",
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/template_metadata.schema.json",
             "type_name": "TemplateMetadata",
             "kind": "output",
-            "bytes": 4822
+            "bytes": 4906
           }
         ]
       },
@@ -3402,7 +3402,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
             "type_name": "PoolStats",
             "kind": "output",
-            "bytes": 2449
+            "bytes": 2491
           },
           {
             "path": "schemas/results/1/scenario_table.schema.json",
@@ -3609,7 +3609,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 216089
+            "bytes": 216966
           },
           {
             "domain": "calibration",
@@ -3665,7 +3665,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/step_params.schema.json",
             "type_name": "StepParams",
             "kind": "component",
-            "bytes": 61295
+            "bytes": 61598
           },
           {
             "domain": "calibration",
@@ -3753,7 +3753,7 @@
             "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
             "type_name": "CashflowScheduleBuildSpec",
             "kind": "input",
-            "bytes": 78273
+            "bytes": 78396
           },
           {
             "domain": "cashflows",
@@ -3777,7 +3777,7 @@
             "$id": "https://finstack_quant.dev/schemas/cashflow/1/fee_specs.schema.json",
             "type_name": "FeeSpec",
             "kind": "component",
-            "bytes": 8090
+            "bytes": 8213
           },
           {
             "domain": "cashflows",
@@ -4513,7 +4513,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario.schema.json",
             "type_name": "ScenarioEnvelope",
             "kind": "input",
-            "bytes": 103053
+            "bytes": 103113
           },
           {
             "domain": "scenarios",
@@ -4521,7 +4521,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/template_metadata.schema.json",
             "type_name": "TemplateMetadata",
             "kind": "output",
-            "bytes": 4822
+            "bytes": 4906
           },
           {
             "domain": "statements",
@@ -5529,7 +5529,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
             "type_name": "PoolStats",
             "kind": "output",
-            "bytes": 2449
+            "bytes": 2491
           },
           {
             "domain": "valuations",

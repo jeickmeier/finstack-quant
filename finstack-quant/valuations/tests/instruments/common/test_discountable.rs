@@ -87,7 +87,12 @@ fn test_schedule_discountable_simple() {
         .unwrap();
 
     // Act - use explicit day count
-    let pv = schedule.npv(&curve, curve.base_date()).unwrap();
+    let pv = finstack_quant_core::cashflow::npv(
+        &curve,
+        curve.base_date(),
+        &schedule.dated_flows().unwrap(),
+    )
+    .unwrap();
 
     // Assert
     assert!(pv.amount().is_finite(), "PV is finite");
@@ -156,7 +161,12 @@ fn test_npv_zero_rate() {
         .unwrap();
 
     // Act - use explicit day count
-    let pv = schedule.npv(&curve, curve.base_date()).unwrap();
+    let pv = finstack_quant_core::cashflow::npv(
+        &curve,
+        curve.base_date(),
+        &schedule.dated_flows().unwrap(),
+    )
+    .unwrap();
 
     // The issue-date funding exchange is excluded; at zero rates the NPV is
     // exactly the sum of strictly future coupon and redemption cashflows.

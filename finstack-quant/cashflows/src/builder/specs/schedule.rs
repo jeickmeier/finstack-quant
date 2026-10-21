@@ -2,6 +2,11 @@
 
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 
+/// Serde default for optional stub fields: `ShortFront` (`StubKind::default()` is `None`).
+pub(crate) fn stub_short_front() -> StubKind {
+    StubKind::ShortFront
+}
+
 /// Roll-date rule applied when generating schedule anchors.
 ///
 /// Selects the core `ScheduleBuilder` date-generation mode. The IMM modes
@@ -88,7 +93,7 @@ pub struct ScheduleParams {
     /// [`Self::adjust_accrual_dates`] is `true`, in which case the same
     /// convention also rolls both accrual-period boundaries (swap/ISDA 2006
     /// §4.10 convention).
-    #[serde(default = "crate::serde_defaults::bdc_modified_following")]
+    #[serde(default)]
     pub business_day_convention: BusinessDayConvention,
     /// Holiday calendar identifier used together with `business_day_convention`.
     ///
@@ -96,7 +101,7 @@ pub struct ScheduleParams {
     pub calendar_id: finstack_quant_core::types::CalendarId,
     /// Stub-handling rule used when the start/end dates do not fit an exact
     /// whole number of periods.
-    #[serde(default = "crate::serde_defaults::stub_short_front")]
+    #[serde(default = "crate::builder::specs::schedule::stub_short_front")]
     pub stub: StubKind,
     /// Whether end-of-month rolling should be preserved when generating the
     /// schedule.
@@ -136,7 +141,7 @@ pub struct ScheduleParams {
     pub roll_rule: RollRule,
 }
 
-const WK: &str = crate::builder::calendar::WEEKENDS_ONLY_ID;
+const WK: &str = finstack_quant_core::dates::WEEKENDS_ONLY_ID;
 
 impl ScheduleParams {
     fn preset(

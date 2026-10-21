@@ -443,7 +443,7 @@ fn merge_updated_flows(
 mod opening_tests {
     use super::resolve_opening_balance;
     use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-    use finstack_quant_cashflows::primitives::CFKind;
+    use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::cashflow::CashFlow;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};

@@ -75,6 +75,10 @@ fn materialize_fixings(
 
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let module = crate::bindings::module_utils::new_submodule(parent, "fixings")?;
+    module.setattr(
+        "__doc__",
+        "Projected index fixings recorded on schedules and their materialization on a market roll.",
+    )?;
     module.add_class::<PyProjectedFixing>()?;
     module.add_function(wrap_pyfunction!(materialize_fixings, &module)?)?;
     module.setattr(
