@@ -49,8 +49,9 @@
 //! # }
 //! ```
 
+use crate::invalid_input;
 use finstack_quant_core::validation::validate_f64_non_negative;
-use finstack_quant_core::{Error, Result};
+use finstack_quant_core::Result;
 
 /// Multiple of the hold-out present value that the tender consideration must
 /// exceed before tendering is recommended.
@@ -319,12 +320,12 @@ pub fn analyze_lme(
     ebitda: Option<f64>,
 ) -> Result<LmeAnalysis> {
     if !notional.is_finite() || notional <= 0.0 {
-        return Err(validation_error(format!(
+        return Err(invalid_input(format!(
             "notional must be finite and positive, got {notional}"
         )));
     }
     if !(0.0..=1.0).contains(&opt_acceptance_pct) {
-        return Err(validation_error(format!(
+        return Err(invalid_input(format!(
             "opt_acceptance_pct must be in [0.0, 1.0], got {opt_acceptance_pct}"
         )));
     }
@@ -334,7 +335,7 @@ pub fn analyze_lme(
     let (par_retired, cost, remaining_holder_impact_pct) = match lme_type {
         LmeType::OpenMarketRepurchase | LmeType::TenderOffer => {
             if !(repurchase_price_pct > 0.0 && repurchase_price_pct <= 1.5) {
-                return Err(validation_error(format!(
+                return Err(invalid_input(format!(
                     "repurchase_price_pct must be in (0.0, 1.5], got {repurchase_price_pct}"
                 )));
             }
@@ -342,7 +343,7 @@ pub fn analyze_lme(
         }
         LmeType::AmendAndExtend => {
             if !(0.0..=0.10).contains(&repurchase_price_pct) {
-                return Err(validation_error(format!(
+                return Err(invalid_input(format!(
                     "extension_fee must be in [0.0, 0.10], got {repurchase_price_pct}"
                 )));
             }
@@ -350,7 +351,7 @@ pub fn analyze_lme(
         }
         LmeType::Dropdown => {
             if !(0.0..=1.0).contains(&repurchase_price_pct) {
-                return Err(validation_error(format!(
+                return Err(invalid_input(format!(
                     "transferred-asset fraction must be in [0.0, 1.0], got {repurchase_price_pct}"
                 )));
             }
@@ -385,8 +386,4 @@ pub fn analyze_lme(
         remaining_holder_impact_pct,
         leverage_impact,
     })
-}
-
-fn validation_error(message: impl Into<String>) -> Error {
-    Error::Validation(message.into())
 }

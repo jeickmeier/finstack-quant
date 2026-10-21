@@ -5,6 +5,21 @@
 //! decomposers share one check. Normal quantiles and densities come straight
 //! from `finstack_quant_core::math`.
 
+/// Absolute tolerance below which a computed variance is numerical noise:
+/// variances in `[-VARIANCE_TOLERANCE, 0)` clamp to zero, lower ones are
+/// rejected.
+pub(crate) const VARIANCE_TOLERANCE: f64 = 1e-12;
+
+/// Normal-tail multipliers at `confidence`: the quantile `z = Φ⁻¹(c)` and the
+/// expected-shortfall multiplier `φ(z) / (1 − c)`.
+pub(crate) fn tail_multipliers(confidence: f64) -> (f64, f64) {
+    let z = finstack_quant_core::math::standard_normal_inv_cdf(confidence);
+    (
+        z,
+        finstack_quant_core::math::norm_pdf(z) / (1.0 - confidence),
+    )
+}
+
 /// Validate a raw position covariance using the shared core PSD factorization.
 ///
 /// # Arguments

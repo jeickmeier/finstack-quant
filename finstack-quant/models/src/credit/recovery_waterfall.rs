@@ -11,6 +11,7 @@
 
 use std::collections::HashSet;
 
+use crate::invalid_input;
 use finstack_quant_core::math::{neumaier_sum, NeumaierAccumulator};
 use finstack_quant_core::validation::validate_f64_non_negative;
 use finstack_quant_core::{Error, Result};
@@ -125,13 +126,13 @@ pub fn allocate_recovery(
         validate_claim(claim)?;
         let trimmed_id = claim.id.trim();
         if !seen_ids.insert(trimmed_id) {
-            return Err(validation_error(format!(
+            return Err(invalid_input(format!(
                 "duplicate recovery claim id after trimming: '{trimmed_id}'"
             )));
         }
         let total_claim = claim.total_claim();
         if !total_claim.is_finite() {
-            return Err(validation_error(format!(
+            return Err(invalid_input(format!(
                 "claim '{}' total amount must be finite",
                 claim.id
             )));
@@ -143,7 +144,7 @@ pub fn allocate_recovery(
             .min(total_claim);
         total_collateral_sum.add(collateral_recovery);
         if !total_collateral_sum.total().is_finite() {
-            return Err(validation_error(
+            return Err(invalid_input(
                 "aggregate collateral recovery must be finite",
             ));
         }
@@ -153,7 +154,7 @@ pub fn allocate_recovery(
     let mut total_collateral = total_collateral_sum.total();
     let collateral_tolerance = comparison_tolerance(total_collateral, estate_value);
     if total_collateral > estate_value + collateral_tolerance {
-        return Err(validation_error(format!(
+        return Err(invalid_input(format!(
             "net collateral recovery ({total_collateral}) exceeds estate_value ({estate_value}); \
              estate_value must include pledged collateral"
         )));
@@ -194,7 +195,7 @@ pub fn allocate_recovery(
         }
         let group_deficiency = group_deficiency_sum.total();
         if !group_deficiency.is_finite() {
-            return Err(validation_error(
+            return Err(invalid_input(
                 "aggregate priority-class deficiency must be finite",
             ));
         }
@@ -233,7 +234,7 @@ pub fn allocate_recovery(
     let mut total_distributed = sum_recoveries(&allocations);
     let distribution_tolerance = comparison_tolerance(total_distributed, estate_value);
     if total_distributed > estate_value + distribution_tolerance {
-        return Err(validation_error(format!(
+        return Err(invalid_input(format!(
             "aggregate recovery ({total_distributed}) exceeds estate_value ({estate_value})"
         )));
     }
@@ -244,7 +245,7 @@ pub fn allocate_recovery(
     let undistributed_estate = (estate_value - total_distributed).max(0.0);
     let conserved = neumaier_sum([total_distributed, undistributed_estate]);
     if (conserved - estate_value).abs() > comparison_tolerance(conserved, estate_value) {
-        return Err(validation_error(format!(
+        return Err(invalid_input(format!(
             "recovery conservation failed: distributed ({total_distributed}) plus undistributed \
              ({undistributed_estate}) does not equal estate_value ({estate_value})"
         )));
@@ -328,12 +329,10 @@ fn comparison_tolerance(left: f64, right: f64) -> f64 {
 
 fn validate_claim(claim: &RecoveryClaim) -> Result<()> {
     if claim.id.trim().is_empty() {
-        return Err(validation_error("recovery claim id must not be empty"));
+        return Err(invalid_input("recovery claim id must not be empty"));
     }
     if claim.seniority.trim().is_empty() {
-        return Err(validation_error(
-            "recovery claim seniority must not be empty",
-        ));
+        return Err(invalid_input("recovery claim seniority must not be empty"));
     }
     validate_f64_non_negative(claim.principal, "principal")?;
     validate_f64_non_negative(claim.accrued, "accrued")?;
@@ -342,14 +341,10 @@ fn validate_claim(claim: &RecoveryClaim) -> Result<()> {
         validate_f64_non_negative(collateral_value, "collateral_value")?;
     }
     if !claim.collateral_haircut.is_finite() || !(0.0..=1.0).contains(&claim.collateral_haircut) {
-        return Err(validation_error(format!(
+        return Err(invalid_input(format!(
             "collateral_haircut must be finite and in [0, 1], got {}",
             claim.collateral_haircut
         )));
     }
     Ok(())
-}
-
-fn validation_error(message: impl Into<String>) -> Error {
-    Error::Validation(message.into())
 }

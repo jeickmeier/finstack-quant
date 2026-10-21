@@ -70,6 +70,11 @@ pub use trees::{
 pub use types::{ExerciseStyle, OptionType};
 pub use volatility::{d1_d2, d1_d2_black76, SabrCalibrator, SabrParameters, SabrShift};
 
+/// Validation error for a caller input outside its domain.
+pub(crate) fn invalid_input(message: impl Into<String>) -> finstack_quant_core::Error {
+    finstack_quant_core::Error::Validation(message.into())
+}
+
 /// Compiles the crate `README.md` Rust samples as doctests.
 #[cfg(doctest)]
 #[doc = include_str!("../README.md")]

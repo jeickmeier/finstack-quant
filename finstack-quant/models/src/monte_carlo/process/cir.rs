@@ -85,7 +85,7 @@ impl CirParams {
     /// Feller condition: 2κθ ≥ σ²
     /// If satisfied, the process stays strictly positive.
     pub fn satisfies_feller(&self) -> bool {
-        2.0 * self.kappa * self.theta >= self.sigma * self.sigma
+        super::heston::heston_satisfies_feller(self.kappa, self.theta, self.sigma)
     }
 }
 

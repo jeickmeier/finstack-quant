@@ -359,11 +359,7 @@ pub fn build_stress_attribution(
         )));
     }
 
-    if !confidence.is_finite() || confidence <= 0.5 || confidence >= 1.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "confidence must be finite and in (0.5, 1), got {confidence}"
-        )));
-    }
+    crate::config::validate_confidence(confidence)?;
 
     if let Some(bad_idx) = position_pnls.iter().position(|p| !p.is_finite()) {
         let scenario = bad_idx / n_positions;
@@ -461,9 +457,9 @@ pub fn build_stress_attribution(
 
 // Shared math helpers
 
-const VARIANCE_TOLERANCE: f64 = 1e-12;
+use super::math::{tail_multipliers, VARIANCE_TOLERANCE};
 
-use finstack_quant_core::math::{norm_pdf, standard_normal_inv_cdf};
+use finstack_quant_core::math::standard_normal_inv_cdf;
 
 // Validation helpers
 
@@ -492,11 +488,7 @@ fn validate_decomposition_inputs(
         )));
     }
 
-    if !confidence.is_finite() || confidence <= 0.5 || confidence >= 1.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "confidence must be finite and in (0.5, 1), got {confidence}"
-        )));
-    }
+    crate::config::validate_confidence(confidence)?;
 
     if weights.iter().any(|v| !v.is_finite()) {
         return Err(finstack_quant_core::Error::Validation(
@@ -639,9 +631,7 @@ pub fn parametric_var_decomposition(
         });
     }
 
-    let z_alpha = standard_normal_inv_cdf(confidence);
-    let phi_z = norm_pdf(z_alpha);
-    let es_multiplier = phi_z / (1.0 - confidence);
+    let (z_alpha, es_multiplier) = tail_multipliers(confidence);
 
     // Sigma * w (matrix-vector product).
     let mut sigma_w = vec![0.0; n];
@@ -861,11 +851,7 @@ pub fn historical_var_decomposition(
         )));
     }
 
-    if !confidence.is_finite() || confidence <= 0.5 || confidence >= 1.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "confidence must be finite and in (0.5, 1), got {confidence}"
-        )));
-    }
+    crate::config::validate_confidence(confidence)?;
 
     if n == 0 || n_scenarios == 0 {
         return Ok(PositionRiskDecomposition {

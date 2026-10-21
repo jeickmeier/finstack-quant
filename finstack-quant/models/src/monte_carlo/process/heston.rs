@@ -128,7 +128,7 @@ use crate::closed_form::heston::HestonPricingParams;
 /// [`HestonParams::satisfies_feller`](crate::volatility::heston::HestonParams::satisfies_feller)
 /// and the host-language bindings, so all surfaces agree on the boundary
 /// case: it is **inclusive** — non-attainment of zero holds iff `2κθ ≥ σ_v²`
-/// (Feller 1951), matching `CirParams::satisfies_feller`.
+/// (Feller 1951). `CirParams::satisfies_feller` calls it as well.
 ///
 /// Inputs are not otherwise validated; non-finite inputs yield `false` except
 /// where IEEE comparison rules dictate otherwise (e.g. infinite `kappa`).
@@ -172,34 +172,17 @@ pub struct HestonProcess {
 impl HestonProcess {
     /// Create a new Heston process.
     ///
-    /// # Feller Condition Warning
-    ///
-    /// If the Feller condition (2κθ ≥ σᵥ²) is violated, a warning is logged.
-    /// When violated, the variance process can reach zero with positive probability,
-    /// though the QE scheme handles this gracefully via truncation.
+    /// # Feller Condition
     ///
     /// This constructor accepts already validated parameters and does not
-    /// enforce the Feller condition; use [`HestonPricingParams::new`] or
-    /// [`Self::with_params`] when constructing raw numeric inputs.
+    /// enforce the Feller condition (2κθ ≥ σᵥ²). [`HestonPricingParams::new`]
+    /// (used by [`Self::with_params`]) logs the one warning when it is
+    /// violated; the QE scheme truncates variance at zero either way.
     ///
     /// # Arguments
     ///
     /// * `params` - Validated model or algorithm parameters controlling this calculation.
     pub fn new(params: HestonPricingParams) -> Self {
-        // Warn when Feller condition is violated (variance may hit zero)
-        if !params.satisfies_feller() {
-            let feller_ratio =
-                2.0 * params.kappa * params.theta / (params.sigma_v * params.sigma_v);
-            tracing::warn!(
-                kappa = params.kappa,
-                theta = params.theta,
-                sigma_v = params.sigma_v,
-                feller_ratio = feller_ratio,
-                "Heston Feller condition violated (2κθ < σᵥ²): variance may reach zero. \
-                 Feller ratio = {:.4} (should be ≥ 1.0). QE scheme will truncate at zero.",
-                feller_ratio
-            );
-        }
         Self {
             params,
             drift_schedule: None,

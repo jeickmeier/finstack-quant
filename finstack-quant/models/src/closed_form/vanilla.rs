@@ -45,6 +45,7 @@
 
 use crate::types::OptionType;
 use crate::volatility::black::d1_d2;
+use finstack_quant_core::validation::require_with;
 use finstack_quant_core::{Error, Result};
 use std::fmt;
 
@@ -182,6 +183,50 @@ pub fn checked_closed_form_value(value: f64, what: &str) -> Result<f64> {
     }
 }
 
+/// `{model} {name} must be finite, got {value}` unless `value` is finite.
+pub(crate) fn require_finite(model: &str, name: &str, value: f64) -> Result<()> {
+    require_with(value.is_finite(), || {
+        format!("{model} {name} must be finite, got {value}")
+    })
+}
+
+/// `{model} {name} must be finite and positive, got {value}` unless `value`
+/// is finite and strictly positive.
+pub(crate) fn require_finite_positive(model: &str, name: &str, value: f64) -> Result<()> {
+    require_with(value.is_finite() && value > 0.0, || {
+        format!("{model} {name} must be finite and positive, got {value}")
+    })
+}
+
+/// `{model} {name} must be finite and non-negative, got {value}` unless
+/// `value` is finite and non-negative.
+pub(crate) fn require_finite_non_negative(model: &str, name: &str, value: f64) -> Result<()> {
+    require_with(value.is_finite() && value >= 0.0, || {
+        format!("{model} {name} must be finite and non-negative, got {value}")
+    })
+}
+
+/// Domain checks shared by the Black-Scholes-family spot models, in order:
+/// positive spot, finite `rate` and `div_yield`, non-negative `expiry` and
+/// `vol`, then finite discounted spot and discount factor.
+pub(crate) fn validate_spot_model_inputs(
+    model: &str,
+    spot: f64,
+    rate: f64,
+    div_yield: f64,
+    vol: f64,
+    expiry: f64,
+) -> Result<()> {
+    require_finite_positive(model, "spot", spot)?;
+    require_finite(model, "rate", rate)?;
+    require_finite(model, "div_yield", div_yield)?;
+    require_finite_non_negative(model, "expiry", expiry)?;
+    require_finite_non_negative(model, "volatility", vol)?;
+    checked_closed_form_value(spot * (-div_yield * expiry).exp(), "discounted spot")?;
+    checked_closed_form_value((-rate * expiry).exp(), "discount factor")?;
+    Ok(())
+}
+
 /// Black–Scholes / Garman–Kohlhagen price (per unit, no contract scaling).
 ///
 /// # Arguments
@@ -281,30 +326,13 @@ pub fn bs_price(
     expiry: f64,
     option_type: OptionType,
 ) -> Result<f64> {
-    for (name, value) in [("spot", spot), ("strike", strike)] {
-        if !value.is_finite() || value <= 0.0 {
-            return Err(Error::Validation(format!(
-                "Black-Scholes {name} must be finite and positive, got {value}"
-            )));
-        }
-    }
-    for (name, value) in [("rate", rate), ("div_yield", div_yield)] {
-        if !value.is_finite() {
-            return Err(Error::Validation(format!(
-                "Black-Scholes {name} must be finite, got {value}"
-            )));
-        }
-    }
-    if !expiry.is_finite() || expiry < 0.0 {
-        return Err(Error::Validation(format!(
-            "Black-Scholes expiry must be finite and non-negative, got {expiry}"
-        )));
-    }
-    if !vol.is_finite() || vol < 0.0 {
-        return Err(Error::Validation(format!(
-            "Black-Scholes volatility must be finite and non-negative, got {vol}"
-        )));
-    }
+    const MODEL: &str = "Black-Scholes";
+    require_finite_positive(MODEL, "spot", spot)?;
+    require_finite_positive(MODEL, "strike", strike)?;
+    require_finite(MODEL, "rate", rate)?;
+    require_finite(MODEL, "div_yield", div_yield)?;
+    require_finite_non_negative(MODEL, "expiry", expiry)?;
+    require_finite_non_negative(MODEL, "volatility", vol)?;
     // Validate discounted legs before the zero-volatility payoff clamp can
     // hide overflow or an indeterminate infinity-minus-infinity result.
     checked_closed_form_value(spot * (-div_yield * expiry).exp(), "discounted spot")?;

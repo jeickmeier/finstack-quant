@@ -19,7 +19,7 @@
       "format": "double",
       "type": "number"
     },
-    "sigma": {
+    "sigma_v": {
       "description": "Vol-of-vol.",
       "format": "double",
       "type": "number"
@@ -39,7 +39,7 @@
     "v0",
     "kappa",
     "theta",
-    "sigma",
+    "sigma_v",
     "rho",
     "hurst"
   ],

@@ -198,9 +198,7 @@ pub fn lmm_process(num_forwards: usize) -> LmmProcess {
         vol_times: vec![],
         vol_values: vec![loadings],
         initial_forwards: forwards,
-    }
-    .validate()
-    .expect("valid LMM");
+    };
     LmmProcess::new(params)
 }
 

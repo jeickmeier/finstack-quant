@@ -1,5 +1,6 @@
 //! Parametric factor risk decomposition using covariance-based Euler allocation.
 
+use super::math::{tail_multipliers, VARIANCE_TOLERANCE};
 use super::types::{FactorContribution, PositionFactorContribution, RiskDecomposition};
 use crate::{FactorCovarianceMatrix, RiskMeasure, SensitivityMatrix};
 
@@ -36,8 +37,6 @@ pub(crate) fn validate_finite_sensitivities(
     }
     Ok(())
 }
-
-const VARIANCE_TOLERANCE: f64 = 1e-12;
 
 fn validate_factor_axes(
     sensitivities: &SensitivityMatrix,
@@ -122,8 +121,7 @@ pub(super) fn scale_for_measure(
         }
         RiskMeasure::ExpectedShortfall { confidence } => {
             // Loss convention: ES is reported as a negative number.
-            let z_score = finstack_quant_core::math::standard_normal_inv_cdf(*confidence);
-            let es_multiplier = finstack_quant_core::math::norm_pdf(z_score) / (1.0 - confidence);
+            let (_, es_multiplier) = tail_multipliers(*confidence);
             if sigma > 0.0 {
                 (-sigma * es_multiplier, -es_multiplier * sigma.recip())
             } else {

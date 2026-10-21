@@ -542,24 +542,20 @@ fn test_engine_rejects_generic_scheme_for_lmm_process() {
     let payoff = CapturedValuePayoff::default();
     let rng = crate::monte_carlo::rng::philox::PhiloxRng::new(1);
 
-    let lmm = LmmProcess::new(
-        LmmParams {
-            num_forwards: 3,
-            num_factors: 2,
-            tenors: vec![0.0, 1.0, 2.0, 3.0],
-            accrual_factors: vec![1.0, 1.0, 1.0],
-            displacements: vec![0.005, 0.005, 0.005],
-            vol_times: vec![],
-            vol_values: vec![vec![
-                [0.15, 0.05, 0.0],
-                [0.12, 0.08, 0.0],
-                [0.10, 0.10, 0.0],
-            ]],
-            initial_forwards: vec![0.03, 0.03, 0.03],
-        }
-        .validate()
-        .expect("valid LMM params"),
-    );
+    let lmm = LmmProcess::new(LmmParams {
+        num_forwards: 3,
+        num_factors: 2,
+        tenors: vec![0.0, 1.0, 2.0, 3.0],
+        accrual_factors: vec![1.0, 1.0, 1.0],
+        displacements: vec![0.005, 0.005, 0.005],
+        vol_times: vec![],
+        vol_values: vec![vec![
+            [0.15, 0.05, 0.0],
+            [0.12, 0.08, 0.0],
+            [0.10, 0.10, 0.0],
+        ]],
+        initial_forwards: vec![0.03, 0.03, 0.03],
+    });
     let err = engine
         .price(
             &rng,
@@ -971,22 +967,21 @@ fn captured_rough_heston_paths_reset_history_and_match_streaming_prices() {
     use crate::monte_carlo::process::metadata::ProcessMetadata;
     use crate::monte_carlo::process::rough_heston::{RoughHestonParams, RoughHestonProcess};
     use crate::monte_carlo::rng::philox::PhiloxRng;
+    use crate::volatility::heston::HestonParams;
     use finstack_quant_core::math::fractional::HurstExponent;
 
-    let process = RoughHestonProcess::new(
-        RoughHestonParams {
-            r: 0.05,
-            q: 0.02,
-            hurst: HurstExponent::new(0.1).unwrap(),
+    let process = RoughHestonProcess::new(RoughHestonParams {
+        r: 0.05,
+        q: 0.02,
+        hurst: HurstExponent::new(0.1).unwrap(),
+        model: HestonParams {
+            v0: 0.04,
             kappa: 2.0,
             theta: 0.04,
             sigma_v: 0.3,
             rho: -0.7,
-            v0: 0.04,
-        }
-        .validate()
-        .unwrap(),
-    );
+        },
+    });
     let time_grid = TimeGrid::uniform(1.0, 3).unwrap();
     let disc = RoughHestonHybrid::new(time_grid.times(), 0.1).unwrap();
     let payoff = EuropeanCall::new(100.0, 1.0, 3);
