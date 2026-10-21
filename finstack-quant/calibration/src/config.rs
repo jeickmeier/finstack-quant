@@ -806,7 +806,8 @@ impl CalibrationConfig {
     /// # Example
     ///
     /// ```
-    /// use finstack_quant_calibration::{CalibrationConfig, RateBounds};
+    /// use finstack_quant_calibration::CalibrationConfig;
+    /// use finstack_quant_calibration::validation::RateBounds;
     ///
     /// let config = CalibrationConfig::default()
     ///     .with_rate_bounds(RateBounds::emerging_markets());

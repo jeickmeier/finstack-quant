@@ -1,8 +1,7 @@
 //! Tests for calibration configuration helpers and validation rules.
 
-use finstack_quant_calibration::{
-    CalibrationConfig, RateBounds, RateBoundsPolicy, SolverConfig, ValidationConfig,
-};
+use finstack_quant_calibration::validation::{RateBounds, RateBoundsPolicy, ValidationConfig};
+use finstack_quant_calibration::{CalibrationConfig, SolverConfig};
 use finstack_quant_core::currency::Currency;
 
 #[test]

@@ -656,7 +656,8 @@ mod tests {
     use crate::quotes::MarketQuote;
     use crate::solver::traits::GlobalSolveTarget;
     use crate::targets::util::quote_annuity_proxy;
-    use crate::{RateBounds, ResidualWeightingScheme};
+    use crate::validation::RateBounds;
+    use crate::ResidualWeightingScheme;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::BusinessDayConvention;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
