@@ -12,7 +12,7 @@ use finstack_quant_core::dates::{Date, DateExt, Tenor};
 use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
-use finstack_quant_valuations_credit::cds::{CdsConvention, CdsValuationConvention};
+use finstack_quant_valuations_core::market::conventions::{CdsConvention, CdsValuationConvention};
 use rust_decimal::Decimal;
 
 #[test]

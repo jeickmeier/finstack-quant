@@ -28,10 +28,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::Portfolio;
-use finstack_quant_valuations::instruments::credit_derivatives::cds::{
-    CdsConvention, CdsValuationConvention, CreditDefaultSwap, PayReceive, PremiumLegSpec,
-    ProtectionLegSpec,
-};
+use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
     CdsOption, CdsOptionParams,
 };
@@ -64,6 +61,8 @@ use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::EquityUnderlyingParams;
 use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType, SettlementType};
+use finstack_quant_valuations::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
+use finstack_quant_valuations::market::conventions::{CdsConvention, CdsValuationConvention};
 use rust_decimal_macros::dec;
 use std::sync::Arc;
 use time::Month;
@@ -863,7 +862,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     for i in 0..positions_per_derivative.min(2) {
         let cds_option_id = format!("CDSOPTION_{}", i);
         let option_params = CdsOptionParams::call(
-            finstack_quant_valuations::instruments::credit_derivatives::CdsOptionStrike::Spread(
+            finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike::Spread(
                 rust_decimal::Decimal::new(1, 2),
             ),
             base + time::Duration::days(365),

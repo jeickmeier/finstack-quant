@@ -517,7 +517,7 @@ impl CdsPricer {
     /// "Spread DV01"), which also carries the annuity's own spread sensitivity
     /// when the coupon differs from the par spread.
     ///
-    /// [`CdsValuationConvention::BloombergCdswClean`]: crate::cds::CdsValuationConvention::BloombergCdswClean
+    /// [`CdsValuationConvention::BloombergCdswClean`]: finstack_quant_valuations_core::market::conventions::CdsValuationConvention::BloombergCdswClean
     #[must_use = "risky PV01 calculation is pure computation"]
     #[doc(hidden)]
     pub fn risky_pv01(

@@ -4,7 +4,7 @@
 
 use super::helpers::{date_from_hazard_time, haz_t, settlement_date, sp_cond_to};
 use super::*;
-use crate::cds::{CdsValuationConvention, CreditDefaultSwap, PayReceive};
+use crate::cds::CreditDefaultSwap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -13,7 +13,9 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::constants::credit;
+use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
+use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
 use rust_decimal::Decimal;
 use time::macros::date;
 use time::Duration;
@@ -29,7 +31,7 @@ fn create_test_cds(
         finstack_quant_core::types::InstrumentId::new(id),
         Money::from((10000000_i64, Currency::USD)),
         PayReceive::Pay,
-        crate::cds::CdsConvention::IsdaNa,
+        finstack_quant_valuations_core::market::conventions::CdsConvention::IsdaNa,
         Decimal::try_from(spread_bp).expect("valid spread_bp"),
         start_date,
         end_date,
@@ -435,7 +437,7 @@ fn test_doc_clause_default_when_omitted() {
         .id(finstack_quant_core::types::InstrumentId::new("CDS-BUILDER"))
         .notional(Money::from((10_000_000_i64, Currency::USD)))
         .side(PayReceive::Pay)
-        .convention(crate::cds::CdsConvention::IsdaNa)
+        .convention(finstack_quant_valuations_core::market::conventions::CdsConvention::IsdaNa)
         .premium_leg(
             finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PremiumLegSpec {
                 roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,

@@ -83,7 +83,6 @@ pub(crate) mod parameters;
 pub(crate) mod pricing;
 mod types;
 
-pub use finstack_quant_models::correlation::copula::CopulaSpec;
 pub use parameters::CdsTrancheParams;
 pub use types::{CdsTranche, CdsTrancheBuilder};
 

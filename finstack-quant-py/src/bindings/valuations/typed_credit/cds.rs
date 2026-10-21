@@ -7,10 +7,10 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::{core_to_py, value_error};
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_valuations::instruments::credit_derivatives::cds::CdsValuationConvention;
 use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 use finstack_quant_valuations::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations::market::conventions::CdsConvention;
+use finstack_quant_valuations::market::conventions::CdsValuationConvention;
 use rust_decimal::prelude::ToPrimitive;
 
 use super::super::convert::{

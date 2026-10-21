@@ -715,12 +715,13 @@ mod tests {
     };
     use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::types::{CurveId, UnderlyingId};
+    use finstack_quant_models::correlation::copula::CopulaSpec;
     use finstack_quant_models::rates::hull_white::HullWhiteParams;
     use finstack_quant_valuations_core::instruments::OptionType;
     use finstack_quant_valuations_core::market::conventions::ids::{
         CdsConventionKey, CdsDocClause, SwaptionConventionId,
     };
-    use finstack_quant_valuations_credit::cds_tranche::{CdsTranchePricer, CopulaSpec};
+    use finstack_quant_valuations_credit::cds_tranche::CdsTranchePricer;
     use std::sync::Arc;
     use time::Month;
 

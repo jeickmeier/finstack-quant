@@ -4,7 +4,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::{Error, FxHashMap, InputError, Result};
 
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
-use finstack_quant_valuations_credit::cds::CdsValuationConvention;
+use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
 
 /// Context for building instruments from market quotes.
 ///

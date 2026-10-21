@@ -38,7 +38,7 @@ pub(crate) fn market_doc_clause(
     cds: &crate::cds::CreditDefaultSwap,
 ) -> finstack_quant_valuations_core::market::conventions::ids::CdsDocClause {
     cds.doc_clause
-        .and_then(crate::cds::CdsConvention::family_from_doc_clause)
+        .and_then(finstack_quant_valuations_core::market::conventions::CdsConvention::family_from_doc_clause)
         .unwrap_or(cds.convention)
         .as_doc_clause()
 }
@@ -75,7 +75,7 @@ impl crate::cs01::CdsCs01Conventions for crate::cds::CreditDefaultSwap {
         _as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<(
         finstack_quant_valuations_core::market::conventions::ids::CdsDocClause,
-        crate::cds::CdsValuationConvention,
+        finstack_quant_valuations_core::market::conventions::CdsValuationConvention,
     )> {
         Ok((market_doc_clause(self), self.valuation_convention))
     }

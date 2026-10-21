@@ -51,7 +51,7 @@ impl crate::cs01::CdsCs01Conventions for crate::cds_option::CdsOption {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<(
         finstack_quant_valuations_core::market::conventions::ids::CdsDocClause,
-        crate::cds::CdsValuationConvention,
+        finstack_quant_valuations_core::market::conventions::CdsValuationConvention,
     )> {
         // CS01 is a quote-spread risk measured against the synthetic
         // underlying CDS; its doc clause and valuation convention drive the

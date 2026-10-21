@@ -19,7 +19,9 @@ use rust_decimal::Decimal;
 use time::macros::date;
 
 // Reuse CDS components for conventions and legs
-use crate::cds::{CdsConvention, CreditDefaultSwap, PayReceive, PremiumLegSpec, ProtectionLegSpec};
+use crate::cds::CreditDefaultSwap;
+use finstack_quant_valuations_core::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
+use finstack_quant_valuations_core::market::conventions::CdsConvention;
 
 use super::parameters::CdsIndexParams;
 use super::pricer::CdsIndexPricer;
@@ -441,7 +443,9 @@ impl CdsIndex {
             instrument_pricing_overrides: self.instrument_pricing_overrides.clone(),
             metric_pricing_overrides: self.metric_pricing_overrides.clone(),
             scenario_pricing_overrides: self.scenario_pricing_overrides.clone(),
-            valuation_convention: crate::cds::CdsValuationConvention::default(),
+            valuation_convention:
+                finstack_quant_valuations_core::market::conventions::CdsValuationConvention::default(
+                ),
             upfront: None,
             doc_clause: None,
             protection_effective_date: None,

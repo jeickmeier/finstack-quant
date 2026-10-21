@@ -12,7 +12,7 @@
 //! `crate::cds::pricing::CdsPricer`.
 
 use crate::cds::pricing::{date_from_hazard_time, CdsPricer, CdsPricerConfig};
-use crate::cds::{CreditDefaultSwap, PayReceive};
+use crate::cds::CreditDefaultSwap;
 use crate::cds_index::{
     CdsIndex, ConstituentResult, IndexParSpreadResult, IndexPricing, IndexResult,
 };
@@ -32,6 +32,7 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::constants::credit;
 use finstack_quant_valuations_core::instruments::common_impl::traits::Instrument;
+use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::pricer::expect_inst;
 use finstack_quant_valuations_core::recalibration::{
     HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump, RecalibrationProvider,
@@ -1019,7 +1020,7 @@ mod tests {
             .expect("pay npv with upfront");
 
         let mut receive = CdsIndex::example().expect("example");
-        receive.side = crate::cds::PayReceive::Receive;
+        receive.side = finstack_quant_valuations_core::instruments::PayReceive::Receive;
         let mut receive_with_upfront = receive.clone();
         receive_with_upfront.upfront = Some((as_of, upfront));
         let receive_base = pricer

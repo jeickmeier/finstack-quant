@@ -509,7 +509,7 @@ mod tests {
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::types::{Attributes, CurveId};
     use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
-    use finstack_quant_valuations::instruments::credit_derivatives::CdsIndex;
+    use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndex;
     use finstack_quant_valuations::instruments::fixed_income::bond;
     use finstack_quant_valuations::instruments::fixed_income::AgencyMbsPassthrough;
     use finstack_quant_valuations::instruments::rates::Swaption;

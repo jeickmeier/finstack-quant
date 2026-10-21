@@ -23,7 +23,7 @@ valuations-core only; no other instrument family.
 
 ```rust
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_credit::CreditDefaultSwap;
+use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
 
 let cds = CreditDefaultSwap::example().unwrap();
 assert!(!cds.id().is_empty());

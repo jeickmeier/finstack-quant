@@ -8,7 +8,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::CreditParams;
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_credit::cds::PayReceive;
+use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_credit::cds_index::{CdsIndex, CdsIndexConstituent, CdsIndexParams};
 use time::Month;
 

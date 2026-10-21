@@ -13,11 +13,11 @@ use super::test_utils::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
-use finstack_quant_valuations::instruments::credit_derivatives::cds::PayReceive;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
     CdsIndex, IndexPricing,
 };
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 

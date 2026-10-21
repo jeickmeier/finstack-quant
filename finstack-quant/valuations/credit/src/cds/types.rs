@@ -67,11 +67,7 @@ use time::macros::date;
 use crate::cds::pricing::CdsPricer;
 use finstack_quant_valuations_core::instruments::common_impl::traits::impl_instrument_base;
 
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::PayReceive;
-
-pub use finstack_quant_valuations_core::instruments::common_impl::parameters::legs::{
-    PremiumLegSpec, ProtectionLegSpec,
-};
+use finstack_quant_valuations_core::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
 
 /// Resolve a meta documentation clause (e.g., `IsdaNa`, `IsdaEu`) to its
 /// concrete restructuring variant. Concrete clauses pass through unchanged.
@@ -399,8 +395,8 @@ impl CreditDefaultSwap {
     /// use finstack_quant_core::types::CurveId;
     /// use finstack_quant_cashflows::builder::RollRule;
     /// use finstack_quant_valuations_core::constants::isda::STANDARD_RECOVERY_SENIOR;
-    /// use finstack_quant_valuations_credit::cds::CdsConvention;
-    /// use finstack_quant_valuations_credit::CreditDefaultSwap;
+    /// use finstack_quant_valuations_core::market::conventions::CdsConvention;
+    /// use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
     /// use finstack_quant_valuations_core::instruments::{Attributes, InstrumentPricingOverrides, PayReceive, PremiumLegSpec, ProtectionLegSpec};
     /// use rust_decimal::Decimal;
     /// use time::macros::date;

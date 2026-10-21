@@ -54,7 +54,7 @@
 //! # Quick Example
 //!
 //! ```
-//! use finstack_quant_valuations_credit::CreditDefaultSwap;
+//! use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
 //!
 //! // Canonical 5-year investment-grade CDS with standard ISDA conventions.
 //! let cds = CreditDefaultSwap::example().expect("example");
@@ -85,11 +85,6 @@ pub(crate) mod cs01;
 
 mod family;
 pub use family::CREDIT;
-
-pub use cds::CreditDefaultSwap;
-pub use cds_index::CdsIndex;
-pub use cds_option::{CdsOption, CdsOptionStrike, CdsOptionStrikeKind};
-pub use cds_tranche::CdsTranche;
 
 extern crate self as finstack_quant_valuations_credit;
 

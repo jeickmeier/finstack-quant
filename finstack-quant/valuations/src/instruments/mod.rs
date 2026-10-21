@@ -195,7 +195,9 @@ pub use rates::{
     YoYInflationSwap,
 };
 
-pub use credit_derivatives::{CdsIndex, CdsOption, CdsTranche, CreditDefaultSwap};
+pub use credit_derivatives::{
+    cds::CreditDefaultSwap, cds_index::CdsIndex, cds_option::CdsOption, cds_tranche::CdsTranche,
+};
 
 pub use equity::{
     Autocallable, CliquetOption, DiscountedCashFlow, Equity, EquityFuture, EquityFutureOption,
