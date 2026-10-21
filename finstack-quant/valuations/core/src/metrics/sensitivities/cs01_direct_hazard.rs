@@ -143,7 +143,7 @@ where
             let cs01 = hazard_bump_sensitivity(context, &hazard, hazard_bp, |curve, bp| {
                 curve.with_tenor_hazard_rate_bumps_bp(&[(tenor, bp)])
             })? * (hazard_bp / bump_bp);
-            series.push((sens_config::format_bucket_label_cow(tenor), cs01));
+            series.push((crate::metrics::format_bucket_label_cow(tenor), cs01));
             total += cs01;
         }
         context.store_bucketed_series(
