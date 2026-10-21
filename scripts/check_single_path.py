@@ -287,8 +287,10 @@ def main():
         after = {ident for c in crates.values() for ident in c.reach}
         lost = sorted(set(before) - after)
         lost_items = [ident for ident in lost if before[ident][0] != "module"]
-        head.append(f"\nCompared with `{COMPARE}`: **{len(lost)}** identities no longer reachable "
-                    f"(**{len(lost_items)}** of them not modules).")
+        head.append(
+            f"\nCompared with `{COMPARE}`: **{len(lost)}** identities no longer reachable "
+            f"(**{len(lost_items)}** of them not modules)."
+        )
         if lost:
             lines.append("\n## no longer reachable\n")
             for ident in lost:
