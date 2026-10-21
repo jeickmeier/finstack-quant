@@ -71,8 +71,8 @@
 
 pub(crate) mod engine;
 pub(crate) mod forward;
-pub mod json;
-pub mod metric;
+pub(crate) mod json;
+pub(crate) mod metric;
 pub(crate) mod report;
 pub(crate) mod schedule;
 #[cfg(feature = "json-schema")]
