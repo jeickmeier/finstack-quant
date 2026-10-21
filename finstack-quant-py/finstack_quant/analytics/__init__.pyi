@@ -3518,7 +3518,7 @@ class Performance:
 
 def sharpe(
     returns: Sequence[float] | npt.NDArray[np.float64] | pd.Series,
-    rf: float = 0.0,
+    risk_free_rate: float = 0.0,
     periods_per_year: float = 252,
 ) -> float:
     """
@@ -3531,7 +3531,7 @@ def sharpe(
     ----------
     returns : sequence of float, numpy.ndarray, or pandas.Series
         Per-period simple decimal returns (``0.01`` is +1%) in date order.
-    rf : float, default 0.0
+    risk_free_rate : float, default 0.0
         Annualized risk-free rate as a decimal (``0.02`` for 2%),
         geometrically decompounded to the observation frequency.
     periods_per_year : float, default 252
