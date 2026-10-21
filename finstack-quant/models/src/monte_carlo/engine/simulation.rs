@@ -350,8 +350,7 @@ impl McEngine {
         D: Discretization<P>,
         F: Payoff,
     {
-        // Both payoffs are reset by the caller (so on_path_start has already
-        // run and any per-path RNG draws are stable across the pair).
+        // Both payoffs are reset by the caller.
         work.fill(0.0);
         work_anti.fill(0.0);
         // Primary path

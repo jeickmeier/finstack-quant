@@ -113,8 +113,7 @@ impl Discretization<PiecewiseGbmProcess> for PiecewiseExactGbm {
         let sigma = process.sigmas[idx];
 
         let drift = (r - q - 0.5 * sigma * sigma) * dt;
-        let diffusion = sigma * dt.sqrt() * z[0];
-        x[0] *= (drift + diffusion).exp();
+        x[0] *= crate::monte_carlo::discretization::exact::gbm_growth(drift, sigma, dt, z[0]);
     }
 
     fn work_size(&self, _process: &PiecewiseGbmProcess) -> usize {

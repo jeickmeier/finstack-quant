@@ -260,46 +260,27 @@ impl MertonModel {
                 None
             };
 
-            all_paths.push(v0);
-            let mut v = v0;
-
-            for step in 0..num_steps {
-                let z = normals[step];
-                v *= (drift_per_step + diffusion * z).exp();
-
-                if let (Some(ref jd), Some((_, mu_j, sigma_j))) = (&jump_data, jump_params) {
-                    let jump_step = &jd[step];
-                    for &jz in jump_step.jump_normals.iter().take(jump_step.base_count) {
-                        // Jump multiplier e^J with J ~ N(mu_J, sigma_J^2): mean
-                        // E[e^J] = exp(mu_J + sigma_J^2/2), matching the kappa
-                        // compensator above. No Ito correction belongs on the
-                        // jump itself .
-                        v *= (mu_j + sigma_j * jz).exp();
-                    }
-                }
-
-                all_paths.push(v);
-            }
-
+            push_path(
+                &mut all_paths,
+                v0,
+                &normals,
+                jump_data.as_deref(),
+                jump_params,
+                drift_per_step,
+                diffusion,
+                false,
+            );
             if gen_antithetic && all_paths.len() / values_per_path < num_paths {
-                all_paths.push(v0);
-                let mut v_anti = v0;
-
-                for step in 0..num_steps {
-                    let z = -normals[step]; // Negated normal
-                    v_anti *= (drift_per_step + diffusion * z).exp();
-
-                    if let (Some(ref jd), Some((_, mu_j, sigma_j))) = (&jump_data, jump_params) {
-                        let jump_step = &jd[step];
-                        for &jz in jump_step.jump_normals.iter().take(jump_step.anti_count) {
-                            let jz = -jz;
-                            // Same e^J law as the base path .
-                            v_anti *= (mu_j + sigma_j * jz).exp();
-                        }
-                    }
-
-                    all_paths.push(v_anti);
-                }
+                push_path(
+                    &mut all_paths,
+                    v0,
+                    &normals,
+                    jump_data.as_deref(),
+                    jump_params,
+                    drift_per_step,
+                    diffusion,
+                    true,
+                );
             }
         }
 
@@ -312,6 +293,48 @@ impl MertonModel {
             num_paths,
             num_steps,
         })
+    }
+}
+
+/// Append one simulated path (`v0` then one value per step) to `all_paths`.
+///
+/// The antithetic leg negates the diffusion and jump-size normals and uses the
+/// antithetic Poisson counts; every random draw happened beforehand, so both
+/// legs read the same numbers.
+#[allow(clippy::too_many_arguments)]
+fn push_path(
+    all_paths: &mut Vec<f64>,
+    v0: f64,
+    normals: &[f64],
+    jump_data: Option<&[StepJumpData]>,
+    jump_params: Option<(f64, f64, f64)>,
+    drift_per_step: f64,
+    diffusion: f64,
+    anti: bool,
+) {
+    let sign = |x: f64| if anti { -x } else { x };
+    all_paths.push(v0);
+    let mut v = v0;
+    for (step, &z) in normals.iter().enumerate() {
+        v *= (drift_per_step + diffusion * sign(z)).exp();
+
+        if let (Some(jd), Some((_, mu_j, sigma_j))) = (jump_data, jump_params) {
+            let jump_step = &jd[step];
+            let count = if anti {
+                jump_step.anti_count
+            } else {
+                jump_step.base_count
+            };
+            for &jz in jump_step.jump_normals.iter().take(count) {
+                // Jump multiplier e^J with J ~ N(mu_J, sigma_J^2): mean
+                // E[e^J] = exp(mu_J + sigma_J^2/2), matching the kappa
+                // compensator above. No Ito correction belongs on the
+                // jump itself.
+                v *= (mu_j + sigma_j * sign(jz)).exp();
+            }
+        }
+
+        all_paths.push(v);
     }
 }
 

@@ -200,37 +200,7 @@ impl InterestRateSpec {
                 Ok(())
             }
             Self::DeterministicForward { times, rates } => {
-                if times.len() != rates.len() {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "deterministic forward curve requires equal-length knot \
-                         arrays (times: {}, rates: {})",
-                        times.len(),
-                        rates.len()
-                    )));
-                }
-                if times.is_empty() {
-                    return Err(finstack_quant_core::Error::Validation(
-                        "deterministic forward curve requires at least one knot".to_string(),
-                    ));
-                }
-                for pair in times.windows(2) {
-                    if !pair[0].is_finite() || pair[1] <= pair[0] {
-                        return Err(finstack_quant_core::Error::Validation(
-                            "deterministic forward curve knot times must be finite \
-                             and strictly increasing"
-                                .to_string(),
-                        ));
-                    }
-                }
-                for (i, rate) in rates.iter().enumerate() {
-                    if !rate.is_finite() {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "deterministic forward curve rate at knot {i} must be \
-                             finite, got {rate}"
-                        )));
-                    }
-                }
-                Ok(())
+                super::validate_piecewise_knots(times, rates, false, "deterministic forward")
             }
         }
     }

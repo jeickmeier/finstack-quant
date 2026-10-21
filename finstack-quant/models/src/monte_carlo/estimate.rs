@@ -121,6 +121,36 @@ impl Estimate {
         }
     }
 
+    /// Summarize an accumulator of independent estimators.
+    ///
+    /// Takes the sample mean, standard error, Student-t 95% confidence
+    /// interval ([`OnlineStats::confidence_interval`] with `alpha = 0.05`),
+    /// observation count and sample standard deviation. `num_simulated_paths`
+    /// defaults to the count; chain [`Self::with_num_simulated_paths`] for
+    /// antithetic runs.
+    ///
+    /// # Arguments
+    ///
+    /// * `stats` - Accumulator updated once per independent estimator (a
+    ///   discounted path value, or the mean of one antithetic pair), in the
+    ///   numeric unit of the reported estimate.
+    ///
+    /// # Returns
+    ///
+    /// An estimate with `std_dev` set and no captured-path diagnostics. With
+    /// fewer than two observations the standard error and interval are `NaN`.
+    ///
+    /// [`OnlineStats::confidence_interval`]: finstack_quant_core::math::stats::OnlineStats::confidence_interval
+    pub fn from_stats(stats: &finstack_quant_core::math::stats::OnlineStats) -> Self {
+        Self::new(
+            stats.mean(),
+            stats.stderr(),
+            stats.confidence_interval(0.05),
+            stats.count(),
+        )
+        .with_std_dev(stats.std_dev())
+    }
+
     /// Record the total number of simulated sample paths.
     ///
     /// Callers should set this to `2 * num_paths` when antithetic variates
