@@ -907,9 +907,10 @@ export type CalibrationStep =
       /**
        * Calibration method to use.
        *
-       * Forward curves require [`CalibrationMethod::GlobalSolve`]. Sequential
-       * bootstrap is rejected because contractual off-grid reset intervals
-       * couple adjacent rates through projection discount factors.
+       * Forward curves require [`CalibrationMethod::GlobalSolve`], which is the
+       * default (finite-difference Jacobian). Sequential bootstrap is rejected
+       * because contractual off-grid reset intervals couple adjacent rates
+       * through projection discount factors.
        */
       method?: CalibrationMethod;
       /**
@@ -1229,7 +1230,9 @@ export type CalibrationStep =
        */
       day_count?: valuations.DayCount | null;
       /**
-       * Detachment points (as percentages) for the tranches.
+       * Expected tranche detachment points as decimals in `(0, 1]` (e.g. `0.03`
+       * for 3%), the same unit as `CdsTrancheQuote.detachment`. When non-empty,
+       * every quote must match one point and every point must be quoted.
        */
       detachment_points?: number[];
       /**
@@ -3703,9 +3706,10 @@ export type StepParams =
       /**
        * Calibration method to use.
        *
-       * Forward curves require [`CalibrationMethod::GlobalSolve`]. Sequential
-       * bootstrap is rejected because contractual off-grid reset intervals
-       * couple adjacent rates through projection discount factors.
+       * Forward curves require [`CalibrationMethod::GlobalSolve`], which is the
+       * default (finite-difference Jacobian). Sequential bootstrap is rejected
+       * because contractual off-grid reset intervals couple adjacent rates
+       * through projection discount factors.
        */
       method?: CalibrationMethod;
       /**
@@ -3985,7 +3989,9 @@ export type StepParams =
        */
       day_count?: valuations.DayCount | null;
       /**
-       * Detachment points (as percentages) for the tranches.
+       * Expected tranche detachment points as decimals in `(0, 1]` (e.g. `0.03`
+       * for 3%), the same unit as `CdsTrancheQuote.detachment`. When non-empty,
+       * every quote must match one point and every point must be quoted.
        */
       detachment_points?: number[];
       /**
@@ -4743,10 +4749,20 @@ export interface InflationCurveSolveConfig {
 }
 /**
  * Audit metadata and freshness policy for calibration inputs.
+ *
+ * The snapshot age is `as_of_timestamp - snapshot_timestamp`. Both instants
+ * are caller inputs, so validation never reads the wall clock and the same
+ * envelope always validates the same way.
  */
 export interface MarketFreshnessPolicy {
   /**
-   * Maximum permitted snapshot age in seconds.
+   * RFC3339 instant at which freshness is assessed (normally the caller's
+   * clock when it submits the envelope). Required with `snapshot_timestamp`
+   * and `max_age_seconds`.
+   */
+  as_of_timestamp?: string | null;
+  /**
+   * Maximum permitted snapshot age in seconds, measured at `as_of_timestamp`.
    */
   max_age_seconds?: number | null;
   /**
