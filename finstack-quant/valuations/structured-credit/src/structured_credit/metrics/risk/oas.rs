@@ -127,7 +127,7 @@ pub struct OasResult {
 /// Returns an error if the tranche is missing, the discount curve is
 /// unavailable, a scenario fails to simulate, the solver fails to converge, or
 /// a result field is non-finite.
-pub fn calculate_tranche_oas(
+pub fn tranche_oas(
     deal: &StructuredCredit,
     tranche_id: &str,
     market: &MarketContext,

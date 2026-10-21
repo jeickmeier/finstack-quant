@@ -163,16 +163,16 @@ class TestStructuredCreditTypedAnalytics:
         from finstack_quant.valuations.instruments import (
             StructuredCredit,
             TrancheMetrics,
-            structured_credit_tranche_metrics,
+            tranche_metrics,
         )
 
         deal_json = _valid_deal_json()
         tranche_id = _metrics_tranche_id(deal_json)
         market = _market()
 
-        via_json = structured_credit_tranche_metrics(deal_json, tranche_id, market, "2024-01-01")
+        via_json = tranche_metrics(deal_json, tranche_id, market, "2024-01-01")
         typed_deal = StructuredCredit.from_json(deal_json)
-        via_typed = structured_credit_tranche_metrics(typed_deal, tranche_id, market, "2024-01-01")
+        via_typed = tranche_metrics(typed_deal, tranche_id, market, "2024-01-01")
         # Both sides serialize the same Rust value directly (no parse cycle),
         # so the wire payloads must match exactly.
         assert json.loads(via_typed.to_json()) == json.loads(via_json.to_json())

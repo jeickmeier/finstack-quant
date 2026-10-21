@@ -17,9 +17,9 @@ use finstack_quant_models::credit::pool::{
     CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_tranche_metrics, run_simulation_with_diagnostics, AssetPool, CoverageTestSpec,
-    DealType, LossAllocationPolicy, PoolAsset, ReinvestmentCriteria, ReinvestmentPeriod,
-    SimulationRun, StochasticPricingResult, StructuredCredit, StructuredCreditPricingMode, Tranche,
+    run_simulation_with_diagnostics, tranche_metrics, AssetPool, CoverageTestSpec, DealType,
+    LossAllocationPolicy, PoolAsset, ReinvestmentCriteria, ReinvestmentPeriod, SimulationRun,
+    StochasticPricingResult, StructuredCredit, StructuredCreditPricingMode, Tranche,
     TrancheSeniority, TrancheStructure,
 };
 use time::Month;
@@ -218,10 +218,10 @@ fn seasoned_note_prices_per_current_face() {
     tranche_mut(&mut seasoned, "SR").current_balance =
         Money::new(400_000.0, Currency::USD).expect("money");
 
-    let fresh = calculate_tranche_metrics(&new_issue, "SR", &market, as_of(), None, &[])
-        .expect("new-issue metrics");
-    let aged = calculate_tranche_metrics(&seasoned, "SR", &market, as_of(), None, &[])
-        .expect("seasoned metrics");
+    let fresh =
+        tranche_metrics(&new_issue, "SR", &market, as_of(), None, &[]).expect("new-issue metrics");
+    let aged =
+        tranche_metrics(&seasoned, "SR", &market, as_of(), None, &[]).expect("seasoned metrics");
     assert!(
         (aged.pv / fresh.pv - 0.5).abs() < 1e-9,
         "PV scales with the current balance: {} vs {}",

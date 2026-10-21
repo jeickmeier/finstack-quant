@@ -24,7 +24,7 @@ use finstack_quant_valuations_core::instruments::{Attributes, Instrument};
 
 /// A deal plus the identifier of the note the metrics are computed for.
 ///
-/// Built by [`calculate_tranche_metrics`](crate::structured_credit::calculate_tranche_metrics)
+/// Built by [`tranche_metrics`](crate::structured_credit::tranche_metrics)
 /// for its registry `metrics` pass.
 #[derive(Clone, Debug)]
 pub(crate) struct StructuredCreditTranche {

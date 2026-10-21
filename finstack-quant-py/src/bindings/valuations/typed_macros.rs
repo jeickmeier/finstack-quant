@@ -258,7 +258,7 @@ pub(crate) use instrument_greek_methods;
 ///
 /// On the instrument wrapper `$ty`: `builder`, `__reduce__`, `from_json`,
 /// `to_json` and `id`. On its builder wrapper `$builder`: `build`,
-/// `__repr__` and, unless `pricing_overrides = none` is given, the three
+/// `__repr__` and the three
 /// `*_pricing_overrides` setters (with the matching getters on `$ty`; see
 /// `pricing_override_methods!`).
 ///
@@ -280,26 +280,9 @@ pub(crate) use instrument_greek_methods;
 /// * `builder_doc = [ ... ]` (optional) — docstring lines (each a `str`
 ///   literal with its own leading space, typically a NumPy ``Notes``
 ///   section) appended after the `builder` docstring's ``Returns`` section.
-/// * `pricing_overrides = none` (optional) — skip the pricing-override
-///   surface.
 /// * the `build` docstring, written as `///` lines before the closing
 ///   `build` keyword, forwarded verbatim.
 macro_rules! instrument_envelope_methods {
-    (
-        $ty:ident, $variant:ident, $type_tag:literal,
-        builder = $builder:ident($builder_name:literal, $shape:ident),
-        seed = $seed:expr,
-        $(builder_doc = [ $($builder_doc:literal),* $(,)? ],)?
-        pricing_overrides = none,
-        $(#[$build_doc:meta])*
-        build $(,)?
-    ) => {
-        $crate::bindings::valuations::typed_macros::instrument_envelope_methods!(
-            @impl $ty, $variant, $type_tag, $builder, $builder_name, $shape, $seed,
-            [$($($builder_doc),*)?],
-            $(#[$build_doc])*
-        );
-    };
     (
         $ty:ident, $variant:ident, $type_tag:literal,
         builder = $builder:ident($builder_name:literal, $shape:ident),

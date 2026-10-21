@@ -13,7 +13,7 @@ api:
 - finstack_quant.margin.ScheduleImCalculator
 - finstack_quant.margin.VmCalculator
 - finstack_quant.valuations.instruments.price_instrument
-- finstack_quant.valuations.instruments.structured_credit_tranche_metrics
+- finstack_quant.valuations.instruments.tranche_metrics
 status: published
 ---
 
@@ -95,7 +95,7 @@ from finstack_quant.calibration import calibrate
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import DiscountCurve,FxMatrix,HazardCurve,PriceCurve,VolSurface
 from finstack_quant.portfolio import Portfolio,value_portfolio,brinson_fachler,carino_link,twrr_linked
-from finstack_quant.valuations.instruments import price_instrument,structured_credit_tranche_metrics
+from finstack_quant.valuations.instruments import price_instrument,tranche_metrics
 AS_OF = date(2025, 1, 15)
 TRACK='credit'
 ```
@@ -125,7 +125,7 @@ wire=json.loads(base.to_json())
 positions=pd.DataFrame([{"position":iid,"currency":row["value_native"]["currency"],
     "native_value":float(row["value_native"]["amount"]),"usd_value":float(row["value_base"]["amount"])}
     for iid,row in wire["position_values"].items()])
-bbb=structured_credit_tranche_metrics(json.dumps(holding["deal"]),"BBB",market,AS_OF)
+bbb=tranche_metrics(json.dumps(holding["deal"]),"BBB",market,AS_OF)
 bbb_pv=holding["quantity"]*bbb.pv
 combined_base=base.total_value+bbb_pv
 positions.loc[len(positions)]={"position":"CLO-BBB","currency":"USD","native_value":bbb_pv,"usd_value":bbb_pv}
@@ -258,7 +258,7 @@ def capstone_scenario_value(shock):
     # is an explicit synthetic assumption, not an estimated pricing PD.
     cdr=spec["default_spec"]["cdr"]+.10*max(hazard,0.)
     spec["default_spec"]["cdr"]=cdr
-    tranche_value=holding["quantity"]*structured_credit_tranche_metrics(
+    tranche_value=holding["quantity"]*tranche_metrics(
         json.dumps(scenario_deal),"BBB",scenario_market,AS_OF).pv
     return native_value,tranche_value
 
@@ -338,7 +338,7 @@ stress.insert_price("CONVERT",80.,"USD")
 stressed_deal=deepcopy(holding["deal"])
 stressed_deal["instrument"]["spec"].update({"default_spec":{"curve":"constant","cdr":.05},
     "recovery_spec":{"rate":.25,"recovery_lag":6}})
-bbb_stress=structured_credit_tranche_metrics(json.dumps(stressed_deal),"BBB",stress,AS_OF).pv*holding["quantity"]
+bbb_stress=tranche_metrics(json.dumps(stressed_deal),"BBB",stress,AS_OF).pv*holding["quantity"]
 stressed=value_portfolio(book,stress,metrics=[])
 stress_wire=json.loads(stressed.to_json())
 scenario=pd.DataFrame([{"position":iid,"base_usd":float(row["value_base"]["amount"]),
@@ -383,7 +383,7 @@ replay_market.insert_price("CONVERT",100*equity_ratio,"USD")
 replay_market.insert(HazardCurve("CONVERT-RISKY",AS_OF,[(1.0,.025+credit_change_bp/10000)],recovery_rate=0.))
 replay_native=value_portfolio(book,replay_market,metrics=[])
 replay_wire=json.loads(replay_native.to_json())
-replay_bbb=holding["quantity"]*structured_credit_tranche_metrics(json.dumps(holding["deal"]),"BBB",replay_market,AS_OF).pv
+replay_bbb=holding["quantity"]*tranche_metrics(json.dumps(holding["deal"]),"BBB",replay_market,AS_OF).pv
 replay_position_rows=[]
 for iid,row in wire["position_values"].items():
     base_value=float(row["value_base"]["amount"])
@@ -405,15 +405,15 @@ print("Synthetic 2025Q2 observation-pattern replay onto the 15 January book: the
 
 {/* notebook-block notebook="08_capstone/end_to_end_credit_portfolio_workflow.ipynb" cell="credit-track-diagnostics" role="build" */}
 ```python exec id=credit-track-diagnostics role=build
-from finstack_quant.valuations.instruments import structured_credit_tranche_breakeven_cdr,structured_credit_tranche_scenario_table,instrument_cashflows
+from finstack_quant.valuations.instruments import tranche_breakeven_cdr,tranche_scenario_table,instrument_cashflows
 from finstack_quant.models.correlation import CorrelatedBernoulli
 waterfall_rows=[]
 for label,payload,m in [("base",holding["deal"],market),("joint_stress",stressed_deal,stress)]:
     for tranche in ["AAA","BBB","EQUITY"]:
-        out=structured_credit_tranche_metrics(json.dumps(payload),tranche,m,AS_OF)
+        out=tranche_metrics(json.dumps(payload),tranche,m,AS_OF)
         waterfall_rows.append({"case":label,"tranche":tranche,"PV":out.pv,"WAL":out.wal})
-first_loss_base=structured_credit_tranche_breakeven_cdr(json.dumps(holding["deal"]),"BBB",market,AS_OF)
-first_loss_stress=structured_credit_tranche_breakeven_cdr(json.dumps(stressed_deal),"BBB",stress,AS_OF)
+first_loss_base=tranche_breakeven_cdr(json.dumps(holding["deal"]),"BBB",market,AS_OF)
+first_loss_stress=tranche_breakeven_cdr(json.dumps(stressed_deal),"BBB",stress,AS_OF)
 waterfall_table=pd.DataFrame(waterfall_rows)
 print(waterfall_table.to_string(index=False));print({"BBB_first_loss_CDR_base":first_loss_base,"BBB_first_loss_CDR_lower_recovery":first_loss_stress})
 # One-period stressed trace has immediate recovery so every distribution shares one known date.
@@ -422,7 +422,7 @@ ts.update(default_spec={"curve":"constant","cdr":.05},recovery_spec={"rate":.25,
 flows=json.loads(instrument_cashflows(json.dumps(trace),market,AS_OF,"discounting").to_json())["flows"]
 cash_flows=[flow for flow in flows if flow["date"]>AS_OF.isoformat() and flow["kind"]!="defaulted_notional"]
 trace_df=market.get_discount("USD-OIS").df(90/365)
-trace_rows=[{"tranche":tranche,"stressed_one_period_cash":structured_credit_tranche_metrics(json.dumps(trace),tranche,market,AS_OF).pv/trace_df} for tranche in ["AAA","BBB","EQUITY"]]
+trace_rows=[{"tranche":tranche,"stressed_one_period_cash":tranche_metrics(json.dumps(trace),tranche,market,AS_OF).pv/trace_df} for tranche in ["AAA","BBB","EQUITY"]]
 print(pd.DataFrame(trace_rows).to_string(index=False))
 print("Trace contains remaining post-as-of cash only; exported defaulted-notional rows are loss records, not investor cash receipts, and zero-PV as-of records are excluded from the remaining-value reconciliation.")
 rev=tracks.credit_extension()["ANALYST-REVOLVER"]["instrument"]["spec"]
@@ -592,7 +592,7 @@ for day in dates:
     valuation=value_portfolio(Portfolio.from_spec(json.dumps(dated_spec)),dated,metrics=[])
     dated_wire=json.loads(valuation.to_json())
     by_position={iid:float(row["value_base"]["amount"]) for iid,row in dated_wire["position_values"].items()}
-    bbb_dated=structured_credit_tranche_metrics(json.dumps(holding["deal"]),"BBB",dated,day).pv*holding["quantity"]
+    bbb_dated=tranche_metrics(json.dumps(holding["deal"]),"BBB",dated,day).pv*holding["quantity"]
     cumulative_vm_cash=0.0
     sleeves={"common":sum(value for iid,value in by_position.items() if iid in common_ids),
              "track_extension":sum(value for iid,value in by_position.items() if iid not in common_ids)}

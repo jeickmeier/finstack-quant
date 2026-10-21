@@ -261,7 +261,7 @@ test('Rust types reject unknown keys and non-finite numbers in object inputs', (
   );
   assert.throws(
     () =>
-      valuations.fx.FxForward.fromJson(
+      valuations.instruments.FxForward.fromJson(
         valuations.instruments.instrumentEnvelopeFromSpec('fx_forward', {
           contract_rate: Number.NaN,
         })

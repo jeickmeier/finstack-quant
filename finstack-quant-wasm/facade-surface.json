@@ -12,6 +12,7 @@
   },
   "analytics.Performance": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson", "fromReturns"],
     "methods": [
       "activeDates",
@@ -471,12 +472,14 @@
   },
   "cashflows.AccrualIndex": {
     "kind": "class",
+    "constructor": false,
     "statics": ["build"],
     "methods": ["accruedAt", "free"],
     "getters": []
   },
   "cashflows.CashFlowBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "addFixedWindow",
@@ -501,6 +504,7 @@
   },
   "cashflows.CashFlowSchedule": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "fromFlows", "fromJson", "fromParts"],
     "methods": [
       "calendarYearLadder",
@@ -839,6 +843,7 @@
   },
   "core.Currency": {
     "kind": "class",
+    "constructor": true,
     "statics": [
       "aed",
       "afn",
@@ -1007,6 +1012,7 @@
   },
   "core.Money": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromDecimalStr", "fromJson", "zero"],
     "methods": [
       "checkedAdd",
@@ -1024,18 +1030,21 @@
   },
   "core.Rate": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromBp", "fromJson", "fromPercent", "parse", "zero"],
     "methods": ["abs", "free", "isNegative", "isPositive", "isZero", "toJson"],
     "getters": ["asBp", "asBpF64", "asDecimal", "asPercent"]
   },
   "core.Bps": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson", "zero"],
     "methods": ["abs", "free", "isNegative", "isPositive", "isZero", "toJson"],
     "getters": ["asBp", "asDecimal", "asPercent", "asRate"]
   },
   "core.CreditRating": {
     "kind": "class",
+    "constructor": true,
     "statics": [
       "a",
       "aMinus",
@@ -1076,6 +1085,7 @@
   },
   "core.Attributes": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": [
       "addTag",
@@ -1093,12 +1103,14 @@
   },
   "core.RoundingMode": {
     "kind": "class",
+    "constructor": false,
     "statics": ["awayFromZero", "bankers", "ceil", "floor", "fromJson", "fromName", "towardZero"],
     "methods": ["free", "toJson", "toString"],
     "getters": ["name"]
   },
   "core.FinstackConfig": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": [
       "extensionKeys",
@@ -1118,12 +1130,14 @@
   },
   "core.UnknownScalePolicy": {
     "kind": "class",
+    "constructor": false,
     "statics": ["error", "fallbackToDefault", "fromJson", "fromName", "warnAndFallback"],
     "methods": ["free", "toJson", "toString"],
     "getters": ["name"]
   },
   "core.RatingScaleRegistry": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fromJson"],
     "methods": [
       "defaultScaleId",
@@ -1148,6 +1162,7 @@
   },
   "core.DayCount": {
     "kind": "class",
+    "constructor": false,
     "statics": [
       "act360",
       "act365f",
@@ -1169,12 +1184,14 @@
   },
   "core.DayCountContext": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": ["free", "toJson"],
     "getters": ["busBasis", "calendarId", "couponPeriod", "endIsTerminationDate", "frequency"]
   },
   "core.Thirty360Convention": {
     "kind": "class",
+    "constructor": false,
     "statics": ["european", "fromName", "isda", "italian", "usSia"],
     "methods": ["free", "toString"],
     "getters": []
@@ -1187,6 +1204,7 @@
   },
   "core.Tenor": {
     "kind": "class",
+    "constructor": true,
     "statics": [
       "annual",
       "bimonthly",
@@ -1213,6 +1231,7 @@
   },
   "core.TenorUnit": {
     "kind": "class",
+    "constructor": false,
     "statics": ["days", "fromChar", "months", "weeks", "years"],
     "methods": ["free", "toString"],
     "getters": []
@@ -1228,6 +1247,7 @@
   },
   "core.BusinessDayConvention": {
     "kind": "class",
+    "constructor": false,
     "statics": [
       "following",
       "fromName",
@@ -1242,6 +1262,7 @@
   },
   "core.HolidayCalendar": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": ["countBusinessDays", "free", "isBusinessDay", "isHoliday", "toString"],
     "getters": ["code", "metadata"]
@@ -1278,18 +1299,21 @@
   },
   "core.PeriodKind": {
     "kind": "class",
+    "constructor": false,
     "statics": ["annual", "daily", "fromName", "monthly", "quarterly", "semiAnnual", "weekly"],
     "methods": ["free", "priorObservationDate", "toString"],
     "getters": ["annualizationFactor", "periodsPerYear"]
   },
   "core.PeriodId": {
     "kind": "class",
+    "constructor": false,
     "statics": ["annual", "day", "half", "month", "parse", "quarter", "week"],
     "methods": ["free", "next", "nextFiscal", "prev", "prevFiscal", "toString"],
     "getters": ["code", "index", "isFiscal", "kind", "year"]
   },
   "core.FiscalConfig": {
     "kind": "class",
+    "constructor": true,
     "statics": ["australia", "calendarYear", "japan", "uk", "usFederal"],
     "methods": ["free"],
     "getters": ["startDay", "startMonth"]
@@ -1302,24 +1326,28 @@
   },
   "core.StubKind": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fromName", "longBack", "longFront", "none", "shortBack", "shortFront"],
     "methods": ["free", "toString"],
     "getters": []
   },
   "core.ScheduleErrorPolicy": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fromName", "gracefulEmpty", "missingCalendarWarning", "strict"],
     "methods": ["free", "toString"],
     "getters": []
   },
   "core.Schedule": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "fromJson", "fromSpec"],
     "methods": ["free", "hasWarnings", "toJson", "usedGracefulFallback"],
     "getters": ["dates", "fixingDates", "paymentDates", "warnings"]
   },
   "core.ScheduleBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "adjustWith",
@@ -1375,6 +1403,7 @@
   },
   "core.SifmaSettlementClass": {
     "kind": "class",
+    "constructor": false,
     "statics": ["a", "b", "c", "d", "fromAgencyTerm"],
     "methods": ["free", "toString"],
     "getters": []
@@ -1393,6 +1422,7 @@
   },
   "core.DiscountCurve": {
     "kind": "class",
+    "constructor": true,
     "statics": ["flat", "fromDates", "fromJson", "fromZeroRates"],
     "methods": [
       "df",
@@ -1418,6 +1448,7 @@
   },
   "core.HazardCurve": {
     "kind": "class",
+    "constructor": true,
     "statics": ["flat", "fromJson", "fromSurvivalProbs"],
     "methods": [
       "cdsQuoteBp",
@@ -1445,6 +1476,7 @@
   },
   "core.ForwardCurve": {
     "kind": "class",
+    "constructor": true,
     "statics": ["flat", "fromJson"],
     "methods": ["df", "free", "rate", "rateBetween", "ratePeriod", "toJson"],
     "getters": [
@@ -1463,6 +1495,7 @@
   },
   "core.InflationCurve": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": ["cpi", "cpiWithLag", "free", "indexRatio", "inflationRate", "toJson"],
     "getters": [
@@ -1479,6 +1512,7 @@
   },
   "core.PriceCurve": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": ["free", "price", "toJson"],
     "getters": [
@@ -1495,12 +1529,14 @@
   },
   "core.BaseCorrelationCurve": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": ["correlation", "free", "toJson"],
     "getters": ["correlations", "detachmentPoints", "extrapolation", "id", "interpStyle"]
   },
   "core.CreditIndexData": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": [
       "free",
@@ -1514,6 +1550,7 @@
   },
   "core.VolSurface": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": ["free", "toJson", "withDisplacements"],
     "getters": [
@@ -1530,12 +1567,14 @@
   },
   "core.VolCube": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": ["forwardAt", "free", "paramsAt", "toJson"],
     "getters": ["expiries", "forwards", "gridShape", "id", "interpolationMode", "params", "tenors"]
   },
   "core.VolCubeExpirySlice": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": ["free", "toJson"],
     "getters": [
@@ -1551,18 +1590,21 @@
   },
   "core.FxDeltaVolSurface": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": ["free", "toJson"],
     "getters": ["atmVols", "bf10d", "bf25d", "expiries", "id", "numExpiries", "rr10d", "rr25d"]
   },
   "core.ScalarTimeSeries": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": ["free", "toJson", "valueOn", "valueOnExact"],
     "getters": ["currency", "firstDate", "id", "interpolation", "lastDate", "observations"]
   },
   "core.InflationIndex": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": [
       "dateRange",
@@ -1579,6 +1621,7 @@
   },
   "core.MarketContext": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": [
       "contains",
@@ -1617,30 +1660,35 @@
   },
   "core.FxConversionPolicy": {
     "kind": "class",
+    "constructor": false,
     "statics": ["cashflowDate", "fromName", "periodAverage", "periodEnd"],
     "methods": ["free", "toString"],
     "getters": []
   },
   "core.FxRateResult": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fromJson"],
     "methods": ["free", "toJson"],
     "getters": ["rate", "triangulated"]
   },
   "core.FxMatrix": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromDict"],
     "methods": ["free", "rate", "setQuote", "setQuoteOn", "setQuotes"],
     "getters": []
   },
   "core.FxQuoteConvention": {
     "kind": "class",
+    "constructor": false,
     "statics": ["direct", "fromName", "indirect"],
     "methods": ["free", "toString"],
     "getters": []
   },
   "core.FxPairConvention": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": ["free"],
     "getters": ["base", "pipSize", "quote", "settlementDays", "usdQuotation"]
@@ -1837,6 +1885,7 @@
   },
   "covenants.CovenantEngine": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson", "fromSpecs"],
     "methods": [
       "addSpec",
@@ -2139,12 +2188,14 @@
   },
   "margin.FrtbSbaEngine": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": ["calculate", "free"],
     "getters": ["riskClasses", "scenarios"]
   },
   "margin.FrtbSensitivities": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": [
       "addCommodityCurvature",
@@ -2181,30 +2232,35 @@
   },
   "margin.HaircutImCalculator": {
     "kind": "class",
+    "constructor": false,
     "statics": ["bcbsStandard", "fromSchedule", "usTreasuries"],
     "methods": ["calculateForCollateral", "free", "haircutFor", "withCollateralTerms"],
     "getters": ["eligibleCollateral", "mporDays"]
   },
   "margin.SaCcrEngine": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": ["calculateEad", "free"],
     "getters": ["alpha"]
   },
   "margin.ScheduleImCalculator": {
     "kind": "class",
+    "constructor": false,
     "statics": ["bcbsStandard", "fromFinstackConfig", "fromRegistryId"],
     "methods": ["calculateForNotional", "calculateNettingSetWithNgr", "free", "rate"],
     "getters": ["mporDays"]
   },
   "margin.SimmCalculator": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromFinstackConfig"],
     "methods": ["calculateFromSensitivities", "free"],
     "getters": ["mporDays", "version"]
   },
   "margin.SimmSensitivities": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": [
       "addCommodityDelta",
@@ -2234,6 +2290,7 @@
   },
   "margin.VmCalculator": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": ["calculate", "free", "generateMarginCalls", "marginCallDates"],
     "getters": ["csa"]
@@ -2480,36 +2537,42 @@
   },
   "models.correlation.CopulaSpec": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fromJson", "gaussian", "multiFactor", "randomFactorLoading", "studentT"],
     "methods": ["build", "free", "toJson"],
     "getters": ["isGaussian", "isMultiFactor", "isRfl", "isStudentT"]
   },
   "models.correlation.Copula": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": ["conditionalDefaultProb", "free", "stressCorrelationProxy", "tailDependence"],
     "getters": ["modelName", "numFactors"]
   },
   "models.correlation.RecoverySpec": {
     "kind": "class",
+    "constructor": false,
     "statics": ["constant", "fromJson", "marketCorrelated", "marketStandardStochastic"],
     "methods": ["build", "free", "toJson"],
     "getters": ["expectedRecovery"]
   },
   "models.correlation.RecoveryModel": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": ["conditionalLgd", "conditionalRecovery", "free"],
     "getters": ["expectedRecovery", "isStochastic", "lgd", "modelName", "recoveryVolatility"]
   },
   "models.correlation.PortfolioLossResult": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fromJson", "fromLosses"],
     "methods": ["free", "toJson", "trancheLossStatistics"],
     "getters": ["confidence", "expectedLoss", "expectedShortfall", "losses", "var"]
   },
   "models.correlation.CorrelatedBernoulli": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": [
       "conditionalP1GivenX2",
@@ -2531,30 +2594,35 @@
   },
   "models.correlation.LatentFactorSpec": {
     "kind": "class",
+    "constructor": false,
     "statics": ["singleFactor", "twoFactor"],
     "methods": ["build", "free"],
     "getters": ["numFactors"]
   },
   "models.correlation.LatentFactorKind": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": ["diagonalFactorContribution", "free"],
     "getters": ["correlationMatrix", "factorNames", "modelName", "numFactors", "volatilities"]
   },
   "models.correlation.LatentSingleFactor": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": ["free"],
     "getters": ["meanReversion", "numFactors", "volatility"]
   },
   "models.correlation.LatentTwoFactor": {
     "kind": "class",
+    "constructor": true,
     "statics": ["cloStandard", "rmbsStandard"],
     "methods": ["free"],
     "getters": ["choleskyL10", "choleskyL11", "correlation", "creditVol", "numFactors", "prepayVol"]
   },
   "models.correlation.LatentMultiFactor": {
     "kind": "class",
+    "constructor": true,
     "statics": ["uncorrelated"],
     "methods": ["free", "generateCorrelatedFactors"],
     "getters": ["correlationMatrix", "numFactors", "volatilities"]
@@ -2629,6 +2697,7 @@
   },
   "models.credit.MertonModel": {
     "kind": "class",
+    "constructor": true,
     "statics": [
       "creditGrades",
       "fromCdsSpread",
@@ -2665,24 +2734,28 @@
   },
   "models.credit.MertonBarrierType": {
     "kind": "class",
+    "constructor": false,
     "statics": ["firstPassage", "fromJson", "terminal"],
     "methods": ["free", "toJson"],
     "getters": []
   },
   "models.credit.AssetDynamics": {
     "kind": "class",
+    "constructor": false,
     "statics": ["creditGrades", "fromJson", "geometricBrownian", "jumpDiffusion"],
     "methods": ["free", "toJson"],
     "getters": []
   },
   "models.credit.SimulatedPaths": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fromJson"],
     "methods": ["free", "get", "path", "toJson", "toNested"],
     "getters": ["assetValues", "numPaths", "numSteps", "times", "valuesPerPath"]
   },
   "models.credit.DynamicRecoverySpec": {
     "kind": "class",
+    "constructor": false,
     "statics": [
       "constant",
       "flooredInverse",
@@ -2696,18 +2769,21 @@
   },
   "models.credit.EndogenousHazardSpec": {
     "kind": "class",
+    "constructor": false,
     "statics": ["exponential", "fromJson", "powerLaw", "tabular"],
     "methods": ["free", "hazardAfterPikAccrual", "hazardAtLeverage", "toJson"],
     "getters": ["baseHazardRate", "baseLeverage", "kind", "leverageHazardMap"]
   },
   "models.credit.ToggleExerciseModel": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fromJson", "optimal", "stochastic", "threshold"],
     "methods": ["free", "shouldPik", "toJson"],
     "getters": ["kind", "params"]
   },
   "models.credit.RatingFactorTable": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fromJson", "fromRegistryId", "moodysStandard"],
     "methods": ["free", "getFactor", "toJson"],
     "getters": ["agency", "defaultFactor", "methodology"]
@@ -2726,24 +2802,28 @@
   },
   "models.credit.BetaRecovery": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": ["free", "quantile", "sampleSeeded", "toJson"],
     "getters": ["alpha", "betaParam", "mean", "meanLgd", "mode", "stdDev", "variance"]
   },
   "models.credit.WorkoutCosts": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson", "standard", "zero"],
     "methods": ["free", "toJson"],
     "getters": ["directCostRate", "indirectCostRate", "totalRate"]
   },
   "models.credit.WorkoutLgd": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "fromJson"],
     "methods": ["evaluate", "free", "netRecovery", "toJson"],
     "getters": ["collateral", "costs", "discountRate", "workoutYears"]
   },
   "models.credit.WorkoutLgdBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "build",
@@ -2758,6 +2838,7 @@
   },
   "models.credit.DownturnLgd": {
     "kind": "class",
+    "constructor": false,
     "statics": [
       "baselSecured",
       "baselUnsecured",
@@ -2771,6 +2852,7 @@
   },
   "models.credit.EadCalculator": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson", "revolver", "termLoan"],
     "methods": ["free", "leqFromObservedEad", "toJson"],
     "getters": ["ead", "totalCommitment", "utilization"]
@@ -2786,6 +2868,7 @@
   },
   "models.credit.MasterScale": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson", "fromRegistryId", "moodysAssumptions", "spAssumptions"],
     "methods": ["free", "mapPd", "mapPds", "mapScore", "toJson"],
     "getters": ["grades", "nGrades"]
@@ -2807,6 +2890,7 @@
   },
   "models.credit.RatingScale": {
     "kind": "class",
+    "constructor": false,
     "statics": ["custom", "customWithDefault", "fromJson", "notched", "standard", "standardWithNr"],
     "methods": [
       "defaultState",
@@ -2823,6 +2907,7 @@
   },
   "models.credit.TransitionMatrix": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": [
       "compose",
@@ -2838,12 +2923,14 @@
   },
   "models.credit.GeneratorMatrix": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson", "fromTransitionMatrix", "fromTransitionMatrixWithTol"],
     "methods": ["exitRate", "free", "intensity", "toJson", "toMatrix"],
     "getters": ["nStates", "regularizationL1", "roundTripError", "scale"]
   },
   "models.credit.RatingPath": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fromJson"],
     "methods": [
       "defaultTime",
@@ -2859,12 +2946,14 @@
   },
   "models.credit.RatingPaths": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fromJson"],
     "methods": ["free", "toJson"],
     "getters": ["defaultRate", "length", "paths"]
   },
   "models.credit.MigrationSimulator": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": ["empiricalMatrix", "free", "simulate", "toJson"],
     "getters": ["generator", "horizon"]
@@ -2909,6 +2998,21 @@
       "validateFactorModelConfig"
     ]
   },
+  "models.factor.factorVariance": {
+    "kind": "function"
+  },
+  "models.factor.factorCovariance": {
+    "kind": "function"
+  },
+  "models.factor.factorCorrelation": {
+    "kind": "function"
+  },
+  "models.factor.factorCovarianceRows": {
+    "kind": "function"
+  },
+  "models.factor.validateFactorModelConfig": {
+    "kind": "function"
+  },
   "models.factor.credit": {
     "kind": "namespace",
     "keys": [
@@ -2924,6 +3028,7 @@
   },
   "models.factor.credit.CreditFactorModel": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fromJson"],
     "methods": ["factorIds", "free", "issuerIds", "levelNames", "toJson"],
     "getters": [
@@ -2944,30 +3049,35 @@
   },
   "models.factor.credit.CreditCalibrator": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": ["calibrate", "free"],
     "getters": ["config"]
   },
   "models.factor.credit.LevelsAtDate": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fromJson"],
     "methods": ["adder", "free", "levelValues", "toJson"],
     "getters": ["date", "generic", "nLevels"]
   },
   "models.factor.credit.PeriodDecomposition": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fromJson"],
     "methods": ["dAdder", "free", "levelDeltas", "toJson"],
     "getters": ["dGeneric", "fromDate", "nLevels", "toDate"]
   },
   "models.factor.credit.FactorCovarianceForecast": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": ["covarianceAt", "factorModelAt", "free", "idiosyncraticVol"],
     "getters": []
   },
   "models.factor.credit.VolHorizon": {
     "kind": "class",
+    "constructor": false,
     "statics": ["nSteps", "oneStep", "parse", "unconditional", "years"],
     "methods": ["free", "toString"],
     "getters": ["kind", "n", "yearsValue"]
@@ -2976,21 +3086,6 @@
     "kind": "function"
   },
   "models.factor.credit.decomposePeriod": {
-    "kind": "function"
-  },
-  "models.factor.factorVariance": {
-    "kind": "function"
-  },
-  "models.factor.factorCovariance": {
-    "kind": "function"
-  },
-  "models.factor.factorCorrelation": {
-    "kind": "function"
-  },
-  "models.factor.factorCovarianceRows": {
-    "kind": "function"
-  },
-  "models.factor.validateFactorModelConfig": {
     "kind": "function"
   },
   "models.factor.risk": {
@@ -3060,12 +3155,14 @@
   },
   "models.liquidity.AlmgrenChrissModel": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson", "fromProfile"],
     "methods": ["estimateCost", "free", "optimalTrajectory", "toJson"],
     "getters": ["delta", "eta", "gamma"]
   },
   "models.liquidity.KyleLambdaModel": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromAmihud", "fromJson"],
     "methods": ["estimateCost", "free", "optimalTrajectory", "toJson"],
     "getters": ["lambda"]
@@ -3123,18 +3220,21 @@
   },
   "models.monteCarlo.EuropeanPricer": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": ["free", "priceCall", "pricePut"],
     "getters": ["numPaths", "seed", "useParallel"]
   },
   "models.monteCarlo.PathDependentPricer": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": ["free", "priceAsian", "priceWithLrmGreeks"],
     "getters": ["antithetic", "numPaths", "seed", "useBrownianBridge", "useParallel", "useSobol"]
   },
   "models.monteCarlo.LsmcPricer": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": ["free", "priceAmerican", "priceAmericanUnbiased"],
     "getters": ["antithetic", "basis", "basisDegree", "numPaths", "seed", "useParallel"]
@@ -3170,18 +3270,21 @@
   },
   "models.rates.dtsm.YieldPanel": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": ["free", "toJson", "yieldChanges"],
     "getters": ["dates", "numDates", "numTenors", "tenors", "yields"]
   },
   "models.rates.dtsm.DieboldLi": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": ["extractFactors", "fit", "fitVar", "forecast", "free", "loadingMatrix", "toJson"],
     "getters": ["factors", "lambda", "mu", "phi", "qCov", "tenors"]
   },
   "models.rates.dtsm.YieldPca": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fit", "fitYieldChanges", "fromJson"],
     "methods": [
       "applyScenario",
@@ -3220,6 +3323,7 @@
   },
   "models.rates.hullWhite.HullWhiteParams": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson", "piecewise"],
     "methods": ["bondVol", "free", "sigma", "stateCovariance", "stateVariance", "toJson"],
     "getters": ["kappa", "times", "values"]
@@ -3280,6 +3384,7 @@
   },
   "models.volatility.SabrCalibrator": {
     "kind": "class",
+    "constructor": true,
     "statics": ["highPrecision"],
     "methods": [
       "calibrate",
@@ -3293,6 +3398,7 @@
   },
   "models.volatility.SabrParameters": {
     "kind": "class",
+    "constructor": true,
     "statics": [
       "equityDefault",
       "fromJson",
@@ -3308,6 +3414,7 @@
   },
   "models.volatility.SabrSmile": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": [
       "atmVol",
@@ -3547,18 +3654,21 @@
   },
   "portfolio.InstrumentArtifactCache": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": ["free"],
     "getters": ["decodeCount", "size"]
   },
   "portfolio.Portfolio": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "fromMaterialization", "fromSpec", "validateMaterialization"],
     "methods": ["free", "numPositions", "toJson", "toSpec"],
     "getters": ["asOf", "baseCurrency", "entityIds", "id", "meta", "name", "positionIds", "tags"]
   },
   "portfolio.FactorModel": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fromConfig"],
     "methods": [
       "analyze",
@@ -3573,6 +3683,7 @@
   },
   "portfolio.PortfolioMarginAggregator": {
     "kind": "class",
+    "constructor": false,
     "statics": ["fromPortfolio"],
     "methods": ["calculate", "free"],
     "getters": []
@@ -3672,6 +3783,7 @@
   },
   "portfolio.PortfolioBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": ["build", "entity", "free", "meta", "name", "position", "tag"],
     "getters": []
@@ -4053,12 +4165,14 @@
   },
   "statements.Evaluator": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": ["evaluate", "evaluateMonteCarlo", "evaluateWithMarket", "free", "withChecks"],
     "getters": []
   },
   "statements.Registry": {
     "kind": "class",
+    "constructor": true,
     "statics": ["withBuiltins"],
     "methods": [
       "dependencies",
@@ -4073,6 +4187,7 @@
   },
   "statements.ModelBuilder": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromSpec"],
     "methods": [
       "addBond",
@@ -4104,6 +4219,7 @@
   },
   "statements.MixedNodeBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": ["build", "forecast", "formula", "free", "name", "values", "valuesMoney"],
     "getters": []
@@ -4406,6 +4522,7 @@
   },
   "statements_analytics.DependencyTracer": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": [
       "allDependencies",
@@ -4420,12 +4537,14 @@
   },
   "statements_analytics.CorkscrewExtension": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": ["config", "execute", "free"],
     "getters": []
   },
   "statements_analytics.CreditScorecardExtension": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": ["config", "execute", "free"],
     "getters": []
@@ -4608,18 +4727,14 @@
     "kind": "namespace",
     "keys": [
       "composite",
-      "fx",
       "instruments",
       "market",
       "schema",
       "valuationResultAllCovenantsPassed",
       "valuationResultFailedCovenants",
       "valuationResultGetMetric",
-      "valuationResultMetricCount",
-      "valuationResultMetricKeys",
       "valuationResultMetricSeries",
       "valuationResultMetricUnits",
-      "valuationResultPriceDecimal",
       "valuationResultToJson"
     ]
   },
@@ -4636,13 +4751,10 @@
       "rebalance",
       "rebalanceRuleCalendar",
       "rebalanceRuleDates",
-      "rebalanceRuleManual",
       "weightingMethodDeltaNeutral",
       "weightingMethodDurationWeighted",
       "weightingMethodDv01Neutral",
-      "weightingMethodFixedQuantity",
       "weightingMethodMetricWeighted",
-      "weightingMethodNotionalWeighted",
       "weightingMethodVolatilityWeighted"
     ]
   },
@@ -4664,12 +4776,6 @@
   "valuations.composite.history": {
     "kind": "function"
   },
-  "valuations.composite.weightingMethodFixedQuantity": {
-    "kind": "function"
-  },
-  "valuations.composite.weightingMethodNotionalWeighted": {
-    "kind": "function"
-  },
   "valuations.composite.weightingMethodMetricWeighted": {
     "kind": "function"
   },
@@ -4685,9 +4791,6 @@
   "valuations.composite.weightingMethodVolatilityWeighted": {
     "kind": "function"
   },
-  "valuations.composite.rebalanceRuleManual": {
-    "kind": "function"
-  },
   "valuations.composite.rebalanceRuleDates": {
     "kind": "function"
   },
@@ -4699,244 +4802,6 @@
   },
   "valuations.composite.compositeHistoryResultRowJson": {
     "kind": "function"
-  },
-  "valuations.fx": {
-    "kind": "namespace",
-    "keys": [
-      "FxBarrierOption",
-      "FxDigitalOption",
-      "FxForward",
-      "FxForwardBuilder",
-      "FxOption",
-      "FxOptionBuilder",
-      "FxSpot",
-      "FxSwap",
-      "FxTouchOption",
-      "FxVarianceSwap",
-      "Ndf",
-      "QuantoOption"
-    ]
-  },
-  "valuations.fx.FxSpot": {
-    "kind": "class",
-    "statics": ["fromJson"],
-    "methods": ["free", "metric", "price", "toJson"],
-    "getters": ["id"]
-  },
-  "valuations.fx.FxForward": {
-    "kind": "class",
-    "statics": ["builder", "example", "fromJson", "fromTradeDate", "standardSettlementDays"],
-    "methods": [
-      "free",
-      "marketDependencies",
-      "marketForwardRate",
-      "metric",
-      "price",
-      "toDict",
-      "toJson",
-      "withForwardPips",
-      "withForwardPoints"
-    ],
-    "getters": [
-      "attributes",
-      "baseCalendarId",
-      "baseCurrency",
-      "contractRate",
-      "defaultModel",
-      "domesticDiscountCurveId",
-      "expiry",
-      "foreignDiscountCurveId",
-      "id",
-      "instrumentPricingOverrides",
-      "maturity",
-      "metricPricingOverrides",
-      "notional",
-      "quoteCalendarId",
-      "quoteCurrency",
-      "quotedSpot",
-      "scenarioPricingOverrides"
-    ]
-  },
-  "valuations.fx.FxSwap": {
-    "kind": "class",
-    "statics": ["fromJson"],
-    "methods": ["free", "metric", "price", "toJson"],
-    "getters": ["id"]
-  },
-  "valuations.fx.Ndf": {
-    "kind": "class",
-    "statics": ["fromJson"],
-    "methods": ["free", "metric", "price", "toJson"],
-    "getters": ["id"]
-  },
-  "valuations.fx.FxOption": {
-    "kind": "class",
-    "statics": ["builder", "european", "example", "fromJson"],
-    "methods": [
-      "delta",
-      "foreignRho",
-      "free",
-      "gamma",
-      "greeks",
-      "impliedVol",
-      "marketDependencies",
-      "metric",
-      "price",
-      "rho",
-      "theta",
-      "toDict",
-      "toJson",
-      "vanna",
-      "vega",
-      "volga"
-    ],
-    "getters": [
-      "attributes",
-      "baseCurrency",
-      "dayCount",
-      "defaultModel",
-      "deltaConvention",
-      "domesticDiscountCurveId",
-      "expiry",
-      "foreignDiscountCurveId",
-      "id",
-      "instrumentPricingOverrides",
-      "metricPricingOverrides",
-      "notional",
-      "optionType",
-      "quoteCurrency",
-      "scenarioPricingOverrides",
-      "strike",
-      "volSurfaceId"
-    ]
-  },
-  "valuations.fx.FxDigitalOption": {
-    "kind": "class",
-    "statics": ["fromJson"],
-    "methods": [
-      "delta",
-      "free",
-      "gamma",
-      "greeks",
-      "metric",
-      "price",
-      "rho",
-      "theta",
-      "toJson",
-      "vega"
-    ],
-    "getters": ["id"]
-  },
-  "valuations.fx.FxTouchOption": {
-    "kind": "class",
-    "statics": ["fromJson"],
-    "methods": [
-      "delta",
-      "free",
-      "gamma",
-      "greeks",
-      "metric",
-      "price",
-      "rho",
-      "theta",
-      "toJson",
-      "vega"
-    ],
-    "getters": ["id"]
-  },
-  "valuations.fx.FxBarrierOption": {
-    "kind": "class",
-    "statics": ["fromJson"],
-    "methods": [
-      "delta",
-      "free",
-      "gamma",
-      "greeks",
-      "metric",
-      "price",
-      "rho",
-      "theta",
-      "toJson",
-      "vanna",
-      "vega",
-      "volga"
-    ],
-    "getters": ["id"]
-  },
-  "valuations.fx.FxVarianceSwap": {
-    "kind": "class",
-    "statics": ["fromJson"],
-    "methods": ["free", "metric", "price", "toJson"],
-    "getters": ["id"]
-  },
-  "valuations.fx.QuantoOption": {
-    "kind": "class",
-    "statics": ["fromJson"],
-    "methods": [
-      "delta",
-      "foreignRho",
-      "free",
-      "gamma",
-      "greeks",
-      "metric",
-      "price",
-      "rho",
-      "theta",
-      "toJson",
-      "vanna",
-      "vega",
-      "volga"
-    ],
-    "getters": ["id"]
-  },
-  "valuations.fx.FxForwardBuilder": {
-    "kind": "class",
-    "statics": [],
-    "methods": [
-      "attributes",
-      "baseCalendarId",
-      "baseCurrency",
-      "build",
-      "contractRate",
-      "domesticDiscountCurveId",
-      "foreignDiscountCurveId",
-      "free",
-      "id",
-      "instrumentPricingOverrides",
-      "maturity",
-      "metricPricingOverrides",
-      "notional",
-      "quoteCalendarId",
-      "quoteCurrency",
-      "quotedSpot",
-      "scenarioPricingOverrides"
-    ],
-    "getters": []
-  },
-  "valuations.fx.FxOptionBuilder": {
-    "kind": "class",
-    "statics": [],
-    "methods": [
-      "attributes",
-      "baseCurrency",
-      "build",
-      "dayCount",
-      "deltaConvention",
-      "domesticDiscountCurveId",
-      "expiry",
-      "foreignDiscountCurveId",
-      "free",
-      "id",
-      "instrumentPricingOverrides",
-      "metricPricingOverrides",
-      "notional",
-      "optionType",
-      "quoteCurrency",
-      "scenarioPricingOverrides",
-      "strike",
-      "volSurfaceId"
-    ],
-    "getters": []
   },
   "valuations.instruments": {
     "kind": "namespace",
@@ -4959,9 +4824,21 @@
       "CreditDefaultSwapBuilder",
       "EquityOption",
       "EquityOptionBuilder",
+      "FxBarrierOption",
+      "FxDigitalOption",
+      "FxForward",
+      "FxForwardBuilder",
+      "FxOption",
+      "FxOptionBuilder",
+      "FxSpot",
+      "FxSwap",
+      "FxTouchOption",
+      "FxVarianceSwap",
       "InterestRateSwap",
       "InterestRateSwapBuilder",
       "MertonMcConfig",
+      "Ndf",
+      "QuantoOption",
       "RevolvingCredit",
       "RevolvingCreditBuilder",
       "StructuredCredit",
@@ -5012,12 +4889,12 @@
       "priceInstrument",
       "priceInstrumentWithMarket",
       "scenarioTableCells",
-      "structuredCreditTrancheBreakevenCdr",
-      "structuredCreditTrancheDiscountMargin",
-      "structuredCreditTrancheMetrics",
-      "structuredCreditTrancheOas",
-      "structuredCreditTrancheScenarioTable",
+      "trancheBreakevenCdr",
       "trancheBuilder",
+      "trancheDiscountMargin",
+      "trancheMetrics",
+      "trancheOas",
+      "trancheScenarioTable",
       "trancheStructureFromBalances",
       "validateInstrumentJson",
       "validateTypedInstrumentJson",
@@ -5026,6 +4903,7 @@
   },
   "valuations.instruments.Bond": {
     "kind": "class",
+    "constructor": false,
     "statics": [
       "builder",
       "example",
@@ -5078,6 +4956,7 @@
   },
   "valuations.instruments.TermLoan": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "example", "exampleCallable", "exampleFloatingWithDdtl", "fromJson"],
     "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
     "getters": [
@@ -5112,6 +4991,7 @@
   },
   "valuations.instruments.RevolvingCredit": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "example", "fromJson"],
     "methods": [
       "expectedCashflows",
@@ -5159,6 +5039,7 @@
   },
   "valuations.instruments.AssetBackedFacility": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "example", "fromJson"],
     "methods": [
       "borrowingBase",
@@ -5243,23 +5124,24 @@
   "valuations.instruments.metricMetadata": {
     "kind": "function"
   },
-  "valuations.instruments.structuredCreditTrancheDiscountMargin": {
+  "valuations.instruments.trancheDiscountMargin": {
     "kind": "function"
   },
-  "valuations.instruments.structuredCreditTrancheBreakevenCdr": {
+  "valuations.instruments.trancheBreakevenCdr": {
     "kind": "function"
   },
-  "valuations.instruments.structuredCreditTrancheOas": {
+  "valuations.instruments.trancheOas": {
     "kind": "function"
   },
-  "valuations.instruments.structuredCreditTrancheScenarioTable": {
+  "valuations.instruments.trancheScenarioTable": {
     "kind": "function"
   },
-  "valuations.instruments.structuredCreditTrancheMetrics": {
+  "valuations.instruments.trancheMetrics": {
     "kind": "function"
   },
   "valuations.instruments.InterestRateSwap": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "example", "fromConventions", "fromJson"],
     "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
     "getters": [
@@ -5281,6 +5163,7 @@
   },
   "valuations.instruments.Swaption": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "example", "fromJson"],
     "methods": [
       "forwardSwapRate",
@@ -5315,6 +5198,7 @@
   },
   "valuations.instruments.CapFloor": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "example", "fromJson"],
     "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
     "getters": [
@@ -5349,6 +5233,7 @@
   },
   "valuations.instruments.CreditDefaultSwap": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "example", "fromJson"],
     "methods": ["free", "marketDependencies", "metric", "parSpread", "price", "toDict", "toJson"],
     "getters": [
@@ -5375,6 +5260,7 @@
   },
   "valuations.instruments.CdsIndex": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "example", "fromJson", "fromPreset"],
     "methods": [
       "cs01",
@@ -5413,6 +5299,7 @@
   },
   "valuations.instruments.CdsTranche": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "example", "fromJson", "standard"],
     "methods": [
       "expectedLoss",
@@ -5455,6 +5342,7 @@
   },
   "valuations.instruments.CdsOption": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "example", "fromJson"],
     "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
     "getters": [
@@ -5467,12 +5355,15 @@
       "expiry",
       "id",
       "indexFactor",
+      "instrumentPricingOverrides",
       "knockout",
+      "metricPricingOverrides",
       "notional",
       "optionType",
       "protectionStartConvention",
       "realizedLoss",
       "recoveryRate",
+      "scenarioPricingOverrides",
       "settlement",
       "strike",
       "strikeIndexFactor",
@@ -5485,6 +5376,7 @@
   },
   "valuations.instruments.ConvertibleBond": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "example", "exampleMandatory", "fromJson"],
     "methods": [
       "conversionPremium",
@@ -5526,6 +5418,7 @@
   },
   "valuations.instruments.EquityOption": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "european", "example", "fromJson"],
     "methods": [
       "delta",
@@ -5569,6 +5462,7 @@
   },
   "valuations.instruments.StructuredCredit": {
     "kind": "class",
+    "constructor": false,
     "statics": ["builder", "example", "fromJson", "newAbs", "newClo", "newCmbs", "newRmbs"],
     "methods": [
       "createWaterfall",
@@ -5637,8 +5531,191 @@
       "waterfallRules"
     ]
   },
+  "valuations.instruments.FxSpot": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["fromJson"],
+    "methods": ["free", "metric", "price", "toJson"],
+    "getters": ["id"]
+  },
+  "valuations.instruments.FxForward": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["builder", "example", "fromJson", "fromTradeDate", "standardSettlementDays"],
+    "methods": [
+      "free",
+      "marketDependencies",
+      "marketForwardRate",
+      "metric",
+      "price",
+      "toDict",
+      "toJson",
+      "withForwardPips",
+      "withForwardPoints"
+    ],
+    "getters": [
+      "attributes",
+      "baseCalendarId",
+      "baseCurrency",
+      "contractRate",
+      "defaultModel",
+      "domesticDiscountCurveId",
+      "expiry",
+      "foreignDiscountCurveId",
+      "id",
+      "instrumentPricingOverrides",
+      "maturity",
+      "metricPricingOverrides",
+      "notional",
+      "quoteCalendarId",
+      "quoteCurrency",
+      "quotedSpot",
+      "scenarioPricingOverrides"
+    ]
+  },
+  "valuations.instruments.FxSwap": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["fromJson"],
+    "methods": ["free", "metric", "price", "toJson"],
+    "getters": ["id"]
+  },
+  "valuations.instruments.Ndf": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["fromJson"],
+    "methods": ["free", "metric", "price", "toJson"],
+    "getters": ["id"]
+  },
+  "valuations.instruments.FxOption": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["builder", "european", "example", "fromJson"],
+    "methods": [
+      "delta",
+      "foreignRho",
+      "free",
+      "gamma",
+      "greeks",
+      "impliedVol",
+      "marketDependencies",
+      "metric",
+      "price",
+      "rho",
+      "theta",
+      "toDict",
+      "toJson",
+      "vanna",
+      "vega",
+      "volga"
+    ],
+    "getters": [
+      "attributes",
+      "baseCurrency",
+      "dayCount",
+      "defaultModel",
+      "deltaConvention",
+      "domesticDiscountCurveId",
+      "expiry",
+      "foreignDiscountCurveId",
+      "id",
+      "instrumentPricingOverrides",
+      "metricPricingOverrides",
+      "notional",
+      "optionType",
+      "quoteCurrency",
+      "scenarioPricingOverrides",
+      "strike",
+      "volSurfaceId"
+    ]
+  },
+  "valuations.instruments.FxDigitalOption": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["fromJson"],
+    "methods": [
+      "delta",
+      "free",
+      "gamma",
+      "greeks",
+      "metric",
+      "price",
+      "rho",
+      "theta",
+      "toJson",
+      "vega"
+    ],
+    "getters": ["id"]
+  },
+  "valuations.instruments.FxTouchOption": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["fromJson"],
+    "methods": [
+      "delta",
+      "free",
+      "gamma",
+      "greeks",
+      "metric",
+      "price",
+      "rho",
+      "theta",
+      "toJson",
+      "vega"
+    ],
+    "getters": ["id"]
+  },
+  "valuations.instruments.FxBarrierOption": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["fromJson"],
+    "methods": [
+      "delta",
+      "free",
+      "gamma",
+      "greeks",
+      "metric",
+      "price",
+      "rho",
+      "theta",
+      "toJson",
+      "vanna",
+      "vega",
+      "volga"
+    ],
+    "getters": ["id"]
+  },
+  "valuations.instruments.FxVarianceSwap": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["fromJson"],
+    "methods": ["free", "metric", "price", "toJson"],
+    "getters": ["id"]
+  },
+  "valuations.instruments.QuantoOption": {
+    "kind": "class",
+    "constructor": false,
+    "statics": ["fromJson"],
+    "methods": [
+      "delta",
+      "foreignRho",
+      "free",
+      "gamma",
+      "greeks",
+      "metric",
+      "price",
+      "rho",
+      "theta",
+      "toJson",
+      "vanna",
+      "vega",
+      "volga"
+    ],
+    "getters": ["id"]
+  },
   "valuations.instruments.BondBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "accrualMethod",
@@ -5665,6 +5742,7 @@
   },
   "valuations.instruments.TermLoanBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "amortization",
@@ -5699,6 +5777,7 @@
   },
   "valuations.instruments.RevolvingCreditBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "attributes",
@@ -5736,6 +5815,7 @@
   },
   "valuations.instruments.AssetBackedFacilityBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "amortizationEvents",
@@ -5773,6 +5853,7 @@
   },
   "valuations.instruments.InterestRateSwapBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "adjustFixedAccrualDates",
@@ -5794,6 +5875,7 @@
   },
   "valuations.instruments.SwaptionBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "attributes",
@@ -5818,6 +5900,7 @@
   },
   "valuations.instruments.CapFloorBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "attributes",
@@ -5852,6 +5935,7 @@
   },
   "valuations.instruments.CreditDefaultSwapBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "attributes",
@@ -5876,6 +5960,7 @@
   },
   "valuations.instruments.CdsIndexBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "attributes",
@@ -5904,6 +5989,7 @@
   },
   "valuations.instruments.CdsTrancheBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "attachPct",
@@ -5937,6 +6023,7 @@
   },
   "valuations.instruments.CdsOptionBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "attributes",
@@ -5949,12 +6036,15 @@
       "free",
       "id",
       "indexFactor",
+      "instrumentPricingOverrides",
       "knockout",
+      "metricPricingOverrides",
       "notional",
       "optionType",
       "protectionStartConvention",
       "realizedLoss",
       "recoveryRate",
+      "scenarioPricingOverrides",
       "settlement",
       "strike",
       "strikeIndexFactor",
@@ -5968,6 +6058,7 @@
   },
   "valuations.instruments.ConvertibleBondBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "attributes",
@@ -5997,6 +6088,7 @@
   },
   "valuations.instruments.EquityOptionBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "attributes",
@@ -6027,6 +6119,7 @@
   },
   "valuations.instruments.StructuredCreditBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "attributes",
@@ -6076,8 +6169,60 @@
     ],
     "getters": []
   },
+  "valuations.instruments.FxForwardBuilder": {
+    "kind": "class",
+    "constructor": false,
+    "statics": [],
+    "methods": [
+      "attributes",
+      "baseCalendarId",
+      "baseCurrency",
+      "build",
+      "contractRate",
+      "domesticDiscountCurveId",
+      "foreignDiscountCurveId",
+      "free",
+      "id",
+      "instrumentPricingOverrides",
+      "maturity",
+      "metricPricingOverrides",
+      "notional",
+      "quoteCalendarId",
+      "quoteCurrency",
+      "quotedSpot",
+      "scenarioPricingOverrides"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.FxOptionBuilder": {
+    "kind": "class",
+    "constructor": false,
+    "statics": [],
+    "methods": [
+      "attributes",
+      "baseCurrency",
+      "build",
+      "dayCount",
+      "deltaConvention",
+      "domesticDiscountCurveId",
+      "expiry",
+      "foreignDiscountCurveId",
+      "free",
+      "id",
+      "instrumentPricingOverrides",
+      "metricPricingOverrides",
+      "notional",
+      "optionType",
+      "quoteCurrency",
+      "scenarioPricingOverrides",
+      "strike",
+      "volSurfaceId"
+    ],
+    "getters": []
+  },
   "valuations.instruments.TrancheBuilder": {
     "kind": "class",
+    "constructor": false,
     "statics": [],
     "methods": [
       "attachPct",
@@ -6105,6 +6250,7 @@
   },
   "valuations.instruments.MertonMcConfig": {
     "kind": "class",
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": [
       "barrierCrossing",
@@ -6233,6 +6379,7 @@
   },
   "valuations.market.ConventionRegistry": {
     "kind": "class",
+    "constructor": true,
     "statics": [],
     "methods": [
       "free",
@@ -6293,16 +6440,7 @@
   "valuations.valuationResultMetricSeries": {
     "kind": "function"
   },
-  "valuations.valuationResultPriceDecimal": {
-    "kind": "function"
-  },
   "valuations.valuationResultGetMetric": {
-    "kind": "function"
-  },
-  "valuations.valuationResultMetricKeys": {
-    "kind": "function"
-  },
-  "valuations.valuationResultMetricCount": {
     "kind": "function"
   },
   "valuations.valuationResultMetricUnits": {

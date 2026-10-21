@@ -180,9 +180,8 @@ mod discount_margin_tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        calculate_tranche_discount_margin, calculate_tranche_metrics, calculate_tranche_z_spread,
-        AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority,
-        TrancheStructure,
+        calculate_tranche_z_spread, tranche_discount_margin, tranche_metrics, AssetPool, DealType,
+        PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
     };
     use time::Month;
 
@@ -304,14 +303,8 @@ mod discount_margin_tests {
         let sc = deal(true);
         let mkt = market();
         let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
-        let dm = calculate_tranche_discount_margin(
-            &sc,
-            "SR",
-            &mkt,
-            closing(),
-            clean_pct(&sc, pv.amount()),
-        )
-        .unwrap();
+        let dm = tranche_discount_margin(&sc, "SR", &mkt, closing(), clean_pct(&sc, pv.amount()))
+            .unwrap();
         assert!(
             dm.abs() < 1e-6,
             "at the model PV the discount margin must be zero (no spread over \
@@ -328,10 +321,8 @@ mod discount_margin_tests {
         let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
         let richer = clean_pct(&sc, pv.amount() * 1.002);
         let cheaper = clean_pct(&sc, pv.amount() * 0.998);
-        let dm_rich =
-            calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), richer).unwrap();
-        let dm_cheap =
-            calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), cheaper).unwrap();
+        let dm_rich = tranche_discount_margin(&sc, "SR", &mkt, closing(), richer).unwrap();
+        let dm_cheap = tranche_discount_margin(&sc, "SR", &mkt, closing(), cheaper).unwrap();
 
         assert!(
             dm_rich < 0.0,
@@ -357,14 +348,9 @@ mod discount_margin_tests {
         let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
         let target = Money::new(pv.amount() * 0.99, pv.currency()).expect("valid money fixture");
 
-        let dm = calculate_tranche_discount_margin(
-            &sc,
-            "SR",
-            &mkt,
-            closing(),
-            clean_pct(&sc, target.amount()),
-        )
-        .unwrap();
+        let dm =
+            tranche_discount_margin(&sc, "SR", &mkt, closing(), clean_pct(&sc, target.amount()))
+                .unwrap();
 
         let flows = (sc).tranche_cashflows("SR", &mkt, closing()).unwrap();
         let curve = mkt.get_discount("USD-OIS").unwrap();
@@ -388,9 +374,8 @@ mod discount_margin_tests {
         let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
         let price = clean_pct(&sc, pv.amount() * 0.97);
 
-        let dm = calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), price).unwrap();
-        let summary =
-            calculate_tranche_metrics(&sc, "SR", &mkt, closing(), Some(price), &[]).unwrap();
+        let dm = tranche_discount_margin(&sc, "SR", &mkt, closing(), price).unwrap();
+        let summary = tranche_metrics(&sc, "SR", &mkt, closing(), Some(price), &[]).unwrap();
         let summary_dm_bp = summary
             .dm_bp
             .expect("floating tranche has a discount margin");
@@ -412,13 +397,8 @@ mod discount_margin_tests {
         let sc = deal(false);
         let mkt = market();
         let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
-        let result = calculate_tranche_discount_margin(
-            &sc,
-            "SR",
-            &mkt,
-            closing(),
-            clean_pct(&sc, pv.amount()),
-        );
+        let result =
+            tranche_discount_margin(&sc, "SR", &mkt, closing(), clean_pct(&sc, pv.amount()));
         assert!(result.is_err(), "DM on a fixed-rate tranche must error");
     }
 
@@ -432,7 +412,7 @@ mod discount_margin_tests {
     #[test]
     fn effective_duration_of_a_floater_is_short_while_spread_duration_is_not() {
         let mkt = market();
-        let floater = calculate_tranche_metrics(&deal(true), "SR", &mkt, closing(), None, &[])
+        let floater = tranche_metrics(&deal(true), "SR", &mkt, closing(), None, &[])
             .expect("floater metrics");
         assert!(
             floater.effective_duration < 0.5,
@@ -449,8 +429,8 @@ mod discount_margin_tests {
             .expect("floating tranches carry a discount margin");
         assert!(dm.abs() < 1e-3, "zero margin at the model price: {dm}");
 
-        let fixed = calculate_tranche_metrics(&deal(false), "SR", &mkt, closing(), None, &[])
-            .expect("fixed metrics");
+        let fixed =
+            tranche_metrics(&deal(false), "SR", &mkt, closing(), None, &[]).expect("fixed metrics");
         assert!(fixed.dm_bp.is_none());
         assert!(
             (fixed.effective_duration - fixed.spread_duration).abs() < 0.02,
@@ -482,7 +462,7 @@ mod breakeven_cdr_tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        calculate_tranche_breakeven_cdr, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche,
+        tranche_breakeven_cdr, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche,
         TrancheSeniority, TrancheStructure,
     };
     use time::Month;
@@ -560,7 +540,7 @@ mod breakeven_cdr_tests {
     fn breakeven_cdr_brackets_first_senior_writedown() {
         let sc = deal();
         let mkt = market();
-        let be = calculate_tranche_breakeven_cdr(&sc, "SR", &mkt, closing()).unwrap();
+        let be = tranche_breakeven_cdr(&sc, "SR", &mkt, closing()).unwrap();
         assert!(
             be > 0.0 && be < 1.0,
             "break-even CDR should be interior, got {be}"
@@ -587,8 +567,8 @@ mod scenario_table_tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        scenario_table, AssetPool, DealType, PoolAsset, ScenarioGrid, StructuredCredit, Tranche,
-        TrancheSeniority, TrancheStructure,
+        tranche_scenario_table, AssetPool, DealType, PoolAsset, ScenarioGrid, StructuredCredit,
+        Tranche, TrancheSeniority, TrancheStructure,
     };
     use time::Month;
 
@@ -660,7 +640,7 @@ mod scenario_table_tests {
             severities: vec![0.60],
             recovery_lag: None,
         };
-        let table = scenario_table(&sc, "SR", &mkt, closing(), &grid).unwrap();
+        let table = tranche_scenario_table(&sc, "SR", &mkt, closing(), &grid).unwrap();
 
         // 2 CPR x 2 CDR x 1 severity, in CPR-major then CDR order:
         // [0]=(0,0) [1]=(0,0.5) [2]=(0.1,0) [3]=(0.1,0.5).
@@ -704,8 +684,8 @@ mod scenario_table_tests {
             severities: vec![0.50],
             recovery_lag: Some(0),
         };
-        let a = scenario_table(&sc, "SR", &mkt, closing(), &inherited).unwrap();
-        let b = scenario_table(&sc, "SR", &mkt, closing(), &overridden).unwrap();
+        let a = tranche_scenario_table(&sc, "SR", &mkt, closing(), &inherited).unwrap();
+        let b = tranche_scenario_table(&sc, "SR", &mkt, closing(), &overridden).unwrap();
         let d_price = (a.cells[0].price - b.cells[0].price).abs();
         let d_wal = (a.cells[0].wal - b.cells[0].wal).abs();
         assert!(
@@ -727,8 +707,8 @@ mod oas_tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations_structured_credit::structured_credit::{
-        calculate_tranche_oas, calculate_tranche_z_spread, AssetPool, DealType, OasConfig,
-        PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
+        calculate_tranche_z_spread, tranche_oas, AssetPool, DealType, OasConfig, PoolAsset,
+        StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
     };
     use time::Month;
 
@@ -834,7 +814,7 @@ mod oas_tests {
             stochastic_credit: false,
             ..Default::default()
         };
-        let oas = calculate_tranche_oas(&sc, "SR", &mkt, as_of, market_price, &config).unwrap();
+        let oas = tranche_oas(&sc, "SR", &mkt, as_of, market_price, &config).unwrap();
 
         assert!(
             (oas.oas - z_bp / 10_000.0).abs() < 1e-4,
@@ -873,7 +853,7 @@ mod oas_tests {
             prepay_beta: 0.0,
             ..Default::default()
         };
-        let oas = calculate_tranche_oas(&sc, "SR", &mkt, as_of, market_price, &config).unwrap();
+        let oas = tranche_oas(&sc, "SR", &mkt, as_of, market_price, &config).unwrap();
         assert!(
             (oas.oas - z_bp / 10_000.0).abs() < 1e-4,
             "zero-vol stochastic-rate OAS {} should equal the z-spread {} (decimal) \
@@ -931,7 +911,7 @@ mod oas_tests {
             tolerance: 1e-14,
             ..Default::default()
         };
-        let oas = calculate_tranche_oas(&sc, "SR", &mkt, as_of, market_price, &config).unwrap();
+        let oas = tranche_oas(&sc, "SR", &mkt, as_of, market_price, &config).unwrap();
         assert!(
             (oas.oas - z).abs() < 1e-8,
             "deterministic OAS {} must equal the z-spread {z} (diff {:e})",
@@ -952,7 +932,7 @@ mod oas_tests {
             stochastic_credit: true,
             ..Default::default()
         };
-        let oas = calculate_tranche_oas(&sc, "SR", &mkt, closing(), 99.0, &config).unwrap();
+        let oas = tranche_oas(&sc, "SR", &mkt, closing(), 99.0, &config).unwrap();
         assert!(oas.oas.is_finite(), "OAS must be finite, got {}", oas.oas);
         assert!(oas.price_std_error >= 0.0);
         assert!(

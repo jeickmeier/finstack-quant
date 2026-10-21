@@ -30,5 +30,5 @@ def test_registered_term_loan_metrics_cross_python_json_boundary(fixture: str) -
         model=body["model"],
         metrics=["all_in_rate", "yt2y"],
     )
-    assert "all_in_rate" in result.metric_keys()
-    assert "yt2y" in result.metric_keys()
+    assert "all_in_rate" in result.metrics
+    assert "yt2y" in result.metrics

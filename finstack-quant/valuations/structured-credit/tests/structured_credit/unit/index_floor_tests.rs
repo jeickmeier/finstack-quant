@@ -7,8 +7,8 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_tranche_oas, run_simulation_with_diagnostics, AssetPool, DealType, OasConfig,
-    PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
+    run_simulation_with_diagnostics, tranche_oas, AssetPool, DealType, OasConfig, PoolAsset,
+    StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -110,7 +110,7 @@ fn an_index_floor_above_the_forward_lifts_the_pool_coupon() {
 #[test]
 fn oas_differs_between_floored_and_unfloored_pools() {
     let market = market_with_curves(close());
-    let unfloored = calculate_tranche_oas(
+    let unfloored = tranche_oas(
         &deal(None),
         "E",
         &market,
@@ -119,7 +119,7 @@ fn oas_differs_between_floored_and_unfloored_pools() {
         &OasConfig::default(),
     )
     .expect("oas");
-    let floored = calculate_tranche_oas(
+    let floored = tranche_oas(
         &deal(Some(600.0)),
         "E",
         &market,

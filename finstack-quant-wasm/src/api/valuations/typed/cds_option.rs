@@ -80,7 +80,7 @@ getters!(JsCdsOption, "CdsOption", |i| {
         coupon_bp as couponBp => json(i.coupon_bp.and_then(|d| rust_decimal::prelude::ToPrimitive::to_f64(&d))),
 });
 
-common_getters!(JsCdsOption, "CdsOption", attributes);
+common_getters!(JsCdsOption, "CdsOption");
 
 factories!(JsCdsOption, "CdsOption", finstack_quant_valuations::instruments::CdsOption, {
         /// Canonical 100bp-strike call on a 5-year USD 10,000,000 corporate CDS (mirrors Rust `CdsOption::example`): expiry 2025-06-20, CDS maturity 2030-06-20, cash settlement, 40% recovery, curves `USD-OIS` / `CORP-HAZARD`, vol surface `CDSOPT-VOL`.
@@ -207,7 +207,7 @@ setters!(JsCdsOptionBuilder, "CdsOptionBuilder", {
         coupon_bp as couponBp => dec,
 });
 
-common_setters!(JsCdsOptionBuilder, "CdsOptionBuilder", attributes);
+common_setters!(JsCdsOptionBuilder, "CdsOptionBuilder");
 
 handle_setters!(JsCdsOptionBuilder, "CdsOptionBuilder", {
         /// Set the option notional.

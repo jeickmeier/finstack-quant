@@ -62,7 +62,7 @@ const WRITEDOWN_EPS_FRACTION: f64 = 1e-4;
 ///
 /// Returns an error if the tranche cashflows cannot be projected for a probed
 /// CDR.
-pub fn calculate_tranche_breakeven_cdr(
+pub fn tranche_breakeven_cdr(
     deal: &StructuredCredit,
     tranche_id: &str,
     market: &MarketContext,

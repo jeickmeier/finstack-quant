@@ -179,7 +179,7 @@ class TestCreditDefaultSwap:
         assert json.loads(cds.to_json())["instrument"]["spec"]["upfront"] is not None
 
         result = cds.price(_credit_market(), "2024-06-20", "hazard_rate", metrics=["cs01"])
-        keys = result.metric_keys()
+        keys = list(result.metrics)
         assert any(key.startswith("cs01") for key in keys), keys
         cs01 = cds.metric(_credit_market(), "2024-06-20", "cs01", "hazard_rate")
         assert math.isfinite(cs01)

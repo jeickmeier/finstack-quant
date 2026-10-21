@@ -179,7 +179,7 @@ impl PyCompositeLegSpec {
     /// Returns
     /// -------
     /// dict
-    ///     Tagged instrument object identical to ``json.loads(self.instrument_json)``.
+    ///     Canonical ``finstack_quant.instrument/1`` envelope of the embedded instrument.
     ///
     /// Raises
     /// ------
@@ -227,22 +227,6 @@ crate::bindings::macros::py_getters!(PyCompositeLegSpec |s| {
     /// -----
     /// This accessor does not raise; it returns the validated stored value.
     score -> f64 = s.inner.score;
-
-    /// Return the embedded instrument as a canonical v1 envelope.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     ``finstack_quant.instrument/1`` JSON for the embedded instrument.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If canonical JSON serialization fails.
-    instrument_json -> PyResult<String> = serialize_typed_instrument_json(
-        s.inner.instrument.as_ref().clone(),
-        "embedded",
-    );
 });
 
 /// Serializable policy for resolving signed composite quantities.
@@ -1165,31 +1149,6 @@ impl PyCompositeInstrument {
         serde_to_py(py, &trades)
     }
 
-    /// JSON twin of ``execution_trades``.
-    ///
-    /// Parameters
-    /// ----------
-    /// previous : CompositeInstrument | None
-    ///     Prior resolved state, or ``None`` for establishment trades.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     JSON array of primitive identifiers, types, and signed quantity deltas.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If either state is invalid or primitive definitions conflict.
-    #[pyo3(signature = (previous=None))]
-    fn execution_trades_json(&self, previous: Option<&PyCompositeInstrument>) -> PyResult<String> {
-        let trades = self
-            .inner
-            .execution_trades(previous.map(|value| &value.inner))
-            .map_err(core_to_py)?;
-        serialize_json_with_context(&trades, "failed to serialize composite execution trades")
-    }
-
     /// ``execution_trades`` as a pandas ``DataFrame``.
     ///
     /// Parameters
@@ -1378,19 +1337,6 @@ crate::bindings::macros::py_getters!(PyCompositeRebalanceResult |s| {
     /// This accessor does not raise; it clones the stored result instrument.
     instrument -> PyCompositeInstrument =
         PyCompositeInstrument { inner: s.inner.instrument.clone() };
-
-    /// Return net primitive quantity deltas as a JSON array.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     Primitive IDs, type tags, and signed quantity deltas.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If canonical JSON serialization fails.
-    trades_json -> PyResult<String> = serialize_json_with_context(&s.inner.trades, "failed to serialize composite rebalance trades");
 });
 
 /// Primitive path, net, and gross exposure report.
@@ -1510,6 +1456,17 @@ pub struct PyCompositeHistoryResult {
     pub(crate) inner: Vec<CompositeHistoryRow>,
 }
 
+impl PyCompositeHistoryResult {
+    /// The zero-based row `index`, or a Python `IndexError` when it is out of range.
+    fn history_row(&self, index: usize) -> PyResult<&CompositeHistoryRow> {
+        self.inner.get(index).ok_or_else(|| {
+            pyo3::exceptions::PyIndexError::new_err(format!(
+                "history row index {index} is out of range"
+            ))
+        })
+    }
+}
+
 #[pymethods]
 impl PyCompositeHistoryResult {
     /// Deserialize a chronological array of composite history rows.
@@ -1571,7 +1528,31 @@ impl PyCompositeHistoryResult {
         serde_rows_to_dataframe_with_schema(py, &rows, COMPOSITE_HISTORY_COLUMNS)
     }
 
-    /// Serialize one zero-based dated history row.
+    /// Return one zero-based dated history row as a ``dict``.
+    ///
+    /// Parameters
+    /// ----------
+    /// index : int
+    ///     Zero-based row index in chronological order.
+    ///
+    /// Returns
+    /// -------
+    /// dict
+    ///     The selected row in its canonical serde shape (the dict
+    ///     ``json.loads(self.row_json(index))`` returns): value, cashflows,
+    ///     P&L, return, exposures and rebalance trades.
+    ///
+    /// Raises
+    /// ------
+    /// IndexError
+    ///     If ``index`` is outside the result bounds.
+    /// ValueError
+    ///     If the selected row cannot be converted.
+    fn row<'py>(&self, py: Python<'py>, index: usize) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, self.history_row(index)?)
+    }
+
+    /// Serialize one zero-based dated history row; JSON twin of ``row``.
     ///
     /// Parameters
     /// ----------
@@ -1590,12 +1571,10 @@ impl PyCompositeHistoryResult {
     /// ValueError
     ///     If the selected row cannot be serialized.
     fn row_json(&self, index: usize) -> PyResult<String> {
-        let row = self.inner.get(index).ok_or_else(|| {
-            pyo3::exceptions::PyIndexError::new_err(format!(
-                "history row index {index} is out of range"
-            ))
-        })?;
-        serialize_json_with_context(row, "failed to serialize CompositeHistoryRow")
+        serialize_json_with_context(
+            self.history_row(index)?,
+            "failed to serialize CompositeHistoryRow",
+        )
     }
 
     /// Serialize every dated history row as a JSON array.

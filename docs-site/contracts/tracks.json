@@ -322,9 +322,9 @@
       "finstack_quant.valuations.instruments.StructuredCredit",
       "finstack_quant.valuations.instruments.TrancheStructure",
       "finstack_quant.valuations.instruments.price_instrument",
-      "finstack_quant.valuations.instruments.structured_credit_tranche_breakeven_cdr",
-      "finstack_quant.valuations.instruments.structured_credit_tranche_metrics",
-      "finstack_quant.valuations.instruments.structured_credit_tranche_scenario_table",
+      "finstack_quant.valuations.instruments.tranche_breakeven_cdr",
+      "finstack_quant.valuations.instruments.tranche_metrics",
+      "finstack_quant.valuations.instruments.tranche_scenario_table",
       "finstack_quant.valuations.instruments.validate_instrument_json"
     ],
     "models": [
@@ -437,7 +437,7 @@
       "finstack_quant.calibration.calibrate",
       "finstack_quant.core.market_data.BaseCorrelationCurve",
       "finstack_quant.valuations.instruments.price_instrument",
-      "finstack_quant.valuations.instruments.structured_credit_tranche_metrics",
+      "finstack_quant.valuations.instruments.tranche_metrics",
       "finstack_quant.valuations.instruments.validate_instrument_json"
     ],
     "models": [
@@ -1251,9 +1251,9 @@
       "finstack_quant.statements_analytics.compute_ecl",
       "finstack_quant.valuations.instruments.instrument_cashflows_json",
       "finstack_quant.valuations.instruments.price_instrument",
-      "finstack_quant.valuations.instruments.structured_credit_tranche_breakeven_cdr",
-      "finstack_quant.valuations.instruments.structured_credit_tranche_metrics",
-      "finstack_quant.valuations.instruments.structured_credit_tranche_scenario_table"
+      "finstack_quant.valuations.instruments.tranche_breakeven_cdr",
+      "finstack_quant.valuations.instruments.tranche_metrics",
+      "finstack_quant.valuations.instruments.tranche_scenario_table"
     ],
     "models": [
       "registry: bond_future_clean_price_proxy",

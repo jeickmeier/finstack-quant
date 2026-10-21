@@ -121,11 +121,11 @@ __all__ = [
     "metric_metadata",
     "pretty_instrument_json",
     "price_instrument",
-    "structured_credit_tranche_breakeven_cdr",
-    "structured_credit_tranche_discount_margin",
-    "structured_credit_tranche_metrics",
-    "structured_credit_tranche_oas",
-    "structured_credit_tranche_scenario_table",
+    "tranche_breakeven_cdr",
+    "tranche_discount_margin",
+    "tranche_metrics",
+    "tranche_oas",
+    "tranche_scenario_table",
     "validate_instrument_json",
     "validate_typed_instrument_json",
 ]
@@ -9955,6 +9955,58 @@ class CdsOption:
         """
         ...
     @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def attributes(self) -> Attributes:
         """
         Instrument attributes (tags and metadata) used for scenario selection.
@@ -10751,6 +10803,75 @@ class CdsOptionBuilder:
         ------
         ValueError
             If ``value`` is not a decimal number.
+        """
+        ...
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> CdsOptionBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(
+        self, value: MetricPricingOverrides | dict[str, object] | str
+    ) -> CdsOptionBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> CdsOptionBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
         """
         ...
     def attributes(self, value: Attributes | dict[str, Any] | None) -> CdsOptionBuilder:
@@ -28168,7 +28289,7 @@ def price_instrument(
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 1), 0.04))
     >>> from finstack_quant.valuations.instruments import price_instrument
     >>> result = price_instrument(loan, market, "2024-01-01", metrics=["all_in_rate"])
-    >>> (result.metric_keys(), round(result.get_metric("all_in_rate"), 4))
+    >>> (list(result.metrics), round(result.get_metric("all_in_rate"), 4))
     (['all_in_rate'], 0.06)
 
     """
@@ -33009,7 +33130,7 @@ class SimulationDiagnostics:
 class OasResult:
     """
     Result of an option-adjusted-spread calculation for a structured-credit
-    tranche (``structured_credit_tranche_oas``'s return value).
+    tranche (``tranche_oas``'s return value).
 
     Examples
     --------
@@ -33187,7 +33308,7 @@ class OasResult:
 class TrancheMetrics:
     """
     Per-tranche valuation, yield, spread and risk metrics
-    (``structured_credit_tranche_metrics``'s return value).
+    (``tranche_metrics``'s return value).
 
     Prices are quoted per the tranche's current balance; an impaired note
     reports zero prices and spreads and ``ytm`` ``None``.
@@ -33669,7 +33790,7 @@ class TrancheMetrics:
 class ScenarioTable:
     """
     Scenario/yield table for a single structured-credit tranche
-    (``structured_credit_tranche_scenario_table``'s return value).
+    (``tranche_scenario_table``'s return value).
 
     Examples
     --------
@@ -33793,7 +33914,7 @@ class ScenarioTable:
         """
         ...
 
-def structured_credit_tranche_discount_margin(
+def tranche_discount_margin(
     instrument: StructuredCredit | str,
     tranche_id: str,
     market: MarketContext | str,
@@ -33845,9 +33966,9 @@ def structured_credit_tranche_discount_margin(
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import structured_credit_tranche_discount_margin
+    >>> from finstack_quant.valuations.instruments import tranche_discount_margin
     >>> try:
-    ...     structured_credit_tranche_discount_margin("{}", "A", "{}", "2026-01-01", 100.0)
+    ...     tranche_discount_margin("{}", "A", "{}", "2026-01-01", 100.0)
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True
@@ -33855,7 +33976,7 @@ def structured_credit_tranche_discount_margin(
     """
     ...
 
-def structured_credit_tranche_breakeven_cdr(
+def tranche_breakeven_cdr(
     instrument: StructuredCredit | str,
     tranche_id: str,
     market: MarketContext | str,
@@ -33891,9 +34012,9 @@ def structured_credit_tranche_breakeven_cdr(
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import structured_credit_tranche_breakeven_cdr
+    >>> from finstack_quant.valuations.instruments import tranche_breakeven_cdr
     >>> try:
-    ...     structured_credit_tranche_breakeven_cdr("{}", "A", "{}", "2026-01-01")
+    ...     tranche_breakeven_cdr("{}", "A", "{}", "2026-01-01")
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True
@@ -33901,7 +34022,7 @@ def structured_credit_tranche_breakeven_cdr(
     """
     ...
 
-def structured_credit_tranche_oas(
+def tranche_oas(
     instrument: StructuredCredit | str,
     tranche_id: str,
     market: MarketContext | str,
@@ -33946,9 +34067,9 @@ def structured_credit_tranche_oas(
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import structured_credit_tranche_oas
+    >>> from finstack_quant.valuations.instruments import tranche_oas
     >>> try:
-    ...     structured_credit_tranche_oas("{}", "A", "{}", "2026-01-01", 100.0)
+    ...     tranche_oas("{}", "A", "{}", "2026-01-01", 100.0)
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True
@@ -33989,7 +34110,7 @@ def calculate_pool_stats(pool: AssetPool, as_of: datetime.date | str) -> PoolSta
     """
     ...
 
-def structured_credit_tranche_metrics(
+def tranche_metrics(
     instrument: StructuredCredit | str,
     tranche_id: str,
     market: MarketContext | str,
@@ -34042,9 +34163,9 @@ def structured_credit_tranche_metrics(
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import structured_credit_tranche_metrics
+    >>> from finstack_quant.valuations.instruments import tranche_metrics
     >>> try:
-    ...     structured_credit_tranche_metrics("{}", "A", "{}", "2026-01-01")
+    ...     tranche_metrics("{}", "A", "{}", "2026-01-01")
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True
@@ -34052,7 +34173,7 @@ def structured_credit_tranche_metrics(
     """
     ...
 
-def structured_credit_tranche_scenario_table(
+def tranche_scenario_table(
     instrument: StructuredCredit | str,
     tranche_id: str,
     market: MarketContext | str,
@@ -34093,9 +34214,9 @@ def structured_credit_tranche_scenario_table(
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import structured_credit_tranche_scenario_table
+    >>> from finstack_quant.valuations.instruments import tranche_scenario_table
     >>> try:
-    ...     structured_credit_tranche_scenario_table("{}", "A", "{}", "2026-01-01", "{}")
+    ...     tranche_scenario_table("{}", "A", "{}", "2026-01-01", "{}")
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True

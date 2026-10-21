@@ -306,25 +306,6 @@ use finstack_quant_valuations::instruments::composite::{
 };
 use finstack_quant_valuations::instruments::InstrumentEnvelope;
 
-/// `WeightingMethod::FixedQuantity`: leg quantities are the leg scores.
-/// @returns The `WeightingMethod` plain object.
-/// @throws Error - Throws if the value cannot be converted to JavaScript.
-#[wasm_bindgen(js_name = weightingMethodFixedQuantity)]
-pub fn weighting_method_fixed_quantity() -> Result<JsValue, JsValue> {
-    to_js_value(&WeightingMethod::FixedQuantity)
-}
-
-/// `WeightingMethod::NotionalWeighted`: scale the legs to a gross notional.
-/// @param gross_notional - Target gross notional as a `Money` plain object in the reporting currency.
-/// @returns The `WeightingMethod` plain object.
-/// @throws Error - Throws with kind `validation` if `grossNotional` is not a `Money` plain object.
-#[wasm_bindgen(js_name = weightingMethodNotionalWeighted)]
-pub fn weighting_method_notional_weighted(gross_notional: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&WeightingMethod::NotionalWeighted {
-        gross_notional: from_js_json(&gross_notional, "grossNotional")?,
-    })
-}
-
 /// `WeightingMethod::MetricWeighted`: size the legs by an additive metric.
 /// @param metric - Canonical additive metric identifier, e.g. `"dv01"` or `"delta"`.
 /// @param anchor_leg_id - Leg whose quantity is fixed at `anchorQuantity`.
@@ -407,14 +388,6 @@ pub fn weighting_method_volatility_weighted(
 fn rebalance_rule(rule: RebalanceRule) -> Result<JsValue, JsValue> {
     rule.validate().map_err(to_js_err)?;
     to_js_value(&rule)
-}
-
-/// `RebalanceRule::Manual`: holdings change only on explicit `rebalance` calls.
-/// @returns The `RebalanceRule` plain object.
-/// @throws Error - Throws if the value cannot be converted to JavaScript.
-#[wasm_bindgen(js_name = rebalanceRuleManual)]
-pub fn rebalance_rule_manual() -> Result<JsValue, JsValue> {
-    rebalance_rule(RebalanceRule::Manual)
 }
 
 /// `RebalanceRule::Dates`: rebalance on explicit dates.

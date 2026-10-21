@@ -285,7 +285,7 @@ fn truncate_at_call(
 /// missing, the discount curve is unavailable, the cashflows cannot be
 /// projected, a solve fails, a requested metric fails, or a figure is
 /// non-finite.
-pub fn calculate_tranche_metrics(
+pub fn tranche_metrics(
     deal: &StructuredCredit,
     tranche_id: &str,
     market: &MarketContext,

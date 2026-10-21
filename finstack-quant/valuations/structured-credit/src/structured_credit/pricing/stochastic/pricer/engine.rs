@@ -1357,7 +1357,7 @@ impl ScenarioCollector {
             // equal to dirty and flagged as UNADJUSTED: understating accrued by
             // at most one period's interest, in a known direction, instead of
             // silently mislabelling which of the two is authoritative. Use
-            // `calculate_tranche_metrics` for an accrued-adjusted clean price.
+            // `tranche_metrics` for an accrued-adjusted clean price.
             result.dirty_price = mean_pv / notional * 100.0;
             result.clean_price = result.dirty_price;
         }

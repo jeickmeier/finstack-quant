@@ -148,21 +148,6 @@ impl PyValuationResult {
         crate::bindings::date_utils::date_to_py(py, self.inner.as_of)
     }
 
-    /// Return the exact Decimal price as a string, without a float round-trip.
-    ///
-    /// Unlike the ``price`` property (a lossy ``float``), this preserves the
-    /// internal Decimal representation exactly. Pass the result to
-    /// ``decimal.Decimal`` for lossless arithmetic in Python.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     Exact decimal string of the valuation amount, e.g. ``"1000000.00"``.
-    #[pyo3(text_signature = "($self)")]
-    fn price_decimal(&self) -> String {
-        self.inner.value.amount_decimal().to_string()
-    }
-
     /// All computed measures as ``{metric_key: value}`` in computation order.
     ///
     /// Keys are literal composite keys (``bucketed_dv01::USD-OIS::10y``).
@@ -275,18 +260,6 @@ impl PyValuationResult {
     #[pyo3(text_signature = "($self)")]
     fn to_long_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         Self::long_rows_dataframe(py, &self.inner.to_long_rows())
-    }
-
-    /// Measure keys in computation order (literal composite form).
-    #[pyo3(text_signature = "($self)")]
-    fn metric_keys(&self) -> Vec<String> {
-        self.inner.measures.keys().map(|k| k.to_string()).collect()
-    }
-
-    /// Number of measures on this result.
-    #[pyo3(text_signature = "($self)")]
-    fn metric_count(&self) -> usize {
-        self.inner.measures.len()
     }
 
     /// Unit family of every measure, keyed by metric key.

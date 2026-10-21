@@ -487,7 +487,7 @@ export default [
   {
     "path": "#/$defs/d_482fa346c77e25f26a51/properties/clean_price",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StochasticPricingResult/properties/clean_price",
-    "description": "Clean price (percent of the sum of current tranche balances),\nUNADJUSTED for accrued interest.\n\nThis equals [`Self::dirty_price`]. The deal-level stochastic\nresult carries no per-tranche interest flows, so accrued cannot be\ncomputed here (the same constraint documented on the accrued\ncalculator). It is reported unadjusted rather than fabricated: the\nerror is at most one period's accrued interest, in a known direction.\nUse `calculate_tranche_metrics` when an accrued-adjusted clean price is\nrequired.",
+    "description": "Clean price (percent of the sum of current tranche balances),\nUNADJUSTED for accrued interest.\n\nThis equals [`Self::dirty_price`]. The deal-level stochastic\nresult carries no per-tranche interest flows, so accrued cannot be\ncomputed here (the same constraint documented on the accrued\ncalculator). It is reported unadjusted rather than fabricated: the\nerror is at most one period's accrued interest, in a known direction.\nUse `tranche_metrics` when an accrued-adjusted clean price is\nrequired.",
     "format": "double"
   },
   {

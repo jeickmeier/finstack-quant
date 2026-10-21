@@ -19,7 +19,7 @@ and ordinary Rust callers should stay on `price_with_metrics` /
 - `StructuredCredit::price_stochastic` / `price_stochastic_with_mode` — covered
   by `ModelKey::StructuredCreditStochastic` (`StructuredCreditStochasticPricer`
   already calls `price_stochastic_base`).
-- `StructuredCredit::value_tranche` and `calculate_tranche_metrics` — per-tranche
+- `StructuredCredit::value_tranche` and `tranche_metrics` — per-tranche
   valuation and analytics; deal-level PV still goes through the registry.
 - `Bond::price_merton_mc` — covered by `ModelKey::MertonMc`.
 

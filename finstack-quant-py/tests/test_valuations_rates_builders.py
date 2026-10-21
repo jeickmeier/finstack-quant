@@ -651,7 +651,7 @@ def test_metric_keys_are_human_readable_not_escaped() -> None:
 
     Curve ids such as ``USD-OIS`` used to surface as ``pv01::USD_x2dOIS`` on
     every Python-facing metric surface. The canonical Rust codec now writes
-    ordinary identifiers literally, so ``metric_keys()``, the ``metrics``
+    ordinary identifiers literally, so the ``metrics``
     mapping, ``metric_series`` / ``to_long_dataframe`` components and the wide
     ``to_dataframe()`` columns must all be free of escape markers, and
     ``get_metric`` / ``__getitem__`` must accept the decoded spelling.
@@ -668,7 +668,7 @@ def test_metric_keys_are_human_readable_not_escaped() -> None:
     )
     result = swap.price(_market(), AS_OF, metrics=["pv01", "bucketed_dv01"])
 
-    keys = result.metric_keys()
+    keys = list(result.metrics)
     assert keys, "expected pv01 / bucketed_dv01 measures"
     composite = [k for k in keys if "::" in k]
     assert composite, f"expected composite metric keys, got {keys}"

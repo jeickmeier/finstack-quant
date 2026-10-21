@@ -83,7 +83,7 @@ pub(crate) mod summary;
 
 /// Reprice a (bumped) deal on the scope of the metric context: the named
 /// tranche when the context carries one tranche's cashflows (set by
-/// [`calculate_tranche_metrics`]'s registry pass), else the whole deal
+/// [`tranche_metrics`]'s registry pass), else the whole deal
 /// through the context's pricing dispatch. Keeps the bump metrics
 /// (Default01, Prepayment01, Recovery01, Severity01) per tranche.
 ///
@@ -113,14 +113,12 @@ pub use deal_specific::{
 pub use pool::{CdrCalculator, CloWarfCalculator, CprCalculator};
 pub use pricing::calculate_tranche_wal;
 pub use risk::{
-    calculate_tranche_breakeven_cdr, calculate_tranche_convexity, calculate_tranche_cs01,
-    calculate_tranche_discount_margin, calculate_tranche_duration, calculate_tranche_oas,
-    calculate_tranche_z_spread, OasConfig, OasResult,
+    calculate_tranche_convexity, calculate_tranche_cs01, calculate_tranche_duration,
+    calculate_tranche_z_spread, tranche_breakeven_cdr, tranche_discount_margin, tranche_oas,
+    OasConfig, OasResult,
 };
-pub use scenario::{scenario_table, ScenarioCell, ScenarioGrid, ScenarioTable};
-pub use summary::{
-    calculate_equity_metrics, calculate_tranche_metrics, EquityMetrics, TrancheMetrics,
-};
+pub use scenario::{tranche_scenario_table, ScenarioCell, ScenarioGrid, ScenarioTable};
+pub use summary::{calculate_equity_metrics, tranche_metrics, EquityMetrics, TrancheMetrics};
 
 /// Register all structured credit metrics
 pub(crate) fn register_structured_credit_metrics(

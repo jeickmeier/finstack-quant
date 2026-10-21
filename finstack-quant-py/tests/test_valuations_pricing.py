@@ -10,11 +10,11 @@ import pytest
 from finstack_quant.valuations.instruments import (
     instrument_cashflows,
     price_instrument,
-    structured_credit_tranche_breakeven_cdr,
-    structured_credit_tranche_discount_margin,
-    structured_credit_tranche_metrics,
-    structured_credit_tranche_oas,
-    structured_credit_tranche_scenario_table,
+    tranche_breakeven_cdr,
+    tranche_discount_margin,
+    tranche_metrics,
+    tranche_oas,
+    tranche_scenario_table,
     validate_instrument_json,
 )
 from tests.golden.conftest import fixture_path
@@ -634,11 +634,11 @@ def test_python_pricing_routes_validate_instrument_before_other_inputs() -> None
             metrics=["not-a-metric"],
         ),
         lambda: instrument_cashflows(invalid, market, "not-a-date", "not-a-model").to_json(),
-        lambda: structured_credit_tranche_discount_margin(invalid, "missing", market, "not-a-date", float("nan")),
-        lambda: structured_credit_tranche_breakeven_cdr(invalid, "missing", market, "not-a-date"),
-        lambda: structured_credit_tranche_oas(invalid, "missing", market, "not-a-date", float("nan"), "not-json"),
-        lambda: structured_credit_tranche_metrics(invalid, "missing", market, "not-a-date", float("nan")),
-        lambda: structured_credit_tranche_scenario_table(invalid, "missing", market, "not-a-date", "not-json"),
+        lambda: tranche_discount_margin(invalid, "missing", market, "not-a-date", float("nan")),
+        lambda: tranche_breakeven_cdr(invalid, "missing", market, "not-a-date"),
+        lambda: tranche_oas(invalid, "missing", market, "not-a-date", float("nan"), "not-json"),
+        lambda: tranche_metrics(invalid, "missing", market, "not-a-date", float("nan")),
+        lambda: tranche_scenario_table(invalid, "missing", market, "not-a-date", "not-json"),
     ]
 
     for call in calls:
@@ -714,7 +714,7 @@ def test_unsupported_requested_metric_raises_rather_than_returning_nothing(
 def test_supported_requested_metrics_are_still_returned(golden: str, metrics: list[str]) -> None:
     result = _golden_pricing_call(golden, metrics)()
     for metric in metrics:
-        assert metric in result.metric_keys(), metric
+        assert metric in result.metrics, metric
 
 
 def test_commodity_spot_cash_claim_survives_json_replay() -> None:

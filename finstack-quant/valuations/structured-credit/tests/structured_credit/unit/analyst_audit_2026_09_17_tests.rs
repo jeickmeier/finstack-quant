@@ -19,7 +19,7 @@ use finstack_quant_core::types::CreditRating;
 use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_tranche_metrics, execute_waterfall, run_simulation, run_simulation_with_diagnostics,
+    execute_waterfall, run_simulation, run_simulation_with_diagnostics, tranche_metrics,
     AllocationMode, AssetPool, AssetType, CallAssumption, CardPortfolioSpec,
     ControlledAccumulationSpec, CoverageRules, CoverageTestSpec, DealType, LiquidationSpec,
     PaymentCalculation, PaymentType, PoolAsset, Recipient, RecipientType, ReinvestmentCriteria,
@@ -514,9 +514,9 @@ fn p7_tranche_bump_metrics_are_per_tranche_and_severity01_is_live() {
     );
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.05);
     let mkt = market(close);
-    let a = calculate_tranche_metrics(&deal, "A", &mkt, close, None, &[MetricId::Default01])
-        .expect("A metrics");
-    let eq = calculate_tranche_metrics(&deal, "EQ", &mkt, close, None, &[MetricId::Default01])
+    let a =
+        tranche_metrics(&deal, "A", &mkt, close, None, &[MetricId::Default01]).expect("A metrics");
+    let eq = tranche_metrics(&deal, "EQ", &mkt, close, None, &[MetricId::Default01])
         .expect("EQ metrics");
     let whole = deal
         .price_with_metrics(
@@ -541,10 +541,10 @@ fn p7_tranche_bump_metrics_are_per_tranche_and_severity01_is_live() {
     // senior's sensitivity is a small fraction of equity's.
     let mut mild = deal.clone();
     mild.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.01);
-    let a_mild = calculate_tranche_metrics(&mild, "A", &mkt, close, None, &[MetricId::Default01])
+    let a_mild = tranche_metrics(&mild, "A", &mkt, close, None, &[MetricId::Default01])
         .expect("A metrics")
         .metrics[&MetricId::Default01];
-    let eq_mild = calculate_tranche_metrics(&mild, "EQ", &mkt, close, None, &[MetricId::Default01])
+    let eq_mild = tranche_metrics(&mild, "EQ", &mkt, close, None, &[MetricId::Default01])
         .expect("EQ metrics")
         .metrics[&MetricId::Default01];
     assert!(
@@ -573,7 +573,7 @@ fn p7_tranche_bump_metrics_are_per_tranche_and_severity01_is_live() {
     assert_eq!(severity01, -recovery01);
 
     // Requested alone, at tranche scope, Severity01 still resolves.
-    let eq_sev = calculate_tranche_metrics(
+    let eq_sev = tranche_metrics(
         &low_recovery,
         "EQ",
         &mkt,
@@ -582,7 +582,7 @@ fn p7_tranche_bump_metrics_are_per_tranche_and_severity01_is_live() {
         &[MetricId::Severity01],
     )
     .expect("EQ severity");
-    let eq_rec = calculate_tranche_metrics(
+    let eq_rec = tranche_metrics(
         &low_recovery,
         "EQ",
         &mkt,
@@ -1032,10 +1032,10 @@ fn tranche_dv01_is_per_tranche_and_sums_to_the_deal() {
         0.0,
     );
     let mkt = market(close);
-    let a = calculate_tranche_metrics(&deal, "A", &mkt, close, None, &[MetricId::Dv01])
+    let a = tranche_metrics(&deal, "A", &mkt, close, None, &[MetricId::Dv01])
         .expect("A metrics")
         .metrics[&MetricId::Dv01];
-    let eq = calculate_tranche_metrics(&deal, "EQ", &mkt, close, None, &[MetricId::Dv01])
+    let eq = tranche_metrics(&deal, "EQ", &mkt, close, None, &[MetricId::Dv01])
         .expect("EQ metrics")
         .metrics[&MetricId::Dv01];
     let whole = deal

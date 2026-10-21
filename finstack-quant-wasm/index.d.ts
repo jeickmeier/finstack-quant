@@ -17795,7 +17795,7 @@ export interface FxForwardBuilder extends WasmOwned {
    * @returns The validated instrument.
    * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
    */
-  build(): FxForwardInstrument;
+  build(): FxForward;
   /**
    * Set the instrument identifier.
    * @param value - Unique identifier for the FX forward.
@@ -17910,19 +17910,19 @@ export interface FxForwardBuilder extends WasmOwned {
 }
 
 /**
- * Class object of `FxForwardBuilder`; create builders with `valuations.fx.FxForward.builder()`.
+ * Class object of `FxForwardBuilder`; create builders with `valuations.instruments.FxForward.builder()`.
  * @example
  * ```typescript
  * import init, { valuations } from "finstack-quant-wasm";
  * await init();
- * const builder = valuations.fx.FxForward.builder();
+ * const builder = valuations.instruments.FxForward.builder();
  * console.log(typeof builder.build);
  * builder.free();
  * ```
  */
 export interface FxForwardBuilderConstructor {
   /**
-   * JavaScript prototype of `FxForwardBuilder`; instances come from `valuations.fx.FxForward.builder()`, not `new`.
+   * JavaScript prototype of `FxForwardBuilder`; instances come from `valuations.instruments.FxForward.builder()`, not `new`.
    */
   readonly prototype: FxForwardBuilder;
 }
@@ -17940,7 +17940,7 @@ export interface FxOptionBuilder extends WasmOwned {
    * @returns The validated instrument.
    * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
    */
-  build(): FxVanillaOptionInstrument;
+  build(): FxOption;
   /**
    * Set the instrument identifier.
    * @param value - Unique identifier for the FX option.
@@ -18070,19 +18070,19 @@ export interface FxOptionBuilder extends WasmOwned {
 }
 
 /**
- * Class object of `FxOptionBuilder`; create builders with `valuations.fx.FxOption.builder()`.
+ * Class object of `FxOptionBuilder`; create builders with `valuations.instruments.FxOption.builder()`.
  * @example
  * ```typescript
  * import init, { valuations } from "finstack-quant-wasm";
  * await init();
- * const builder = valuations.fx.FxOption.builder();
+ * const builder = valuations.instruments.FxOption.builder();
  * console.log(typeof builder.build);
  * builder.free();
  * ```
  */
 export interface FxOptionBuilderConstructor {
   /**
-   * JavaScript prototype of `FxOptionBuilder`; instances come from `valuations.fx.FxOption.builder()`, not `new`.
+   * JavaScript prototype of `FxOptionBuilder`; instances come from `valuations.instruments.FxOption.builder()`, not `new`.
    */
   readonly prototype: FxOptionBuilder;
 }
@@ -18216,15 +18216,15 @@ export interface InterestRateSwap extends WasmOwned {
   metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
   /**
    * Whether fixed accrual boundaries use the leg's calendar and business-day convention.
-   * @returns True for adjusted accrual dates; false for contractual dates (default).
    * @throws This property does not throw.
+   * @returns True for adjusted accrual dates; false for contractual unadjusted dates (default).
    */
   readonly adjustFixedAccrualDates: boolean;
 
   /**
    * Whether floating accrual boundaries use the leg's calendar and business-day convention.
-   * @returns True for adjusted accrual dates; false for contractual dates (default).
    * @throws This property does not throw.
+   * @returns True for adjusted accrual dates; false for contractual unadjusted dates (default).
    */
   readonly adjustFloatAccrualDates: boolean;
 
@@ -18391,17 +18391,17 @@ export interface InterestRateSwapBuilder extends WasmOwned {
   attributes(value: generated.valuations.InterestRateSwap['attributes']): InterestRateSwapBuilder;
   /**
    * Select fixed accrual-date adjustment independently of payment dates.
-   * @param value - True applies the fixed leg's calendar and business-day convention; false (default) retains contractual boundaries.
+   * @param value - True applies the fixed leg's calendar and business-day convention; false (default) retains contractual accrual boundaries.
    * @returns The builder for chaining.
-   * @throws Throws for a non-boolean value or an already consumed builder.
+   * @throws Error - Throws for a non-boolean value or an already consumed builder.
    */
   adjustFixedAccrualDates(value: boolean): InterestRateSwapBuilder;
 
   /**
    * Select floating accrual-date adjustment independently of payment dates.
-   * @param value - True applies the floating leg's calendar and business-day convention; false (default) retains contractual boundaries.
+   * @param value - True applies the floating leg's calendar and business-day convention; false (default) retains contractual accrual boundaries.
    * @returns The builder for chaining.
-   * @throws Throws for a non-boolean value or an already consumed builder.
+   * @throws Error - Throws for a non-boolean value or an already consumed builder.
    */
   adjustFloatAccrualDates(value: boolean): InterestRateSwapBuilder;
 
@@ -20579,6 +20579,27 @@ export interface CdsOption extends WasmOwned {
    */
   readonly defaultModel: string;
   /**
+   * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly instrumentPricingOverrides: NonNullable<
+    generated.valuations.CdsOption['instrument_pricing_overrides']
+  >;
+  /**
+   * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+   * @returns The overrides plain object; unset fields are `null` or omitted.
+   */
+  readonly metricPricingOverrides: NonNullable<
+    generated.valuations.CdsOption['metric_pricing_overrides']
+  >;
+  /**
+   * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly scenarioPricingOverrides: NonNullable<
+    generated.valuations.CdsOption['scenario_pricing_overrides']
+  >;
+  /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
    */
@@ -20864,35 +20885,35 @@ export interface CdsOptionBuilder extends WasmOwned {
    * Set whether the option knocks out on default before expiry.
    * @param value - `true` for knock-out single-name options; default `false`.
    * @returns The builder, for chaining.
-   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
    */
   knockout(value: boolean): CdsOptionBuilder;
   /**
    * Set the recovery rate assumption.
    * @param value - Recovery as a decimal in `[0, 1]`.
    * @returns The builder, for chaining.
-   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
    */
   recoveryRate(value: number): CdsOptionBuilder;
   /**
    * Set the discount curve identifier.
    * @param value - Discount curve id in the market context.
    * @returns The builder, for chaining.
-   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
    */
   discountCurveId(value: string): CdsOptionBuilder;
   /**
    * Set the hazard (credit) curve identifier.
    * @param value - Hazard curve id in the market context.
    * @returns The builder, for chaining.
-   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
    */
   creditCurveId(value: string): CdsOptionBuilder;
   /**
    * Set the volatility surface identifier.
    * @param value - Vol surface id in the market context.
    * @returns The builder, for chaining.
-   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
    */
   volSurfaceId(value: string): CdsOptionBuilder;
   /**
@@ -20908,28 +20929,28 @@ export interface CdsOptionBuilder extends WasmOwned {
    * Set whether the underlying is a CDS index.
    * @param value - `true` for an index option (no knock-out, index factor applies), `false` for a single name.
    * @returns The builder, for chaining.
-   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
    */
   underlyingIsIndex(value: boolean): CdsOptionBuilder;
   /**
    * Set the current index factor.
    * @param value - Surviving fraction of the original index notional, in `(0, 1]`; default `1.0`.
    * @returns The builder, for chaining.
-   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
    */
   indexFactor(value: number): CdsOptionBuilder;
   /**
    * Set the original index factor of a clean-price strike.
    * @param value - `f0` the clean-price strike is quoted on.
    * @returns The builder, for chaining.
-   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
    */
   strikeIndexFactor(value: number): CdsOptionBuilder;
   /**
    * Set the settled cumulative index loss since option inception.
    * @param value - Decimal fraction of original index notional in `[0, 1]`; default `0.0`.
    * @returns The builder, for chaining.
-   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
    */
   realizedLoss(value: number): CdsOptionBuilder;
   /**
@@ -20939,6 +20960,33 @@ export interface CdsOptionBuilder extends WasmOwned {
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
   couponBp(value: number): CdsOptionBuilder;
+  /**
+   * Set the instrument-owned pricing inputs.
+   * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  instrumentPricingOverrides(
+    value: NonNullable<generated.valuations.CdsOption['instrument_pricing_overrides']>
+  ): CdsOptionBuilder;
+  /**
+   * Set the metric-time pricing configuration stored on the instrument.
+   * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  metricPricingOverrides(
+    value: NonNullable<generated.valuations.CdsOption['metric_pricing_overrides']>
+  ): CdsOptionBuilder;
+  /**
+   * Set the scenario-only pricing adjustments.
+   * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scenarioPricingOverrides(
+    value: NonNullable<generated.valuations.CdsOption['scenario_pricing_overrides']>
+  ): CdsOptionBuilder;
   /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
@@ -21110,8 +21158,8 @@ export interface ConvertibleBond extends WasmOwned {
   readonly recoveryRate: NonNullable<generated.valuations.ConvertibleBond['recovery_rate']> | null;
   /**
    * Recorded exercise and delayed delivery replacing the debt and its coupons.
-   * @returns Canonical settlement record, or `null` while unresolved.
    * @throws Never; returns the stored record.
+   * @returns Canonical settlement record with ISO dates, shares and currency-tagged cash/recovery basis, or `null` while unresolved.
    */
   readonly resolvedSettlement: NonNullable<generated.valuations.ConvertibleBond['resolved_settlement']> | null;
   /**
@@ -21362,7 +21410,7 @@ export interface ConvertibleBondBuilder extends WasmOwned {
   recoveryRate(value: number): ConvertibleBondBuilder;
   /**
    * Record the claim remaining after exercise extinguishes the debt.
-   * @param value - Canonical settlement with ISO exercise/delivery dates, nonnegative shares, and currency-tagged cash/recovery basis. Cash includes retained coupons; recovery basis excludes uncapitalized accrual. Omission leaves debt unresolved.
+   * @param value - Canonical `ConvertibleSettlement` object or JSON string with ISO `exercise_date` and `delivery_date`, nonnegative `shares`, and currency-tagged `cash` and `recovery_basis`. Cash includes retained coupons; recovery basis excludes uncapitalized accrual. Omission leaves debt unresolved.
    * @returns The builder, for chaining.
    * @throws Error - Throws for malformed input or a consumed builder; `build()` validates dates, currencies and amounts.
    */
@@ -23622,7 +23670,7 @@ export interface ValuationInstrumentsNamespace {
    * @returns The z-spread-equivalent discount margin in decimal units.
    * @throws Error - Thrown if JSON or the date is malformed, the deal is invalid, the tranche is missing or fixed-rate, market_price_pct is not finite and positive, required market data is unavailable, or the spread solve fails or exceeds ±5000 bp.
    */
-  structuredCreditTrancheDiscountMargin(
+  trancheDiscountMargin(
     instrumentJson: JsonInput,
     trancheId: string,
     marketJson: JsonInput,
@@ -23639,7 +23687,7 @@ export interface ValuationInstrumentsNamespace {
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @throws Error - Throws a JavaScript exception if the instrument or market JSON is malformed; the instrument fails pricing validation or is not a structured-credit deal; `as_of` is invalid; the tranche or required market data is missing; or the break-even calculation fails.
    */
-  structuredCreditTrancheBreakevenCdr(
+  trancheBreakevenCdr(
     instrumentJson: JsonInput,
     trancheId: string,
     marketJson: JsonInput,
@@ -23663,7 +23711,7 @@ export interface ValuationInstrumentsNamespace {
    * @param config - Optional OasConfig JSON; omit to use the default OAS solver configuration.
    * @throws Error - Throws a JavaScript exception if the instrument, market, or optional configuration JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; the OAS solve fails or produces a non-finite result; or the result cannot be converted to a JavaScript value.
    */
-  structuredCreditTrancheOas(
+  trancheOas(
     instrumentJson: JsonInput,
     trancheId: string,
     marketJson: JsonInput,
@@ -23687,7 +23735,7 @@ export interface ValuationInstrumentsNamespace {
    * @param grid - ScenarioGrid JSON containing the CPR, CDR, and severity axes for the table.
    * @throws Error - Throws a JavaScript exception if the instrument, market, or scenario-grid JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or required market data is missing; a scenario fails or produces a non-finite result; or the table cannot be converted to a JavaScript value.
    */
-  structuredCreditTrancheScenarioTable(
+  trancheScenarioTable(
     instrumentJson: JsonInput,
     trancheId: string,
     marketJson: JsonInput,
@@ -23715,7 +23763,7 @@ export interface ValuationInstrumentsNamespace {
    * @param metrics - Optional registry metric ids to value on this note; omit or pass an empty array for none.
    * @throws Error - Throws a JavaScript exception if the instrument or market JSON is malformed; a metric id is unknown; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; a metric fails or is non-finite; or the result cannot be converted to a JavaScript value.
    */
-  structuredCreditTrancheMetrics(
+  trancheMetrics(
     instrumentJson: JsonInput,
     trancheId: string,
     marketJson: JsonInput,
@@ -24055,7 +24103,7 @@ export interface ValuationInstrumentsNamespace {
   ): generated.valuations.CoverageTestSpec[];
   /**
    * The grid cells of a structured-credit scenario table.
-   * @param table - `ScenarioTable` plain object or JSON string, as returned by `structuredCreditTrancheScenarioTable`.
+   * @param table - `ScenarioTable` plain object or JSON string, as returned by `trancheScenarioTable`.
    * @returns `ScenarioCell` plain objects: `cpr`, `cdr`, `severity`, `price`, `wal` and `writedown` per grid point.
    * @throws Error - Throws with kind `validation` if `table` does not match the `ScenarioTable` schema.
    */
@@ -24193,12 +24241,60 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws with kind `validation` if `json` is malformed or fails instrument validation.
    */
   prettyInstrumentJson(json: JsonInput): string;
+  /**
+   * Spot FX instrument constructor.
+   */
+  FxSpot: FxConstructor<FxSpot>;
+  /**
+   * FX forward instrument constructor.
+   */
+  FxForward: FxForwardConstructor;
+  /**
+   * FX swap instrument constructor.
+   */
+  FxSwap: FxConstructor<FxSwap>;
+  /**
+   * Non-deliverable forward constructor.
+   */
+  Ndf: FxConstructor<Ndf>;
+  /**
+   * Vanilla FX option constructor.
+   */
+  FxOption: FxOptionConstructor;
+  /**
+   * Digital FX option constructor.
+   */
+  FxDigitalOption: FxConstructor<FxDigitalOption>;
+  /**
+   * One-touch / no-touch FX option constructor.
+   */
+  FxTouchOption: FxConstructor<FxTouchOption>;
+  /**
+   * Barrier FX option constructor.
+   */
+  FxBarrierOption: FxConstructor<FxBarrierOption>;
+  /**
+   * FX variance-swap constructor.
+   */
+  FxVarianceSwap: FxConstructor<FxVarianceSwap>;
+  /**
+   * Quanto option constructor.
+   */
+  QuantoOption: FxConstructor<QuantoOption>;
+  /**
+   * Fluent `FxForwardBuilder` class (see `FxForwardBuilderConstructor`).
+   */
+  FxForwardBuilder: FxForwardBuilderConstructor;
+  /**
+   * Fluent `FxOptionBuilder` class (see `FxOptionBuilderConstructor`).
+   */
+  FxOptionBuilder: FxOptionBuilderConstructor;
 }
 
 /**
- * FX instrument handle priced against a market context.
+ * Members shared by every FX instrument handle (`id`, `toJson`, `price`, `metric`).
  */
-export interface FxInstrument extends WasmOwned {
+export interface FxHandle extends WasmOwned {
   /**
    * Instrument identifier (mirrors the Python typed wrappers' `id` property).
    */
@@ -24241,9 +24337,29 @@ export interface FxInstrument extends WasmOwned {
 }
 
 /**
+ * Spot FX handle (Rust `FxSpot`): the shared `FxHandle` surface.
+ */
+export type FxSpot = FxHandle;
+
+/**
+ * FX swap handle (Rust `FxSwap`): the shared `FxHandle` surface.
+ */
+export type FxSwap = FxHandle;
+
+/**
+ * Non-deliverable forward handle (Rust `Ndf`): the shared `FxHandle` surface.
+ */
+export type Ndf = FxHandle;
+
+/**
+ * FX variance-swap handle (Rust `FxVarianceSwap`): the shared `FxHandle` surface.
+ */
+export type FxVarianceSwap = FxHandle;
+
+/**
  * FX forward handle with the Rust forward-rate helpers.
  */
-export interface FxForwardInstrument extends FxInstrument {
+export interface FxForward extends FxHandle {
   /**
    * Return a copy whose contract rate is `spotRate + forwardPoints` (mirrors Rust `FxForward::with_forward_points`).
    * @param spotRate - Spot rate, quote currency per unit of base currency; must be positive.
@@ -24251,7 +24367,7 @@ export interface FxForwardInstrument extends FxInstrument {
    * @returns A new forward with the contract rate set.
    * @throws Error - Throws with kind `validation` if `spotRate` is not positive and finite or the resulting rate is not positive.
    */
-  withForwardPoints(spotRate: number, forwardPoints: number): FxForwardInstrument;
+  withForwardPoints(spotRate: number, forwardPoints: number): FxForward;
   /**
    * Return a copy whose contract rate is `spotRate + pips * pipSize` (mirrors Rust `FxForward::with_forward_pips`).
    * @param spotRate - Spot rate, quote currency per unit of base currency; must be positive.
@@ -24259,7 +24375,7 @@ export interface FxForwardInstrument extends FxInstrument {
    * @returns A new forward with the contract rate set.
    * @throws Error - Throws with kind `validation` if `pips` or `spotRate` is not finite or the resulting rate is not positive.
    */
-  withForwardPips(spotRate: number, pips: number): FxForwardInstrument;
+  withForwardPips(spotRate: number, pips: number): FxForward;
   /**
    * Covered-interest-parity forward rate implied by the market (mirrors Rust `FxForward::market_forward_rate`).
    * @param marketJson - Serialized `MarketContext` carrying both discount curves and the FX spot (or an explicit `quoted_spot` on the instrument).
@@ -24399,14 +24515,14 @@ export interface FxForwardFromTradeDateOptions {
 /**
  * Vanilla FX option handle: the option Greeks plus implied volatility.
  */
-export interface FxVanillaOptionInstrument extends FxOptionInstrument {
+export interface FxOption extends FxOptionGreeks {
   /**
    * Implied volatility that reproduces `targetPrice` (mirrors Rust `FxOption::implied_vol`, Garman–Kohlhagen inversion).
    * @param marketJson - Serialized `MarketContext` carrying both discount curves and the FX spot.
    * @param asOf - Valuation date as an ISO-8601 string.
    * @param targetPrice - Observed option PV in quote currency, on the same scale as `price`.
    * @returns Annualized lognormal volatility as a decimal (`0.10` = 10%).
-   * @throws Error - Throws with kind `not_found` if a curve or the spot is missing, kind `validation` if an input is malformed, and kind `computation` if the root search does not converge.
+   * @throws Error - Throws with kind `not_found` if a curve or the spot is missing, kind `validation` if an input is malformed, and kind `computation` if the root search does not converge (price outside the no-arbitrage bounds).
    */
   impliedVol(marketJson: JsonInput, asOf: string, targetPrice: number): number;
   /**
@@ -24514,7 +24630,7 @@ export interface FxVanillaOptionInstrument extends FxOptionInstrument {
 /**
  * FX vanilla option handle with first-order greeks.
  */
-export interface FxOptionInstrument extends FxInstrument {
+export interface FxOptionGreeks extends FxHandle {
   /**
    * Spot delta of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -24602,7 +24718,7 @@ export interface FxOptionInstrument extends FxInstrument {
  * Quanto option handle. It shares the vanilla Greek surface; only `theta`
  * differs: the quanto reports the theta-horizon P&L, not the model theta.
  */
-export interface QuantoOptionInstrument extends FxOptionInstrument {
+export interface QuantoOption extends FxOptionGreeks {
   /**
    * Theta of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -24617,7 +24733,7 @@ export interface QuantoOptionInstrument extends FxOptionInstrument {
 /**
  * FX digital option handle with first-order greeks.
  */
-export interface FxDigitalOptionInstrument extends FxInstrument {
+export interface FxDigitalOption extends FxHandle {
   /**
    * Spot delta of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -24677,7 +24793,7 @@ export interface FxDigitalOptionInstrument extends FxInstrument {
 /**
  * FX touch option handle with first-order greeks.
  */
-export interface FxTouchOptionInstrument extends FxInstrument {
+export interface FxTouchOption extends FxHandle {
   /**
    * Spot delta of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -24737,7 +24853,7 @@ export interface FxTouchOptionInstrument extends FxInstrument {
 /**
  * FX barrier option handle with vanna and volga in addition to touch greeks.
  */
-export interface FxBarrierOptionInstrument extends FxTouchOptionInstrument {
+export interface FxBarrierOption extends FxTouchOption {
   /**
    * Vanna of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
@@ -24774,18 +24890,18 @@ export interface FxBarrierOptionInstrument extends FxTouchOptionInstrument {
  *   notional: { amount: "1000000", currency: "EUR" },
  *   attributes: {},
  * });
- * const spot = valuations.fx.FxSpot.fromJson(envelope);
+ * const spot = valuations.instruments.FxSpot.fromJson(envelope);
  * console.log(JSON.parse(spot.toJson()).instrument.type);
  * spot.free();
  * ```
  */
-export interface FxInstrumentConstructor<T extends FxInstrument> {
+export interface FxConstructor<T extends FxHandle> {
   /**
    * JavaScript prototype of the FX class; instances come from the static factories, not `new`.
    */
   readonly prototype: T;
   /**
-   * Parse a `FxInstrument` value from canonical JSON.
+   * Parse an FX instrument handle from canonical JSON.
    * @param json - Canonical FX instrument JSON accepted by `fromJson`.
    * @returns A typed FX instrument handle.
    */
@@ -24798,18 +24914,18 @@ export interface FxInstrumentConstructor<T extends FxInstrument> {
  * ```typescript
  * import init, { valuations } from "finstack-quant-wasm";
  * await init();
- * const forward = valuations.fx.FxForward.example().withForwardPoints(1.1, 0.002);
- * console.log(valuations.fx.FxForward.standardSettlementDays("EUR", "USD"), forward.id);
+ * const forward = valuations.instruments.FxForward.example().withForwardPoints(1.1, 0.002);
+ * console.log(valuations.instruments.FxForward.standardSettlementDays("EUR", "USD"), forward.id);
  * forward.free();
  * ```
  */
-export interface FxForwardConstructor extends FxInstrumentConstructor<FxForwardInstrument> {
+export interface FxForwardConstructor extends FxConstructor<FxForward> {
   /**
    * Canonical example forward (mirrors Rust `FxForward::example`): EUR/USD, EUR 1,000,000 at 1.12.
    * @returns The example forward.
    * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
    */
-  example(): FxForwardInstrument;
+  example(): FxForward;
   /**
    * Market-standard spot lag in business days for a currency pair (mirrors Rust `FxForward::standard_settlement_days`).
    * @param base - Base (foreign) currency ISO code.
@@ -24842,7 +24958,7 @@ export interface FxForwardConstructor extends FxInstrumentConstructor<FxForwardI
     domesticDiscountCurveId: string,
     foreignDiscountCurveId: string,
     options?: FxForwardFromTradeDateOptions | null
-  ): FxForwardInstrument;
+  ): FxForward;
   /**
    * Create a fluent builder (mirrors the Rust `builder()`).
    *
@@ -24858,18 +24974,18 @@ export interface FxForwardConstructor extends FxInstrumentConstructor<FxForwardI
  * ```typescript
  * import init, { valuations } from "finstack-quant-wasm";
  * await init();
- * const option = valuations.fx.FxOption.example();
+ * const option = valuations.instruments.FxOption.example();
  * console.log(option.id, JSON.parse(option.toJson()).instrument.type);
  * option.free();
  * ```
  */
-export interface FxOptionConstructor extends FxInstrumentConstructor<FxVanillaOptionInstrument> {
+export interface FxOptionConstructor extends FxConstructor<FxOption> {
   /**
    * Canonical example option (mirrors Rust `FxOption::example`): EUR/USD call, strike 1.12, EUR 1,000,000.
    * @returns The example option.
    * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
    */
-  example(): FxVanillaOptionInstrument;
+  example(): FxOption;
   /**
    * Build a European FX option with currency-derived OIS curves (mirrors Rust `FxOption::european`).
    * @param id - Unique instrument identifier.
@@ -24898,7 +25014,7 @@ export interface FxOptionConstructor extends FxInstrumentConstructor<FxVanillaOp
     deltaConventionKind: 'spot' | 'forward' | 'premium_adjusted_spot' | 'premium_adjusted_forward',
     premiumCurrency: string,
     venue: string
-  ): FxVanillaOptionInstrument;
+  ): FxOption;
   /**
    * Create a fluent builder (mirrors the Rust `builder()`).
    *
@@ -24906,78 +25022,6 @@ export interface FxOptionConstructor extends FxInstrumentConstructor<FxVanillaOp
    * @returns An empty builder.
    */
   builder(): FxOptionBuilder;
-}
-
-/**
- * Namespaced TypeScript entry points for fx calculations and types.
- * @example
- * ```typescript
- * import init, { valuations } from "finstack-quant-wasm";
- * await init();
- * const spot = valuations.fx.FxSpot.fromJson(
- *   valuations.instruments.instrumentEnvelopeFromSpec("fx_spot", {
- *     id: "EURUSD-SPOT",
- *     base_currency: "EUR",
- *     quote_currency: "USD",
- *     settlement_date: "2025-01-17",
- *     quoted_spot: 1.1,
- *     notional: { amount: "1000000", currency: "EUR" },
- *     attributes: {},
- *   }),
- * );
- * console.log(spot.toJson());
- * spot.free();
- * ```
- */
-export interface FxNamespace {
-  /**
-   * Spot FX instrument constructor.
-   */
-  FxSpot: FxInstrumentConstructor<FxInstrument>;
-  /**
-   * FX forward instrument constructor.
-   */
-  FxForward: FxForwardConstructor;
-  /**
-   * FX swap instrument constructor.
-   */
-  FxSwap: FxInstrumentConstructor<FxInstrument>;
-  /**
-   * Non-deliverable forward constructor.
-   */
-  Ndf: FxInstrumentConstructor<FxInstrument>;
-  /**
-   * Vanilla FX option constructor.
-   */
-  FxOption: FxOptionConstructor;
-  /**
-   * Digital FX option constructor.
-   */
-  FxDigitalOption: FxInstrumentConstructor<FxDigitalOptionInstrument>;
-  /**
-   * One-touch / no-touch FX option constructor.
-   */
-  FxTouchOption: FxInstrumentConstructor<FxTouchOptionInstrument>;
-  /**
-   * Barrier FX option constructor.
-   */
-  FxBarrierOption: FxInstrumentConstructor<FxBarrierOptionInstrument>;
-  /**
-   * FX variance-swap constructor.
-   */
-  FxVarianceSwap: FxInstrumentConstructor<FxInstrument>;
-  /**
-   * Quanto option constructor.
-   */
-  QuantoOption: FxInstrumentConstructor<QuantoOptionInstrument>;
-  /**
-   * Fluent `FxForwardBuilder` class (see `FxForwardBuilderConstructor`).
-   */
-  FxForwardBuilder: FxForwardBuilderConstructor;
-  /**
-   * Fluent `FxOptionBuilder` class (see `FxOptionBuilderConstructor`).
-   */
-  FxOptionBuilder: FxOptionBuilderConstructor;
 }
 
 // --- SABR (Stochastic Alpha Beta Rho) volatility -------------------------
@@ -27804,8 +27848,8 @@ export type JsonInput = string | object;
  *     { instrument_id: "A", instrument: equity("A", 100), score: 1 },
  *     { instrument_id: "B", instrument: equity("B", 90), score: -1 },
  *   ],
- *   weighting_method: valuations.composite.weightingMethodFixedQuantity(),
- *   rebalance_rule: valuations.composite.rebalanceRuleManual(),
+ *   weighting_method: { kind: "fixed_quantity" },
+ *   rebalance_rule: { kind: "manual" },
  *   attributes: {},
  * };
  * // Both legs carry a quoted spot, so an empty market is enough.
@@ -27911,19 +27955,6 @@ export interface CompositeNamespace {
     metrics?: string[]
   ): CompositeHistoryRow[];
   /**
-   * `WeightingMethod::FixedQuantity`: leg quantities are the leg scores.
-   * @returns The `WeightingMethod` plain object.
-   * @throws Error - Throws if the value cannot be converted to JavaScript.
-   */
-  weightingMethodFixedQuantity(): generated.valuations.WeightingMethod;
-  /**
-   * `WeightingMethod::NotionalWeighted`: scale the legs to a gross notional.
-   * @param grossNotional - Target gross notional as a `Money` plain object in the reporting currency.
-   * @returns The `WeightingMethod` plain object.
-   * @throws Error - Throws with kind `validation` if `grossNotional` is not a `Money` plain object.
-   */
-  weightingMethodNotionalWeighted(grossNotional: MoneyValue): generated.valuations.WeightingMethod;
-  /**
    * `WeightingMethod::MetricWeighted`: size the legs by an additive metric.
    * @param metric - Canonical additive metric identifier, e.g. `"dv01"` or `"delta"`.
    * @param anchorLegId - Leg whose quantity is fixed at `anchorQuantity`.
@@ -27988,12 +28019,6 @@ export interface CompositeNamespace {
     minObservations: number,
     annualizationFactor: number
   ): generated.valuations.WeightingMethod;
-  /**
-   * `RebalanceRule::Manual`: holdings change only on explicit `rebalance` calls.
-   * @returns The `RebalanceRule` plain object.
-   * @throws Error - Throws if the value cannot be converted to JavaScript.
-   */
-  rebalanceRuleManual(): generated.valuations.RebalanceRule;
   /**
    * `RebalanceRule::Dates`: rebalance on explicit dates.
    * @param dates - Strictly increasing ISO-8601 rebalance dates.
@@ -31006,10 +31031,6 @@ export interface ValuationsNamespace {
    */
   composite: CompositeNamespace;
   /**
-   * Direct FX instrument wrappers.
-   */
-  fx: FxNamespace;
-  /**
    * Instrument JSON validation and pricing helpers.
    */
   instruments: ValuationInstrumentsNamespace;
@@ -31043,16 +31064,6 @@ export interface ValuationsNamespace {
    */
   schema: ValuationsSchemaNamespace;
   /**
-   * Present value as an exact decimal string.
-   *
-   * Twin of Python `ValuationResult.price_decimal`: the `Money` amount without
-   * the binary rounding a JavaScript number would add.
-   * @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
-   * @returns The present value amount as a decimal string, e.g. `"1042315.67"`.
-   * @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
-   */
-  valuationResultPriceDecimal(result: ValuationResult | string): string;
-  /**
    * One measure of a valuation result by its metric key.
    *
    * Twin of Python `ValuationResult.get_metric` (Rust `ValuationResult::metric_str`).
@@ -31062,24 +31073,6 @@ export interface ValuationsNamespace {
    * @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema, and kind `invalid_type` if `key` is not a string.
    */
   valuationResultGetMetric(result: ValuationResult | string, key: string): number | undefined;
-  /**
-   * Metric keys of a valuation result, in measure order.
-   *
-   * Twin of Python `ValuationResult.metric_keys`.
-   * @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
-   * @returns Fully qualified metric keys in the order the measures were computed.
-   * @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
-   */
-  valuationResultMetricKeys(result: ValuationResult | string): string[];
-  /**
-   * Number of measures in a valuation result.
-   *
-   * Twin of Python `ValuationResult.metric_count`.
-   * @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
-   * @returns Count of measure keys.
-   * @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
-   */
-  valuationResultMetricCount(result: ValuationResult | string): number;
   /**
    * Unit of every measure in a valuation result.
    *

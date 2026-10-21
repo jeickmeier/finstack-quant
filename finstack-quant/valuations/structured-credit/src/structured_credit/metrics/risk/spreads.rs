@@ -425,7 +425,7 @@ pub(crate) fn calculate_tranche_spread_convexity(
 /// fixed-rate, the price is not finite and positive, required
 /// discount/projection market data is unavailable, or the spread solve fails
 /// or exceeds the ±5000 bp bound.
-pub fn calculate_tranche_discount_margin(
+pub fn tranche_discount_margin(
     deal: &StructuredCredit,
     tranche_id: &str,
     market: &MarketContext,

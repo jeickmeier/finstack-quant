@@ -14,7 +14,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_tranche_metrics, scenario_table, AssetPool, DealType, PoolAsset, ScenarioGrid,
+    tranche_metrics, tranche_scenario_table, AssetPool, DealType, PoolAsset, ScenarioGrid,
     StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
@@ -101,10 +101,9 @@ fn fixture(seasoned: bool) -> (StructuredCredit, Date) {
 fn seasoned_tranche_price_is_per_current_face() {
     let (deal, as_of) = fixture(true);
     let market = market(as_of);
-    let metrics =
-        calculate_tranche_metrics(&deal, "A", &market, as_of, None, &[]).expect("metrics");
-    let new_issue = calculate_tranche_metrics(&fixture(false).0, "A", &market, as_of, None, &[])
-        .expect("metrics");
+    let metrics = tranche_metrics(&deal, "A", &market, as_of, None, &[]).expect("metrics");
+    let new_issue =
+        tranche_metrics(&fixture(false).0, "A", &market, as_of, None, &[]).expect("metrics");
 
     // Same coupon, curve and schedule: the note at factor 0.5 has half the PV
     // of the unamortized note and the SAME clean price per current face.
@@ -144,8 +143,7 @@ fn seasoned_tranche_price_is_per_current_face() {
 fn desk_quote_per_current_face_solves_a_sane_spread() {
     let (deal, as_of) = fixture(true);
     let market = market(as_of);
-    let quoted =
-        calculate_tranche_metrics(&deal, "A", &market, as_of, Some(99.0), &[]).expect("metrics");
+    let quoted = tranche_metrics(&deal, "A", &market, as_of, Some(99.0), &[]).expect("metrics");
     assert!(
         (quoted.target_price_pct - 99.0).abs() < 1e-9,
         "the quote is echoed as the target on the current-face basis"
@@ -172,8 +170,8 @@ fn scenario_table_price_is_per_current_face() {
         severities: vec![0.6],
         recovery_lag: None,
     };
-    let table = scenario_table(&deal, "A", &market, as_of, &grid).expect("table");
-    let model = calculate_tranche_metrics(&deal, "A", &market, as_of, None, &[]).expect("metrics");
+    let table = tranche_scenario_table(&deal, "A", &market, as_of, &grid).expect("table");
+    let model = tranche_metrics(&deal, "A", &market, as_of, None, &[]).expect("metrics");
     let cell = &table.cells[0];
     // The grid cell reprices at the deal's own assumptions here, so the cell
     // quotes the model's clean settlement price on current face.
@@ -196,7 +194,7 @@ fn fully_written_down_class_prices_at_zero_without_a_yield() {
     // sees no cash at all.
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(1.0);
     let market = market(as_of);
-    let equity = calculate_tranche_metrics(&deal, "EQ", &market, as_of, None, &[])
+    let equity = tranche_metrics(&deal, "EQ", &market, as_of, None, &[])
         .expect("an impaired note still values");
     assert_eq!(equity.pv, 0.0);
     assert_eq!(equity.clean_price_pct, 0.0);
@@ -204,7 +202,7 @@ fn fully_written_down_class_prices_at_zero_without_a_yield() {
     assert!(equity.ytm.is_none(), "no yield on a worthless note");
     assert_eq!(equity.z_spread_bp, 0.0);
     assert_eq!(equity.cs01, 0.0);
-    let senior = calculate_tranche_metrics(&deal, "A", &market, as_of, None, &[]).expect("senior");
+    let senior = tranche_metrics(&deal, "A", &market, as_of, None, &[]).expect("senior");
     assert!(senior.ytm.is_some());
 }
 
@@ -224,7 +222,7 @@ fn par_quarterly_note_yields_its_coupon() {
         .market_quotes
         .quoted_clean_price_pct = Some(100.0);
     let market = market(as_of);
-    let senior = calculate_tranche_metrics(&deal, "A", &market, as_of, None, &[]).expect("senior");
+    let senior = tranche_metrics(&deal, "A", &market, as_of, None, &[]).expect("senior");
     let ytm = senior.ytm.expect("yield");
     assert!(
         (ytm - 0.05).abs() < 1e-6,

@@ -89,9 +89,10 @@ Name resolution in `sync-facade-jsdoc.mjs` maps facade shapes onto raw classes:
 interface `FooConstructor` takes its members from the statics of raw class `Foo`
 plus that class's instance constructor; interface `FooNamespace` takes them from
 raw free functions; a plain interface `Foo` takes them from `Foo`'s instance
-members, and `FooInstrument` (the FX instrument handles) from raw class `Foo`
-when no raw class is named `FooInstrument`. Class and top-level function
-declarations map directly.
+members. Class and top-level function declarations map directly. wasm-bindgen
+writes a doc line forwarded through a `macro_rules!` macro as its raw-string
+literal (`r" text`, `r#" text"#`); the synchronizer reads those lines as
+plain text.
 
 Parameters are matched by name after snake_case to camelCase conversion, then by
 the name without its `Json` suffix (Rust `instrument_json` documents the facade's
@@ -131,7 +132,8 @@ produce — keep the three in step when changing any of them.
 The tooling is tested like production code, because it edits the published
 contract. [`../tests/scripts/typescript_docs.test.mjs`](../tests/scripts/typescript_docs.test.mjs)
 covers the synchronizer in `--write` and `--check` (including the `Json`-suffix
-parameter mapping, facade-only parameters and `<Name>Instrument` interfaces), the
+parameter mapping, facade-only parameters and macro-forwarded raw-string doc
+lines), the
 completer's legacy-removal and no-invented-unit behaviour, the checker's
 accept/reject pairs, and the `--write`/`--check` exit-2 contract.
 

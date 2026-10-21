@@ -328,7 +328,7 @@ test('RevolvingCredit exposes isStochastic and the expected cashflow schedule', 
 // --------------------------------------------------------------------- FX
 
 test('FxForward presets and the CIP market forward match Python', () => {
-  const { FxForward } = valuations.fx;
+  const { FxForward } = valuations.instruments;
   const forward = FxForward.example();
   close(forward.marketForwardRate(FX_MARKET, '2025-01-15'), 1.109139126165159, 1e-12, 'fwd');
   close(forward.metric(FX_MARKET, '2025-01-15', 'dv01'), 0.44193883896969055, 1e-9, 'dv01');
@@ -381,7 +381,7 @@ test('FxForward presets and the CIP market forward match Python', () => {
 });
 
 test('FxOption.european and impliedVol recover the surface vol', () => {
-  const { FxOption } = valuations.fx;
+  const { FxOption } = valuations.instruments;
   assert.equal(JSON.parse(FxOption.example().toJson()).instrument.type, 'fx_option');
   const option = FxOption.european(
     'EURUSD-CALL',

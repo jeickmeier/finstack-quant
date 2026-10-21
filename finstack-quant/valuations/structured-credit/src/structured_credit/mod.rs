@@ -67,16 +67,16 @@ pub use pricing::{
 
 pub use metrics::{
     calculate_equity_metrics,
-    calculate_tranche_breakeven_cdr,
     calculate_tranche_convexity,
     calculate_tranche_cs01,
-    calculate_tranche_discount_margin,
     calculate_tranche_duration,
-    calculate_tranche_metrics,
-    calculate_tranche_oas,
     calculate_tranche_wal,
     calculate_tranche_z_spread,
-    scenario_table,
+    tranche_breakeven_cdr,
+    tranche_discount_margin,
+    tranche_metrics,
+    tranche_oas,
+    tranche_scenario_table,
     // Deal and pool metric calculators
     AbsChargeOffCalculator,
     AbsCreditEnhancementCalculator,

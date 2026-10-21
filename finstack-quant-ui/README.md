@@ -357,7 +357,7 @@ npx shadcn@4.21.0 add @finstack/scenario-heatmap
 ```tsx
 import { ScenarioHeatmapPanel } from "@/components/finstack/valuations/components/scenario-heatmap/scenario-heatmap";
 
-// table is the unchanged result of structuredCreditTrancheScenarioTable.
+// table is the unchanged result of trancheScenarioTable.
 // Choose an explicit display extent containing every supplied price and par 100.
 <ScenarioHeatmapPanel table={table} priceDomain={[80, 140]} />;
 ```

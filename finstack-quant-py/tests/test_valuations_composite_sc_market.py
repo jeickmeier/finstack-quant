@@ -35,8 +35,8 @@ from finstack_quant.valuations.instruments import (
     StructuredCredit,
     Tranche,
     TrancheStructure,
-    structured_credit_tranche_metrics,
-    structured_credit_tranche_scenario_table,
+    tranche_metrics,
+    tranche_scenario_table,
 )
 from finstack_quant.valuations.market import (
     CdsConventionSpec,
@@ -84,10 +84,9 @@ def _fixed_spec() -> CompositeSpec:
 # --------------------------------------------------------------------------- composite
 
 
-def test_execution_trades_typed_twin_matches_json_twin() -> None:
+def test_execution_trades_typed_and_dataframe() -> None:
     resolved = _fixed_spec().initialize(MarketContext(), dt.date(2025, 1, 1)).instrument
     typed = resolved.execution_trades()
-    assert typed == json.loads(resolved.execution_trades_json())
     assert [t["quantity_delta"] for t in typed] == [1.0, -1.0]
     frame = resolved.execution_trades_dataframe()
     assert isinstance(frame, pd.DataFrame)
@@ -97,7 +96,7 @@ def test_execution_trades_typed_twin_matches_json_twin() -> None:
 
 def test_rebalance_result_exposes_typed_trades() -> None:
     result = _fixed_spec().initialize(MarketContext(), dt.date(2025, 1, 1))
-    assert result.trades == json.loads(result.trades_json)
+    assert result.trades == json.loads(result.to_json())["trades"]
     assert list(result.to_dataframe()["instrument_id"]) == ["A", "B"]
 
 
@@ -136,7 +135,7 @@ def test_composite_reprs_and_spec_getters() -> None:
     assert repr(spec.rebalance_rule) == "RebalanceRule(kind='manual')"
     leg = spec.legs[0]
     assert repr(leg) == "CompositeLegSpec(instrument_id='A', instrument_type='equity', score=1)"
-    assert leg.instrument_dict() == json.loads(leg.instrument_json)
+    assert leg.instrument_dict()["instrument"] == json.loads(leg.to_json())["instrument"]
     resolved = spec.initialize(MarketContext(), dt.date(2025, 1, 1)).instrument
     assert repr(resolved) == "CompositeInstrument(id='A-B', effective_date='2025-01-01', legs=2)"
     assert repr(resolved.state) == "CompositeState(effective_date='2025-01-01', legs=2)"
@@ -289,11 +288,11 @@ def test_structured_credit_getters_and_dict_inputs() -> None:
 def test_unknown_tranche_raises_key_error_and_grid_accepts_dict() -> None:
     deal = StructuredCredit.from_json(canonical_structured_credit_json())
     with pytest.raises(KeyError):
-        structured_credit_tranche_metrics(deal, "NOPE", _market(), "2024-01-01")
+        tranche_metrics(deal, "NOPE", _market(), "2024-01-01")
     tranche_id = deal.tranches.tranches[0].id
     grid = {"cprs": [0.10], "cdrs": [0.02], "severities": [0.40]}
-    via_dict = structured_credit_tranche_scenario_table(deal, tranche_id, _market(), "2024-01-01", grid)
-    via_json = structured_credit_tranche_scenario_table(
+    via_dict = tranche_scenario_table(deal, tranche_id, _market(), "2024-01-01", grid)
+    via_json = tranche_scenario_table(
         instrument=deal, tranche_id=tranche_id, market=_market(), as_of="2024-01-01", grid=json.dumps(grid)
     )
     assert via_dict.to_json() == via_json.to_json()

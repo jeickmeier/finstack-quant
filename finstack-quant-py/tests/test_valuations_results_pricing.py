@@ -112,7 +112,7 @@ def _swap() -> InterestRateSwap:
 
 def test_metric_keys_have_no_rust_escaping() -> None:
     result = price_instrument(_swap(), _market(), AS_OF, metrics=["pv01", "bucketed_dv01"])
-    keys = result.metric_keys()
+    keys = list(result.metrics)
 
     assert not any("_x2d" in key or "_x5f" in key for key in keys), keys
     assert "pv01::USD-OIS" in keys
@@ -127,7 +127,7 @@ def test_metric_keys_have_no_rust_escaping() -> None:
     assert not any("_x2d" in key for key in payload["measures"])
 
     round_trip = ValuationResult.from_json(result.to_json())
-    assert round_trip.metric_keys() == keys
+    assert list(round_trip.metrics) == keys
     assert round_trip == result
 
     assert result.get_metric("pv01::USD_x2dOIS") is None
@@ -166,7 +166,7 @@ def test_valuation_result_dict_access_and_money_value() -> None:
     assert result.value.amount == pytest.approx(result.price)
 
     metrics = result.metrics
-    assert list(metrics) == result.metric_keys()
+    assert list(metrics) == list(result.metrics)
     assert metrics["dv01"] == result["dv01"] == result.get_metric("dv01")
     assert "ytm" in result
     assert "vega" not in result

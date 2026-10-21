@@ -470,22 +470,28 @@ fn cashflows_dts_matches_json_bridge_surface() {
 fn valuations_dts_exposes_direct_fx_instruments() {
     let dts = index_dts();
 
-    assert!(dts.contains("export interface FxNamespace"));
-    assert!(dts.contains("FxSpot: FxInstrumentConstructor<FxInstrument>;"));
-    assert!(dts.contains("FxForward: FxForwardConstructor;"));
-    assert!(dts.contains("FxSwap: FxInstrumentConstructor<FxInstrument>;"));
-    assert!(dts.contains("Ndf: FxInstrumentConstructor<FxInstrument>;"));
-    assert!(dts.contains("FxOption: FxOptionConstructor;"));
-    assert!(dts.contains("FxBarrierOption: FxInstrumentConstructor<FxBarrierOptionInstrument>;"));
-    assert!(dts.contains("FxDigitalOption: FxInstrumentConstructor<FxDigitalOptionInstrument>;"));
-    assert!(dts.contains("FxTouchOption: FxInstrumentConstructor<FxTouchOptionInstrument>;"));
-    assert!(dts.contains("QuantoOption: FxInstrumentConstructor<QuantoOptionInstrument>;"));
-    assert!(dts.contains("export interface QuantoOptionInstrument extends FxOptionInstrument"));
+    // The FX classes live in `valuations.instruments`, like every other
+    // family, and their handle types carry the Rust type names.
+    assert!(!dts.contains("FxNamespace"));
+    let instruments = interface_block(&dts, "ValuationInstrumentsNamespace");
+    for member in [
+        "FxSpot: FxConstructor<FxSpot>;",
+        "FxForward: FxForwardConstructor;",
+        "FxSwap: FxConstructor<FxSwap>;",
+        "Ndf: FxConstructor<Ndf>;",
+        "FxOption: FxOptionConstructor;",
+        "FxBarrierOption: FxConstructor<FxBarrierOption>;",
+        "FxDigitalOption: FxConstructor<FxDigitalOption>;",
+        "FxTouchOption: FxConstructor<FxTouchOption>;",
+        "QuantoOption: FxConstructor<QuantoOption>;",
+    ] {
+        assert!(instruments.contains(member), "{member}");
+    }
+    assert!(dts.contains("export interface QuantoOption extends FxOptionGreeks"));
     assert!(contains_signature(
-        interface_block(&dts, "QuantoOptionInstrument"),
+        interface_block(&dts, "QuantoOption "),
         "theta(marketJson: JsonInput, asOf: string, model?: string | null): number;"
     ));
-    assert!(dts.contains("fx: FxNamespace;"));
     assert!(dts.contains(
         "foreignRho(marketJson: JsonInput, asOf: string, model?: string | null): number;"
     ));
@@ -504,12 +510,12 @@ fn valuations_dts_exposes_direct_fx_instruments() {
     ));
     let bond_ctor = interface_block(&dts, "BondConstructor");
     assert!(contains_ignoring_ws(bond_ctor, "withConvention(id: string, notional: Money, couponRate: Rate, issueDate: string, maturity: string, convention:"));
-    let touch = interface_block(&dts, "FxTouchOptionInstrument");
+    let touch = interface_block(&dts, "FxTouchOption ");
     assert!(contains_signature(
         touch,
         "theta(marketJson: JsonInput, asOf: string, model?: string | null): number;"
     ));
-    let fx_instrument = interface_block(&dts, "FxInstrument");
+    let fx_instrument = interface_block(&dts, "FxHandle ");
     assert!(fx_instrument.contains("readonly id: string;"));
     assert!(contains_ignoring_ws(
         fx_instrument,
@@ -664,23 +670,23 @@ fn structured_credit_tranche_analytics_declare_typed_results() {
     assert!(declares_type(&dts, "ScenarioCell"));
     assert!(contains_ignoring_ws(
         &dts,
-        "structuredCreditTrancheOas(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct: number, config?: string | null): OasResult;",
+        "trancheOas(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct: number, config?: string | null): OasResult;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "structuredCreditTrancheMetrics(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct?: number | null, metrics?: string[] | null): TrancheMetrics;",
+        "trancheMetrics(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct?: number | null, metrics?: string[] | null): TrancheMetrics;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "structuredCreditTrancheScenarioTable(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, grid: string): ScenarioTable;",
+        "trancheScenarioTable(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, grid: string): ScenarioTable;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "structuredCreditTrancheDiscountMargin(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct: number): number;",
+        "trancheDiscountMargin(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string, marketPricePct: number): number;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "structuredCreditTrancheBreakevenCdr(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string): number;",
+        "trancheBreakevenCdr(instrumentJson: JsonInput, trancheId: string, marketJson: JsonInput, asOf: string): number;",
     ));
 }
 

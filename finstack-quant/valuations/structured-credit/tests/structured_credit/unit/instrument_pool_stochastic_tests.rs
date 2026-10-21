@@ -14,8 +14,8 @@ use finstack_quant_valuations_fixed_income::revolving_credit::{
     StochasticUtilizationSpec, UtilizationProcess,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_tranche_oas, CallExercisePolicy, InstrumentCollateral, OasConfig,
-    StochasticPricingResult, StructuredCredit, StructuredCreditPricingMode,
+    tranche_oas, CallExercisePolicy, InstrumentCollateral, OasConfig, StochasticPricingResult,
+    StructuredCredit, StructuredCreditPricingMode,
 };
 use time::macros::date;
 
@@ -321,7 +321,7 @@ fn oas_solves_on_instrument_collateral() {
         .amount();
     let price_pct = senior / 11_700_000.0 * 100.0;
 
-    let deterministic = calculate_tranche_oas(
+    let deterministic = tranche_oas(
         &deal,
         "A",
         &market,
@@ -341,7 +341,7 @@ fn oas_solves_on_instrument_collateral() {
         deterministic.oas
     );
 
-    let stochastic = calculate_tranche_oas(
+    let stochastic = tranche_oas(
         &deal,
         "A",
         &market,

@@ -18,7 +18,7 @@ from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.models import bs_price
 from finstack_quant.models.correlation import CorrelatedBernoulli, LatentMultiFactor
 from finstack_quant.portfolio import value_portfolio
-from finstack_quant.valuations.instruments import price_instrument, structured_credit_tranche_metrics
+from finstack_quant.valuations.instruments import price_instrument, tranche_metrics
 
 
 @pytest.fixture(scope="module")
@@ -129,7 +129,7 @@ def test_real_clo_one_payment_cash_conservation_and_separate_bbb(tracks: ModuleT
     market = tracks.build_market("credit")
     df = market.get_discount("USD-OIS").df((date(2025, 4, 15) - tracks.AS_OF).days / 365.0)
     native = {
-        iid: structured_credit_tranche_metrics(json.dumps(deal), iid, market, tracks.AS_OF).pv for iid in receipts
+        iid: tranche_metrics(json.dumps(deal), iid, market, tracks.AS_OF).pv for iid in receipts
     }
     assert sum(native.values()) / df == pytest.approx(principal + interest, abs=0.01)
     assert all(native[iid] == pytest.approx(receipts[iid] * df, abs=0.01) for iid in receipts)
@@ -144,7 +144,7 @@ def test_oc_breach_changes_priority_and_does_not_invent_a_bbb_instrument(tracks:
     assert 100e6 / 80e6 < 1.30
     metrics = [
         {
-            iid: structured_credit_tranche_metrics(json.dumps(payload), iid, market, tracks.AS_OF)
+            iid: tranche_metrics(json.dumps(payload), iid, market, tracks.AS_OF)
             for iid in ("AAA", "BBB", "EQUITY")
         }
         for payload in (base, breach)

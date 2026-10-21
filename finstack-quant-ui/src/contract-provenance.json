@@ -1242,10 +1242,10 @@
       "route": "returned-prices",
       "convention": "Rust clean settlement price, percent of current tranche balance.",
       "api": {
-        "name": "valuations.instruments.structuredCreditTrancheScenarioTable",
+        "name": "valuations.instruments.trancheScenarioTable",
         "source": "finstack-quant-wasm/index.d.ts",
         "owner": "ValuationInstrumentsNamespace",
-        "member": "structuredCreditTrancheScenarioTable",
+        "member": "trancheScenarioTable",
         "inputs": [
           {
             "name": "instrumentJson",
@@ -1274,8 +1274,8 @@
           }
         ],
         "returns": "ScenarioTable",
-        "declaration": "/**\n   * Scenario (CPR x CDR x severity) table for a tranche; returns a typed\n   * `ScenarioTable` object. `grid` is a JSON `ScenarioGrid` (`cprs`, `cdrs`,\n   * `severities`).\n   *\n   * The result is a plain object with snake_case fields — the same shape\n   * Python exposes through its typed `ScenarioTable` wrapper. Pass it to\n   * `JSON.stringify` if a wire string is needed.\n   * @returns Typed `ScenarioTable` object over the CPR/CDR/severity grid.\n   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.\n   * @param trancheId - Stable tranche identifier used to select the required domain object.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param grid - ScenarioGrid JSON containing the CPR, CDR, and severity axes for the table.\n   * @throws Error - Throws a JavaScript exception if the instrument, market, or scenario-grid JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or required market data is missing; a scenario fails or produces a non-finite result; or the table cannot be converted to a JavaScript value.\n   */\n  structuredCreditTrancheScenarioTable(\n    instrumentJson: JsonInput,\n    trancheId: string,\n    marketJson: JsonInput,\n    asOf: string,\n    grid: string\n  ): ScenarioTable;",
-        "sha256": "1bf8a3fdf452ddfa7ff958ad6a54ff8511d1092ee98689669b080ff5b3bf420c"
+        "declaration": "/**\n   * Scenario (CPR x CDR x severity) table for a tranche; returns a typed\n   * `ScenarioTable` object. `grid` is a JSON `ScenarioGrid` (`cprs`, `cdrs`,\n   * `severities`).\n   *\n   * The result is a plain object with snake_case fields — the same shape\n   * Python exposes through its typed `ScenarioTable` wrapper. Pass it to\n   * `JSON.stringify` if a wire string is needed.\n   * @returns Typed `ScenarioTable` object over the CPR/CDR/severity grid.\n   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.\n   * @param trancheId - Stable tranche identifier used to select the required domain object.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param grid - ScenarioGrid JSON containing the CPR, CDR, and severity axes for the table.\n   * @throws Error - Throws a JavaScript exception if the instrument, market, or scenario-grid JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or required market data is missing; a scenario fails or produces a non-finite result; or the table cannot be converted to a JavaScript value.\n   */\n  trancheScenarioTable(\n    instrumentJson: JsonInput,\n    trancheId: string,\n    marketJson: JsonInput,\n    asOf: string,\n    grid: string\n  ): ScenarioTable;",
+        "sha256": "5a647d2f495e8f05bb16c42b0789a653e18bd4c17454154274a790f70618ed93"
       }
     }
   ],
@@ -1319,7 +1319,7 @@
   ],
   "hostContract": {
     "source": "finstack-quant-wasm/schemas/host/1/valuation_result.schema.json",
-    "sha256": "91da98d63e0bd5ee3ff631e29958e056f92b060f87a8f20369504289ffe93d23"
+    "sha256": "ea7896f3ab0ab63d7ae78f4f183fedf133d7ee16028e246fcd0bf8ce5d0442eb"
   },
   "details": [
     {
@@ -1345,7 +1345,7 @@
   ],
   "scenarioAuthority": {
     "source": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/scenario.rs",
-    "sha256": "076890bcd2a4b0628794805f77ef7d2c6c4c145216d20f3bf070915eba7affa8"
+    "sha256": "6d1e2e6ef80f6979abba09e6c918668e0eb2bbfc1b3847bdafdc76e50a3c3c39"
   },
   "deferred": {
     "machine-readable-units": "Generic values stay raw; do not infer units from names or decimal refs.",

@@ -48,8 +48,9 @@ There is **no `prelude` module** — import the names you need directly.
 | `run_simulation` | Deterministic projection entry point (per-tranche cashflows). |
 | `execute_waterfall`, `WaterfallContext`, `WaterfallDistribution` | Waterfall execution. |
 | `CoverageTest`, `TestContext`, `TestResult` | Coverage-test evaluation. |
-| `calculate_tranche_metrics`, `TrancheMetrics`, `scenario_table`, `ScenarioTable`/`ScenarioGrid`/`ScenarioCell` | The one per-tranche API (clean/dirty price, accrued, WAL, yield, z-spread, CS01, spread duration and convexity, effective duration and convexity from ±1 bp re-projection, discount margin for floaters, plus requested registry metrics valued on the note) and scenario grids (one projection per cell, clean settlement price per current face). |
-| `calculate_tranche_wal`, `_duration`, `_convexity`, `_spread_convexity`, `_z_spread`, `_discount_margin`, `_oas` (+ `OasConfig`, `OasResult`), `_cs01`, `_breakeven_cdr` | Individual tranche analytics, the same functions the Python/WASM `structured_credit_tranche_*` entry points wrap. |
+| `tranche_metrics`, `TrancheMetrics`, `tranche_scenario_table`, `ScenarioTable`/`ScenarioGrid`/`ScenarioCell` | The one per-tranche API (clean/dirty price, accrued, WAL, yield, z-spread, CS01, spread duration and convexity, effective duration and convexity from ±1 bp re-projection, discount margin for floaters, plus requested registry metrics valued on the note) and scenario grids (one projection per cell, clean settlement price per current face). |
+| `tranche_discount_margin`, `tranche_oas` (+ `OasConfig`, `OasResult`), `tranche_breakeven_cdr` | Individual tranche analytics, bound under the same names in Python and (camelCase) in WASM. |
+| `calculate_tranche_wal`, `_duration`, `_convexity`, `_spread_convexity`, `_z_spread`, `_cs01` | Individual tranche analytics used by `tranche_metrics` (Rust-only). |
 | `clamped_cpr_to_smm`, `clamped_smm_to_cpr`, `clamped_cdr_to_mdr`, `clamped_mdr_to_cdr`, `psa_to_cpr` | Rate conversions. |
 | `validate_tiers`, `ValidationError` | Waterfall validation. |
 | Constants | `BASIS_POINTS_DIVISOR`, re-exported at the module root (the `types` submodule itself is `pub(crate)`); solver tolerances stay crate-internal. The pool-balance cleanup threshold is read from the embedded assumptions registry. |
@@ -79,8 +80,8 @@ structured_credit/
 │   ├── risk/          # duration, convexity, YTM, z-spread, OAS, CS01, breakeven CDR, *01 sensitivities
 │   ├── pool/          # WAM, CPR, CDR, WARF, WAS
 │   ├── deal_specific/ # ABS charge-off & credit enhancement, CMBS DSCR
-│   ├── scenario.rs    # scenario_table
-│   └── summary.rs     # calculate_tranche_metrics
+│   ├── scenario.rs    # tranche_scenario_table
+│   └── summary.rs     # tranche_metrics
 └── utils/             # rate conversions, floating-rate helpers, recovery queue, validation
 ```
 
@@ -163,7 +164,7 @@ against the path's fair spread; see
 ## Valuation
 
 ```rust
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::calculate_tranche_metrics;
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::tranche_metrics;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::metrics::MetricId;
@@ -183,7 +184,7 @@ let result = deal.price_with_metrics(
 let tranche_pv = deal.value_tranche("CLASS_A", &context, as_of)?;
 // Prices, yield, spreads and durations of one note, plus registry metrics
 // (DV01, Default01, ...) valued on that note.
-let class_a = calculate_tranche_metrics(
+let class_a = tranche_metrics(
     &deal,
     "CLASS_A",
     &context,
@@ -847,21 +848,21 @@ Both bindings expose structured credit under their `instruments` namespace:
   `equity_metrics` (`EquityMetrics`), `run_simulation_with_diagnostics`
   (`SimulationDiagnostics` with the per-period record and coverage-test
   frame), `price_stochastic`; tranche analytics
-  `structured_credit_tranche_metrics` (with the `*_to_call` twins),
-  `structured_credit_tranche_oas`, `structured_credit_tranche_discount_margin`,
-  `structured_credit_tranche_breakeven_cdr`,
-  `structured_credit_tranche_scenario_table` and the result types
+  `tranche_metrics` (with the `*_to_call` twins),
+  `tranche_oas`, `tranche_discount_margin`,
+  `tranche_breakeven_cdr`,
+  `tranche_scenario_table` and the result types
   `TrancheMetrics`, `OasResult`, `ScenarioTable`. Generic pricing via
   `price_instrument(...)`. `tests/parity/test_structured_credit_fields.py`
   checks every schema field of the five core types against the getters and
   setters; `tests/test_typed_structured_credit_surface.py` rebuilds the CLO
   regression golden from typed calls alone.
-- **WASM** (`valuations.instruments`): `structuredCreditTrancheMetrics`
+- **WASM** (`valuations.instruments`): `trancheMetrics`
   (its `TrancheMetrics` shape carries the optional `wal_to_call`,
-  `z_spread_to_call_bp`, `dm_to_call_bp`), `structuredCreditTrancheOas`,
-  `structuredCreditTrancheDiscountMargin`,
-  `structuredCreditTrancheBreakevenCdr`,
-  `structuredCreditTrancheScenarioTable`, plus `priceInstrument` and
+  `z_spread_to_call_bp`, `dm_to_call_bp`), `trancheOas`,
+  `trancheDiscountMargin`,
+  `trancheBreakevenCdr`,
+  `trancheScenarioTable`, plus `priceInstrument` and
   `instrumentCashflows` on the `InstrumentJson::StructuredCredit` envelope.
 
 Deep sub-configs (`WaterfallRules`, the stochastic specs, `DealFees`,
