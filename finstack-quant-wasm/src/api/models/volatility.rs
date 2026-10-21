@@ -292,7 +292,7 @@ impl JsSabrParameters {
         let strike = js_f64(&strike, "strike")?;
         let t = js_f64(&t, "t")?;
         self.inner
-            .implied_volatility(forward, strike, t)
+            .implied_vol(forward, strike, t)
             .map_err(to_js_err)
     }
 }
@@ -496,8 +496,8 @@ impl JsSabrSmile {
     }
 
     /// Time to expiry of the smile, in years.
-    #[wasm_bindgen(getter)]
-    pub fn t(&self) -> f64 {
+    #[wasm_bindgen(getter, js_name = timeToExpiry)]
+    pub fn time_to_expiry(&self) -> f64 {
         self.inner.time_to_expiry()
     }
 }

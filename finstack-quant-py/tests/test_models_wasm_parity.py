@@ -751,7 +751,7 @@ def _volatility_cases() -> dict[str, Callable[[], Any]]:
         "volatility.fx_delta_surface": lambda: _surface_vols(
             volatility.materialize_fx_delta_surface(fx(), 1.10, 0.03, 0.02)
         ),
-        "volatility.sabr_smile": lambda: [smile().forward, smile().t],
+        "volatility.sabr_smile": lambda: [smile().forward, smile().time_to_expiry],
         "models.bs_greeks_is_valid": lambda: greeks().is_valid(),
     }
 

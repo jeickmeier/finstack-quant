@@ -25232,7 +25232,7 @@ export interface SabrSmile extends WasmOwned {
   /**
    * Time to expiry of the smile, in years.
    */
-  readonly t: number;
+  readonly timeToExpiry: number;
 }
 
 /**

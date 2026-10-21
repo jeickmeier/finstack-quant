@@ -265,7 +265,7 @@ impl PyPathDependentPricer {
         let num_steps = convenience::path_dependent_num_steps(num_steps).map_err(core_to_py)?;
         let pricer = &self.inner;
         py.detach(|| {
-            pricer.price_gbm_asian(
+            pricer.price_asian(
                 OptionType::from(is_call),
                 spot,
                 strike,
@@ -336,7 +336,7 @@ impl PyPathDependentPricer {
         let num_steps = convenience::lrm_num_steps(num_steps).map_err(core_to_py)?;
         let pricer = &self.inner;
         py.detach(|| {
-            pricer.price_gbm_asian_with_lrm_greeks(
+            pricer.price_with_lrm_greeks(
                 OptionType::from(is_call),
                 spot,
                 strike,
@@ -560,7 +560,7 @@ impl PyLsmcPricer {
         let (pricer, num_steps, basis, basis_degree) =
             self.call_config(num_steps, basis, basis_degree)?;
         py.detach(|| {
-            pricer.price_gbm_american(
+            pricer.price_american(
                 OptionType::from(is_call),
                 spot,
                 strike,
@@ -619,7 +619,7 @@ impl PyLsmcPricer {
         let (pricer, num_steps, basis, basis_degree) =
             self.call_config(num_steps, basis, basis_degree)?;
         py.detach(|| {
-            pricer.price_gbm_american_unbiased(
+            pricer.price_american_unbiased(
                 OptionType::from(is_call),
                 spot,
                 strike,

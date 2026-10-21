@@ -313,7 +313,7 @@ impl VolSurfaceTarget {
          -> Result<f64> {
             let forward = forward_fn(slice_expiry)?;
             let sigma = slice_params
-                .implied_volatility(forward, target_strike, slice_expiry)
+                .implied_vol(forward, target_strike, slice_expiry)
                 .map_err(|e| finstack_quant_core::Error::Calibration {
                     message: format!(
                         "Failed to compute SABR implied vol at t={slice_expiry:.6}, k={target_strike:.6}: {e}"
@@ -363,8 +363,7 @@ mod tests {
     }
 
     fn slice_vol(p: &SabrParameters, forward: f64, strike: f64, expiry: f64) -> f64 {
-        p.implied_volatility(forward, strike, expiry)
-            .expect("SABR vol")
+        p.implied_vol(forward, strike, expiry).expect("SABR vol")
     }
 
     fn slice_total_variance(p: &SabrParameters, forward: f64, strike: f64, expiry: f64) -> f64 {

@@ -167,7 +167,7 @@ pub fn path_dependent_num_steps(num_steps: Option<usize>) -> Result<usize> {
 }
 
 /// Time-grid step count of a likelihood-ratio Greeks convenience price
-/// ([`PathDependentPricer::price_gbm_asian_with_lrm_greeks`]).
+/// ([`PathDependentPricer::price_with_lrm_greeks`]).
 ///
 /// The likelihood-ratio estimator keeps every simulated path in memory and is
 /// limited to four million path points, `num_paths x (num_steps + 1)`. Its

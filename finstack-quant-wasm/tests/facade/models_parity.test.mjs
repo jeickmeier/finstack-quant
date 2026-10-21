@@ -778,7 +778,7 @@ const CASES = {
       100.0,
       1.5
     );
-    return [smile.forward, smile.t];
+    return [smile.forward, smile.timeToExpiry];
   },
   'models.bs_greeks_is_valid': () =>
     models.bsGreeksIsValid(models.bsGreeks(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, true)),

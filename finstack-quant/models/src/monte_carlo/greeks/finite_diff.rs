@@ -14,7 +14,7 @@
 //!
 //! # Reported standard errors are paired
 //!
-//! [`finite_diff_delta`] and [`finite_diff_gamma`] simulate every stencil
+//! [`finite_diff_delta_from_inputs`] and [`finite_diff_gamma_from_inputs`] simulate every stencil
 //! point on the same per-path substream and form the finite difference **per
 //! path**:
 //!
@@ -294,7 +294,7 @@ where
 /// `bump_size` is non-finite or non-positive, the symmetric down-bump is below
 /// `1e-12`, the RNG is not splittable, configuration is invalid, or any path
 /// simulation fails (e.g., non-finite payoff).
-pub fn finite_diff_delta<R, P, D, F>(
+pub fn finite_diff_delta_from_inputs<R, P, D, F>(
     inputs: &FiniteDiffInputs<'_, R, P, D, F>,
     initial_spot: f64,
     bump_size: f64,
@@ -307,12 +307,12 @@ where
 {
     if inputs.process.dim() != 1 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "finite_diff_delta requires a 1D spot process (process.dim() == 1, got {}); \
+            "finite_diff_delta_from_inputs requires a 1D spot process (process.dim() == 1, got {}); \
              use finite_diff_delta_state for multi-dimensional processes",
             inputs.process.dim()
         )));
     }
-    require_splittable_rng(inputs.rng, "finite_diff_delta")?;
+    require_splittable_rng(inputs.rng, "finite_diff_delta_from_inputs")?;
     let (initial_down, _initial_base, initial_up, h) =
         validate_central_bump(initial_spot, bump_size)?;
 
@@ -337,7 +337,7 @@ where
 /// The estimate is the mean of the per-path second differences
 /// `(V_up_i − 2 V_base_i + V_down_i) / h²` and the reported standard error is
 /// their paired sample standard error. Runs serially under the same
-/// restrictions as [`finite_diff_delta`].
+/// restrictions as [`finite_diff_delta_from_inputs`].
 ///
 /// # Arguments
 ///
@@ -356,9 +356,9 @@ where
 /// # Errors
 ///
 /// Returns [`finstack_quant_core::Error::Validation`] for the invalid central
-/// stencils documented by [`finite_diff_delta`], or when path simulation
+/// stencils documented by [`finite_diff_delta_from_inputs`], or when path simulation
 /// fails.
-pub fn finite_diff_gamma<R, P, D, F>(
+pub fn finite_diff_gamma_from_inputs<R, P, D, F>(
     inputs: &FiniteDiffInputs<'_, R, P, D, F>,
     initial_spot: f64,
     bump_size: f64,
@@ -371,12 +371,12 @@ where
 {
     if inputs.process.dim() != 1 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "finite_diff_gamma requires a 1D spot process (process.dim() == 1, got {}); \
+            "finite_diff_gamma_from_inputs requires a 1D spot process (process.dim() == 1, got {}); \
              use finite_diff_gamma_state for multi-dimensional processes",
             inputs.process.dim()
         )));
     }
-    require_splittable_rng(inputs.rng, "finite_diff_gamma")?;
+    require_splittable_rng(inputs.rng, "finite_diff_gamma_from_inputs")?;
     let (initial_down, initial_base, initial_up, h) =
         validate_central_bump(initial_spot, bump_size)?;
 
@@ -539,9 +539,9 @@ mod tests {
         };
 
         let (delta, delta_stderr) =
-            finite_diff_delta(&inputs, SPOT, bump_size).expect("paired delta");
+            finite_diff_delta_from_inputs(&inputs, SPOT, bump_size).expect("paired delta");
         let (gamma, gamma_stderr) =
-            finite_diff_gamma(&inputs, SPOT, bump_size).expect("paired gamma");
+            finite_diff_gamma_from_inputs(&inputs, SPOT, bump_size).expect("paired gamma");
 
         assert_within_reported_error("paired delta", delta, reference_delta, delta_stderr);
         assert_within_reported_error("paired gamma", gamma, reference_gamma, gamma_stderr);
@@ -616,8 +616,14 @@ mod tests {
         ];
 
         for (spot, bump_size, expected) in cases {
-            assert_validation_contains(finite_diff_delta(&inputs, spot, bump_size), expected);
-            assert_validation_contains(finite_diff_gamma(&inputs, spot, bump_size), expected);
+            assert_validation_contains(
+                finite_diff_delta_from_inputs(&inputs, spot, bump_size),
+                expected,
+            );
+            assert_validation_contains(
+                finite_diff_gamma_from_inputs(&inputs, spot, bump_size),
+                expected,
+            );
         }
     }
 
@@ -644,8 +650,8 @@ mod tests {
                 discount_factor,
             };
             for result in [
-                finite_diff_delta(&inputs, SPOT, 0.01),
-                finite_diff_gamma(&inputs, SPOT, 0.01),
+                finite_diff_delta_from_inputs(&inputs, SPOT, 0.01),
+                finite_diff_gamma_from_inputs(&inputs, SPOT, 0.01),
             ] {
                 assert_validation_contains(result, message);
             }
@@ -672,7 +678,7 @@ mod tests {
             discount_factor: 1.0,
         };
         assert_validation_contains(
-            finite_diff_delta(&inputs, SPOT, 0.01),
+            finite_diff_delta_from_inputs(&inputs, SPOT, 0.01),
             "dedicated discretization",
         );
     }
@@ -719,8 +725,12 @@ mod tests {
         let (v_down, v_base, v_up) = (price(down), price(base), price(up));
         let delta = (v_up - v_down) / (2.0 * h);
         let gamma = (v_up - 2.0 * v_base + v_down) / (h * h);
-        let delta_paired = finite_diff_delta(&inputs, SPOT, 0.01).unwrap().0;
-        let gamma_paired = finite_diff_gamma(&inputs, SPOT, 0.01).unwrap().0;
+        let delta_paired = finite_diff_delta_from_inputs(&inputs, SPOT, 0.01)
+            .unwrap()
+            .0;
+        let gamma_paired = finite_diff_gamma_from_inputs(&inputs, SPOT, 0.01)
+            .unwrap()
+            .0;
         assert!((delta - delta_paired).abs() < 1e-12);
         assert!((gamma - gamma_paired).abs() < 1e-12);
     }

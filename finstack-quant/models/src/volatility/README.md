@@ -107,12 +107,12 @@ dσ = ν σ dW₂
 
 ### Vol quoting convention — read this first
 
-`SabrParameters::implied_volatility` returns a **normal (Bachelier)** volatility in
+`SabrParameters::implied_vol` returns a **normal (Bachelier)** volatility in
 absolute rate units when β is within `BETA_SNAP_TOL = 1e-4` of 0, and a
 **lognormal (Black)** volatility otherwise. Storing one in a surface that
 expects the other is a silent unit error. `SabrParameters::quote_convention()`
 returns the `VolatilityConvention::{Normal, Lognormal, ShiftedLognormal}` tag
-of the vols `implied_volatility(forward, strike, t)` produces. The same rule
+of the vols `implied_vol(forward, strike, t)` produces. The same rule
 binds calibration: pass normal quotes when calibrating with β ≈ 0 and
 lognormal quotes otherwise.
 
@@ -144,7 +144,7 @@ Residual accuracy limits after the correction:
 β is snapped to exactly 0 or 1 within `BETA_SNAP_TOL` so the dedicated normal
 and lognormal branches engage and `powf` with a near-zero exponent is avoided.
 Near ATM the χ(z) ratio blends between a Taylor series and the exact form via a
-Hermite smoothstep, which keeps Greeks continuous. `implied_volatility`
+Hermite smoothstep, which keeps Greeks continuous. `implied_vol`
 validates inputs up front (positive expiry, positive effective forward and
 strike after any shift) and returns `Result<f64>`. `implied_vol_lognormal` and
 `implied_vol_normal` evaluate one convention explicitly.
@@ -239,7 +239,7 @@ assert!(receiver >= 0.0);
 // SABR: build a rates smile at beta = 0.5 and read one vol off it.
 let params = SabrParameters::rates_standard(0.02, 0.30, -0.10)?;
 assert_eq!(params.quote_convention(), VolatilityConvention::Lognormal); // beta = 0.5
-let vol = params.implied_volatility(0.03, 0.035, 1.0)?;
+let vol = params.implied_vol(0.03, 0.035, 1.0)?;
 
 // Calibrate to a market smile, then check the fit for butterfly arbitrage.
 let strikes = [0.01, 0.02, 0.03, 0.04, 0.05];
@@ -324,7 +324,7 @@ touching either file.
 2. Parameters struct deriving `Serialize, Deserialize, schemars::JsonSchema`,
    validated in a fallible `new()` returning
    `finstack_quant_core::Result<Self>`.
-3. Model struct exposing `implied_volatility()` and/or `price_*()`. Mark hot
+3. Model struct exposing `implied_vol()` and/or `price_*()`. Mark hot
    entry points `#[inline]` and `#[must_use]`.
 4. If the model's vol output convention is β- or regime-dependent, expose a tag
    type the way `SabrParameters::quote_convention` does — an untagged vol is a unit bug waiting to

@@ -3348,7 +3348,7 @@
       "strikeFromDelta",
       "validateNoArbitrage"
     ],
-    "getters": ["forward", "t"]
+    "getters": ["forward", "timeToExpiry"]
   },
   "models.volatility.calibrateSvi": {
     "kind": "function"

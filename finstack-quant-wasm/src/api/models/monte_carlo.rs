@@ -17,9 +17,7 @@ use std::str::FromStr;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::convenience::{self, LsmcConvenience};
-use finstack_quant_models::monte_carlo::greeks::gbm_european::{
-    finite_diff_delta_gbm, finite_diff_gamma_gbm, GbmEuropeanFdSpec,
-};
+use finstack_quant_models::monte_carlo::greeks::gbm_european::{self, GbmEuropeanFdSpec};
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
@@ -414,7 +412,7 @@ pub fn finite_diff_delta(
         bump_size.as_ref(),
         currency.as_ref(),
     )?;
-    to_js_value(&finite_diff_delta_gbm(spec).map_err(to_js_err)?)
+    to_js_value(&gbm_european::finite_diff_delta(spec).map_err(to_js_err)?)
 }
 
 /// Monte Carlo finite-difference gamma of a GBM European option under common random numbers.
@@ -470,7 +468,7 @@ pub fn finite_diff_gamma(
         bump_size.as_ref(),
         currency.as_ref(),
     )?;
-    to_js_value(&finite_diff_gamma_gbm(spec).map_err(to_js_err)?)
+    to_js_value(&gbm_european::finite_diff_gamma(spec).map_err(to_js_err)?)
 }
 
 /// Monte Carlo pricer for European options under geometric Brownian motion.
@@ -743,7 +741,7 @@ impl JsPathDependentPricer {
         let currency = js_currency(currency.as_ref())?;
         let estimate = self
             .inner
-            .price_gbm_asian(
+            .price_asian(
                 option_type,
                 gbm.spot,
                 gbm.strike,
@@ -814,7 +812,7 @@ impl JsPathDependentPricer {
         let currency = js_currency(currency.as_ref())?;
         let greeks = self
             .inner
-            .price_gbm_asian_with_lrm_greeks(
+            .price_with_lrm_greeks(
                 option_type,
                 gbm.spot,
                 gbm.strike,
@@ -1012,7 +1010,7 @@ impl JsLsmcPricer {
         )?;
         let estimate = call
             .pricer
-            .price_gbm_american(
+            .price_american(
                 option_type,
                 call.gbm.spot,
                 call.gbm.strike,
@@ -1088,7 +1086,7 @@ impl JsLsmcPricer {
         )?;
         let estimate = call
             .pricer
-            .price_gbm_american_unbiased(
+            .price_american_unbiased(
                 option_type,
                 call.gbm.spot,
                 call.gbm.strike,

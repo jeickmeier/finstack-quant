@@ -150,7 +150,7 @@ impl SabrSmile {
     #[must_use = "computed ATM volatility should be used"]
     pub fn atm_vol(&self) -> Result<f64> {
         self.params
-            .implied_volatility(self.forward, self.forward, self.time_to_expiry)
+            .implied_vol(self.forward, self.forward, self.time_to_expiry)
     }
 
     /// Implied volatility at one strike on this smile.
@@ -169,7 +169,7 @@ impl SabrSmile {
     /// model domain or the Hagan expansion produces an invalid volatility.
     pub fn implied_vol(&self, strike: f64) -> Result<f64> {
         self.params
-            .implied_volatility(self.forward, strike, self.time_to_expiry)
+            .implied_vol(self.forward, strike, self.time_to_expiry)
     }
 
     /// Generate volatility smile for given strikes.

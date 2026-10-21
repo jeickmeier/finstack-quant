@@ -543,7 +543,11 @@ public = [
 
 [crates.models.monte_carlo]
 python_package = "finstack_quant.models.monte_carlo"
-# `finite_diff_*` take `is_call: bool` and return a typed `Estimate` whose
+# `finite_diff_delta` / `finite_diff_gamma` bind the Rust
+# `greeks::gbm_european` functions of the same names (the generic kernels are
+# Rust-only `finite_diff_*_from_inputs`). The hosts take `is_call: bool`
+# where the Rust `GbmEuropeanFdSpec` field is `option_type: OptionType`
+# (`true` is `Call`), and return a typed `Estimate` whose
 # `stderr` is the paired (common-random-number) standard error. The
 # closed-form Black-Scholes reference is `models.bs_price`. Rust-only:
 # engine/process/discretization/RNG/payoff
@@ -1878,6 +1882,78 @@ js_rule_members = { free = "wasm ownership: releases the wasm-bindgen handle", t
 # The member backlog is empty: PX2 recorded plain-data constructors and views
 # as `literal` and bound the members that compute or validate in Rust.
 backlog_ceiling = { modules = 0, members = 0 }
+
+# Host names in `finstack_quant.models` that are not the name of the Rust item
+# they bind, read by tests/parity/test_rust_names.py (a Python name and its
+# WASM twin pair through the ledger above, so this covers both hosts). Keys are
+# Python paths; values say what the host reads in Rust. An entry that becomes a
+# Rust name must be removed.
+[parity.rust_names]
+"finstack_quant.models.correlation.cholesky_decompose" = "binds core `math::linalg::cholesky_correlation`; the host name was kept when the models re-export was removed"
+"finstack_quant.models.credit.DynamicRecoverySpec.kind" = "serde tag of the Rust `model()` enum variant"
+"finstack_quant.models.credit.EndogenousHazardSpec.kind" = "serde tag of the Rust `leverage_hazard_map()` enum variant"
+"finstack_quant.models.credit.ToggleExerciseModel.kind" = "serde tag of the Rust enum variant"
+"finstack_quant.models.credit.ToggleExerciseModel.params" = "the Rust enum variant's payload as a dict"
+"finstack_quant.models.credit.lgd.DownturnLgd.params" = "serde form of the Rust `method()` enum"
+"finstack_quant.models.credit.migration.GeneratorMatrix.to_matrix" = "Rust `to_rows()` (host nested-list / NumPy exit)"
+"finstack_quant.models.credit.migration.TransitionMatrix.to_matrix" = "Rust `to_rows()` (host nested-list / NumPy exit)"
+"finstack_quant.models.credit.migration.RatingPaths" = "host collection over the Rust `Vec<RatingPath>` returned by `MigrationSimulator::simulate`; Rust has no named type"
+"finstack_quant.models.credit.migration.RatingPaths.default_rate" = "share of the Rust paths that end in the default state"
+"finstack_quant.models.credit.migration.RatingPaths.paths" = "the Rust `Vec<RatingPath>`"
+"finstack_quant.models.factor.FactorCovarianceMatrix.data" = "Rust `as_slice()` (row-major values)"
+"finstack_quant.models.factor.FactorCovarianceMatrix.to_numpy" = "NumPy exit of Rust `as_slice()`"
+"finstack_quant.models.factor.FactorModelConfig.factor_ids" = "ids of the Rust `factors` field"
+"finstack_quant.models.factor.FactorModelConfig.n_factors" = "length of the Rust `factors` field"
+"finstack_quant.models.factor.credit.CreditFactorModel.covariance" = "Rust `config.covariance` (second getter for `config`, PY-18)"
+"finstack_quant.models.factor.credit.CreditFactorModel.n_factors" = "length of the Rust `config.factors` field"
+"finstack_quant.models.factor.credit.CreditFactorModel.n_issuers" = "length of the Rust `issuer_betas` field"
+"finstack_quant.models.factor.credit.CreditFactorModel.n_levels" = "length of the Rust `hierarchy.levels` field"
+"finstack_quant.models.factor.credit.LevelsAtDate.level_values" = "Rust `level(level_index)` as a dict"
+"finstack_quant.models.factor.credit.LevelsAtDate.n_levels" = "length of the Rust `by_level` field"
+"finstack_quant.models.factor.credit.PeriodDecomposition.from_date" = "Rust field `from`, a Python keyword"
+"finstack_quant.models.factor.credit.PeriodDecomposition.to_date" = "Rust field `to`, paired with `from_date`"
+"finstack_quant.models.factor.credit.PeriodDecomposition.level_deltas" = "Rust `level(level_index)` as a dict"
+"finstack_quant.models.factor.credit.PeriodDecomposition.n_levels" = "length of the Rust `by_level` field"
+"finstack_quant.models.factor.credit.VolHorizon.n" = "payload of the Rust `NSteps` variant"
+"finstack_quant.models.factor.credit.VolHorizon.years_value" = "payload of the Rust `Years` variant"
+"finstack_quant.models.factor.risk.PositionResidualContribution.source_issuer_id" = "issuer id of the Rust `source` enum (see the `risk` module note)"
+"finstack_quant.models.factor.risk.PositionResidualContribution.source_kind" = "variant of the Rust `source` enum (see the `risk` module note)"
+"finstack_quant.models.factor.risk.TailScenarioBreakdown.position_ids" = "position ids the Rust `position_pnls` are ordered by"
+"finstack_quant.models.factor.risk.position_component_var" = "free-function form of Rust `PositionRiskDecomposition::component_var` (see the `risk` module note)"
+"finstack_quant.models.liquidity.kyle_lambda" = "free-function form of Rust `KyleLambdaModel::lambda_from_series` (see `[crates.models.liquidity]`)"
+"finstack_quant.models.monte_carlo.Estimate.ci_lower" = "first element of the Rust `ci_95` tuple"
+"finstack_quant.models.monte_carlo.Estimate.ci_upper" = "second element of the Rust `ci_95` tuple"
+"finstack_quant.models.monte_carlo.MoneyEstimate.ci_lower" = "first element of the Rust `ci_95` tuple"
+"finstack_quant.models.monte_carlo.MoneyEstimate.ci_upper" = "second element of the Rust `ci_95` tuple"
+"finstack_quant.models.monte_carlo.EuropeanPricer.price_call" = "Rust `price_gbm(OptionType::Call, ..)`; the host call/put pair is merged in slice B3"
+"finstack_quant.models.monte_carlo.EuropeanPricer.price_put" = "Rust `price_gbm(OptionType::Put, ..)`; the host call/put pair is merged in slice B3"
+"finstack_quant.models.monte_carlo.price_heston_call" = "Rust `pricer::heston::price_heston(OptionType::Call, ..)`; merged in slice B3"
+"finstack_quant.models.monte_carlo.price_heston_put" = "Rust `pricer::heston::price_heston(OptionType::Put, ..)`; merged in slice B3"
+"finstack_quant.models.monte_carlo.LsmcPricer.antithetic" = "Rust `LsmcConfig::antithetic` of the pricer's config"
+"finstack_quant.models.monte_carlo.LsmcPricer.basis" = "Rust `LsmcConvenience::basis` (default regression basis)"
+"finstack_quant.models.monte_carlo.LsmcPricer.basis_degree" = "Rust `LsmcConvenience::basis_degree`"
+"finstack_quant.models.monte_carlo.LsmcPricer.num_paths" = "Rust `LsmcConfig::num_paths` of the pricer's config"
+"finstack_quant.models.monte_carlo.LsmcPricer.seed" = "Rust `LsmcConfig::seed` of the pricer's config"
+"finstack_quant.models.monte_carlo.LsmcPricer.use_parallel" = "Rust `LsmcConfig::use_parallel` of the pricer's config"
+"finstack_quant.models.monte_carlo.PathDependentPricer.antithetic" = "Rust `PathDependentPricerConfig::antithetic`"
+"finstack_quant.models.monte_carlo.PathDependentPricer.num_paths" = "Rust `PathDependentPricerConfig::num_paths`"
+"finstack_quant.models.monte_carlo.PathDependentPricer.seed" = "Rust `PathDependentPricerConfig::seed`"
+"finstack_quant.models.monte_carlo.PathDependentPricer.use_brownian_bridge" = "Rust `PathDependentPricerConfig::use_brownian_bridge`"
+"finstack_quant.models.monte_carlo.PathDependentPricer.use_parallel" = "Rust `PathDependentPricerConfig::use_parallel`"
+"finstack_quant.models.monte_carlo.PathDependentPricer.use_sobol" = "Rust `PathDependentPricerConfig::use_sobol`"
+"finstack_quant.models.rates.dtsm.FactorTimeSeries.level" = "column 0 of the Rust `factors` matrix"
+"finstack_quant.models.rates.dtsm.FactorTimeSeries.slope" = "column 1 of the Rust `factors` matrix"
+"finstack_quant.models.rates.dtsm.FactorTimeSeries.curvature" = "column 2 of the Rust `factors` matrix"
+"finstack_quant.models.rates.dtsm.YieldPcaView.num_components" = "length of the Rust `eigenvalues` field"
+"finstack_quant.models.rates.hull_white.HullWhiteParams.bond_vol" = "Rust free function `hull_white::hw_bond_vol_with_model(params, ..)`; reworked in slice B5"
+"finstack_quant.models.rates.hull_white.HullWhiteParams.piecewise" = "Rust `HullWhiteParams::new(kappa, PiecewiseConstantCurve)`; reworked in slice B5"
+"finstack_quant.models.rates.hull_white.HullWhiteParams.sigma" = "Rust `volatility.value_at(t)`; reworked in slice B5"
+"finstack_quant.models.rates.hull_white.HullWhiteParams.times" = "knot times of the Rust `volatility` curve; reworked in slice B5"
+"finstack_quant.models.rates.hull_white.HullWhiteParams.values" = "knot values of the Rust `volatility` curve; reworked in slice B5"
+"finstack_quant.models.volatility.ArbitrageReport.by_severity" = "Rust `counts_by_severity` field"
+"finstack_quant.models.volatility.ArbitrageReport.by_type" = "Rust `counts_by_type` field"
+"finstack_quant.models.volatility.ArbitrageReport.total_violations" = "length of the Rust `violations` field"
+"finstack_quant.models.volatility.surface_to_dataframe" = "pandas exit of a Rust `VolSurface`"
 
 [parity.modules."finstack_quant"]
 js = ""

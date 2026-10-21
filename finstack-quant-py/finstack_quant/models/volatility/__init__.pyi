@@ -822,7 +822,7 @@ class SabrSmile:
         ...
 
     @property
-    def t(self) -> float:
+    def time_to_expiry(self) -> float:
         """
         Time to expiry in years this smile is anchored on.
 

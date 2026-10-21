@@ -31,7 +31,7 @@ fn test_sabr_atm_implied_volatility_matches_hagan_eq_2_18() {
                     + (2.0 - 3.0 * rho * rho) / 24.0 * nu * nu));
 
     let atm_vol = model
-        .implied_volatility(forward, forward, time_to_expiry)
+        .implied_vol(forward, forward, time_to_expiry)
         .expect("ATM volatility calculation should succeed in test");
     assert!(
         (atm_vol - expected).abs() < 1e-14,
@@ -45,7 +45,7 @@ fn test_sabr_validate_inputs_names_the_non_finite_input() {
         SabrParameters::new(0.2, 0.5, 0.3, -0.1).expect("SABR parameters should be valid in test");
 
     let err = model
-        .implied_volatility(f64::NAN, 100.0, 1.0)
+        .implied_vol(f64::NAN, 100.0, 1.0)
         .expect_err("NaN forward must be rejected")
         .to_string();
     assert!(
@@ -54,7 +54,7 @@ fn test_sabr_validate_inputs_names_the_non_finite_input() {
     );
 
     let err = model
-        .implied_volatility(100.0, 100.0, -1.0)
+        .implied_vol(100.0, 100.0, -1.0)
         .expect_err("negative expiry must be rejected")
         .to_string();
     assert!(
@@ -76,7 +76,7 @@ fn test_sabr_smile_shape() {
 
     for strike in &strikes {
         let vol = model
-            .implied_volatility(forward, *strike, time_to_expiry)
+            .implied_vol(forward, *strike, time_to_expiry)
             .expect("Volatility calculation should succeed in test");
         vols.push(vol);
     }
@@ -106,7 +106,7 @@ fn test_sabr_normal_model() {
     let time_to_expiry = 2.0;
 
     let vol = model
-        .implied_volatility(forward, strike, time_to_expiry)
+        .implied_vol(forward, strike, time_to_expiry)
         .expect("Volatility calculation should succeed in test");
 
     assert!(vol > 0.0);
@@ -123,7 +123,7 @@ fn test_sabr_lognormal_model() {
     let time_to_expiry = 0.5;
 
     let vol = model
-        .implied_volatility(forward, strike, time_to_expiry)
+        .implied_vol(forward, strike, time_to_expiry)
         .expect("Volatility calculation should succeed in test");
 
     assert!(vol > 0.0);
@@ -156,7 +156,7 @@ fn test_sabr_calibration() {
 
     for (i, &strike) in strikes.iter().enumerate() {
         let model_vol = params
-            .implied_volatility(forward, strike, time_to_expiry)
+            .implied_vol(forward, strike, time_to_expiry)
             .expect("Volatility calculation should succeed in test");
         let error = (model_vol - market_vols[i]).abs();
         assert!(error / market_vols[i] < 0.05); // Within the requested relative quote budget
@@ -192,7 +192,7 @@ fn test_sabr_negative_rates_shifted() {
         .expect("SABR parameters should be valid in test"); // Higher alpha for more reasonable vols
 
     for &strike in &strikes {
-        let vol = model.implied_volatility(forward, strike, 1.0);
+        let vol = model.implied_vol(forward, strike, 1.0);
         assert!(vol.is_ok(), "Failed for strike {}: {:?}", strike, vol);
         let vol_val = vol.expect("Volatility should be Some in test");
         assert!(
@@ -227,7 +227,7 @@ fn test_sabr_atm_stability() {
     let mut vols = Vec::new();
     for &strike in &strikes {
         let vol = model
-            .implied_volatility(forward, strike, 1.0)
+            .implied_vol(forward, strike, 1.0)
             .expect("Implied volatility calculation should succeed in test");
         vols.push(vol);
     }
@@ -252,7 +252,7 @@ fn test_sabr_auto_shift_calibration() {
         .iter()
         .map(|&strike| {
             reference
-                .implied_volatility(forward, strike, 0.5)
+                .implied_vol(forward, strike, 0.5)
                 .expect("synthetic normal quote")
         })
         .collect();
@@ -269,7 +269,7 @@ fn test_sabr_auto_shift_calibration() {
     assert!(params.shift().expect("Shift should be Some") > 0.0);
 
     for &strike in &strikes {
-        let vol = params.implied_volatility(forward, strike, time_to_expiry);
+        let vol = params.implied_vol(forward, strike, time_to_expiry);
         assert!(vol.is_ok(), "Failed for strike {}: {:?}", strike, vol);
         let vol_val = vol.expect("Volatility should be Some in test");
         assert!(
@@ -290,7 +290,7 @@ fn test_sabr_numerical_stability_extreme_parameters() {
     let strikes = vec![0.0005, 0.001, 0.002];
 
     for &strike in &strikes {
-        let vol = model.implied_volatility(forward, strike, 5.0); // Long maturity
+        let vol = model.implied_vol(forward, strike, 5.0); // Long maturity
         assert!(vol.is_ok());
         let vol_val = vol.expect("Volatility should be Some in test");
         assert!(vol_val > 0.0);
@@ -720,7 +720,7 @@ fn test_sabr_validate_inputs_covers_standard_and_shifted_branches() {
 
 #[test]
 fn test_sabr_implied_volatility_rejects_nonpositive_time_to_expiry() {
-    // `implied_volatility` must wire in `validate_inputs`: a non-positive
+    // `implied_vol` must wire in `validate_inputs`: a non-positive
     // `time_to_expiry` is rejected up front with a clear error rather than
     // flowing silently into the time-correction factor.
     let model = SabrParameters::new(0.2, 0.5, 0.3, -0.2).expect("valid standard params");
@@ -730,7 +730,7 @@ fn test_sabr_implied_volatility_rejects_nonpositive_time_to_expiry() {
 
     for bad_expiry in [0.0, -1.0] {
         let err = model
-            .implied_volatility(forward, strike, bad_expiry)
+            .implied_vol(forward, strike, bad_expiry)
             .expect_err("non-positive time_to_expiry must error");
         assert!(
             err.to_string().contains("time_to_expiry"),
@@ -739,7 +739,7 @@ fn test_sabr_implied_volatility_rejects_nonpositive_time_to_expiry() {
     }
 
     // A positive expiry on the same model still succeeds.
-    assert!(model.implied_volatility(forward, strike, 1.0).is_ok());
+    assert!(model.implied_vol(forward, strike, 1.0).is_ok());
 }
 
 /// Regression: the ν→0 (pure CEV) limit must produce a **non-flat** smile for
@@ -747,7 +747,7 @@ fn test_sabr_implied_volatility_rejects_nonpositive_time_to_expiry() {
 ///
 /// Failure mode under test (the deleted `test_sabr_nu_zero_short_circuit_*`
 /// asserted the *opposite*, incorrect behavior): the old code short-circuited
-/// `implied_volatility` to the ATM vol for *every* strike whenever
+/// `implied_vol` to the ATM vol for *every* strike whenever
 /// `nu.abs() < 1e-14`, fabricating a perfectly flat smile. For β≠1 the SABR/CEV
 /// smile is genuinely non-flat: `factor1 = α/(f_mid^(1-β)·correction)` depends
 /// on the strike through `f_mid`, and the z/χ(z) ratio is a well-defined limit
@@ -761,13 +761,13 @@ fn test_sabr_nu_zero_smile_is_non_flat_for_beta_half() {
     let expiry = 1.5;
 
     let vol_itm = model
-        .implied_volatility(forward, 80.0, expiry)
+        .implied_vol(forward, 80.0, expiry)
         .expect("ITM vol should compute");
     let vol_atm = model
-        .implied_volatility(forward, forward, expiry)
+        .implied_vol(forward, forward, expiry)
         .expect("ATM vol should compute");
     let vol_otm = model
-        .implied_volatility(forward, 120.0, expiry)
+        .implied_vol(forward, 120.0, expiry)
         .expect("OTM vol should compute");
 
     // The CEV smile must NOT be flat: a flat-smile short-circuit would make all
@@ -815,9 +815,9 @@ fn test_sabr_beta_zero_time_correction_is_vol_of_vol_only() {
     let forward = 0.03_f64;
     let expiry = 2.0_f64;
 
-    // Off-ATM: locks the β=0 branch of `implied_volatility`.
+    // Off-ATM: locks the β=0 branch of `implied_vol`.
     let off_atm = model
-        .implied_volatility(forward, 0.045, expiry)
+        .implied_vol(forward, 0.045, expiry)
         .expect("β=0 off-ATM vol should compute");
     assert!(
         (off_atm - 0.011_934_131_358_503).abs() < 1e-12,
@@ -827,7 +827,7 @@ fn test_sabr_beta_zero_time_correction_is_vol_of_vol_only() {
 
     // ATM: locks the β=0 branch at K = F.
     let atm = model
-        .implied_volatility(forward, forward, expiry)
+        .implied_vol(forward, forward, expiry)
         .expect("β=0 ATM vol should compute");
     assert!(
         (atm - 0.012_117_500_000_000).abs() < 1e-12,
@@ -853,7 +853,7 @@ fn test_sabr_beta_zero_nu_zero_is_flat_bachelier_alpha() {
     for &forward in &[0.02_f64, 0.03, 0.05] {
         for &expiry in &[0.5_f64, 2.0, 10.0] {
             let atm = model
-                .implied_volatility(forward, forward, expiry)
+                .implied_vol(forward, forward, expiry)
                 .expect("β=0,ν=0 ATM vol should compute");
             assert!(
                 (atm - alpha).abs() < 1e-12,
@@ -863,7 +863,7 @@ fn test_sabr_beta_zero_nu_zero_is_flat_bachelier_alpha() {
             // Off-ATM strikes: the normal smile is flat at α.
             for &strike in &[forward * 0.7, forward * 1.4] {
                 let vol = model
-                    .implied_volatility(forward, strike, expiry)
+                    .implied_vol(forward, strike, expiry)
                     .expect("β=0,ν=0 off-ATM vol should compute");
                 assert!(
                     (vol - alpha).abs() < 1e-12,
@@ -886,7 +886,7 @@ fn test_solve_alpha_for_atm_round_trips_target_vol() {
 
     let original = SabrParameters::new(original_alpha, beta, nu, rho).expect("valid params");
     let target_atm = original
-        .implied_volatility(forward, forward, time_to_expiry)
+        .implied_vol(forward, forward, time_to_expiry)
         .expect("ATM vol should compute");
 
     let solved_alpha =
@@ -896,7 +896,7 @@ fn test_solve_alpha_for_atm_round_trips_target_vol() {
     let solved =
         SabrParameters::new(solved_alpha, beta, nu, rho).expect("solved params should be valid");
     let solved_atm = solved
-        .implied_volatility(forward, forward, time_to_expiry)
+        .implied_vol(forward, forward, time_to_expiry)
         .expect("ATM vol should compute");
 
     assert!((solved_alpha - original_alpha).abs() < 1e-8);
@@ -931,7 +931,7 @@ fn test_sabr_calibrate_with_atm_pinning_matches_synthetic_smile() {
         .iter()
         .map(|&strike| {
             true_model
-                .implied_volatility(forward, strike, expiry)
+                .implied_vol(forward, strike, expiry)
                 .expect("synthetic vol should compute")
         })
         .collect();
@@ -949,13 +949,13 @@ fn test_sabr_calibrate_with_atm_pinning_matches_synthetic_smile() {
         .expect("ATM strike should be present");
     let atm_market = market_vols[atm_idx];
     let calibrated_atm = prepared_model
-        .implied_volatility(forward, forward, expiry)
+        .implied_vol(forward, forward, expiry)
         .expect("ATM vol should compute");
     assert!((calibrated_atm - atm_market).abs() < 1e-8);
 
     for (strike, market_vol) in strikes.iter().zip(market_vols.iter()) {
         let fitted = prepared_model
-            .implied_volatility(forward, *strike, expiry)
+            .implied_vol(forward, *strike, expiry)
             .expect("fitted vol should compute");
         assert!(
             (fitted - market_vol).abs() < 1e-3,
@@ -976,7 +976,7 @@ fn test_sabr_beta_zero_calibrates_negative_cross_zero_forward() {
         .iter()
         .map(|&strike| {
             true_model
-                .implied_volatility(forward, strike, expiry)
+                .implied_vol(forward, strike, expiry)
                 .expect("β=0 normal vol must compute for cross-zero inputs")
         })
         .collect();
@@ -994,7 +994,7 @@ fn test_sabr_beta_zero_calibrates_negative_cross_zero_forward() {
 
     let atm_market = market_vols[2];
     let calibrated_atm = prepared_model
-        .implied_volatility(forward, forward, expiry)
+        .implied_vol(forward, forward, expiry)
         .expect("ATM normal vol should compute");
     assert!(
         (calibrated_atm - atm_market).abs() < 1e-8,
@@ -1003,7 +1003,7 @@ fn test_sabr_beta_zero_calibrates_negative_cross_zero_forward() {
 
     for (strike, market_vol) in strikes.iter().zip(market_vols.iter()) {
         let fitted = prepared_model
-            .implied_volatility(forward, *strike, expiry)
+            .implied_vol(forward, *strike, expiry)
             .expect("fitted vol should compute");
         assert!(
             (fitted - market_vol).abs() < 5e-5,
@@ -1024,7 +1024,7 @@ fn test_sabr_calibrate_recovers_known_smile() {
         .iter()
         .map(|&strike| {
             true_model
-                .implied_volatility(forward, strike, expiry)
+                .implied_vol(forward, strike, expiry)
                 .expect("synthetic vol should compute")
         })
         .collect();
@@ -1041,7 +1041,7 @@ fn test_sabr_calibrate_recovers_known_smile() {
 
     for (strike, market_vol) in strikes.into_iter().zip(market_vols) {
         let fitted = model
-            .implied_volatility(forward, strike, expiry)
+            .implied_vol(forward, strike, expiry)
             .expect("model vol should compute");
         assert!(
             (fitted - market_vol).abs() < 2e-2,
@@ -1059,7 +1059,7 @@ fn test_sabr_strike_from_delta_half_delta_is_delta_neutral_strike() {
     let forward = 100.0;
     let expiry = 1.0;
     let atm_vol = model
-        .implied_volatility(forward, forward, expiry)
+        .implied_vol(forward, forward, expiry)
         .expect("ATM vol should compute");
     let smile = SabrSmile::new(model, forward, expiry);
 
@@ -1089,7 +1089,7 @@ fn test_sabr_strike_from_delta_round_trip_at_25_delta() {
     let forward = 100.0;
     let expiry = 1.0;
     let atm_vol = model
-        .implied_volatility(forward, forward, expiry)
+        .implied_vol(forward, forward, expiry)
         .expect("ATM vol should compute");
     let smile = SabrSmile::new(model, forward, expiry);
 
@@ -1149,7 +1149,7 @@ fn sabr_beta_one_atm_recovers_alpha() {
 
     for &fwd in &[0.01_f64, 1.0, 100.0, 4000.0] {
         let vol = model
-            .implied_volatility(fwd, fwd, 1.0)
+            .implied_vol(fwd, fwd, 1.0)
             .expect("ATM vol should compute for β=1, ν=0");
         assert!(
             (vol - alpha).abs() < 1e-10,
@@ -1214,7 +1214,7 @@ fn sabr_beta_one_smile_matches_hagan_reference() {
         .expect("β=1 lognormal SABR params should be valid");
 
     let vol = model
-        .implied_volatility(forward, strike, expiry)
+        .implied_vol(forward, strike, expiry)
         .expect("OTM vol should compute for β=1");
 
     assert!(
@@ -1243,7 +1243,7 @@ fn test_sabr_normal_convention_calibration_reprices_wings_unweighted() {
         .iter()
         .map(|&strike| {
             true_model
-                .implied_volatility(forward, strike, expiry)
+                .implied_vol(forward, strike, expiry)
                 .expect("synthetic normal vol should compute")
         })
         .collect();
@@ -1271,7 +1271,7 @@ fn test_sabr_normal_convention_calibration_reprices_wings_unweighted() {
     // Unweighted wing repricing: every strike within 0.5 normal bp.
     for (strike, market_vol) in strikes.iter().zip(market_vols.iter()) {
         let fitted = calibrated
-            .implied_volatility(forward, *strike, expiry)
+            .implied_vol(forward, *strike, expiry)
             .expect("fitted normal vol should compute");
         assert!(
             (fitted - market_vol).abs() < 5e-5,
@@ -1365,7 +1365,7 @@ fn fractional_beta_smile_matches_independent_hagan_obloj_reference() {
         (0.04, 0.114_609_353_928_979_06),
     ] {
         let vol = model
-            .implied_volatility(forward, strike, expiry)
+            .implied_vol(forward, strike, expiry)
             .expect("smile vol should compute");
         assert!(
             (vol - expected).abs() < 1e-9,
@@ -1377,7 +1377,7 @@ fn fractional_beta_smile_matches_independent_hagan_obloj_reference() {
 #[test]
 fn atm_beta_snap_is_consistent_between_smile_and_atm_paths() {
     // A raw β inside the snap band below 1 (here 1−5e-5) is snapped to
-    // exactly 1.0 by `implied_volatility` for every off-ATM strike. The
+    // exactly 1.0 by `implied_vol` for every off-ATM strike. The
     // ATM limit branch must classify the same raw β
     // identically, otherwise the ATM point prices with prefactor
     // α/F^(1−β) while its immediate neighbours price with α — a
@@ -1390,10 +1390,10 @@ fn atm_beta_snap_is_consistent_between_smile_and_atm_paths() {
         SabrParameters::new(0.2, 1.0, 0.4, -0.3).expect("SABR parameters should be valid");
 
     let atm_snapped = snapped
-        .implied_volatility(forward, forward, t)
+        .implied_vol(forward, forward, t)
         .expect("ATM vol should compute");
     let atm_exact = exact_one
-        .implied_volatility(forward, forward, t)
+        .implied_vol(forward, forward, t)
         .expect("ATM vol should compute");
     assert!(
         (atm_snapped - atm_exact).abs() < 1e-9,
@@ -1404,7 +1404,7 @@ fn atm_beta_snap_is_consistent_between_smile_and_atm_paths() {
     // immediately adjacent strike (general branch, snapped β=1) must agree
     // to well under a basis point of vol.
     let near_atm = snapped
-        .implied_volatility(forward, forward * (1.0 + 1e-6), t)
+        .implied_vol(forward, forward * (1.0 + 1e-6), t)
         .expect("near-ATM vol should compute");
     assert!(
         (atm_snapped - near_atm).abs() < 5e-6,
@@ -1492,7 +1492,7 @@ fn arbitrage_validation_result_serializes_its_verdict() {
     assert!(!dirty.arbitrage_free);
 }
 
-/// Bit-level pin of `SabrParameters::implied_volatility` across the β = 0,
+/// Bit-level pin of `SabrParameters::implied_vol` across the β = 0,
 /// general-β and β = 1 branches, with and without a displacement, at the
 /// money and in both wings. `u64::MAX` marks a rejected input.
 #[test]
@@ -1637,7 +1637,7 @@ fn sabr_model_implied_volatility_is_bit_stable() {
                 for strike in [forward, forward + 1e-9, 0.005, 0.02, 0.06, 0.15, -0.01] {
                     actual.push(
                         model
-                            .implied_volatility(forward, strike, expiry)
+                            .implied_vol(forward, strike, expiry)
                             .map_or(u64::MAX, f64::to_bits),
                     );
                 }

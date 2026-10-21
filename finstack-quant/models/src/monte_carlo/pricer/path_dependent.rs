@@ -43,7 +43,7 @@ const SOBOL_SCRAMBLE_DOMAIN_SALT: u64 = 0x534F_424F_4C53_4352; // "SOBOLSCR"
 const SOBOL_QMC_REPLICATES: usize = 16;
 
 /// Upper bound on captured path points (`num_paths x (num_steps + 1)`) in
-/// [`PathDependentPricer::price_with_lrm_greeks`], which keeps every path in
+/// [`PathDependentPricer::price_with_lrm_greeks_from_payoff`], which keeps every path in
 /// memory to rebuild its shocks. Checked before any path is simulated.
 pub(crate) const MAX_LRM_CAPTURED_POINTS: usize = 4_000_000;
 
@@ -649,7 +649,7 @@ impl PathDependentPricer {
     /// factor is invalid, the uniform grid is invalid, or the underlying engine
     /// rejects the run.
     #[allow(clippy::too_many_arguments)]
-    pub fn price_gbm_asian(
+    pub fn price_asian(
         &self,
         option_type: crate::types::OptionType,
         spot: f64,
@@ -688,7 +688,7 @@ impl PathDependentPricer {
     /// Uses unit notional, arithmetic averaging over the default post-step
     /// fixing schedule [`default_fixing_steps`], and the flat continuous
     /// discount factor `exp(-rT)`: the contract of
-    /// [`Self::price_gbm_asian`], run through [`Self::price_with_lrm_greeks`].
+    /// [`Self::price_asian`], run through [`Self::price_with_lrm_greeks_from_payoff`].
     /// This is the canonical composition behind the host-binding
     /// `PathDependentPricer.price_with_lrm_greeks` methods.
     ///
@@ -709,10 +709,10 @@ impl PathDependentPricer {
     ///
     /// Returns a validation error when the GBM parameters, discount factor or
     /// grid are invalid, and in every case listed on
-    /// [`Self::price_with_lrm_greeks`]: Sobol or antithetic sampling, or more
+    /// [`Self::price_with_lrm_greeks_from_payoff`]: Sobol or antithetic sampling, or more
     /// than four million captured path points.
     #[allow(clippy::too_many_arguments)]
-    pub fn price_gbm_asian_with_lrm_greeks(
+    pub fn price_with_lrm_greeks(
         &self,
         option_type: crate::types::OptionType,
         spot: f64,
@@ -736,7 +736,7 @@ impl PathDependentPricer {
             AveragingMethod::Arithmetic,
             default_fixing_steps(num_steps),
         )?;
-        self.price_with_lrm_greeks(
+        self.price_with_lrm_greeks_from_payoff(
             &process,
             spot,
             expiry,
@@ -947,7 +947,7 @@ impl PathDependentPricer {
     /// * `vol` - Annualized volatility (decimal), strictly positive, used in
     ///   the score.
     #[allow(clippy::too_many_arguments)]
-    pub fn price_with_lrm_greeks<P>(
+    pub fn price_with_lrm_greeks_from_payoff<P>(
         &self,
         process: &GbmProcess,
         initial_spot: f64,
@@ -1330,7 +1330,7 @@ mod tests {
         )
         .unwrap();
         let asian_error = pricer
-            .price_with_lrm_greeks(
+            .price_with_lrm_greeks_from_payoff(
                 &gbm,
                 100.0,
                 1.0,
@@ -1345,7 +1345,7 @@ mod tests {
             .expect_err("a time-zero fixing has an explicit spot derivative");
         let lookback = Lookback::new(crate::types::OptionType::Call, 90.0, 1.0, 1);
         let lookback_error = pricer
-            .price_with_lrm_greeks(
+            .price_with_lrm_greeks_from_payoff(
                 &gbm,
                 100.0,
                 1.0,
@@ -1578,7 +1578,7 @@ mod tests {
 
         let df = (-r * t).exp();
         let greeks = pricer
-            .price_with_lrm_greeks(
+            .price_with_lrm_greeks_from_payoff(
                 &gbm,
                 s0,
                 t,
@@ -1621,7 +1621,7 @@ mod tests {
                 .with_parallel(false),
         );
         let price = |spot: f64, vol: f64, expiry: f64, num_steps: usize| {
-            pricer.price_gbm_asian_with_lrm_greeks(
+            pricer.price_with_lrm_greeks(
                 crate::types::OptionType::Call,
                 spot,
                 100.0,
@@ -1676,7 +1676,7 @@ mod tests {
         ] {
             let plain = |spot: f64, vol: f64| -> f64 {
                 pricer
-                    .price_gbm_asian(
+                    .price_asian(
                         option_type,
                         spot,
                         strike,
@@ -1692,7 +1692,7 @@ mod tests {
                     .amount()
             };
             let greeks = pricer
-                .price_gbm_asian_with_lrm_greeks(
+                .price_with_lrm_greeks(
                     option_type,
                     spot,
                     strike,
@@ -1988,7 +1988,7 @@ mod tests {
                 .with_parallel(false),
         );
         let estimate = pricer
-            .price_gbm_asian(
+            .price_asian(
                 crate::types::OptionType::Call,
                 100.0,
                 100.0,
@@ -2011,7 +2011,7 @@ mod tests {
                 .with_parallel(false),
         );
         let estimate = pricer
-            .price_gbm_asian(
+            .price_asian(
                 crate::types::OptionType::Put,
                 100.0,
                 100.0,
@@ -2079,7 +2079,7 @@ mod tests {
             );
             for (strike, num_steps) in [(100.0, 12), (90.0, 5), (115.0, 30)] {
                 let call = pricer
-                    .price_gbm_asian(
+                    .price_asian(
                         crate::types::OptionType::Call,
                         100.0,
                         strike,
@@ -2092,7 +2092,7 @@ mod tests {
                     )
                     .expect("call");
                 let put = pricer
-                    .price_gbm_asian(
+                    .price_asian(
                         crate::types::OptionType::Put,
                         100.0,
                         strike,
@@ -2121,7 +2121,7 @@ mod tests {
             crate::types::OptionType::Put,
         ] {
             let greeks = lrm_pricer
-                .price_gbm_asian_with_lrm_greeks(
+                .price_with_lrm_greeks(
                     option_type,
                     100.0,
                     100.0,

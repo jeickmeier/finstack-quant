@@ -274,7 +274,7 @@ reported price, so it cannot print below intrinsic.
 
 ### Finite-difference Greeks with common random numbers
 
-`finite_diff_delta` / `finite_diff_gamma` simulate every stencil point on the
+`finite_diff_delta_from_inputs` / `finite_diff_gamma_from_inputs` simulate every stencil point on the
 same per-path substream, average the per-path differences, and report their
 **paired** standard error. They run serially with a fixed path count (adaptive
 stopping and path capture are rejected), require a splittable RNG and fail
@@ -285,7 +285,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::greeks::finite_diff::{
-    finite_diff_delta, FiniteDiffInputs,
+    finite_diff_delta_from_inputs, FiniteDiffInputs,
 };
 use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
@@ -310,7 +310,7 @@ let inputs = FiniteDiffInputs {
     currency: Currency::USD,
     discount_factor: (-0.05_f64).exp(),
 };
-let (delta, paired_stderr) = finite_diff_delta(
+let (delta, paired_stderr) = finite_diff_delta_from_inputs(
     &inputs,
     /* initial_spot   = */ 100.0,
     /* relative bump  = */ 0.01,

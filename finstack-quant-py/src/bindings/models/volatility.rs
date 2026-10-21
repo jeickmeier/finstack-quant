@@ -222,7 +222,7 @@ impl PySabrParameters {
     ///     (shifted) SABR domain.
     fn implied_vol(&self, forward: f64, strike: f64, t: f64) -> PyResult<f64> {
         self.inner
-            .implied_volatility(forward, strike, t)
+            .implied_vol(forward, strike, t)
             .map_err(core_to_py)
     }
 
@@ -439,7 +439,7 @@ impl PySabrSmile {
 
     /// Time to expiry in years used by this smile.
     #[getter]
-    fn t(&self) -> f64 {
+    fn time_to_expiry(&self) -> f64 {
         self.inner.time_to_expiry()
     }
 
