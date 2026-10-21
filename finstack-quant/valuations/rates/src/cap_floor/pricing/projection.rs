@@ -194,6 +194,46 @@ pub(crate) fn resolve_optioned_caplet_inputs(
     })
 }
 
+/// A caplet/floorlet still to be paid, with its forward and strike taken net
+/// of the coupon's additive spread (the option is on the index alone).
+pub(crate) struct UnpaidCaplet {
+    /// Canonical coupon, discount and fixing-time inputs.
+    pub inputs: OptionedCapletInputs,
+    /// Projected index forward: coupon forward minus the additive spread.
+    pub forward: f64,
+    /// Contract strike minus the same additive spread.
+    pub strike: f64,
+}
+
+/// Lazily resolve every coupon of `cap_floor` paying after `as_of`, in
+/// schedule order: the caplet loop shared by pricing and the analytic Greeks.
+///
+/// # Errors
+///
+/// Fails up front when the strike or the pricing schedule is invalid; each
+/// item fails when its coupon projection or discount factor cannot be resolved.
+pub(crate) fn unpaid_caplets<'a>(
+    cap_floor: &'a CapFloor,
+    market: &'a MarketContext,
+    as_of: Date,
+) -> finstack_quant_core::Result<impl Iterator<Item = finstack_quant_core::Result<UnpaidCaplet>> + 'a>
+{
+    let strike = cap_floor.strike_f64()?;
+    let periods = cap_floor.pricing_periods()?;
+    Ok(periods
+        .into_iter()
+        .filter(move |period| period.payment_date > as_of)
+        .map(move |period| {
+            let inputs = resolve_optioned_caplet_inputs(cap_floor, &period, market, as_of)?;
+            let spread = inputs.coupon.additive_spread;
+            Ok(UnpaidCaplet {
+                forward: inputs.coupon.forward - spread,
+                strike: strike - spread,
+                inputs,
+            })
+        }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

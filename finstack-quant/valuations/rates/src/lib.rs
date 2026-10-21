@@ -139,6 +139,8 @@ pub(crate) mod forward_swap_rate;
 pub mod fra;
 /// Inflation cap/floor module.
 pub mod inflation_cap_floor;
+/// Finite-difference inflation-curve sensitivities shared by the inflation instruments.
+pub(crate) mod inflation_fd;
 /// Inflation swap module.
 pub mod inflation_swap;
 /// IR future module - Interest rate futures.

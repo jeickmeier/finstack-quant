@@ -94,9 +94,11 @@ fn price_swaption(
     }
 
     let pv = if swaption.sabr_params.is_some() {
-        swaption.price_sabr(market, as_of).map_err(|error| {
-            PricingError::model_failure_with_context(error.to_string(), context.clone())
-        })?
+        swaption
+            .price_sabr_before_expiry(market, as_of)
+            .map_err(|error| {
+                PricingError::model_failure_with_context(error.to_string(), context.clone())
+            })?
     } else {
         // Use Act/365F for the option time-to-expiry so the vol-surface
         // pillar lookup is on the same time axis used by both pricing kernels.
@@ -117,11 +119,9 @@ fn price_swaption(
                 PricingError::missing_market_data_with_context(error.to_string(), context.clone())
             })?;
 
-        match expected_vol_model {
-            VolatilityModel::Black => swaption.price_black(market, vol, as_of),
-            VolatilityModel::Normal => swaption.price_normal(market, vol, as_of),
-        }
-        .map_err(|error| PricingError::model_failure_with_context(error.to_string(), context))?
+        swaption
+            .price_with_vol_at(market, as_of, forward, time_to_expiry, vol)
+            .map_err(|error| PricingError::model_failure_with_context(error.to_string(), context))?
     };
 
     Ok(ValuationResult::stamped(swaption.id(), as_of, pv))

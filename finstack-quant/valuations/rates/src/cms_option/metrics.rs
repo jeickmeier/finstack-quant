@@ -7,7 +7,7 @@
 use crate::cms_common::ConvexityAdjustmentRiskCalculator;
 use crate::cms_option::pricer::convexity_adjustment_with_frequency;
 use crate::cms_option::types::CmsOption;
-use finstack_quant_core::dates::{DateExt, DayCountContext};
+use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::math::norm_pdf;
 use finstack_quant_core::Result;
@@ -172,13 +172,10 @@ impl MetricCalculator for VannaCalculator {
 
             // 1. Calculate Forward Swap Rate
             let reference_swap = inst.reference_swap();
-            let swap_start = reference_swap.reference_swap_start(fixing_date)?;
             let swap_tenor_months =
                 crate::cms_common::cms_tenor_months(inst.cms_tenor, "CmsOption cms_tenor")?;
-            let swap_end = swap_start.add_months(swap_tenor_months)?;
-
-            let (forward_swap_rate, _) =
-                reference_swap.forward_rate_and_annuity(curves, as_of, swap_start, swap_end)?;
+            let (swap_start, forward_swap_rate) =
+                reference_swap.forward_at_fixing(curves, as_of, fixing_date, swap_tenor_months)?;
 
             // 2. Volatility and Time
             // Calendar time for the vol axis: ACT/365F, not the accrual day count.

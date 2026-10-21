@@ -17,47 +17,26 @@
 //! a ±1bp bump expressed in bp-units).
 
 use crate::inflation_cap_floor::InflationCapFloor;
-use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+use crate::inflation_fd::{bumped_inflation_market, INFLATION_BUMP_PCT};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
-/// Inflation curve bump size: 1bp = 0.01% for `BumpSpec::inflation_shift_pct`.
-/// The BumpSpec expects percentage terms, so 0.01 means 0.01% = 1bp.
-pub(crate) const INFLATION_BUMP_PCT: f64 = 0.01;
-
 /// Inflation01 calculator for inflation cap/floor options.
 ///
-/// Computes the present value sensitivity to a 1bp parallel shift in inflation expectations.
+/// Computes the present value sensitivity to a 1bp parallel shift in inflation
+/// expectations from unrounded reprices on the active dispatch path.
 pub(crate) struct Inflation01Calculator;
 
 impl MetricCalculator for Inflation01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let option: &InflationCapFloor = context.instrument_as()?;
         let as_of = context.as_of;
-
-        // Bump up by 1bp (0.01%)
-        let bump_spec_up = BumpSpec::inflation_shift_pct(INFLATION_BUMP_PCT);
-        let curves_up = context.curves.as_ref().bump([MarketBump::Curve {
-            id: option.inflation_index_id.clone(),
-            spec: bump_spec_up,
-        }])?;
+        let curves_up =
+            bumped_inflation_market(context, &option.inflation_index_id, INFLATION_BUMP_PCT)?;
         let pv_up = context.reprice_raw(&curves_up, as_of)?;
-
-        // Bump down by 1bp (-0.01%)
-        let bump_spec_down = BumpSpec::inflation_shift_pct(-INFLATION_BUMP_PCT);
-        let curves_down = context.curves.as_ref().bump([MarketBump::Curve {
-            id: option.inflation_index_id.clone(),
-            spec: bump_spec_down,
-        }])?;
+        let curves_down =
+            bumped_inflation_market(context, &option.inflation_index_id, -INFLATION_BUMP_PCT)?;
         let pv_down = context.reprice_raw(&curves_down, as_of)?;
-
-        // Central difference: Inflation01 = (PV_up - PV_down) / 2.
-        //
-        // The curve was bumped by exactly ±1bp (INFLATION_BUMP_PCT = 0.01% = 0.0001 decimal).
-        // A symmetric ±1bp central difference already produces the PV change for
-        // a 1bp move; no further normalization by the decimal bump value is needed.
-        // Dividing by 2 (not by 2 × 0.0001) is the correct per-1bp convention —
-        // consistent with DV01 and CS01 in the workspace.
         Ok((pv_up - pv_down) / 2.0)
     }
 }

@@ -268,21 +268,14 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsSpreadOption
                 Some(self.strike_rate()),
             ),
         );
-        let long_tenor_years = self.long_cms_tenor.months().map(f64::from).ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "CMS long tenor must be month- or year-based".to_string(),
-            )
-        })? / 12.0;
-        let short_tenor_years = self
-            .short_cms_tenor
-            .months()
-            .map(f64::from)
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(
-                    "CMS short tenor must be month- or year-based".to_string(),
-                )
-            })?
-            / 12.0;
+        let long_tenor_years = f64::from(crate::cms_common::cms_tenor_months(
+            self.long_cms_tenor,
+            "CmsSpreadOption long_cms_tenor",
+        )?) / 12.0;
+        let short_tenor_years = f64::from(crate::cms_common::cms_tenor_months(
+            self.short_cms_tenor,
+            "CmsSpreadOption short_cms_tenor",
+        )?) / 12.0;
         deps.add_series_id(
             finstack_quant_core::market_data::fixings::cms_fixing_series_id(
                 self.forward_curve_id.as_str(),

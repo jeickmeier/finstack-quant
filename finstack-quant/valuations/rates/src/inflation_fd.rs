@@ -1,97 +1,132 @@
-//! Inflation01 (inflation rate sensitivity) metric for `InflationSwap`.
+//! Finite-difference sensitivities to a parallel inflation-curve shift.
 //!
-//! # Finite-Difference Method
+//! Shared by the zero-coupon and YoY inflation swaps and the inflation
+//! cap/floor. Every calculator bumps the instrument's inflation curve by ±1bp
+//! with [`BumpSpec::inflation_shift_pct`] and reprices.
 //!
-//! Inflation01 is computed by **central finite differences** on the inflation
-//! curve — the same approach the YoY path (`YoYInflation01Calculator`) uses,
-//! so the zero-coupon and YoY metrics are mutually consistent and both agree
-//! with a bumped-curve DV01:
+//! - [`Inflation01Calculator`]: `(PV(+1bp) − PV(−1bp)) / 2`, the PV change per
+//!   1bp move (the DV01/CS01 convention; see `sensitivity_central_diff`).
+//! - [`InflationGammaCalculator`]: `(PV(+h) − 2·PV + PV(−h)) / h²` with
+//!   `h = 1bp = 0.0001`, the raw second derivative `d²PV/dπ²` per unit² of
+//!   inflation rate (divide by 1e8 for a per-bp² view). All three PVs are
+//!   unrounded so Money quantization is not amplified by the `h² = 1e-8`
+//!   divisor. Convexity is non-zero even for a par swap (PV = 0): it measures
+//!   curvature, not level.
 //!
-//! ```text
-//! Inflation01 = (PV(+1bp) − PV(−1bp)) / 2
-//! ```
-//!
-//! Dividing by 2 (not by 2 × bump_size_decimal) produces the PV change for a
-//! **1bp move**, consistent with the DV01/CS01 convention throughout the
-//! workspace (see `sensitivity_central_diff` where the divisor is 2·1 = 2 for
-//! a ±1bp bump expressed in bp-units).
-//!
-//! # Why not the closed form
-//!
-//! The previous analytical approximation
-//!
-//! ```text
-//! Inflation01 ≈ N · I(T)/I(0) · DF(T) · T · 1bp
-//! ```
-//!
-//! had a **lag mismatch**: the maturity time `T` in the `dPV/dπ` factor was
-//! computed to the *lagged* maturity (`maturity − indexation lag`, ACT/365F)
-//! while the discount factor `DF(T)` used the *unlagged* maturity on the
-//! discount curve's own day count. The two `T`s referred to different dates,
-//! so the analytic sensitivity disagreed with the bumped-curve DV01. It also
-//! silently assumed continuous compounding `exp(π·T)` whereas inflation curves
-//! may compound discretely. Finite differences re-use the instrument's actual
-//! `value()` (lag, day counts, compounding all consistent) and so carry no
-//! such mismatch.
-//!
-//! # Sign Convention
-//!
-//! - **Pay**: positive Inflation01 (benefits from higher inflation).
-//! - **Receive**: negative Inflation01 (loses from higher inflation).
-//!
-//! The bumped-curve `value()` already carries the leg signs, so the finite
-//! difference reproduces the correct sign without an explicit branch.
+//! The bumped-curve PVs carry the instrument's leg signs, so a pay-fixed
+//! inflation swap has a positive Inflation01 without an explicit branch.
 
-use crate::inflation_swap::InflationSwap;
+use std::marker::PhantomData;
+
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
-use finstack_quant_core::math::units::ONE_BASIS_POINT;
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
-/// Calculates Inflation01 (1bp inflation rate sensitivity) for zero-coupon
-/// inflation swaps via central finite differences on the inflation curve.
-pub(crate) struct Inflation01Calculator;
+/// A 1bp inflation-curve shift in `BumpSpec::inflation_shift_pct` units
+/// (percent: 0.01% = 1bp).
+pub(crate) const INFLATION_BUMP_PCT: f64 = 0.01;
 
-impl MetricCalculator for Inflation01Calculator {
+/// The same 1bp shift as a decimal rate: the step `h` of the second difference.
+const INFLATION_BUMP_DECIMAL: f64 = 0.0001;
+
+/// An instrument priced off one inflation curve.
+pub(crate) trait InflationIndexed: Instrument {
+    /// Identifier of the inflation curve the instrument projects index
+    /// levels from; the finite-difference calculators bump this curve.
+    fn inflation_index_id(&self) -> &CurveId;
+}
+
+/// `context.curves` with the inflation curve `id` shifted by `shift_pct`
+/// percent (`INFLATION_BUMP_PCT` = 1bp).
+pub(crate) fn bumped_inflation_market(
+    context: &MetricContext,
+    id: &CurveId,
+    shift_pct: f64,
+) -> Result<MarketContext> {
+    context.curves.as_ref().bump([MarketBump::Curve {
+        id: id.clone(),
+        spec: BumpSpec::inflation_shift_pct(shift_pct),
+    }])
+}
+
+/// Inflation01 of an inflation swap: the PV change for a 1bp parallel
+/// inflation-curve move, by central difference of the instrument's `value`.
+pub(crate) struct Inflation01Calculator<I>(PhantomData<fn() -> I>);
+
+impl<I> Inflation01Calculator<I> {
+    /// Calculator for instruments of type `I`.
+    pub(crate) const fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<I: InflationIndexed + 'static> MetricCalculator for Inflation01Calculator<I> {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let swap: &InflationSwap = context.instrument_as()?;
+        let instrument: &I = context.instrument_as()?;
         let as_of = context.as_of;
-
-        // Bump the inflation curve up by 1bp and reprice.
-        let bump_up = BumpSpec::inflation_shift_pct(ONE_BASIS_POINT * 100.0);
-        let curves_up = context.curves.as_ref().bump([MarketBump::Curve {
-            id: swap.inflation_index_id.clone(),
-            spec: bump_up,
-        }])?;
-        let pv_up = swap.value(&curves_up, as_of)?.amount();
-
-        // Bump the inflation curve down by 1bp and reprice.
-        let bump_down = BumpSpec::inflation_shift_pct(-ONE_BASIS_POINT * 100.0);
-        let curves_down = context.curves.as_ref().bump([MarketBump::Curve {
-            id: swap.inflation_index_id.clone(),
-            spec: bump_down,
-        }])?;
-        let pv_down = swap.value(&curves_down, as_of)?.amount();
-
-        // Central difference: Inflation01 = (PV_up - PV_down) / 2.
-        //
-        // The curve was bumped by exactly ±1bp (ONE_BASIS_POINT = 0.0001).
-        // A symmetric ±1bp central difference already produces the PV change
-        // for a 1bp move; no further normalization by the decimal bump value is
-        // needed. Dividing by 2 (not by 2 × ONE_BASIS_POINT) is the correct
-        // per-1bp convention — consistent with DV01 and CS01 in the workspace.
+        let id = instrument.inflation_index_id();
+        let curves_up = bumped_inflation_market(context, id, INFLATION_BUMP_PCT)?;
+        let pv_up = instrument.value(&curves_up, as_of)?.amount();
+        let curves_down = bumped_inflation_market(context, id, -INFLATION_BUMP_PCT)?;
+        let pv_down = instrument.value(&curves_down, as_of)?.amount();
         Ok((pv_up - pv_down) / 2.0)
     }
 }
 
+/// Second derivative of PV to a parallel inflation-curve shift (inflation
+/// swap convexity, inflation cap/floor gamma), from unrounded reprices on the
+/// active dispatch path.
+pub(crate) struct InflationGammaCalculator<I>(PhantomData<fn() -> I>);
+
+impl<I> InflationGammaCalculator<I> {
+    /// Calculator for instruments of type `I`.
+    pub(crate) const fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<I: InflationIndexed + 'static> MetricCalculator for InflationGammaCalculator<I> {
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let id = context.instrument_as::<I>()?.inflation_index_id().clone();
+        let as_of = context.as_of;
+        let base_pv = context.reprice_raw(context.curves.as_ref(), as_of)?;
+        let curves_up = bumped_inflation_market(context, &id, INFLATION_BUMP_PCT)?;
+        let pv_up = context.reprice_raw(&curves_up, as_of)?;
+        let curves_down = bumped_inflation_market(context, &id, -INFLATION_BUMP_PCT)?;
+        let pv_down = context.reprice_raw(&curves_down, as_of)?;
+        let h_squared = INFLATION_BUMP_DECIMAL * INFLATION_BUMP_DECIMAL;
+        Ok((pv_up - 2.0 * base_pv + pv_down) / h_squared)
+    }
+}
+
+impl InflationIndexed for crate::inflation_swap::InflationSwap {
+    fn inflation_index_id(&self) -> &CurveId {
+        &self.inflation_index_id
+    }
+}
+
+impl InflationIndexed for crate::inflation_swap::YoYInflationSwap {
+    fn inflation_index_id(&self) -> &CurveId {
+        &self.inflation_index_id
+    }
+}
+
+impl InflationIndexed for crate::inflation_cap_floor::InflationCapFloor {
+    fn inflation_index_id(&self) -> &CurveId {
+        &self.inflation_index_id
+    }
+}
+
 #[cfg(test)]
-mod tests {
-    use super::ONE_BASIS_POINT;
+mod inflation_swap_inflation01_tests {
     use crate::inflation_swap::InflationSwap;
     use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
+    use finstack_quant_core::math::units::ONE_BASIS_POINT;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::PricingOptions;

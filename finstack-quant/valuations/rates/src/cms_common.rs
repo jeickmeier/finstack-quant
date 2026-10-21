@@ -175,6 +175,39 @@ impl CmsReferenceSwap<'_> {
         fixing_date.add_business_days(convention.market_settlement_days, calendar)
     }
 
+    /// Effective date and forward par rate of the reference swap fixing on
+    /// `fixing_date`.
+    ///
+    /// The swap starts on [`Self::reference_swap_start`] (fixing date plus the
+    /// market settlement lag) and runs `tenor_months` months.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market supplying the discount and projection curves.
+    /// * `as_of` - Valuation date used for relative discount factors.
+    /// * `fixing_date` - CMS fixing (observation) date.
+    /// * `tenor_months` - Reference swap tenor in months, as returned by
+    ///   [`cms_tenor_months`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::reference_swap_start`] and
+    /// [`Self::forward_rate_and_annuity`], or a date error when the swap end
+    /// overflows.
+    pub fn forward_at_fixing(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        fixing_date: Date,
+        tenor_months: i32,
+    ) -> Result<(Date, f64)> {
+        let swap_start = self.reference_swap_start(fixing_date)?;
+        let swap_end = swap_start.add_months(tenor_months)?;
+        let (forward_rate, _annuity) =
+            self.forward_rate_and_annuity(market, as_of, swap_start, swap_end)?;
+        Ok((swap_start, forward_rate))
+    }
+
     /// Forward par swap rate and market annuity of the reference swap
     /// `[start, end]` on the resolved conventions.
     ///

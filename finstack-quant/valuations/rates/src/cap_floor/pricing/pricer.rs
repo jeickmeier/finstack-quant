@@ -1,8 +1,8 @@
 //! Pricing and metric helpers for interest-rate instruments.
 //!
-use crate::cap_floor::pricing::projection::resolve_optioned_caplet_inputs;
+use crate::cap_floor::pricing::projection::{unpaid_caplets, UnpaidCaplet};
 use crate::cap_floor::pricing::CapletFloorletInputs;
-use crate::cap_floor::{CapFloor, CapFloorVolType, RateOptionType};
+use crate::cap_floor::{CapFloor, CapFloorVolType};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -89,23 +89,14 @@ pub(crate) fn price_cap_floor(
 
     cap_floor.validate_for_pricing()?;
 
-    let strike = cap_floor.strike_f64()?;
-
     let mut total_pv = Money::from((0_i64, cap_floor.notional.currency()));
-    let periods = cap_floor.pricing_periods()?;
-    if periods.is_empty() {
-        return Ok(total_pv);
-    }
-
-    let is_cap = matches!(
-        cap_floor.rate_option_type,
-        RateOptionType::Caplet | RateOptionType::Cap
-    );
-    for period in periods {
-        if period.payment_date <= as_of {
-            continue;
-        }
-        let resolved_inputs = resolve_optioned_caplet_inputs(cap_floor, &period, curves, as_of)?;
+    let is_cap = cap_floor.rate_option_type.is_cap();
+    for caplet in unpaid_caplets(cap_floor, curves, as_of)? {
+        let UnpaidCaplet {
+            inputs: resolved_inputs,
+            forward,
+            strike,
+        } = caplet?;
         let projection = &resolved_inputs.coupon;
 
         let fixing_date = projection.fixing_date;
@@ -119,8 +110,6 @@ pub(crate) fn price_cap_floor(
             resolved_inputs.time_to_fixing.max(MIN_VOL_LOOKUP_TIME)
         };
 
-        let forward = projection.forward - projection.additive_spread;
-        let strike = strike - projection.additive_spread;
         let df = resolved_inputs.discount_factor;
         let quote = if effective_t_fix > 0.0 {
             resolve_caplet_volatility(cap_floor, curves, effective_t_fix, strike)?

@@ -28,8 +28,8 @@ use rust_decimal::Decimal;
 use crate::irs::InterestRateSwap;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_cashflows::builder::{
-    build_periods, merge_cashflow_schedules, BuildPeriodsParams, CashFlowSchedule,
-    FloatingCouponSpec, FloatingRateSpec, Notional, PrincipalExchange, SchedulePeriod,
+    build_periods, merge_cashflow_schedules, CashFlowSchedule, FloatingCouponSpec,
+    FloatingRateSpec, Notional, PrincipalExchange, SchedulePeriod,
 };
 use finstack_quant_valuations_core::instruments::PayReceive;
 
@@ -131,23 +131,11 @@ pub(crate) fn projected_compounded_float_leg_schedule(
     use finstack_quant_core::cashflow::{CFKind, CashFlow};
 
     let float = irs.resolved_float_leg()?;
-    let periods = build_periods(BuildPeriodsParams {
-        start: float.start,
-        end: float.end,
-        frequency: float.frequency,
-        stub: float.stub,
-        business_day_convention: float.business_day_convention,
-        calendar_id: float
-            .calendar_id
-            .as_deref()
-            .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID),
-        end_of_month: float.end_of_month,
-        day_count: float.day_count,
-        payment_lag_days: float.payment_lag_days,
-        reset_lag_days: None,
-        adjust_accrual_dates: irs.adjust_float_accrual_dates,
-        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
-    })?;
+    let periods = build_periods(float.schedule_params(
+        float.calendar_or_weekends(),
+        None,
+        irs.adjust_float_accrual_dates,
+    ))?;
     if periods.is_empty() {
         return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
             Vec::new(),
@@ -282,25 +270,7 @@ pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSched
     use finstack_quant_core::cashflow::{CFKind, CashFlow};
 
     let fixed = irs.resolved_fixed_leg()?;
-    let calendar_id = fixed
-        .calendar_id
-        .as_deref()
-        .unwrap_or(finstack_quant_cashflows::builder::WEEKENDS_ONLY_ID);
-    let adjust_accrual_dates = irs.adjust_fixed_accrual_dates;
-    let periods = build_periods(BuildPeriodsParams {
-        start: fixed.start,
-        end: fixed.end,
-        frequency: fixed.frequency,
-        stub: fixed.stub,
-        business_day_convention: fixed.business_day_convention,
-        calendar_id,
-        end_of_month: fixed.end_of_month,
-        day_count: fixed.day_count,
-        payment_lag_days: fixed.payment_lag_days,
-        reset_lag_days: None,
-        adjust_accrual_dates,
-        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
-    })?;
+    let periods = build_periods(fixed.schedule_params(irs.adjust_fixed_accrual_dates))?;
     let period_count = periods.len();
     let rate = fixed.rate.as_f64();
     let flows = periods

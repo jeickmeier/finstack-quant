@@ -18,7 +18,7 @@
 
 use crate::cms_common::annuity_weight;
 use crate::cms_option::types::CmsOption;
-use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::integration::gauss_legendre_integrate_adaptive;
 use finstack_quant_core::money::Money;
@@ -189,7 +189,6 @@ impl CmsReplicationPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
-        inst.validate()?;
         let mut total_pv = 0.0;
 
         let strike = inst.strike_f64()?;
@@ -234,19 +233,16 @@ impl CmsReplicationPricer {
                 continue;
             }
 
-            // Forward-starting swap parameters for this fixing
-            let swap_start = reference_swap.reference_swap_start(fixing_date)?;
-            let swap_end = swap_start.add_months(crate::cms_common::cms_tenor_months(
-                inst.cms_tenor,
-                "CmsOption cms_tenor",
-            )?)?;
-
-            // F (forward swap rate). The market annuity A₀ is intentionally
-            // discarded: the static replication uses the closed-form par
-            // annuity `A_par(·)` consistently in both `g(k)` and `C_sw(k)`
-            // (see the annuity-consistency note at the boundary term below).
-            let (forward_rate, _annuity_mkt) =
-                reference_swap.forward_rate_and_annuity(curves, as_of, swap_start, swap_end)?;
+            // F (forward swap rate). The market annuity A₀ is not used: the
+            // static replication uses the closed-form par annuity `A_par(·)`
+            // consistently in both `g(k)` and `C_sw(k)` (see the
+            // annuity-consistency note at the boundary term below).
+            let (swap_start, forward_rate) = reference_swap.forward_at_fixing(
+                curves,
+                as_of,
+                fixing_date,
+                crate::cms_common::cms_tenor_months(inst.cms_tenor, "CmsOption cms_tenor")?,
+            )?;
 
             if forward_rate <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(

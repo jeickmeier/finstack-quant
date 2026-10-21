@@ -21,7 +21,6 @@ mod vega;
 
 use self::common::CapletInputs;
 use crate::cap_floor::CapFloor;
-use crate::cap_floor::RateOptionType;
 use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::Result;
@@ -76,33 +75,34 @@ pub(crate) struct DeltaCalculator;
 impl MetricCalculator for DeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let option: &CapFloor = context.instrument_as()?;
-        if context.pricing_model().is_some_and(|model| {
-            model == finstack_quant_valuations_core::pricer::ModelKey::HullWhite1F
-        }) {
-            return finstack_quant_valuations_core::metrics::sensitivities::option_greeks::selected_rate_greek(
+        if let Some(greek) =
+            finstack_quant_valuations_core::metrics::sensitivities::option_greeks::hw1f_rate_greek(
                 context,
                 &option.forward_curve_id,
                 false,
-            );
+            )
+        {
+            return greek;
         }
-        let is_cap = matches!(
-            option.rate_option_type,
-            RateOptionType::Caplet | RateOptionType::Cap
-        );
+        let is_cap = option.rate_option_type.is_cap();
         common::aggregate_over_caplets(option, context, |c: CapletInputs| caplet_delta(is_cap, c))
     }
 }
 
-fn caplet_delta(is_cap: bool, c: CapletInputs) -> f64 {
+/// Model forward delta of one caplet/floorlet coupon, per unit forward rate.
+fn coupon_delta(is_cap: bool, c: &CapletInputs) -> f64 {
     use crate::cap_floor::pricing::{black, normal};
     use finstack_quant_models::volatility::VolatilityConvention;
-    let coupon_delta = match c.convention {
+    match c.convention {
         VolatilityConvention::Normal => {
             normal::delta(is_cap, c.strike, c.forward, c.sigma, c.time_to_fixing)
         }
         _ => black::delta(is_cap, c.strike, c.forward, c.sigma, c.time_to_fixing),
-    };
-    coupon_delta * c.forward_sensitivity
+    }
+}
+
+fn caplet_delta(is_cap: bool, c: CapletInputs) -> f64 {
+    coupon_delta(is_cap, &c) * c.forward_sensitivity
 }
 
 /// Forward PV01 calculator (per 1bp parallel forward curve bump).
@@ -145,38 +145,31 @@ pub(crate) struct GammaCalculator;
 impl MetricCalculator for GammaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let option: &CapFloor = context.instrument_as()?;
-        if context.pricing_model().is_some_and(|model| {
-            model == finstack_quant_valuations_core::pricer::ModelKey::HullWhite1F
-        }) {
-            return finstack_quant_valuations_core::metrics::sensitivities::option_greeks::selected_rate_greek(
+        if let Some(greek) =
+            finstack_quant_valuations_core::metrics::sensitivities::option_greeks::hw1f_rate_greek(
                 context,
                 &option.forward_curve_id,
                 true,
-            );
+            )
+        {
+            return greek;
         }
-        let is_cap = matches!(
-            option.rate_option_type,
-            RateOptionType::Caplet | RateOptionType::Cap
-        );
+        let is_cap = option.rate_option_type.is_cap();
         common::aggregate_over_caplets(option, context, |c: CapletInputs| caplet_gamma(is_cap, c))
     }
 }
 
 fn caplet_gamma(is_cap: bool, c: CapletInputs) -> f64 {
-    use crate::cap_floor::pricing::{black, normal};
     use finstack_quant_models::closed_form::{bachelier_gamma, black_gamma};
     use finstack_quant_models::volatility::VolatilityConvention;
     // Forward gamma (per unit forward) is non-negative for long options; for
     // Bachelier it is n(d) / (σ√T).
-    let (delta, gamma) = match c.convention {
-        VolatilityConvention::Normal => (
-            normal::delta(is_cap, c.strike, c.forward, c.sigma, c.time_to_fixing),
-            bachelier_gamma(c.forward, c.strike, c.sigma, c.time_to_fixing),
-        ),
-        _ => (
-            black::delta(is_cap, c.strike, c.forward, c.sigma, c.time_to_fixing),
-            black_gamma(c.forward, c.strike, c.sigma, c.time_to_fixing),
-        ),
+    let gamma = match c.convention {
+        VolatilityConvention::Normal => {
+            bachelier_gamma(c.forward, c.strike, c.sigma, c.time_to_fixing)
+        }
+        _ => black_gamma(c.forward, c.strike, c.sigma, c.time_to_fixing),
     };
-    gamma * c.forward_sensitivity * c.forward_sensitivity + delta * c.forward_second_sensitivity
+    gamma * c.forward_sensitivity * c.forward_sensitivity
+        + coupon_delta(is_cap, &c) * c.forward_second_sensitivity
 }

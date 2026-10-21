@@ -12,7 +12,6 @@
 //! - **BucketedDv01**: Key-rate sensitivities to discount curve
 //! - **Theta**: Time decay (1-day roll)
 
-mod gamma;
 mod inflation01;
 
 use crate::inflation_cap_floor::InflationCapFloor;
@@ -38,7 +37,7 @@ pub(crate) fn register_inflation_cap_floor_metrics(
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             (Inflation01, inflation01::Inflation01Calculator),
-            (Gamma, gamma::GammaCalculator),
+            (Gamma, crate::inflation_fd::InflationGammaCalculator::<InflationCapFloor>::new()),
         ]
     };
     Ok(())

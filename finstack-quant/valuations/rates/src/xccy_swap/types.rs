@@ -501,22 +501,11 @@ impl XccySwap {
         leg: &XccySwapLeg,
         calendar_id: &str,
     ) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
-        finstack_quant_cashflows::builder::build_periods(
-            finstack_quant_cashflows::builder::BuildPeriodsParams {
-                start: leg.leg.start,
-                end: leg.leg.end,
-                frequency: leg.leg.frequency,
-                stub: leg.leg.stub,
-                business_day_convention: leg.leg.business_day_convention,
-                calendar_id,
-                end_of_month: leg.leg.end_of_month,
-                day_count: leg.leg.day_count,
-                payment_lag_days: leg.leg.payment_lag_days,
-                reset_lag_days: leg.period_reset_lag(),
-                adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
-            },
-        )
+        finstack_quant_cashflows::builder::build_periods(leg.leg.schedule_params(
+            calendar_id,
+            leg.period_reset_lag(),
+            false,
+        ))
     }
 
     /// Projected index rate, coupon year fraction, and compound factor for one

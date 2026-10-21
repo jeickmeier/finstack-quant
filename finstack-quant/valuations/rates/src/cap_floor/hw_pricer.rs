@@ -28,7 +28,7 @@ use crate::cap_floor::pricing::projection::{
     resolve_optioned_caplet_inputs, OptionedCouponProjection,
 };
 use crate::cap_floor::pricing::CapletFloorletInputs;
-use crate::cap_floor::types::{CapFloor, RateOptionType};
+use crate::cap_floor::types::CapFloor;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
@@ -241,10 +241,7 @@ impl CapFloorHullWhitePricer {
         let term_strike = strike - cap_floor.spread_rate()?;
         let notional = cap_floor.notional.amount();
 
-        let is_cap = matches!(
-            cap_floor.rate_option_type,
-            RateOptionType::Cap | RateOptionType::Caplet
-        );
+        let is_cap = cap_floor.rate_option_type.is_cap();
 
         // Resolve a complete HW1F input from either explicit overrides or
         // pre-fitted MarketContext parameters. Missing/partial inputs fail.
@@ -468,6 +465,7 @@ mod tests {
 
     use super::*;
     use crate::cap_floor::pricing::projection::resolve_optioned_coupon;
+    use crate::cap_floor::RateOptionType;
     use crate::cap_floor::{OvernightCouponConvention, OvernightSpreadCompounding};
     use date_support::date;
     use discount_forward_curve_support::{flat_discount_with_tenor, flat_forward_with_tenor};
@@ -637,10 +635,7 @@ mod tests {
         );
 
         let strike = caplet.strike_f64().expect("valid strike");
-        let is_cap = matches!(
-            caplet.rate_option_type,
-            RateOptionType::Cap | RateOptionType::Caplet
-        );
+        let is_cap = caplet.rate_option_type.is_cap();
         let pricer = Hw1fMcPricer {
             // A flat θ = r₀ keeps the centered short-rate state exactly
             // zero-mean, so the independently reconstructed affine factors are
