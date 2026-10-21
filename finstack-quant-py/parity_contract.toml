@@ -504,7 +504,8 @@ rates        = { python = "finstack_quant.models.rates", status = "exists", note
 # one call into the same-named checked Rust entry point in `closed_form`
 # (`forward.rs`, `dispatch.rs`, `heston_price`). Host defaults come from Rust
 # constants: `theta_days_per_year` = `DEFAULT_THETA_DAYS_PER_YEAR`, `averaging` =
-# `DEFAULT_ASIAN_AVERAGING`, `strike_type` = `DEFAULT_LOOKBACK_STRIKE_TYPE`. The
+# `DEFAULT_ASIAN_AVERAGING` (an `AveragingMethod`; hosts parse its serde label),
+# `strike_type` = `DEFAULT_LOOKBACK_STRIKE_TYPE`. The
 # optional `is_call` of `asian_option_price` / `lookback_option_price` /
 # `quanto_option_price` / `heston_price` defaults to a call in both hosts (a
 # host signature default mapped to `OptionType::Call`). Rust-only closed-form

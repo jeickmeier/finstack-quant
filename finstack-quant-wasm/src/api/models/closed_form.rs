@@ -18,6 +18,7 @@ use crate::utils::input::{
     js_bool, js_f64, js_opt_bool, js_opt_f64, js_opt_string, js_string, js_uint,
 };
 use crate::utils::to_js_err;
+use finstack_quant_core::wire::serde_parse;
 use finstack_quant_models::closed_form::implied_vol::{
     black76_implied_vol as black76_implied_vol_core, bs_implied_vol as bs_implied_vol_core,
 };
@@ -33,6 +34,7 @@ use finstack_quant_models::closed_form::{
     vanilla_expiry_payoff as vanilla_expiry_payoff_core, HestonPricingParams,
     DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE, DEFAULT_THETA_DAYS_PER_YEAR,
 };
+use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_models::OptionType;
 use wasm_bindgen::prelude::*;
 
@@ -640,9 +642,12 @@ pub fn asian_option_price(
     let vol = js_f64(&vol, "vol")?;
     let expiry = js_f64(&expiry, "expiry")?;
     let num_fixings: usize = js_uint(&num_fixings, "numFixings")?;
-    let averaging = js_opt_string(averaging.as_ref(), "averaging")?;
+    let averaging = js_opt_string(averaging.as_ref(), "averaging")?
+        .map(|label| serde_parse::<AveragingMethod>(&label))
+        .transpose()
+        .map_err(to_js_err)?
+        .unwrap_or(DEFAULT_ASIAN_AVERAGING);
     let is_call = js_opt_bool(is_call.as_ref(), "isCall")?;
-    let averaging = averaging.as_deref().unwrap_or(DEFAULT_ASIAN_AVERAGING);
     let option_type = OptionType::from(is_call.unwrap_or(true));
     asian_option_price_core(
         spot,

@@ -64,6 +64,52 @@ pub fn js_opt_wire<T: DeserializeOwned>(
     }
 }
 
+/// A string argument parsed by the Rust type's `FromStr`.
+///
+/// For types whose text parser accepts more than their serde names (currency
+/// codes in any case, day-count aliases such as `"ACT/360"`, rating notches),
+/// so [`js_wire`] would narrow the accepted input.
+///
+/// # Arguments
+///
+/// * `value` - The JavaScript argument.
+/// * `label` - The camelCase argument name, used in the type-error message.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (`kind: "invalid_type"`) when `value` is not a string,
+/// and the mapped Rust parse error when `FromStr` rejects it.
+pub fn js_parse<T>(value: &JsValue, label: &str) -> Result<T, JsValue>
+where
+    T: std::str::FromStr,
+    T::Err: super::IntoJsError,
+{
+    js_string(value, label)?.parse::<T>().map_err(to_js_err)
+}
+
+/// An optional [`js_parse`] argument: `undefined` and `null` are `None`.
+///
+/// # Arguments
+///
+/// * `value` - The JavaScript argument, if supplied.
+/// * `label` - The camelCase argument name, used in the type-error message.
+///
+/// # Errors
+///
+/// Throws as [`js_parse`] does for a supplied value.
+pub fn js_opt_parse<T>(value: Option<&JsValue>, label: &str) -> Result<Option<T>, JsValue>
+where
+    T: std::str::FromStr,
+    T::Err: super::IntoJsError,
+{
+    match value {
+        Some(value) if !value.is_undefined() && !value.is_null() => {
+            js_parse(value, label).map(Some)
+        }
+        _ => Ok(None),
+    }
+}
+
 /// A required ISO-8601 calendar date string (`"YYYY-MM-DD"`).
 ///
 /// # Arguments

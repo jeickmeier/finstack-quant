@@ -25,7 +25,7 @@ const COLLATERAL_TYPES: &str =
     "cash, securities, receivables, inventory, equipment, real_estate, intellectual_property, other";
 
 fn parse_collateral_type(value: &str) -> PyResult<WorkoutCollateralType> {
-    value.parse::<WorkoutCollateralType>().map_err(core_to_py)
+    finstack_quant_core::wire::serde_parse::<WorkoutCollateralType>(value).map_err(core_to_py)
 }
 
 /// Beta-distributed recovery rate parameterised by mean and standard deviation.

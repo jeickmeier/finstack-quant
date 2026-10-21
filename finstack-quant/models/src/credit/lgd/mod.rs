@@ -27,6 +27,8 @@ pub use workout::{
     WorkoutLgdResult,
 };
 
+use finstack_quant_core::wire::serde_parse;
+
 /// Return historical recovery distribution parameters for a seniority class.
 ///
 /// # Arguments
@@ -42,7 +44,7 @@ pub fn seniority_recovery_stats(
     seniority: &str,
     rating_agency: &str,
 ) -> finstack_quant_core::Result<BetaRecovery> {
-    let class = seniority.parse::<SeniorityClass>()?;
+    let class = serde_parse::<SeniorityClass>(seniority)?;
     let calibration = SeniorityCalibration::from_agency(rating_agency)?;
     calibration.get(class).copied().ok_or_else(|| {
         finstack_quant_core::Error::Validation("seniority not in calibration".into())
@@ -62,7 +64,7 @@ pub fn seniority_recovery_stats(
 pub fn seniority_recovery_stats_default(
     seniority: &str,
 ) -> finstack_quant_core::Result<BetaRecovery> {
-    let class = seniority.parse::<SeniorityClass>()?;
+    let class = serde_parse::<SeniorityClass>(seniority)?;
     let calibration = SeniorityCalibration::moodys_historical()?;
     calibration.get(class).copied().ok_or_else(|| {
         finstack_quant_core::Error::Validation("seniority not in calibration".into())
@@ -98,7 +100,7 @@ pub fn workout_lgd(
     let pieces = collateral
         .into_iter()
         .map(|(type_name, value, haircut)| {
-            let collateral_type = type_name.parse::<WorkoutCollateralType>()?;
+            let collateral_type = serde_parse::<WorkoutCollateralType>(&type_name)?;
             CollateralPiece::new(collateral_type, value, haircut)
         })
         .collect::<finstack_quant_core::Result<Vec<_>>>()?;
