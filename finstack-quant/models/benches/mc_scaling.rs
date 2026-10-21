@@ -30,6 +30,7 @@ use finstack_quant_models::monte_carlo::rng::fbm::FractionalNoiseGenerator;
 use finstack_quant_models::monte_carlo::rng::volterra::RiemannLiouvilleVolterra;
 use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream};
 use finstack_quant_models::types::OptionType;
+use finstack_quant_models::volatility::heston::HestonParams;
 use fixtures::{
     discount, european_call, exact_gbm, gbm, heston, lmm_process, lmm_scheme, multi_gbm, philox,
     qe_heston, serial_engine, RATE, SEED, SPOT, STRIKE,
@@ -182,14 +183,14 @@ fn scaling_rough_heston_steps(c: &mut Criterion) {
             r: 0.03,
             q: 0.0,
             hurst,
-            kappa: 2.0,
-            theta: 0.04,
-            sigma_v: 0.3,
-            rho: -0.7,
-            v0: 0.04,
-        }
-        .validate()
-        .expect("valid rough Heston params");
+            model: HestonParams {
+                v0: 0.04,
+                kappa: 2.0,
+                theta: 0.04,
+                sigma_v: 0.3,
+                rho: -0.7,
+            },
+        };
         let process = RoughHestonProcess::new(params);
         let scheme = RoughHestonHybrid::new(&times, 0.1).expect("valid scheme");
         let work_size = 2 * num_steps + 1;

@@ -9,6 +9,7 @@
 use std::collections::HashSet;
 
 use super::{Copula, CopulaSpec, RecoveryModel, RecoverySpec};
+use crate::invalid_input;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::validation::{validate_f64_non_negative, validate_f64_unit_interval};
 use finstack_quant_core::{Error, Result};
@@ -119,7 +120,7 @@ impl TryFrom<RawPortfolioLossResult> for PortfolioLossResult {
         let carried = (raw.expected_loss, raw.var, raw.expected_shortfall);
         let rebuilt = (result.expected_loss, result.var, result.expected_shortfall);
         if carried != rebuilt {
-            return Err(validation_error(format!(
+            return Err(invalid_input(format!(
                 "portfolio loss aggregates (expected_loss, var, expected_shortfall) = \
                  {carried:?} do not match the losses, which give {rebuilt:?}"
             )));
@@ -186,7 +187,7 @@ impl PortfolioLossResult {
     pub fn from_losses(losses: Vec<f64>, confidence: f64) -> Result<Self> {
         validate_confidence(confidence)?;
         if losses.is_empty() {
-            return Err(validation_error(
+            return Err(invalid_input(
                 "portfolio loss distribution must not be empty",
             ));
         }
@@ -196,7 +197,7 @@ impl PortfolioLossResult {
             .enumerate()
             .find(|(_, loss)| !loss.is_finite() || *loss < 0.0)
         {
-            return Err(validation_error(format!(
+            return Err(invalid_input(format!(
                 "portfolio loss at index {index} must be finite and non-negative, got {loss}"
             )));
         }
@@ -204,7 +205,7 @@ impl PortfolioLossResult {
         let expected_loss = scaled_mean(&losses, "expected loss")?;
         let mut sorted = Vec::new();
         sorted.try_reserve_exact(losses.len()).map_err(|error| {
-            allocation_error(format!(
+            Error::internal(format!(
                 "could not reserve {} losses for tail-statistic sorting: {error}",
                 losses.len()
             ))
@@ -234,7 +235,7 @@ impl PortfolioLossResult {
             (sum.total() / tail_mass).min(1.0) * scale
         };
         if !var.is_finite() || !expected_loss.is_finite() || !expected_shortfall.is_finite() {
-            return Err(validation_error("portfolio loss statistics must be finite"));
+            return Err(invalid_input("portfolio loss statistics must be finite"));
         }
 
         Ok(Self {
@@ -309,12 +310,12 @@ impl PortfolioLossResult {
         validate_f64_unit_interval(attachment, "tranche attachment")?;
         validate_f64_unit_interval(detachment, "tranche detachment")?;
         if attachment >= detachment {
-            return Err(validation_error(format!(
+            return Err(invalid_input(format!(
                 "tranche attachment must be strictly below detachment, got {attachment} >= {detachment}"
             )));
         }
         if !pool_notional.is_finite() || pool_notional <= 0.0 {
-            return Err(validation_error(format!(
+            return Err(invalid_input(format!(
                 "tranche pool_notional must be finite and strictly positive, got {pool_notional}"
             )));
         }
@@ -325,7 +326,7 @@ impl PortfolioLossResult {
         fractions
             .try_reserve_exact(self.losses.len())
             .map_err(|error| {
-                allocation_error(format!(
+                Error::internal(format!(
                     "could not reserve {} tranche loss fractions: {error}",
                     self.losses.len()
                 ))
@@ -461,12 +462,10 @@ impl ValidatedSimulation {
         uses_recovery_model: bool,
     ) -> Result<Self> {
         if config.num_paths == 0 {
-            return Err(validation_error(
-                "portfolio loss num_paths must be positive",
-            ));
+            return Err(invalid_input("portfolio loss num_paths must be positive"));
         }
         if config.num_paths > MAX_PORTFOLIO_LOSS_PATHS {
-            return Err(validation_error(format!(
+            return Err(invalid_input(format!(
                 "portfolio loss num_paths must not exceed {MAX_PORTFOLIO_LOSS_PATHS}, got {}",
                 config.num_paths
             )));
@@ -483,7 +482,7 @@ impl ValidatedSimulation {
             CopulaSpec::Gaussian => false,
             CopulaSpec::MultiFactor => {
                 if !exposures.is_empty() && factor_count != 2 {
-                    return Err(validation_error(format!(
+                    return Err(invalid_input(format!(
                         "Multi-Factor copula portfolio loss simulation requires 2 factor loadings per exposure, got {factor_count}"
                     )));
                 }
@@ -491,7 +490,7 @@ impl ValidatedSimulation {
             }
             CopulaSpec::StudentT { .. } => true,
             CopulaSpec::RandomFactorLoading { .. } => {
-                return Err(validation_error(
+                return Err(invalid_input(
                     "portfolio loss simulation supports Gaussian, Student-t, and Multi-Factor copulas only",
                 ));
             }
@@ -499,12 +498,12 @@ impl ValidatedSimulation {
         let copula = config
             .copula
             .build()
-            .map_err(|error| validation_error(error.to_string()))?;
+            .map_err(|error| invalid_input(error.to_string()))?;
         let mut thresholds = Vec::new();
         thresholds
             .try_reserve_exact(exposures.len())
             .map_err(|error| {
-                allocation_error(format!(
+                Error::internal(format!(
                     "could not reserve {} portfolio default thresholds: {error}",
                     exposures.len()
                 ))
@@ -542,7 +541,7 @@ impl ValidatedSimulation {
         factors
             .try_reserve_exact(self.factor_count)
             .map_err(|error| {
-                allocation_error(format!(
+                Error::internal(format!(
                     "could not reserve {} systematic factors: {error}",
                     self.factor_count
                 ))
@@ -569,7 +568,7 @@ impl ValidatedSimulation {
                 self.copula
                     .latent_variable(systematic, rng.next_std_normal(), mixing, rho);
             if !latent.is_finite() {
-                return Err(validation_error(
+                return Err(invalid_input(
                     "portfolio copula produced a non-finite latent default variable",
                 ));
             }
@@ -585,7 +584,7 @@ impl ValidatedSimulation {
                 let contribution = exposure.notional * lgd;
                 let next_loss = total_loss + contribution;
                 if !contribution.is_finite() || !next_loss.is_finite() {
-                    return Err(validation_error(
+                    return Err(invalid_input(
                         "portfolio path loss overflowed finite f64 range",
                     ));
                 }
@@ -604,25 +603,25 @@ fn validate_exposures(exposures: &[CreditExposure]) -> Result<Vec<f64>> {
     loading_norms
         .try_reserve_exact(exposures.len())
         .map_err(|error| {
-            allocation_error(format!(
+            Error::internal(format!(
                 "could not reserve {} factor-loading norms: {error}",
                 exposures.len()
             ))
         })?;
     let mut seen_ids = HashSet::new();
     seen_ids.try_reserve(exposures.len()).map_err(|error| {
-        allocation_error(format!(
+        Error::internal(format!(
             "could not reserve {} credit exposure identifiers: {error}",
             exposures.len()
         ))
     })?;
     for exposure in exposures {
         if exposure.id.trim().is_empty() {
-            return Err(validation_error("credit exposure id must not be empty"));
+            return Err(invalid_input("credit exposure id must not be empty"));
         }
         let trimmed_id = exposure.id.trim();
         if !seen_ids.insert(trimmed_id) {
-            return Err(validation_error(format!(
+            return Err(invalid_input(format!(
                 "duplicate credit exposure id after trimming: '{trimmed_id}'"
             )));
         }
@@ -630,13 +629,13 @@ fn validate_exposures(exposures: &[CreditExposure]) -> Result<Vec<f64>> {
         validate_f64_unit_interval(exposure.default_probability, "default_probability")?;
         validate_f64_unit_interval(exposure.lgd, "lgd")?;
         if exposure.factor_loadings.is_empty() {
-            return Err(validation_error(format!(
+            return Err(invalid_input(format!(
                 "credit exposure '{}' must have at least one factor loading",
                 exposure.id
             )));
         }
         if exposure.factor_loadings.len() != factor_count {
-            return Err(validation_error(format!(
+            return Err(invalid_input(format!(
                 "credit exposure '{}' has {} factor loadings; expected {factor_count}",
                 exposure.id,
                 exposure.factor_loadings.len()
@@ -647,7 +646,7 @@ fn validate_exposures(exposures: &[CreditExposure]) -> Result<Vec<f64>> {
             .iter()
             .any(|loading| !loading.is_finite())
         {
-            return Err(validation_error(format!(
+            return Err(invalid_input(format!(
                 "credit exposure '{}' factor loadings must be finite",
                 exposure.id
             )));
@@ -659,7 +658,7 @@ fn validate_exposures(exposures: &[CreditExposure]) -> Result<Vec<f64>> {
         let squared_norm = squared_norm_sum.total();
         let tolerance = FACTOR_NORM_REL_TOLERANCE * squared_norm.abs().max(1.0);
         if !squared_norm.is_finite() || squared_norm > 1.0 + tolerance {
-            return Err(validation_error(format!(
+            return Err(invalid_input(format!(
                 "credit exposure '{}' squared factor-loading norm must be at most 1, got {squared_norm}",
                 exposure.id
             )));
@@ -673,18 +672,10 @@ fn validate_confidence(confidence: f64) -> Result<()> {
     if confidence.is_finite() && confidence > 0.0 && confidence < 1.0 {
         Ok(())
     } else {
-        Err(validation_error(format!(
+        Err(invalid_input(format!(
             "portfolio loss confidence must be finite and strictly between 0 and 1, got {confidence}"
         )))
     }
-}
-
-fn validation_error(message: impl Into<String>) -> Error {
-    Error::Validation(message.into())
-}
-
-fn allocation_error(message: impl Into<String>) -> Error {
-    Error::Internal(message.into())
 }
 
 fn scaled_mean(values: &[f64], statistic: &str) -> Result<f64> {
@@ -701,7 +692,7 @@ fn scaled_mean(values: &[f64], statistic: &str) -> Result<f64> {
     if mean.is_finite() {
         Ok(mean)
     } else {
-        Err(validation_error(format!(
+        Err(invalid_input(format!(
             "portfolio loss {statistic} must be finite"
         )))
     }
@@ -710,7 +701,7 @@ fn scaled_mean(values: &[f64], statistic: &str) -> Result<f64> {
 fn allocate_loss_buffer(num_paths: usize) -> Result<Vec<f64>> {
     let mut losses = Vec::new();
     losses.try_reserve_exact(num_paths).map_err(|error| {
-        allocation_error(format!(
+        Error::internal(format!(
             "could not reserve {num_paths} portfolio loss paths: {error}"
         ))
     })?;
@@ -777,7 +768,7 @@ mod tests {
     fn parallel_fill_reports_the_lowest_failing_path() {
         let simulate_path = |path_index: usize| {
             if path_index % 13 == 9 {
-                Err(validation_error(format!("path {path_index} failed")))
+                Err(invalid_input(format!("path {path_index} failed")))
             } else {
                 Ok(path_index as f64)
             }
@@ -788,7 +779,7 @@ mod tests {
                 fill_parallel_losses(&mut losses, simulate_path).expect_err("several paths fail");
             assert_eq!(
                 error.to_string(),
-                validation_error("path 9 failed").to_string()
+                invalid_input("path 9 failed").to_string()
             );
         }
         let mut losses = allocate_loss_buffer(64).expect("buffer");

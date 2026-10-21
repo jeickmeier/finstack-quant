@@ -73,8 +73,6 @@ fn lmm_params() -> LmmParams {
         ]],
         initial_forwards: vec![0.03, 0.032, 0.034, 0.036],
     }
-    .validate()
-    .expect("valid LMM params")
 }
 
 /// Minimum sub-steps between critical dates, shared by the engine config and

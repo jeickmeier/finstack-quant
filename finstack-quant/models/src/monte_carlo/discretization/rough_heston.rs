@@ -298,6 +298,7 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
 mod tests {
     use super::super::super::process::rough_heston::{RoughHestonParams, RoughHestonProcess};
     use super::*;
+    use crate::volatility::heston::HestonParams;
     use finstack_quant_core::math::fractional::HurstExponent;
 
     fn make_process() -> RoughHestonProcess {
@@ -306,14 +307,14 @@ mod tests {
             r: 0.05,
             q: 0.02,
             hurst,
-            kappa: 2.0,
-            theta: 0.04,
-            sigma_v: 0.3,
-            rho: -0.7,
-            v0: 0.04,
-        }
-        .validate()
-        .expect("valid");
+            model: HestonParams {
+                v0: 0.04,
+                kappa: 2.0,
+                theta: 0.04,
+                sigma_v: 0.3,
+                rho: -0.7,
+            },
+        };
         RoughHestonProcess::new(params)
     }
 
@@ -538,14 +539,14 @@ mod tests {
             r,
             q,
             hurst,
-            kappa,
-            theta,
-            sigma_v,
-            rho,
-            v0,
-        }
-        .validate()
-        .expect("valid");
+            model: HestonParams {
+                v0,
+                kappa,
+                theta,
+                sigma_v,
+                rho,
+            },
+        };
         let process = RoughHestonProcess::new(params);
 
         let t_end = 1.0_f64;
@@ -629,14 +630,14 @@ mod tests {
             r,
             q,
             hurst,
-            kappa,
-            theta,
-            sigma_v,
-            rho,
-            v0,
-        }
-        .validate()
-        .expect("valid");
+            model: HestonParams {
+                v0,
+                kappa,
+                theta,
+                sigma_v,
+                rho,
+            },
+        };
         let process = RoughHestonProcess::new(params);
 
         // Positive-part Euler converges slowly at small H. On this fixture,

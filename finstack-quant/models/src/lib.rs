@@ -60,6 +60,11 @@ pub mod trees;
 pub mod types;
 pub mod volatility;
 
+/// Validation error for a caller input outside its domain.
+pub(crate) fn invalid_input(message: impl Into<String>) -> finstack_quant_core::Error {
+    finstack_quant_core::Error::Validation(message.into())
+}
+
 /// Compiles the crate `README.md` Rust samples as doctests.
 #[cfg(doctest)]
 #[doc = include_str!("../README.md")]
