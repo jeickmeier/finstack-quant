@@ -173,7 +173,8 @@ fn test_standard_cs01_requires_replay_recipe() {
 
     let idx = standard_single_curve_index("CDX-CS01", start, end, 10_000_000.0);
     let ctx = standard_market_context(as_of);
-    let provider = finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
+    let provider =
+        finstack_quant_calibration::recalibration::CachedRecalibrationProvider::default();
 
     let direct_error = idx
         .cs01(&ctx, as_of, &provider)
@@ -765,7 +766,7 @@ fn parallel_cs01_uses_the_configured_credit_spread_bump() {
             &hazard,
             &ctx,
             &QuoteBump::ParallelBp(bp),
-            Some(&discount_id),
+            &discount_id,
             None,
             None,
         )

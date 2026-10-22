@@ -197,7 +197,7 @@ fn standard_cs01_without_deal_quote_matches_direct_up_down_replay() {
         &hazard,
         &market,
         &QuoteBump::ParallelBp(1.0),
-        Some(&discount_id),
+        &discount_id,
         None,
         None,
     )
@@ -206,7 +206,7 @@ fn standard_cs01_without_deal_quote_matches_direct_up_down_replay() {
         &hazard,
         &market,
         &QuoteBump::ParallelBp(-1.0),
-        Some(&discount_id),
+        &discount_id,
         None,
         None,
     )
@@ -340,7 +340,7 @@ fn deal_quote_cs_gamma_is_centered_on_override_quote_set() {
         &hazard,
         &market,
         &QuoteBump::TenorsBp(vec![(override_tenor, override_quote_bp - 100.0)]),
-        Some(&discount_id),
+        &discount_id,
         None,
         None,
     )
@@ -350,7 +350,7 @@ fn deal_quote_cs_gamma_is_centered_on_override_quote_set() {
         &centered_hazard,
         &centered_market,
         &QuoteBump::ParallelBp(1.0),
-        Some(&discount_id),
+        &discount_id,
         None,
         None,
     )
@@ -359,7 +359,7 @@ fn deal_quote_cs_gamma_is_centered_on_override_quote_set() {
         &centered_hazard,
         &centered_market,
         &QuoteBump::ParallelBp(-1.0),
-        Some(&discount_id),
+        &discount_id,
         None,
         None,
     )

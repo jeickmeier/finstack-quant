@@ -1076,7 +1076,7 @@ fn hazard_recipe_upfront_inputs_support_par_space_replay() {
         hazard.as_ref(),
         &ctx,
         &QuoteBump::ParallelBp(1.0),
-        Some(&CurveId::new("USD-OIS")),
+        &CurveId::new("USD-OIS"),
         None,
         None,
     )

@@ -33,7 +33,7 @@ use std::sync::Arc;
 /// Build request-scoped pricing options with a fresh cached recalibration provider.
 pub fn pricing_options() -> PricingOptions {
     PricingOptions::default().with_recalibration_provider(Arc::new(
-        finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new(),
+        finstack_quant_calibration::recalibration::CachedRecalibrationProvider::default(),
     ))
 }
 

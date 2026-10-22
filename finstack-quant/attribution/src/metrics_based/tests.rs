@@ -881,7 +881,7 @@ fn credit_duplicate_display_labels_match_exact_quote_id_and_pillar() {
     let second = date!(2026 - 06 - 20);
     let source =
         exact_credit_recipe_curve(base, &[(first, "FIRST", 100.0), (second, "SECOND", 200.0)]);
-    let provider = CachedRecalibrationProvider::new();
+    let provider = CachedRecalibrationProvider::default();
     let coordinates = provider
         .hazard_spread_risk_buckets(&source)
         .expect("typed coordinates");
@@ -1005,7 +1005,7 @@ fn credit_rejects_invalid_serialized_closing_pillar() {
     let pillar = date!(2026 - 03 - 20);
     let opening_curve = exact_credit_recipe_curve(base, &[(pillar, "QUOTE", 100.0)]);
     let closing_curve = exact_credit_recipe_curve(base, &[(pillar, "QUOTE", 110.0)]);
-    let provider = CachedRecalibrationProvider::new();
+    let provider = CachedRecalibrationProvider::default();
     let buckets = provider
         .hazard_spread_risk_buckets(&opening_curve)
         .expect("opening quote binding");

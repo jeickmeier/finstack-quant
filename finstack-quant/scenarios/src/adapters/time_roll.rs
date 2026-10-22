@@ -422,7 +422,7 @@ mod tests {
         mode: TimeRollMode,
     ) -> Result<RollForwardReport> {
         let provider =
-            finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
+            finstack_quant_calibration::recalibration::CachedRecalibrationProvider::default();
         apply_time_roll_forward(ctx, period, mode, &[], &provider)
     }
     use crate::engine::ExecutionContext;

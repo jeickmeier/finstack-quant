@@ -59,7 +59,7 @@ pub(crate) fn credit_factor_detail(
         MarketSnapshot::restore_market(market_t1, &credit_snapshot, MarketRestoreFlags::HAZARD);
     let cs01_bump_bp = 1.0_f64;
     let disc = cascade.discount_curve_id.as_ref();
-    let recalibration_provider = CachedRecalibrationProvider::new();
+    let recalibration_provider = CachedRecalibrationProvider::default();
     let pv_up = instrument.value(
         &shift_credit_curves_par_spread(
             market_t0,

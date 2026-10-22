@@ -804,7 +804,7 @@ impl JsCdsIndex {
         let market = parse_market(&market_json)?;
         let as_of = js_date(&as_of, "asOf")?;
         let provider =
-            finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
+            finstack_quant_calibration::recalibration::CachedRecalibrationProvider::default();
         self.inner
             .cs01(&market, as_of, &provider)
             .map_err(to_js_err)

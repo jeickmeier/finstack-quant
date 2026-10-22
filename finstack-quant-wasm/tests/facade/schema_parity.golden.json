@@ -72,10 +72,7 @@
           "title",
           "type"
         ],
-        "definitions": [
-          "Period",
-          "PeriodId"
-        ]
+        "definitions": ["Period", "PeriodId"]
       },
       "llm": {
         "id": "https://finstack_quant.dev/schemas/dates/1/period_plan.schema.json",
@@ -92,10 +89,7 @@
           "title",
           "type"
         ],
-        "definitions": [
-          "Period",
-          "PeriodId"
-        ]
+        "definitions": ["Period", "PeriodId"]
       },
       "report": [
         {
@@ -828,7 +822,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 215880
+            "bytes": 215865
           },
           {
             "path": "schemas/calibration/1/calibration_result.schema.json",
@@ -884,49 +878,49 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/cds_quote.schema.json",
             "type_name": "CdsQuote",
             "kind": "component",
-            "bytes": 9195
+            "bytes": 9180
           },
           {
             "path": "schemas/market/1/cds_tranche_quote.schema.json",
             "$id": "https://finstack_quant.dev/schemas/market/1/cds_tranche_quote.schema.json",
             "type_name": "CdsTrancheQuote",
             "kind": "component",
-            "bytes": 5899
+            "bytes": 5894
           },
           {
             "path": "schemas/market/1/inflation_quote.schema.json",
             "$id": "https://finstack_quant.dev/schemas/market/1/inflation_quote.schema.json",
             "type_name": "InflationQuote",
             "kind": "component",
-            "bytes": 4402
+            "bytes": 4397
           },
           {
             "path": "schemas/market/1/market_quote.schema.json",
             "$id": "https://finstack_quant.dev/schemas/market/1/market_quote.schema.json",
             "type_name": "MarketQuote",
             "kind": "component",
-            "bytes": 30547
+            "bytes": 30532
           },
           {
             "path": "schemas/market/1/rate_quote.schema.json",
             "$id": "https://finstack_quant.dev/schemas/market/1/rate_quote.schema.json",
             "type_name": "RateQuote",
             "kind": "component",
-            "bytes": 8837
+            "bytes": 8822
           },
           {
             "path": "schemas/market/1/vol_quote.schema.json",
             "$id": "https://finstack_quant.dev/schemas/market/1/vol_quote.schema.json",
             "type_name": "VolQuote",
             "kind": "component",
-            "bytes": 8454
+            "bytes": 8449
           },
           {
             "path": "schemas/market/1/xccy_quote.schema.json",
             "$id": "https://finstack_quant.dev/schemas/market/1/xccy_quote.schema.json",
             "type_name": "XccyQuote",
             "kind": "component",
-            "bytes": 4517
+            "bytes": 4502
           }
         ]
       },
@@ -1210,34 +1204,14 @@
       "canonical": {
         "id": "https://finstack_quant.dev/schemas/cashflow/1/amortization_spec.schema.json",
         "title": "AmortizationSpec",
-        "keys": [
-          "$id",
-          "$schema",
-          "description",
-          "examples",
-          "oneOf",
-          "title"
-        ],
+        "keys": ["$id", "$schema", "description", "examples", "oneOf", "title"],
         "definitions": []
       },
       "llm": {
         "id": "https://finstack_quant.dev/schemas/cashflow/1/amortization_spec.schema.json",
         "title": "AmortizationSpec",
-        "keys": [
-          "$defs",
-          "$id",
-          "$schema",
-          "description",
-          "examples",
-          "oneOf",
-          "title"
-        ],
-        "definitions": [
-          "Currency",
-          "Date",
-          "DecimalWire",
-          "Money"
-        ]
+        "keys": ["$defs", "$id", "$schema", "description", "examples", "oneOf", "title"],
+        "definitions": ["Currency", "Date", "DecimalWire", "Money"]
       },
       "report": [
         {
@@ -3613,7 +3587,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 215880
+            "bytes": 215865
           },
           {
             "domain": "calibration",
@@ -3677,7 +3651,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/cds_quote.schema.json",
             "type_name": "CdsQuote",
             "kind": "component",
-            "bytes": 9195
+            "bytes": 9180
           },
           {
             "domain": "calibration",
@@ -3685,7 +3659,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/cds_tranche_quote.schema.json",
             "type_name": "CdsTrancheQuote",
             "kind": "component",
-            "bytes": 5899
+            "bytes": 5894
           },
           {
             "domain": "calibration",
@@ -3693,7 +3667,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/inflation_quote.schema.json",
             "type_name": "InflationQuote",
             "kind": "component",
-            "bytes": 4402
+            "bytes": 4397
           },
           {
             "domain": "calibration",
@@ -3701,7 +3675,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/market_quote.schema.json",
             "type_name": "MarketQuote",
             "kind": "component",
-            "bytes": 30547
+            "bytes": 30532
           },
           {
             "domain": "calibration",
@@ -3709,7 +3683,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/rate_quote.schema.json",
             "type_name": "RateQuote",
             "kind": "component",
-            "bytes": 8837
+            "bytes": 8822
           },
           {
             "domain": "calibration",
@@ -3717,7 +3691,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/vol_quote.schema.json",
             "type_name": "VolQuote",
             "kind": "component",
-            "bytes": 8454
+            "bytes": 8449
           },
           {
             "domain": "calibration",
@@ -3725,7 +3699,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/xccy_quote.schema.json",
             "type_name": "XccyQuote",
             "kind": "component",
-            "bytes": 4517
+            "bytes": 4502
           },
           {
             "domain": "cashflows",
@@ -5716,22 +5690,12 @@
         "title",
         "type"
       ],
-      "definitions": [
-        "AccrualMethod",
-        "ExCouponRule"
-      ]
+      "definitions": ["AccrualMethod", "ExCouponRule"]
     },
     "https://finstack_quant.dev/schemas/cashflow/1/amortization_spec.schema.json": {
       "id": "https://finstack_quant.dev/schemas/cashflow/1/amortization_spec.schema.json",
       "title": "AmortizationSpec",
-      "keys": [
-        "$id",
-        "$schema",
-        "description",
-        "examples",
-        "oneOf",
-        "title"
-      ],
+      "keys": ["$id", "$schema", "description", "examples", "oneOf", "title"],
       "definitions": []
     },
     "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule.schema.json": {
@@ -5815,42 +5779,19 @@
         "title",
         "type"
       ],
-      "definitions": [
-        "CouponType",
-        "RollRule",
-        "StubKind"
-      ]
+      "definitions": ["CouponType", "RollRule", "StubKind"]
     },
     "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json": {
       "id": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json",
       "title": "DefaultModelSpec",
-      "keys": [
-        "$id",
-        "$schema",
-        "description",
-        "examples",
-        "oneOf",
-        "title"
-      ],
+      "keys": ["$id", "$schema", "description", "examples", "oneOf", "title"],
       "definitions": []
     },
     "https://finstack_quant.dev/schemas/cashflow/1/fee_specs.schema.json": {
       "id": "https://finstack_quant.dev/schemas/cashflow/1/fee_specs.schema.json",
       "title": "FeeSpec",
-      "keys": [
-        "$defs",
-        "$id",
-        "$schema",
-        "description",
-        "examples",
-        "oneOf",
-        "title"
-      ],
-      "definitions": [
-        "FeeAccrualBasis",
-        "FeeBase",
-        "StubKind"
-      ]
+      "keys": ["$defs", "$id", "$schema", "description", "examples", "oneOf", "title"],
+      "definitions": ["FeeAccrualBasis", "FeeBase", "StubKind"]
     },
     "https://finstack_quant.dev/schemas/cashflow/1/floating_coupon_spec.schema.json": {
       "id": "https://finstack_quant.dev/schemas/cashflow/1/floating_coupon_spec.schema.json",
@@ -5894,14 +5835,7 @@
     "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json": {
       "id": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
       "title": "PrepaymentModelSpec",
-      "keys": [
-        "$id",
-        "$schema",
-        "description",
-        "examples",
-        "oneOf",
-        "title"
-      ],
+      "keys": ["$id", "$schema", "description", "examples", "oneOf", "title"],
       "definitions": []
     },
     "https://finstack_quant.dev/schemas/cashflow/1/recovery_model_spec.schema.json": {
@@ -5934,11 +5868,7 @@
         "title",
         "type"
       ],
-      "definitions": [
-        "CashFlowMeta",
-        "CashflowRepresentation",
-        "ProjectedFixing"
-      ]
+      "definitions": ["CashFlowMeta", "CashflowRepresentation", "ProjectedFixing"]
     },
     "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json": {
       "id": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json",
@@ -5955,10 +5885,7 @@
         "title",
         "type"
       ],
-      "definitions": [
-        "RollRule",
-        "StubKind"
-      ]
+      "definitions": ["RollRule", "StubKind"]
     },
     "https://finstack_quant.dev/schemas/cashflow/1/step_up_coupon_spec.schema.json": {
       "id": "https://finstack_quant.dev/schemas/cashflow/1/step_up_coupon_spec.schema.json",
@@ -5975,11 +5902,7 @@
         "title",
         "type"
       ],
-      "definitions": [
-        "CouponType",
-        "RollRule",
-        "StubKind"
-      ]
+      "definitions": ["CouponType", "RollRule", "StubKind"]
     }
   },
   "instrument": {

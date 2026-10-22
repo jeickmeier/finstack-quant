@@ -274,7 +274,7 @@ pub(crate) fn attribute_pnl_waterfall(
         strict_validation,
         num_repricings: 2, // T₀ and T₁ repricings already performed
         factor_use: InstrumentFactorUse::of(instrument.as_ref()),
-        recalibration_provider: Arc::new(CachedRecalibrationProvider::new()),
+        recalibration_provider: Arc::new(CachedRecalibrationProvider::default()),
     };
 
     for (step_index, factor) in factor_order.into_iter().enumerate() {
@@ -614,7 +614,7 @@ mod tests {
             as_of_t1: date!(2025 - 01 - 16),
             strict_validation: false,
             num_repricings: 0,
-            recalibration_provider: Arc::new(CachedRecalibrationProvider::new()),
+            recalibration_provider: Arc::new(CachedRecalibrationProvider::default()),
         };
 
         // Apply 30 increments of 0.1; ideal answer is exactly 1_000_000_003.
@@ -658,7 +658,7 @@ mod tests {
             as_of_t1: date!(2025 - 01 - 16),
             strict_validation: false,
             num_repricings: 0,
-            recalibration_provider: Arc::new(CachedRecalibrationProvider::new()),
+            recalibration_provider: Arc::new(CachedRecalibrationProvider::default()),
         };
 
         let result =

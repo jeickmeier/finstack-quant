@@ -140,14 +140,6 @@ fn recalibrate_from_par_spreads_cached(
         .get_or_compute(key, || recalibrate_from_par_spreads(request))
 }
 
-fn require_discount_id(discount_id: Option<&CurveId>) -> finstack_quant_core::Result<&CurveId> {
-    discount_id.ok_or_else(|| {
-        finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
-            id: "discount curve for hazard recalibration".to_string(),
-        })
-    })
-}
-
 pub(super) fn get_hazard_discount_curve_id(
     hazard: &HazardCurve,
 ) -> finstack_quant_core::Result<CurveId> {
@@ -562,11 +554,10 @@ pub(crate) fn bump_hazard_spread_risk_input_cached(
     hazard: &HazardCurve,
     context: &MarketContext,
     quote_bump: (usize, f64),
-    discount_id: Option<&CurveId>,
+    discount_id: &CurveId,
     doc_clause: Option<CdsDocClause>,
     cds_valuation_convention: Option<CdsValuationConvention>,
 ) -> finstack_quant_core::Result<Arc<HazardCurve>> {
-    let discount_id = require_discount_id(discount_id)?;
     let request = HazardParRecalibration {
         hazard,
         context,
@@ -604,11 +595,10 @@ pub fn bump_hazard_spreads(
     hazard: &HazardCurve,
     context: &MarketContext,
     bump: &QuoteBump,
-    discount_id: Option<&CurveId>,
+    discount_id: &CurveId,
     doc_clause: Option<CdsDocClause>,
     cds_valuation_convention: Option<CdsValuationConvention>,
 ) -> finstack_quant_core::Result<HazardCurve> {
-    let discount_id = require_discount_id(discount_id)?;
     let request = HazardParRecalibration {
         hazard,
         context,
@@ -640,11 +630,10 @@ pub fn bump_hazard_spreads(
 pub(crate) fn replay_hazard_spread_risk_center(
     hazard: &HazardCurve,
     context: &MarketContext,
-    discount_id: Option<&CurveId>,
+    discount_id: &CurveId,
     doc_clause: Option<CdsDocClause>,
     cds_valuation_convention: Option<CdsValuationConvention>,
 ) -> finstack_quant_core::Result<HazardCurve> {
-    let discount_id = require_discount_id(discount_id)?;
     let zero_bump = QuoteBump::ParallelBp(0.0);
     recalibrate_from_par_spreads(HazardParRecalibration {
         hazard,
@@ -676,7 +665,7 @@ pub(crate) fn replay_hazard_at_horizon(
         source,
         &request.source_market,
         &QuoteBump::ParallelBp(0.0),
-        Some(&request.discount_curve_id),
+        &request.discount_curve_id,
         request.doc_clause,
         request.cds_valuation_convention,
     )?;
@@ -767,11 +756,10 @@ pub(crate) fn replay_hazard_on_dependency_market(
     hazard: &HazardCurve,
     source_context: &MarketContext,
     target_context: &MarketContext,
-    discount_id: Option<&CurveId>,
+    discount_id: &CurveId,
     doc_clause: Option<CdsDocClause>,
     cds_valuation_convention: Option<CdsValuationConvention>,
 ) -> finstack_quant_core::Result<HazardCurve> {
-    let discount_id = require_discount_id(discount_id)?;
     recalibrate_from_par_spreads(HazardParRecalibration {
         hazard,
         context: target_context,
@@ -792,12 +780,11 @@ pub(super) fn recalibrate_hazard_with_recovery(
     hazard: &HazardCurve,
     new_recovery: f64,
     context: &MarketContext,
-    discount_id: Option<&CurveId>,
+    discount_id: &CurveId,
     doc_clause: Option<CdsDocClause>,
     cds_valuation_convention: Option<CdsValuationConvention>,
 ) -> finstack_quant_core::Result<HazardCurve> {
     let new_recovery = new_recovery.clamp(0.0, 0.999_999);
-    let discount_id = require_discount_id(discount_id)?;
     recalibrate_from_par_spreads(HazardParRecalibration {
         hazard,
         context,

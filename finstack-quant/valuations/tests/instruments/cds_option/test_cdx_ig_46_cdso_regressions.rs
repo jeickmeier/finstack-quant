@@ -96,7 +96,7 @@ fn cdx_ig_46_zero_rebootstrap_preserves_supplied_curve_npv() {
         hazard.as_ref(),
         &market,
         &QuoteBump::ParallelBp(0.0),
-        Some(&option.discount_curve_id),
+        &option.discount_curve_id,
         Some(CdsDocClause::IsdaNa),
         Some(CdsValuationConvention::BloombergCdswClean),
     )

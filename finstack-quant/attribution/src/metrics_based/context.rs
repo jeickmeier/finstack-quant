@@ -118,7 +118,7 @@ impl<'a> MetricsContext<'a> {
             &market_deps.curves.credit_curves,
             market_t0,
             market_t1,
-            &finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new(),
+            &finstack_quant_calibration::recalibration::CachedRecalibrationProvider::default(),
         )?;
         let (avg_credit_shift_bp, credit_curves_measured) =
             average_credit(&market_deps, market_t0, market_t1)?;

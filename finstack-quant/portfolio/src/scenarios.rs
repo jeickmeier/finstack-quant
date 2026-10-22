@@ -505,7 +505,7 @@ pub fn scenario_pnl_batch(
     let profile = crate::evaluation::EvaluationProfile::from_options(&options);
     let mut results = Vec::with_capacity(scenarios.len());
     let recalibration_provider: Arc<dyn RecalibrationProvider> =
-        Arc::new(CachedRecalibrationProvider::new());
+        Arc::new(CachedRecalibrationProvider::default());
 
     for wave in scenarios.chunks(SCENARIO_BATCH_MAX_ACTIVE_STATES) {
         let mut applied = Vec::with_capacity(wave.len());

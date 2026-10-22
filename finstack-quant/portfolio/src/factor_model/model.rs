@@ -828,7 +828,7 @@ fn bump_credit_spreads(
         &curve,
         market,
         &QuoteBump::ParallelBp(bump_bp),
-        Some(&params.discount_curve_id),
+        &params.discount_curve_id,
         None,
         None,
     )?)

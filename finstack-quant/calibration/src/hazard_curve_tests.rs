@@ -217,7 +217,7 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         &mismatched_curve,
         &ctx,
         &QuoteBump::ParallelBp(1.0),
-        Some(&CurveId::new("TEST-DISC")),
+        &CurveId::new("TEST-DISC"),
         None,
         None,
     )
@@ -249,7 +249,7 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         &tampered_curve,
         &ctx,
         &QuoteBump::ParallelBp(1.0),
-        Some(&CurveId::new("TEST-DISC")),
+        &CurveId::new("TEST-DISC"),
         None,
         None,
     )
@@ -301,7 +301,7 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         curve.as_ref(),
         &ctx,
         &QuoteBump::ParallelBp(0.0),
-        Some(&CurveId::new("TEST-DISC")),
+        &CurveId::new("TEST-DISC"),
         None,
         None,
     )
@@ -316,7 +316,7 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         curve.as_ref(),
         &ctx,
         &QuoteBump::ParallelBp(1.0),
-        Some(&CurveId::new("TEST-DISC")),
+        &CurveId::new("TEST-DISC"),
         None,
         None,
     )
@@ -325,7 +325,7 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         curve.as_ref(),
         &ctx,
         &QuoteBump::ParallelBp(-1.0),
-        Some(&CurveId::new("TEST-DISC")),
+        &CurveId::new("TEST-DISC"),
         None,
         None,
     )

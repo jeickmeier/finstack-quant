@@ -62,7 +62,7 @@ fn linked_rate_replay_reprices_bumped_swaps_with_bumped_discounting(
         quote["rate"] = json!(quote["rate"].as_f64().expect("fixture rate") + 1e-4);
     }
     let direct = calibrate(&input.to_string())?;
-    let provider = CachedRecalibrationProvider::new();
+    let provider = CachedRecalibrationProvider::default();
     let replay =
         provider.rebuild_rate_market(&RateMarketRecalibrationRequest::LinkedDiscountForward {
             market: Arc::clone(&source),
@@ -129,7 +129,7 @@ fn single_ois_quote_replay_composes_and_preserves_zero_shock_identity(
     let source = calibrate(include_str!(
         "../../examples/market_bootstrap/01_usd_discount.json"
     ))?;
-    let provider = CachedRecalibrationProvider::new();
+    let provider = CachedRecalibrationProvider::default();
     let bump = |market: Arc<MarketContext>, bp: f64| {
         provider.rebuild_rate_market(&RateMarketRecalibrationRequest::SingleOis {
             market,
@@ -177,7 +177,7 @@ fn single_ois_quote_replay_composes_and_preserves_zero_shock_identity(
 fn linked_rate_quote_replay_composes_both_curve_recipes(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let source = calibrate(&joint_swap_fixture()?.to_string())?;
-    let provider = CachedRecalibrationProvider::new();
+    let provider = CachedRecalibrationProvider::default();
     let bump = |market: Arc<MarketContext>, bp: f64| {
         provider.rebuild_rate_market(&RateMarketRecalibrationRequest::LinkedDiscountForward {
             market,

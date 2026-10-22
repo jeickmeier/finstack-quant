@@ -198,7 +198,7 @@ fn price(case: &Case, metrics: &[String], overrides: Option<&str>) -> Result<Opt
         metrics,
         None,
         PricingOptions::default()
-            .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new())),
+            .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::default())),
     )
     .map_err(|e| e.to_string())?;
     Ok(result.measures.get("theta").copied())
