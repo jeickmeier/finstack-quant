@@ -291,10 +291,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(dry_run, &m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(validate_calibration, &m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(
-        validation::validate_butterfly_call_convexity,
-        &m
-    )?)?;
-    m.add_function(pyo3::wrap_pyfunction!(
         validation::validate_butterfly_spread,
         &m
     )?)?;
@@ -302,15 +298,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         validation::validate_calendar_spread,
         &m
     )?)?;
-    m.add_function(pyo3::wrap_pyfunction!(
-        validation::validate_calendar_spread_with_forwards,
-        &m
-    )?)?;
     m.add_function(pyo3::wrap_pyfunction!(validation::validate_surface, &m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(
-        validation::validate_surface_with_forwards,
-        &m
-    )?)?;
     m.add_function(pyo3::wrap_pyfunction!(validation::validate_vol_bounds, &m)?)?;
     hull_white::register(py, &m)?;
     schema::register(py, &m)?;
@@ -345,13 +333,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "dry_run",
                 "hull_white",
                 "schema",
-                "validate_butterfly_call_convexity",
                 "validate_butterfly_spread",
                 "validate_calendar_spread",
-                "validate_calendar_spread_with_forwards",
                 "validate_calibration",
                 "validate_surface",
-                "validate_surface_with_forwards",
                 "validate_vol_bounds",
             ],
         )?,

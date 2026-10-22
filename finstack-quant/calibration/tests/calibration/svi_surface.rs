@@ -402,3 +402,227 @@ fn calibrated_surfaces_preserve_total_variance_between_published_expiries() {
         }
     }
 }
+
+/// Execute real surface solves across the fit/acceptance/execution-policy matrix.
+#[test]
+fn surface_acceptance_policy_preserves_fit_and_execution_controls() {
+    use finstack_quant_calibration::validation::ValidationMode;
+    let base_date = Date::from_calendar_date(2025, Month::January, 3).expect("base date");
+    let strikes = vec![70.0, 80.0, 90.0, 100.0, 110.0, 120.0, 140.0];
+    let discount = nonflat_discount_curve(base_date);
+    let quote_forward = SPOT / discount.df(1.0);
+    let truth = finstack_quant_models::volatility::sabr::SabrParameters::new(0.2, 1.0, 1.0, -0.3)
+        .expect("SABR truth");
+    let source_market = MarketContext::new().insert(discount);
+    let quotes: Vec<_> = strikes
+        .iter()
+        .map(|&strike| {
+            let vol = truth
+                .implied_vol(quote_forward, strike, 1.0)
+                .expect("model quote");
+            MarketQuote::Vol(VolQuote::OptionVol {
+                id: QuoteId::new(format!("matrix-{strike}")),
+                underlying: UNDERLYING.into(),
+                expiry: base_date + time::Duration::days(365),
+                strike,
+                vol,
+                option_type: OptionType::Call,
+            })
+        })
+        .collect();
+    let (prior_market, mut market_data) = cal_utils::split_market_context(&source_market);
+    cal_utils::extend_market_data(&mut market_data, &quotes);
+    let steps = [
+        StepParams::VolSurface(VolSurfaceParams {
+            vol_surface_id: "MATRIX".into(),
+            base_date,
+            underlying_ticker: UNDERLYING.into(),
+            discount_curve_id: Some(DISCOUNT_ID.into()),
+            beta: 1.0,
+            target_expiries: vec![1.0],
+            target_strikes: strikes.clone(),
+            spot_override: Some(SPOT),
+            dividend_yield_override: Some(0.0),
+            expiry_extrapolation: SurfaceExtrapolationPolicy::Error,
+        }),
+        StepParams::SviSurface(SviSurfaceParams {
+            vol_surface_id: "MATRIX".into(),
+            base_date,
+            underlying_ticker: UNDERLYING.into(),
+            discount_curve_id: Some(DISCOUNT_ID.into()),
+            target_expiries: vec![1.0],
+            target_strikes: strikes,
+            spot_override: Some(SPOT),
+            dividend_yield_override: Some(0.0),
+        }),
+    ];
+    for params in steps {
+        for fit_success in [true, false] {
+            let mut params = params.clone();
+            if !fit_success {
+                // Model slices still fit; the coarser delivered grid loses quote accuracy.
+                match &mut params {
+                    StepParams::VolSurface(p) => p.target_strikes = vec![70.0, 100.0, 140.0],
+                    StepParams::SviSurface(p) => {
+                        p.target_strikes = vec![70.0, 90.0, 100.0, 120.0, 140.0]
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            for violation in [true, false] {
+                for mode in [ValidationMode::Warn, ValidationMode::Error] {
+                    for fail_on_bad_fit in [true, false] {
+                        let mut settings = CalibrationConfig {
+                            validation_mode: mode.clone(),
+                            fail_on_bad_fit,
+                            ..Default::default()
+                        };
+                        settings.vol_surface.validation_tolerance = 0.001;
+                        settings.validation.check_arbitrage = false;
+                        settings.validation.max_volatility = if violation { 0.1 } else { 5.0 };
+                        let envelope = CalibrationEnvelope {
+                            schema_url: None,
+                            schema:
+                                finstack_quant_calibration::api::schema::CalibrationSchema::CURRENT,
+                            plan: CalibrationPlan {
+                                id: "surface-policy".into(),
+                                description: None,
+                                quote_sets: [("quotes".into(), cal_utils::quote_set_ids(&quotes))]
+                                    .into(),
+                                settings,
+                                steps: vec![CalibrationStep {
+                                    id: "surface".into(),
+                                    quote_set: "quotes".into(),
+                                    params: params.clone(),
+                                }],
+                            },
+                            market_data: market_data.clone(),
+                            prior_market: prior_market.clone(),
+                        };
+                        let expected_success =
+                            fit_success && !(violation && mode == ValidationMode::Error);
+                        let result = engine::calibrate(&envelope);
+                        if fail_on_bad_fit && !expected_success {
+                            assert!(result.is_err(), "{params:?}, fit={fit_success}, violation={violation}, mode={mode:?}");
+                            continue;
+                        }
+                        let result = result.expect("accepted execution policy");
+                        let report = &result.result.step_reports["surface"];
+                        assert_eq!(report.success, expected_success, "{params:?}, fit={fit_success}, violation={violation}, mode={mode:?}: {report:?}");
+                        assert_eq!(
+                            report.metadata.contains_key("validation_warning"),
+                            violation && mode == ValidationMode::Warn
+                        );
+                        assert_eq!(
+                            report.validation_passed,
+                            !(violation && mode == ValidationMode::Error)
+                        );
+                        if violation && mode == ValidationMode::Error {
+                            assert!(report
+                                .validation_error
+                                .as_deref()
+                                .is_some_and(|s| s.contains("volatility")));
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn svi_density_scan_obeys_global_arbitrage_and_report_policy() {
+    use finstack_quant_calibration::validation::ValidationMode;
+    let base_date = Date::from_calendar_date(2025, Month::January, 3).expect("base date");
+    let truth = SviParams {
+        a: 0.015,
+        b: 0.5,
+        rho: 0.6,
+        m: 0.2,
+        sigma: 0.1,
+    };
+    truth.validate().expect("necessary SVI conditions");
+    assert!(truth.butterfly_violation(-1.5, 1.5, 201, 1e-10).is_some());
+    let strikes: Vec<_> = [-0.5_f64, -0.3, -0.1, 0.0, 0.1, 0.2, 0.3, 0.5]
+        .iter()
+        .map(|k| SPOT * k.exp())
+        .collect();
+    let quotes: Vec<_> = strikes
+        .iter()
+        .map(|&strike| {
+            MarketQuote::Vol(VolQuote::OptionVol {
+                id: QuoteId::new(format!("density-{strike}")),
+                underlying: UNDERLYING.into(),
+                expiry: base_date + time::Duration::days(365),
+                strike,
+                vol: truth.implied_vol((strike / SPOT).ln(), 1.0).expect("vol"),
+                option_type: OptionType::Call,
+            })
+        })
+        .collect();
+    let discount = DiscountCurve::builder(DISCOUNT_ID)
+        .base_date(base_date)
+        .knots([(0.0, 1.0), (5.0, 1.0)])
+        .build()
+        .expect("discount");
+    let (prior_market, mut market_data) =
+        cal_utils::split_market_context(&MarketContext::new().insert(discount));
+    cal_utils::extend_market_data(&mut market_data, &quotes);
+    for check_arbitrage in [true, false] {
+        for mode in [ValidationMode::Warn, ValidationMode::Error] {
+            let mut settings = CalibrationConfig {
+                validation_mode: mode.clone(),
+                fail_on_bad_fit: false,
+                ..Default::default()
+            };
+            settings.vol_surface.validation_tolerance = 0.1;
+            settings.validation.check_arbitrage = check_arbitrage;
+            let envelope = CalibrationEnvelope {
+                schema_url: None,
+                schema: finstack_quant_calibration::api::schema::CalibrationSchema::CURRENT,
+                plan: CalibrationPlan {
+                    id: "density-policy".into(),
+                    description: None,
+                    quote_sets: [("quotes".into(), cal_utils::quote_set_ids(&quotes))].into(),
+                    settings,
+                    steps: vec![CalibrationStep {
+                        id: "surface".into(),
+                        quote_set: "quotes".into(),
+                        params: StepParams::SviSurface(SviSurfaceParams {
+                            vol_surface_id: "DENSITY".into(),
+                            base_date,
+                            underlying_ticker: UNDERLYING.into(),
+                            discount_curve_id: Some(DISCOUNT_ID.into()),
+                            target_expiries: vec![1.0],
+                            target_strikes: strikes.clone(),
+                            spot_override: Some(SPOT),
+                            dividend_yield_override: Some(0.0),
+                        }),
+                    }],
+                },
+                market_data: market_data.clone(),
+                prior_market: prior_market.clone(),
+            };
+            let result = engine::calibrate(&envelope).expect("return diagnostic report");
+            let report = &result.result.step_reports["surface"];
+            assert_eq!(
+                report.success,
+                !check_arbitrage || mode == ValidationMode::Warn,
+                "{report:?}"
+            );
+            let detail = if mode == ValidationMode::Warn {
+                report.metadata.get("validation_warning")
+            } else {
+                report.validation_error.as_ref()
+            };
+            if check_arbitrage {
+                assert!(
+                    detail.is_some_and(|text| text.contains("Durrleman")),
+                    "{report:?}"
+                );
+            } else {
+                assert!(detail.is_none(), "{report:?}");
+            }
+        }
+    }
+}

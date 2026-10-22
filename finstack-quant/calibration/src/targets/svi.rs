@@ -14,12 +14,9 @@
 //! monotonicity of `w` by linearity whenever the calibrated slices
 //! themselves are calendar-monotone.
 //!
-//! After the grid is built, we hand it to
-//! `validate_calendar_spread_with_forwards` (calendar monotonicity at fixed
-//! forward log-moneyness) and enforce Durrleman's `g(k) ≥ 0` per calibrated
-//! slice (with `validate_butterfly_call_convexity` as a grid-level
-//! diagnostic) so any residual arbitrage surfaces as a structured
-//! `Error::Validation` rather than propagating silently into pricing.
+//! The delivered grid uses the global forward-aware surface checks. A separate
+//! Durrleman density scan checks each calibrated slice. Acceptance violations
+//! follow the global Warn/Error policy; input and evaluation errors propagate.
 
 use crate::api::schema::SurfaceExtrapolationPolicy;
 use crate::api::schema::SviSurfaceParams;
@@ -31,7 +28,7 @@ use crate::targets::util::{
     extract_equity_option_quotes, interpolate_total_variance, resolve_equity_forward_inputs,
     resolve_equity_spot, surface_quote_residuals,
 };
-use crate::validation::ValidationConfig;
+use crate::validation::attach_validation_result;
 use crate::CalibrationReport;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -39,9 +36,7 @@ use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurfac
 use finstack_quant_core::Result;
 use std::collections::BTreeMap;
 
-use crate::validation::surfaces::{
-    validate_butterfly_call_convexity, validate_calendar_spread_with_forwards,
-};
+use crate::validation::surfaces::{surface_violations, violations_result};
 
 /// Target for SVI surface calibration from option volatility quotes.
 /// Calibrate an SVI volatility surface from option vol quotes.
@@ -217,42 +212,45 @@ pub(crate) fn solve(
         params.base_date,
     )?;
 
-    // Calendar and per-slice butterfly checks are strict; interpolated
-    // grid call convexity is advisory.
     let target_forwards: Vec<f64> = params
         .target_expiries
         .iter()
         .map(|&t| forward_fn(t))
         .collect::<Result<Vec<_>>>()?;
-    let calendar_cfg = ValidationConfig {
-        lenient_arbitrage: false,
-        ..ValidationConfig::default()
-    };
-    let calendar_arbitrage =
-        validate_calendar_spread_with_forwards(&surface, &calendar_cfg, &target_forwards)
-            .err()
-            .map(|e| format!("SVI calendar-spread arbitrage: {e}"));
+    let mut violations = surface_violations(&surface, &global_config.validation, &target_forwards)?;
 
-    // Scan each calibrated slice with a one-unit wing margin.
-    let mut slice_butterfly_arbitrage: Option<String> = None;
-    for (&expiry_key, svi_params) in &params_by_expiry {
-        let expiry = expiry_key.into_inner();
-        let forward = forward_fn(expiry)?;
-        let k_lo = (params.target_strikes.first().copied().unwrap_or(forward) / forward).ln() - 1.0;
-        let k_hi = (params.target_strikes.last().copied().unwrap_or(forward) / forward).ln() + 1.0;
-        if let Some((k, g)) = svi_params.butterfly_violation(k_lo, k_hi, 201, 1e-10) {
-            slice_butterfly_arbitrage = Some(format!(
-                "SVI butterfly arbitrage: Durrleman g(k)={g:.3e} < 0 at k={k:.4}, \
-                 T={expiry:.4}y (negative implied density)"
-            ));
-            break;
+    // Retain the separate 201-point Durrleman scan with one-unit wing margins.
+    if global_config.validation.check_arbitrage {
+        for (&expiry_key, svi_params) in &params_by_expiry {
+            let expiry = expiry_key.into_inner();
+            let forward = forward_fn(expiry)?;
+            let k_lo = (params.target_strikes[0] / forward).ln() - 1.0;
+            let k_hi =
+                (params.target_strikes[params.target_strikes.len() - 1] / forward).ln() + 1.0;
+            if !k_lo.is_finite() || !k_hi.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Invalid SVI density scan range".into(),
+                ));
+            }
+            let mut worst: Option<(f64, f64)> = None;
+            let step = (k_hi - k_lo) / 200.0;
+            for i in 0..201 {
+                let k = k_lo + step * f64::from(i);
+                let g = svi_params.durrleman_g(k);
+                if !g.is_finite() {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "SVI density evaluation failed at k={k}, T={expiry}"
+                    )));
+                }
+                if g < -1e-10 && worst.is_none_or(|(_, previous)| g < previous) {
+                    worst = Some((k, g));
+                }
+            }
+            if let Some((k, g)) = worst {
+                violations.push(format!("SVI butterfly arbitrage: Durrleman g(k)={g:.3e} < 0 at k={k:.4}, T={expiry:.4}y (negative implied density)"));
+            }
         }
     }
-
-    let butterfly_warning =
-        validate_butterfly_call_convexity(&surface, &calendar_cfg, &target_forwards)
-            .err()
-            .map(|e| format!("SVI butterfly-spread arbitrage: {e}"));
 
     let mut report = CalibrationReport::for_type_with_tolerance(
         "svi_surface",
@@ -266,22 +264,7 @@ pub(crate) fn solve(
     .with_fitted_slices(fitted_slices);
     report.update_solver_config(global_config.solver.clone());
 
-    let strict_failures: Vec<String> = [calendar_arbitrage, slice_butterfly_arbitrage]
-        .into_iter()
-        .flatten()
-        .collect();
-    if !strict_failures.is_empty() {
-        report.validation_passed = false;
-        let mut detail = strict_failures.join("; ");
-        if let Some(bf) = &butterfly_warning {
-            detail = format!("{detail}; (advisory) {bf}");
-        }
-        report.validation_error = Some(detail.clone());
-        report.success = false;
-        report.convergence_reason = format!("SVI surface calibration failed validation: {detail}");
-    } else if let Some(bf) = butterfly_warning {
-        report.validation_error = Some(format!("(advisory) {bf}"));
-    }
+    let report = attach_validation_result(report, violations_result(violations), global_config);
 
     Ok((surface, report))
 }

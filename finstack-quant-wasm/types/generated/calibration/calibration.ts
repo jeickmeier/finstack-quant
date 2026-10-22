@@ -4817,18 +4817,6 @@ export interface ValidationConfig {
    */
   allow_negative_rates?: boolean;
   /**
-   * Butterfly spread convexity tolerance ratio (lower bound).
-   * Actual variance must be >= interpolated * this ratio to pass.
-   * Default 0.90 (10% tolerance); use values closer to 1.0 for stricter checking.
-   */
-  butterfly_lower_ratio?: number;
-  /**
-   * Butterfly spread convexity tolerance ratio (upper bound).
-   * Actual variance must be <= interpolated * this ratio to pass.
-   * Default 1.10 (10% tolerance); use values closer to 1.0 for stricter checking.
-   */
-  butterfly_upper_ratio?: number;
-  /**
    * Enable arbitrage checks
    */
   check_arbitrage?: boolean;
@@ -4840,12 +4828,6 @@ export interface ValidationConfig {
    * Enable monotonicity checks
    */
   check_monotonicity?: boolean;
-  /**
-   * When true, arbitrage violations (calendar/butterfly) produce warnings instead of errors.
-   * Default is false - arbitrage violations fail validation.
-   * Set to true only for exploratory analysis or when arbitrage-free fitting is not required.
-   */
-  lenient_arbitrage?: boolean;
   /**
    * Maximum allowed annual CPI growth (default 0.50 = 50%)
    */

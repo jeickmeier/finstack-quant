@@ -116,12 +116,9 @@
           "$ref": "#/$defs/ValidationConfig",
           "default": {
             "allow_negative_rates": false,
-            "butterfly_lower_ratio": 0.9,
-            "butterfly_upper_ratio": 1.1,
             "check_arbitrage": true,
             "check_forward_positivity": true,
             "check_monotonicity": true,
-            "lenient_arbitrage": false,
             "max_cpi_growth": 0.5,
             "max_forward_rate": 0.5,
             "max_fwd_inflation": 0.5,
@@ -260,12 +257,9 @@
             "use_parallel": false,
             "validation": {
               "allow_negative_rates": false,
-              "butterfly_lower_ratio": 0.9,
-              "butterfly_upper_ratio": 1.1,
               "check_arbitrage": true,
               "check_forward_positivity": true,
               "check_monotonicity": true,
-              "lenient_arbitrage": false,
               "max_cpi_growth": 0.5,
               "max_forward_rate": 0.5,
               "max_fwd_inflation": 0.5,
@@ -5100,18 +5094,6 @@
           "description": "Allow negative rate environments (DF > 1.0 at short end)",
           "type": "boolean"
         },
-        "butterfly_lower_ratio": {
-          "default": 0.9,
-          "description": "Butterfly spread convexity tolerance ratio (lower bound).\nActual variance must be >= interpolated * this ratio to pass.\nDefault 0.90 (10% tolerance); use values closer to 1.0 for stricter checking.",
-          "format": "double",
-          "type": "number"
-        },
-        "butterfly_upper_ratio": {
-          "default": 1.1,
-          "description": "Butterfly spread convexity tolerance ratio (upper bound).\nActual variance must be <= interpolated * this ratio to pass.\nDefault 1.10 (10% tolerance); use values closer to 1.0 for stricter checking.",
-          "format": "double",
-          "type": "number"
-        },
         "check_arbitrage": {
           "default": true,
           "description": "Enable arbitrage checks",
@@ -5125,11 +5107,6 @@
         "check_monotonicity": {
           "default": true,
           "description": "Enable monotonicity checks",
-          "type": "boolean"
-        },
-        "lenient_arbitrage": {
-          "default": false,
-          "description": "When true, arbitrage violations (calendar/butterfly) produce warnings instead of errors.\nDefault is false - arbitrage violations fail validation.\nSet to true only for exploratory analysis or when arbitrage-free fitting is not required.",
           "type": "boolean"
         },
         "max_cpi_growth": {
@@ -5342,12 +5319,9 @@
           "use_parallel": false,
           "validation": {
             "allow_negative_rates": false,
-            "butterfly_lower_ratio": 0.9,
-            "butterfly_upper_ratio": 1.1,
             "check_arbitrage": true,
             "check_forward_positivity": true,
             "check_monotonicity": true,
-            "lenient_arbitrage": false,
             "max_cpi_growth": 0.5,
             "max_forward_rate": 0.5,
             "max_fwd_inflation": 0.5,

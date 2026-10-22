@@ -54,13 +54,10 @@ __all__ = [
     "dry_run",
     "hull_white",
     "schema",
-    "validate_butterfly_call_convexity",
     "validate_butterfly_spread",
     "validate_calendar_spread",
-    "validate_calendar_spread_with_forwards",
     "validate_calibration",
     "validate_surface",
-    "validate_surface_with_forwards",
     "validate_vol_bounds",
 ]
 
@@ -4592,33 +4589,7 @@ def calibrate_bermudan_lmm_base_vol(
 
     """
 
-def validate_surface(surface: VolSurface, config: ValidationConfig) -> None:
-    """Run the calendar-spread, butterfly-spread and volatility-bound checks.
-
-    Parameters
-    ----------
-    surface : VolSurface
-        Implied-volatility surface (expiries in years, absolute strikes).
-    config : ValidationConfig
-        Thresholds; ``check_arbitrage=False`` skips the two arbitrage checks
-        and ``lenient_arbitrage=True`` logs arbitrage violations instead of
-        raising (the volatility bounds are always checked).
-
-    Raises
-    ------
-    ValueError
-        If any check fails, naming the offending expiry and strike.
-
-    Examples:
-    --------
-    >>> from finstack_quant.calibration import ValidationConfig, validate_surface
-    >>> from finstack_quant.core.market_data import VolSurface
-    >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
-    >>> validate_surface(surface, ValidationConfig())
-
-    """
-
-def validate_surface_with_forwards(surface: VolSurface, config: ValidationConfig, forwards: list[float]) -> None:
+def validate_surface(surface: VolSurface, config: ValidationConfig, forwards: list[float]) -> None:
     """Run the forward-aware calendar and call-convexity checks plus the volatility bounds.
 
     Parameters
@@ -4626,8 +4597,8 @@ def validate_surface_with_forwards(surface: VolSurface, config: ValidationConfig
     surface : VolSurface
         Implied-volatility surface (expiries in years, absolute strikes).
     config : ValidationConfig
-        Thresholds; ``check_arbitrage=False`` skips the arbitrage checks and
-        ``lenient_arbitrage=True`` logs arbitrage violations instead of raising.
+        Thresholds; ``check_arbitrage=False`` skips arbitrage checks but
+        retains forward-input validation and volatility bounds.
     forwards : list[float]
         Forward price for each surface expiry, in expiry order (same units as
         the strikes); one finite positive entry per expiry.
@@ -4640,41 +4611,14 @@ def validate_surface_with_forwards(surface: VolSurface, config: ValidationConfig
 
     Examples:
     --------
-    >>> from finstack_quant.calibration import ValidationConfig, validate_surface_with_forwards
+    >>> from finstack_quant.calibration import ValidationConfig, validate_surface
     >>> from finstack_quant.core.market_data import VolSurface
     >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
-    >>> validate_surface_with_forwards(surface, ValidationConfig(), [100.0, 100.0])
+    >>> validate_surface(surface, ValidationConfig(), [100.0, 100.0])
 
     """
 
-def validate_calendar_spread(surface: VolSurface, config: ValidationConfig) -> None:
-    """Check that total variance does not decrease with expiry at each strike.
-
-    Parameters
-    ----------
-    surface : VolSurface
-        Implied-volatility surface (expiries in years, absolute strikes).
-    config : ValidationConfig
-        Thresholds; ``check_arbitrage=False`` skips the check and
-        ``lenient_arbitrage=True`` logs violations instead of raising.
-
-    Raises
-    ------
-    ValueError
-        If total variance decreases between two expiries.
-
-    Examples:
-    --------
-    >>> from finstack_quant.calibration import ValidationConfig, validate_calendar_spread
-    >>> from finstack_quant.core.market_data import VolSurface
-    >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
-    >>> validate_calendar_spread(surface, ValidationConfig())
-
-    """
-
-def validate_calendar_spread_with_forwards(
-    surface: VolSurface, config: ValidationConfig, forwards: list[float]
-) -> None:
+def validate_calendar_spread(surface: VolSurface, config: ValidationConfig, forwards: list[float]) -> None:
     """Check that total variance does not decrease with expiry at fixed forward moneyness.
 
     Parameters
@@ -4683,7 +4627,7 @@ def validate_calendar_spread_with_forwards(
         Implied-volatility surface (expiries in years, absolute strikes).
     config : ValidationConfig
         Thresholds; ``check_arbitrage=False`` skips the check and
-        ``lenient_arbitrage=True`` logs violations instead of raising.
+        forward-input validation remains active.
     forwards : list[float]
         Forward price for each surface expiry, in expiry order (same units as
         the strikes); one finite positive entry per expiry.
@@ -4696,44 +4640,18 @@ def validate_calendar_spread_with_forwards(
 
     Examples:
     --------
-    >>> from finstack_quant.calibration import ValidationConfig, validate_calendar_spread_with_forwards
+    >>> from finstack_quant.calibration import ValidationConfig, validate_calendar_spread
     >>> from finstack_quant.core.market_data import VolSurface
     >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
-    >>> validate_calendar_spread_with_forwards(surface, ValidationConfig(), [100.0, 100.0])
+    >>> validate_calendar_spread(surface, ValidationConfig(), [100.0, 100.0])
 
     """
 
-def validate_butterfly_spread(surface: VolSurface, config: ValidationConfig) -> None:
-    """Check that total variance is convex in strike at each expiry (butterfly spread).
-
-    Parameters
-    ----------
-    surface : VolSurface
-        Implied-volatility surface (expiries in years, absolute strikes).
-    config : ValidationConfig
-        Thresholds (``butterfly_upper_ratio``, ``butterfly_lower_ratio``);
-        ``check_arbitrage=False`` skips the check and
-        ``lenient_arbitrage=True`` logs violations instead of raising.
-
-    Raises
-    ------
-    ValueError
-        If a butterfly violation exceeds the configured tolerance.
-
-    Examples:
-    --------
-    >>> from finstack_quant.calibration import ValidationConfig, validate_butterfly_spread
-    >>> from finstack_quant.core.market_data import VolSurface
-    >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
-    >>> validate_butterfly_spread(surface, ValidationConfig())
-
-    """
-
-def validate_butterfly_call_convexity(surface: VolSurface, config: ValidationConfig, forwards: list[float]) -> None:
+def validate_butterfly_spread(surface: VolSurface, config: ValidationConfig, forwards: list[float]) -> None:
     """Check that undiscounted Black call prices are convex in strike at each expiry.
 
     Every adjacent vertical call spread must also cost between zero and its
-    strike width; the price tolerance is ``config.tolerance`` times the forward.
+    strike width; the price tolerance is ``max(config.tolerance, 1e-12)`` times the forward.
 
     Parameters
     ----------
@@ -4741,7 +4659,7 @@ def validate_butterfly_call_convexity(surface: VolSurface, config: ValidationCon
         Implied-volatility surface (expiries in years, absolute strikes).
     config : ValidationConfig
         Thresholds; ``check_arbitrage=False`` skips the check and
-        ``lenient_arbitrage=True`` logs violations instead of raising.
+        forward-input validation remains active.
     forwards : list[float]
         Forward price for each surface expiry, in expiry order (same units as
         the strikes); one finite positive entry per expiry.
@@ -4754,10 +4672,10 @@ def validate_butterfly_call_convexity(surface: VolSurface, config: ValidationCon
 
     Examples:
     --------
-    >>> from finstack_quant.calibration import ValidationConfig, validate_butterfly_call_convexity
+    >>> from finstack_quant.calibration import ValidationConfig, validate_butterfly_spread
     >>> from finstack_quant.core.market_data import VolSurface
     >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
-    >>> validate_butterfly_call_convexity(surface, ValidationConfig(), [100.0, 100.0])
+    >>> validate_butterfly_spread(surface, ValidationConfig(), [100.0, 100.0])
 
     """
 

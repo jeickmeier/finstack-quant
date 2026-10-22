@@ -448,18 +448,15 @@ test('surface validators match the Python validate_* functions', () => {
   const config = GOLDEN.validation_config;
   const surface = (vols) => new core.VolSurface('EQ-VOL', [1.0, 2.0], [90, 100, 110], vols);
   const clean = surface([0.205, 0.2, 0.205, 0.215, 0.21, 0.215]);
-  calibration.validateSurface(clean, config);
-  calibration.validateCalendarSpread(clean, config);
-  calibration.validateButterflySpread(clean, config);
   calibration.validateVolBounds(clean, config);
-  calibration.validateSurfaceWithForwards(clean, config, [100, 100]);
-  calibration.validateCalendarSpreadWithForwards(clean, config, [100, 100]);
-  calibration.validateButterflyCallConvexity(clean, config, [100, 100]);
+  calibration.validateSurface(clean, config, [100, 100]);
+  calibration.validateCalendarSpread(clean, config, [100, 100]);
+  calibration.validateButterflySpread(clean, config, [100, 100]);
 
   const inverted = surface([0.3, 0.3, 0.3, 0.1, 0.1, 0.1]);
-  assert.throws(() => calibration.validateCalendarSpread(inverted, config), validation);
-  calibration.validateCalendarSpread(inverted, { ...config, check_arbitrage: false });
-  assert.throws(() => calibration.validateSurfaceWithForwards(clean, config, [100]), validation);
+  assert.throws(() => calibration.validateCalendarSpread(inverted, config, [100, 100]), validation);
+  calibration.validateCalendarSpread(inverted, { ...config, check_arbitrage: false }, [100, 100]);
+  assert.throws(() => calibration.validateSurface(clean, config, [100]), validation);
   assert.throws(
     () => calibration.validateVolBounds(clean, { ...config, max_volatility: 0.1 }),
     validation
@@ -506,4 +503,40 @@ test('checked quote constructors match Python and reject invalid fields', () => 
       );
     }
   }
+});
+
+test('surface validation requires forwards even with arbitrage disabled', () => {
+  const expiring = new core.VolSurface('EXPIRING', [0, 1], [90, 100], [0.2, 0.2, 0.2, 0.2]);
+  calibration.validateSurface(expiring, GOLDEN.validation_config, [100, 105]);
+  const surface = new core.VolSurface('INPUTS', [1, 2], [90, 100], [0.2, 0.2, 0.21, 0.21]);
+  for (const check_arbitrage of [true, false]) {
+    const config = { ...GOLDEN.validation_config, check_arbitrage };
+    for (const forwards of [[], [100], [100, 0], [100, -1], [100, NaN], [100, Infinity]]) {
+      for (const validate of [
+        calibration.validateSurface,
+        calibration.validateCalendarSpread,
+        calibration.validateButterflySpread,
+      ]) {
+        assert.throws(() => validate(surface, config, forwards));
+      }
+    }
+    assert.throws(
+      () => calibration.validateSurface(surface, { ...config, max_volatility: 0.1 }, [100, 110]),
+      validation
+    );
+  }
+});
+
+test('calendar acceptance uses forward moneyness and the configured tolerance', () => {
+  const surface = new core.VolSurface('MONEYNESS', [1, 2], [100, 200], [0.4, 0.1, 0.3, 0.2]);
+  calibration.validateCalendarSpread(surface, GOLDEN.validation_config, [100, 100]);
+  assert.throws(
+    () => calibration.validateCalendarSpread(surface, GOLDEN.validation_config, [100, 200]),
+    validation
+  );
+  calibration.validateCalendarSpread(
+    surface,
+    { ...GOLDEN.validation_config, tolerance: 0.09 },
+    [100, 200]
+  );
 });

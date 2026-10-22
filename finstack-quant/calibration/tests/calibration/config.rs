@@ -152,7 +152,7 @@ fn rate_bounds_reject_non_finite_endpoints() {
 #[test]
 fn validation_config_rejects_non_finite_thresholds() {
     type SetThreshold = fn(&mut ValidationConfig, f64);
-    let thresholds: [(&str, SetThreshold); 11] = [
+    let thresholds: [(&str, SetThreshold); 9] = [
         ("min_forward_rate", |config, value| {
             config.min_forward_rate = value
         }),
@@ -177,12 +177,6 @@ fn validation_config_rejects_non_finite_thresholds() {
         }),
         ("max_volatility", |config, value| {
             config.max_volatility = value
-        }),
-        ("butterfly_upper_ratio", |config, value| {
-            config.butterfly_upper_ratio = value
-        }),
-        ("butterfly_lower_ratio", |config, value| {
-            config.butterfly_lower_ratio = value
         }),
     ];
     for (label, set) in thresholds {

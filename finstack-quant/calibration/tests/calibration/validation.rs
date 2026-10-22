@@ -2,8 +2,8 @@
 //!
 use finstack_quant_calibration::validation::ValidationConfig;
 use finstack_quant_calibration::validation::{
-    validate_butterfly_call_convexity, validate_butterfly_spread, validate_calendar_spread,
-    validate_surface, validate_vol_bounds, CurveValidator,
+    validate_butterfly_spread, validate_calendar_spread, validate_surface, validate_vol_bounds,
+    CurveValidator,
 };
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::interp::InterpStyle;
@@ -345,18 +345,18 @@ fn test_butterfly_arbitrage_detected_and_fails() {
     .expect("should build vol surface for testing");
 
     let strict_config = ValidationConfig::default();
-    let result = validate_butterfly_spread(&surface, &strict_config);
+    let result = validate_butterfly_spread(&surface, &strict_config, &[100.0; 3]);
     assert!(result.is_err());
 
     let err_msg = result.expect_err("Expected validation error").to_string();
     assert!(err_msg.contains("Butterfly") || err_msg.contains("butterfly"));
 
-    let lenient_config = ValidationConfig {
-        lenient_arbitrage: true,
+    let disabled_config = ValidationConfig {
+        check_arbitrage: false,
         ..Default::default()
     };
-    let lenient_result = validate_butterfly_spread(&surface, &lenient_config);
-    assert!(lenient_result.is_ok());
+    let disabled_result = validate_butterfly_spread(&surface, &disabled_config, &[100.0; 3]);
+    assert!(disabled_result.is_ok());
 }
 
 #[test]
@@ -383,17 +383,16 @@ fn test_call_convexity_rejects_vertical_spread_above_strike_width() {
             None,
         )
         .expect("surface should build");
-        let error =
-            validate_butterfly_call_convexity(&surface, &ValidationConfig::default(), &[100.0])
-                .expect_err("call spread must not cost more than its maximum payoff");
+        let error = validate_butterfly_spread(&surface, &ValidationConfig::default(), &[100.0])
+            .expect_err("call spread must not cost more than its maximum payoff");
         assert!(error.to_string().contains("Vertical spread"));
         assert!(error.to_string().contains("strike width"));
 
-        let lenient_config = ValidationConfig {
-            lenient_arbitrage: true,
+        let disabled_config = ValidationConfig {
+            check_arbitrage: false,
             ..Default::default()
         };
-        assert!(validate_butterfly_call_convexity(&surface, &lenient_config, &[100.0]).is_ok());
+        assert!(validate_butterfly_spread(&surface, &disabled_config, &[100.0]).is_ok());
     }
 }
 
@@ -410,7 +409,7 @@ fn test_call_convexity_checks_two_strike_monotonicity() {
         None,
     )
     .expect("surface should build");
-    let error = validate_butterfly_call_convexity(&surface, &ValidationConfig::default(), &[100.0])
+    let error = validate_butterfly_spread(&surface, &ValidationConfig::default(), &[100.0])
         .expect_err("higher-strike call must not cost more than lower-strike call");
     assert!(error.to_string().contains("Vertical spread"));
 }
@@ -431,12 +430,9 @@ fn test_call_convexity_accepts_valid_two_strike_spreads() {
             None,
         )
         .expect("surface should build");
-        assert!(validate_butterfly_call_convexity(
-            &surface,
-            &ValidationConfig::default(),
-            &[100.0]
-        )
-        .is_ok());
+        assert!(
+            validate_butterfly_spread(&surface, &ValidationConfig::default(), &[100.0]).is_ok()
+        );
     }
 }
 
@@ -453,7 +449,7 @@ fn test_call_convexity_still_rejects_butterfly_with_valid_vertical_spreads() {
         None,
     )
     .expect("surface should build");
-    let error = validate_butterfly_call_convexity(&surface, &ValidationConfig::default(), &[100.0])
+    let error = validate_butterfly_spread(&surface, &ValidationConfig::default(), &[100.0])
         .expect_err("a middle call above its neighbors' chord violates convexity");
     let message = error.to_string();
     assert!(message.contains("Butterfly"));
@@ -484,18 +480,18 @@ fn test_calendar_arbitrage_detected_and_fails() {
     .expect("should build vol surface for testing");
 
     let strict_config = ValidationConfig::default();
-    let result = validate_calendar_spread(&surface, &strict_config);
+    let result = validate_calendar_spread(&surface, &strict_config, &[100.0; 3]);
     assert!(result.is_err());
 
     let err_msg = result.expect_err("Expected validation error").to_string();
     assert!(err_msg.contains("Calendar") || err_msg.contains("calendar"));
 
-    let lenient_config = ValidationConfig {
-        lenient_arbitrage: true,
+    let disabled_config = ValidationConfig {
+        check_arbitrage: false,
         ..Default::default()
     };
-    let lenient_result = validate_calendar_spread(&surface, &lenient_config);
-    assert!(lenient_result.is_ok());
+    let disabled_result = validate_calendar_spread(&surface, &disabled_config, &[100.0; 3]);
+    assert!(disabled_result.is_ok());
 }
 
 #[test]
@@ -522,10 +518,10 @@ fn test_valid_surface_passes_arbitrage_checks() {
     .expect("should build valid vol surface");
 
     let config = ValidationConfig::default();
-    assert!(validate_calendar_spread(&surface, &config).is_ok());
-    assert!(validate_butterfly_spread(&surface, &config).is_ok());
+    assert!(validate_calendar_spread(&surface, &config, &[100.0; 3]).is_ok());
+    assert!(validate_butterfly_spread(&surface, &config, &[100.0; 3]).is_ok());
     assert!(validate_vol_bounds(&surface, &config).is_ok());
-    assert!(validate_surface(&surface, &config).is_ok());
+    assert!(validate_surface(&surface, &config, &[100.0; 3]).is_ok());
 }
 
 #[test]
@@ -591,4 +587,102 @@ fn test_inflation_curve_hyperinflation_rejected() {
         .validate_monotonicity(&config)
         .expect_err("hyperinflation should be rejected");
     assert!(err.to_string().contains("Hyperinflation"));
+}
+
+#[test]
+fn surface_validators_require_valid_forwards_even_when_disabled() {
+    use finstack_quant_core::market_data::surfaces::VolSurface;
+    let surface = VolSurface::from_grid(
+        "INPUTS",
+        &[1.0, 2.0],
+        &[90.0, 100.0],
+        &[0.2; 4],
+        Default::default(),
+        None,
+    )
+    .expect("surface");
+    for enabled in [true, false] {
+        let config = ValidationConfig {
+            check_arbitrage: enabled,
+            ..Default::default()
+        };
+        for forwards in [
+            vec![],
+            vec![100.0],
+            vec![100.0, 0.0],
+            vec![100.0, -1.0],
+            vec![100.0, f64::NAN],
+            vec![100.0, f64::INFINITY],
+        ] {
+            assert!(validate_surface(&surface, &config, &forwards).is_err());
+            assert!(validate_calendar_spread(&surface, &config, &forwards).is_err());
+            assert!(validate_butterfly_spread(&surface, &config, &forwards).is_err());
+        }
+        let bounded = ValidationConfig {
+            max_volatility: 0.1,
+            ..config
+        };
+        let err = validate_surface(&surface, &bounded, &[100.0, 110.0])
+            .expect_err("bounds remain active");
+        assert!(err.to_string().contains("volatility"));
+    }
+}
+
+#[test]
+fn calendar_checks_fixed_forward_moneyness_and_respects_tolerance() {
+    use finstack_quant_core::market_data::surfaces::VolSurface;
+    // Absolute-strike variances increase, but K=200 at T=2 maps to K=100 at T=1.
+    let surface = VolSurface::from_grid(
+        "FORWARD-MONEYNESS",
+        &[1.0, 2.0],
+        &[100.0, 200.0],
+        &[0.4, 0.1, 0.3, 0.2],
+        Default::default(),
+        None,
+    )
+    .expect("surface");
+    assert!(
+        validate_calendar_spread(&surface, &ValidationConfig::default(), &[100.0, 100.0]).is_ok()
+    );
+    let error = validate_calendar_spread(&surface, &ValidationConfig::default(), &[100.0, 200.0])
+        .expect_err("fixed moneyness violation");
+    assert!(error.to_string().contains("fixed forward-moneyness"));
+    let config = ValidationConfig {
+        tolerance: 0.09,
+        ..Default::default()
+    };
+    assert!(validate_calendar_spread(&surface, &config, &[100.0, 200.0]).is_ok());
+}
+
+#[test]
+fn surface_evaluation_failure_is_an_error() {
+    use finstack_quant_core::market_data::surfaces::VolSurface;
+    let surface = VolSurface::from_grid(
+        "OVERFLOW",
+        &[1.0, 2.0],
+        &[90.0, 100.0],
+        &[1e200; 4],
+        Default::default(),
+        None,
+    )
+    .expect("finite input surface");
+    let error = validate_surface(&surface, &ValidationConfig::default(), &[100.0, 110.0])
+        .expect_err("nonfinite total variance must fail");
+    assert!(error.to_string().contains("evaluate finite"), "{error}");
+}
+
+#[test]
+fn surface_validation_preserves_zero_expiry_nodes() {
+    use finstack_quant_core::market_data::surfaces::VolSurface;
+    let surface = VolSurface::from_grid(
+        "EXPIRING",
+        &[0.0, 1.0],
+        &[90.0, 100.0],
+        &[0.2; 4],
+        Default::default(),
+        None,
+    )
+    .expect("zero-expiry surface");
+    validate_surface(&surface, &ValidationConfig::default(), &[100.0, 105.0])
+        .expect("zero expiry has zero variance and intrinsic calls");
 }

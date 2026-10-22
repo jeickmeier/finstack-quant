@@ -1,58 +1,12 @@
-//! Volatility-surface validators.
+//! Forward-aware volatility-surface acceptance checks.
 //!
-//! Prefer the forward-aware validators when per-expiry forwards are available.
-//! The forward-free variants remain as heuristics for callers without them.
+//! Input and evaluation errors propagate directly. Only collected acceptance
+//! violations may be handled by a calibration report's Warn/Error policy.
 
 use crate::validation::ValidationConfig;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::closed_form::black_call;
-
-/// Validate all volatility-surface constraints.
-///
-/// Forward-free variant. Prefer
-/// [`validate_surface_with_forwards`] when per-expiry forwards are available.
-///
-/// # Arguments
-///
-/// * `surface` - Volatility surface whose expiry/strike grid and quoted
-///   annualized volatilities are checked.
-/// * `config` - Validation tolerances, volatility cap, and strict-versus-
-///   lenient arbitrage policy.
-pub fn validate_surface(surface: &VolSurface, config: &ValidationConfig) -> Result<()> {
-    validate_calendar_spread(surface, config)?;
-    validate_butterfly_spread(surface, config)?;
-    validate_vol_bounds(surface, config)?;
-    Ok(())
-}
-
-/// Validate all volatility-surface constraints using per-expiry forwards.
-///
-/// Checks calendar monotonicity at fixed forward log-moneyness, call-price
-/// convexity in strike, and volatility bounds.
-///
-/// # Arguments
-///
-/// * `surface` - Volatility surface whose expiry/strike grid is checked.
-/// * `config` - Validation tolerances and strict-versus-lenient policy.
-/// * `forwards` - Forward level `F(T_i)` for each expiry on the surface's
-///   grid, in the same order as `surface.expiries()`. All must be positive.
-///
-/// # Errors
-///
-/// Returns an error on the first violated constraint (in strict mode), or if
-/// `forwards` is malformed.
-pub fn validate_surface_with_forwards(
-    surface: &VolSurface,
-    config: &ValidationConfig,
-    forwards: &[f64],
-) -> Result<()> {
-    validate_forwards_input(surface, forwards)?;
-    validate_calendar_spread_with_forwards(surface, config, forwards)?;
-    validate_butterfly_call_convexity(surface, config, forwards)?;
-    validate_vol_bounds(surface, config)?;
-    Ok(())
-}
 
 /// Check that the `forwards` slice matches the surface's expiry grid.
 fn validate_forwards_input(surface: &VolSurface, forwards: &[f64]) -> Result<()> {
@@ -75,33 +29,19 @@ fn validate_forwards_input(surface: &VolSurface, forwards: &[f64]) -> Result<()>
     Ok(())
 }
 
-/// Validate calendar monotonicity of total variance at fixed forward
-/// log-moneyness, skipping probes outside the quoted strike range.
-///
-/// # Arguments
-///
-/// * `surface` - Volatility surface under test.
-/// * `config` - Arbitrage-check toggle, tolerance, and strict/lenient policy.
-/// * `forwards` - `F(T_i)` per expiry, aligned with `surface.expiries()`.
-///
-/// # Errors
-///
-/// In strict mode (`lenient_arbitrage = false`), returns an error listing the
-/// violating `(k, T)` points. Lenient mode logs warnings and returns `Ok`.
-pub fn validate_calendar_spread_with_forwards(
+fn calendar_violations(
     surface: &VolSurface,
     config: &ValidationConfig,
     forwards: &[f64],
-) -> Result<()> {
+) -> Result<Vec<String>> {
     if !config.check_arbitrage {
-        return Ok(());
+        return Ok(Vec::new());
     }
-    validate_forwards_input(surface, forwards)?;
 
     let strikes = surface.strikes();
     let expiries = surface.expiries();
     let (Some(&k_min), Some(&k_max)) = (strikes.first(), strikes.last()) else {
-        return Ok(());
+        return Ok(Vec::new());
     };
 
     let mut violations: Vec<(f64, f64, f64, f64, f64)> = Vec::new();
@@ -112,69 +52,44 @@ pub fn validate_calendar_spread_with_forwards(
         for &strike in strikes {
             let k = (strike / f2).ln();
             let strike_prev = f1 * k.exp();
+            ensure_finite(&[k, strike_prev], "forward moneyness")?;
             if strike_prev < k_min || strike_prev > k_max {
                 continue;
             }
             let v1 = finstack_quant_models::volatility::get_surface_vol(surface, t1, strike_prev)?;
             let v2 = finstack_quant_models::volatility::get_surface_vol(surface, t2, strike)?;
+            ensure_finite(&[k, strike_prev, v1, v2], "calendar probe")?;
             let w1 = v1 * v1 * t1;
             let w2 = v2 * v2 * t2;
+            ensure_finite(&[w1, w2], "total variance")?;
             if w2 < w1 - config.tolerance {
                 violations.push((k, t1, t2, w1, w2));
-                if config.lenient_arbitrage {
-                    tracing::warn!(
-                        "Calendar spread arbitrage at fixed forward-moneyness k={:.4}: \
-                         w({:.4}y)={:.6} > w({:.4}y)={:.6} in {}",
-                        k,
-                        t1,
-                        w1,
-                        t2,
-                        w2,
-                        surface.id().as_str()
-                    );
-                }
             }
         }
     }
 
-    strict_arbitrage_result(
+    Ok(describe_violations(
         surface,
-        config,
         &violations,
         "Calendar spread arbitrage (fixed forward-moneyness)",
         "Total variance must be non-decreasing in expiry at fixed k = ln(K/F_T).",
         |(k, t1, t2, w1, w2)| format!("k={k:.4}: w({t1:.4}y)={w1:.6} > w({t2:.4}y)={w2:.6}"),
-    )
+    ))
 }
 
-/// Validate that undiscounted call prices are convex in strike and that every
-/// adjacent vertical spread costs between zero and its strike width.
-///
-/// # Arguments
-///
-/// * `surface` - Volatility surface under test.
-/// * `config` - Arbitrage-check toggle, tolerance, and strict/lenient policy.
-///   `config.tolerance` is applied *relative to the forward* (prices scale
-///   with `F`).
-/// * `forwards` - `F(T_i)` per expiry, aligned with `surface.expiries()`.
-///
-/// # Errors
-///
-/// In strict mode, returns an error listing the violating `(K, T)` points.
-pub fn validate_butterfly_call_convexity(
+fn butterfly_violations(
     surface: &VolSurface,
     config: &ValidationConfig,
     forwards: &[f64],
-) -> Result<()> {
+) -> Result<Vec<String>> {
     if !config.check_arbitrage {
-        return Ok(());
+        return Ok(Vec::new());
     }
-    validate_forwards_input(surface, forwards)?;
 
     let strikes = surface.strikes();
     let expiries = surface.expiries();
     if strikes.len() < 2 {
-        return Ok(());
+        return Ok(Vec::new());
     }
 
     let mut violations: Vec<String> = Vec::new();
@@ -194,6 +109,9 @@ pub fn validate_butterfly_call_convexity(
             })
             .collect::<Result<_>>()?;
 
+        ensure_finite(&calls, "Black call prices")?;
+        ensure_finite(&[price_tol], "call-price tolerance")?;
+
         for (strike_pair, call_pair) in strikes.windows(2).zip(calls.windows(2)) {
             let strike_width = strike_pair[1] - strike_pair[0];
             let spread = call_pair[0] - call_pair[1];
@@ -203,9 +121,6 @@ pub fn validate_butterfly_call_convexity(
                      expected a value in [0, strike width {strike_width:.6e}]",
                     strike_pair[0], strike_pair[1]
                 );
-                if config.lenient_arbitrage {
-                    tracing::warn!("{} in {}", detail, surface.id().as_str());
-                }
                 violations.push(detail);
             }
         }
@@ -223,178 +138,17 @@ pub fn validate_butterfly_call_convexity(
                     "Butterfly at T={expiry:.4}y, K={k2:.4} \
                      (call={c2:.6e} > chord={c_interp:.6e})"
                 ));
-                if config.lenient_arbitrage {
-                    tracing::warn!(
-                        "Butterfly arbitrage (negative density) at T={:.4}, K={:.4} in {}: \
-                         call={:.6e} above chord={:.6e}",
-                        expiry,
-                        k2,
-                        surface.id().as_str(),
-                        c2,
-                        c_interp
-                    );
-                }
             }
         }
     }
 
-    strict_arbitrage_result(
+    Ok(describe_violations(
         surface,
-        config,
         &violations,
         "Call-spread arbitrage",
         "Undiscounted call prices must be convex in strike, and adjacent vertical spreads must cost between zero and their strike width.",
         String::clone,
-    )
-}
-
-/// Validate calendar monotonicity at fixed absolute strike.
-///
-/// Prefer [`validate_calendar_spread_with_forwards`] when forwards vary by
-/// expiry.
-///
-/// # Arguments
-///
-/// * `surface` - Volatility surface tested along every strike across increasing
-///   expiry nodes.
-/// * `config` - Arbitrage-check toggle, numerical tolerance, and policy that
-///   turns violations into errors or warnings.
-pub fn validate_calendar_spread(surface: &VolSurface, config: &ValidationConfig) -> Result<()> {
-    if !config.check_arbitrage {
-        return Ok(());
-    }
-
-    // Total variance (σ²T) must be monotonically increasing with time to prevent calendar arbitrage.
-    // This is a fundamental no-arbitrage condition: longer-dated options must have at least
-    // as much total variance as shorter-dated options at the same strike.
-    let strikes = surface.strikes();
-    let expiries = surface.expiries();
-    let mut violations: Vec<(f64, f64, f64, f64)> = Vec::new(); // (strike, expiry, actual, expected)
-
-    for strike in strikes {
-        let mut prev_total_var = 0.0;
-        let mut prev_expiry = 0.0_f64;
-
-        for &expiry in expiries {
-            let vol = finstack_quant_models::volatility::get_surface_vol(surface, expiry, *strike)?;
-            let total_var = vol * vol * expiry; // σ²T
-
-            // Check monotonicity of total variance
-            if total_var < prev_total_var - config.tolerance {
-                violations.push((*strike, expiry, total_var, prev_total_var));
-
-                if config.lenient_arbitrage {
-                    tracing::warn!(
-                            "Calendar spread arbitrage detected: total variance {:.6} < {:.6} at K={}, T={:.4} (prev T={:.4}) in {}. \
-                            Consider using SVI or monotone convex fitting for arbitrage-free surfaces.",
-                            total_var,
-                            prev_total_var,
-                            strike,
-                            expiry,
-                            prev_expiry,
-                            surface.id().as_str()
-                        );
-                }
-            }
-
-            prev_total_var = total_var;
-            prev_expiry = expiry;
-        }
-    }
-
-    strict_arbitrage_result(
-        surface,
-        config,
-        &violations,
-        "Calendar spread arbitrage detected",
-        "Total variance must be monotonically increasing in expiry. Consider using SVI or monotone convex fitting for arbitrage-free surfaces.",
-        |(k, t, actual, expected)| format!("K={k:.2}, T={t:.4}y (var={actual:.6} < {expected:.6})"),
-    )
-}
-
-/// Apply a forward-free convexity-band heuristic to total variance.
-///
-/// Prefer [`validate_butterfly_call_convexity`] when per-expiry forwards are
-/// available.
-///
-/// # Arguments
-///
-/// * `surface` - Volatility surface tested along every expiry across ordered
-///   strike nodes.
-/// * `config` - Arbitrage-check toggle and allowed convexity-ratio band used
-///   to classify butterfly violations.
-pub fn validate_butterfly_spread(surface: &VolSurface, config: &ValidationConfig) -> Result<()> {
-    if !config.check_arbitrage {
-        return Ok(());
-    }
-
-    // Check convexity of total variance in strike dimension.
-    // Proper butterfly arbitrage check requires that total variance (σ²T) is convex in strike,
-    // which prevents risk-free arbitrage via butterfly spreads.
-    let strikes = surface.strikes();
-    let expiries = surface.expiries();
-
-    if strikes.len() < 3 {
-        return Ok(()); // Need at least 3 strikes to check
-    }
-
-    let mut violations: Vec<(f64, f64, f64, f64, f64)> = Vec::new(); // (expiry, strike, actual, interp, ratio)
-
-    for &expiry in expiries {
-        for i in 1..strikes.len() - 1 {
-            let k1 = strikes[i - 1];
-            let k2 = strikes[i];
-            let k3 = strikes[i + 1];
-
-            let v1 = finstack_quant_models::volatility::get_surface_vol(surface, expiry, k1)?;
-            let v2 = finstack_quant_models::volatility::get_surface_vol(surface, expiry, k2)?;
-            let v3 = finstack_quant_models::volatility::get_surface_vol(surface, expiry, k3)?;
-
-            // Convert to total variance for proper arbitrage check
-            let w1 = v1 * v1 * expiry;
-            let w2 = v2 * v2 * expiry;
-            let w3 = v3 * v3 * expiry;
-
-            // Check convexity of total variance: w2 should be ≤ linear interpolation
-            let weight = (k2 - k1) / (k3 - k1);
-            let w2_interpolated = w1 + weight * (w3 - w1);
-
-            let ratio = if w2_interpolated.abs() > 1e-12 {
-                w2 / w2_interpolated
-            } else {
-                1.0
-            };
-
-            if w2 > w2_interpolated * config.butterfly_upper_ratio
-                || w2 < w2_interpolated * config.butterfly_lower_ratio
-            {
-                violations.push((expiry, k2, w2, w2_interpolated, ratio));
-
-                if config.lenient_arbitrage {
-                    tracing::warn!(
-                        "Potential butterfly arbitrage at T={:.2}, K={:.2} in {}: \
-                            total_var={:.6} vs interpolated={:.6} (ratio {:.2}). \
-                            Consider SVI or monotone convex fitting.",
-                        expiry,
-                        k2,
-                        surface.id().as_str(),
-                        w2,
-                        w2_interpolated,
-                        ratio
-                    );
-                }
-            }
-        }
-    }
-
-    strict_arbitrage_result(
-        surface,
-        config,
-        &violations,
-        "Butterfly spread arbitrage detected",
-        "Total variance must be convex in strike. Consider using SVI or monotone convex fitting for arbitrage-free surfaces.",
-        |(t, k, actual, interp, ratio)| format!("T={t:.2}y, K={k:.2} (var={actual:.6} vs interp={interp:.6}, ratio={ratio:.2})"),
-    )
+    ))
 }
 
 /// Validate volatility bounds.
@@ -406,66 +160,189 @@ pub fn validate_butterfly_spread(surface: &VolSurface, config: &ValidationConfig
 /// * `surface` - Volatility surface whose annualized values are inspected.
 /// * `config` - Validation configuration supplying the maximum permissible
 ///   annualized volatility and other surface policy controls.
-pub fn validate_vol_bounds(surface: &VolSurface, config: &ValidationConfig) -> Result<()> {
+fn bounds_violations(surface: &VolSurface, config: &ValidationConfig) -> Result<Vec<String>> {
     let strikes = surface.strikes();
     let expiries = surface.expiries();
+    let mut violations = Vec::new();
 
     for &expiry in expiries {
         for strike in strikes {
             let vol = finstack_quant_models::volatility::get_surface_vol(surface, expiry, *strike)?;
 
+            ensure_finite(&[vol], "surface volatility")?;
+
             // Volatility should be positive
             if vol <= 0.0 {
-                return Err(Error::Validation(format!(
+                violations.push(format!(
                     "Non-positive volatility {:.2}% at T={}, K={} in {}",
                     vol * 100.0,
                     expiry,
                     strike,
                     surface.id().as_str()
-                )));
+                ));
             }
 
             // Cap at reasonable maximum (500% vol)
             if vol > config.max_volatility {
-                return Err(Error::Validation(format!(
+                violations.push(format!(
                     "Unreasonably high volatility {:.2}% at T={}, K={} in {} (limit: {:.2}%)",
                     vol * 100.0,
                     expiry,
                     strike,
                     surface.id().as_str(),
                     config.max_volatility * 100.0
-                )));
+                ));
             }
         }
     }
 
+    Ok(violations)
+}
+
+/// Validate forward-moneyness calendars, call spreads, and volatility bounds.
+///
+/// # Arguments
+///
+/// * `surface` - Implied annualized decimal volatilities on expiry-year and absolute-strike grids.
+/// * `config` - Positive comparison tolerance and volatility cap; `check_arbitrage=false`
+///   skips calendar and call-spread checks but retains input checks and volatility bounds.
+/// * `forwards` - One positive finite forward per expiry, in expiry order and strike units.
+///
+/// # Errors
+///
+/// Returns an error for malformed inputs, failed evaluation, or any acceptance violation.
+pub fn validate_surface(
+    surface: &VolSurface,
+    config: &ValidationConfig,
+    forwards: &[f64],
+) -> Result<()> {
+    violations_result(surface_violations(surface, config, forwards)?)
+}
+
+/// Validate nondecreasing total variance at fixed forward log-moneyness.
+///
+/// Probes outside the common quoted strike range are skipped.
+///
+/// # Arguments
+///
+/// * `surface` - Annualized decimal volatilities on expiry-year and absolute-strike grids.
+/// * `config` - Comparison tolerance in total-variance units; `check_arbitrage=false` skips this check.
+/// * `forwards` - One positive finite forward per expiry, in expiry order and strike units;
+///   required even when arbitrage checks are disabled.
+///
+/// # Errors
+///
+/// Returns an error for malformed inputs, failed evaluation, or decreasing total variance.
+pub fn validate_calendar_spread(
+    surface: &VolSurface,
+    config: &ValidationConfig,
+    forwards: &[f64],
+) -> Result<()> {
+    validate_inputs(surface, config, forwards)?;
+    violations_result(calendar_violations(surface, config, forwards)?)
+}
+
+/// Validate convex undiscounted Black calls and vertical-spread payoff bounds.
+///
+/// # Arguments
+///
+/// * `surface` - Annualized decimal volatilities on expiry-year and absolute-strike grids.
+/// * `config` - Call-price tolerance `max(tolerance, 1e-12)` times the forward;
+///   `check_arbitrage=false` skips this check.
+/// * `forwards` - One positive finite forward per expiry, in expiry order and strike units;
+///   required even when arbitrage checks are disabled.
+///
+/// # Errors
+///
+/// Returns an error for malformed inputs, failed evaluation, nonconvex calls, or a vertical
+/// spread costing less than zero or more than its strike width, beyond tolerance.
+pub fn validate_butterfly_spread(
+    surface: &VolSurface,
+    config: &ValidationConfig,
+    forwards: &[f64],
+) -> Result<()> {
+    validate_inputs(surface, config, forwards)?;
+    violations_result(butterfly_violations(surface, config, forwards)?)
+}
+
+/// Validate positive volatility bounded by the configured maximum.
+///
+/// # Arguments
+///
+/// * `surface` - Surface whose annualized decimal volatility is checked at every grid node.
+/// * `config` - Maximum annualized decimal volatility; bounds apply regardless of `check_arbitrage`.
+///
+/// # Errors
+///
+/// Returns an error for malformed configuration, failed evaluation, or a volatility outside `(0, max_volatility]`.
+pub fn validate_vol_bounds(surface: &VolSurface, config: &ValidationConfig) -> Result<()> {
+    config.validate()?;
+    violations_result(bounds_violations(surface, config)?)
+}
+
+pub(crate) fn surface_violations(
+    surface: &VolSurface,
+    config: &ValidationConfig,
+    forwards: &[f64],
+) -> Result<Vec<String>> {
+    validate_inputs(surface, config, forwards)?;
+    let mut violations = calendar_violations(surface, config, forwards)?;
+    violations.extend(butterfly_violations(surface, config, forwards)?);
+    violations.extend(bounds_violations(surface, config)?);
+    Ok(violations)
+}
+
+pub(crate) fn violations_result(violations: Vec<String>) -> Result<()> {
+    if violations.is_empty() {
+        Ok(())
+    } else {
+        Err(Error::Validation(violations.join("; ")))
+    }
+}
+
+fn validate_inputs(
+    surface: &VolSurface,
+    config: &ValidationConfig,
+    forwards: &[f64],
+) -> Result<()> {
+    config.validate()?;
+    validate_forwards_input(surface, forwards)?;
+    if surface
+        .strikes()
+        .iter()
+        .any(|v| !v.is_finite() || *v <= 0.0)
+    {
+        return Err(Error::Validation(
+            "Surface validation requires positive finite strikes".to_string(),
+        ));
+    }
     Ok(())
 }
 
-/// Fail with up to five sampled violations unless lenient arbitrage checks are on.
-///
-/// The message is `"{kind} at {n} point(s) in {surface id}: [...]{more}. {rule}"`.
-fn strict_arbitrage_result<T>(
+fn ensure_finite(values: &[f64], calculation: &str) -> Result<()> {
+    if values.iter().any(|v| !v.is_finite()) {
+        return Err(Error::Validation(format!(
+            "Surface validation failed to evaluate finite {calculation}"
+        )));
+    }
+    Ok(())
+}
+
+fn describe_violations<T>(
     surface: &VolSurface,
-    config: &ValidationConfig,
     violations: &[T],
     kind: &str,
     rule: &str,
     describe: impl Fn(&T) -> String,
-) -> Result<()> {
-    if violations.is_empty() || config.lenient_arbitrage {
-        return Ok(());
+) -> Vec<String> {
+    if violations.is_empty() {
+        return Vec::new();
     }
-    let details: Vec<String> = violations.iter().take(5).map(describe).collect();
-    let suffix = if violations.len() > 5 {
-        format!(" (and {} more)", violations.len() - 5)
-    } else {
-        String::new()
-    };
-    Err(Error::Validation(format!(
-        "{kind} at {} point(s) in {}: [{}]{suffix}. {rule}",
+    let details: Vec<_> = violations.iter().take(5).map(describe).collect();
+    vec![format!(
+        "{kind} at {} point(s) in {}: [{}]. {rule}",
         violations.len(),
         surface.id().as_str(),
-        details.join("; "),
-    )))
+        details.join("; ")
+    )]
 }

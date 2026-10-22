@@ -228,13 +228,10 @@
       "rateQuoteFutures",
       "rateQuoteSwap",
       "schema",
-      "validateButterflyCallConvexity",
       "validateButterflySpread",
       "validateCalendarSpread",
-      "validateCalendarSpreadWithForwards",
       "validateCalibration",
       "validateSurface",
-      "validateSurfaceWithForwards",
       "validateVolBounds",
       "volQuoteCapFloorVol",
       "volQuoteOptionVol",
@@ -362,19 +359,10 @@
   "calibration.validateSurface": {
     "kind": "function"
   },
-  "calibration.validateSurfaceWithForwards": {
-    "kind": "function"
-  },
   "calibration.validateCalendarSpread": {
     "kind": "function"
   },
-  "calibration.validateCalendarSpreadWithForwards": {
-    "kind": "function"
-  },
   "calibration.validateButterflySpread": {
-    "kind": "function"
-  },
-  "calibration.validateButterflyCallConvexity": {
     "kind": "function"
   },
   "calibration.validateVolBounds": {

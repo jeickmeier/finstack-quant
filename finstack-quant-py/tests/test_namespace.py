@@ -501,13 +501,10 @@ class TestCalibrationNamespace:
             "dry_run",
             "hull_white",
             "schema",
-            "validate_butterfly_call_convexity",
             "validate_butterfly_spread",
             "validate_calendar_spread",
-            "validate_calendar_spread_with_forwards",
             "validate_calibration",
             "validate_surface",
-            "validate_surface_with_forwards",
             "validate_vol_bounds",
         }
         assert set(calibration.__all__) == expected

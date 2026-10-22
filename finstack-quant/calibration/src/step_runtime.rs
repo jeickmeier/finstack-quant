@@ -24,9 +24,8 @@ use crate::targets::svi;
 use crate::targets::swaption;
 use crate::targets::vol;
 use crate::targets::xccy_basis::XccyBasisTarget;
-use crate::validation::surfaces::validate_surface;
+use crate::validation::attach_validation_result;
 use crate::validation::CurveValidator;
-use crate::validation::ValidationMode;
 use crate::CalibrationReport;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
@@ -61,25 +60,6 @@ pub(crate) struct StepOutcome {
     pub output: StepOutput,
     pub credit_index_update: Option<(String, CreditIndexData)>,
     pub report: CalibrationReport,
-}
-
-fn attach_validation_result(
-    report: CalibrationReport,
-    validation: Result<()>,
-    global_config: &CalibrationConfig,
-) -> CalibrationReport {
-    match validation {
-        // A passing gate keeps any failure the target already recorded.
-        Ok(()) => report,
-        Err(err) => match global_config.validation_mode {
-            ValidationMode::Error => report.with_validation_result(false, Some(err.to_string())),
-            ValidationMode::Warn => {
-                let mut report = report;
-                report.update_metadata("validation_warning", err.to_string());
-                report
-            }
-        },
-    }
 }
 
 /// Gate a solved curve with its curve validator and wrap it as a step outcome.
@@ -391,11 +371,6 @@ fn execute_params(
                         global_config.explain.max_entries,
                     );
             }
-            let new_report = attach_validation_result(
-                new_report,
-                validate_surface(&surface, &global_config.validation),
-                global_config,
-            );
             Ok(StepOutcome {
                 output: StepOutput::Surface(surface.into()),
                 credit_index_update: None,
