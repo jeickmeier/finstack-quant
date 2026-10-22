@@ -134,12 +134,12 @@ scenario_enum!(
 /// Compounding convention for rate-extraction operations.
 ///
 /// Wraps the canonical core ``Compounding`` (the scenario wire form is
-/// ``"continuous"``, ``"simple"``, ``"annual"`` or ``{"periodic": n}``).
+/// ``"continuous"``, ``"simple"`` or ``{"periodic": n}``).
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.scenarios import Compounding
-/// >>> Compounding("annual") == Compounding.annual()
+/// >>> Compounding("periodic(1)").value == "periodic(1)"
 /// True
 #[pyclass(
     name = "Compounding",
@@ -176,14 +176,6 @@ impl PyCompounding {
     fn continuous(_cls: &Bound<'_, PyType>) -> Self {
         Self {
             inner: Compounding::Continuous,
-        }
-    }
-
-    /// Annual compounding.
-    #[classmethod]
-    fn annual(_cls: &Bound<'_, PyType>) -> Self {
-        Self {
-            inner: Compounding::Annual,
         }
     }
 

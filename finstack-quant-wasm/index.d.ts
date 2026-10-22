@@ -3085,7 +3085,7 @@ export interface DiscountCurve extends WasmOwned {
    * (Rust `DiscountCurve::zero_rate` / `DiscountCurve::zero_rate_on_date`).
    *
    * @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
-   * @param compounding - `"continuous"`, `"simple"`, `"annual"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
+   * @param compounding - `"continuous"`, `"simple"`, `"periodic(1)"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
    * @returns The zero rate as a decimal; `0` at `t = 0`.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for a malformed date, an unknown compounding, or a year fraction that cannot be computed.
    */
@@ -3163,7 +3163,7 @@ export interface DiscountCurveConstructor {
    * @param id - Curve identifier stored on the curve.
    * @param baseDate - ISO-8601 valuation date anchoring `t = 0`.
    * @param points - Flat `[t0, z0, t1, z1, …]` array: times in years and zero rates as decimals (`0.05` is 5%), with strictly increasing times.
-   * @param compounding - Compounding of the zero rates: `"continuous"`, `"simple"`, `"annual"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
+   * @param compounding - Compounding of the zero rates: `"continuous"`, `"simple"`, `"periodic(1)"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
    * @returns Curve whose discount factors reproduce every zero rate.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for an empty or odd-length `points`, a malformed date, an unknown compounding, or discount factors the curve validation rejects.
    */

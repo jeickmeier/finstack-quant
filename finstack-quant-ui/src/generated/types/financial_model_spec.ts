@@ -3955,7 +3955,6 @@ export interface D_65B0652Ed08913529246 {
    */
   oas_quote_compounding?:
     | "continuous"
-    | "annual"
     | {
         periodic: number;
       }

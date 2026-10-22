@@ -315,7 +315,7 @@ const CASES = {
   // --- market data ------------------------------------------------------------------
   discount_curve: () => JSON.parse(discount().toJson()),
   discount_curve_queries: () => [
-    discount().zeroRate(2.0, 'annual'),
+    discount().zeroRate(2.0, 'periodic(1)'),
     discount().zeroRate(2.0, 'semi_annual'),
     discount().zeroRate('2027-01-02', 'quarterly'),
     discount().df('2027-01-02'),

@@ -42,7 +42,7 @@ fn bench_periodic_to_continuous(c: &mut Criterion) {
     let mut group = c.benchmark_group("periodic_to_continuous");
 
     let conventions = [
-        ("annual", Compounding::Annual),
+        ("annual", Compounding::Periodic(std::num::NonZeroU32::MIN)),
         ("semiannual", Compounding::SEMI_ANNUAL),
         ("quarterly", Compounding::QUARTERLY),
         ("monthly", Compounding::MONTHLY),
@@ -63,7 +63,7 @@ fn bench_continuous_to_periodic(c: &mut Criterion) {
     let mut group = c.benchmark_group("continuous_to_periodic");
 
     let conventions = [
-        ("annual", Compounding::Annual),
+        ("annual", Compounding::Periodic(std::num::NonZeroU32::MIN)),
         ("semiannual", Compounding::SEMI_ANNUAL),
         ("quarterly", Compounding::QUARTERLY),
         ("monthly", Compounding::MONTHLY),
@@ -230,7 +230,7 @@ fn bench_market_scenarios(c: &mut Criterion) {
 
     // Corporate bond: annual to continuous (option pricing)
     bench_iter(&mut group, "corporate_to_continuous", || {
-        let continuous = Compounding::Annual.convert_rate(
+        let continuous = Compounding::Periodic(std::num::NonZeroU32::MIN).convert_rate(
             black_box(0.05),
             black_box(1.0),
             &Compounding::Continuous,

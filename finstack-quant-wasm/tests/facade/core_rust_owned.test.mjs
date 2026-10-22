@@ -253,7 +253,12 @@ test('tiny annual zero rates avoid subtractive cancellation', () => {
     knots: [0, 1, 1, df],
     interp: 'log_linear',
   });
-  assert.ok(Math.abs(curve.zeroRate(1, 'annual') - (1 - df) / df) < 1e-23);
+  assert.ok(Math.abs(curve.zeroRate(1, 'periodic(1)') - (1 - df) / df) < 1e-23);
+  assert.throws(
+    () => curve.zeroRate(1, 'annual'),
+    (error) => error.kind === 'validation' && /unknown compounding/.test(error.message)
+  );
+  curve.free();
 });
 
 test('plain-object constructor factories use Rust validation and defaults', () => {

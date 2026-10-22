@@ -2544,7 +2544,7 @@ renames = { values = { js = "features.timeSeriesOpValues", reason = "WASM TimeSe
 excluded = { carry_to_dataframe = "pandas", changes_to_dataframe = "pandas" }
 
 [parity.members."finstack_quant.scenarios.Compounding"]
-excluded = { annual = "literal", continuous = "literal", monthly = "literal", quarterly = "literal", semi_annual = "literal", simple = "literal" }
+excluded = { continuous = "literal", monthly = "literal", quarterly = "literal", semi_annual = "literal", simple = "literal" }
 
 [parity.members."finstack_quant.scenarios.CurveKind"]
 excluded = { commodity = "literal", discount = "literal", forward = "literal", inflation = "literal", par_cds = "literal" }

@@ -477,7 +477,10 @@ fn ytm_discount_convention(instrument: &dyn Instrument) -> (YieldCompounding, Te
     if let Some(bond) = instrument.as_any().downcast_ref::<Bond>() {
         (YieldCompounding::Street, bond.cashflow_spec.frequency())
     } else {
-        (YieldCompounding::Rate(Compounding::Annual), Tenor::annual())
+        (
+            YieldCompounding::Rate(Compounding::Periodic(std::num::NonZeroU32::MIN)),
+            Tenor::annual(),
+        )
     }
 }
 

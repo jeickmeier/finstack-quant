@@ -240,7 +240,7 @@ fn invalid_rate_conversion_reports_failure_without_mutating_forecasts() {
     // case has a valid quarterly factor but overflows the annual output rate.
     for (simple_rate, compounding) in [
         (-5.0, Compounding::Continuous),
-        (1e100, Compounding::Annual),
+        (1e100, Compounding::Periodic(std::num::NonZeroU32::MIN)),
     ] {
         let forward = ForwardCurve::builder("FWD", 0.25)
             .base_date(as_of)
