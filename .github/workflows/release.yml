@@ -1,21 +1,26 @@
 name: Release
 
-# Pushing a vX.Y.Z tag cuts a numbered release:
+# Pushing a vX.Y.Z tag cuts a numbered release; pushing vX.Y.Z-rc.N cuts a
+# release candidate for QA/UAT:
 #
-#   1. Gates: the tag matches the version metadata, the nightly check set
-#      (nightly.yml), documentation and every doc example, the slow Rust and
-#      Python suites, crate publish checks, and semver against the previous
-#      release tag.
-#   2. Artifacts, only after every gate passes: wheels, sdist, WASM packages.
+#   1. Gates: the tag matches the version metadata, the standard check set
+#      (checks.yml), every commit is on master (upstream first),
+#      documentation and every doc example, the slow Rust and Python suites,
+#      crate publish checks, and semver against the previous release tag.
+#   2. Artifacts, only after every gate passes: wheels, sdist, WASM packages
+#      (build-artifacts.yml), stamped with the tag's version.
 #   3. Publish, only after every artifact builds: a GitHub Release carrying the
-#      artifacts, with release_notes/RELEASE_NOTES_X.Y.Z.md as its body.
+#      artifacts. A release uses release_notes/RELEASE_NOTES_X.Y.Z.md and is
+#      marked latest; a candidate is a pre-release whose notes list the pull
+#      requests since the previous tag and the master commits it leaves out.
 #
 # A failed gate leaves the tag without a release. Fix forward, then delete and
-# re-push the tag (or push the next patch version).
+# re-push the tag (or push the next patch version or candidate).
 on:
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -36,38 +41,73 @@ jobs:
     name: Version metadata
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # The tag is the version: build-artifacts.yml and the semver job stamp it
+      # into the manifests, so a patch or candidate on release/X.Y needs no
+      # release-only version commit. The committed manifests must be on the
+      # tag's X.Y line, which catches a tag on the wrong branch (master carries
+      # the next minor version once release/X.Y is cut). The changelog section
+      # and release notes are required for the final release only.
       - name: Check the tag against the version metadata
+        id: check
         run: |
           version="${GITHUB_REF_NAME#v}"
+          base="${version%%-*}"
+          line="${base%.*}"
+          prerelease=false
+          [ "$version" != "$base" ] && prerelease=true
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
           cargo_version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"])')
           npm_version=$(node -p 'require("./finstack-quant-wasm/package.json").version')
           status=0
-          if [ "$cargo_version" != "$version" ]; then
-            echo "::error::Cargo.toml workspace version is $cargo_version, tag is $GITHUB_REF_NAME"
+          if [ "${cargo_version%.*}" != "$line" ]; then
+            echo "::error::Cargo.toml workspace version is $cargo_version, not on the $line line of $GITHUB_REF_NAME"
             status=1
           fi
-          if [ "$npm_version" != "$version" ]; then
-            echo "::error::finstack-quant-wasm/package.json version is $npm_version, tag is $GITHUB_REF_NAME"
+          if [ "${npm_version%.*}" != "$line" ]; then
+            echo "::error::finstack-quant-wasm/package.json version is $npm_version, not on the $line line of $GITHUB_REF_NAME"
             status=1
           fi
-          if ! grep -qF "## [$version]" CHANGELOG.md; then
-            echo "::error::CHANGELOG.md has no '## [$version]' section"
-            status=1
-          fi
-          if [ ! -f "release_notes/RELEASE_NOTES_$version.md" ]; then
-            echo "::error::release_notes/RELEASE_NOTES_$version.md is missing"
-            status=1
+          if [ "$prerelease" = false ]; then
+            if ! grep -qF "## [$version]" CHANGELOG.md; then
+              echo "::error::CHANGELOG.md has no '## [$version]' section"
+              status=1
+            fi
+            if [ ! -f "release_notes/RELEASE_NOTES_$version.md" ]; then
+              echo "::error::release_notes/RELEASE_NOTES_$version.md is missing"
+              status=1
+            fi
           fi
           exit "$status"
 
   checks:
-    name: Nightly checks
+    name: Checks
     needs: version
-    uses: ./.github/workflows/nightly.yml
+    uses: ./.github/workflows/checks.yml
+
+  # Upstream first: the tagged commit carries nothing master lacks. A tag on
+  # master passes trivially; a tag on release/X.Y passes when every commit
+  # since the branch point is a backport of a master change.
+  upstream:
+    name: Upstream check
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository (full history)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Require every commit to be on master
+        run: python3 scripts/check_release_upstream.py check origin/master "$GITHUB_SHA"
 
   # Release-only jobs build cold: nothing on master saves a cache for them, and
   # caches saved on a tag are visible only to that tag.
@@ -270,11 +310,18 @@ jobs:
           # rustup download cache is not concurrency-safe under parallel cargo:*.
           MISE_JOBS: "1"
 
+      # cargo semver-checks reads the bump kind from the manifest version, so
+      # check the version being released: the tag's X.Y.Z.
+      - name: Stamp the release version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          python3 scripts/stamp_version.py "${version%%-*}"
+
       # The baseline is the newest vX.Y.Z tag reachable from the tagged
-      # commit's parent, i.e. the previous release.
+      # commit's parent, i.e. the previous release; candidates are excluded.
       - name: Run semver checks against the previous release
         run: |
-          baseline=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' "${GITHUB_REF_NAME}^")
+          baseline=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' --exclude '*-*' "${GITHUB_REF_NAME}^")
           echo "Baseline: $baseline"
           cargo semver-checks check-release \
             -p finstack-quant-core \
@@ -282,169 +329,31 @@ jobs:
             -p finstack-quant-portfolio \
             --baseline-rev "$baseline"
 
-  # ── Python Wheels ───────────────────────────────────────────────
-  build-wheels:
-    name: Wheel / ${{ matrix.os }} / py${{ matrix.python }}
-    needs: [checks, docs, slow-rust, slow-python, publish-checks, semver]
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: ${{ matrix.timeout }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Native x86_64 keeps workspace fat LTO. Constrained arm64 jobs use
-          # thin LTO: linux-arm64 is a manylinux cross-link that OOMs with fat
-          # LTO (Release #142), and macos-14's 3-core runners spend 40+ minutes
-          # in rustc on finstack-quant-py and hit the job timeout (Release #143).
-          # ── Linux x86_64 ──
-          - { os: linux-x64,   runner: ubuntu-24.04,   target: x86_64,  python: "3.12", timeout: 60, lto: fat,  codegen_units: 1 }
-          - { os: linux-x64,   runner: ubuntu-24.04,   target: x86_64,  python: "3.13", timeout: 60, lto: fat,  codegen_units: 1 }
-          - { os: linux-x64,   runner: ubuntu-24.04,   target: x86_64,  python: "3.14", timeout: 60, lto: fat,  codegen_units: 1 }
-          # ── Linux arm64 ──
-          - { os: linux-arm64, runner: ubuntu-24.04,   target: aarch64, python: "3.12", timeout: 60, lto: thin, codegen_units: 16 }
-          - { os: linux-arm64, runner: ubuntu-24.04,   target: aarch64, python: "3.13", timeout: 60, lto: thin, codegen_units: 16 }
-          - { os: linux-arm64, runner: ubuntu-24.04,   target: aarch64, python: "3.14", timeout: 60, lto: thin, codegen_units: 16 }
-          # ── macOS arm64 (Apple Silicon) ──
-          - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.12", timeout: 90, lto: thin, codegen_units: 16 }
-          - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.13", timeout: 90, lto: thin, codegen_units: 16 }
-          - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.14", timeout: 90, lto: thin, codegen_units: 16 }
-          # ── Windows x86_64 (MSVC fat LTO — larger timeout) ──
-          # Release #155 cancelled py3.12 at the 90-minute cap while rustc was
-          # still compiling finstack-quant-py. py3.14 finished at 89 minutes.
-          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.12", timeout: 120, lto: fat,  codegen_units: 1 }
-          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.13", timeout: 120, lto: fat,  codegen_units: 1 }
-          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.14", timeout: 120, lto: fat,  codegen_units: 1 }
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set HOME for mise on Windows
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: '"HOME=$env:USERPROFILE" | Out-File -FilePath $env:GITHUB_ENV -Append'
-
-      - name: Provision toolchain (mise)
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
-        with:
-          cache: true
-          # Wheels only need the pinned stable compiler. A full `mise install`
-          # also compiles cargo-nextest, cargo-deny, cargo-public-api,
-          # cargo-llvm-cov, flamegraph, and maturin from source, and downloads
-          # nightly. On the Release #155 Windows cache miss that took 26
-          # minutes, then maturin-action installed its own maturin anyway.
-          install_args: rust@1.97.1
-        env:
-          # rustup download cache is not concurrency-safe under parallel cargo:*.
-          MISE_JOBS: "1"
-
-      - name: Set up matrix Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        with:
-          python-version: ${{ matrix.python }}
-
-      - name: Build wheel
-        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1
-        with:
-          target: ${{ matrix.target }}
-          args: >-
-            --release
-            --out dist
-            --interpreter python${{ matrix.python }}
-          manylinux: "2_28"
-          # Windows wheel builds have hit rustc-version skew from cached artifacts
-          # (E0514). linux-arm64 is a manylinux cross-compile of the PyO3 cdylib;
-          # sccache + workspace fat LTO OOMs rustc (exit 2, no diagnostic).
-          sccache: ${{ runner.os != 'Windows' && matrix.os != 'linux-arm64' }}
-        env:
-          # sccache refuses to wrap rustc when incremental compilation is enabled.
-          CARGO_INCREMENTAL: "0"
-          CARGO_PROFILE_RELEASE_LTO: ${{ matrix.lto }}
-          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ matrix.codegen_units }}
-
-      # Linux arm64 remains build-only until the project selects a native arm64 runner.
-      - name: Install built wheel
-        if: matrix.os != 'linux-arm64'
-        run: |
-          python -c "from pathlib import Path; import subprocess, sys; wheels = sorted(Path('dist').glob('finstack_quant_py-*.whl')); assert len(wheels) == 1, f'Expected exactly one wheel in dist/, found: {wheels}'; subprocess.run([sys.executable, '-m', 'pip', 'install', str(wheels[0])], check=True)"
-
-      - name: Smoke test installed wheel
-        if: matrix.os != 'linux-arm64'
-        run: python scripts/smoke_python_wheel.py
-
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: dist-wheel-${{ matrix.os }}-py${{ matrix.python }}
-          path: dist/*.whl
-
-  # ── Source Distribution ─────────────────────────────────────────
-  build-sdist:
-    name: Source dist
-    needs: [checks, docs, slow-rust, slow-python, publish-checks, semver]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1
-        with:
-          command: sdist
-          args: --out dist
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: dist-sdist
-          path: dist/*.tar.gz
-
-  # ── WASM / npm Package ─────────────────────────────────────────
-  build-wasm:
-    name: WASM / npm
-    needs: [checks, docs, slow-rust, slow-python, publish-checks, semver]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 50
-    env:
-      # `mise run` would otherwise install every tool in mise.toml, including
-      # the cargo CLIs that build from source; this job needs only the four below.
-      MISE_TASK_RUN_AUTO_INSTALL: "false"
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Provision toolchain (mise)
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
-        with:
-          cache: true
-          install_args: rust@1.97.1 node github:wasm-bindgen/wasm-pack github:wasm-bindgen/wasm-bindgen aqua:WebAssembly/binaryen
-        env:
-          # rustup download cache is not concurrency-safe under parallel cargo:*.
-          MISE_JOBS: "1"
-
-      # The size-optimized web package (release-size + wasm-opt) and the
-      # Node package, exactly as built locally.
-      - name: Build release WASM packages
-        run: mise run wasm-pkg
-
-      - name: Package npm tarball and per-target archives
-        run: |
-          mkdir -p dist
-          tar -czf dist/finstack-quant-wasm-web.tar.gz -C finstack-quant-wasm pkg
-          tar -czf dist/finstack-quant-wasm-nodejs.tar.gz -C finstack-quant-wasm pkg-node
-          (cd finstack-quant-wasm && npm pack --ignore-scripts --pack-destination ../dist)
-
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: dist-wasm
-          path: dist/*
+  # ── Artifacts ───────────────────────────────────────────────────
+  build:
+    name: Build
+    needs: [version, checks, upstream, docs, slow-rust, slow-python, publish-checks, semver]
+    uses: ./.github/workflows/build-artifacts.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
 
   # ── Publish ─────────────────────────────────────────────────────
   publish:
     name: Publish Release
-    needs: [build-wheels, build-sdist, build-wasm]
+    needs: [version, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: write
+    env:
+      PRERELEASE: ${{ needs.version.outputs.prerelease }}
     steps:
-      - name: Checkout repository
+      - name: Checkout repository (full history for the candidate notes)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
-      # `dist-*` only: the nightly checks also upload coverage artifacts.
+      # `dist-*` only: the checks also upload coverage artifacts.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: dist-*
@@ -454,9 +363,27 @@ jobs:
       - name: List release artifacts
         run: ls -lhR dist/
 
+      # A release uses its committed notes. A candidate's body lists the master
+      # commits it leaves out; GitHub appends the pull requests since the
+      # previous tag (generate_release_notes).
       - name: Resolve release notes
         id: notes
-        run: echo "path=release_notes/RELEASE_NOTES_${GITHUB_REF_NAME#v}.md" >> "$GITHUB_OUTPUT"
+        run: |
+          if [ "$PRERELEASE" = false ]; then
+            echo "path=release_notes/RELEASE_NOTES_${GITHUB_REF_NAME#v}.md" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          left_out=$(python3 scripts/check_release_upstream.py missing "$GITHUB_SHA")
+          {
+            echo "Release candidate for QA/UAT. Not for production use."
+            echo
+            echo "## Not in this candidate"
+            echo
+            echo "Changes on master since this release branch was cut that it does not carry:"
+            echo
+            echo "${left_out:-None: this candidate carries everything on master.}"
+          } > candidate-notes.md
+          echo "path=candidate-notes.md" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
@@ -464,8 +391,9 @@ jobs:
           name: ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
           body_path: ${{ steps.notes.outputs.path }}
+          generate_release_notes: ${{ env.PRERELEASE == 'true' }}
           files: dist/*
           fail_on_unmatched_files: true
           overwrite_files: true
-          prerelease: false
-          make_latest: true
+          prerelease: ${{ env.PRERELEASE == 'true' }}
+          make_latest: ${{ env.PRERELEASE == 'true' && 'false' || 'true' }}

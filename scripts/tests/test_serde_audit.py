@@ -501,9 +501,9 @@ def test_missing_maintained_one_way_reports_policy_capabilities(
 
 
 def test_ci_path_runs_audit_tests_and_check_mode() -> None:
-    """The nightly workflow reaches pytest and check mode through gen-check."""
+    """The CI check set reaches pytest and check mode through gen-check."""
     mise = (_REPOSITORY_ROOT / "mise.toml").read_text(encoding="utf-8")
-    nightly = (_REPOSITORY_ROOT / ".github" / "workflows" / "nightly.yml").read_text(encoding="utf-8")
+    checks = (_REPOSITORY_ROOT / ".github" / "workflows" / "checks.yml").read_text(encoding="utf-8")
 
     def task(name: str) -> str:
         return mise.split(f"[tasks.{name}]", 1)[1].split("[tasks.", 1)[0]
@@ -513,7 +513,7 @@ def test_ci_path_runs_audit_tests_and_check_mode() -> None:
     assert "python -m scripts.serde_audit --check" in serde_audit
     assert '"rust-check-serde-audit"' in task("rust-check-schemas")
     assert re.search(r"mise run [^\n]*\brust-check-schemas\b", task("gen-check"))
-    assert "mise run gen-check" in nightly
+    assert "mise run gen-check" in checks
 
 
 def test_documented_one_way_inventory_is_exact() -> None:
