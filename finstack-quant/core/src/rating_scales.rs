@@ -7,13 +7,18 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 /// Configuration extension key for replacing the embedded rating-scale registry.
+///
+/// This names the configuration slot; the document schema is independently
+/// validated as `finstack_quant.rating_scales/2`. Old documents in this slot
+/// are rejected instead of being ignored in favor of the embedded defaults.
 pub const RATING_SCALES_EXTENSION_KEY: &str = "core.rating_scales.v1";
 
-static EMBEDDED_REGISTRY: EmbeddedJsonRegistry<RatingScaleRegistry> = EmbeddedJsonRegistry::new(
-    include_str!("../data/rating_scales/rating_scales.v1.json"),
-    Some(RATING_SCALES_EXTENSION_KEY),
-    "rating-scale",
-);
+static EMBEDDED_REGISTRY: EmbeddedJsonRegistry<RatingScaleRegistry, RawRatingScaleRegistry> =
+    EmbeddedJsonRegistry::new(
+        include_str!("../data/rating_scales/rating_scales.v2.json"),
+        Some(RATING_SCALES_EXTENSION_KEY),
+        "rating-scale",
+    );
 
 /// Rating level for credit rating scales.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -205,28 +210,61 @@ impl std::str::FromStr for UnknownScalePolicy {
 
 /// Versioned registry of rating scales and scorecard defaults.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "RawRatingScaleRegistry")]
 pub struct RatingScaleRegistry {
     schema: String,
     scorecard_policy: ScorecardPolicy,
     rating_scales: Vec<RatingScaleEntry>,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawRatingScaleRegistry {
+    schema: String,
+    scorecard_policy: ScorecardPolicy,
+    rating_scales: Vec<RatingScaleEntry>,
+}
+
+impl TryFrom<RawRatingScaleRegistry> for RatingScaleRegistry {
+    type Error = Error;
+
+    fn try_from(raw: RawRatingScaleRegistry) -> Result<Self> {
+        let mut registry = Self {
+            schema: raw.schema,
+            scorecard_policy: raw.scorecard_policy,
+            rating_scales: raw.rating_scales,
+        };
+        registry.scorecard_policy.default_scale_id = registry
+            .scorecard_policy
+            .default_scale_id
+            .trim()
+            .to_ascii_lowercase();
+        for entry in &mut registry.rating_scales {
+            entry.id = entry.id.trim().to_ascii_lowercase();
+        }
+        registry.validate()?;
+        Ok(registry)
+    }
+}
+
 impl RatingScaleRegistry {
     /// Deserialize a registry from JSON and validate it.
     ///
-    /// Validation enforces the supported schema version, unique scale ids and
-    /// aliases, existence of the default scale, and in-range scores — the same
+    /// Validation enforces schema version 2, unique normalized scale ids,
+    /// existence of the default scale, and in-range scores — the same
     /// checks applied to the embedded and config-loaded registries.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Registry document with schema `finstack_quant.rating_scales/2`
+    ///   and one `id` per scale; identifiers are trimmed and ASCII-lowercased.
     ///
     /// # Errors
     /// Returns [`Error::Validation`] when the JSON cannot be parsed or the
     /// deserialized registry fails validation.
     pub fn from_json(json: &str) -> Result<Self> {
-        let registry: RatingScaleRegistry = serde_json::from_str(json).map_err(|err| {
-            Error::Validation(format!("invalid rating scale registry JSON: {err}"))
-        })?;
-        validate_registry(registry)
+        serde_json::from_str(json)
+            .map_err(|err| Error::Validation(format!("invalid rating scale registry JSON: {err}")))
     }
 
     /// Returns the configured default scorecard score for threshold gaps.
@@ -244,30 +282,27 @@ impl RatingScaleRegistry {
         self.scorecard_policy.unknown_scale_policy
     }
 
-    /// Primary (first) id of every registered scale, in registry order.
-    ///
-    /// Aliases are not included; resolve them through
-    /// [`rating_scale`](Self::rating_scale) or
-    /// [`is_known_rating_scale`](Self::is_known_rating_scale).
+    /// Canonical, normalized id of every registered scale, in registry order.
     pub fn scale_ids(&self) -> Vec<&str> {
         self.rating_scales
             .iter()
-            .map(|entry| first_id(&entry.ids))
+            .map(|entry| entry.id.as_str())
             .collect()
     }
 
-    /// Returns true when the provided name is a known scale id or alias.
+    /// Return whether a canonical scale id is known after trimming and ASCII case folding.
     ///
     /// # Arguments
     ///
-    /// * `name` - Human-readable name used for registry lookup or diagnostic messages
+    /// * `name` - Canonical scale id such as `sp` or `moodys`; surrounding whitespace and ASCII case are ignored.
     pub fn is_known_rating_scale(&self, name: &str) -> bool {
-        self.resolve_scale_id(name).is_some()
+        self.rating_scale_by_id(&name.trim().to_ascii_lowercase())
+            .is_some()
     }
 
-    /// Resolve a scorecard scale ID or alias under the configured unknown-name policy.
+    /// Resolve a canonical scale id under the configured unknown-name policy.
     ///
-    /// Exact scale IDs take precedence over aliases. An unknown name either
+    /// Surrounding whitespace and ASCII case are ignored. An unknown name either
     /// returns an error or resolves to `default_scale_id`, depending on
     /// [`UnknownScalePolicy`]. Call [`is_known_rating_scale`](Self::is_known_rating_scale)
     /// first when a caller must distinguish an explicit match from fallback.
@@ -280,46 +315,37 @@ impl RatingScaleRegistry {
     ///
     /// # Arguments
     ///
-    /// * `name` - Human-readable name used for registry lookup or diagnostic messages
+    /// * `name` - Canonical scale id such as `sp` or `moodys`; surrounding whitespace and ASCII case are ignored.
     pub fn rating_scale(&self, name: &str) -> Result<&ScorecardScale> {
-        let id = match self.resolve_scale_id(name) {
-            Some(id) => id,
-            None => match self.scorecard_policy.unknown_scale_policy {
-                UnknownScalePolicy::Error => return Err(not_found(name)),
-                UnknownScalePolicy::FallbackToDefault => self.default_scale_id(),
-                UnknownScalePolicy::WarnAndFallback => {
-                    tracing::warn!(
-                        scale = name,
-                        default_scale = self.default_scale_id(),
-                        "unknown scorecard rating scale; falling back to the default scale"
-                    );
-                    self.default_scale_id()
-                }
-            },
-        };
-        self.rating_scale_by_id(id).ok_or_else(|| not_found(name))
+        if let Some(scale) = self.rating_scale_by_id(&name.trim().to_ascii_lowercase()) {
+            return Ok(scale);
+        }
+        match self.scorecard_policy.unknown_scale_policy {
+            UnknownScalePolicy::Error => Err(not_found(name)),
+            UnknownScalePolicy::FallbackToDefault => self
+                .rating_scale_by_id(self.default_scale_id())
+                .ok_or_else(|| not_found(name)),
+            UnknownScalePolicy::WarnAndFallback => {
+                tracing::warn!(
+                    scale = name,
+                    default_scale = self.default_scale_id(),
+                    "unknown scorecard rating scale; falling back to the default scale"
+                );
+                self.rating_scale_by_id(self.default_scale_id())
+                    .ok_or_else(|| not_found(name))
+            }
+        }
     }
 
     fn rating_scale_by_id(&self, id: &str) -> Option<&ScorecardScale> {
         self.rating_scales
             .iter()
-            .find(|entry| has_id(&entry.ids, id))
+            .find(|entry| entry.id == id)
             .map(|entry| &entry.scale)
     }
 
-    fn resolve_scale_id<'a>(&'a self, name: &'a str) -> Option<&'a str> {
-        if self.rating_scale_by_id(name).is_some() {
-            return Some(name);
-        }
-        self.scorecard_policy
-            .aliases
-            .iter()
-            .find(|alias| alias.alias == name)
-            .map(|alias| alias.scale_id.as_str())
-    }
-
     fn validate(&self) -> Result<()> {
-        if self.schema != "finstack_quant.rating_scales/1" {
+        if self.schema != "finstack_quant.rating_scales/2" {
             return Err(Error::Validation(format!(
                 "unsupported rating scale registry schema version '{}'",
                 self.schema
@@ -329,7 +355,9 @@ impl RatingScaleRegistry {
         crate::validation::validate_unique_ids(
             "rating scale registry",
             "rating scale",
-            self.rating_scales.iter().map(|entry| entry.ids.as_slice()),
+            self.rating_scales
+                .iter()
+                .map(|entry| std::slice::from_ref(&entry.id)),
         )?;
         if self
             .rating_scale_by_id(&self.scorecard_policy.default_scale_id)
@@ -339,27 +367,6 @@ impl RatingScaleRegistry {
                 "rating scale registry default scale id '{}' does not exist",
                 self.scorecard_policy.default_scale_id
             )));
-        }
-
-        let mut aliases = BTreeSet::new();
-        for alias in &self.scorecard_policy.aliases {
-            if alias.alias.trim().is_empty() {
-                return Err(Error::Validation(
-                    "rating scale registry contains blank alias".to_string(),
-                ));
-            }
-            if !aliases.insert(alias.alias.clone()) {
-                return Err(Error::Validation(format!(
-                    "rating scale registry contains duplicate alias '{}'",
-                    alias.alias
-                )));
-            }
-            if self.rating_scale_by_id(&alias.scale_id).is_none() {
-                return Err(Error::Validation(format!(
-                    "rating scale alias '{}' targets unknown scale id '{}'",
-                    alias.alias, alias.scale_id
-                )));
-            }
         }
 
         // Each `ScorecardScale` was already validated when it was built or
@@ -378,11 +385,11 @@ impl RatingScaleRegistry {
 /// # Errors
 ///
 /// Returns [`Error::Validation`] if the embedded document is malformed or
-/// violates the supported schema, identifier, alias, score-range, default-scale,
+/// violates the supported schema, identifier, score-range, default-scale,
 /// or ordering invariants. Such an error signals a build/package defect rather
 /// than caller-supplied runtime data.
 pub fn embedded_registry() -> Result<&'static RatingScaleRegistry> {
-    EMBEDDED_REGISTRY.load(validate_registry)
+    EMBEDDED_REGISTRY.load(RatingScaleRegistry::try_from)
 }
 
 /// Load a rating-scale registry from configuration or fall back to the embedded registry.
@@ -404,12 +411,7 @@ pub fn embedded_registry() -> Result<&'static RatingScaleRegistry> {
 /// * `config` - Library configuration that may contain a validated rating-scale
 ///   registry extension; otherwise the embedded registry is cloned.
 pub fn registry_from_config(config: &FinstackConfig) -> Result<RatingScaleRegistry> {
-    EMBEDDED_REGISTRY.load_from_config(config, validate_registry)
-}
-
-fn validate_registry(registry: RatingScaleRegistry) -> Result<RatingScaleRegistry> {
-    registry.validate()?;
-    Ok(registry)
+    EMBEDDED_REGISTRY.load_from_config(config, RatingScaleRegistry::try_from)
 }
 
 /// Validate one rating level; `scale_label` names the owning scale in the
@@ -475,14 +477,6 @@ fn validate_score(value: f64, label: &str) -> Result<()> {
     }
 }
 
-fn has_id(ids: &[String], id: &str) -> bool {
-    ids.iter().any(|candidate| candidate == id)
-}
-
-fn first_id(ids: &[String]) -> &str {
-    ids.first().map_or("<missing>", String::as_str)
-}
-
 fn not_found(name: &str) -> Error {
     Error::Validation(format!(
         "rating scale registry does not contain scale '{name}'"
@@ -495,20 +489,12 @@ struct ScorecardPolicy {
     default_score: f64,
     default_scale_id: String,
     unknown_scale_policy: UnknownScalePolicy,
-    aliases: Vec<RatingScaleAlias>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
-struct RatingScaleAlias {
-    alias: String,
-    scale_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct RatingScaleEntry {
-    ids: Vec<String>,
+    id: String,
     source: String,
     scale: ScorecardScale,
 }
@@ -594,28 +580,59 @@ mod tests {
     }
 
     #[test]
-    fn aliases_resolve_current_supported_names() {
-        let registry = embedded_registry().expect("registry should load");
-        assert_eq!(registry.rating_scale("S&P").expect("S&P").scale_name, "S&P");
+    fn normalized_ids_and_unknown_policies_are_distinct() {
+        let embedded = embedded_registry().expect("embedded");
+        let mut value = serde_json::to_value(embedded).expect("serialize");
+        value["scorecard_policy"]["unknown_scale_policy"] = serde_json::json!("error");
+        value["rating_scales"][0]["id"] = serde_json::json!(" SP ");
+        value["scorecard_policy"]["default_scale_id"] = serde_json::json!(" Sp ");
+        let registry: RatingScaleRegistry =
+            serde_json::from_value(value.clone()).expect("normalized");
+        assert_eq!(registry.scale_ids(), ["sp", "moodys"]);
+        assert_eq!(registry.default_scale_id(), "sp");
         assert_eq!(
-            registry.rating_scale("Fitch").expect("Fitch").scale_name,
+            registry.rating_scale(" SP ").expect("known").scale_name,
             "S&P"
         );
         assert_eq!(
-            registry
-                .rating_scale("Moody's")
-                .expect("Moody's")
-                .scale_name,
+            registry.rating_scale(" MOODYS ").expect("known").scale_name,
             "Moody's"
         );
-        assert!(!registry.is_known_rating_scale("unknown"));
-        assert_eq!(
-            registry
-                .rating_scale("unknown")
-                .expect("fallback")
-                .scale_name,
-            "S&P"
-        );
+        for alias in ["S&P", "Fitch", "standard_and_poors", "Moody's"] {
+            assert!(!registry.is_known_rating_scale(alias));
+            assert!(registry.rating_scale(alias).is_err(), "{alias}");
+        }
+        for policy in ["fallback_to_default", "warn_and_fallback"] {
+            value["scorecard_policy"]["unknown_scale_policy"] = serde_json::json!(policy);
+            let fallback: RatingScaleRegistry =
+                serde_json::from_value(value.clone()).expect("fallback registry");
+            assert!(!fallback.is_known_rating_scale("S&P"));
+            assert_eq!(
+                fallback.rating_scale("S&P").expect("explicit fallback"),
+                fallback.rating_scale("sp").expect("known")
+            );
+        }
+    }
+
+    #[test]
+    fn registry_rejects_old_shape_and_invalid_normalized_ids() {
+        let value =
+            serde_json::to_value(embedded_registry().expect("embedded")).expect("serialize");
+        for id in ["", "  ", " SP "] {
+            let mut invalid = value.clone();
+            invalid["rating_scales"][1]["id"] = serde_json::json!(id);
+            assert!(serde_json::from_value::<RatingScaleRegistry>(invalid.clone()).is_err());
+            assert!(RatingScaleRegistry::from_json(&invalid.to_string()).is_err());
+        }
+        let mut old = value.clone();
+        old["schema"] = serde_json::json!("finstack_quant.rating_scales/1");
+        assert!(RatingScaleRegistry::from_json(&old.to_string()).is_err());
+        let mut aliases = value.clone();
+        aliases["scorecard_policy"]["aliases"] = serde_json::json!([]);
+        assert!(RatingScaleRegistry::from_json(&aliases.to_string()).is_err());
+        let mut ids = value;
+        ids["rating_scales"][0]["ids"] = serde_json::json!(["sp"]);
+        assert!(RatingScaleRegistry::from_json(&ids.to_string()).is_err());
     }
 
     #[test]
@@ -633,6 +650,14 @@ mod tests {
             loaded.default_scorecard_score(),
             embedded.default_scorecard_score()
         );
+
+        let mut old = serde_json::to_value(embedded).expect("serialize registry");
+        old["schema"] = serde_json::json!("finstack_quant.rating_scales/1");
+        config
+            .extensions
+            .insert(RATING_SCALES_EXTENSION_KEY, old)
+            .expect("static extension key");
+        assert!(registry_from_config(&config).is_err());
     }
 
     #[test]

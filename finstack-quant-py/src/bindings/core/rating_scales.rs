@@ -1,7 +1,7 @@
 //! Python bindings for [`finstack_quant_core::rating_scales`].
 //!
 //! Exposes the shared credit rating-scale registry (scorecard scales such as
-//! S&P / Moody's / Fitch), the rating-level threshold rows, and the
+//! S&P / Moody's), the rating-level threshold rows, and the
 //! [`UnknownScalePolicy`] enum used by scorecards. The classes here mirror the
 //! Rust types one-for-one; arithmetic and lookup logic stays in Rust.
 
@@ -293,14 +293,14 @@ wire_methods!(PyScorecardScale, ScorecardScale, "ScorecardScale");
 /// Versioned registry of scorecard rating scales and defaults.
 ///
 /// Obtain one via ``embedded_registry()`` (the bundled default) or
-/// ``registry_from_config(config)``; resolve scales by id or alias with
+/// ``registry_from_config(config)``; resolve scales by canonical id with
 /// ``rating_scale(name)``.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.core.rating_scales import embedded_registry
 /// >>> registry = embedded_registry()
-/// >>> registry.rating_scale("Fitch").scale_name
+/// >>> registry.rating_scale(" SP ").scale_name
 /// 'S&P'
 #[pyclass(
     module = "finstack_quant.core.rating_scales",
@@ -340,7 +340,7 @@ impl PyRatingScaleRegistry {
         PyUnknownScalePolicy::from_inner(self.inner.unknown_scale_policy())
     }
 
-    /// Primary id of every registered scale, in registry order (aliases excluded).
+    /// Canonical normalized id of every registered scale, in registry order.
     #[pyo3(text_signature = "(self)")]
     fn scale_ids(&self) -> Vec<String> {
         self.inner
@@ -350,13 +350,13 @@ impl PyRatingScaleRegistry {
             .collect()
     }
 
-    /// Return ``True`` if ``name`` is a known scale id or alias.
+    /// Return ``True`` if ``name`` is a known canonical id after trimming and ASCII case folding.
     #[pyo3(text_signature = "(self, name)")]
     fn is_known_rating_scale(&self, name: &str) -> bool {
         self.inner.is_known_rating_scale(name)
     }
 
-    /// Resolve a scale name or alias to a ``ScorecardScale``.
+    /// Resolve a canonical scale id to a ``ScorecardScale``.
     ///
     /// Honours the registry's unknown-scale policy: depending on the policy
     /// this may fall back to the default scale or raise ``ValueError``.

@@ -157,7 +157,7 @@ class TestCorkscrewAccount:
 
 class TestScorecardConfig:
     def test_period_round_trip(self) -> None:
-        cfg = ScorecardConfig(rating_scale="S&P", metrics=[], period="2024Q1")
+        cfg = ScorecardConfig(rating_scale="sp", metrics=[], period="2024Q1")
         assert cfg.period == "2024Q1"
         assert json.loads(cfg.to_json())["period"] == "2024Q1"
 

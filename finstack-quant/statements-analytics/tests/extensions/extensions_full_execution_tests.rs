@@ -387,7 +387,7 @@ fn test_scorecard_extension_with_valid_config() {
     thresholds_interest_cov.insert("B".into(), (0.0, 2.0));
 
     let config = ScorecardConfig {
-        rating_scale: "S&P".into(),
+        rating_scale: "sp".into(),
         metrics: vec![
             ScorecardMetric {
                 name: "debt_to_ebitda".into(),
@@ -479,7 +479,7 @@ fn test_scorecard_moodys_rating_scale() {
     thresholds.insert("Baa1".into(), (3.0, 999.0));
 
     let config = ScorecardConfig {
-        rating_scale: "Moody's".into(),
+        rating_scale: "moodys".into(),
         metrics: vec![ScorecardMetric {
             name: "debt_to_equity".into(),
             formula: "debt / equity".into(),
@@ -500,43 +500,12 @@ fn test_scorecard_moodys_rating_scale() {
 }
 
 #[test]
-fn test_scorecard_fitch_rating_scale() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .value(
-            "value",
-            &[(
-                PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                AmountOrScalar::scalar(100.0),
-            )],
-        )
-        .build()
-        .unwrap();
-
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    let mut thresholds = indexmap::IndexMap::new();
-    thresholds.insert("AAA".into(), (0.0, 999.0));
-
+fn test_scorecard_rejects_retired_fitch_alias() {
     let config = ScorecardConfig {
         rating_scale: "Fitch".into(),
-        metrics: vec![ScorecardMetric {
-            name: "simple".into(),
-            formula: "value".into(),
-            weight: 1.0,
-            thresholds,
-            description: None,
-        }],
-        min_rating: None,
-        period: None,
+        ..Default::default()
     };
-
-    let extension = CreditScorecardExtension::new(config);
-
-    let report = extension.execute(&model, &results).unwrap();
-    assert_eq!(report.status, ScorecardStatus::Success);
+    assert!(CreditScorecardExtension::validate_config(&config).is_err());
 }
 
 #[test]
@@ -600,7 +569,7 @@ fn test_scorecard_with_minimum_rating_warning() {
     thresholds.insert("BBB".into(), (3.0, 999.0));
 
     let config = ScorecardConfig {
-        rating_scale: "S&P".into(),
+        rating_scale: "sp".into(),
         metrics: vec![ScorecardMetric {
             name: "leverage".into(),
             formula: "debt / ttm(ebitda)".into(),
@@ -687,7 +656,7 @@ fn test_scorecard_multiple_metrics_weighted() {
     thresholds2.insert("A".into(), (3.0, 4.0));
 
     let config = ScorecardConfig {
-        rating_scale: "S&P".into(),
+        rating_scale: "sp".into(),
         metrics: vec![
             ScorecardMetric {
                 name: "metric1".into(),
@@ -738,7 +707,7 @@ fn test_scorecard_metric_evaluation_error_handling() {
     let results = evaluator.evaluate(&model).unwrap();
 
     let config = ScorecardConfig {
-        rating_scale: "S&P".into(),
+        rating_scale: "sp".into(),
         metrics: vec![ScorecardMetric {
             name: "invalid_metric".into(),
             formula: "nonexistent_node".into(), // References non-existent node
@@ -827,7 +796,7 @@ fn leverage_coverage_config() -> ScorecardConfig {
     coverage_thresholds.insert("A".into(), (2.0, 4.0));
 
     ScorecardConfig {
-        rating_scale: "S&P".into(),
+        rating_scale: "sp".into(),
         metrics: vec![
             ScorecardMetric {
                 name: "leverage".into(),

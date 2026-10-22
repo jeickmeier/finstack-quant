@@ -186,7 +186,7 @@ impl JsUnknownScalePolicy {
     }
 }
 
-/// Versioned registry of scorecard rating scales (S&P, Moody's, Fitch, …).
+/// Versioned registry of scorecard rating scales (canonical ids `sp` and `moodys`).
 ///
 /// Get one from `embeddedRegistry()`, `registryFromConfig(config)` or
 /// `RatingScaleRegistry.fromJson(json)`.
@@ -224,9 +224,9 @@ impl JsRatingScaleRegistry {
         self.inner.default_scale_id().to_string()
     }
 
-    /// Primary id of every registered scale, in registry order.
+    /// Canonical normalized id of every registered scale, in registry order.
     ///
-    /// @returns Scale ids; aliases are not listed.
+    /// @returns Canonical trimmed, ASCII-lowercase scale ids.
     #[wasm_bindgen(js_name = scaleIds)]
     pub fn scale_ids(&self) -> Vec<String> {
         self.inner
@@ -244,11 +244,11 @@ impl JsRatingScaleRegistry {
         JsUnknownScalePolicy::from_inner(self.inner.unknown_scale_policy())
     }
 
-    /// Whether a name is a registered scale id or alias.
+    /// Whether a name is a registered canonical id after trimming and ASCII case folding.
     ///
     /// # Arguments
     ///
-    /// * `name` - Scale id or alias to look up.
+    /// * `name` - Canonical id (`sp` or `moodys`); surrounding whitespace and ASCII case are ignored.
     ///
     /// @returns `true` when the registry knows the name.
     /// @throws `TypeError` if `name` is not a string.
@@ -257,12 +257,12 @@ impl JsRatingScaleRegistry {
         Ok(self.inner.is_known_rating_scale(&js_string(&name, "name")?))
     }
 
-    /// Resolve a scale by id or alias under the unknown-scale policy (Rust
+    /// Resolve a canonical scale id under the unknown-scale policy (Rust
     /// `RatingScaleRegistry::rating_scale`).
     ///
     /// # Arguments
     ///
-    /// * `name` - Scale id or alias; an unknown name returns the default
+    /// * `name` - Canonical id, ignoring surrounding whitespace and ASCII case; an unknown name returns the default
     ///   scale under a fallback policy.
     ///
     /// @returns A plain `ScorecardScale` object: `scale_name`, optional
@@ -293,8 +293,7 @@ impl JsRatingScaleRegistry {
     /// # Arguments
     ///
     /// * `json` - Registry JSON text or plain object, such as `toJson()`
-    ///   output. Validation enforces the schema version, unique scale ids and
-    ///   aliases, an existing default scale and in-range scores.
+    ///   output. Validation enforces the schema version, unique normalized scale ids, an existing default scale and in-range scores.
     ///
     /// @returns The validated `RatingScaleRegistry`.
     /// @throws `TypeError` if `json` is not a JSON string or plain object;
