@@ -79,6 +79,7 @@ returns them.
 | `BetaResult`, `GreeksResult`, `RollingGreeks`, `MultiFactorResult`, `ReturnKind` | `benchmark` | Returned / consumed by benchmark methods |
 | `CagrDayCount` | `risk_metrics` | Act/365.25 default or a wrapped core `DayCount` |
 | `DatedSeries` | `risk_metrics` | Returned by `Performance::rolling_*` |
+| `sharpe`, `sortino`, `volatility`, `max_drawdown` | crate root | Single-series metrics without panel construction |
 | `beta` | `benchmark` | Freestanding OLS slope; consumed by `finstack-quant-factor` |
 | `regression` | `regression` | Public module: `constrained_least_squares` |
 
@@ -170,9 +171,10 @@ caches. Unknown fields, including serialized caches, are rejected. `LookbackRetu
   exception. `Performance` gains DataFrame-first constructors
   (`Performance(prices_df, ...)`, `Performance.from_returns(df, ...)`) with the
   Rust-shaped array constructors available as `Performance.from_arrays` and
-  `Performance.from_returns_arrays`, plus `*_to_dataframe` exits.
-- **WASM** — `analytics.Performance` and `analytics.constrainedLeastSquares`
-  only (see [`exports/analytics.js`](../../finstack-quant-wasm/exports/analytics.js)).
+  `Performance.from_returns_arrays`, plus result `to_dataframe` methods.
+- **WASM** — `analytics.Performance`, `analytics.constrainedLeastSquares`,
+  `analytics.maxDrawdown`, `analytics.sharpe`, `analytics.sortino`, and
+  `analytics.volatility` (see [`exports/analytics.js`](../../finstack-quant-wasm/exports/analytics.js)).
   WASM `Performance` methods return plain JS values instead of typed wrappers.
 - Shared correlation helpers are bound under
   `finstack_quant.models.correlation` in both hosts, with the canonical
@@ -180,7 +182,7 @@ caches. Unknown fields, including serialized caches, are rejected. `LookbackRetu
 
 The authoritative contract, including every known gap, is
 [`parity_contract.toml`](../../finstack-quant-py/parity_contract.toml)
-(`[crates.analytics]`, `[wasm_analytics_subset]`).
+(`[crates.analytics]`, `[parity.modules."finstack_quant.analytics"]`).
 
 ## Tests and benchmarks
 
@@ -188,7 +190,6 @@ The authoritative contract, including every known gap, is
 |------|----------|
 | [`tests/performance_smoke.rs`](tests/performance_smoke.rs) | End-to-end `Performance` construction and metric coverage |
 | [`tests/correctness_regressions.rs`](tests/correctness_regressions.rs) | Hand-checked metric values pinned to `1e-12` |
-| [`tests/correlation_validator_agreement.rs`](tests/correlation_validator_agreement.rs) | `correlation::validate_correlation_matrix` agrees with core's `math::linalg` validator |
 | [`benches/analytics_hot_paths.rs`](benches/analytics_hot_paths.rs) | Criterion benches for the hot scalar and rolling paths |
 | [`benches/analytics_scaling.rs`](benches/analytics_scaling.rs) | Criterion size-sweep benches (ns per element vs series / matrix size) |
 

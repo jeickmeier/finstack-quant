@@ -237,7 +237,6 @@ status = "exists"
 [crates.analytics.modules]
 aggregation  = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.period_stats; freestanding bindings removed in paredown" }
 benchmark    = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.beta / .greeks / .rolling_greeks; freestanding bindings removed" }
-correlation  = { python = "finstack_quant.models.correlation", status = "exists", note = "Correlation-matrix validation and nearest-correlation repair are core-owned (core::math::linalg); reusable copula and credit-correlation models are exposed through finstack_quant.models.correlation." }
 drawdown     = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.max_drawdown / .mean_drawdown / .drawdown_series / .drawdown_details" }
 lookback     = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.lookback_returns. Rust, Python, and WASM always expose LookbackReturns.fytd as a non-null per-ticker vector; the serialized field name is fytd." }
 performance  = { python = "finstack_quant.analytics", status = "flattened", note = "Performance class is the sole entry point on finstack_quant.analytics. Canonical Rust Performance::periodic_returns is shared as Python Performance.periodic_returns and WASM Performance.periodicReturns. Rust returns PeriodicReturn {date, value} points: WASM emits them as plain `{date, value}` objects (TS `PeriodicReturn`), Python as `(date, value)` tuples. Rolling methods return Rust DatedSeries {values, dates, value_column} (value_column = Rust RollingMetric name): Python wraps it as the DatedSeries class (to_json is the same object), WASM returns it as a plain object with values as a Float64Array. Rust Performance::correlation_matrix returns (matrix, repaired): Python returns the same `(matrix, repaired)` tuple, WASM the plain object `{matrix, repaired}`. Omitted arguments on both hosts resolve to the Rust `finstack_quant_analytics::DEFAULT_*` constants (DEFAULT_FREQUENCY, DEFAULT_PERIODIC_FREQUENCY, DEFAULT_ROLLING_WINDOW, DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_ANNUALIZE, DEFAULT_RISK_FREE_RATE, DEFAULT_MAR — also the omega threshold), ReturnKind::from_label(None, ..) (excess), CagrDayCount::default() (act365_25) and FiscalConfig::from_parts / FiscalConfig::default() (an omitted fiscal month is January, an omitted day the 1st, both omitted is the calendar year)." }
@@ -2168,14 +2167,6 @@ attributePnlEnvelopeJson = "Canonical Rust JSON wire twin of attribute_pnl_envel
 attributePnlJson = "JSON wire twin of attribute_pnl (Python returns the typed PnlAttribution)"
 attributeReturnContributionJson = "JSON wire twin of attribute_return_contribution (Rust attribute_return_contribution_json; Python returns the typed ReturnContributionResult)"
 
-[parity.js."core".wasm_only]
-cashFlowGetBalanceDate = "twin of Python CashFlow.get_balance_date (Rust CashFlow::get_balance_date); recorded as a member rename of finstack_quant.core.cashflow.CashFlow"
-cashFlowValidate = "twin of Python CashFlow.validate (Rust CashFlow::validate); recorded as a member rename of finstack_quant.core.cashflow.CashFlow"
-cfKindIsCashSettlement = "twin of Python CFKind.is_cash_settlement (Rust CFKind::is_cash_settlement); recorded as a member rename of finstack_quant.core.cashflow.CFKind"
-cfKindIsInterestLike = "twin of Python CFKind.is_interest_like (Rust CFKind::is_interest_like); recorded as a member rename of finstack_quant.core.cashflow.CFKind"
-cfKindIsPrincipalLike = "twin of Python CFKind.is_principal_like (Rust CFKind::is_principal_like); recorded as a member rename of finstack_quant.core.cashflow.CFKind"
-cfKindParse = "twin of Python CFKind.parse (Rust CFKind::from_str); recorded as a member rename of finstack_quant.core.cashflow.CFKind"
-
 [parity.js."covenants".wasm_only]
 covenantNew = "twin of the Python Covenant(covenant_type, test_frequency, label) constructor (Rust Covenant::new); WASM Covenant values are plain objects"
 covenantSpecNew = "twin of the Python CovenantSpec(covenant) constructor without a metric id (Rust CovenantSpec::new); WASM CovenantSpec values are plain objects"
@@ -2299,6 +2290,10 @@ renames = { metric_series = { js = "valuations.valuationResultMetricSeries", rea
 
 [parity.members."finstack_quant.valuations.instruments.AssetBackedFacility"]
 renames = { synthesized_deal = { js = "synthesizedDealJson", reason = "the Rust AssetBackedFacility::synthesized_deal result is returned as its canonical instrument envelope JSON; pass it to StructuredCredit.fromJson for the typed deal" } }
+
+[parity.js."statements_analytics".wasm_only]
+explainFormulaText = "Text rendering of explain_formula in one call; Python calls Explanation.to_text on the returned explanation"
+plSummaryReportText = "Text rendering of a PLSummaryReport in one call; Python calls PLSummaryReport.to_text on the returned report"
 
 [parity.members."finstack_quant.analytics.Performance"]
 renames = { from_arrays = { js = "constructor", reason = "Python distinguishes its pandas constructor from the Rust-shaped array adapter; WASM's constructor already accepts arrays (Rust Performance::new)" }, from_returns_arrays = { js = "fromReturns", reason = "Python distinguishes pandas and array input adapters; WASM fromReturns already accepts arrays (Rust Performance::from_returns)" } }
