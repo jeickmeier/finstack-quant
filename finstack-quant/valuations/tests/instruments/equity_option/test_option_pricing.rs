@@ -9,7 +9,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{VolGridOpts, VolSurface};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
@@ -47,6 +47,8 @@ fn create_test_market(base_date: Date) -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0],
         &[80.0, 90.0, 100.0, 110.0, 120.0],
         &[0.25; 20], // 20 = 4 expiries × 5 strikes
+        VolGridOpts::default(),
+        None,
     )
     .unwrap();
 
