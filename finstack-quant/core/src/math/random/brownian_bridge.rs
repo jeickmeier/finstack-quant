@@ -24,9 +24,14 @@
 //!
 //! Reference: Moskowitz & Caflisch (1996) - "Smoothness and dimension reduction in QMC"
 
-use std::collections::BTreeSet;
-
 use crate::{Error, Result};
+
+/// One midpoint and its already populated neighbours in bridge order.
+struct BridgeStep {
+    index: usize,
+    left: usize,
+    right: usize,
+}
 
 /// Brownian bridge construction order.
 ///
@@ -34,16 +39,8 @@ use crate::{Error, Result};
 pub struct BrownianBridge {
     /// Number of time steps this bridge was built for.
     num_steps: usize,
-    /// Construction order (indices into time grid)
-    construction_order: Vec<usize>,
-    /// Precomputed `(left, right)` bracketing neighbours, parallel to
-    /// [`Self::construction_order`].
-    ///
-    /// The populated set when construction step `i` runs is always
-    /// `{0, num_steps} ∪ construction_order[..i]`, so each step's brackets are
-    /// a pure function of `num_steps`. They are recorded once here instead of
-    /// being recomputed with an ordered-set walk on every path.
-    brackets: Vec<(usize, usize)>,
+    /// Midpoints and neighbours emitted together by binary subdivision.
+    steps: Vec<BridgeStep>,
 }
 
 impl BrownianBridge {
@@ -59,51 +56,26 @@ impl BrownianBridge {
     /// - Standard order: [0, 1, 2, 3, 4]
     /// - Bridge order:   [4, 2, 1, 3] (terminal, half, quarters, ...)
     pub fn new(num_steps: usize) -> Self {
-        let mut construction_order = Vec::with_capacity(num_steps);
-
-        // Binary subdivision
-        Self::build_bridge_recursive(0, num_steps, &mut construction_order);
-
-        // One simulation pass records each step's bracketing neighbours. The
-        // populated set evolves identically inside every construct_path
-        // call, so this table serves all paths ever built by this bridge.
-        let mut populated = BTreeSet::new();
-        populated.insert(0);
-        populated.insert(num_steps);
-        let mut brackets = Vec::with_capacity(construction_order.len());
-        for &idx in &construction_order {
-            let left = populated.range(..idx).next_back().copied().unwrap_or(0);
-            let right = populated
-                .range(idx + 1..)
-                .next()
-                .copied()
-                .unwrap_or(num_steps);
-            brackets.push((left, right));
-            populated.insert(idx);
-        }
-
-        Self {
-            num_steps,
-            construction_order,
-            brackets,
-        }
+        let mut steps = Vec::with_capacity(num_steps);
+        Self::build_bridge_recursive(0, num_steps, &mut steps);
+        Self { num_steps, steps }
     }
 
-    /// Recursive builder for bridge order.
-    fn build_bridge_recursive(left: usize, right: usize, order: &mut Vec<usize>) {
+    /// Emit midpoints with their known bracketing neighbours.
+    fn build_bridge_recursive(left: usize, right: usize, steps: &mut Vec<BridgeStep>) {
         if right - left <= 1 {
             return;
         }
-        let mid = (left + right) / 2;
-        order.push(mid);
-        Self::build_bridge_recursive(left, mid, order);
-        Self::build_bridge_recursive(mid, right, order);
+        let index = (left + right) / 2;
+        steps.push(BridgeStep { index, left, right });
+        Self::build_bridge_recursive(left, index, steps);
+        Self::build_bridge_recursive(index, right, steps);
     }
 
     /// Construction order, exposed to the unit tests that pin the bridge layout.
     #[cfg(test)]
-    fn order(&self) -> &[usize] {
-        &self.construction_order
+    fn order(&self) -> Vec<usize> {
+        self.steps.iter().map(|step| step.index).collect()
     }
 
     /// Apply bridge construction to generate a Brownian path from independent
@@ -159,12 +131,15 @@ impl BrownianBridge {
         }
         w_out[num_steps] = z[0] * times[num_steps].sqrt();
 
-        // Brackets are precomputed in `new`; this loop is allocation-free.
-        for (i, (&idx, &(left, right))) in self
-            .construction_order
-            .iter()
-            .zip(&self.brackets)
-            .enumerate()
+        // Midpoints and brackets are precomputed; this loop is allocation-free.
+        for (
+            i,
+            &BridgeStep {
+                index: idx,
+                left,
+                right,
+            },
+        ) in self.steps.iter().enumerate()
         {
             let left_time = times[left];
             let idx_time = times[idx];
@@ -184,7 +159,7 @@ impl BrownianBridge {
     ///
     /// `z` carries one shock for the terminal point plus one per bridge
     /// construction step, so a bridge built for `n` steps requires
-    /// `z.len() == n` (with `n == construction_order.len() + 1` for `n ≥ 1`)
+    /// `z.len() == n` (with `n == steps.len() + 1` for `n ≥ 1`)
     /// and `w_out.len() == n + 1`.
     fn validate_shocks_and_output(&self, num_steps: usize, w_out_len: usize) -> Result<()> {
         if w_out_len != num_steps + 1 {
@@ -391,18 +366,22 @@ mod tests {
 
     #[test]
     fn precomputed_brackets_match_per_path_lookup_bit_for_bit() {
-        for &num_steps in &[2usize, 3, 4, 5, 8, 17, 64, 255, 256] {
+        for &num_steps in &[0usize, 1, 2, 3, 4, 5, 8, 17, 64, 255, 256] {
             let bridge = BrownianBridge::new(num_steps);
             let z: Vec<f64> = (0..num_steps)
                 .map(|i| ((i % 23) as f64 * 0.113) - 1.2)
                 .collect();
-            let times = uniform_times(num_steps, 1.0 / 252.0);
-
-            let mut fast = vec![0.0; num_steps + 1];
-            bridge.construct_path(&z, &mut fast, &times).expect("valid");
-            let mut reference = vec![0.0; num_steps + 1];
-            reference_construct_path(num_steps, bridge.order(), &z, &mut reference, &times);
-            assert_eq!(fast, reference, "n={num_steps}");
+            let grids = [
+                uniform_times(num_steps, 1.0 / 252.0),
+                (0..=num_steps).map(|i| (i * i) as f64 / 252.0).collect(),
+            ];
+            for times in grids {
+                let mut fast = vec![0.0; num_steps + 1];
+                bridge.construct_path(&z, &mut fast, &times).expect("valid");
+                let mut reference = vec![0.0; num_steps + 1];
+                reference_construct_path(num_steps, &bridge.order(), &z, &mut reference, &times);
+                assert_eq!(fast, reference, "n={num_steps}");
+            }
         }
     }
 }
