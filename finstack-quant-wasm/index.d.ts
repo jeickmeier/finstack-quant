@@ -14121,6 +14121,34 @@ export interface CashflowsNamespace {
   ): generated.cashflows.PeriodAggregation;
 
   /**
+   * Read one period's currency totals using the canonical Rust label lookup.
+   *
+   * @param aggregation - Period-to-currency map with currency-tagged Money values; currency keys must agree with their amounts.
+   * @param period - Exact case-sensitive PeriodId display label, such as `"2025Q1"`; whitespace is not trimmed and aliases are not parsed.
+   * @returns An independent currency map, including an empty map for a stored empty bucket, or null for an absent or malformed label. No FX conversion is performed.
+   * @throws If aggregation has an invalid wire shape or mismatched currencies (kind `validation`), or period is not a string (kind `invalid_type`).
+   */
+  periodAggregationGetPeriod(
+    aggregation: generated.cashflows.PeriodAggregation,
+    period: string
+  ): Record<string, MoneyValue> | null;
+
+  /**
+   * Read one period-and-currency amount using the canonical Rust lookup.
+   *
+   * @param aggregation - Period-to-currency map with currency-tagged Money values; currency keys must agree with their amounts.
+   * @param period - Exact case-sensitive PeriodId display label; whitespace is not trimmed and aliases are not parsed.
+   * @param currency - ISO-4217 currency code of the requested total; no FX conversion is performed.
+   * @returns The Money value or null if the period or currency is absent; a malformed period label is a miss.
+   * @throws If aggregation or currency has an invalid wire shape, or currency keys disagree with amounts (kind `validation`), or period is not a string (kind `invalid_type`).
+   */
+  periodAggregationGetAmount(
+    aggregation: generated.cashflows.PeriodAggregation,
+    period: string,
+    currency: generated.core.Currency
+  ): MoneyValue | null;
+
+  /**
    * Sum dated amounts that must all be in one currency.
    *
    * @param flows - `{ date, amount }` entries: ISO-8601 date and `Money` amount of each flow.

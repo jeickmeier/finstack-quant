@@ -2329,7 +2329,7 @@ wasm_only = { parse = "Rust Rate::from_str; twin of the Python Rate(text) constr
 renames = { ex_date = { js = "cashflows.exCouponRuleExDate", reason = "WASM ExCouponRule values are plain objects; the Rust ExCouponRule::ex_date function is a free function over the wire value" }, is_ex_coupon = { js = "cashflows.exCouponRuleIsExCoupon", reason = "WASM ExCouponRule values are plain objects; the Rust ExCouponRule::is_ex_coupon function is a free function over the wire value" } }
 
 [parity.members."finstack_quant.cashflows.aggregation.PeriodAggregation"]
-excluded = { get_amount = "literal" }
+renames = { get_amount = { js = "cashflows.periodAggregationGetAmount", reason = "WASM aggregation values are plain objects; Rust owns the period and currency lookup" }, get_period = { js = "cashflows.periodAggregationGetPeriod", reason = "WASM aggregation values are plain objects; Rust owns exact period-label lookup" } }
 
 [parity.members."finstack_quant.cashflows.builder.AmortizationSpec"]
 excluded = { custom_principal = "literal", linear_between = "literal", linear_to = "literal", percent_of_original_per_period = "literal", percent_of_remaining_per_period = "literal", step_remaining = "literal" }

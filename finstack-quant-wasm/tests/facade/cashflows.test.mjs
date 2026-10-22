@@ -106,6 +106,8 @@ const EXPORTED_KEYS = [
   'monthlyToAnnual',
   'notionalPar',
   'notionalValidate',
+  'periodAggregationGetAmount',
+  'periodAggregationGetPeriod',
   'prepaymentModelSpecSmm',
   'prepaymentModelSpecValidate',
   'recoveryModelSpecRecoveryRate',
@@ -589,4 +591,24 @@ test('canonical credit-rate conversions preserve boundaries and reject invalid r
       (error) => error.kind === 'invalid_type'
     );
   }
+});
+
+test('period lookups preserve exact labels, empty buckets, and currency validation', () => {
+  const totals = {
+    '2025Q1': { USD: { amount: '100.25', currency: 'USD' } },
+    '2025Q2': {},
+  };
+  const first = cashflows.periodAggregationGetPeriod(totals, '2025Q1');
+  assert.deepEqual(first, totals['2025Q1']);
+  first.USD = { amount: '1', currency: 'USD' };
+  assert.equal(cashflows.periodAggregationGetAmount(totals, '2025Q1', 'USD').amount, '100.25');
+  assert.deepEqual(cashflows.periodAggregationGetPeriod(totals, '2025Q2'), {});
+  assert.equal(cashflows.periodAggregationGetAmount(totals, '2025Q2', 'USD'), null);
+  assert.equal(cashflows.periodAggregationGetAmount(totals, '2025Q1', 'EUR'), null);
+  for (const missing of ['2025Q3', '2025q1', ' 2025Q1', 'nope', '']) {
+    assert.equal(cashflows.periodAggregationGetPeriod(totals, missing), null);
+  }
+  const bad = { '2025Q1': { USD: { amount: '1', currency: 'EUR' } } };
+  assert.throws(() => cashflows.periodAggregationGetPeriod(bad, '2025Q1'));
+  assert.throws(() => cashflows.periodAggregationGetAmount(bad, '2025Q1', 'USD'));
 });
