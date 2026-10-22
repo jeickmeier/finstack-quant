@@ -344,7 +344,7 @@ def build_cases() -> dict[str, Any]:
         "reinvestment_period": reinvestment_period,
         "pool_with_reinvestment_period": _json(pool.with_reinvestment_period(reinvestment_period)),
         "scenario_table": scenario_table,
-        "scenario_table_cells": ins.ScenarioTable.from_json(json.dumps(scenario_table)).cells(),
+        "scenario_table_cells": ins.ScenarioTable.from_json(json.dumps(scenario_table)).cells,
         "pool_with_reserve": _json(
             pool.with_reserve(Money(500_000.0, USD), 0.02, reserve_target=Money(750_000.0, USD))
         ),

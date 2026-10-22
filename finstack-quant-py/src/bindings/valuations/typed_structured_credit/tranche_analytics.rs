@@ -776,8 +776,9 @@ impl PyScenarioTable {
     /// Returns
     /// -------
     /// list[dict[str, float]]
-    ///     One dict per evaluated scenario cell.
-    #[pyo3(text_signature = "($self)")]
+    ///     A copy of each stored scenario cell; mutating the returned list does
+    ///     not change this read-only property.
+    #[getter]
     fn cells(&self) -> Vec<BTreeMap<String, f64>> {
         self.inner
             .cells

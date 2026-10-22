@@ -4568,7 +4568,6 @@
       "prettyInstrumentJson",
       "priceInstrument",
       "priceInstrumentWithMarket",
-      "scenarioTableCells",
       "trancheBreakevenCdr",
       "trancheBuilder",
       "trancheDiscountMargin",
@@ -6012,9 +6011,6 @@
     "kind": "function"
   },
   "valuations.instruments.waterfallCoverageTests": {
-    "kind": "function"
-  },
-  "valuations.instruments.scenarioTableCells": {
     "kind": "function"
   },
   "valuations.instruments.amortizationEventDate": {

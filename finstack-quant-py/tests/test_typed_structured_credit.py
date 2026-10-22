@@ -227,4 +227,10 @@ class TestStructuredCreditTypedAnalytics:
         })
         table = ScenarioTable.from_json(payload)
         assert table.tranche_id == "A"
-        assert table.cells()[0]["price"] == pytest.approx(98.2)
+        assert table.cells[0]["price"] == pytest.approx(98.2)
+        assert not callable(table.cells)
+        with pytest.raises(AttributeError):
+            table.cells = []  # type: ignore[misc]
+        cells = table.cells
+        cells[0]["price"] = 1.0
+        assert table.cells[0]["price"] == pytest.approx(98.2)

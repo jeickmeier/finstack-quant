@@ -33817,7 +33817,7 @@ class ScenarioTable:
         ...     "cells": [{"cpr": 0.06, "cdr": 0.02, "severity": 0.6, "price": 98.2, "wal": 4.1, "writedown": 0.0}],
         ... }
         >>> table = ScenarioTable.from_json(json.dumps(payload))
-        >>> (table.tranche_id, table.cells()[0]["price"])
+        >>> (table.tranche_id, table.cells[0]["price"])
         ('A', 98.2)
 
         """
@@ -33855,6 +33855,7 @@ class ScenarioTable:
         """
         ...
 
+    @property
     def cells(self) -> list[dict[str, float]]:
         """
         Evaluated cells, in CPR-major, then CDR, then severity order.
@@ -33871,7 +33872,7 @@ class ScenarioTable:
 
         Notes
         -----
-        This method does not raise; it returns the stored or derived value.
+        This read-only property returns a copy of the stored cells and does not raise.
         """
         ...
 

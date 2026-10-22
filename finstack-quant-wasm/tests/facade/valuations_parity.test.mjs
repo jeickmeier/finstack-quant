@@ -579,11 +579,7 @@ test('instrument data-type constructors match Python', () => {
     data.pool_with_reinvestment_period,
     'reinvestment period'
   );
-  same(
-    plain(instruments.scenarioTableCells(data.scenario_table)),
-    data.scenario_table_cells,
-    'scenario cells'
-  );
+  same(plain(data.scenario_table.cells), data.scenario_table_cells, 'scenario cells');
   same(
     plain(instruments.assetPoolWithReserve(data.pool, usd(500_000), 0.02, usd(750_000))),
     data.pool_with_reserve,
