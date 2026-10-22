@@ -28,9 +28,14 @@ jobs:
     name: Checks
     uses: ./.github/workflows/checks.yml
 
+  full-checks:
+    name: Full checks
+    uses: ./.github/workflows/full-checks.yml
+    secrets: inherit
+
   plan:
     name: Plan nightly build
-    needs: checks
+    needs: [checks, full-checks]
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04
     timeout-minutes: 5

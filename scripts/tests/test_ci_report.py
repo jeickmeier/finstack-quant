@@ -112,6 +112,26 @@ def test_build_python_report_with_junit_and_cobertura(tmp_path: Path) -> None:
     assert "`finstack_quant.core` | 2 / 3 | 66.7%" in report
 
 
+def test_build_python_report_without_cobertura(tmp_path: Path) -> None:
+    """Python report without a Cobertura file shows coverage as unavailable."""
+    junit_path = tmp_path / "junit.xml"
+    junit_path.write_text(
+        """<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+  <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="1" time="0.5">
+    <testcase classname="tests.test_core" name="test_money" time="0.5"/>
+  </testsuite>
+</testsuites>
+""",
+        encoding="utf-8",
+    )
+
+    report = ci_report.build_python_report(junit_path, tmp_path / "missing.xml")
+
+    assert "| **Passed** | 1 | 1 | 0 | 0 | 0 | 0.5s | — |" in report
+    assert "Coverage by package" not in report
+
+
 def test_build_wasm_report_parses_wasm_pack_and_node_test(tmp_path: Path) -> None:
     """WASM report aggregates wasm-bindgen and Node.js facade test results."""
     log_path = tmp_path / "wasm-test.log"

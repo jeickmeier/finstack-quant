@@ -496,11 +496,11 @@ elif [ "${usage_all:-false}" = "true" ]; then
 else
   set -- "$@" -m "not slow and not doctest"
 fi
+mkdir -p coverage/python
+set -- "$@" --junitxml=coverage/python/junit.xml
 if [ "${usage_coverage:-false}" = "true" ]; then
-  mkdir -p coverage/python
   set -- "$@" --cov=finstack-quant-py/finstack_quant --cov-report=term-missing \
-    --cov-report=html:target/python-cov --cov-report=xml:coverage/python/coverage.xml \
-    --junitxml=coverage/python/junit.xml
+    --cov-report=html:target/python-cov --cov-report=xml:coverage/python/coverage.xml
 fi
 mise run python-build
 uv run --no-sync pytest "$@"
