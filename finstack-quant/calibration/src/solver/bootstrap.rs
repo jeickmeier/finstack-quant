@@ -325,256 +325,253 @@ fn validate_and_commit_knot<T: BootstrapTarget>(
 ///    observed point; results from this path carry
 ///    `is_sign_change_bracket = false` and are gated by
 ///    [`BootstrapTarget::allow_approximate_knots`].
-pub(crate) struct SequentialBootstrapper;
+///
+/// Execute the sequential bootstrapping algorithm.
+///
+/// # Generic Parameters
+/// * `T` - The calibration target (e.g., [`DiscountCurveTarget`](crate::targets::discount::DiscountCurveTarget)).
+///
+/// # Arguments
+/// * `target` - The domain-specific implementation of the [`BootstrapTarget`] trait.
+/// * `quotes` - The list of high-level market quotes to fit.
+/// * `initial_knots` - Optional pre-existing knots (e.g., spot or short-end anchors).
+/// * `config` - Calibration settings specifying tolerances and methods.
+/// * `tolerance` - Target-specific validation tolerance for determining calibration success.
+///
+/// # Returns
+/// A pair containing the calibrated term structure and a diagnostic report.
+pub(crate) fn bootstrap<T>(
+    target: &T,
+    quotes: &[T::Quote],
+    initial_knots: Vec<(f64, f64)>,
+    config: &CalibrationConfig,
+    tolerance: f64,
+) -> Result<(T::Curve, CalibrationReport)>
+where
+    T: BootstrapTarget,
+    T::Quote: std::fmt::Debug,
+{
+    let validation_tolerance = tolerance;
+    let sorted_quotes = sort_quotes_by_time(target, quotes)?;
 
-impl SequentialBootstrapper {
-    /// Execute the sequential bootstrapping algorithm.
-    ///
-    /// # Generic Parameters
-    /// * `T` - The calibration target (e.g., [`DiscountCurveTarget`](crate::targets::discount::DiscountCurveTarget)).
-    ///
-    /// # Arguments
-    /// * `target` - The domain-specific implementation of the [`BootstrapTarget`] trait.
-    /// * `quotes` - The list of high-level market quotes to fit.
-    /// * `initial_knots` - Optional pre-existing knots (e.g., spot or short-end anchors).
-    /// * `config` - Calibration settings specifying tolerances and methods.
-    /// * `tolerance` - Target-specific validation tolerance for determining calibration success.
-    ///
-    /// # Returns
-    /// A pair containing the calibrated term structure and a diagnostic report.
-    pub(crate) fn bootstrap<T>(
-        target: &T,
-        quotes: &[T::Quote],
-        initial_knots: Vec<(f64, f64)>,
-        config: &CalibrationConfig,
-        tolerance: f64,
-    ) -> Result<(T::Curve, CalibrationReport)>
-    where
-        T: BootstrapTarget,
-        T::Quote: std::fmt::Debug,
-    {
-        let validation_tolerance = tolerance;
-        let sorted_quotes = sort_quotes_by_time(target, quotes)?;
+    let mut knots = initial_knots;
+    let mut total_iterations = 0;
+    let mut last_time = knots.iter().map(|(t, _)| *t).fold(0.0_f64, f64::max);
+    // W-40: track knot times accepted without a sign-change bracket so the
+    // report can flag them as approximate rather than silently treating them
+    // as true bracketed roots.
+    let mut approximate_knot_times: Vec<f64> = Vec::new();
+    let mut trace = config
+        .explain
+        .enabled
+        .then(|| ExplanationTrace::new("bootstrap"));
 
-        let mut knots = initial_knots;
-        let mut total_iterations = 0;
-        let mut last_time = knots.iter().map(|(t, _)| *t).fold(0.0_f64, f64::max);
-        // W-40: track knot times accepted without a sign-change bracket so the
-        // report can flag them as approximate rather than silently treating them
-        // as true bracketed roots.
-        let mut approximate_knot_times: Vec<f64> = Vec::new();
-        let mut trace = config
-            .explain
-            .enabled
-            .then(|| ExplanationTrace::new("bootstrap"));
+    for (index, sq) in sorted_quotes.iter().enumerate() {
+        validate_time_ordering(sq.time, last_time, sq.original_idx)?;
+        let quote = &quotes[sq.original_idx];
+        let time = sq.time;
 
-        for (index, sq) in sorted_quotes.iter().enumerate() {
-            validate_time_ordering(sq.time, last_time, sq.original_idx)?;
-            let quote = &quotes[sq.original_idx];
-            let time = sq.time;
+        let (solved_value, eval_count, is_approximate) =
+            solve_single_knot(target, quote, &knots, time, config, validation_tolerance)?;
 
-            let (solved_value, eval_count, is_approximate) =
-                Self::solve_single_knot(target, quote, &knots, time, config, validation_tolerance)?;
-
-            if is_approximate {
-                approximate_knot_times.push(time);
-            }
-
-            let residual = validate_and_commit_knot(
-                target,
-                &mut knots,
-                time,
-                solved_value,
-                quote,
-                validation_tolerance,
-            )?;
-            if let Some(trace) = trace.as_mut() {
-                // Residual on the curve as it stood when this knot was
-                // committed; the report carries the final-curve residual.
-                trace.push(
-                    TraceEntry::ComputationStep {
-                        name: "knot_solved".to_string(),
-                        description: target.residual_key(quote, index),
-                        metadata: Some(serde_json::json!({
-                            "time": time,
-                            "value": solved_value,
-                            "residual": residual,
-                            "quote_value": target.quote_value(quote),
-                            "evaluations": eval_count,
-                            "approximate": is_approximate,
-                        })),
-                    },
-                    config.explain.max_entries,
-                );
-            }
-
-            total_iterations += eval_count;
-            last_time = time;
+        if is_approximate {
+            approximate_knot_times.push(time);
         }
 
-        let final_curve = target.build_curve_final(&knots)?;
-        // Later knots can move earlier interpolation segments for non-local
-        // schemes such as PCHIP and MonotoneConvex. Reprice every quote on the
-        // final curve instead of reporting the stale residual captured when
-        // each knot was first committed.
-        let residuals = sorted_quotes
-            .iter()
-            .map(|sq| target.calculate_residual(&final_curve, &quotes[sq.original_idx]))
-            .collect::<Result<Vec<_>>>()?
-            .into_iter()
-            .enumerate()
-            .map(|(index, residual)| {
-                (
-                    target.residual_key(&quotes[sorted_quotes[index].original_idx], index),
-                    residual,
-                )
-            })
-            .collect();
-        let mut report = CalibrationReport::for_type_with_tolerance(
-            "generic_bootstrap",
-            residuals,
-            total_iterations,
+        let residual = validate_and_commit_knot(
+            target,
+            &mut knots,
+            time,
+            solved_value,
+            quote,
             validation_tolerance,
-        )
-        .with_solver_method(crate::report::SolverMethod::SequentialBootstrap)
-        .with_residual_units(target.residual_units());
-
-        // W-40: flag approximate knots in report metadata so callers can
-        // distinguish true bracketed roots from accepted local |f|-minima.
-        if !approximate_knot_times.is_empty() {
-            let times_str = approximate_knot_times
-                .iter()
-                .map(|t| format!("{t:.6}"))
-                .collect::<Vec<_>>()
-                .join(",");
-            report = report.with_metadata("approximate_knots", times_str);
-        }
-
-        // Compute optional diagnostics if requested.
-        if config.compute_diagnostics {
-            let diagnostics =
-                compute_bootstrap_diagnostics(target, quotes, &knots, &report.residuals, config)?;
-            report = report.with_diagnostics(diagnostics);
-        }
-        if let Some(trace) = trace {
-            report = report.with_explanation(trace);
-        }
-
-        Ok((final_curve, report))
-    }
-
-    /// Solve for a single knot value using bracket + polish.
-    ///
-    /// Returns `(solved_value, eval_count, is_approximate)`.
-    /// `is_approximate = true` means the knot was accepted from a local `|f|`-minimum
-    /// without a sign-change bracket (W-40).
-    fn solve_single_knot<T>(
-        target: &T,
-        quote: &T::Quote,
-        knots: &[(f64, f64)],
-        time: f64,
-        config: &CalibrationConfig,
-        validation_tolerance: f64,
-    ) -> Result<(f64, usize, bool)>
-    where
-        T: BootstrapTarget,
-        T::Quote: std::fmt::Debug,
-    {
-        let initial_guess = target.initial_guess(quote, knots)?;
-
-        // Track the first evaluation error for diagnostics
-        let first_eval_error: std::cell::RefCell<Option<String>> = std::cell::RefCell::new(None);
-        let eval_counter = AtomicUsize::new(0);
-
-        // Optimization: reuse buffer to avoid allocation in hot loop
-        let reuse_buffer = std::cell::RefCell::new(Vec::with_capacity(knots.len() + 1));
-
-        let objective = |value: f64| -> f64 {
-            let eval_idx = eval_counter.fetch_add(1, Ordering::Relaxed) + 1;
-
-            let mut temp_knots_guard = reuse_buffer.borrow_mut();
-            temp_knots_guard.clear();
-            temp_knots_guard.extend_from_slice(knots);
-            temp_knots_guard.push((time, value));
-            let temp_knots = &*temp_knots_guard;
-
-            let curve = match target.build_curve_for_solver(temp_knots) {
-                Ok(c) => c,
-                Err(e) => {
-                    if first_eval_error.borrow().is_none() {
-                        *first_eval_error.borrow_mut() = Some(format!(
-                            "eval#{eval_idx} curve construction failed at value={value}: {e}"
-                        ));
-                    }
-                    return f64::NAN;
-                }
-            };
-
-            match target.calculate_residual(&curve, quote) {
-                Ok(r) => r,
-                Err(e) => {
-                    if first_eval_error.borrow().is_none() {
-                        *first_eval_error.borrow_mut() = Some(format!(
-                            "eval#{eval_idx} residual evaluation failed at value={value}: {e}"
-                        ));
-                    }
-                    f64::NAN
-                }
-            }
-        };
-
-        let scan_points = {
-            let points = target.scan_points(quote, initial_guess)?;
-            if points.is_empty() {
-                build_default_scan_grid(initial_guess, config)
-            } else {
-                points
-            }
-        };
-        let scan_points = normalize_scan_points(scan_points, initial_guess, time)?;
-
-        let scan_strategy = if target.supports_nearest_first_bracketing() {
-            ScanStrategy::NearestFirst
-        } else {
-            ScanStrategy::Exhaustive
-        };
-        let (tentative, diag) = bracket_solve_1d(
-            &objective,
-            initial_guess,
-            &scan_points,
-            config.solver.tolerance(),
-            config.solver.max_iterations(),
-            scan_strategy,
         )?;
+        if let Some(trace) = trace.as_mut() {
+            // Residual on the curve as it stood when this knot was
+            // committed; the report carries the final-curve residual.
+            trace.push(
+                TraceEntry::ComputationStep {
+                    name: "knot_solved".to_string(),
+                    description: target.residual_key(quote, index),
+                    metadata: Some(serde_json::json!({
+                        "time": time,
+                        "value": solved_value,
+                        "residual": residual,
+                        "quote_value": target.quote_value(quote),
+                        "evaluations": eval_count,
+                        "approximate": is_approximate,
+                    })),
+                },
+                config.explain.max_entries,
+            );
+        }
 
-        // W-40: a result is "approximate" if it was NOT derived from a true sign-change
-        // bracket (two scan-grid points with opposite signs). This covers:
-        //   - `tentative = None` → `resolve_no_bracket` accepted a local |f|-minimum
-        //   - `tentative = Some` but found via secant/best-point (no sign change)
-        //
-        // Gate-bypass fix: a `Some` candidate without a sign-change bracket (no-bracket
-        // secant fallback or scan-grid |f|-minimum hit) must pass the SAME opt-in gate
-        // as the `None` path. Previously it committed unconditionally with only the
-        // metadata flag, so identical economics got opposite outcomes depending on
-        // whether the secant landed just below or just above the solver tolerance.
-        let (solved_value, is_approximate) = match tentative {
-            Some(root) if diag.is_sign_change_bracket => (root, false),
-            Some(root) if target.allow_approximate_knots() => (root, true),
-            // `Some` without a bracket and without the opt-in, or `None`: resolve
-            // through the shared no-bracket policy (hard error unless a genuinely
-            // bracketed best point exists within tolerance).
-            Some(_) | None => resolve_no_bracket(NoBracketContext {
-                time,
-                quote,
-                diag: &diag,
-                validation_tolerance,
-                allow_approximate: target.allow_approximate_knots(),
-                first_eval_error: first_eval_error.borrow().clone(),
-            })?,
+        total_iterations += eval_count;
+        last_time = time;
+    }
+
+    let final_curve = target.build_curve_final(&knots)?;
+    // Later knots can move earlier interpolation segments for non-local
+    // schemes such as PCHIP and MonotoneConvex. Reprice every quote on the
+    // final curve instead of reporting the stale residual captured when
+    // each knot was first committed.
+    let residuals = sorted_quotes
+        .iter()
+        .map(|sq| target.calculate_residual(&final_curve, &quotes[sq.original_idx]))
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .enumerate()
+        .map(|(index, residual)| {
+            (
+                target.residual_key(&quotes[sorted_quotes[index].original_idx], index),
+                residual,
+            )
+        })
+        .collect();
+    let mut report = CalibrationReport::for_type_with_tolerance(
+        "generic_bootstrap",
+        residuals,
+        total_iterations,
+        validation_tolerance,
+    )
+    .with_solver_method(crate::report::SolverMethod::SequentialBootstrap)
+    .with_residual_units(target.residual_units());
+
+    // W-40: flag approximate knots in report metadata so callers can
+    // distinguish true bracketed roots from accepted local |f|-minima.
+    if !approximate_knot_times.is_empty() {
+        let times_str = approximate_knot_times
+            .iter()
+            .map(|t| format!("{t:.6}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        report = report.with_metadata("approximate_knots", times_str);
+    }
+
+    // Compute optional diagnostics if requested.
+    if config.compute_diagnostics {
+        let diagnostics =
+            compute_bootstrap_diagnostics(target, quotes, &knots, &report.residuals, config)?;
+        report = report.with_diagnostics(diagnostics);
+    }
+    if let Some(trace) = trace {
+        report = report.with_explanation(trace);
+    }
+
+    Ok((final_curve, report))
+}
+
+/// Solve for a single knot value using bracket + polish.
+///
+/// Returns `(solved_value, eval_count, is_approximate)`.
+/// `is_approximate = true` means the knot was accepted from a local `|f|`-minimum
+/// without a sign-change bracket (W-40).
+fn solve_single_knot<T>(
+    target: &T,
+    quote: &T::Quote,
+    knots: &[(f64, f64)],
+    time: f64,
+    config: &CalibrationConfig,
+    validation_tolerance: f64,
+) -> Result<(f64, usize, bool)>
+where
+    T: BootstrapTarget,
+    T::Quote: std::fmt::Debug,
+{
+    let initial_guess = target.initial_guess(quote, knots)?;
+
+    // Track the first evaluation error for diagnostics
+    let first_eval_error: std::cell::RefCell<Option<String>> = std::cell::RefCell::new(None);
+    let eval_counter = AtomicUsize::new(0);
+
+    // Optimization: reuse buffer to avoid allocation in hot loop
+    let reuse_buffer = std::cell::RefCell::new(Vec::with_capacity(knots.len() + 1));
+
+    let objective = |value: f64| -> f64 {
+        let eval_idx = eval_counter.fetch_add(1, Ordering::Relaxed) + 1;
+
+        let mut temp_knots_guard = reuse_buffer.borrow_mut();
+        temp_knots_guard.clear();
+        temp_knots_guard.extend_from_slice(knots);
+        temp_knots_guard.push((time, value));
+        let temp_knots = &*temp_knots_guard;
+
+        let curve = match target.build_curve_for_solver(temp_knots) {
+            Ok(c) => c,
+            Err(e) => {
+                if first_eval_error.borrow().is_none() {
+                    *first_eval_error.borrow_mut() = Some(format!(
+                        "eval#{eval_idx} curve construction failed at value={value}: {e}"
+                    ));
+                }
+                return f64::NAN;
+            }
         };
 
-        Ok((solved_value, diag.eval_count, is_approximate))
-    }
+        match target.calculate_residual(&curve, quote) {
+            Ok(r) => r,
+            Err(e) => {
+                if first_eval_error.borrow().is_none() {
+                    *first_eval_error.borrow_mut() = Some(format!(
+                        "eval#{eval_idx} residual evaluation failed at value={value}: {e}"
+                    ));
+                }
+                f64::NAN
+            }
+        }
+    };
+
+    let scan_points = {
+        let points = target.scan_points(quote, initial_guess)?;
+        if points.is_empty() {
+            build_default_scan_grid(initial_guess, config)
+        } else {
+            points
+        }
+    };
+    let scan_points = normalize_scan_points(scan_points, initial_guess, time)?;
+
+    let scan_strategy = if target.supports_nearest_first_bracketing() {
+        ScanStrategy::NearestFirst
+    } else {
+        ScanStrategy::Exhaustive
+    };
+    let (tentative, diag) = bracket_solve_1d(
+        &objective,
+        initial_guess,
+        &scan_points,
+        config.solver.tolerance(),
+        config.solver.max_iterations(),
+        scan_strategy,
+    )?;
+
+    // W-40: a result is "approximate" if it was NOT derived from a true sign-change
+    // bracket (two scan-grid points with opposite signs). This covers:
+    //   - `tentative = None` → `resolve_no_bracket` accepted a local |f|-minimum
+    //   - `tentative = Some` but found via secant/best-point (no sign change)
+    //
+    // Gate-bypass fix: a `Some` candidate without a sign-change bracket (no-bracket
+    // secant fallback or scan-grid |f|-minimum hit) must pass the SAME opt-in gate
+    // as the `None` path. Previously it committed unconditionally with only the
+    // metadata flag, so identical economics got opposite outcomes depending on
+    // whether the secant landed just below or just above the solver tolerance.
+    let (solved_value, is_approximate) = match tentative {
+        Some(root) if diag.is_sign_change_bracket => (root, false),
+        Some(root) if target.allow_approximate_knots() => (root, true),
+        // `Some` without a bracket and without the opt-in, or `None`: resolve
+        // through the shared no-bracket policy (hard error unless a genuinely
+        // bracketed best point exists within tolerance).
+        Some(_) | None => resolve_no_bracket(NoBracketContext {
+            time,
+            quote,
+            diag: &diag,
+            validation_tolerance,
+            allow_approximate: target.allow_approximate_knots(),
+            first_eval_error: first_eval_error.borrow().clone(),
+        })?,
+    };
+
+    Ok((solved_value, diag.eval_count, is_approximate))
 }
 
 /// Compute bootstrap diagnostics via per-knot finite-difference sensitivity.
@@ -737,14 +734,14 @@ mod tests {
         shuffled.reverse();
 
         let config = CalibrationConfig::default();
-        let (curve_a, _) = SequentialBootstrapper::bootstrap(
+        let (curve_a, _) = bootstrap(
             &target,
             &quotes,
             Vec::new(),
             &config,
             config.solver.tolerance(),
         )?;
-        let (curve_b, _) = SequentialBootstrapper::bootstrap(
+        let (curve_b, _) = bootstrap(
             &target,
             &shuffled,
             Vec::new(),
@@ -844,7 +841,7 @@ mod tests {
             vec![short.clone(), long.clone()],
             vec![long.clone(), short.clone()],
         ] {
-            let (curve, report) = SequentialBootstrapper::bootstrap(
+            let (curve, report) = bootstrap(
                 &BoundaryDiagnosticTarget,
                 &quotes,
                 vec![(0.0, 0.0)],
@@ -1006,7 +1003,7 @@ mod w40_tests {
         };
         // With the scan grid including sign-change points, the solver should bracket
         // and converge to a true root.
-        let (curve, report) = SequentialBootstrapper::bootstrap(
+        let (curve, report) = bootstrap(
             &target,
             &[q],
             vec![(0.0, 0.0)],
@@ -1137,8 +1134,7 @@ mod w40_tests {
 
         // After the fix: when a knot is accepted without a bracket, the report
         // must flag it. Pre-fix: this test detects the ABSENCE of the flag.
-        let result =
-            SequentialBootstrapper::bootstrap(&target, &[q], vec![(0.0, 0.0)], &cfg, tolerance);
+        let result = bootstrap(&target, &[q], vec![(0.0, 0.0)], &cfg, tolerance);
 
         // The test verifies:
         // 1. If bootstrap succeeds (best point accepted), the report MUST contain
@@ -1192,7 +1188,7 @@ mod w40_tests {
 
         // Validation tolerance 1e-6 > eps: pre-fix `resolve_no_bracket` accepted the
         // local minimum as an "approximate knot" and reported success.
-        let result = SequentialBootstrapper::bootstrap(&target, &[q], vec![(0.0, 0.0)], &cfg, 1e-6);
+        let result = bootstrap(&target, &[q], vec![(0.0, 0.0)], &cfg, 1e-6);
 
         let err = result.expect_err(
             "Item 10: a no-bracket local-minimum knot must be a hard failure, \
@@ -1235,12 +1231,10 @@ mod w40_tests {
             ..crate::CalibrationConfig::default()
         };
 
-        let err =
-            SequentialBootstrapper::bootstrap(&target, &[q], vec![(0.0, 0.0)], &cfg, tolerance)
-                .expect_err(
-                    "a no-bracket Some-path knot must be a hard failure when the target \
+        let err = bootstrap(&target, &[q], vec![(0.0, 0.0)], &cfg, tolerance).expect_err(
+            "a no-bracket Some-path knot must be a hard failure when the target \
              does not opt into approximate knots",
-                );
+        );
         let finstack_quant_core::Error::Calibration { message, category } = err else {
             unreachable!("no-bracket failure should return a Calibration error");
         };
@@ -1322,9 +1316,8 @@ mod w40_tests {
             ..crate::CalibrationConfig::default()
         };
 
-        let (curve, report) =
-            SequentialBootstrapper::bootstrap(&target, &[q], vec![(0.0, 0.0)], &cfg, tolerance)
-                .expect("opt-in target must accept the best-effort knot");
+        let (curve, report) = bootstrap(&target, &[q], vec![(0.0, 0.0)], &cfg, tolerance)
+            .expect("opt-in target must accept the best-effort knot");
 
         assert!(
             (curve - 0.5).abs() < 1e-6,
@@ -1438,7 +1431,7 @@ mod solver_tests {
                 .with_max_iterations(200),
             ..CalibrationConfig::default()
         };
-        let (curve, report) = SequentialBootstrapper::bootstrap(
+        let (curve, report) = bootstrap(
             &target,
             &[q],
             vec![(0.0, 0.0)],
@@ -1467,7 +1460,7 @@ mod solver_tests {
                 .with_max_iterations(200),
             ..CalibrationConfig::default()
         };
-        let (curve, report) = SequentialBootstrapper::bootstrap(
+        let (curve, report) = bootstrap(
             &target,
             &[q],
             vec![(0.0, 0.0)],
@@ -1497,7 +1490,7 @@ mod solver_tests {
                 .with_max_iterations(200),
             ..CalibrationConfig::default()
         };
-        let err = SequentialBootstrapper::bootstrap(
+        let err = bootstrap(
             &target,
             &[q],
             vec![(0.0, 0.0)],
@@ -1594,7 +1587,7 @@ mod solver_tests {
                 .with_max_iterations(200),
             ..CalibrationConfig::default()
         };
-        let err = SequentialBootstrapper::bootstrap(
+        let err = bootstrap(
             &target,
             &[q],
             vec![(0.0, 0.0)],
@@ -1621,7 +1614,7 @@ mod solver_tests {
         };
         let q2 = DummyQuote { t: 1.0, ..q1 };
         let cfg = CalibrationConfig::default();
-        let err = SequentialBootstrapper::bootstrap(
+        let err = bootstrap(
             &target,
             &[q1, q2],
             vec![(0.0, 0.0)],
@@ -1656,7 +1649,7 @@ mod solver_tests {
             ..CalibrationConfig::default()
         };
 
-        let (curve_sorted, report_sorted) = SequentialBootstrapper::bootstrap(
+        let (curve_sorted, report_sorted) = bootstrap(
             &target,
             &[q_short.clone(), q_long.clone()],
             vec![(0.0, 0.0)],
@@ -1664,7 +1657,7 @@ mod solver_tests {
             cfg.solver.tolerance(),
         )
         .expect("sorted input should succeed");
-        let (curve_shuffled, report_shuffled) = SequentialBootstrapper::bootstrap(
+        let (curve_shuffled, report_shuffled) = bootstrap(
             &target,
             &[q_long, q_short],
             vec![(0.0, 0.0)],

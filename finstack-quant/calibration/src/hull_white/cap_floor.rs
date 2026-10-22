@@ -153,7 +153,7 @@ pub(crate) fn calibrate_hull_white_to_cap_floors_with_fn(
         return Ok((HullWhiteCalibrationParams::new(fixed, sigma)?, report));
     }
 
-    // Two-parameter (κ, σ) path via GlobalFitOptimizer.
+    // Two-parameter (κ, σ) path via global.
     let init = config.initial_guess.unwrap_or_default();
     let x0 = [init.kappa.ln(), init.sigma.ln()];
 

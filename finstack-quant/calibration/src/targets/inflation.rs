@@ -6,8 +6,8 @@ use crate::config::{CalibrationConfig, CalibrationMethod};
 use crate::constants::WEIGHT_MIN_FLOOR;
 use crate::quotes::inflation::InflationQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
-use crate::solver::bootstrap::SequentialBootstrapper;
-use crate::solver::global::GlobalFitOptimizer;
+use crate::solver::bootstrap;
+use crate::solver::global;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
 use crate::targets::util::{
     scheme_factor, sorted_knot_grid, validate_global_knot_grid, ContextScratch,
@@ -290,7 +290,7 @@ impl InflationCurveTarget {
         let success_tolerance = config.inflation_curve.validation_tolerance;
 
         let (curve, mut report) = match params.method {
-            CalibrationMethod::Bootstrap => SequentialBootstrapper::bootstrap(
+            CalibrationMethod::Bootstrap => bootstrap::bootstrap(
                 &target,
                 &prepared_quotes,
                 Vec::new(),
@@ -299,7 +299,7 @@ impl InflationCurveTarget {
             )?,
             CalibrationMethod::GlobalSolve {
                 use_analytical_jacobian,
-            } => GlobalFitOptimizer::optimize(
+            } => global::optimize(
                 &target,
                 &prepared_quotes,
                 &config,

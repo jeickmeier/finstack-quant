@@ -52,7 +52,7 @@ use finstack_quant_core::math::special_functions::norm_cdf;
 use std::collections::BTreeMap;
 
 use crate::config::CalibrationConfig;
-use crate::solver::global::GlobalFitOptimizer;
+use crate::solver::global;
 use crate::solver::multi_start::MultiStartConfig;
 use crate::solver::traits::GlobalSolveTarget;
 use crate::CalibrationReport;

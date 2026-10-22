@@ -111,7 +111,7 @@ where
         perturbation_scale: HW_PERTURB_SCALE,
     };
 
-    GlobalFitOptimizer::optimize_with_multi_start(
+    global::optimize_with_multi_start(
         target,
         quotes,
         &config,

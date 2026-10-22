@@ -119,392 +119,387 @@ fn fill_penalty(
 ///
 /// When [`MultiStartConfig`] is provided, the optimizer runs additional LM solves
 /// from deterministically-perturbed starting points and returns the best result.
-pub(crate) struct GlobalFitOptimizer;
+/// Execute a simultaneous weighted least-squares fit.
+///
+/// # Generic Parameters
+/// * `T` - The calibration target (e.g., [`DiscountCurveTarget`](crate::targets::discount::DiscountCurveTarget)).
+///
+/// # Arguments
+/// * `target` - The domain-specific implementation of the [`GlobalSolveTarget`] trait.
+/// * `quotes` - The list of high-level market quotes to fit.
+/// * `config` - Numerical calibration and acceptance settings.
+/// * `use_analytical_jacobian` - Use the target derivative when it supports one.
+/// * `success_tolerance` - Accept/reject threshold for the unweighted native residual
+///   (`max_i |r_i|`). Distinct from the LM solver convergence tolerance in `config`.
+///   Callers pass the target-specific validation tolerance (for example
+///   `config.forward_curve.validation_tolerance`). There is no implicit
+///   discount-curve fallback.
+///
+/// # Returns
+/// A pair containing the calibrated term structure and a diagnostic report.
+///
+/// # Tolerance Semantics
+/// Success is `max_i |r_i| <= success_tolerance` on the unweighted native residual.
+/// Residual weights affect only the LM objective (`objective_value` / weighted L2),
+/// not the accept/reject gate. The report stores signed residuals.
+pub(crate) fn optimize<T>(
+    target: &T,
+    quotes: &[T::Quote],
+    config: &CalibrationConfig,
+    success_tolerance: f64,
+    use_analytical_jacobian: bool,
+) -> Result<(T::Curve, CalibrationReport)>
+where
+    T: GlobalSolveTarget,
+{
+    optimize_impl(
+        target,
+        quotes,
+        config,
+        success_tolerance,
+        None,
+        no_restarts::<T>,
+        use_analytical_jacobian,
+    )
+}
 
-impl GlobalFitOptimizer {
-    /// Execute a simultaneous weighted least-squares fit.
-    ///
-    /// # Generic Parameters
-    /// * `T` - The calibration target (e.g., [`DiscountCurveTarget`](crate::targets::discount::DiscountCurveTarget)).
-    ///
-    /// # Arguments
-    /// * `target` - The domain-specific implementation of the [`GlobalSolveTarget`] trait.
-    /// * `quotes` - The list of high-level market quotes to fit.
-    /// * `config` - Numerical calibration and acceptance settings.
-    /// * `use_analytical_jacobian` - Use the target derivative when it supports one.
-    /// * `success_tolerance` - Accept/reject threshold for the unweighted native residual
-    ///   (`max_i |r_i|`). Distinct from the LM solver convergence tolerance in `config`.
-    ///   Callers pass the target-specific validation tolerance (for example
-    ///   `config.forward_curve.validation_tolerance`). There is no implicit
-    ///   discount-curve fallback.
-    ///
-    /// # Returns
-    /// A pair containing the calibrated term structure and a diagnostic report.
-    ///
-    /// # Tolerance Semantics
-    /// Success is `max_i |r_i| <= success_tolerance` on the unweighted native residual.
-    /// Residual weights affect only the LM objective (`objective_value` / weighted L2),
-    /// not the accept/reject gate. The report stores signed residuals.
-    pub(crate) fn optimize<T>(
-        target: &T,
-        quotes: &[T::Quote],
-        config: &CalibrationConfig,
-        success_tolerance: f64,
-        use_analytical_jacobian: bool,
-    ) -> Result<(T::Curve, CalibrationReport)>
-    where
-        T: GlobalSolveTarget,
-    {
-        Self::optimize_impl(
-            target,
-            quotes,
-            config,
-            success_tolerance,
-            None,
-            no_restarts::<T>,
-            use_analytical_jacobian,
-        )
+/// Execute a simultaneous weighted least-squares fit with optional multi-start.
+///
+/// When `multi_start` is `Some`, the optimizer runs `num_restarts` additional solves
+/// from deterministically-perturbed starting points. On native targets the restarts
+/// run in parallel; results are folded in restart order, so the winner is identical
+/// to a serial run. The best result (lowest weighted residual norm) is returned.
+pub(crate) fn optimize_with_multi_start<T>(
+    target: &T,
+    quotes: &[T::Quote],
+    config: &CalibrationConfig,
+    success_tolerance: f64,
+    multi_start: Option<&MultiStartConfig>,
+    use_analytical_jacobian: bool,
+) -> Result<(T::Curve, CalibrationReport)>
+where
+    T: GlobalSolveTarget + Sync,
+    T::Quote: Sync,
+{
+    optimize_impl(
+        target,
+        quotes,
+        config,
+        success_tolerance,
+        multi_start,
+        parallel_restarts::<T>,
+        use_analytical_jacobian,
+    )
+}
+
+fn optimize_impl<T>(
+    target: &T,
+    quotes: &[T::Quote],
+    config: &CalibrationConfig,
+    success_tolerance: f64,
+    multi_start: Option<&MultiStartConfig>,
+    run_restarts: RestartRunner<T>,
+    use_analytical_jacobian: bool,
+) -> Result<(T::Curve, CalibrationReport)>
+where
+    T: GlobalSolveTarget,
+{
+    // 1. Build grid and guesses
+    let (times, initials, active_quotes) = target.build_time_grid_and_guesses(quotes)?;
+    let n_residuals = active_quotes.len();
+
+    if n_residuals == 0 {
+        return Err(finstack_quant_core::Error::Input(
+            finstack_quant_core::InputError::TooFewPoints,
+        ));
     }
 
-    /// Execute a simultaneous weighted least-squares fit with optional multi-start.
-    ///
-    /// When `multi_start` is `Some`, the optimizer runs `num_restarts` additional solves
-    /// from deterministically-perturbed starting points. On native targets the restarts
-    /// run in parallel; results are folded in restart order, so the winner is identical
-    /// to a serial run. The best result (lowest weighted residual norm) is returned.
-    pub(crate) fn optimize_with_multi_start<T>(
-        target: &T,
-        quotes: &[T::Quote],
-        config: &CalibrationConfig,
-        success_tolerance: f64,
-        multi_start: Option<&MultiStartConfig>,
-        use_analytical_jacobian: bool,
-    ) -> Result<(T::Curve, CalibrationReport)>
-    where
-        T: GlobalSolveTarget + Sync,
-        T::Quote: Sync,
-    {
-        Self::optimize_impl(
-            target,
-            quotes,
-            config,
-            success_tolerance,
-            multi_start,
-            parallel_restarts::<T>,
-            use_analytical_jacobian,
-        )
-    }
+    validate_global_inputs(&times, &initials, n_residuals)?;
 
-    fn optimize_impl<T>(
-        target: &T,
-        quotes: &[T::Quote],
-        config: &CalibrationConfig,
-        success_tolerance: f64,
-        multi_start: Option<&MultiStartConfig>,
-        run_restarts: RestartRunner<T>,
-        use_analytical_jacobian: bool,
-    ) -> Result<(T::Curve, CalibrationReport)>
-    where
-        T: GlobalSolveTarget,
-    {
-        // 1. Build grid and guesses
-        let (times, initials, active_quotes) = target.build_time_grid_and_guesses(quotes)?;
-        let n_residuals = active_quotes.len();
-
-        if n_residuals == 0 {
-            return Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::TooFewPoints,
-            ));
-        }
-
-        validate_global_inputs(&times, &initials, n_residuals)?;
-
-        let mut weights = vec![1.0_f64; n_residuals];
-        target.residual_weights(&active_quotes, &mut weights)?;
-        for (idx, w) in weights.iter().enumerate() {
-            if !w.is_finite() || *w < 0.0 {
-                return Err(finstack_quant_core::Error::Calibration {
-                    message: format!(
-                        "Global solve requires non-negative finite residual weights; got {} at index {}.",
-                        w, idx
-                    ),
-                    category: "global_solve".to_string(),
-                });
-            }
-        }
-        if weights.iter().all(|w| *w == 0.0) {
+    let mut weights = vec![1.0_f64; n_residuals];
+    target.residual_weights(&active_quotes, &mut weights)?;
+    for (idx, w) in weights.iter().enumerate() {
+        if !w.is_finite() || *w < 0.0 {
             return Err(finstack_quant_core::Error::Calibration {
-                message: "Global solve requires at least one positive residual weight.".to_string(),
+                message: format!(
+                    "Global solve requires non-negative finite residual weights; got {} at index {}.",
+                    w, idx
+                ),
                 category: "global_solve".to_string(),
             });
         }
-        let weight_scales: Vec<f64> = weights.iter().map(|w| w.sqrt()).collect();
-
-        let lb = target.lower_bounds();
-        let ub = target.upper_bounds();
-        validate_parameter_bounds(&initials, &lb, &ub)?;
-
-        // Run the primary solve from the original initial guess. A hard LM error is
-        // logged but does *not* short-circuit multi-start: if perturbed restarts exist
-        // they may succeed where the primary failed (e.g. the initial guess landed in a
-        // region where the curve builder rejected the params). The original error is
-        // returned only if every attempt fails.
-        let mut primary_error: Option<finstack_quant_core::Error> = None;
-        // Tracks which start produced the best result so far: None = primary solve,
-        // Some(i) = multi-start restart i. Recorded in the calibration report so a
-        // user can see whether the answer came from the originally-supplied initial
-        // guess or required a perturbation to escape a bad region.
-        let mut winning_start: Option<usize> = None;
-        let inputs = SolveInputs {
-            target,
-            active_quotes: &active_quotes,
-            times: &times,
-            weight_scales: &weight_scales,
-            lb: &lb,
-            ub: &ub,
-            config,
-            use_analytical_jacobian,
-        };
-        let mut best: Option<(SingleSolveResult, f64)> = match run_single_solve(&inputs, &initials)
-        {
-            Ok(v) => Some(v),
-            Err(err) => {
-                tracing::warn!(
-                    error = %err,
-                    "GlobalFitOptimizer: primary LM solve failed; will attempt multi-start if configured"
-                );
-                primary_error = Some(err);
-                None
-            }
-        };
-
-        // Multi-start: run additional solves from perturbed starting points.
-        if let Some(ms) = multi_start {
-            tracing::debug!(
-                "GlobalFitOptimizer: running {} multi-start restarts (perturbation_scale={:.3})",
-                ms.num_restarts,
-                ms.perturbation_scale,
-            );
-
-            // Restarts are independent solves; fold them in index order so the
-            // first strictly-better restart wins exactly as it would serially.
-            let restart_results = run_restarts(&inputs, &initials, ms);
-            for (restart_idx, outcome) in restart_results.into_iter().enumerate() {
-                match outcome {
-                    Ok((result, wl2)) => {
-                        let improved = best.as_ref().is_none_or(|(_, prev)| wl2 < *prev);
-                        if improved {
-                            tracing::debug!(
-                                "GlobalFitOptimizer: restart {} improved weighted L2: {:?} -> {:.4e}",
-                                restart_idx,
-                                best.as_ref().map(|(_, l)| *l),
-                                wl2,
-                            );
-                            best = Some((result, wl2));
-                            winning_start = Some(restart_idx);
-                        }
-                    }
-                    Err(err) => {
-                        tracing::warn!(
-                            restart = restart_idx,
-                            error = %err,
-                            "GlobalFitOptimizer: multi-start restart failed, skipping",
-                        );
-                    }
-                }
-            }
-        }
-
-        // If the primary solve failed and no restart rescued it, propagate the original
-        // error rather than feeding a sentinel into the final-curve build.
-        let Some((best_result, _best_weighted_l2)) = best else {
-            return Err(
-                primary_error.unwrap_or_else(|| finstack_quant_core::Error::Calibration {
-                    message: "GlobalFitOptimizer: every solve attempt failed".to_string(),
-                    category: "global_solve".to_string(),
-                }),
-            );
-        };
-        let (solved_params, stats, eval_counter_val, eval_diagnostics_val, final_n_clamped) =
-            best_result;
-
-        let final_curve = target.build_curve_final_from_params(&times, &solved_params)?;
-
-        let mut residuals_map = BTreeMap::new();
-        let mut resid_values = vec![0.0; n_residuals];
-        target.calculate_residuals(&final_curve, &active_quotes, &mut resid_values)?;
-
-        for (i, (&val, quote)) in resid_values.iter().zip(active_quotes.iter()).enumerate() {
-            let key = target.residual_key(quote, i);
-            match residuals_map.entry(key) {
-                Entry::Vacant(entry) => {
-                    entry.insert(val);
-                }
-                Entry::Occupied(entry) => {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Global calibration produced duplicate residual key '{}' for observation {i}",
-                        entry.key()
-                    )));
-                }
-            }
-        }
-
-        let l2_norm: f64 = resid_values.iter().map(|r| r * r).sum::<f64>().sqrt();
-        let weighted_l2_norm: f64 = resid_values
-            .iter()
-            .zip(weight_scales.iter())
-            .map(|(r, w)| (r * w).powi(2))
-            .sum::<f64>()
-            .sqrt();
-        let max_abs_residual = resid_values.iter().map(|r| r.abs()).fold(0.0_f64, f64::max);
-        let weighted_max_abs_residual = resid_values
-            .iter()
-            .zip(weight_scales.iter())
-            .map(|(r, w)| (r * w).abs())
-            .fold(0.0_f64, f64::max);
-
-        // `validation_tolerance` is the accept/reject threshold for the final residual,
-        // distinct from the LM solver convergence tolerance. See calibration/README.md.
-        let validation_tolerance = success_tolerance;
-
-        // Success is unweighted `max_i |r_i| <= validation_tolerance`. Weights belong
-        // in the LM objective only; do not scale the gate by √n or compare weighted L2
-        // to this tolerance. `for_type_with_tolerance` already applies that rule.
-        let mut report = CalibrationReport::for_type_with_tolerance(
-            "global_fit",
-            residuals_map,
-            stats.iterations,
-            validation_tolerance,
-        );
-        report.objective_value = weighted_l2_norm;
-        // Always surface the LM termination reason so callers can distinguish
-        // "gradient tolerance met" (clean convergence) from "max iterations
-        // reached but residuals within tolerance" (acceptable but suspect).
-        report.convergence_reason.push_str(&format!(
-            "; LM terminated with {:?}",
-            stats.termination_reason
-        ));
-
-        if !report.success {
-            // Surface the worst-fit quotes without requiring diagnostics.
-            let worst = top_k_worst_fits(target, &active_quotes, &resid_values, 3);
-            if !worst.is_empty() {
-                report.convergence_reason.push_str(". Worst fits: ");
-                report.convergence_reason.push_str(&worst);
-            }
-        }
-
-        // A clamped final point is not a stationary solution.
-        if final_n_clamped > 0 {
-            report = report
-                .with_metadata("final_params_clamped", final_n_clamped.to_string())
-                .with_has_penalty_residuals(true);
-        }
-
-        report = report
-            .with_solver_method(crate::report::SolverMethod::GlobalFitLmWeightedLsq)
-            .with_residual_units(target.residual_units())
-            .with_metadata("tolerance_definition", "max_abs_residual")
-            .with_metadata(
-                "validation_tolerance",
-                format!("{:.2e}", validation_tolerance),
-            )
-            .with_metadata(
-                "solver_tolerance",
-                format!("{:.2e}", config.solver.tolerance()),
-            )
-            .with_metadata("residual_evals", stats.residual_evals.to_string())
-            .with_metadata("residual_closure_evals", eval_counter_val.to_string())
-            .with_metadata(
-                "lm_termination_reason",
-                format!("{:?}", stats.termination_reason),
-            )
-            .with_metadata("lm_jacobian_evals", stats.jacobian_evals.to_string())
-            .with_metadata(
-                "lm_final_weighted_resid_l2_norm",
-                format!("{:.2e}", stats.final_residual_norm),
-            )
-            .with_metadata(
-                "lm_final_step_norm",
-                format!("{:.2e}", stats.final_step_norm),
-            )
-            .with_metadata("lm_lambda_final", format!("{:.2e}", stats.lambda_final))
-            .with_metadata("final_unweighted_resid_l2_norm", format!("{:.2e}", l2_norm))
-            .with_metadata(
-                "final_unweighted_max_abs_residual",
-                format!("{:.2e}", max_abs_residual),
-            )
-            .with_metadata(
-                "final_weighted_resid_l2_norm",
-                format!("{:.2e}", weighted_l2_norm),
-            )
-            .with_metadata(
-                "final_weighted_max_abs_residual",
-                format!("{:.2e}", weighted_max_abs_residual),
-            );
-
-        if let Some(ms) = multi_start {
-            report = report.with_metadata("multi_start_restarts", ms.num_restarts.to_string());
-            // Surface which start produced the best result so users can tell whether
-            // the primary initial guess won or a perturbation rescued it.
-            let winner_label = match winning_start {
-                None => "primary".to_string(),
-                Some(i) => format!("restart_{}", i),
-            };
-            report = report.with_metadata("multi_start_winner", winner_label);
-        }
-
-        // Attach diagnostics from any infeasible evaluations encountered during solving.
-        {
-            report.metadata.insert(
-                "invalid_eval_count".to_string(),
-                eval_diagnostics_val.invalid_eval_count.to_string(),
-            );
-            if let Some(first) = &eval_diagnostics_val.first_invalid_eval {
-                report
-                    .metadata
-                    .insert("first_invalid_eval".to_string(), first.clone());
-            }
-        }
-
-        report.update_solver_config(config.solver.clone());
-
-        // Compute optional diagnostics if requested.
-        if config.compute_diagnostics {
-            let diagnostics = compute_global_diagnostics(
-                target,
-                &active_quotes,
-                &times,
-                &solved_params,
-                &resid_values,
-                &weight_scales,
-                config,
-            );
-            report = report.with_diagnostics(diagnostics);
-        }
-        if config.explain.enabled {
-            let mut trace = ExplanationTrace::new("global_fit");
-            trace.push(
-                TraceEntry::ComputationStep {
-                    name: "global_solve".to_string(),
-                    description: format!("{:?}", stats.termination_reason),
-                    metadata: Some(serde_json::json!({
-                        "times": times,
-                        "solved_params": solved_params,
-                        "iterations": stats.iterations,
-                        "residual_evals": stats.residual_evals,
-                        "jacobian_evals": stats.jacobian_evals,
-                        "weighted_residual_l2_norm": weighted_l2_norm,
-                        "max_abs_residual": max_abs_residual,
-                    })),
-                },
-                config.explain.max_entries,
-            );
-            report = report.with_explanation(trace);
-        }
-
-        Ok((final_curve, report))
     }
+    if weights.iter().all(|w| *w == 0.0) {
+        return Err(finstack_quant_core::Error::Calibration {
+            message: "Global solve requires at least one positive residual weight.".to_string(),
+            category: "global_solve".to_string(),
+        });
+    }
+    let weight_scales: Vec<f64> = weights.iter().map(|w| w.sqrt()).collect();
+
+    let lb = target.lower_bounds();
+    let ub = target.upper_bounds();
+    validate_parameter_bounds(&initials, &lb, &ub)?;
+
+    // Run the primary solve from the original initial guess. A hard LM error is
+    // logged but does *not* short-circuit multi-start: if perturbed restarts exist
+    // they may succeed where the primary failed (e.g. the initial guess landed in a
+    // region where the curve builder rejected the params). The original error is
+    // returned only if every attempt fails.
+    let mut primary_error: Option<finstack_quant_core::Error> = None;
+    // Tracks which start produced the best result so far: None = primary solve,
+    // Some(i) = multi-start restart i. Recorded in the calibration report so a
+    // user can see whether the answer came from the originally-supplied initial
+    // guess or required a perturbation to escape a bad region.
+    let mut winning_start: Option<usize> = None;
+    let inputs = SolveInputs {
+        target,
+        active_quotes: &active_quotes,
+        times: &times,
+        weight_scales: &weight_scales,
+        lb: &lb,
+        ub: &ub,
+        config,
+        use_analytical_jacobian,
+    };
+    let mut best: Option<(SingleSolveResult, f64)> = match run_single_solve(&inputs, &initials) {
+        Ok(v) => Some(v),
+        Err(err) => {
+            tracing::warn!(
+                error = %err,
+                "global: primary LM solve failed; will attempt multi-start if configured"
+            );
+            primary_error = Some(err);
+            None
+        }
+    };
+
+    // Multi-start: run additional solves from perturbed starting points.
+    if let Some(ms) = multi_start {
+        tracing::debug!(
+            "global: running {} multi-start restarts (perturbation_scale={:.3})",
+            ms.num_restarts,
+            ms.perturbation_scale,
+        );
+
+        // Restarts are independent solves; fold them in index order so the
+        // first strictly-better restart wins exactly as it would serially.
+        let restart_results = run_restarts(&inputs, &initials, ms);
+        for (restart_idx, outcome) in restart_results.into_iter().enumerate() {
+            match outcome {
+                Ok((result, wl2)) => {
+                    let improved = best.as_ref().is_none_or(|(_, prev)| wl2 < *prev);
+                    if improved {
+                        tracing::debug!(
+                            "global: restart {} improved weighted L2: {:?} -> {:.4e}",
+                            restart_idx,
+                            best.as_ref().map(|(_, l)| *l),
+                            wl2,
+                        );
+                        best = Some((result, wl2));
+                        winning_start = Some(restart_idx);
+                    }
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        restart = restart_idx,
+                        error = %err,
+                        "global: multi-start restart failed, skipping",
+                    );
+                }
+            }
+        }
+    }
+
+    // If the primary solve failed and no restart rescued it, propagate the original
+    // error rather than feeding a sentinel into the final-curve build.
+    let Some((best_result, _best_weighted_l2)) = best else {
+        return Err(
+            primary_error.unwrap_or_else(|| finstack_quant_core::Error::Calibration {
+                message: "global: every solve attempt failed".to_string(),
+                category: "global_solve".to_string(),
+            }),
+        );
+    };
+    let (solved_params, stats, eval_counter_val, eval_diagnostics_val, final_n_clamped) =
+        best_result;
+
+    let final_curve = target.build_curve_final_from_params(&times, &solved_params)?;
+
+    let mut residuals_map = BTreeMap::new();
+    let mut resid_values = vec![0.0; n_residuals];
+    target.calculate_residuals(&final_curve, &active_quotes, &mut resid_values)?;
+
+    for (i, (&val, quote)) in resid_values.iter().zip(active_quotes.iter()).enumerate() {
+        let key = target.residual_key(quote, i);
+        match residuals_map.entry(key) {
+            Entry::Vacant(entry) => {
+                entry.insert(val);
+            }
+            Entry::Occupied(entry) => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Global calibration produced duplicate residual key '{}' for observation {i}",
+                    entry.key()
+                )));
+            }
+        }
+    }
+
+    let l2_norm: f64 = resid_values.iter().map(|r| r * r).sum::<f64>().sqrt();
+    let weighted_l2_norm: f64 = resid_values
+        .iter()
+        .zip(weight_scales.iter())
+        .map(|(r, w)| (r * w).powi(2))
+        .sum::<f64>()
+        .sqrt();
+    let max_abs_residual = resid_values.iter().map(|r| r.abs()).fold(0.0_f64, f64::max);
+    let weighted_max_abs_residual = resid_values
+        .iter()
+        .zip(weight_scales.iter())
+        .map(|(r, w)| (r * w).abs())
+        .fold(0.0_f64, f64::max);
+
+    // `validation_tolerance` is the accept/reject threshold for the final residual,
+    // distinct from the LM solver convergence tolerance. See calibration/README.md.
+    let validation_tolerance = success_tolerance;
+
+    // Success is unweighted `max_i |r_i| <= validation_tolerance`. Weights belong
+    // in the LM objective only; do not scale the gate by √n or compare weighted L2
+    // to this tolerance. `for_type_with_tolerance` already applies that rule.
+    let mut report = CalibrationReport::for_type_with_tolerance(
+        "global_fit",
+        residuals_map,
+        stats.iterations,
+        validation_tolerance,
+    );
+    report.objective_value = weighted_l2_norm;
+    // Always surface the LM termination reason so callers can distinguish
+    // "gradient tolerance met" (clean convergence) from "max iterations
+    // reached but residuals within tolerance" (acceptable but suspect).
+    report.convergence_reason.push_str(&format!(
+        "; LM terminated with {:?}",
+        stats.termination_reason
+    ));
+
+    if !report.success {
+        // Surface the worst-fit quotes without requiring diagnostics.
+        let worst = top_k_worst_fits(target, &active_quotes, &resid_values, 3);
+        if !worst.is_empty() {
+            report.convergence_reason.push_str(". Worst fits: ");
+            report.convergence_reason.push_str(&worst);
+        }
+    }
+
+    // A clamped final point is not a stationary solution.
+    if final_n_clamped > 0 {
+        report = report
+            .with_metadata("final_params_clamped", final_n_clamped.to_string())
+            .with_has_penalty_residuals(true);
+    }
+
+    report = report
+        .with_solver_method(crate::report::SolverMethod::GlobalFitLmWeightedLsq)
+        .with_residual_units(target.residual_units())
+        .with_metadata("tolerance_definition", "max_abs_residual")
+        .with_metadata(
+            "validation_tolerance",
+            format!("{:.2e}", validation_tolerance),
+        )
+        .with_metadata(
+            "solver_tolerance",
+            format!("{:.2e}", config.solver.tolerance()),
+        )
+        .with_metadata("residual_evals", stats.residual_evals.to_string())
+        .with_metadata("residual_closure_evals", eval_counter_val.to_string())
+        .with_metadata(
+            "lm_termination_reason",
+            format!("{:?}", stats.termination_reason),
+        )
+        .with_metadata("lm_jacobian_evals", stats.jacobian_evals.to_string())
+        .with_metadata(
+            "lm_final_weighted_resid_l2_norm",
+            format!("{:.2e}", stats.final_residual_norm),
+        )
+        .with_metadata(
+            "lm_final_step_norm",
+            format!("{:.2e}", stats.final_step_norm),
+        )
+        .with_metadata("lm_lambda_final", format!("{:.2e}", stats.lambda_final))
+        .with_metadata("final_unweighted_resid_l2_norm", format!("{:.2e}", l2_norm))
+        .with_metadata(
+            "final_unweighted_max_abs_residual",
+            format!("{:.2e}", max_abs_residual),
+        )
+        .with_metadata(
+            "final_weighted_resid_l2_norm",
+            format!("{:.2e}", weighted_l2_norm),
+        )
+        .with_metadata(
+            "final_weighted_max_abs_residual",
+            format!("{:.2e}", weighted_max_abs_residual),
+        );
+
+    if let Some(ms) = multi_start {
+        report = report.with_metadata("multi_start_restarts", ms.num_restarts.to_string());
+        // Surface which start produced the best result so users can tell whether
+        // the primary initial guess won or a perturbation rescued it.
+        let winner_label = match winning_start {
+            None => "primary".to_string(),
+            Some(i) => format!("restart_{}", i),
+        };
+        report = report.with_metadata("multi_start_winner", winner_label);
+    }
+
+    // Attach diagnostics from any infeasible evaluations encountered during solving.
+    {
+        report.metadata.insert(
+            "invalid_eval_count".to_string(),
+            eval_diagnostics_val.invalid_eval_count.to_string(),
+        );
+        if let Some(first) = &eval_diagnostics_val.first_invalid_eval {
+            report
+                .metadata
+                .insert("first_invalid_eval".to_string(), first.clone());
+        }
+    }
+
+    report.update_solver_config(config.solver.clone());
+
+    // Compute optional diagnostics if requested.
+    if config.compute_diagnostics {
+        let diagnostics = compute_global_diagnostics(
+            target,
+            &active_quotes,
+            &times,
+            &solved_params,
+            &resid_values,
+            &weight_scales,
+            config,
+        );
+        report = report.with_diagnostics(diagnostics);
+    }
+    if config.explain.enabled {
+        let mut trace = ExplanationTrace::new("global_fit");
+        trace.push(
+            TraceEntry::ComputationStep {
+                name: "global_solve".to_string(),
+                description: format!("{:?}", stats.termination_reason),
+                metadata: Some(serde_json::json!({
+                    "times": times,
+                    "solved_params": solved_params,
+                    "iterations": stats.iterations,
+                    "residual_evals": stats.residual_evals,
+                    "jacobian_evals": stats.jacobian_evals,
+                    "weighted_residual_l2_norm": weighted_l2_norm,
+                    "max_abs_residual": max_abs_residual,
+                })),
+            },
+            config.explain.max_entries,
+        );
+        report = report.with_explanation(trace);
+    }
+
+    Ok((final_curve, report))
 }
 
 // The Halton multi-start helpers (`halton`, `perturb_initial_guess`, and
@@ -540,7 +535,7 @@ struct SolveInputs<'a, T: GlobalSolveTarget> {
 type RestartRunner<T> =
     fn(&SolveInputs<'_, T>, &[f64], &MultiStartConfig) -> Vec<Result<(SingleSolveResult, f64)>>;
 
-/// Restart runner for [`GlobalFitOptimizer::optimize`], which never restarts.
+/// Restart runner for [`optimize`], which never restarts.
 fn no_restarts<T: GlobalSolveTarget>(
     _inputs: &SolveInputs<'_, T>,
     _initials: &[f64],
@@ -1480,14 +1475,8 @@ mod tests {
     #[test]
     fn rejects_colliding_residual_keys_before_acceptance() {
         let target = TestTarget::from_len(2, vec![0.005, 0.0]);
-        let error = GlobalFitOptimizer::optimize(
-            &target,
-            &[0, 0],
-            &CalibrationConfig::default(),
-            1e-6,
-            true,
-        )
-        .expect_err("a residual must never overwrite another observation");
+        let error = optimize(&target, &[0, 0], &CalibrationConfig::default(), 1e-6, true)
+            .expect_err("a residual must never overwrite another observation");
         assert!(error.to_string().contains("duplicate residual key"));
     }
 
@@ -1501,8 +1490,8 @@ mod tests {
         let target = TestTarget::from_len(4, vec![tol; 4]);
         let quotes = vec![0usize, 1usize, 2usize, 3usize];
         let config = CalibrationConfig::default().with_tolerance(1.0);
-        let (_curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, tol, true)
-            .expect("optimization should complete");
+        let (_curve, report) =
+            optimize(&target, &quotes, &config, tol, true).expect("optimization should complete");
 
         assert!(
             report.success,
@@ -1527,8 +1516,8 @@ mod tests {
         let target = TestTarget::from_len(2, vec![0.15, 0.0]).with_weights(vec![0.01, 0.01]);
         let quotes = vec![0usize, 1usize];
         let config = CalibrationConfig::default().with_tolerance(1e-12);
-        let (_curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, 0.1, true)
-            .expect("optimization should complete");
+        let (_curve, report) =
+            optimize(&target, &quotes, &config, 0.1, true).expect("optimization should complete");
         assert!(
             !report.success,
             "max |r| > tol must fail even if weighted L2 is small \
@@ -1551,8 +1540,8 @@ mod tests {
 
         // The 4th arg is the *validation/success* tolerance (distinct from the LM
         // solver tolerance set via `with_tolerance`).
-        let (_curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, 0.1, true)
-            .expect("optimization should complete");
+        let (_curve, report) =
+            optimize(&target, &quotes, &config, 0.1, true).expect("optimization should complete");
 
         assert!(
             !report.success,
@@ -1663,7 +1652,7 @@ mod tests {
         let quotes = vec![0usize, 1usize];
         let config = CalibrationConfig::default().with_tolerance(1.0);
 
-        let (_curve, report) = GlobalFitOptimizer::optimize(
+        let (_curve, report) = optimize(
             &target,
             &quotes,
             &config,
@@ -1691,7 +1680,7 @@ mod tests {
         let quotes = vec![0usize, 1usize];
         let config = CalibrationConfig::default().with_tolerance(1.0);
 
-        let err = GlobalFitOptimizer::optimize(
+        let err = optimize(
             &target,
             &quotes,
             &config,
@@ -1715,7 +1704,7 @@ mod tests {
         let quotes = vec![0usize, 1usize];
         let config = CalibrationConfig::default().with_tolerance(1.0);
 
-        let err = GlobalFitOptimizer::optimize(
+        let err = optimize(
             &target,
             &quotes,
             &config,
@@ -1739,7 +1728,7 @@ mod tests {
         let quotes = vec![0usize];
         let config = CalibrationConfig::default().with_tolerance(1.0);
 
-        let err = GlobalFitOptimizer::optimize(
+        let err = optimize(
             &target,
             &quotes,
             &config,
@@ -1766,7 +1755,7 @@ mod tests {
         let quotes = vec![5usize, 7usize];
         let config = CalibrationConfig::default().with_tolerance(1.0);
 
-        let (_curve, report) = GlobalFitOptimizer::optimize(
+        let (_curve, report) = optimize(
             &target,
             &quotes,
             &config,
@@ -1796,7 +1785,7 @@ mod tests {
         let quotes = vec![10usize, 11usize, 12usize];
         let config = CalibrationConfig::default().with_tolerance(1e12);
 
-        let (_curve, report) = GlobalFitOptimizer::optimize(
+        let (_curve, report) = optimize(
             &target,
             &quotes,
             &config,
@@ -1868,7 +1857,7 @@ mod tests {
         let quotes = vec![0usize, 1usize];
         let config = CalibrationConfig::default().with_tolerance(1e12);
 
-        let (_curve, report) = GlobalFitOptimizer::optimize(
+        let (_curve, report) = optimize(
             &target,
             &quotes,
             &config,
@@ -1971,7 +1960,7 @@ mod tests {
             .with_tolerance(1e-12)
             .with_max_iterations(50);
 
-        let (_curve, report) = GlobalFitOptimizer::optimize(
+        let (_curve, report) = optimize(
             &target,
             &quotes,
             &config,
@@ -1989,7 +1978,7 @@ mod tests {
         let quotes: Vec<usize> = Vec::new();
         let config = CalibrationConfig::default().with_tolerance(1.0);
 
-        let err = GlobalFitOptimizer::optimize(
+        let err = optimize(
             &target,
             &quotes,
             &config,
@@ -2009,7 +1998,7 @@ mod tests {
         let quotes = vec![0usize, 1usize];
         let config = CalibrationConfig::default().with_tolerance(1.0);
 
-        let err = GlobalFitOptimizer::optimize(
+        let err = optimize(
             &target,
             &quotes,
             &config,
@@ -2033,7 +2022,7 @@ mod tests {
 
         for weights in [vec![-1.0, 1.0], vec![f64::NAN, 1.0]] {
             let target = TestTarget::from_len(2, vec![0.01, 0.02]).with_weights(weights);
-            let err = GlobalFitOptimizer::optimize(
+            let err = optimize(
                 &target,
                 &quotes,
                 &config,
@@ -2051,7 +2040,7 @@ mod tests {
         }
 
         let zero_target = TestTarget::from_len(2, vec![0.01, 0.02]).with_weights(vec![0.0, 0.0]);
-        let zero_err = GlobalFitOptimizer::optimize(
+        let zero_err = optimize(
             &zero_target,
             &quotes,
             &config,
@@ -2074,7 +2063,7 @@ mod tests {
         let quotes = vec![0usize];
         let config = CalibrationConfig::default().with_tolerance(1.0);
 
-        let (_curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, 0.1, true)
+        let (_curve, report) = optimize(&target, &quotes, &config, 0.1, true)
             .expect("optimization should still complete");
 
         assert!(
@@ -2096,7 +2085,7 @@ mod tests {
             .with_tolerance(1.0)
             .with_compute_diagnostics(true);
 
-        let (_curve, report) = GlobalFitOptimizer::optimize(
+        let (_curve, report) = optimize(
             &target,
             &quotes,
             &config,

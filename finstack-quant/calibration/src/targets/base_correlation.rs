@@ -7,7 +7,7 @@ use crate::build::context::BuildCtx;
 use crate::config::CalibrationConfig;
 use crate::quotes::cds_tranche::CdsTrancheQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
-use crate::solver::bootstrap::SequentialBootstrapper;
+use crate::solver::bootstrap;
 use crate::solver::traits::BootstrapTarget;
 use crate::targets::util::ContextScratch;
 use crate::CalibrationReport;
@@ -296,7 +296,7 @@ impl BaseCorrelationTarget {
         const BASE_CORRELATION_VALIDATION_TOLERANCE: f64 = 1e-3;
         let success_tolerance = BASE_CORRELATION_VALIDATION_TOLERANCE;
 
-        let (curve, mut report) = SequentialBootstrapper::bootstrap(
+        let (curve, mut report) = bootstrap::bootstrap(
             &target,
             &prepared_quotes,
             Vec::new(),

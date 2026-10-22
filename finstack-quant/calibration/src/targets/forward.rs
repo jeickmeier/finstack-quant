@@ -7,7 +7,7 @@ use crate::config::CalibrationMethod;
 use crate::quotes::rates::RateQuote;
 use crate::quotes::ExtractQuotes;
 use crate::quotes::MarketQuote;
-use crate::solver::global::GlobalFitOptimizer;
+use crate::solver::global;
 use crate::solver::traits::GlobalSolveTarget;
 use crate::targets::rate_recipe::rate_calibration_recipe;
 use crate::targets::util::{
@@ -142,7 +142,7 @@ impl ForwardCurveTarget {
         // DF-implied term rates couple adjacent reset-date forwards whenever a
         // contractual period has a calendar stub. Fit all reset-date rates
         // simultaneously against a dense grid of actual contractual intervals.
-        let (curve, mut report) = GlobalFitOptimizer::optimize(
+        let (curve, mut report) = global::optimize(
             &target,
             &prepared_quotes,
             &config,
@@ -835,7 +835,7 @@ mod tests {
             );
         }
 
-        let (curve, report) = GlobalFitOptimizer::optimize(
+        let (curve, report) = global::optimize(
             &target,
             &quotes,
             &target.params.config,
@@ -911,7 +911,7 @@ mod tests {
             .expect("deposit parameter grid");
         assert_eq!(times, vec![0.0, 0.25]);
 
-        let (curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, 1e-8, true)
+        let (curve, report) = global::optimize(&target, &quotes, &config, 1e-8, true)
             .expect("multi-deposit global solve");
         assert!(report.success, "{}", report.convergence_reason);
         assert!((curve.rate_between(0.0, 0.25).expect("3M rate") - 0.04).abs() < 1e-8);
@@ -979,7 +979,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, 1e-8, true)
+        let (curve, report) = global::optimize(&target, &quotes, &config, 1e-8, true)
             .expect("mixed day-count deposit global solve");
         assert!(report.success, "{}", report.convergence_reason);
 

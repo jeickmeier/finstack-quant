@@ -44,261 +44,246 @@ use crate::validation::surfaces::{
 };
 
 /// Target for SVI surface calibration from option volatility quotes.
-pub(crate) struct SviSurfaceTarget;
+/// Calibrate an SVI volatility surface from option vol quotes.
+///
+/// Groups quotes by expiry, calibrates SVI parameters per expiry slice,
+/// interpolates parameters for target expiries, and evaluates onto a grid.
+pub(crate) fn solve(
+    params: &SviSurfaceParams,
+    quotes: &[MarketQuote],
+    context: &MarketContext,
+    global_config: &CalibrationConfig,
+) -> Result<(VolSurface, CalibrationReport)> {
+    if params.target_expiries.is_empty() || params.target_strikes.is_empty() {
+        return Err(finstack_quant_core::Error::Input(
+            finstack_quant_core::InputError::TooFewPoints,
+        ));
+    }
+    let option_quotes = extract_equity_option_quotes(quotes, &params.underlying_ticker)?;
+    let spot = resolve_equity_spot(params.spot_override, &params.underlying_ticker, context)?;
+    finstack_quant_core::validation::validate_f64_positive(spot, "SVI spot")?;
 
-impl SviSurfaceTarget {
-    /// Calibrate an SVI volatility surface from option vol quotes.
-    ///
-    /// Groups quotes by expiry, calibrates SVI parameters per expiry slice,
-    /// interpolates parameters for target expiries, and evaluates onto a grid.
-    pub(crate) fn solve(
-        params: &SviSurfaceParams,
-        quotes: &[MarketQuote],
-        context: &MarketContext,
-        global_config: &CalibrationConfig,
-    ) -> Result<(VolSurface, CalibrationReport)> {
-        if params.target_expiries.is_empty() || params.target_strikes.is_empty() {
-            return Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::TooFewPoints,
-            ));
-        }
-        let option_quotes = extract_equity_option_quotes(quotes, &params.underlying_ticker)?;
-        let spot = resolve_equity_spot(params.spot_override, &params.underlying_ticker, context)?;
-        finstack_quant_core::validation::validate_f64_positive(spot, "SVI spot")?;
+    let discount = params
+        .discount_curve_id
+        .as_ref()
+        .map(|curve_id| context.get_discount(curve_id))
+        .transpose()?;
 
-        let discount = params
-            .discount_curve_id
-            .as_ref()
-            .map(|curve_id| context.get_discount(curve_id))
-            .transpose()?;
-
-        let zero_rate_yield = if discount.is_none() {
-            let value = super::util::resolve_continuous_dividend_yield(
-                &params.underlying_ticker,
-                params.dividend_yield_override,
-                context,
-                "SVI",
-            )?
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
-                    id: format!(
-                        "explicit dividend yield for equity '{}' without a discount curve",
-                        params.underlying_ticker
-                    ),
-                })
-            })?;
-            Some(value)
-        } else {
-            None
-        };
-        let forward_inputs = discount
-            .as_ref()
-            .map(|discount| {
-                resolve_equity_forward_inputs(
-                    &params.underlying_ticker,
-                    params.base_date,
-                    spot,
-                    params.dividend_yield_override,
-                    discount.as_ref(),
-                    context,
-                )
+    let zero_rate_yield = if discount.is_none() {
+        let value = super::util::resolve_continuous_dividend_yield(
+            &params.underlying_ticker,
+            params.dividend_yield_override,
+            context,
+            "SVI",
+        )?
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
+                id: format!(
+                    "explicit dividend yield for equity '{}' without a discount curve",
+                    params.underlying_ticker
+                ),
             })
-            .transpose()?;
-        let forward_fn = |t: f64| {
-            if let (Some(discount), Some(inputs)) = (&discount, &forward_inputs) {
-                inputs.forward(discount.as_ref(), t)
-            } else {
-                let dividend_yield = zero_rate_yield.ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(
-                        "SVI equity carry resolution is incomplete".to_string(),
-                    )
-                })?;
-                let forward = spot * (-dividend_yield * t).exp();
-                finstack_quant_core::validation::validate_f64_positive(forward, "SVI forward")?;
-                Ok(forward)
-            }
-        };
+        })?;
+        Some(value)
+    } else {
+        None
+    };
+    let forward_inputs = discount
+        .as_ref()
+        .map(|discount| {
+            resolve_equity_forward_inputs(
+                &params.underlying_ticker,
+                params.base_date,
+                spot,
+                params.dividend_yield_override,
+                discount.as_ref(),
+                context,
+            )
+        })
+        .transpose()?;
+    let forward_fn = |t: f64| {
+        if let (Some(discount), Some(inputs)) = (&discount, &forward_inputs) {
+            inputs.forward(discount.as_ref(), t)
+        } else {
+            let dividend_yield = zero_rate_yield.ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "SVI equity carry resolution is incomplete".to_string(),
+                )
+            })?;
+            let forward = spot * (-dividend_yield * t).exp();
+            finstack_quant_core::validation::validate_f64_positive(forward, "SVI forward")?;
+            Ok(forward)
+        }
+    };
 
-        let mut quotes_by_expiry: BTreeMap<OrderedF64, Vec<(f64, f64)>> = BTreeMap::new();
-        for quote in option_quotes {
-            if let VolQuote::OptionVol {
-                expiry,
-                strike,
-                vol,
-                ..
-            } = quote
-            {
-                let t = DayCount::Act365F.year_fraction(
-                    params.base_date,
-                    *expiry,
-                    DayCountContext::default(),
-                )?;
-                finstack_quant_core::validation::validate_f64_positive(
-                    *strike,
-                    "SVI quote strike",
-                )?;
-                finstack_quant_core::validation::validate_f64_positive(*vol, "SVI quote vol")?;
-                if t > 0.0 {
-                    quotes_by_expiry
-                        .entry(t.into())
-                        .or_default()
-                        .push((*strike, *vol));
-                }
+    let mut quotes_by_expiry: BTreeMap<OrderedF64, Vec<(f64, f64)>> = BTreeMap::new();
+    for quote in option_quotes {
+        if let VolQuote::OptionVol {
+            expiry,
+            strike,
+            vol,
+            ..
+        } = quote
+        {
+            let t = DayCount::Act365F.year_fraction(
+                params.base_date,
+                *expiry,
+                DayCountContext::default(),
+            )?;
+            finstack_quant_core::validation::validate_f64_positive(*strike, "SVI quote strike")?;
+            finstack_quant_core::validation::validate_f64_positive(*vol, "SVI quote vol")?;
+            if t > 0.0 {
+                quotes_by_expiry
+                    .entry(t.into())
+                    .or_default()
+                    .push((*strike, *vol));
             }
         }
+    }
 
-        if quotes_by_expiry.is_empty() {
-            return Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::TooFewPoints,
-            ));
+    if quotes_by_expiry.is_empty() {
+        return Err(finstack_quant_core::Error::Input(
+            finstack_quant_core::InputError::TooFewPoints,
+        ));
+    }
+
+    let mut params_by_expiry = BTreeMap::new();
+    let solver = finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver::new()
+        .with_tolerance(global_config.solver.tolerance())
+        .with_max_iterations(global_config.solver.max_iterations());
+    let mut solver_iterations = 0;
+    let mut fitted_slices = Vec::new();
+
+    for (&expiry_key, expiry_quotes) in &quotes_by_expiry {
+        if expiry_quotes.len() < 5 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "SVI surface calibration requires at least 5 strikes per expiry; got {} at t={:.6}",
+                expiry_quotes.len(),
+                expiry_key.into_inner()
+            )));
         }
 
-        let mut params_by_expiry = BTreeMap::new();
-        let solver = finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver::new()
-            .with_tolerance(global_config.solver.tolerance())
-            .with_max_iterations(global_config.solver.max_iterations());
-        let mut solver_iterations = 0;
-        let mut fitted_slices = Vec::new();
+        let expiry = expiry_key.into_inner();
+        let forward = forward_fn(expiry)?;
+        finstack_quant_core::validation::validate_f64_positive(forward, "SVI forward")?;
+        let strikes: Vec<f64> = expiry_quotes.iter().map(|(strike, _)| *strike).collect();
+        let vols: Vec<f64> = expiry_quotes.iter().map(|(_, vol)| *vol).collect();
 
-        for (&expiry_key, expiry_quotes) in &quotes_by_expiry {
-            if expiry_quotes.len() < 5 {
+        let (svi_params, iterations) =
+            finstack_quant_models::volatility::svi::calibrate_svi_with_solver(
+                &strikes, &vols, forward, expiry, &solver,
+            )?;
+        solver_iterations += iterations;
+        fitted_slices.push(crate::report::FittedSlice {
+            expiry,
+            parameters: crate::report::FittedSliceParameters::Svi(svi_params),
+            iterations,
+            max_relative_quote_error: None,
+        });
+
+        params_by_expiry.insert(expiry_key, svi_params);
+    }
+
+    let mut grid = Vec::with_capacity(params.target_expiries.len() * params.target_strikes.len());
+    for &target_expiry in &params.target_expiries {
+        let forward = forward_fn(target_expiry)?;
+        finstack_quant_core::validation::validate_f64_positive(forward, "SVI forward")?;
+        for &target_strike in &params.target_strikes {
+            let vol =
+                interpolate_svi_vol(target_expiry, target_strike, &forward_fn, &params_by_expiry)?;
+            if !vol.is_finite() || vol <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "SVI surface calibration requires at least 5 strikes per expiry; got {} at t={:.6}",
-                    expiry_quotes.len(),
-                    expiry_key.into_inner()
+                    "SVI surface produced invalid implied vol at t={target_expiry:.6}, strike={target_strike:.6}",
                 )));
             }
-
-            let expiry = expiry_key.into_inner();
-            let forward = forward_fn(expiry)?;
-            finstack_quant_core::validation::validate_f64_positive(forward, "SVI forward")?;
-            let strikes: Vec<f64> = expiry_quotes.iter().map(|(strike, _)| *strike).collect();
-            let vols: Vec<f64> = expiry_quotes.iter().map(|(_, vol)| *vol).collect();
-
-            let (svi_params, iterations) =
-                finstack_quant_models::volatility::svi::calibrate_svi_with_solver(
-                    &strikes, &vols, forward, expiry, &solver,
-                )?;
-            solver_iterations += iterations;
-            fitted_slices.push(crate::report::FittedSlice {
-                expiry,
-                parameters: crate::report::FittedSliceParameters::Svi(svi_params),
-                iterations,
-                max_relative_quote_error: None,
-            });
-
-            params_by_expiry.insert(expiry_key, svi_params);
+            grid.push(vol);
         }
-
-        let mut grid =
-            Vec::with_capacity(params.target_expiries.len() * params.target_strikes.len());
-        for &target_expiry in &params.target_expiries {
-            let forward = forward_fn(target_expiry)?;
-            finstack_quant_core::validation::validate_f64_positive(forward, "SVI forward")?;
-            for &target_strike in &params.target_strikes {
-                let vol = interpolate_svi_vol(
-                    target_expiry,
-                    target_strike,
-                    &forward_fn,
-                    &params_by_expiry,
-                )?;
-                if !vol.is_finite() || vol <= 0.0 {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "SVI surface produced invalid implied vol at t={target_expiry:.6}, strike={target_strike:.6}",
-                    )));
-                }
-                grid.push(vol);
-            }
-        }
-
-        let surface = VolSurface::from_grid(
-            &params.vol_surface_id,
-            &params.target_expiries,
-            &params.target_strikes,
-            &grid,
-            Default::default(),
-            None,
-        )?
-        .with_interpolation_mode(VolInterpolationMode::TotalVariance);
-
-        let residuals = surface_quote_residuals(
-            &surface,
-            quotes,
-            &params.underlying_ticker,
-            params.base_date,
-        )?;
-
-        // Calendar and per-slice butterfly checks are strict; interpolated
-        // grid call convexity is advisory.
-        let target_forwards: Vec<f64> = params
-            .target_expiries
-            .iter()
-            .map(|&t| forward_fn(t))
-            .collect::<Result<Vec<_>>>()?;
-        let calendar_cfg = ValidationConfig {
-            lenient_arbitrage: false,
-            ..ValidationConfig::default()
-        };
-        let calendar_arbitrage =
-            validate_calendar_spread_with_forwards(&surface, &calendar_cfg, &target_forwards)
-                .err()
-                .map(|e| format!("SVI calendar-spread arbitrage: {e}"));
-
-        // Scan each calibrated slice with a one-unit wing margin.
-        let mut slice_butterfly_arbitrage: Option<String> = None;
-        for (&expiry_key, svi_params) in &params_by_expiry {
-            let expiry = expiry_key.into_inner();
-            let forward = forward_fn(expiry)?;
-            let k_lo =
-                (params.target_strikes.first().copied().unwrap_or(forward) / forward).ln() - 1.0;
-            let k_hi =
-                (params.target_strikes.last().copied().unwrap_or(forward) / forward).ln() + 1.0;
-            if let Some((k, g)) = svi_params.butterfly_violation(k_lo, k_hi, 201, 1e-10) {
-                slice_butterfly_arbitrage = Some(format!(
-                    "SVI butterfly arbitrage: Durrleman g(k)={g:.3e} < 0 at k={k:.4}, \
-                     T={expiry:.4}y (negative implied density)"
-                ));
-                break;
-            }
-        }
-
-        let butterfly_warning =
-            validate_butterfly_call_convexity(&surface, &calendar_cfg, &target_forwards)
-                .err()
-                .map(|e| format!("SVI butterfly-spread arbitrage: {e}"));
-
-        let mut report = CalibrationReport::for_type_with_tolerance(
-            "svi_surface",
-            residuals,
-            solver_iterations,
-            global_config.vol_surface.validation_tolerance,
-        )
-        .with_model_version(crate::versions::SVI_SURFACE)
-        .with_solver_method(crate::report::SolverMethod::PerSliceLeastSquares)
-        .with_residual_units(crate::report::ResidualUnits::QuotedVolatility)
-        .with_fitted_slices(fitted_slices);
-        report.update_solver_config(global_config.solver.clone());
-
-        let strict_failures: Vec<String> = [calendar_arbitrage, slice_butterfly_arbitrage]
-            .into_iter()
-            .flatten()
-            .collect();
-        if !strict_failures.is_empty() {
-            report.validation_passed = false;
-            let mut detail = strict_failures.join("; ");
-            if let Some(bf) = &butterfly_warning {
-                detail = format!("{detail}; (advisory) {bf}");
-            }
-            report.validation_error = Some(detail.clone());
-            report.success = false;
-            report.convergence_reason =
-                format!("SVI surface calibration failed validation: {detail}");
-        } else if let Some(bf) = butterfly_warning {
-            report.validation_error = Some(format!("(advisory) {bf}"));
-        }
-
-        Ok((surface, report))
     }
+
+    let surface = VolSurface::from_grid(
+        &params.vol_surface_id,
+        &params.target_expiries,
+        &params.target_strikes,
+        &grid,
+        Default::default(),
+        None,
+    )?
+    .with_interpolation_mode(VolInterpolationMode::TotalVariance);
+
+    let residuals = surface_quote_residuals(
+        &surface,
+        quotes,
+        &params.underlying_ticker,
+        params.base_date,
+    )?;
+
+    // Calendar and per-slice butterfly checks are strict; interpolated
+    // grid call convexity is advisory.
+    let target_forwards: Vec<f64> = params
+        .target_expiries
+        .iter()
+        .map(|&t| forward_fn(t))
+        .collect::<Result<Vec<_>>>()?;
+    let calendar_cfg = ValidationConfig {
+        lenient_arbitrage: false,
+        ..ValidationConfig::default()
+    };
+    let calendar_arbitrage =
+        validate_calendar_spread_with_forwards(&surface, &calendar_cfg, &target_forwards)
+            .err()
+            .map(|e| format!("SVI calendar-spread arbitrage: {e}"));
+
+    // Scan each calibrated slice with a one-unit wing margin.
+    let mut slice_butterfly_arbitrage: Option<String> = None;
+    for (&expiry_key, svi_params) in &params_by_expiry {
+        let expiry = expiry_key.into_inner();
+        let forward = forward_fn(expiry)?;
+        let k_lo = (params.target_strikes.first().copied().unwrap_or(forward) / forward).ln() - 1.0;
+        let k_hi = (params.target_strikes.last().copied().unwrap_or(forward) / forward).ln() + 1.0;
+        if let Some((k, g)) = svi_params.butterfly_violation(k_lo, k_hi, 201, 1e-10) {
+            slice_butterfly_arbitrage = Some(format!(
+                "SVI butterfly arbitrage: Durrleman g(k)={g:.3e} < 0 at k={k:.4}, \
+                 T={expiry:.4}y (negative implied density)"
+            ));
+            break;
+        }
+    }
+
+    let butterfly_warning =
+        validate_butterfly_call_convexity(&surface, &calendar_cfg, &target_forwards)
+            .err()
+            .map(|e| format!("SVI butterfly-spread arbitrage: {e}"));
+
+    let mut report = CalibrationReport::for_type_with_tolerance(
+        "svi_surface",
+        residuals,
+        solver_iterations,
+        global_config.vol_surface.validation_tolerance,
+    )
+    .with_model_version(crate::versions::SVI_SURFACE)
+    .with_solver_method(crate::report::SolverMethod::PerSliceLeastSquares)
+    .with_residual_units(crate::report::ResidualUnits::QuotedVolatility)
+    .with_fitted_slices(fitted_slices);
+    report.update_solver_config(global_config.solver.clone());
+
+    let strict_failures: Vec<String> = [calendar_arbitrage, slice_butterfly_arbitrage]
+        .into_iter()
+        .flatten()
+        .collect();
+    if !strict_failures.is_empty() {
+        report.validation_passed = false;
+        let mut detail = strict_failures.join("; ");
+        if let Some(bf) = &butterfly_warning {
+            detail = format!("{detail}; (advisory) {bf}");
+        }
+        report.validation_error = Some(detail.clone());
+        report.success = false;
+        report.convergence_reason = format!("SVI surface calibration failed validation: {detail}");
+    } else if let Some(bf) = butterfly_warning {
+        report.validation_error = Some(format!("(advisory) {bf}"));
+    }
+
+    Ok((surface, report))
 }
 
 /// Evaluate one calibrated SVI slice without allowing NaN sentinel residuals.
@@ -435,7 +420,7 @@ mod tests {
             option_type: OptionType::Call,
         });
 
-        let err = SviSurfaceTarget::solve(
+        let err = solve(
             &base_params(),
             &quotes,
             &MarketContext::new(),
@@ -702,7 +687,7 @@ mod tests {
         let mut p = base_params();
         p.target_expiries = vec![90.0 / 365.0, 1.0];
 
-        let (_surface, report) = SviSurfaceTarget::solve(
+        let (_surface, report) = solve(
             &p,
             &quotes,
             &MarketContext::new(),
@@ -735,7 +720,7 @@ mod tests {
         let mut params = base_params();
         params.spot_override = Some(0.0);
 
-        let err = SviSurfaceTarget::solve(
+        let err = solve(
             &params,
             &sample_quotes(),
             &MarketContext::new(),

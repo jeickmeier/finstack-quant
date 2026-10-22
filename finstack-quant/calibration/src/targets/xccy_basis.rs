@@ -30,7 +30,7 @@ use crate::quotes::rates::RateQuote;
 use crate::quotes::xccy::XccyQuote;
 use crate::quotes::ExtractQuotes;
 use crate::quotes::MarketQuote;
-use crate::solver::bootstrap::SequentialBootstrapper;
+use crate::solver::bootstrap;
 use crate::solver::traits::BootstrapTarget;
 use crate::targets::util::{
     discount_and_forward_curve_ids, prepare_rate_calibration_quotes, ContextScratch,
@@ -240,7 +240,7 @@ impl XccyBasisTarget {
 
         let success_tolerance = config.discount_curve.validation_tolerance;
 
-        let (curve, report) = SequentialBootstrapper::bootstrap(
+        let (curve, report) = bootstrap::bootstrap(
             &target,
             &prepared_quotes,
             vec![(0.0, 1.0)],

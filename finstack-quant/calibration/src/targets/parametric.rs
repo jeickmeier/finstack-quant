@@ -8,7 +8,7 @@ use crate::build::prepared::PreparedQuote;
 use crate::config::CalibrationConfig;
 use crate::quotes::rates::RateQuote;
 use crate::quotes::MarketQuote;
-use crate::solver::global::GlobalFitOptimizer;
+use crate::solver::global;
 use crate::solver::traits::GlobalSolveTarget;
 use crate::targets::util::{
     discount_and_forward_curve_ids, prepare_rate_calibration_quotes, ContextScratch,
@@ -211,13 +211,8 @@ impl ParametricCurveTarget {
             context.clone(),
         );
         let success_tolerance = config.discount_curve.validation_tolerance;
-        let (curve, report) = GlobalFitOptimizer::optimize(
-            &target,
-            &prepared_quotes,
-            &config,
-            success_tolerance,
-            false,
-        )?;
+        let (curve, report) =
+            global::optimize(&target, &prepared_quotes, &config, success_tolerance, false)?;
 
         Ok((curve, report))
     }
