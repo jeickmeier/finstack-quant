@@ -271,7 +271,7 @@ impl JsPerformance {
     /// @returns Ticker labels in column order as a JavaScript string array.
     #[wasm_bindgen(js_name = tickerNames)]
     pub fn ticker_names(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&self.inner.ticker_names().to_vec())
+        to_js_value(&self.inner.ticker_names())
     }
 
     /// Benchmark column index.
