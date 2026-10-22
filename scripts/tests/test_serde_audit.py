@@ -505,11 +505,14 @@ def test_ci_path_runs_audit_tests_and_check_mode() -> None:
     mise = (_REPOSITORY_ROOT / "mise.toml").read_text(encoding="utf-8")
     nightly = (_REPOSITORY_ROOT / ".github" / "workflows" / "nightly.yml").read_text(encoding="utf-8")
 
-    check_schemas = mise.split("[tasks.rust-check-schemas]", 1)[1].split("[tasks.", 1)[0]
-    gen_check = mise.split("[tasks.gen-check]", 1)[1].split("[tasks.", 1)[0]
-    assert "pytest scripts/tests/test_serde_audit.py" in check_schemas
-    assert "python -m scripts.serde_audit --check" in check_schemas
-    assert "mise run rust-check-schemas" in gen_check
+    def task(name: str) -> str:
+        return mise.split(f"[tasks.{name}]", 1)[1].split("[tasks.", 1)[0]
+
+    serde_audit = task("rust-check-serde-audit")
+    assert "pytest scripts/tests/test_serde_audit.py" in serde_audit
+    assert "python -m scripts.serde_audit --check" in serde_audit
+    assert '"rust-check-serde-audit"' in task("rust-check-schemas")
+    assert re.search(r"mise run [^\n]*\brust-check-schemas\b", task("gen-check"))
     assert "mise run gen-check" in nightly
 
 

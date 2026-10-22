@@ -32,66 +32,72 @@ class TestEuropeanPricer:
 
     def test_call_price_positive(self, pricer: EuropeanPricer) -> None:
         """ATM call price should be positive."""
-        result = pricer.price_call(
+        result = pricer.price_gbm(
             spot=100.0,
             strike=100.0,
             rate=0.05,
             div_yield=0.0,
             vol=0.20,
             expiry=1.0,
+            is_call=True,
         )
         assert result.mean.amount > 0.0
 
     def test_put_price_positive(self, pricer: EuropeanPricer) -> None:
         """ATM put price should be positive."""
-        result = pricer.price_put(
+        result = pricer.price_gbm(
             spot=100.0,
             strike=100.0,
             rate=0.05,
             div_yield=0.0,
             vol=0.20,
             expiry=1.0,
+            is_call=False,
         )
         assert result.mean.amount > 0.0
 
     def test_call_itm_more_expensive(self, pricer: EuropeanPricer) -> None:
         """A lower strike (deeper ITM) call should be more expensive."""
-        atm = pricer.price_call(
+        atm = pricer.price_gbm(
             spot=100.0,
             strike=100.0,
             rate=0.05,
             div_yield=0.0,
             vol=0.20,
             expiry=1.0,
+            is_call=True,
         )
-        itm = pricer.price_call(
+        itm = pricer.price_gbm(
             spot=100.0,
             strike=80.0,
             rate=0.05,
             div_yield=0.0,
             vol=0.20,
             expiry=1.0,
+            is_call=True,
         )
         assert itm.mean.amount > atm.mean.amount
 
     def test_put_call_parity_approx(self, pricer: EuropeanPricer) -> None:
         """Put-call parity: C - P ≈ e^(-rT) * (S*e^((r-q)T) - K)."""
         spot, strike, r, q, vol, expiry = 100.0, 100.0, 0.05, 0.0, 0.20, 1.0
-        call = pricer.price_call(
+        call = pricer.price_gbm(
             spot=spot,
             strike=strike,
             rate=r,
             div_yield=q,
             vol=vol,
             expiry=expiry,
+            is_call=True,
         )
-        put = pricer.price_put(
+        put = pricer.price_gbm(
             spot=spot,
             strike=strike,
             rate=r,
             div_yield=q,
             vol=vol,
             expiry=expiry,
+            is_call=False,
         )
         lhs = call.mean.amount - put.mean.amount
         forward = spot * math.exp((r - q) * expiry)
@@ -100,13 +106,14 @@ class TestEuropeanPricer:
 
     def test_result_attributes(self, pricer: EuropeanPricer) -> None:
         """MoneyEstimate exposes stderr, ci_lower, ci_upper, num_paths."""
-        result = pricer.price_call(
+        result = pricer.price_gbm(
             spot=100.0,
             strike=100.0,
             rate=0.05,
             div_yield=0.0,
             vol=0.20,
             expiry=1.0,
+            is_call=True,
         )
         assert result.stderr > 0.0
         assert result.ci_lower.amount < result.mean.amount
@@ -117,8 +124,8 @@ class TestEuropeanPricer:
         """Same seed produces identical results."""
         p1 = EuropeanPricer(num_paths=10_000, seed=123)
         p2 = EuropeanPricer(num_paths=10_000, seed=123)
-        r1 = p1.price_call(spot=100.0, strike=100.0, rate=0.05, div_yield=0.0, vol=0.20, expiry=1.0)
-        r2 = p2.price_call(spot=100.0, strike=100.0, rate=0.05, div_yield=0.0, vol=0.20, expiry=1.0)
+        r1 = p1.price_gbm(spot=100.0, strike=100.0, rate=0.05, div_yield=0.0, vol=0.20, expiry=1.0, is_call=True)
+        r2 = p2.price_gbm(spot=100.0, strike=100.0, rate=0.05, div_yield=0.0, vol=0.20, expiry=1.0, is_call=True)
         assert r1.mean.amount == pytest.approx(r2.mean.amount, abs=1e-10)
 
 

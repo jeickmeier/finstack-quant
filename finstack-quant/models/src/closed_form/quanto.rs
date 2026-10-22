@@ -31,6 +31,7 @@
 //! - σ_asset is the asset volatility
 //! - σ_fx is the FX rate volatility
 
+use crate::types::OptionType;
 use finstack_quant_core::math::special_functions::norm_cdf;
 
 /// Compute the quanto drift adjustment.
@@ -51,35 +52,38 @@ fn quanto_drift_adjustment(correlation: f64, vol_asset: f64, vol_fx: f64) -> f64
     -correlation * vol_asset * vol_fx
 }
 
-/// Price a quanto call option (closed-form).
+/// Price a quanto option (closed-form).
 ///
 /// # Arguments
 ///
 /// * `spot` - Current spot price (in foreign currency)
 /// * `strike` - Strike price (in foreign currency)
 /// * `time` - Time to maturity (years)
-/// * `rate_domestic` - Domestic risk-free rate
-/// * `rate_foreign` - Foreign risk-free rate
-/// * `div_yield` - Dividend yield (in foreign terms)
-/// * `vol_asset` - Asset volatility
-/// * `vol_fx` - FX rate volatility
-/// * `correlation` - Correlation between asset and FX rate
+/// * `rate_domestic` - Domestic risk-free rate, continuously compounded decimal
+/// * `rate_foreign` - Foreign risk-free rate, continuously compounded decimal
+/// * `div_yield` - Dividend yield (in foreign terms), continuously compounded decimal
+/// * `vol_asset` - Annualized asset volatility as a decimal
+/// * `vol_fx` - Annualized FX rate volatility as a decimal
+/// * `correlation` - Correlation between asset and FX rate, normally in `[-1, 1]`
+/// * `option_type` - Call or put payoff convention
 ///
 /// # Returns
 ///
-/// Call option price in domestic currency (per unit of foreign notional)
+/// Option price in domestic currency (per unit of foreign notional); `NaN`
+/// when an input or the result is non-finite.
 ///
 /// # Formula
 ///
-/// The quanto call is priced like a vanilla call with adjusted drift:
+/// The quanto option is priced like a vanilla option with adjusted drift:
 /// C_quanto = exp(-r_dom * T) * [F_adjusted * N(d1) - K * N(d2)]
+/// P_quanto = exp(-r_dom * T) * [K * N(-d2) - F_adjusted * N(-d1)]
 ///
 /// where:
 /// - F_adjusted = S * exp((r_for - q - ρ*σ_S*σ_X) * T)
 /// - d1 = [ln(S/K) + (r_for - q - ρ*σ_S*σ_X + σ_S²/2) * T] / (σ_S√T)
 /// - d2 = d1 - σ_S√T
 #[allow(clippy::too_many_arguments)]
-pub fn quanto_call(
+pub fn quanto_price(
     spot: f64,
     strike: f64,
     time: f64,
@@ -89,6 +93,7 @@ pub fn quanto_call(
     vol_asset: f64,
     vol_fx: f64,
     correlation: f64,
+    option_type: OptionType,
 ) -> f64 {
     if !spot.is_finite()
         || !strike.is_finite()
@@ -103,7 +108,7 @@ pub fn quanto_call(
         return f64::NAN;
     }
     if time <= 0.0 {
-        return (spot - strike).max(0.0);
+        return option_type.intrinsic(spot, strike);
     }
     if vol_asset <= 0.0 {
         let forward_adj = spot
@@ -111,7 +116,11 @@ pub fn quanto_call(
                 + quanto_drift_adjustment(correlation, vol_asset, vol_fx))
                 * time)
                 .exp();
-        let price = (forward_adj - strike) * (-rate_domestic * time).exp();
+        let forward_payoff = match option_type {
+            OptionType::Call => forward_adj - strike,
+            OptionType::Put => strike - forward_adj,
+        };
+        let price = forward_payoff * (-rate_domestic * time).exp();
         return if price.is_finite() {
             price.max(0.0)
         } else {
@@ -137,90 +146,10 @@ pub fn quanto_call(
     // Discount at domestic rate
     let discount = (-rate_domestic * time).exp();
 
-    let price = discount * (forward_adj * norm_cdf(d1) - strike * norm_cdf(d2));
-    if price.is_finite() {
-        price.max(0.0)
-    } else {
-        f64::NAN
-    }
-}
-
-/// Price a quanto put option (closed-form).
-///
-/// # Arguments
-///
-/// * `spot` - Current foreign underlying spot price in the option quote units.
-/// * `strike` - Domestic-currency exercise price in the same quote units as
-///   the converted payoff.
-/// * `time` - Remaining time to expiry in years.
-/// * `rate_domestic` - Continuously compounded domestic discount rate as a
-///   decimal annual rate.
-/// * `rate_foreign` - Continuously compounded foreign risk-free rate as a
-///   decimal annual rate.
-/// * `div_yield` - Continuously compounded underlying dividend yield as a
-///   decimal annual rate.
-/// * `vol_asset` - Annualized asset-price volatility as a decimal.
-/// * `vol_fx` - Annualized FX volatility for the conversion currency pair.
-/// * `correlation` - Instantaneous asset/FX return correlation, normally in
-///   the closed interval `[-1, 1]`.
-///
-/// # Returns
-///
-/// Put option price in domestic currency (per unit of foreign notional)
-#[allow(clippy::too_many_arguments)]
-pub fn quanto_put(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    rate_domestic: f64,
-    rate_foreign: f64,
-    div_yield: f64,
-    vol_asset: f64,
-    vol_fx: f64,
-    correlation: f64,
-) -> f64 {
-    if !spot.is_finite()
-        || !strike.is_finite()
-        || !time.is_finite()
-        || !rate_domestic.is_finite()
-        || !rate_foreign.is_finite()
-        || !div_yield.is_finite()
-        || !vol_asset.is_finite()
-        || !vol_fx.is_finite()
-        || !correlation.is_finite()
-    {
-        return f64::NAN;
-    }
-    if time <= 0.0 {
-        return (strike - spot).max(0.0);
-    }
-    if vol_asset <= 0.0 {
-        let forward_adj = spot
-            * ((rate_foreign - div_yield
-                + quanto_drift_adjustment(correlation, vol_asset, vol_fx))
-                * time)
-                .exp();
-        let price = (strike - forward_adj) * (-rate_domestic * time).exp();
-        return if price.is_finite() {
-            price.max(0.0)
-        } else {
-            f64::NAN
-        };
-    }
-
-    let sqrt_t = time.sqrt();
-    let vol_sqrt_t = vol_asset * sqrt_t;
-
-    let quanto_adj = quanto_drift_adjustment(correlation, vol_asset, vol_fx);
-    let drift_adj = rate_foreign - div_yield + quanto_adj;
-
-    let d1 = ((spot / strike).ln() + (drift_adj + 0.5 * vol_asset * vol_asset) * time) / vol_sqrt_t;
-    let d2 = d1 - vol_sqrt_t;
-
-    let forward_adj = spot * (drift_adj * time).exp();
-    let discount = (-rate_domestic * time).exp();
-
-    let price = discount * (strike * norm_cdf(-d2) - forward_adj * norm_cdf(-d1));
+    let price = match option_type {
+        OptionType::Call => discount * (forward_adj * norm_cdf(d1) - strike * norm_cdf(d2)),
+        OptionType::Put => discount * (strike * norm_cdf(-d2) - forward_adj * norm_cdf(-d1)),
+    };
     if price.is_finite() {
         price.max(0.0)
     } else {
@@ -243,14 +172,36 @@ mod tests {
 
     #[test]
     fn test_quanto_call_positive() {
-        let price = quanto_call(100.0, 100.0, 1.0, 0.05, 0.03, 0.01, 0.2, 0.1, 0.5);
+        let price = quanto_price(
+            100.0,
+            100.0,
+            1.0,
+            0.05,
+            0.03,
+            0.01,
+            0.2,
+            0.1,
+            0.5,
+            OptionType::Call,
+        );
         assert!(price > 0.0);
         assert!(price < 100.0);
     }
 
     #[test]
     fn test_quanto_put_positive() {
-        let price = quanto_put(100.0, 100.0, 1.0, 0.05, 0.03, 0.01, 0.2, 0.1, 0.5);
+        let price = quanto_price(
+            100.0,
+            100.0,
+            1.0,
+            0.05,
+            0.03,
+            0.01,
+            0.2,
+            0.1,
+            0.5,
+            OptionType::Put,
+        );
         assert!(price > 0.0);
         assert!(price < 100.0);
     }
@@ -265,8 +216,18 @@ mod tests {
         let div_yield = 0.02;
         let vol = 0.2;
 
-        let quanto_call_price =
-            quanto_call(spot, strike, time, rate, rate, div_yield, vol, 0.1, 0.0);
+        let quanto_call_price = quanto_price(
+            spot,
+            strike,
+            time,
+            rate,
+            rate,
+            div_yield,
+            vol,
+            0.1,
+            0.0,
+            OptionType::Call,
+        );
 
         let sqrt_t = time.sqrt();
         let d1 =
@@ -299,7 +260,7 @@ mod tests {
         let vol_fx = 0.1;
         let correlation = 0.5;
 
-        let call = quanto_call(
+        let call = quanto_price(
             spot,
             strike,
             time,
@@ -309,8 +270,9 @@ mod tests {
             vol_asset,
             vol_fx,
             correlation,
+            OptionType::Call,
         );
-        let put = quanto_put(
+        let put = quanto_price(
             spot,
             strike,
             time,
@@ -320,6 +282,7 @@ mod tests {
             vol_asset,
             vol_fx,
             correlation,
+            OptionType::Put,
         );
 
         let quanto_adj = quanto_drift_adjustment(correlation, vol_asset, vol_fx);
@@ -350,11 +313,29 @@ mod tests {
         let vol_asset = 0.2;
         let vol_fx = 0.1;
 
-        let call_neg_corr = quanto_call(
-            spot, strike, time, r_dom, r_for, div_yield, vol_asset, vol_fx, -0.5,
+        let call_neg_corr = quanto_price(
+            spot,
+            strike,
+            time,
+            r_dom,
+            r_for,
+            div_yield,
+            vol_asset,
+            vol_fx,
+            -0.5,
+            OptionType::Call,
         );
-        let call_pos_corr = quanto_call(
-            spot, strike, time, r_dom, r_for, div_yield, vol_asset, vol_fx, 0.5,
+        let call_pos_corr = quanto_price(
+            spot,
+            strike,
+            time,
+            r_dom,
+            r_for,
+            div_yield,
+            vol_asset,
+            vol_fx,
+            0.5,
+            OptionType::Call,
         );
 
         assert!(

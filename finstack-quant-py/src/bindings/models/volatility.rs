@@ -39,9 +39,8 @@ use finstack_quant_models::volatility::sabr::{
 };
 use finstack_quant_models::volatility::svi::{calibrate_svi as rust_calibrate_svi, SviParams};
 use finstack_quant_models::volatility::VolatilityConvention;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyDict, PyList};
+use pyo3::types::{PyDict, PyList};
 
 /// SABR model parameters ``(alpha, beta, nu, rho)`` with optional ``shift``.
 ///
@@ -222,7 +221,7 @@ impl PySabrParameters {
     ///     (shifted) SABR domain.
     fn implied_vol(&self, forward: f64, strike: f64, t: f64) -> PyResult<f64> {
         self.inner
-            .implied_volatility(forward, strike, t)
+            .implied_vol(forward, strike, t)
             .map_err(core_to_py)
     }
 
@@ -439,7 +438,7 @@ impl PySabrSmile {
 
     /// Time to expiry in years used by this smile.
     #[getter]
-    fn t(&self) -> f64 {
+    fn time_to_expiry(&self) -> f64 {
         self.inner.time_to_expiry()
     }
 
@@ -595,25 +594,8 @@ impl PySabrCalibrator {
     ///     If ``shift`` is neither ``None``, a float, nor ``"auto"`` (a
     ///     ``bool`` is rejected, not read as a 0/1 shift).
     #[pyo3(signature = (shift))]
-    fn with_shift(&self, shift: &Bound<'_, PyAny>) -> PyResult<Self> {
-        // Host-union conversion only: None → None, str → the Rust `SabrShift`
-        // keyword parser, float → Fixed. `bool` subclasses `int`, so reject it
-        // before the float extraction.
-        let shift = if shift.is_none() {
-            SabrShift::None
-        } else if let Ok(text) = shift.extract::<String>() {
-            text.parse::<SabrShift>().map_err(core_to_py)?
-        } else if shift.is_instance_of::<PyBool>() {
-            return Err(PyValueError::new_err(
-                "shift must be None, a float, or \"auto\"; got bool",
-            ));
-        } else if let Ok(value) = shift.extract::<f64>() {
-            SabrShift::Fixed(value)
-        } else {
-            return Err(PyValueError::new_err(
-                "shift must be None, a float, or \"auto\"",
-            ));
-        };
+    fn with_shift(&self, py: Python<'_>, shift: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let shift: SabrShift = py_to_serde(py, shift, "shift")?;
         Ok(Self {
             inner: self.inner.clone().with_shift(shift),
         })
@@ -653,11 +635,7 @@ impl PySabrCalibrator {
     /// Displacement policy: ``None``, a fixed float shift, or ``"auto"``.
     #[getter]
     fn shift<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        Ok(match self.inner.shift() {
-            SabrShift::None => py.None().into_bound(py),
-            SabrShift::Fixed(value) => value.into_pyobject(py)?.into_any(),
-            SabrShift::Auto => SabrShift::Auto.to_string().into_pyobject(py)?.into_any(),
-        })
+        serde_to_py(py, &self.inner.shift())
     }
 
     /// Whether ``alpha`` is pinned to the interpolated ATM volatility.
@@ -915,46 +893,6 @@ fn grid_to_dataframe<'py>(
     dict_to_dataframe(py, &data, Some(index))
 }
 
-/// Tabulate a core ``VolSurface`` grid as a ``pandas.DataFrame``.
-///
-/// Parameters
-/// ----------
-/// surface : VolSurface
-///     Data-only surface, e.g. the result of ``materialize_cube_tenor_slice``
-///     or ``materialize_fx_delta_surface``.
-///
-/// Returns
-/// -------
-/// pandas.DataFrame
-///     Expiry-major grid: index ``expiry`` (years), one column per strike /
-///     secondary-axis node, values in the surface's ``quote_type`` units
-///     (decimal Black vol or absolute normal vol).
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the stored grid length does not match ``expiries x strikes``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.core.market_data import FxDeltaVolSurface
-/// >>> from finstack_quant.models.volatility import materialize_fx_delta_surface, surface_to_dataframe
-/// >>> s = FxDeltaVolSurface("FX", [1.0], [0.12], [0.01], [0.002])
-/// >>> surface_to_dataframe(materialize_fx_delta_surface(s, 1.1, 0.03, 0.02)).shape
-/// (1, 3)
-#[pyfunction]
-fn surface_to_dataframe<'py>(
-    py: Python<'py>,
-    surface: &PyVolSurface,
-) -> PyResult<Bound<'py, PyAny>> {
-    grid_to_dataframe(
-        py,
-        surface.inner.expiries(),
-        surface.inner.strikes(),
-        surface.inner.vols(),
-    )
-}
-
 /// Convert an ATM volatility quote between normal, lognormal and shifted-lognormal conventions.
 ///
 /// Prices are equated at the money (strike = forward) and the target-convention
@@ -1072,15 +1010,9 @@ impl PySviParams {
     #[new]
     #[pyo3(signature = (a, b, rho, m, sigma))]
     fn new(a: f64, b: f64, rho: f64, m: f64, sigma: f64) -> PyResult<Self> {
-        let inner = SviParams {
-            a,
-            b,
-            rho,
-            m,
-            sigma,
-        };
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
+        SviParams::new(a, b, rho, m, sigma)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
     }
 
     /// Overall total-variance level ``a``.
@@ -1326,8 +1258,8 @@ impl PyLocalVolSurface {
     /// Tabulate the grid as a pandas ``DataFrame``.
     ///
     /// One row per expiry (index named ``"expiry"``, in years) and one
-    /// float64 column per strike, the layout of ``surface_to_dataframe`` for
-    /// an implied surface.
+    /// float64 column per strike: the ``expiry`` x ``strike`` pivot of
+    /// ``VolSurface.to_dataframe()`` for an implied surface.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         grid_to_dataframe(
             py,
@@ -1413,7 +1345,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyLocalVolSurface>()?;
     m.add_function(wrap_pyfunction!(calibrate_svi, &m)?)?;
     m.add_function(wrap_pyfunction!(convert_atm_volatility, &m)?)?;
-    m.add_function(wrap_pyfunction!(surface_to_dataframe, &m)?)?;
     m.add_function(wrap_pyfunction!(get_surface_vol, &m)?)?;
     m.add_function(wrap_pyfunction!(get_surface_vol_clamped, &m)?)?;
     m.add_function(wrap_pyfunction!(get_cube_expiry_slice_vol, &m)?)?;
@@ -1470,7 +1401,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "materialize_cube_tenor_slice_normal",
                 "materialize_fx_delta_surface",
                 "strike_to_delta",
-                "surface_to_dataframe",
             ],
         )?,
     )?;

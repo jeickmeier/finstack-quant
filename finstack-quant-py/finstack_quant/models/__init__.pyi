@@ -28,8 +28,7 @@ __all__ = [
     "asian_option_price",
     "bachelier_greeks",
     "bachelier_price",
-    "barrier_call",
-    "barrier_put",
+    "barrier_option_price",
     "black76_greeks",
     "black76_implied_vol",
     "black76_price",
@@ -1007,7 +1006,7 @@ def heston_price(
 
 # Closed-form exotics
 
-def barrier_call(
+def barrier_option_price(
     spot: float,
     strike: float,
     barrier: float,
@@ -1017,9 +1016,10 @@ def barrier_call(
     expiry: float,
     direction: str,
     knock: str,
+    is_call: bool = True,
 ) -> float:
     """
-    Reiner-Rubinstein continuous-monitoring barrier call price.
+    Reiner-Rubinstein continuous-monitoring barrier option price.
 
     ``direction`` is ``"up"`` or ``"down"``; ``knock`` is ``"in"`` or ``"out"``.
 
@@ -1043,11 +1043,13 @@ def barrier_call(
         ``"up"`` or ``"down"``.
     knock : str
         ``"in"`` or ``"out"``.
+    is_call : bool, optional
+        ``True`` for a call (default), ``False`` for a put.
 
     Returns
     -------
     float
-        Per-unit barrier call price.
+        Per-unit barrier option price.
 
     Raises
     ------
@@ -1057,69 +1059,10 @@ def barrier_call(
 
     Examples
     --------
-    >>> from finstack_quant.models import barrier_call
-    >>> round(barrier_call(100.0, 100.0, 120.0, 0.05, 0.0, 0.2, 1.0, "up", "out"), 4)
+    >>> from finstack_quant.models import barrier_option_price
+    >>> round(barrier_option_price(100.0, 100.0, 120.0, 0.05, 0.0, 0.2, 1.0, "up", "out"), 4)
     1.1761
-
-    Sources
-    -------
-    - Reiner-Rubinstein (1991): see docs/REFERENCES.md#reiner-rubinstein-1991
-
-    """
-    ...
-
-def barrier_put(
-    spot: float,
-    strike: float,
-    barrier: float,
-    rate: float,
-    div_yield: float,
-    vol: float,
-    expiry: float,
-    direction: str,
-    knock: str,
-) -> float:
-    """
-    Reiner-Rubinstein continuous-monitoring barrier put price.
-
-    ``direction`` is ``"up"`` or ``"down"``; ``knock`` is ``"in"`` or ``"out"``.
-
-    Parameters
-    ----------
-    spot : float
-        Spot price of the underlying.
-    strike : float
-        Option strike.
-    barrier : float
-        Barrier level.
-    rate : float
-        Continuously compounded risk-free rate (decimal).
-    div_yield : float
-        Continuous dividend/borrow yield (decimal).
-    vol : float
-        Annualized volatility (decimal).
-    expiry : float
-        Time to expiry in years.
-    direction : str
-        ``"up"`` or ``"down"``.
-    knock : str
-        ``"in"`` or ``"out"``.
-
-    Returns
-    -------
-    float
-        Per-unit barrier put price.
-
-    Raises
-    ------
-    ValueError
-        If ``direction`` is not ``"up"`` or ``"down"``, ``knock`` is not
-        ``"in"`` or ``"out"``, or the formula produces a non-finite price.
-
-    Examples
-    --------
-    >>> from finstack_quant.models import barrier_put
-    >>> barrier_put(100.0, 100.0, 80.0, 0.05, 0.0, 0.2, 1.0, "down", "out") > 0
+    >>> barrier_option_price(100.0, 100.0, 80.0, 0.05, 0.0, 0.2, 1.0, "down", "out", is_call=False) > 0
     True
 
     Sources

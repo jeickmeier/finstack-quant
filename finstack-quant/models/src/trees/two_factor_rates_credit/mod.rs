@@ -683,13 +683,13 @@ impl RatesCreditTree {
     /// transition law that fitted the discount and survival curves.
     ///
     /// ```compile_fail
-    /// use finstack_quant_models::trees::two_factor_rates_credit::{RatesCreditConfig, RatesCreditTree};
+    /// use finstack_quant_models::trees::{RatesCreditConfig, RatesCreditTree};
     /// let mut tree = RatesCreditTree::new(RatesCreditConfig::default());
     /// tree.config.rate_mean_reversion = 0.15;
     /// ```
     ///
     /// ```compile_fail
-    /// use finstack_quant_models::trees::two_factor_rates_credit::{RatesCreditConfig, RatesCreditTree};
+    /// use finstack_quant_models::trees::{RatesCreditConfig, RatesCreditTree};
     /// let tree = RatesCreditTree::new(RatesCreditConfig::default());
     /// tree.get_config().correlation = 1.0;
     /// ```

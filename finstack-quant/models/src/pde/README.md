@@ -388,7 +388,7 @@ gamma (`u_xx = u_x`). The PDE degenerates at `v → 0`, and the option value is
 insensitive at `v → ∞`.
 
 The documented anchor is against
-[`closed_form::heston::heston_price`](../closed_form/README.md):
+[`closed_form::heston_price`](../closed_form/README.md):
 
 | Test | Runs by default | Configuration | Tolerance |
 |------|-----------------|---------------|-----------|
@@ -473,7 +473,7 @@ unmeasured. See [`../../../benches/README.md`](../../../benches/README.md).
 5. Declare the file in [`mod.rs`](mod.rs) and add the root re-export.
 6. Anchor it. Every scheme here is graded against an independent closed form —
    the heat equation for the operators, `closed_form` Black-Scholes for 1D,
-   `closed_form::heston` for 2D. Add at least one always-running case that is
+   `closed_form::heston_price` for 2D. Add at least one always-running case that is
    sensitive to the term you introduced; a parity or symmetry identity alone is
    not enough (see the K = 120 note above).
 7. Cite the scheme in the module doc with author, year, and journal per

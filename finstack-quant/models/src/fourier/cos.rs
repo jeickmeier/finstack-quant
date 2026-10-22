@@ -16,6 +16,7 @@ use super::{invalid_input, numerical};
 use crate::fourier::characteristic_function::{
     BlackScholesCf, CharacteristicFunction, MertonJumpCf, VarianceGammaCf,
 };
+use crate::types::OptionType;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::Result;
 use num_complex::Complex64;
@@ -62,8 +63,8 @@ pub struct CosMarketParams {
     pub div_yield: f64,
     /// Time to expiry in years.
     pub expiry: f64,
-    /// `true` for call, `false` for put.
-    pub is_call: bool,
+    /// Call or put payoff.
+    pub option_type: OptionType,
     /// Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to
     /// [`CosConfig::default`].
     pub n_terms: Option<usize>,
@@ -173,12 +174,13 @@ fn cos_config(n_terms: Option<usize>) -> CosConfig {
 }
 
 fn price_from_cf(cf: &dyn CharacteristicFunction, market: CosMarketParams) -> Result<f64> {
-    let pricer = CosPricer::new(cf, cos_config(market.n_terms));
-    if market.is_call {
-        pricer.price_call(market.spot, market.strike, market.rate, market.expiry)
-    } else {
-        pricer.price_put(market.spot, market.strike, market.rate, market.expiry)
-    }
+    CosPricer::new(cf, cos_config(market.n_terms)).price(
+        market.spot,
+        market.strike,
+        market.rate,
+        market.expiry,
+        market.option_type,
+    )
 }
 
 /// COS method pricer for European options.
@@ -210,47 +212,39 @@ impl<'a> CosPricer<'a> {
         Self { cf, config }
     }
 
-    /// Price a European call option.
+    /// Price a single European option.
     ///
-    /// # Parameters
-    ///
-    /// * `r` — risk-free rate used for the discount factor `exp(-r*t)`. This
-    ///   **must** match the rate encoded in the characteristic function's drift
-    ///   term. Any dividend yield is already part of the CF's drift and does
-    ///   not appear here — the COS method computes the risk-neutral expectation
-    ///   directly from `phi_Y`.
+    /// `r` is the risk-free rate used for the discount factor `exp(-r*t)`. It
+    /// **must** match the rate encoded in the characteristic function's drift
+    /// term. Any dividend yield is already part of the CF's drift and does not
+    /// appear here — the COS method computes the risk-neutral expectation
+    /// directly from `phi_Y`.
     ///
     /// # Arguments
     ///
-    /// * `spot` - Spot price or FX rate used to convert delta quotes into absolute strikes
-    /// * `strike` - Option strike in the surface's quote units (absolute or relative)
-    /// * `r` - Continuously compounded risk-free rate in decimal annual units
-    /// * `t` - Year-fraction time from the curve or surface base date to the query point
-    pub fn price_call(&self, spot: f64, strike: f64, r: f64, t: f64) -> Result<f64> {
-        self.price(spot, strike, r, t, true)
-    }
-
-    /// Price a European put option. See [`price_call`](Self::price_call) for the
-    /// role of `r`.
-    pub fn price_put(&self, spot: f64, strike: f64, r: f64, t: f64) -> Result<f64> {
-        self.price(spot, strike, r, t, false)
-    }
-
-    /// Price a strip of European calls across strikes.
-    pub fn price_calls(&self, spot: f64, strikes: &[f64], r: f64, t: f64) -> Result<Vec<f64>> {
-        self.price_strip(spot, strikes, r, t, true)
-    }
-
-    /// Price a strip of European puts across strikes.
-    pub fn price_puts(&self, spot: f64, strikes: &[f64], r: f64, t: f64) -> Result<Vec<f64>> {
-        self.price_strip(spot, strikes, r, t, false)
-    }
-
-    fn price(&self, spot: f64, strike: f64, r: f64, t: f64, is_call: bool) -> Result<f64> {
+    /// * `spot` - Current underlying spot price; finite and positive.
+    /// * `strike` - Option strike in the same units as `spot`; finite and
+    ///   positive.
+    /// * `r` - Continuously compounded risk-free rate in decimal annual units.
+    /// * `t` - Time to expiry in years; finite and positive.
+    /// * `option_type` - Call or put payoff.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid inputs or configuration, a degenerate
+    /// truncation range, or non-finite model evaluations or prices.
+    pub fn price(
+        &self,
+        spot: f64,
+        strike: f64,
+        r: f64,
+        t: f64,
+        option_type: OptionType,
+    ) -> Result<f64> {
         // `price_strip` returns one price per input strike; with a single
         // strike the result is a one-element vector. Use a non-panicking
         // accessor — a panicking index has no place in library code.
-        self.price_strip(spot, &[strike], r, t, is_call)?
+        self.price_strip(spot, &[strike], r, t, option_type)?
             .into_iter()
             .next()
             .ok_or_else(|| {
@@ -258,13 +252,31 @@ impl<'a> CosPricer<'a> {
             })
     }
 
-    fn price_strip(
+    /// Price a strip of European options across strikes, reusing the
+    /// characteristic-function evaluations for every strike.
+    ///
+    /// See [`price`](Self::price) for the role of `r`.
+    ///
+    /// # Arguments
+    ///
+    /// * `spot` - Current underlying spot price; finite and positive.
+    /// * `strikes` - Option strikes in the same units as `spot`; each finite
+    ///   and positive. An empty slice returns an empty vector.
+    /// * `r` - Continuously compounded risk-free rate in decimal annual units.
+    /// * `t` - Time to expiry in years; finite and positive.
+    /// * `option_type` - Call or put payoff, shared by every strike.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid inputs or configuration, a degenerate
+    /// truncation range, or non-finite model evaluations or prices.
+    pub fn price_strip(
         &self,
         spot: f64,
         strikes: &[f64],
         r: f64,
         t: f64,
-        is_call: bool,
+        option_type: OptionType,
     ) -> Result<Vec<f64>> {
         for (name, value) in [("spot", spot), ("expiry", t)] {
             if !value.is_finite() || value <= 0.0 {
@@ -374,6 +386,7 @@ impl<'a> CosPricer<'a> {
         // dividend-discounted spot S_0 * exp(-q*t). Using the CF avoids needing
         // the dividend yield q explicitly. `phi_Y(-i)` is strike-independent,
         // so it is evaluated once here for the whole strip.
+        let is_call = option_type == OptionType::Call;
         let fwd_moment_re = if is_call {
             let fwd_moment = self.cf.cf(Complex64::new(0.0, -1.0), t);
             if !(fwd_moment.re.is_finite() && fwd_moment.im.is_finite()) {
@@ -581,18 +594,26 @@ mod tests {
         };
         let pricer = CosPricer::new(&cf, CosConfig::default());
         for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -100.0, 0.0] {
-            assert!(pricer.price_call(invalid, 100.0, 0.05, 1.0).is_err());
-            assert!(pricer.price_put(invalid, 100.0, 0.05, 1.0).is_err());
             assert!(pricer
-                .price_calls(100.0, &[90.0, invalid], 0.05, 1.0)
+                .price(invalid, 100.0, 0.05, 1.0, OptionType::Call)
                 .is_err());
             assert!(pricer
-                .price_puts(100.0, &[90.0, invalid], 0.05, 1.0)
+                .price(invalid, 100.0, 0.05, 1.0, OptionType::Put)
                 .is_err());
-            assert!(pricer.price_call(100.0, 100.0, 0.05, invalid).is_err());
+            assert!(pricer
+                .price_strip(100.0, &[90.0, invalid], 0.05, 1.0, OptionType::Call)
+                .is_err());
+            assert!(pricer
+                .price_strip(100.0, &[90.0, invalid], 0.05, 1.0, OptionType::Put)
+                .is_err());
+            assert!(pricer
+                .price(100.0, 100.0, 0.05, invalid, OptionType::Call)
+                .is_err());
         }
         for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1000.0, 1000.0] {
-            assert!(pricer.price_call(100.0, 100.0, invalid, 1.0).is_err());
+            assert!(pricer
+                .price(100.0, 100.0, invalid, 1.0, OptionType::Call)
+                .is_err());
         }
     }
 
@@ -604,7 +625,7 @@ mod tests {
             rate: 0.05,
             div_yield: 0.0,
             expiry: 1.0,
-            is_call: true,
+            option_type: OptionType::Call,
             n_terms: None,
         };
         let bad_carry = CosMarketParams {
@@ -697,7 +718,7 @@ mod tests {
             truncation_l: 10.0,
         };
         let pricer = CosPricer::new(&cf, config);
-        let cos_price = pricer.price_call(100.0, 100.0, 0.05, 1.0)?;
+        let cos_price = pricer.price(100.0, 100.0, 0.05, 1.0, OptionType::Call)?;
         let bs_price = bs_call_price(100.0, 100.0, 0.05, 0.0, 1.0, sigma);
 
         assert!(
@@ -720,7 +741,7 @@ mod tests {
         let pricer = CosPricer::new(&cf, config);
 
         for strike in [80.0, 90.0, 100.0, 110.0, 120.0] {
-            let cos_price = pricer.price_call(100.0, strike, 0.05, 1.0)?;
+            let cos_price = pricer.price(100.0, strike, 0.05, 1.0, OptionType::Call)?;
             let bs_price = bs_call_price(100.0, strike, 0.05, 0.02, 1.0, sigma);
             assert!(
                 (cos_price - bs_price).abs() < 1e-4,
@@ -747,8 +768,8 @@ mod tests {
         let q = 0.02;
         let t = 1.0;
 
-        let call = pricer.price_call(spot, strike, r, t)?;
-        let put = pricer.price_put(spot, strike, r, t)?;
+        let call = pricer.price(spot, strike, r, t, OptionType::Call)?;
+        let put = pricer.price(spot, strike, r, t, OptionType::Put)?;
         let parity = call - put - (spot * (-q * t).exp() - strike * (-r * t).exp());
 
         assert!(
@@ -768,7 +789,7 @@ mod tests {
         };
         let config = CosConfig::default();
         let pricer = CosPricer::new(&cf, config);
-        let cos_put = pricer.price_put(100.0, 100.0, 0.05, 1.0)?;
+        let cos_put = pricer.price(100.0, 100.0, 0.05, 1.0, OptionType::Put)?;
         let bs_put = bs_put_price(100.0, 100.0, 0.05, 0.0, 1.0, sigma);
         assert!(
             (cos_put - bs_put).abs() < 1e-6,
@@ -789,9 +810,9 @@ mod tests {
         let pricer = CosPricer::new(&cf, config);
         let strikes = vec![90.0, 95.0, 100.0, 105.0, 110.0];
 
-        let strip = pricer.price_calls(100.0, &strikes, 0.05, 1.0)?;
+        let strip = pricer.price_strip(100.0, &strikes, 0.05, 1.0, OptionType::Call)?;
         for (i, &k) in strikes.iter().enumerate() {
-            let single = pricer.price_call(100.0, k, 0.05, 1.0)?;
+            let single = pricer.price(100.0, k, 0.05, 1.0, OptionType::Call)?;
             assert!(
                 (strip[i] - single).abs() < 1e-12,
                 "Strip[{i}]={}, single={}",
@@ -818,7 +839,7 @@ mod tests {
             truncation_l: 12.0,
         };
         let pricer = CosPricer::new(&vg, config);
-        let call = pricer.price_call(100.0, 100.0, 0.05, 1.0)?;
+        let call = pricer.price(100.0, 100.0, 0.05, 1.0, OptionType::Call)?;
         assert!(call > 0.0, "VG call should be positive: {call}");
         assert!(call < 100.0, "VG call should be < spot: {call}");
         Ok(())
@@ -844,7 +865,7 @@ mod tests {
         // Strikes span deep ITM through deep OTM. |x0| reaches ~0.69, far
         // beyond the ~0.11 cumulant half-width at this vol/maturity.
         for strike in [50.0, 70.0, 90.0, 100.0, 110.0, 130.0, 150.0, 200.0] {
-            let cos_call = pricer.price_call(spot, strike, r, t)?;
+            let cos_call = pricer.price(spot, strike, r, t, OptionType::Call)?;
             let bs_call = bs_call_price(spot, strike, r, q, t, sigma);
             assert!(
                 (cos_call - bs_call).abs() < 1e-6,
@@ -852,7 +873,7 @@ mod tests {
                 (cos_call - bs_call).abs()
             );
 
-            let cos_put = pricer.price_put(spot, strike, r, t)?;
+            let cos_put = pricer.price(spot, strike, r, t, OptionType::Put)?;
             let bs_put = bs_put_price(spot, strike, r, q, t, sigma);
             assert!(
                 (cos_put - bs_put).abs() < 1e-6,
@@ -879,7 +900,7 @@ mod tests {
             truncation_l: 12.0,
         };
         let pricer = CosPricer::new(&merton, config);
-        let call = pricer.price_call(100.0, 100.0, 0.05, 1.0)?;
+        let call = pricer.price(100.0, 100.0, 0.05, 1.0, OptionType::Call)?;
         assert!(call > 0.0, "Merton call should be positive: {call}");
         assert!(call < 100.0, "Merton call should be < spot: {call}");
 
@@ -900,7 +921,7 @@ mod tests {
             rate: 0.03,
             div_yield: 0.0,
             expiry: 1.0,
-            is_call: true,
+            option_type: OptionType::Call,
             n_terms: Some(n_terms),
         };
         assert!(bs_cos_price(market(CosConfig::MAX_TERMS), 0.2).is_ok());
@@ -930,7 +951,7 @@ mod tests {
     fn cos_non_finite_cf_returns_error_not_silent_zero() {
         let pricer = CosPricer::new(&NanCf, CosConfig::default());
 
-        let call = pricer.price_call(100.0, 100.0, 0.05, 1.0);
+        let call = pricer.price(100.0, 100.0, 0.05, 1.0, OptionType::Call);
         assert!(
             call.is_err(),
             "non-finite CF must yield an error, got {call:?}"
@@ -942,7 +963,7 @@ mod tests {
         );
 
         // The strip path must fail the same way (it is the shared core).
-        let strip = pricer.price_calls(100.0, &[90.0, 100.0, 110.0], 0.05, 1.0);
+        let strip = pricer.price_strip(100.0, &[90.0, 100.0, 110.0], 0.05, 1.0, OptionType::Call);
         assert!(
             strip.is_err(),
             "non-finite CF must yield an error on the strip path too, got {strip:?}"
@@ -955,7 +976,7 @@ mod tests {
     #[test]
     fn cos_degenerate_cumulants_return_error() {
         let pricer = CosPricer::new(&DegenerateCf, CosConfig::default());
-        let call = pricer.price_call(100.0, 100.0, 0.05, 1.0);
+        let call = pricer.price(100.0, 100.0, 0.05, 1.0, OptionType::Call);
         assert!(
             call.is_err(),
             "degenerate cumulants must yield an error, got {call:?}"
@@ -978,7 +999,7 @@ mod tests {
         let t = 1.0 / 365.0;
         let cf = BlackScholesCf { r, q: 0.0, sigma };
         let pricer = CosPricer::new(&cf, CosConfig::default());
-        let cos = pricer.price_call(100.0, 100.0, r, t)?;
+        let cos = pricer.price(100.0, 100.0, r, t, OptionType::Call)?;
         let bs = bs_call_price(100.0, 100.0, r, 0.0, t, sigma);
         assert!(
             (cos - bs).abs() < 1e-6,
@@ -1012,8 +1033,8 @@ mod tests {
             let pricer = CosPricer::new(&merton, CosConfig::default());
 
             for k in [80.0, 100.0, 120.0] {
-                let call = pricer.price_call(100.0, k, r, t)?;
-                let put = pricer.price_put(100.0, k, r, t)?;
+                let call = pricer.price(100.0, k, r, t, OptionType::Call)?;
+                let put = pricer.price(100.0, k, r, t, OptionType::Put)?;
 
                 // Sanity bounds: a call is in [intrinsic_fwd_discounted, spot].
                 assert!(
@@ -1106,7 +1127,7 @@ mod tests {
             (100.0, 80.0, 0.03, 0.02, 0.25),
             (100.0, 135.0, -0.01, 0.01, 3.0),
         ] {
-            for is_call in [true, false] {
+            for option_type in [OptionType::Call, OptionType::Put] {
                 for n_terms in [None, Some(64), Some(512)] {
                     let market = CosMarketParams {
                         spot,
@@ -1114,7 +1135,7 @@ mod tests {
                         rate,
                         div_yield,
                         expiry,
-                        is_call,
+                        option_type,
                         n_terms,
                     };
                     let bs = bs_cos_price(market, 0.22);
@@ -1196,7 +1217,7 @@ mod tests {
                     rate: 0.05,
                     div_yield: 0.0,
                     expiry,
-                    is_call: true,
+                    option_type: OptionType::Call,
                     n_terms,
                 },
                 vol,

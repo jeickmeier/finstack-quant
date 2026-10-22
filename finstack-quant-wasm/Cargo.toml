@@ -80,11 +80,6 @@ strum = { workspace = true }
 # - `default`: No feature overrides.
 [features]
 default = []
-contract-generation = ["finstack-quant-valuations/json-schema"]
-
-[[example]]
-name = "generate_contracts"
-required-features = ["contract-generation"]
 
 [package.metadata.wasm-pack.profile.release]
 # Keep this feature allowlist in sync with the wasm features emitted by the

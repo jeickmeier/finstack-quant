@@ -16,16 +16,20 @@
 
 use crate::monte_carlo::traits::PathState;
 use crate::monte_carlo::traits::Payoff;
+use crate::types::OptionType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 
-/// European call option payoff.
+/// European option payoff.
 ///
-/// Pays `max(S_T - K, 0) * notional` at `maturity_step`.
+/// Pays `max(S_T - K, 0) * notional` for a call and `max(K - S_T, 0) *
+/// notional` for a put at `maturity_step`.
 ///
 /// `S_T` is the spot stored in [`PathState`] at the configured maturity step.
 #[derive(Debug, Clone)]
-pub struct EuropeanCall {
+pub struct European {
+    /// Call or put payoff
+    pub option_type: OptionType,
     /// Strike price
     pub strike: f64,
     /// Notional amount
@@ -36,11 +40,12 @@ pub struct EuropeanCall {
     terminal_spot: f64,
 }
 
-impl EuropeanCall {
-    /// Create a new European call payoff.
+impl European {
+    /// Create a new European payoff.
     ///
     /// # Arguments
     ///
+    /// * `option_type` - Call or put payoff.
     /// * `strike` - Strike price in the same units as the simulated spot.
     /// * `notional` - Linear payoff scaling.
     /// * `maturity_step` - Path step index at which the payoff observes `S_T`.
@@ -48,8 +53,9 @@ impl EuropeanCall {
     /// # Returns
     ///
     /// A payoff that records the spot when `state.step == maturity_step`.
-    pub fn new(strike: f64, notional: f64, maturity_step: usize) -> Self {
+    pub fn new(option_type: OptionType, strike: f64, notional: f64, maturity_step: usize) -> Self {
         Self {
+            option_type,
             strike,
             notional,
             maturity_step,
@@ -58,7 +64,7 @@ impl EuropeanCall {
     }
 }
 
-impl Payoff for EuropeanCall {
+impl Payoff for European {
     fn supports_lrm_greeks(&self) -> bool {
         self.maturity_step > 0
     }
@@ -67,10 +73,11 @@ impl Payoff for EuropeanCall {
     ///
     /// Captures the terminal spot price at maturity.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the process did not populate a finite `SPOT` state variable
-    /// (process/payoff wiring bug) — see `require_finite_state`.
+    /// Returns an error if the process did not populate a finite `SPOT` state
+    /// variable (process/payoff wiring bug) — see `require_finite_state`. A
+    /// silent 0.0 default would pay the full strike on a put.
     fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
         if state.step == self.maturity_step {
             self.terminal_spot = super::require_finite_state(state.spot(), "SPOT", state.step)?;
@@ -83,75 +90,7 @@ impl Payoff for EuropeanCall {
     }
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        let intrinsic = (self.terminal_spot - self.strike).max(0.0);
-        Money::new(intrinsic * self.notional, currency)
-    }
-
-    fn reset(&mut self) {
-        self.terminal_spot = 0.0;
-    }
-}
-
-/// European put option payoff.
-///
-/// Pays `max(K - S_T, 0) * notional` at `maturity_step`.
-#[derive(Debug, Clone)]
-pub struct EuropeanPut {
-    /// Strike price
-    pub strike: f64,
-    /// Notional amount
-    pub notional: f64,
-    /// Maturity step index
-    pub maturity_step: usize,
-    /// Terminal spot
-    terminal_spot: f64,
-}
-
-impl EuropeanPut {
-    /// Create a new European put payoff.
-    ///
-    /// # Arguments
-    ///
-    /// * `strike` - Strike price in the same units as the simulated spot.
-    /// * `notional` - Linear payoff scaling.
-    /// * `maturity_step` - Path step index at which the payoff observes `S_T`.
-    pub fn new(strike: f64, notional: f64, maturity_step: usize) -> Self {
-        Self {
-            strike,
-            notional,
-            maturity_step,
-            terminal_spot: 0.0,
-        }
-    }
-}
-
-impl Payoff for EuropeanPut {
-    fn supports_lrm_greeks(&self) -> bool {
-        self.maturity_step > 0
-    }
-
-    /// Process a path event at maturity.
-    ///
-    /// Captures the terminal spot price at maturity.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the process did not populate a finite `SPOT` state variable
-    /// (process/payoff wiring bug) — see `require_finite_state`. A
-    /// silent 0.0 default would pay the full strike here.
-    fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
-        if state.step == self.maturity_step {
-            self.terminal_spot = super::require_finite_state(state.spot(), "SPOT", state.step)?;
-        }
-        Ok(())
-    }
-
-    fn max_event_step(&self) -> Option<usize> {
-        Some(self.maturity_step)
-    }
-
-    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        let intrinsic = (self.strike - self.terminal_spot).max(0.0);
+        let intrinsic = self.option_type.intrinsic(self.terminal_spot, self.strike);
         Money::new(intrinsic * self.notional, currency)
     }
 
@@ -341,7 +280,7 @@ mod tests {
 
     #[test]
     fn test_european_call() {
-        let mut call = EuropeanCall::new(100.0, 1.0, 10);
+        let mut call = European::new(OptionType::Call, 100.0, 1.0, 10);
 
         // Simulate path with terminal spot = 110
         let mut state = create_terminal_state(10, 110.0);
@@ -354,7 +293,7 @@ mod tests {
 
     #[test]
     fn test_european_call_otm() {
-        let mut call = EuropeanCall::new(100.0, 1.0, 10);
+        let mut call = European::new(OptionType::Call, 100.0, 1.0, 10);
 
         // Out of the money
         let mut state = create_terminal_state(10, 90.0);
@@ -366,7 +305,7 @@ mod tests {
 
     #[test]
     fn test_european_put() {
-        let mut put = EuropeanPut::new(100.0, 1.0, 10);
+        let mut put = European::new(OptionType::Put, 100.0, 1.0, 10);
 
         // In the money
         let mut state = create_terminal_state(10, 90.0);
@@ -434,7 +373,7 @@ mod tests {
 
     #[test]
     fn test_payoff_reset() {
-        let mut call = EuropeanCall::new(100.0, 1.0, 10);
+        let mut call = European::new(OptionType::Call, 100.0, 1.0, 10);
 
         let mut state = create_terminal_state(10, 110.0);
         call.on_event(&mut state).expect("valid payoff event");
@@ -446,7 +385,7 @@ mod tests {
 
     #[test]
     fn test_notional_scaling() {
-        let mut call = EuropeanCall::new(100.0, 10.0, 10);
+        let mut call = European::new(OptionType::Call, 100.0, 10.0, 10);
 
         let mut state = create_terminal_state(10, 110.0);
         call.on_event(&mut state).expect("valid payoff event");

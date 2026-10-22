@@ -10,8 +10,8 @@ use finstack_quant_models::rates::clock::ModelDiscountCurve;
 use finstack_quant_models::rates::hull_white::{
     fd_instantaneous_forward, HullWhiteCalibrationParams,
 };
-use finstack_quant_models::trees::HullWhiteTree;
-use finstack_quant_models::trees::HullWhiteTreeConfig;
+use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
+use finstack_quant_models::trees::hull_white_tree::HullWhiteTreeConfig;
 use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
     resolve_hw1f_params, Hw1fParamFamily,
 };

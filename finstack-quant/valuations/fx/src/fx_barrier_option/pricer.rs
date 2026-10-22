@@ -251,7 +251,7 @@ fn validate_monitoring_state(
 }
 
 use finstack_quant_core::types::BarrierType;
-use finstack_quant_models::closed_form::barrier::{barrier_price, barrier_rebate, BarrierParams};
+use finstack_quant_models::closed_form::{barrier_price, barrier_rebate, BarrierParams};
 
 fn expired_barrier_value_per_unit(
     inst: &FxBarrierOption,
@@ -270,20 +270,18 @@ fn expired_barrier_value_per_unit(
     };
     // A recorded knock-out hit includes settlement of an at-hit rebate; the
     // same claim is extinguished before, on, and after expiry.
-    Ok(
-        finstack_quant_models::closed_form::barrier::expired_barrier_payoff(
-            inst.barrier_type,
-            barrier_hit,
-            inst.rebate_timing,
-            intrinsic,
-            inst.rebate_per_unit().unwrap_or(0.0),
-        ),
-    )
+    Ok(finstack_quant_models::closed_form::expired_barrier_payoff(
+        inst.barrier_type,
+        barrier_hit,
+        inst.rebate_timing,
+        intrinsic,
+        inst.rebate_per_unit().unwrap_or(0.0),
+    ))
 }
 
 fn seasoned_breached_value_per_unit(inst: &FxBarrierOption, inputs: &FxOptionInputs) -> f64 {
     if inst.barrier_type.is_knock_in() {
-        finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
+        finstack_quant_models::closed_form::bs_price_unchecked(
             inputs.spot,
             inst.strike,
             inputs.r_domestic,
@@ -515,7 +513,7 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::BarrierType;
     use finstack_quant_core::types::PayoutTiming;
-    use finstack_quant_models::closed_form::barrier::barrier_rebate;
+    use finstack_quant_models::closed_form::barrier_rebate;
     use finstack_quant_models::types::OptionType;
     use finstack_quant_valuations_core::instruments::Instrument;
     use std::sync::Arc;

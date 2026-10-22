@@ -7422,7 +7422,7 @@ export default [
     "path": "#/$defs/d_c2bf0fda0f87921eb6ab/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ThetaDayBasis/oneOf/0",
     "const": "calendar_365",
-    "description": "Calendar-day theta: annual theta divided by\n[`finstack_quant_models::closed_form::vanilla::DEFAULT_THETA_DAYS_PER_YEAR`] (365)."
+    "description": "Calendar-day theta: annual theta divided by\n[`finstack_quant_models::closed_form::DEFAULT_THETA_DAYS_PER_YEAR`] (365)."
   },
   {
     "path": "#/$defs/d_c2bf0fda0f87921eb6ab/oneOf/1",

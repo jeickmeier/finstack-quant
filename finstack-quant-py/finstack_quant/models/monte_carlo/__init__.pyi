@@ -35,8 +35,7 @@ __all__ = [
     "finite_diff_delta",
     "finite_diff_gamma",
     "heston_satisfies_feller",
-    "price_heston_call",
-    "price_heston_put",
+    "price_heston",
     "simulate_paths",
 ]
 
@@ -47,7 +46,7 @@ class MoneyEstimate:
     Examples
     --------
     >>> from finstack_quant.models.monte_carlo import EuropeanPricer
-    >>> r = EuropeanPricer(10_000, seed=42).price_call(100, 100, 0.05, 0.0, 0.2, 1.0)
+    >>> r = EuropeanPricer(10_000, seed=42).price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True)
     >>> r.num_paths
     10000
     """
@@ -75,7 +74,7 @@ class MoneyEstimate:
         Examples
         --------
         >>> from finstack_quant.models.monte_carlo import EuropeanPricer, MoneyEstimate
-        >>> priced = EuropeanPricer(10_000, seed=42).price_call(100, 100, 0.05, 0.0, 0.2, 1.0)
+        >>> priced = EuropeanPricer(10_000, seed=42).price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True)
         >>> MoneyEstimate.from_json(priced.to_json()).num_paths
         10000
         """
@@ -115,7 +114,7 @@ class MoneyEstimate:
         --------
         >>> from finstack_quant.models.monte_carlo import EuropeanPricer
         >>> pricer = EuropeanPricer(1000, seed=42)
-        >>> pricer.price_call(100, 100, 0.05, 0.0, 0.2, 1.0).mean.amount > 0
+        >>> pricer.price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True).mean.amount > 0
         True
         """
         ...
@@ -138,7 +137,7 @@ class MoneyEstimate:
         --------
         >>> from finstack_quant.models.monte_carlo import EuropeanPricer
         >>> pricer = EuropeanPricer(1000, seed=42)
-        >>> pricer.price_call(100, 100, 0.05, 0.0, 0.2, 1.0).stderr >= 0
+        >>> pricer.price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True).stderr >= 0
         True
         """
         ...
@@ -176,7 +175,7 @@ class MoneyEstimate:
         Examples
         --------
         >>> from finstack_quant.models.monte_carlo import EuropeanPricer
-        >>> r = EuropeanPricer(2000, seed=42).price_call(100, 100, 0.05, 0.0, 0.2, 1.0)
+        >>> r = EuropeanPricer(2000, seed=42).price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True)
         >>> r.ci_lower.amount <= r.mean.amount
         True
         """
@@ -199,7 +198,7 @@ class MoneyEstimate:
         Examples
         --------
         >>> from finstack_quant.models.monte_carlo import EuropeanPricer
-        >>> r = EuropeanPricer(2000, seed=42).price_call(100, 100, 0.05, 0.0, 0.2, 1.0)
+        >>> r = EuropeanPricer(2000, seed=42).price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True)
         >>> r.ci_upper.amount >= r.mean.amount
         True
         """
@@ -225,7 +224,7 @@ class MoneyEstimate:
         Examples
         --------
         >>> from finstack_quant.models.monte_carlo import EuropeanPricer
-        >>> EuropeanPricer(1234, seed=42).price_call(100, 100, 0.05, 0.0, 0.2, 1.0).num_paths
+        >>> EuropeanPricer(1234, seed=42).price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True).num_paths
         1234
         """
         ...
@@ -351,7 +350,7 @@ class MoneyEstimate:
         --------
         >>> from finstack_quant.models.monte_carlo import EuropeanPricer
         >>> pricer = EuropeanPricer(5000, seed=42)
-        >>> pricer.price_call(100, 100, 0.05, 0.0, 0.2, 1.0).relative_stderr() >= 0
+        >>> pricer.price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True).relative_stderr() >= 0
         True
         """
         ...
@@ -1117,7 +1116,7 @@ def heston_satisfies_feller(kappa: float, theta: float, vol_of_vol: float) -> bo
     Test the inclusive Feller condition ``2 * kappa * theta >= vol_of_vol**2``.
 
     This is the Monte Carlo engine's own predicate, so the answer at the
-    boundary matches :func:`price_heston_call` / :func:`price_heston_put`.
+    boundary matches :func:`price_heston`.
     Inputs are not validated: non-finite values typically yield ``False``.
 
     Parameters
@@ -1161,7 +1160,7 @@ class EuropeanPricer:
     Examples
     --------
     >>> from finstack_quant.models.monte_carlo import EuropeanPricer
-    >>> EuropeanPricer(num_paths=1000, seed=1).price_call(100, 100, 0.05, 0.0, 0.2, 1.0).num_paths
+    >>> EuropeanPricer(num_paths=1000, seed=1).price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True).num_paths
     1000
     """
 
@@ -1257,7 +1256,7 @@ class EuropeanPricer:
         """
         ...
 
-    def price_call(
+    def price_gbm(
         self,
         spot: float,
         strike: float,
@@ -1265,11 +1264,12 @@ class EuropeanPricer:
         div_yield: float,
         vol: float,
         expiry: float,
+        is_call: bool,
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
         """
-        Monte Carlo present value of a European call on the configured process.
+        Monte Carlo present value of a European option under exact GBM.
 
         Parameters
         ----------
@@ -1285,6 +1285,8 @@ class EuropeanPricer:
             Volatility (decimal).
         expiry : float
             Time to maturity in years.
+        is_call : bool
+            ``True`` for a call payoff, ``False`` for a put.
         num_steps : int, optional
             Time steps. Defaults to the registry default (``1``).
             Exact GBM is unbiased for any step size, so a European payoff
@@ -1300,67 +1302,10 @@ class EuropeanPricer:
         Examples
         --------
         >>> from finstack_quant.models.monte_carlo import EuropeanPricer
-        >>> EuropeanPricer(800, 0).price_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=52).num_paths
+        >>> EuropeanPricer(800, 0).price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True, num_steps=52).num_paths
         800
-
-        Raises
-        ------
-        ValueError
-            If ``rate`` or ``div_yield`` is non-finite, ``vol`` is negative or non-finite,
-            ``expiry`` is non-finite or not strictly positive, ``num_steps`` is zero, the
-            configured path count is zero or exceeds ``10_000_000``,
-            ``currency`` is unknown, or discounting produces a non-finite value.
-        TypeError
-            If a non-``None`` ``currency`` is neither a string nor a ``Currency`` instance.
-
-        """
-        ...
-
-    def price_put(
-        self,
-        spot: float,
-        strike: float,
-        rate: float,
-        div_yield: float,
-        vol: float,
-        expiry: float,
-        num_steps: int | None = None,
-        currency: str | None = None,
-    ) -> MoneyEstimate:
-        """
-        Monte Carlo present value of a European put on the configured process.
-
-        Parameters
-        ----------
-        spot : float
-            Spot price.
-        strike : float
-            Strike price.
-        rate : float
-            Risk-free rate (continuously compounded decimal).
-        div_yield : float
-            Dividend yield (continuously compounded decimal).
-        vol : float
-            Volatility (decimal).
-        expiry : float
-            Time to maturity in years.
-        num_steps : int, optional
-            Time steps. Defaults to the registry default (``1``).
-            Exact GBM is unbiased for any step size, so a European payoff
-            only needs one step.
-        currency : str, optional
-            ISO currency code. Defaults to USD.
-
-        Returns
-        -------
-        MoneyEstimate
-            Monte Carlo price with stderr and confidence bands.
-
-        Examples
-        --------
-        >>> from finstack_quant.models.monte_carlo import EuropeanPricer
-        >>> EuropeanPricer(800, 0).price_put(100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=52).num_paths
-        800
+        >>> EuropeanPricer(800, 0).price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, False).mean.amount > 0
+        True
 
         Raises
         ------
@@ -1991,7 +1936,7 @@ class LsmcPricer:
         """
         ...
 
-def price_heston_call(
+def price_heston(
     spot: float,
     strike: float,
     rate: float,
@@ -2002,13 +1947,14 @@ def price_heston_call(
     rho: float,
     v0: float,
     expiry: float,
+    is_call: bool,
     num_paths: int | None = None,
     seed: int | None = None,
     num_steps: int | None = None,
     currency: str | None = None,
 ) -> MoneyEstimate:
     """
-    Monte Carlo European call under Heston stochastic volatility.
+    Monte Carlo European option under Heston stochastic volatility.
 
     Simulates spot and variance with Andersen's quadratic-exponential (QE)
     discretization, which stays stable when the Feller condition is violated.
@@ -2037,6 +1983,9 @@ def price_heston_call(
         Initial variance (not volatility).
     expiry : float
         Time to maturity in years.
+    is_call : bool
+        ``True`` for a call paying ``max(S_T - K, 0)``, ``False`` for a put
+        paying ``max(K - S_T, 0)``.
     num_paths : int, optional
         Independent path estimators in ``[2, 10_000_000]``; each antithetic
         pair counts once. The registry default is ``100_000``.
@@ -2066,88 +2015,12 @@ def price_heston_call(
 
     Examples
     --------
-    >>> from finstack_quant.models.monte_carlo import price_heston_call
-    >>> r = price_heston_call(100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, num_paths=5000)
+    >>> from finstack_quant.models.monte_carlo import price_heston
+    >>> r = price_heston(100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, True, num_paths=5000)
     >>> r.num_paths
     5000
-    """
-    ...
-
-def price_heston_put(
-    spot: float,
-    strike: float,
-    rate: float,
-    div_yield: float,
-    kappa: float,
-    theta: float,
-    vol_of_vol: float,
-    rho: float,
-    v0: float,
-    expiry: float,
-    num_paths: int | None = None,
-    seed: int | None = None,
-    num_steps: int | None = None,
-    currency: str | None = None,
-) -> MoneyEstimate:
-    """
-    Monte Carlo European put under Heston stochastic volatility.
-
-    Same conventions as :func:`price_heston_call` but pays ``max(K - S_T, 0)``.
-
-    Parameters
-    ----------
-    spot : float
-        Positive initial underlying price in the requested currency units.
-    strike : float
-        Positive put strike in the same price units as ``spot``.
-    rate : float
-        Continuously compounded annual risk-free rate as a decimal.
-    div_yield : float
-        Continuously compounded annual dividend or carry yield as a decimal.
-    kappa : float
-        Positive mean-reversion speed of the Heston variance process per year.
-    theta : float
-        Positive long-run variance level in squared-volatility units.
-    vol_of_vol : float
-        Positive annualized volatility of the Heston variance process.
-    rho : float
-        Spot/variance Brownian correlation in the closed interval ``[-1, 1]``.
-    v0 : float
-        Positive initial variance, not initial volatility.
-    expiry : float
-        Positive time to the European put expiry in years.
-    num_paths : int or None, default None
-        Independent path estimators in ``[2, 10_000_000]``; each antithetic
-        pair counts once. ``None`` selects the engine default.
-    seed : int or None, default None
-        Optional deterministic random seed for reproducible path generation.
-    num_steps : int or None, default None
-        Optional number of time steps; ``None`` selects the engine default grid.
-    currency : str or None, default None
-        ISO-4217 output currency tag; ``None`` uses the registry binding default.
-
-    Returns
-    -------
-    MoneyEstimate
-        Discounted Monte Carlo put price.
-
-    Raises
-    ------
-    ValueError
-        If Heston parameters, expiry, path count, step count, or the discount
-        factor fail validation, or a simulated discounted payoff is
-        non-finite. Violating the Feller condition does not raise.
-
-    Sources
-    -------
-    - Heston (1993): see docs/REFERENCES.md#heston-1993
-    - Andersen QE (2008): see docs/REFERENCES.md#andersen-2008-heston-qe
-
-    Examples
-    --------
-    >>> from finstack_quant.models.monte_carlo import price_heston_put
-    >>> r = price_heston_put(100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, num_paths=5000)
-    >>> r.mean.amount > 0
+    >>> put = price_heston(100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, False, num_paths=5000)
+    >>> put.mean.amount > 0
     True
     """
     ...

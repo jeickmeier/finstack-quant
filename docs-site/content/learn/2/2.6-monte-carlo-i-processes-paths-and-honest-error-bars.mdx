@@ -4,7 +4,7 @@ title: "Monte Carlo I: Processes, Paths, and Honest Error Bars"
 description: "Price a European claim from simulated paths, audit uncertainty and path counts, and measure variance reduction before moving to stochastic volatility."
 desk_question: "There is no convenient formula for this payoff. How do we price it, and what does the error bar actually cover?"
 references: ["#glasserman-2004-monte-carlo", "#heston-1993", "#andersen-2008-heston-qe", "#lord-koekkoek-vandijk-2010", "#broadie-kaya-2006-exact-heston", "#salmon-2011-philox", "#box-muller-1958", "#joe-kuo-2008-sobol", "#kahan-1965", "#albrecher-2007-little-heston-trap"]
-api: ["finstack_quant.models.bs_price", "finstack_quant.models.bs_greeks", "finstack_quant.models.monte_carlo.EuropeanPricer", "finstack_quant.models.monte_carlo.LsmcPricer", "finstack_quant.models.monte_carlo.simulate_paths", "finstack_quant.models.monte_carlo.price_heston_call"]
+api: ["finstack_quant.models.bs_price", "finstack_quant.models.bs_greeks", "finstack_quant.models.monte_carlo.EuropeanPricer", "finstack_quant.models.monte_carlo.LsmcPricer", "finstack_quant.models.monte_carlo.simulate_paths", "finstack_quant.models.monte_carlo.price_heston"]
 status: "published"
 ---
 
@@ -109,7 +109,7 @@ print(f"Analytical ATM call: {analytical:.8f}")
 counts = [1_000, 5_000, 10_000, 50_000, 100_000]
 print("paths | mean | standard error | realized absolute error | SE * sqrt(N)")
 for n in counts:
-    est = EuropeanPricer(num_paths=n, seed=123).price_call(S, K, r, q, vol, T, num_steps=1)
+    est = EuropeanPricer(num_paths=n, seed=123).price_gbm(S, K, r, q, vol, T, True, num_steps=1)
     print(f"{n:6d} | {est.mean.amount:.8f} | {est.stderr:.8f} | "
           f"{abs(est.mean.amount - analytical):.8f} | {est.stderr * math.sqrt(n):.8f}")
 ```
@@ -148,7 +148,7 @@ print(f"Heston params: {heston_params}")
 print(f"Heston Feller (2*kappa*theta >= xi^2): {feller_ok}")
 
 pr = EuropeanPricer(num_paths=25_000, seed=42)
-mc_call = pr.price_call(100.0, 100.0, 0.05, 0.0, 0.20, 1.0, num_steps=1)
+mc_call = pr.price_gbm(100.0, 100.0, 0.05, 0.0, 0.20, 1.0, True, num_steps=1)
 bs = bs_price(100.0, 100.0, 0.05, 0.0, 0.20, 1.0, True)
 print(f"EuropeanPricer ATM call: {mc_call.mean.amount:.6f} (stderr={mc_call.stderr:.6f})")
 print(f"Black–Scholes call:      {bs:.6f}")
@@ -210,8 +210,8 @@ The following tuple compares price, SE, interval endpoints and both path counts.
 {/* notebook-block notebook="07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb" cell="mc-parallel-replay" role="build" */}
 ```python exec id=mc-parallel-replay role=build
 estimates = [
-    EuropeanPricer(num_paths=4096, seed=17, use_parallel=parallel).price_call(
-        100.0, 100.0, 0.05, 0.0, 0.20, 1.0, num_steps=1
+    EuropeanPricer(num_paths=4096, seed=17, use_parallel=parallel).price_gbm(
+        100.0, 100.0, 0.05, 0.0, 0.20, 1.0, True, num_steps=1
     )
     for parallel in (False, True, False)
 ]
@@ -295,7 +295,7 @@ g_est = finite_diff_gamma(**kw); g, g_se = g_est.mean, g_est.stderr
 h = 0.01 * kw["spot"]
 pricer = EuropeanPricer(num_paths=kw["num_paths"], seed=kw["seed"])
 se_up, se_mid, se_dn = (
-    pricer.price_call(s, 100.0, 0.05, 0.0, 0.20, 1.0).stderr for s in (100.0 + h, 100.0, 100.0 - h)
+    pricer.price_gbm(s, 100.0, 0.05, 0.0, 0.20, 1.0, True).stderr for s in (100.0 + h, 100.0, 100.0 - h)
 )
 d_bound = (se_up**2 + se_dn**2) ** 0.5 / (2 * h)
 g_bound = (se_up**2 + 4 * se_mid**2 + se_dn**2) ** 0.5 / h**2
@@ -313,9 +313,9 @@ The Heston calculation uses $v_0=\theta=0.04$, $\kappa=2$, $\xi=0.3$ and $\rho=-
 
 {/* notebook-block notebook="07_advanced_quant/monte_carlo/stochastic_processes.ipynb" cell="heston-qe-pricing" role="build" */}
 ```python exec id=heston-qe-pricing role=build
-from finstack_quant.models.monte_carlo import price_heston_call, price_heston_put
+from finstack_quant.models.monte_carlo import price_heston
 
-hc = price_heston_call(
+hc = price_heston(
     spot=100.0,
     strike=100.0,
     rate=0.05,
@@ -328,8 +328,9 @@ hc = price_heston_call(
     expiry=1.0,
     num_paths=20_000,
     seed=42,
+    is_call=True,
 )
-hp = price_heston_put(
+hp = price_heston(
     spot=100.0,
     strike=100.0,
     rate=0.05,
@@ -342,6 +343,7 @@ hp = price_heston_put(
     expiry=1.0,
     num_paths=20_000,
     seed=42,
+    is_call=False,
 )
 print(f"Heston call: {hc.mean} (stderr={hc.stderr:.4f})")
 print(f"Heston put:  {hp.mean} (stderr={hp.stderr:.4f})")
@@ -368,8 +370,8 @@ import statistics
 reference = bs_price(100, 100, 0.05, 0.0, 0.2, 1.0, True)
 scaling = []
 for count in (1024, 4096):
-    runs = [EuropeanPricer(count, seed, False).price_call(
-        100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=1
+    runs = [EuropeanPricer(count, seed, False).price_gbm(
+        100, 100, 0.05, 0.0, 0.2, 1.0, True, num_steps=1
     ) for seed in range(16)]
     average_se = statistics.mean(run.stderr for run in runs)
     rmse = math.sqrt(statistics.mean((run.mean.amount - reference) ** 2 for run in runs))
@@ -394,14 +396,14 @@ Here $2\kappa\theta=0.08$ and $\xi^2=0.49$. The inequality fails. With the displ
 
 {/* notebook-block notebook="07_advanced_quant/monte_carlo/stochastic_processes.ipynb" cell="heston-feller-boundary" role="exercise" */}
 ```python exec id=heston-feller-boundary role=exercise
-from finstack_quant.models.monte_carlo import heston_satisfies_feller, price_heston_call
+from finstack_quant.models.monte_carlo import heston_satisfies_feller, price_heston
 
 kappa, theta, xi, initial_variance = 1.0, 0.04, 0.7, 0.04
 # A single displayed Euler update can cross zero; the CIR process itself does not.
 euler_variance = initial_variance + kappa * (theta-initial_variance) * 0.25 + xi * initial_variance**0.5 * 0.25**0.5 * -2
-outside_feller = price_heston_call(spot=100, strike=100, rate=0.05, div_yield=0,
+outside_feller = price_heston(spot=100, strike=100, rate=0.05, div_yield=0,
     kappa=kappa, theta=theta, vol_of_vol=xi, rho=-0.7, v0=initial_variance,
-    expiry=1, num_paths=8192, seed=17)
+    expiry=1, num_paths=8192, seed=17, is_call=True)
 print(f"2*kappa*theta={2*kappa*theta:.3f}; xi^2={xi**2:.3f}; Euler update={euler_variance:.3f}")
 print(f"Native Heston QE call={outside_feller.mean.amount:.6f}; SE={outside_feller.stderr:.6f}")
 ```

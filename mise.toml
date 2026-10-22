@@ -331,11 +331,28 @@ run = [
 
 [tasks.rust-check-schemas]
 description = "Verify the JSON schemas, serde coverage and schema contracts match the Rust types"
+run = [{ tasks = ["rust-check-schema-registry", "rust-check-schema-residue", "rust-check-serde-audit"] }]
+
+[tasks.rust-check-serde-audit]
+description = "Verify every public wire type carries the serde and schema derives its contract needs"
+hide = true
 run = [
   "uv run --no-sync pytest scripts/tests/test_serde_audit.py -q",
   "uv run --no-sync python -m scripts.serde_audit --check",
+]
+
+[tasks.rust-check-schema-residue]
+description = "Fail on retired JSON/serde patterns in production and direct-consumer sources"
+hide = true
+run = [
   "uv run --no-sync pytest scripts/tests/test_check_schema_residue.py -q",
   "uv run --no-sync python scripts/check_schema_residue.py",
+]
+
+[tasks.rust-check-schema-registry]
+description = "Regenerate the schema registries in clean-room trees and run the schema-contract tests"
+hide = true
+run = [
   # Locally the rust-test build holds every gen_* binary (a no-op right after
   # rust-test). CI's Lint job has no test build, so it builds the bins plus
   # gen-check's generate_contracts example: an example build turns on
@@ -343,8 +360,7 @@ run = [
   # twice.
   '''
   if [ -n "${CI:-}" ]; then
-    cargo build --workspace --exclude finstack-quant-py --bins \
-      --example generate_contracts --features finstack-quant-wasm/contract-generation
+    cargo build --workspace --exclude finstack-quant-py --bins --example generate_contracts
   else
     cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' --no-run
   fi
@@ -391,8 +407,7 @@ run = [
   { task = "rust-gen-schemas" },
   # `cargo run` cannot select the workspace, so build, then run the binary.
   '''
-  cargo build --workspace --exclude finstack-quant-py --example generate_contracts \
-    --features finstack-quant-wasm/contract-generation
+  cargo build --workspace --exclude finstack-quant-py --example generate_contracts
   "${CARGO_TARGET_DIR:-target}/debug/examples/generate_contracts" --write
   ''',
   "node finstack-quant-wasm/scripts/generate-contract-types.mjs",
@@ -402,28 +417,47 @@ run = [
 
 [tasks.gen-check]
 description = "Fail if any generated artifact drifts from its source"
+# The checks only read the workspace, so they run in parallel; the digest
+# taken around them catches one that writes.
 run = """
 set -eu
 uv run --no-sync pytest scripts/tests/test_generation_digest.py -q
 uv run --no-sync python scripts/generation_digest.py --check-manifest
 before_digest=$(uv run --no-sync python scripts/generation_digest.py)
-uv run --no-sync pytest scripts/tests/test_generate_core_reference_data.py -q
-uv run --no-project python finstack-quant/core/build/generate_reference_data.py --check
-mise run rust-check-schemas
-cargo build --workspace --exclude finstack-quant-py --example generate_contracts \
-  --features finstack-quant-wasm/contract-generation
-"${CARGO_TARGET_DIR:-target}/debug/examples/generate_contracts" --check
-node finstack-quant-wasm/scripts/generate-contract-types.mjs --check
-uv run --no-sync python scripts/sync_generated_ts_index.py --check \
-  || (echo 'Generated TypeScript index is out of date'; exit 1)
-npm --prefix finstack-quant-ui run generate -- --check
-uv run --no-sync python scripts/check_generated_instrument_fixtures.py \
-  || (echo 'Generated instrument fixtures do not match the registry manifest'; exit 1)
+mise run --jobs 8 rust-check-schemas ::: gen-check-contracts ::: gen-check-ui ::: gen-check-sources
 after_digest=$(uv run --no-sync python scripts/generation_digest.py)
 test "$before_digest" = "$after_digest" \
   || (echo "Generated artifacts changed during the check: $before_digest -> $after_digest"; exit 1)
 echo "Generated artifacts are idempotent: sha256:$after_digest"
 """
+
+[tasks.gen-check-contracts]
+description = "Verify the WASM contract registry and the TypeScript types generated from it"
+hide = true
+run = '''
+set -eu
+cargo build --workspace --exclude finstack-quant-py --example generate_contracts
+"${CARGO_TARGET_DIR:-target}/debug/examples/generate_contracts" --check
+node finstack-quant-wasm/scripts/generate-contract-types.mjs --check
+uv run --no-sync python scripts/sync_generated_ts_index.py --check \
+  || (echo 'Generated TypeScript index is out of date'; exit 1)
+'''
+
+[tasks.gen-check-ui]
+description = "Verify the UI files generated from the contracts"
+hide = true
+run = "npm --prefix finstack-quant-ui run generate -- --check"
+
+[tasks.gen-check-sources]
+description = "Verify the core reference data and the generated instrument fixtures"
+hide = true
+run = '''
+set -eu
+uv run --no-sync pytest scripts/tests/test_generate_core_reference_data.py -q
+uv run --no-project python finstack-quant/core/build/generate_reference_data.py --check
+uv run --no-sync python scripts/check_generated_instrument_fixtures.py \
+  || (echo 'Generated instrument fixtures do not match the registry manifest'; exit 1)
+'''
 
 # ─────────────────────────────────────────────────────────────────
 # Python

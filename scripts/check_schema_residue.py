@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 import json
 import os
@@ -683,48 +684,57 @@ def is_explicit_rejection_test(contents: str, match: re.Match[str]) -> bool:
     return SCHEMA_REJECTION_MARKER in contents[rust_test_start : match.start()]
 
 
+def _pattern_findings(
+    path: Path,
+    contents: str,
+    patterns: tuple[ForbiddenPattern, ...],
+    *,
+    skip_rejection_tests: bool,
+) -> list[str]:
+    """Return one diagnostic per match of ``patterns`` in one file's contents."""
+    findings = []
+    for forbidden in patterns:
+        for match in forbidden.finditer(contents):
+            if skip_rejection_tests and is_explicit_rejection_test(contents, match):
+                continue
+            findings.append(
+                f"{path.relative_to(ROOT)}:{line_number(contents, match.start())}: "
+                f"{forbidden.label}: {match.group(0)!r}"
+            )
+    return findings
+
+
+def source_file_findings(path: Path) -> list[str]:
+    """Return the forbidden production patterns in one source file."""
+    contents = path.read_text(encoding="utf-8")
+    findings = _pattern_findings(path, contents, FORBIDDEN, skip_rejection_tests=True)
+    if path.is_relative_to(ROOT / "finstack-quant-py/src") or path.is_relative_to(ROOT / "finstack-quant-wasm/src"):
+        findings.extend(_pattern_findings(path, contents, BINDING_FORBIDDEN, skip_rejection_tests=False))
+    return findings
+
+
+def contract_file_findings(path: Path) -> list[str]:
+    """Return the forbidden direct-consumer patterns in one contract-bearing file."""
+    contents = path.read_text(encoding="utf-8")
+    return _pattern_findings(path, contents, DIRECT_CONSUMER_FORBIDDEN, skip_rejection_tests=True)
+
+
 def main() -> int:
     """Report every forbidden residue and fail if any remains."""
     findings: list[str] = []
     sources = source_files()
-    for path in sources:
-        contents = path.read_text(encoding="utf-8")
-        for forbidden in FORBIDDEN:
-            for match in forbidden.finditer(contents):
-                line_start = contents.rfind("\n", 0, match.start()) + 1
-                line_end = contents.find("\n", match.end())
-                if line_end == -1:
-                    line_end = len(contents)
-                contents[line_start:line_end]
-                if is_explicit_rejection_test(contents, match):
-                    continue
-                relative = path.relative_to(ROOT)
-                findings.append(
-                    f"{relative}:{line_number(contents, match.start())}: {forbidden.label}: {match.group(0)!r}"
-                )
+    # The regex scans dominate the runtime and are independent per file.
+    with ProcessPoolExecutor() as pool:
+        for file_findings in pool.map(source_file_findings, sources, chunksize=64):
+            findings.extend(file_findings)
+        contract_scan = pool.map(contract_file_findings, contract_files(), chunksize=64)
 
-        if path.is_relative_to(ROOT / "finstack-quant-py/src") or path.is_relative_to(ROOT / "finstack-quant-wasm/src"):
-            for forbidden in BINDING_FORBIDDEN:
-                for match in forbidden.finditer(contents):
-                    relative = path.relative_to(ROOT)
-                    findings.append(
-                        f"{relative}:{line_number(contents, match.start())}: {forbidden.label}: {match.group(0)!r}"
-                    )
+        findings.extend(serde_enum_naming_findings(sources))
+        findings.extend(optional_wire_adapter_findings(sources))
+        findings.extend(asymmetric_bounded_adapter_findings(sources))
 
-    findings.extend(serde_enum_naming_findings(sources))
-    findings.extend(optional_wire_adapter_findings(sources))
-    findings.extend(asymmetric_bounded_adapter_findings(sources))
-
-    for path in contract_files():
-        contents = path.read_text(encoding="utf-8")
-        for forbidden in DIRECT_CONSUMER_FORBIDDEN:
-            for match in forbidden.finditer(contents):
-                if is_explicit_rejection_test(contents, match):
-                    continue
-                relative = path.relative_to(ROOT)
-                findings.append(
-                    f"{relative}:{line_number(contents, match.start())}: {forbidden.label}: {match.group(0)!r}"
-                )
+        for file_findings in contract_scan:
+            findings.extend(file_findings)
 
     artifacts = [(path, json.loads(path.read_text(encoding="utf-8"))) for path in schema_artifacts()]
     findings.extend(positional_schema_name_findings(artifacts))

@@ -98,27 +98,11 @@ mod tests {
     use super::*;
 
     fn bs_call(s: f64, k: f64, r: f64, q: f64, sigma: f64, t: f64) -> f64 {
-        crate::closed_form::vanilla::bs_price_unchecked(
-            s,
-            k,
-            r,
-            q,
-            sigma,
-            t,
-            crate::types::OptionType::Call,
-        )
+        crate::closed_form::bs_price_unchecked(s, k, r, q, sigma, t, crate::types::OptionType::Call)
     }
 
     fn bs_put(s: f64, k: f64, r: f64, q: f64, sigma: f64, t: f64) -> f64 {
-        crate::closed_form::vanilla::bs_price_unchecked(
-            s,
-            k,
-            r,
-            q,
-            sigma,
-            t,
-            crate::types::OptionType::Put,
-        )
+        crate::closed_form::bs_price_unchecked(s, k, r, q, sigma, t, crate::types::OptionType::Put)
     }
 
     #[test]

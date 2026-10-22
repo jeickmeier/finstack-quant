@@ -87,7 +87,7 @@ Keep in domain-specific modules ONLY if exclusively useful for that domain:
 - ✅ Move `cholesky_decomposition` to `core::math::linalg` - useful for factor models, portfolio optimization
 - ✅ Move `OnlineStats` to `core::math::stats` - useful for streaming metrics anywhere
 - ❌ Keep `GbmProcess` in `models::monte_carlo::process` - specific to stochastic path simulation
-- ❌ Keep `EuropeanCall` payoff in `models::monte_carlo::payoff` - specific to MC option pricing
+- ❌ Keep `European` payoff in `models::monte_carlo::payoff` - specific to MC option pricing
 
 **Before adding math utilities**:
 
@@ -197,8 +197,7 @@ The complete set of features across all crates (read from each `Cargo.toml`) is:
 | `analytics`, `covenants`, `features`, `margin`, `attribution`, `statements`, `statements-analytics`, `scenarios` | `json-schema` (default) |
 | `finstack-quant` (umbrella) | `json-schema` (default), `jsonschema-validate` (default) |
 | `finstack-quant-py` | `extension-module` (PyO3 requirement) |
-| `finstack-quant-wasm` | `contract-generation` (the `generate_contracts` example) |
-| `arrow-interchange`, `test-utils`, `valuations/macros`, `valuations/test-support` | none |
+| `arrow-interchange`, `finstack-quant-wasm`, `test-utils`, `valuations/macros`, `valuations/test-support` | none |
 
 `json-schema` gates every `schemars::JsonSchema` derive, `core::schema` and the
 `gen_*_schemas` binaries; each downstream crate's `json-schema` forwards to its

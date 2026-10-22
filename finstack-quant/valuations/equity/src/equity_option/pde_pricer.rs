@@ -269,7 +269,7 @@ mod tests {
             option.instrument_pricing_overrides = option
                 .instrument_pricing_overrides
                 .with_implied_volatility(volatility);
-            let reference = finstack_quant_models::closed_form::vanilla::bs_price(
+            let reference = finstack_quant_models::closed_form::bs_price(
                 100.0,
                 100.0,
                 0.05,

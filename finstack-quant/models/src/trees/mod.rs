@@ -9,11 +9,8 @@
 //! and do **not** implement `Serialize`/`Deserialize`. They are constructed
 //! on-demand during pricing and not part of any persistent JSON schema.
 
-pub(crate) mod binomial_tree;
-pub(crate) mod hull_white_tree;
+pub mod binomial_tree;
+pub mod hull_white_tree;
 pub mod short_rate_tree;
 pub mod tree_framework;
 pub mod two_factor_rates_credit;
-
-pub use binomial_tree::{BinomialTree, TreeType};
-pub use hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};

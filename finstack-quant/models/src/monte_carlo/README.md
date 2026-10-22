@@ -11,23 +11,21 @@ Per-item detail is in the rustdoc (`cargo doc -p finstack-quant-models --open`).
 
 | Path | Role | Public modules |
 |------|------|----------------|
-| `barriers/` | Brownian-bridge hit probability and continuity corrections for discretely monitored barriers | `bridge`, `corrections` |
-| `discretization/` | Time-stepping and exact transitions | all except `qe_common` (`pub(crate)`) |
-| `engine/` | Generic simulation loop, config, path capture | files are private `mod`s; `McEngine`, `McEngineConfig`, `PathCaptureConfig`, `PathCaptureMode`, `MAX_NUM_PATHS`, `MAX_CAPTURED_PATHS` are re-exported from `engine/mod.rs` |
+| `discretization/` | Time-stepping and exact transitions | all except `qe_common` (`pub(crate)`); no flat re-exports |
+| `engine/` | Generic simulation loop, config, path capture, fractional-noise path loop | files are private `mod`s; `McEngine`, `McEngineConfig`, `PathCaptureConfig`, `PathCaptureMode`, `MAX_NUM_PATHS`, `MAX_CAPTURED_PATHS`, `simulate_path_fractional` are re-exported from `engine/mod.rs` |
 | `greeks/` | Sensitivity estimators | `pathwise`, `lrm`, `finite_diff`, `gbm_european` |
-| `payoff/` | Contract definitions evaluated on `PathState` | `vanilla`, `asian`, `barrier`, `lookback` |
+| `payoff/` | Contract definitions evaluated on `PathState`; `barrier` also owns the Brownian-bridge crossing test and `GOBET_MIRI_BETA` | `vanilla`, `asian`, `barrier`, `lookback` |
 | `pricer/` | Higher-level workflows over `McEngine` | `european`, `path_dependent`, `lsmc`, `heston`, `basis`, `lsq` |
-| `process/` | SDE definitions and process metadata | all 13 model modules (including Dupire `local_vol`) plus `metadata` |
+| `process/` | SDE definitions | all model modules (including Dupire `local_vol`); no flat re-exports |
 | `rng/` | Random and quasi-random generation | `philox`, `sobol`, `fbm`, `volterra`; `brownian_bridge`, `poisson`, and `BrownianBridge` live in `finstack_quant_core::math::random` |
-| `variance_reduction/` | `control_variate` only — antithetic pairing lives in the engine loop, not here | `control_variate` |
 
 ## Top-level files
 
 | File | Role |
 |------|------|
 | `lib.rs` | Module declarations, crate docs, `prelude` |
-| `traits.rs` | `RandomStream`, `StochasticProcess`, `Discretization`, `Payoff`, `PathState`, `StateKey`, `state_keys`, `ProportionalDiffusion` |
-| `engine_fractional.rs` | `simulate_path_fractional` — per-path loop that injects pre-generated fractional noise, for rough-volatility processes the generic engine rejects |
+| `traits.rs` | `RandomStream`, `StochasticProcess`, `ProcessMetadata`, `Discretization`, `Payoff`, `PathState`, `StateKey`, `state_keys`, `ProportionalDiffusion` |
+| `control_variate.rs` | `apply_control_variate` — antithetic pairing lives in the engine loop, not here |
 | `estimate.rs` | `Estimate`: raw f64 mean / stderr / CI / optional distribution statistics |
 | `results.rs` | `MoneyEstimate`, `MonteCarloResult`, `RunMetadata` — currency-tagged outputs |
 | `paths.rs` | `PathDataset`, `SimulatedPath`, `PathPoint`, `PathSamplingMethod`, `ProcessParams`, `CashflowType` |
@@ -46,12 +44,14 @@ Per-item detail is in the rustdoc (`cargo doc -p finstack-quant-models --open`).
 | `config.rs` | `McEngineConfig`, `MAX_NUM_PATHS`, `MAX_CAPTURED_PATHS` |
 | `path_capture.rs` | `PathCaptureConfig`, `PathCaptureMode`, the deterministic hash-based sampling rule |
 | `pricing.rs` | `McEngine`, `price`, `price_with_capture`, all runtime validation, `adaptive_chunk_size`, result finalization |
-| `simulation.rs` | Engine-internal per-path loops, none re-exported publicly: `run_path_loop` and `NoiseHook` (`pub(crate)`, used by `engine_fractional`), `simulate_path` / `simulate_path_with_capture` / `simulate_antithetic_pair` (engine-private) |
+| `fractional.rs` | `simulate_path_fractional` — per-path loop that injects pre-generated fractional noise, for rough-volatility processes the generic engine rejects |
+| `simulation.rs` | Engine-internal per-path loops, none re-exported publicly: `run_path_loop` and `NoiseHook` (`pub(crate)`, used by `fractional.rs`), `simulate_path` / `simulate_path_with_capture` / `simulate_antithetic_pair` (engine-private) |
 | `tests.rs` | Engine unit tests, including the bit-identical serial/parallel and thread-pool-invariance pins |
 
 ## Adding to the crate
 
 Adding a process, scheme, or payoff means adding a leaf file plus a `pub mod`
-line in the matching `mod.rs`. Route public re-exports through that `mod.rs` so
-each item has one canonical path; the `prelude` in `lib.rs` is a curated list on
+line in the matching `mod.rs`. Each item has one public path: in `process/`,
+`discretization/` and `payoff/` it is the child module path (no flat
+re-exports); in `engine/` the files are private and `engine/mod.rs` re-exports; the `prelude` in `lib.rs` is a curated list on
 top of those, not a second source of truth.

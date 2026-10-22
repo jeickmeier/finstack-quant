@@ -155,6 +155,11 @@ impl Estimate {
     ///
     /// Callers should set this to `2 * num_paths` when antithetic variates
     /// are enabled, and leave it at `num_paths` (the default) otherwise.
+    ///
+    /// # Arguments
+    ///
+    /// * `num_simulated_paths` - Count of sample paths actually simulated,
+    ///   antithetic partners included; reported as-is in the estimate.
     pub fn with_num_simulated_paths(mut self, num_simulated_paths: usize) -> Self {
         self.num_simulated_paths = num_simulated_paths;
         self

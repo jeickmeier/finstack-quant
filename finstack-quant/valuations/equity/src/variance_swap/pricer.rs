@@ -3,7 +3,7 @@
 use crate::variance_swap::VarianceSwap;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_models::closed_form::vanilla::bs_price_unchecked;
+use finstack_quant_models::closed_form::bs_price_unchecked;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::variance_replication::carr_madan_forward_variance;
 

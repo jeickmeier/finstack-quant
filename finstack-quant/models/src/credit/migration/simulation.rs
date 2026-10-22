@@ -187,8 +187,7 @@ impl RatingPath {
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_models::credit::migration::{RatingScale, GeneratorMatrix};
-/// use finstack_quant_models::credit::migration::MigrationSimulator;
+/// use finstack_quant_models::credit::migration::{RatingScale, GeneratorMatrix, MigrationSimulator};
 ///
 /// let scale = RatingScale::custom(vec!["AAA".to_string(), "D".to_string()])
 ///     .expect("valid scale");

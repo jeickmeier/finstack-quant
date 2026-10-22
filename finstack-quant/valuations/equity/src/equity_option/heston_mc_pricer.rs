@@ -13,7 +13,7 @@ use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
-use finstack_quant_models::monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
+use finstack_quant_models::monte_carlo::payoff::vanilla::European;
 use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_valuations_core::instruments::Instrument;
@@ -104,32 +104,16 @@ impl EquityOptionHestonMcPricer {
         // Initial state: [spot, v0]
         let initial_state = [spot, params.v0];
 
-        let result = match inst.option_type {
-            finstack_quant_models::types::OptionType::Call => {
-                let payoff = EuropeanCall::new(inst.strike, inst.quantity, maturity_step);
-                engine.price(
-                    &rng,
-                    &process,
-                    &discretization,
-                    &initial_state,
-                    &payoff,
-                    ccy,
-                    discount_factor,
-                )?
-            }
-            finstack_quant_models::types::OptionType::Put => {
-                let payoff = EuropeanPut::new(inst.strike, inst.quantity, maturity_step);
-                engine.price(
-                    &rng,
-                    &process,
-                    &discretization,
-                    &initial_state,
-                    &payoff,
-                    ccy,
-                    discount_factor,
-                )?
-            }
-        };
+        let payoff = European::new(inst.option_type, inst.strike, inst.quantity, maturity_step);
+        let result = engine.price(
+            &rng,
+            &process,
+            &discretization,
+            &initial_state,
+            &payoff,
+            ccy,
+            discount_factor,
+        )?;
 
         Ok((result.mean, result.stderr))
     }

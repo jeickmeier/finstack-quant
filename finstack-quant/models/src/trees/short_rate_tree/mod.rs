@@ -58,7 +58,6 @@ mod ho_lee;
 mod pricing;
 mod tree;
 
-pub use config::TreeDiscounting;
 pub use config::{
     ShortRateModel, ShortRateTreeConfig, DEFAULT_CURVE_FIT_TOLERANCE_BP, DEFAULT_NORMAL_VOL,
 };

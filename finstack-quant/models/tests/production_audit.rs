@@ -10,7 +10,7 @@ use std::sync::Arc;
 fn m1_hull_white_node_bond_uses_centered_state() {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_models::trees::{HullWhiteTree, HullWhiteTreeConfig};
+    use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
     let curve = DiscountCurve::builder("HW")
         .base_date(Date::from_calendar_date(2025, time::Month::January, 1).expect("date"))
         .knots([(0.0, 1.0), (1.0, 0.98), (3.0, 0.85), (10.0, 0.55)])
@@ -47,7 +47,7 @@ fn m1_scheduled_hw_bond_matches_integrated_ou_moments() {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
-    use finstack_quant_models::trees::{HullWhiteTree, HullWhiteTreeConfig};
+    use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
     let curve = DiscountCurve::flat(
         "HW",
         Date::from_calendar_date(2025, time::Month::January, 1).expect("date"),
@@ -124,7 +124,7 @@ fn b4_normal_sabr_smile_is_translation_invariant_across_zero() {
     let expected = alpha * z / x * (1.0 + (2.0 - 3.0 * rho * rho) / 24.0 * nu * nu * t);
     let params = SabrParameters::new(alpha, 0.0, nu, rho).expect("params");
     for (f, k) in [(-0.02, -0.015), (-0.002, 0.003), (0.01, 0.015)] {
-        let model = params.implied_volatility(f, k, t).expect("model");
+        let model = params.implied_vol(f, k, t).expect("model");
         let expansion = params.implied_vol_normal(f, k, t).expect("expansion");
         assert!(
             (model - expected).abs() < 1e-12,
@@ -147,7 +147,7 @@ fn b5_default_sabr_calibration_controls_relative_quote_error() {
         let params = SabrParameters::new(0.004 * scale, 0.0, 0.7, -0.4).expect("params");
         let quotes: Vec<_> = strikes
             .iter()
-            .map(|&k| params.implied_volatility(forward, k, 2.0).expect("quote"))
+            .map(|&k| params.implied_vol(forward, k, 2.0).expect("quote"))
             .collect();
         let fitted = SabrCalibrator::new()
             .calibrate(forward, &strikes, &quotes, 2.0, 0.0)
@@ -155,14 +155,7 @@ fn b5_default_sabr_calibration_controls_relative_quote_error() {
         let max_relative = strikes
             .iter()
             .zip(&quotes)
-            .map(|(&k, &v)| {
-                (fitted
-                    .implied_volatility(forward, k, 2.0)
-                    .expect("fit quote")
-                    - v)
-                    .abs()
-                    / v
-            })
+            .map(|(&k, &v)| (fitted.implied_vol(forward, k, 2.0).expect("fit quote") - v).abs() / v)
             .fold(0.0_f64, f64::max);
         assert!(
             max_relative <= 1e-4,
@@ -215,9 +208,7 @@ fn b4_normal_cube_uses_canonical_beta_snap() {
         VolatilityConvention::Normal
     );
     let params = SabrParameters::new(0.008, 0.00005, 0.3, -0.2).expect("parameters");
-    let expected = params
-        .implied_volatility(-0.01, 0.001, 1.0)
-        .expect("normal quote");
+    let expected = params.implied_vol(-0.01, 0.001, 1.0).expect("normal quote");
     assert!(
         (source
             .get_normal_vol_clamped(1.0, 5.0, 0.001)
@@ -233,7 +224,7 @@ fn m1_hw_bond_option_converges_to_independent_affine_price() {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::special_functions::norm_cdf;
-    use finstack_quant_models::trees::{HullWhiteTree, HullWhiteTreeConfig};
+    use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
     let rate: f64 = 0.04;
     let kappa: f64 = 0.07;
     let sigma: f64 = 0.02;

@@ -2,13 +2,13 @@
 
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use finstack_quant_models::credit::migration::{
-    projection, GeneratorMatrix, MigrationSimulator, RatingPath, RatingScale, TransitionMatrix,
+    self, GeneratorMatrix, MigrationSimulator, RatingPath, RatingScale, TransitionMatrix,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
 
 use crate::bindings::pandas_utils::dict_to_dataframe;
-use crate::errors::{migration_to_py, value_error};
+use crate::errors::{kinded_to_py, value_error};
 
 /// Build a labelled square `pd.DataFrame` (`index` = origin, `columns` = destination).
 fn labelled_square_frame<'py>(
@@ -84,7 +84,7 @@ impl PyRatingScale {
     fn custom(labels: Vec<String>) -> PyResult<Self> {
         RatingScale::custom(labels)
             .map(Self::from_inner)
-            .map_err(migration_to_py)
+            .map_err(kinded_to_py)
     }
 
     /// A custom scale with an explicit default (absorbing) state label.
@@ -103,7 +103,7 @@ impl PyRatingScale {
     fn custom_with_default(labels: Vec<String>, default_label: String) -> PyResult<Self> {
         RatingScale::custom_with_default(labels, default_label)
             .map(Self::from_inner)
-            .map_err(migration_to_py)
+            .map_err(kinded_to_py)
     }
 
     /// Number of rating states in the scale.
@@ -121,7 +121,7 @@ impl PyRatingScale {
     /// Index of a label in the scale; raises ``KeyError`` if absent.
     #[pyo3(text_signature = "($self, label)")]
     fn index_of_required(&self, label: &str) -> PyResult<usize> {
-        self.inner.index_of_required(label).map_err(migration_to_py)
+        self.inner.index_of_required(label).map_err(kinded_to_py)
     }
 
     /// Label at a state index, or ``None`` when out of range.
@@ -147,7 +147,7 @@ impl PyRatingScale {
     /// Raises ``KeyError`` when the label is unknown or has no WARF factor.
     #[pyo3(text_signature = "($self, label)")]
     fn warf(&self, label: &str) -> PyResult<f64> {
-        self.inner.warf(label).map_err(migration_to_py)
+        self.inner.warf(label).map_err(kinded_to_py)
     }
 
     /// Nearest rating label for a weighted-average rating factor.
@@ -158,7 +158,7 @@ impl PyRatingScale {
         self.inner
             .rating_from_warf(warf)
             .map(str::to_owned)
-            .map_err(migration_to_py)
+            .map_err(kinded_to_py)
     }
 
     fn __len__(&self) -> usize {
@@ -235,7 +235,7 @@ impl PyTransitionMatrix {
         )?;
         TransitionMatrix::new(scale.inner.clone(), &data, horizon)
             .map(Self::from_inner)
-            .map_err(migration_to_py)
+            .map_err(kinded_to_py)
     }
 
     /// Build a transition matrix from a labelled square ``pandas.DataFrame``.
@@ -270,7 +270,7 @@ impl PyTransitionMatrix {
         }
         let scale = match scale {
             Some(scale) => scale.inner.clone(),
-            None => RatingScale::custom(index).map_err(migration_to_py)?,
+            None => RatingScale::custom(index).map_err(kinded_to_py)?,
         };
         let data = crate::bindings::matrix_input::extract_square_matrix(
             df.py(),
@@ -280,7 +280,7 @@ impl PyTransitionMatrix {
         )?;
         TransitionMatrix::new(scale, &data, horizon)
             .map(Self::from_inner)
-            .map_err(migration_to_py)
+            .map_err(kinded_to_py)
     }
 
     /// Transition probability from one labelled state to another.
@@ -289,7 +289,7 @@ impl PyTransitionMatrix {
     #[pyo3(signature = (from_, to))]
     #[pyo3(text_signature = "($self, from_, to)")]
     fn probability(&self, from_: &str, to: &str) -> PyResult<f64> {
-        self.inner.probability(from_, to).map_err(migration_to_py)
+        self.inner.probability(from_, to).map_err(kinded_to_py)
     }
 
     /// Transition probability by state indices; raises ``ValueError`` when
@@ -299,7 +299,7 @@ impl PyTransitionMatrix {
     fn probability_by_index(&self, from_: usize, to: usize) -> PyResult<f64> {
         self.inner
             .probability_by_index(from_, to)
-            .map_err(migration_to_py)
+            .map_err(kinded_to_py)
     }
 
     /// One row of transition probabilities, indexed by destination state.
@@ -308,7 +308,7 @@ impl PyTransitionMatrix {
     #[pyo3(signature = (from_))]
     #[pyo3(text_signature = "($self, from_)")]
     fn row(&self, from_: &str) -> PyResult<Vec<f64>> {
-        self.inner.row(from_).map_err(migration_to_py)
+        self.inner.row(from_).map_err(kinded_to_py)
     }
 
     /// Compose with another matrix on the same scale: ``P(s + t) = P(s) @ P(t)``.
@@ -319,7 +319,7 @@ impl PyTransitionMatrix {
         self.inner
             .compose(&other.inner)
             .map(Self::from_inner)
-            .map_err(migration_to_py)
+            .map_err(kinded_to_py)
     }
 
     /// Row-major copy of the underlying matrix as nested lists.
@@ -416,43 +416,33 @@ impl PyGeneratorMatrix {
         )?;
         GeneratorMatrix::new(scale.inner.clone(), &data)
             .map(Self::from_inner)
-            .map_err(migration_to_py)
+            .map_err(kinded_to_py)
     }
 
     /// Embed a transition matrix as a generator via the matrix logarithm
     /// (Israel-Rosenthal-Wei with Kreinin-Sidenius regularization).
     ///
-    /// Raises ``RuntimeError`` when no valid generator exists (complex or
-    /// non-positive eigenvalues) or the round-trip error exceeds the default
-    /// tolerance.
-    #[staticmethod]
-    #[pyo3(text_signature = "(p)")]
-    fn from_transition_matrix(p: &PyTransitionMatrix) -> PyResult<Self> {
-        GeneratorMatrix::from_transition_matrix(&p.inner)
-            .map(Self::from_inner)
-            .map_err(migration_to_py)
-    }
-
-    /// Like ``from_transition_matrix`` with an explicit round-trip tolerance.
-    ///
     /// Parameters
     /// ----------
     /// p : TransitionMatrix
     ///     Source matrix.
-    /// round_trip_tol : float
+    /// round_trip_tol : float, optional
     ///     Non-negative infinity-norm tolerance on ``exp(Q * h) - P(h)``.
+    ///     ``None`` uses the default ``1e-2``.
     ///
-    /// Raises ``RuntimeError`` when no valid generator exists or the
-    /// round-trip error exceeds ``round_trip_tol``.
+    /// Raises ``RuntimeError`` when no valid generator exists (complex or
+    /// non-positive eigenvalues) or the round-trip error exceeds the
+    /// tolerance.
     #[staticmethod]
-    #[pyo3(text_signature = "(p, round_trip_tol)")]
-    fn from_transition_matrix_with_tol(
+    #[pyo3(signature = (p, round_trip_tol = None))]
+    #[pyo3(text_signature = "(p, round_trip_tol=None)")]
+    fn from_transition_matrix(
         p: &PyTransitionMatrix,
-        round_trip_tol: f64,
+        round_trip_tol: Option<f64>,
     ) -> PyResult<Self> {
-        GeneratorMatrix::from_transition_matrix_with_tol(&p.inner, round_trip_tol)
+        GeneratorMatrix::from_transition_matrix(&p.inner, round_trip_tol)
             .map(Self::from_inner)
-            .map_err(migration_to_py)
+            .map_err(kinded_to_py)
     }
 
     /// Off-diagonal generator intensity (per year) from one state to another.
@@ -461,7 +451,7 @@ impl PyGeneratorMatrix {
     #[pyo3(signature = (from_, to))]
     #[pyo3(text_signature = "($self, from_, to)")]
     fn intensity(&self, from_: &str, to: &str) -> PyResult<f64> {
-        self.inner.intensity(from_, to).map_err(migration_to_py)
+        self.inner.intensity(from_, to).map_err(kinded_to_py)
     }
 
     /// Total intensity of leaving a state (the negated diagonal entry).
@@ -469,7 +459,7 @@ impl PyGeneratorMatrix {
     /// Raises ``KeyError`` for an unknown label.
     #[pyo3(text_signature = "($self, state)")]
     fn exit_rate(&self, state: &str) -> PyResult<f64> {
-        self.inner.exit_rate(state).map_err(migration_to_py)
+        self.inner.exit_rate(state).map_err(kinded_to_py)
     }
 
     /// Row-major copy of the underlying matrix as nested lists.
@@ -638,7 +628,7 @@ impl PyRatingPaths {
     /// Fraction of paths that reached the default state.
     #[getter]
     fn default_rate(&self) -> f64 {
-        finstack_quant_models::credit::migration::default_rate(&self.inner)
+        migration::default_rate(&self.inner)
     }
 
     /// Long-format ``pandas.DataFrame`` of every transition.
@@ -731,7 +721,7 @@ impl PyMigrationSimulator {
     fn new(generator: &PyGeneratorMatrix, horizon: f64) -> PyResult<Self> {
         MigrationSimulator::new(generator.inner.clone(), horizon)
             .map(Self::from_inner)
-            .map_err(migration_to_py)
+            .map_err(kinded_to_py)
     }
 
     /// Simulate rating paths from ``initial_state``.
@@ -763,7 +753,7 @@ impl PyMigrationSimulator {
     ) -> PyResult<PyRatingPaths> {
         let paths = py
             .detach(|| self.inner.simulate(initial_state, n_paths, seed))
-            .map_err(migration_to_py)?;
+            .map_err(kinded_to_py)?;
         Ok(PyRatingPaths { inner: paths })
     }
 
@@ -790,7 +780,7 @@ impl PyMigrationSimulator {
         let matrix = py.detach(|| self.inner.empirical_matrix(n_paths_per_state, seed));
         matrix
             .map(PyTransitionMatrix::from_inner)
-            .map_err(migration_to_py)
+            .map_err(kinded_to_py)
     }
 
     /// Simulation horizon in years.
@@ -855,9 +845,9 @@ wire_methods!(
 #[pyfunction]
 #[pyo3(text_signature = "(generator, t)")]
 fn project(generator: &PyGeneratorMatrix, t: f64) -> PyResult<PyTransitionMatrix> {
-    projection::project(&generator.inner, t)
+    migration::project(&generator.inner, t)
         .map(PyTransitionMatrix::from_inner)
-        .map_err(migration_to_py)
+        .map_err(kinded_to_py)
 }
 
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -62,7 +62,7 @@ path-dependent processes (`lmm`, `rough_bergomi`, `rough_heston`,
 that consume one. It is the one
 path-simulation entry point and is bound in Python and WASM.
 
-Antithetic pairing is **not** in `variance_reduction` — it is implemented inline
+Antithetic pairing is **not** in `control_variate` — it is implemented inline
 in the engine loop and configured with `McEngineConfig::antithetic`.
 
 ### Processes
@@ -72,7 +72,7 @@ in the engine loop and configured with `McEngineConfig::antithetic`.
 | `process::gbm` | `GbmParams`, `GbmProcess`, `MultiGbmProcess` |
 | `process::gbm_dividends` | `Dividend`, `GbmWithDividends` (requires its dedicated scheme) |
 | `process::brownian` | `BrownianParams`, `BrownianProcess`, `MultiBrownianProcess` |
-| `process::heston` | `HestonProcess`; uses canonical `closed_form::heston::HestonPricingParams` and `volatility::heston::HestonParams` |
+| `process::heston` | `HestonProcess`; uses canonical `closed_form::HestonPricingParams` and `volatility::heston::HestonParams` |
 | `process::cir` | `CirParams`, `CirProcess`, `CirPlusPlusProcess` |
 | `process::ou` | `HullWhite1FParams`, `HullWhite1FProcess` (`HullWhite1FProcess::vasicek` for constant θ), `calibrate_theta_from_curve` |
 | `process::multi_ou` | `MultiOuParams`, `MultiOuProcess` |
@@ -130,9 +130,10 @@ reduction, optional serial early stopping, and optional path capture.
 
 ```rust
 use finstack_quant_core::currency::Currency;
-use finstack_quant_models::monte_carlo::discretization::ExactGbm;
+use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
-use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+use finstack_quant_models::monte_carlo::payoff::vanilla::European;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 
@@ -145,7 +146,7 @@ let engine = McEngine::new(
 let rng = PhiloxRng::new(11);
 let process = GbmProcess::with_params(0.03, 0.01, 0.20).expect("valid GBM parameters");
 let disc = ExactGbm::new();
-let payoff = EuropeanCall::new(100.0, 1.0, 252);
+let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 let discount_factor = (-0.03_f64).exp();
 
 let result = engine
@@ -177,12 +178,13 @@ consumers can interpret them.
 
 ```rust
 use finstack_quant_core::currency::Currency;
-use finstack_quant_models::monte_carlo::discretization::ExactGbm;
+use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
 use finstack_quant_models::monte_carlo::engine::{
     McEngine, McEngineConfig, PathCaptureConfig,
 };
 use finstack_quant_models::monte_carlo::paths::ProcessParams;
-use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+use finstack_quant_models::monte_carlo::payoff::vanilla::European;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 
@@ -196,7 +198,7 @@ let engine = McEngine::new(
 let rng = PhiloxRng::new(11);
 let process = GbmProcess::with_params(0.03, 0.01, 0.20).expect("valid GBM parameters");
 let disc = ExactGbm::new();
-let payoff = EuropeanCall::new(100.0, 1.0, 12);
+let payoff = European::new(OptionType::Call, 100.0, 1.0, 12);
 let process_params = ProcessParams::new("GBM").with_factors(vec!["spot".to_string()]);
 
 let result = engine
@@ -274,7 +276,7 @@ reported price, so it cannot print below intrinsic.
 
 ### Finite-difference Greeks with common random numbers
 
-`finite_diff_delta` / `finite_diff_gamma` simulate every stencil point on the
+`finite_diff_delta_from_inputs` / `finite_diff_gamma_from_inputs` simulate every stencil point on the
 same per-path substream, average the per-path differences, and report their
 **paired** standard error. They run serially with a fixed path count (adaptive
 stopping and path capture are rejected), require a splittable RNG and fail
@@ -282,12 +284,13 @@ closed with `SobolRng`.
 
 ```rust
 use finstack_quant_core::currency::Currency;
-use finstack_quant_models::monte_carlo::discretization::ExactGbm;
+use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::greeks::finite_diff::{
-    finite_diff_delta, FiniteDiffInputs,
+    finite_diff_delta_from_inputs, FiniteDiffInputs,
 };
-use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+use finstack_quant_models::monte_carlo::payoff::vanilla::European;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 
@@ -299,7 +302,7 @@ let engine = McEngine::new(
 let rng = PhiloxRng::new(42);
 let gbm = GbmProcess::with_params(0.05, 0.0, 0.2).expect("valid GBM parameters");
 let disc = ExactGbm::new();
-let call = EuropeanCall::new(100.0, 1.0, 50);
+let call = European::new(OptionType::Call, 100.0, 1.0, 50);
 
 let inputs = FiniteDiffInputs {
     engine: &engine,
@@ -310,7 +313,7 @@ let inputs = FiniteDiffInputs {
     currency: Currency::USD,
     discount_factor: (-0.05_f64).exp(),
 };
-let (delta, paired_stderr) = finite_diff_delta(
+let (delta, paired_stderr) = finite_diff_delta_from_inputs(
     &inputs,
     /* initial_spot   = */ 100.0,
     /* relative bump  = */ 0.01,
@@ -328,7 +331,8 @@ For GBM European contracts specifically, host bindings must go through
 
 ```rust
 use finstack_quant_core::currency::Currency;
-use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+use finstack_quant_models::monte_carlo::payoff::vanilla::European;
+use finstack_quant_models::types::OptionType;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 
@@ -337,7 +341,7 @@ let pricer = EuropeanPricer::new(25_000)
     .with_seed(19)
     .with_parallel(false);
 let process = GbmProcess::with_params(0.03, 0.01, 0.20).expect("valid GBM parameters");
-let payoff = EuropeanCall::new(100.0, 1.0, 252);
+let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 
 let result = pricer
     .price(&process, 100.0, 1.0, 252, &payoff, Currency::USD, (-0.03_f64).exp())
@@ -387,7 +391,7 @@ The engine rejects these configurations instead of proceeding:
 - `process.dim() == 0`, or `initial_state.len() != process.dim()`.
 - A process that reports `requires_injected_noise()` (rough-volatility models):
   the generic loop would fill those factor slots with i.i.d. normals. Drive them
-  through `engine_fractional::simulate_path_fractional` or a dedicated pricer.
+  through `engine::simulate_path_fractional` or a dedicated pricer.
 - A process with a `dedicated_scheme()` paired with a different scheme.
 - A payoff whose `max_event_step()` exceeds the grid — the fixing would silently
   never fire.
@@ -487,13 +491,13 @@ via `max_event_step()` so grid mismatches are caught up front.
 
 - **Python** — `finstack_quant.models.monte_carlo` exposes `McEngine`, `TimeGrid`,
   `EuropeanPricer`, `PathDependentPricer`, `LsmcPricer`, `MoneyEstimate`,
-  `Estimate`, `PathSummary`, `simulate_paths`, `price_heston_call` /
-  `price_heston_put`, `heston_satisfies_feller`, `black_scholes_call` /
+  `Estimate`, `PathSummary`, `simulate_paths`, `price_heston`,
+  `heston_satisfies_feller`, `black_scholes_call` /
   `black_scholes_put`, and the four finite-difference Greek functions.
 - **WASM** — the `models.monteCarlo` namespace in
   [`exports/models/monteCarlo.js`](../../finstack-quant-wasm/exports/models/monteCarlo.js)
-  exposes `simulatePaths` and the convenience pricers: `priceEuropeanCall/Put`,
-  `priceHestonCall/Put`, `priceAsian`, `priceAmerican`,
+  exposes `simulatePaths` and the convenience pricers: `EuropeanPricer.priceGbm`,
+  `priceHeston`, `priceAsian`, `priceAmerican`,
   `priceAmericanUnbiased`, and `blackScholesCall/Put`.
 
 Neither binding exposes the generic trait surface: `simulate_paths` selects among

@@ -9,7 +9,7 @@ use wasm_bindgen_test::*;
 
 #[wasm_bindgen_test]
 fn barrier_put_dispatches() {
-    let p = barrier_put(
+    let p = barrier_option_price(
         JsValue::from(100.0),
         JsValue::from(100.0),
         JsValue::from(80.0),
@@ -19,10 +19,11 @@ fn barrier_put_dispatches() {
         JsValue::from(1.0),
         JsValue::from("down"),
         JsValue::from("out"),
+        Some(JsValue::from(false)),
     )
     .expect("finite price");
     assert!(p > 0.0);
-    assert!(barrier_put(
+    assert!(barrier_option_price(
         JsValue::from(100.0),
         JsValue::from(100.0),
         JsValue::from(80.0),
@@ -31,7 +32,8 @@ fn barrier_put_dispatches() {
         JsValue::from(0.2),
         JsValue::from(1.0),
         JsValue::from("sideways"),
-        JsValue::from("out")
+        JsValue::from("out"),
+        Some(JsValue::from(false))
     )
     .is_err());
 }

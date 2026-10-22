@@ -2639,10 +2639,10 @@ def simulate_portfolio_loss(
     ----------
     exposures : Sequence[CreditExposure] or pandas.DataFrame
         Obligors to simulate, each with exposure, marginal PD, LGD, and factor
-        loadings compatible with ``config.copula``. A DataFrame needs columns
-        ``id``, ``notional``, ``pd`` (or ``default_probability``), ``lgd`` and
-        ``factor_loading`` (one scalar per name) or ``factor_loadings`` (a
-        list per name).
+        loadings compatible with ``config.copula``. A DataFrame's columns are
+        the ``CreditExposure`` field names: ``id``, ``notional``,
+        ``default_probability``, ``lgd`` and ``factor_loadings`` (a list
+        per name).
     config : PortfolioLossConfig
         Path count, RNG seed, confidence level, and dependence-model settings.
     recovery : RecoverySpec or None, default None
@@ -2661,7 +2661,7 @@ def simulate_portfolio_loss(
         If ``exposures`` is neither a sequence of ``CreditExposure`` nor a
         DataFrame.
     ValueError
-        If a required DataFrame column is missing; the path count or
+        If a DataFrame record does not match ``CreditExposure``; the path count or
         confidence level is invalid; the copula is not a
         supported Gaussian or Student-t model; exposure identifiers are blank
         or duplicated; notionals, probabilities, LGDs, or factor loadings are
@@ -2683,7 +2683,13 @@ def simulate_portfolio_loss(
     >>> (len(result.losses), result.expected_loss >= 0.0)
     (200, True)
     >>> import pandas as pd
-    >>> frame = pd.DataFrame({"id": ["A"], "notional": [100.0], "pd": [0.05], "lgd": [0.6], "factor_loading": [0.3]})
+    >>> frame = pd.DataFrame({
+    ...     "id": ["A"],
+    ...     "notional": [100.0],
+    ...     "default_probability": [0.05],
+    ...     "lgd": [0.6],
+    ...     "factor_loadings": [[0.3]],
+    ... })
     >>> simulate_portfolio_loss(
     ...     frame, PortfolioLossConfig(200, 42, 0.99, CopulaSpec.gaussian())
     ... ).losses == result.losses

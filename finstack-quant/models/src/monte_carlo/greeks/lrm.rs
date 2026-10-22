@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 /// simulated paths.
 ///
 /// Returned by
-/// [`PathDependentPricer::price_with_lrm_greeks`](crate::monte_carlo::pricer::path_dependent::PathDependentPricer::price_with_lrm_greeks).
+/// [`PathDependentPricer::price_with_lrm_greeks_from_payoff`](crate::monte_carlo::pricer::path_dependent::PathDependentPricer::price_with_lrm_greeks_from_payoff).
 /// The Greeks are sample means of `discounted payoff x score`, so each carries
 /// its own standard error and 95% confidence interval; they share the paths of
 /// `price` and are correlated with it.
@@ -64,7 +64,7 @@ pub struct LrmGreeks {
 /// barriers, lookbacks) only the first-transition density depends on `S₀`:
 /// pass the *first-step* shock together with the *first step's* Δt instead
 /// (Glasserman 2003, §7.3) — this is what
-/// [`PathDependentPricer::price_with_lrm_greeks`](crate::monte_carlo::pricer::path_dependent::PathDependentPricer::price_with_lrm_greeks)
+/// [`PathDependentPricer::price_with_lrm_greeks_from_payoff`](crate::monte_carlo::pricer::path_dependent::PathDependentPricer::price_with_lrm_greeks_from_payoff)
 /// does. Feeding terminal shocks with a path-dependent payoff silently
 /// biases delta (≈ ×0.5 for a uniform-fixing Asian).
 ///

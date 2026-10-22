@@ -5,6 +5,7 @@
 //!
 //! - `RandomStream`: RNG abstraction with splittable streams
 //! - `StochasticProcess`: SDE specification (drift, diffusion)
+//! - `ProcessMetadata`: Captured-path metadata reported by a process
 //! - `Discretization`: Time-stepping schemes
 //! - `PathState`: State information at a point along a path
 //! - `Payoff`: Payoff computation with currency safety
@@ -65,7 +66,7 @@
 //! }
 //! ```
 
-use super::paths::CashflowType;
+use super::paths::{CashflowType, ProcessParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::FxHashMap;
@@ -627,7 +628,7 @@ pub trait StochasticProcess: Send + Sync {
     /// i.i.d. N(0,1) draws, which is silently wrong for such processes — the
     /// variance path would receive uncorrelated, unscaled noise with no
     /// error. `McEngine` rejects processes that return `true`; drive them
-    /// through [`crate::monte_carlo::engine_fractional::simulate_path_fractional`] (or a
+    /// through [`crate::monte_carlo::engine::simulate_path_fractional`] (or a
     /// dedicated pricer) instead.
     fn requires_injected_noise(&self) -> bool {
         false
@@ -688,6 +689,24 @@ pub trait StochasticProcess: Send + Sync {
             state.set_key(StateKey::Variance, x[1]);
         }
     }
+}
+
+/// Captured-path metadata a process reports about itself.
+///
+/// Implementations return a [`ProcessParams`] snapshot that lets downstream
+/// consumers of [`crate::monte_carlo::paths::PathDataset`] interpret captured
+/// paths outside the engine; plain pricing does not need it. The snapshot
+/// should be stable enough for visualization, diagnostics, and serialization:
+///
+/// - `process_type` should identify the model family, such as `"GBM"` or `"Heston"`.
+/// - `parameters` should use clear, documented keys such as `r`, `q`, `sigma`,
+///   `kappa`, or `theta`.
+/// - `factor_names` should describe the order of entries in captured state vectors.
+/// - `correlation`, when present, should be a row-major square matrix aligned with
+///   `factor_names`.
+pub trait ProcessMetadata: Send + Sync {
+    /// Return metadata describing the process configuration and state layout.
+    fn metadata(&self) -> ProcessParams;
 }
 
 /// Marker for processes with **GBM-style proportional diffusion**: `σ(X) = σ_const · X`.

@@ -652,8 +652,9 @@ fn calibrate_hull_white_to_cap_floors(
 ///
 /// Returns
 /// -------
-/// tuple[finstack_quant.models.rates.hull_white.HullWhiteParams, CalibrationReport]
-///     Piecewise parameters and the fit report.
+/// tuple[HullWhiteParams, CalibrationReport]
+///     Piecewise ``finstack_quant.models.rates.hull_white.HullWhiteParams``
+///     and the fit report.
 ///
 /// Raises
 /// ------

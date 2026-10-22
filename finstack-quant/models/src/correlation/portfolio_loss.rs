@@ -10,11 +10,11 @@ use std::collections::HashSet;
 
 use super::{Copula, CopulaSpec, RecoveryModel, RecoverySpec};
 use crate::invalid_input;
+use crate::monte_carlo::rng::philox::PhiloxRng;
+use crate::monte_carlo::traits::RandomStream;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::validation::{validate_f64_non_negative, validate_f64_unit_interval};
 use finstack_quant_core::{Error, Result};
-use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
-use finstack_quant_models::monte_carlo::traits::RandomStream;
 
 /// Maximum number of paths accepted by the portfolio-loss simulation.
 ///
@@ -376,14 +376,20 @@ impl PortfolioLossResult {
 /// `config.seed` and path indexing make the result reproducible across native
 /// serial and parallel execution for the same inputs.
 ///
+/// With a `recovery` specification, the recovery model's conditional LGD is
+/// evaluated on the first systematic factor (the one-factor
+/// recovery/correlation convention) and replaces each defaulted exposure's
+/// stored `lgd`; every exposure must then carry exactly one factor loading.
+///
 /// # Errors
 ///
 /// Returns an error if the simulation configuration is invalid (including a
 /// zero or excessive path count, invalid confidence, or unsupported copula),
 /// any exposure has invalid/heterogeneous factor loadings, probability, LGD,
-/// notional, or identifier data, copula thresholds cannot be calculated,
-/// allocation fails, or a path loss overflows. No partial loss distribution is
-/// returned.
+/// notional, or identifier data, an exposure does not have exactly one factor
+/// loading while `recovery` is supplied, copula thresholds cannot be
+/// calculated, allocation fails, or a path loss overflows. No partial loss
+/// distribution is returned.
 ///
 /// # Arguments
 ///
@@ -391,46 +397,16 @@ impl PortfolioLossResult {
 ///   LGDs, notionals, and factor loadings used for every simulated path.
 /// * `config` - Copula, confidence, path count, random seed, and simulation
 ///   policy; its seed produces deterministic path-indexed streams.
+/// * `recovery` - Optional conditional recovery/LGD specification evaluated
+///   against the first systematic factor on each path. `None` uses each
+///   exposure's stored `lgd`.
 pub fn simulate_portfolio_loss(
     exposures: &[CreditExposure],
     config: &PortfolioLossConfig,
+    recovery: Option<&RecoverySpec>,
 ) -> Result<PortfolioLossResult> {
-    simulate(exposures, config, None)
-}
-
-/// Simulate losses using one shared recovery model instead of exposure LGDs.
-///
-/// The recovery model's conditional LGD is evaluated on the first systematic
-/// factor, matching the one-factor recovery/correlation convention. This
-/// variant therefore requires exactly one factor loading per exposure.
-///
-/// For defaulted names, `recovery.conditional_lgd(factor)` replaces each
-/// exposure's stored `lgd`; notional, default probability, and all other
-/// exposure validation still apply. Outputs remain in the scalar units of the
-/// exposure notionals and use the parallel path-indexed Philox scheme.
-///
-/// # Errors
-///
-/// Returns an error if the recovery specification cannot build, the standard
-/// simulation configuration or exposures are invalid, any exposure does not
-/// have exactly one systematic factor loading, copula/threshold construction
-/// fails, allocation fails, or a simulated path loss becomes non-finite.
-///
-/// # Arguments
-///
-/// * `exposures` - Same-currency one-factor credit exposures; stored LGDs are
-///   replaced by conditional LGD from `recovery` for defaulted names.
-/// * `config` - Copula, confidence, path count, random seed, and simulation
-///   policy for deterministic parallel path simulation.
-/// * `recovery` - Conditional recovery/LGD specification evaluated against the
-///   first systematic factor on each simulated path.
-pub fn simulate_portfolio_loss_with_recovery(
-    exposures: &[CreditExposure],
-    config: &PortfolioLossConfig,
-    recovery: &RecoverySpec,
-) -> Result<PortfolioLossResult> {
-    let recovery = recovery.build();
-    simulate(exposures, config, Some(recovery.as_ref()))
+    let recovery = recovery.map(RecoverySpec::build);
+    simulate(exposures, config, recovery.as_deref())
 }
 
 fn simulate(
@@ -823,7 +799,7 @@ mod tests {
             copula: CopulaSpec::student_t(6.0).expect("valid t copula"),
         };
 
-        let parallel = simulate_portfolio_loss(&exposures, &config).expect("parallel");
+        let parallel = simulate_portfolio_loss(&exposures, &config, None).expect("parallel");
         let serial = simulate_portfolio_loss_serial(&exposures, &config).expect("serial");
         assert_eq!(parallel, serial);
     }

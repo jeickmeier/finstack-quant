@@ -19,6 +19,9 @@
 /// - Append `json_only` for a [`label_enum!`] wrapper: it emits `to_json` /
 ///   `from_json` without `__reduce__`, because label enums pickle through
 ///   their class constant.
+/// - Append `rust_json` when the Rust type owns its wire form through inherent
+///   `from_json(&str)` / `to_json()` methods (both returning
+///   `finstack_quant_core::Result`), so both directions run the Rust checks.
 macro_rules! wire_methods {
     ($py_type:ident, $rust_type:ty, $name:literal) => {
         $crate::bindings::macros::wire_methods!(@json $py_type, $rust_type, $name, [], |inner| inner);
@@ -71,6 +74,36 @@ macro_rules! wire_methods {
     };
     ($py_type:ident, $rust_type:ty, $name:literal, json_only) => {
         $crate::bindings::macros::wire_methods!(@json $py_type, $rust_type, $name, [], |inner| inner);
+    };
+    ($py_type:ident, $rust_type:ty, $name:literal, rust_json) => {
+        #[::pyo3::pymethods]
+        impl $py_type {
+            #[doc = concat!(
+                "Serialize this ", $name, " to its canonical JSON wire form.\n\n",
+                "Returns\n-------\nstr\n    Compact JSON that ``from_json`` accepts.\n\n",
+                "Raises\n------\nValueError\n    If the value cannot be serialized."
+            )]
+            #[allow(clippy::wrong_self_convention)]
+            #[pyo3(text_signature = "($self)")]
+            fn to_json(&self) -> ::pyo3::PyResult<String> {
+                self.inner.to_json().map_err($crate::errors::core_to_py)
+            }
+
+            #[doc = concat!(
+                "Deserialize a ", $name, " from its canonical JSON wire form.\n\n",
+                "Parameters\n----------\njson : str\n    JSON produced by ``to_json`` (strict field names).\n\n",
+                "Returns\n-------\n", $name, "\n    The reconstructed value.\n\n",
+                "Raises\n------\nValueError\n    If the JSON is malformed, carries unknown fields, or fails validation."
+            )]
+            #[staticmethod]
+            #[pyo3(text_signature = "(json)")]
+            fn from_json(json: &str) -> ::pyo3::PyResult<Self> {
+                Ok(Self {
+                    inner: <$rust_type>::from_json(json).map_err($crate::errors::core_to_py)?,
+                })
+            }
+        }
+        $crate::bindings::macros::wire_methods!(@reduce $py_type);
     };
     (@json $py_type:ident, $rust_type:ty, $name:literal, [$($deref:tt)?], |$inner:ident| $checked:expr) => {
         #[::pyo3::pymethods]

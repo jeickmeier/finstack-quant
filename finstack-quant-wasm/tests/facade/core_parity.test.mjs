@@ -338,7 +338,7 @@ const CASES = {
   base_correlation: () => baseCorrelation().correlation(5.0),
   vol_surface: () => JSON.parse(surface().toJson()),
   vol_surface_queries: () => [
-    models.volatility.getSurfaceVol(surface().toJson(), 0.75, 100.0),
+    models.volatility.getSurfaceVol(surface(), 0.75, 100.0),
     Array.from(surface().gridShape),
     surface().secondaryAxis,
     surface().quoteType,
@@ -407,7 +407,7 @@ const CASES = {
     contains: [market().contains('USD-OIS'), market().contains('missing')],
     is_empty: [market().isEmpty(), new core.MarketContext().isEmpty()],
     df: market().getDiscount('USD-OIS').df(1.0),
-    vol: models.volatility.getSurfaceVol(market().getSurface('SPX-VOL').toJson(), 0.75, 100.0),
+    vol: models.volatility.getSurfaceVol(market().getSurface('SPX-VOL'), 0.75, 100.0),
     series: market().getSeries('SOFR-FIXINGS').valueOn('2025-01-06'),
     index_lag: market().getInflationIndex('US-CPI-U').lag,
     credit_index: market().getCreditIndex('CDX-IG-43').numConstituents,

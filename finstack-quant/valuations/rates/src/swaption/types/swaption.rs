@@ -861,7 +861,7 @@ impl Swaption {
                         params.implied_vol_normal(forward, strike, time_to_expiry)?
                     }
                     VolatilityModel::Black => {
-                        let sigma = params.implied_volatility(forward, strike, time_to_expiry)?;
+                        let sigma = params.implied_vol(forward, strike, time_to_expiry)?;
                         if params.quote_convention() == VolatilityConvention::Normal {
                             return Err(Error::Validation(
                                 "normal SABR cannot supply a Black volatility quote".to_owned(),

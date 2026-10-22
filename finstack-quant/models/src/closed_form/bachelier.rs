@@ -244,3 +244,96 @@ pub fn bachelier_price_with_annuity(
     };
     annuity * unit_price
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const EPSILON: f64 = 1e-10;
+
+    #[test]
+    fn test_bachelier_put_call_parity() {
+        // Put-Call parity: Call - Put = F - K
+        let forward = 0.03;
+        let strike = 0.025;
+        let sigma = 0.005;
+        let t = 2.0;
+
+        let call = bachelier_call(forward, strike, sigma, t);
+        let put = bachelier_put(forward, strike, sigma, t);
+
+        let parity_diff = call - put - (forward - strike);
+        assert!(
+            parity_diff.abs() < EPSILON,
+            "Bachelier put-call parity violated: diff = {}",
+            parity_diff
+        );
+    }
+
+    #[test]
+    fn test_bachelier_atm_symmetry() {
+        // ATM: Call = Put when F = K
+        let forward = 0.03;
+        let strike = 0.03; // ATM
+        let sigma = 0.005;
+        let t = 1.0;
+
+        let call = bachelier_call(forward, strike, sigma, t);
+        let put = bachelier_put(forward, strike, sigma, t);
+
+        assert!(
+            (call - put).abs() < EPSILON,
+            "Bachelier ATM call != put: {} vs {}",
+            call,
+            put
+        );
+    }
+
+    #[test]
+    fn test_bachelier_vega_positive() {
+        let forward = 0.03;
+        let strike = 0.025;
+        let sigma = 0.005;
+        let t = 1.0;
+
+        let vega = bachelier_vega(forward, strike, sigma, t);
+        assert!(vega > 0.0, "Bachelier vega should be positive");
+    }
+
+    #[test]
+    fn test_bachelier_delta_bounds() {
+        let forward = 0.03;
+        let sigma = 0.005;
+        let t = 1.0;
+
+        let delta_itm = bachelier_delta_call(forward, 0.01, sigma, t);
+        assert!(delta_itm > 0.9, "ITM call delta should be close to 1");
+
+        let delta_otm = bachelier_delta_call(forward, 0.05, sigma, t);
+        assert!(delta_otm < 0.1, "OTM call delta should be close to 0");
+
+        let delta_atm = bachelier_delta_call(forward, forward, sigma, t);
+        assert!(
+            (delta_atm - 0.5).abs() < 0.01,
+            "ATM call delta should be ~0.5"
+        );
+    }
+
+    #[test]
+    fn test_bachelier_gamma_positive() {
+        let forward = 0.03;
+        let strike = 0.025;
+        let sigma = 0.005;
+        let t = 1.0;
+
+        let gamma = bachelier_gamma(forward, strike, sigma, t);
+        assert!(gamma > 0.0, "Bachelier gamma should be positive");
+
+        let gamma_atm = bachelier_gamma(forward, forward, sigma, t);
+        let gamma_otm = bachelier_gamma(forward, forward + 0.02, sigma, t);
+        assert!(
+            gamma_atm > gamma_otm,
+            "ATM gamma should be higher than OTM gamma"
+        );
+    }
+}

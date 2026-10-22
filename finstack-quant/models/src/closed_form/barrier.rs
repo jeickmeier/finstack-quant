@@ -101,7 +101,7 @@
 //!
 //! ```
 //! use finstack_quant_core::types::BarrierType;
-//! use finstack_quant_models::closed_form::barrier::{barrier_price, BarrierParams};
+//! use finstack_quant_models::closed_form::{barrier_price, BarrierParams};
 //! use finstack_quant_models::types::OptionType;
 //!
 //! let spot = 100.0;
@@ -767,7 +767,7 @@ fn discounted_touch_value(params: &BarrierParams, is_up: bool) -> f64 {
 ///
 /// ```
 /// use finstack_quant_core::types::BarrierType;
-/// use finstack_quant_models::closed_form::barrier::{barrier_price, BarrierParams};
+/// use finstack_quant_models::closed_form::{barrier_price, BarrierParams};
 /// use finstack_quant_models::types::OptionType;
 ///
 /// // spot 100, strike 100, barrier 90, 1y, r = 5%, q = 2%, vol = 20%

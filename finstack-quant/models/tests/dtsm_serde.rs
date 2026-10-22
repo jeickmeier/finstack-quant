@@ -43,13 +43,13 @@ where
 
 #[test]
 fn diebold_li_rejects_unknown_fields() {
-    let model = DieboldLi::with_default_lambda();
+    let model = DieboldLi::new(None).unwrap();
     assert_strict_inbound(&model);
 }
 
 #[test]
 fn diebold_li_rejects_invalid_lambda_on_deserialize() {
-    let model = DieboldLi::with_default_lambda();
+    let model = DieboldLi::new(None).unwrap();
     let mut json = serde_json::to_value(&model).unwrap();
     json.as_object_mut()
         .unwrap()
@@ -60,7 +60,7 @@ fn diebold_li_rejects_invalid_lambda_on_deserialize() {
 #[test]
 fn validated_dtsm_states_round_trip_without_changing_forecasts_or_scenarios() {
     let panel = panel();
-    let model = DieboldLi::with_default_lambda().fit(&panel).unwrap();
+    let model = DieboldLi::new(None).unwrap().fit(&panel).unwrap();
     let forecast = model.forecast(2).unwrap();
     let pca = YieldPca::fit(&panel).unwrap();
     let view = pca.truncated(2).unwrap();
@@ -91,7 +91,7 @@ fn yield_panel_deserialization_rejects_constructor_invalid_shapes() {
 
 #[test]
 fn diebold_li_deserialization_rejects_incomplete_or_misaligned_fitted_state() {
-    let model = DieboldLi::with_default_lambda().fit(&panel()).unwrap();
+    let model = DieboldLi::new(None).unwrap().fit(&panel()).unwrap();
     let value = serde_json::to_value(model).unwrap();
     for (field, replacement) in [
         ("q_cov", serde_json::Value::Null),
@@ -120,7 +120,7 @@ fn diebold_li_deserialization_rejects_incomplete_or_misaligned_fitted_state() {
 #[test]
 fn dtsm_results_reject_shapes_that_would_break_host_accessors() {
     let panel = panel();
-    let model = DieboldLi::with_default_lambda().fit(&panel).unwrap();
+    let model = DieboldLi::new(None).unwrap().fit(&panel).unwrap();
     let mut factors = serde_json::to_value(model.factors().unwrap()).unwrap();
     factors["factors"] = serde_json::to_value(DMatrix::<f64>::zeros(30, 2)).unwrap();
     assert!(serde_json::from_value::<FactorTimeSeries>(factors).is_err());

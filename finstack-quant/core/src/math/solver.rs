@@ -712,7 +712,9 @@ mod tests {
         let solvers = [
             BrentSolver::new(),
             BrentSolver::new().with_initial_bracket_size(Some(5.0)),
-            BrentSolver::new().with_tolerance(1e-8).with_max_iterations(50),
+            BrentSolver::new()
+                .with_tolerance(1e-8)
+                .with_max_iterations(50),
             BrentSolver::new().with_bracket_bounds(0.0, 1e3),
         ];
         for solver in &solvers {

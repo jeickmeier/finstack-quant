@@ -4,13 +4,12 @@
 //! Mirrors `finstack-quant-py/src/bindings/models/credit/migration.rs`.
 
 use crate::utils::input::{
-    js_f64, js_f64_matrix, js_f64_seq, js_string, js_string_seq, js_u64, js_uint,
+    js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_string, js_string_seq, js_u64, js_uint,
 };
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_factor::risk::flatten_square_matrix;
+use finstack_quant_core::math::linalg::flatten_square_matrix;
 use finstack_quant_models::credit::migration::{
-    self, projection, GeneratorMatrix, MigrationSimulator, RatingPath, RatingScale,
-    TransitionMatrix,
+    self, GeneratorMatrix, MigrationSimulator, RatingPath, RatingScale, TransitionMatrix,
 };
 use wasm_bindgen::prelude::*;
 
@@ -344,39 +343,22 @@ impl JsGeneratorMatrix {
     /// Estimate the generator of a transition matrix by matrix logarithm with
     /// regularization (Israel-Rosenthal-Wei).
     /// @param p - `TransitionMatrix` whose generator to extract.
+    /// @param round_trip_tol - Optional largest accepted absolute difference between `exp(Q * horizon)` and `p`; omitted or `null` uses the default `1e-2`.
     /// @returns The regularized generator; `roundTripError` reports the fit.
     ///
     /// # Errors
     ///
     /// Throws a `computation` error if no valid generator exists or the round
-    /// trip exceeds the default tolerance.
+    /// trip exceeds the tolerance, and a `TypeError` if `roundTripTol` is not a number.
     #[wasm_bindgen(js_name = fromTransitionMatrix)]
-    pub fn from_transition_matrix(p: &JsTransitionMatrix) -> Result<JsGeneratorMatrix, JsValue> {
-        GeneratorMatrix::from_transition_matrix(&p.inner)
+    pub fn from_transition_matrix(
+        p: &JsTransitionMatrix,
+        round_trip_tol: Option<JsValue>,
+    ) -> Result<JsGeneratorMatrix, JsValue> {
+        let round_trip_tol = js_opt_f64(round_trip_tol.as_ref(), "roundTripTol")?;
+        GeneratorMatrix::from_transition_matrix(&p.inner, round_trip_tol)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
-    }
-
-    /// Estimate the generator of a transition matrix with an explicit round-trip tolerance.
-    /// @param p - `TransitionMatrix` whose generator to extract.
-    /// @param round_trip_tol - Largest accepted absolute difference between `exp(Q * horizon)` and `p`.
-    /// @returns The regularized generator.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `computation` error if no valid generator exists or the round
-    /// trip exceeds `roundTripTol`.
-    #[wasm_bindgen(js_name = fromTransitionMatrixWithTol)]
-    pub fn from_transition_matrix_with_tol(
-        p: &JsTransitionMatrix,
-        round_trip_tol: JsValue,
-    ) -> Result<JsGeneratorMatrix, JsValue> {
-        GeneratorMatrix::from_transition_matrix_with_tol(
-            &p.inner,
-            js_f64(&round_trip_tol, "roundTripTol")?,
-        )
-        .map(|inner| Self { inner })
-        .map_err(to_js_err)
     }
 
     /// Transition intensity between two labelled states.
@@ -659,7 +641,7 @@ impl JsMigrationSimulator {
 /// `computation` error if the matrix exponential fails.
 #[wasm_bindgen(js_name = project)]
 pub fn project(generator: &JsGeneratorMatrix, t: JsValue) -> Result<JsTransitionMatrix, JsValue> {
-    projection::project(&generator.inner, js_f64(&t, "t")?)
+    migration::project(&generator.inner, js_f64(&t, "t")?)
         .map(|inner| JsTransitionMatrix { inner })
         .map_err(to_js_err)
 }

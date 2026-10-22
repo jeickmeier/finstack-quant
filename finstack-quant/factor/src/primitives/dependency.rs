@@ -1,5 +1,5 @@
-//! Core identifiers and definitions used by the factor model.
-//!
+//! Market dependency descriptors used by factor matchers.
+
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::types::CurveId;
 use serde::{Deserialize, Serialize};

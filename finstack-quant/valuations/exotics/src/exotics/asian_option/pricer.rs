@@ -14,6 +14,7 @@ use finstack_quant_valuations_core::pricer::{
 use finstack_quant_valuations_core::results::ValuationResult;
 
 // MC-specific imports
+use finstack_quant_models::monte_carlo::control_variate::apply_control_variate;
 use finstack_quant_models::monte_carlo::engine::PathCaptureConfig;
 use finstack_quant_models::monte_carlo::payoff::asian::{Asian, AveragingMethod};
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
@@ -21,7 +22,6 @@ use finstack_quant_models::monte_carlo::pricer::path_dependent::{
 };
 use finstack_quant_models::monte_carlo::process::gbm::{GbmParams, GbmProcess};
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
-use finstack_quant_models::monte_carlo::variance_reduction::control_variate::apply_control_variate;
 
 /// Exact simulation grid and one event index for every future fixing.
 /// Repeated indices retain contractual observations sharing a model time.
@@ -508,7 +508,7 @@ impl Pricer for AsianOptionMcPricer {
     }
 }
 
-use finstack_quant_models::closed_form::asian::arithmetic_asian_tw_price_times;
+use finstack_quant_models::closed_form::arithmetic_asian_tw_price_times;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::BlackScholesInputsDf;
 
 /// Value of an expired Asian option: the intrinsic of the realized average
@@ -800,10 +800,6 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
             // equal-spacing-over-[0, t] assumption misstates the average's
             // variance.
             let future_times = fixing_year_fractions(asian, as_of)?;
-            let is_call = matches!(
-                asian.option_type,
-                finstack_quant_models::types::OptionType::Call
-            );
             let unscaled = arithmetic_asian_tw_price_times(
                 spot,
                 k_eff,
@@ -812,7 +808,7 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
                 q,
                 sigma,
                 &future_times,
-                is_call,
+                asian.option_type,
             )?;
             unscaled * scale
         };
@@ -838,7 +834,7 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-    use finstack_quant_models::closed_form::asian::{geometric_asian_call, geometric_asian_put};
+    use finstack_quant_models::closed_form::geometric_asian_price;
     use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
     use finstack_quant_models::types::OptionType;
     use time::Month;
@@ -960,7 +956,7 @@ mod tests {
                     .expect("year fraction")
             })
             .collect();
-        let expected = finstack_quant_models::closed_form::asian::geometric_asian_price_times(
+        let expected = finstack_quant_models::closed_form::geometric_asian_price_times(
             spot,
             strike,
             t,
@@ -968,11 +964,20 @@ mod tests {
             div_yield,
             vol,
             &times,
-            true,
+            OptionType::Call,
         )
         .expect("valid schedule");
         // And it must stay close to the uniform-grid Kemna-Vorst benchmark.
-        let kv = geometric_asian_call(spot, strike, t, rate, div_yield, vol, fixing_dates.len());
+        let kv = geometric_asian_price(
+            spot,
+            strike,
+            t,
+            rate,
+            div_yield,
+            vol,
+            fixing_dates.len(),
+            OptionType::Call,
+        );
         let expected_money = Money::new(expected, Currency::USD)
             .expect("valid money fixture")
             .amount();
@@ -1034,7 +1039,7 @@ mod tests {
                     .expect("year fraction")
             })
             .collect();
-        let reference = finstack_quant_models::closed_form::asian::geometric_asian_price_times(
+        let reference = finstack_quant_models::closed_form::geometric_asian_price_times(
             spot,
             strike,
             t,
@@ -1042,7 +1047,7 @@ mod tests {
             0.0,
             vol,
             &times,
-            true,
+            OptionType::Call,
         )
         .expect("valid schedule");
 
@@ -1095,7 +1100,7 @@ mod tests {
                     .expect("year fraction")
             })
             .collect();
-        let expected = finstack_quant_models::closed_form::asian::geometric_asian_price_times(
+        let expected = finstack_quant_models::closed_form::geometric_asian_price_times(
             spot,
             strike,
             t,
@@ -1103,10 +1108,19 @@ mod tests {
             div_yield,
             vol,
             &times,
-            false,
+            OptionType::Put,
         )
         .expect("valid schedule");
-        let kv = geometric_asian_put(spot, strike, t, rate, div_yield, vol, fixing_dates.len());
+        let kv = geometric_asian_price(
+            spot,
+            strike,
+            t,
+            rate,
+            div_yield,
+            vol,
+            fixing_dates.len(),
+            OptionType::Put,
+        );
         let expected_money = Money::new(expected, Currency::USD)
             .expect("valid money fixture")
             .amount();
@@ -1642,7 +1656,7 @@ mod tests {
             None,
             None,
         );
-        let kv_call = geometric_asian_call(spot, strike, t, r, q, sigma, n);
+        let kv_call = geometric_asian_price(spot, strike, t, r, q, sigma, n, OptionType::Call);
         assert!(
             (seasoned_call - kv_call).abs() < 1e-9,
             "unseasoned seasoned-control call {seasoned_call} must equal \
@@ -1663,7 +1677,7 @@ mod tests {
             None,
             None,
         );
-        let kv_put = geometric_asian_put(spot, strike, t, r, q, sigma, n);
+        let kv_put = geometric_asian_price(spot, strike, t, r, q, sigma, n, OptionType::Put);
         assert!(
             (seasoned_put - kv_put).abs() < 1e-9,
             "unseasoned seasoned-control put {seasoned_put} must equal \

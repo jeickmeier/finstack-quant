@@ -6,7 +6,7 @@ use super::matchers::{
     CascadeMatcher, FactorMatcher, FactorNode, HierarchicalMatcher, MappingRule,
     MappingTableMatcher,
 };
-use crate::primitives::factor_types::FactorId;
+use crate::FactorId;
 use serde::{Deserialize, Serialize};
 
 /// Declarative configuration for a dependency-scoped hierarchical matcher.
@@ -110,9 +110,9 @@ fn collect_node_factor_ids(node: &FactorNode, ids: &mut std::collections::BTreeS
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::primitives::dependency::{DependencyType, MarketDependency};
-    use crate::primitives::factor_types::FactorId;
-    use crate::{AttributeFilter, DependencyFilter};
+    use crate::matching::{AttributeFilter, DependencyFilter};
+    use crate::FactorId;
+    use crate::{DependencyType, MarketDependency};
     use finstack_quant_core::types::{Attributes, CurveId};
 
     fn deepest_match(

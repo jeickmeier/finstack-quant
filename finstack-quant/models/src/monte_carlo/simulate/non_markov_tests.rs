@@ -4,7 +4,7 @@
 
 use super::tests::{assert_mean, engine_states, error_message, mean_var, spec, terminal};
 use super::*;
-use crate::monte_carlo::engine_fractional::simulate_path_fractional;
+use crate::monte_carlo::engine::simulate_path_fractional;
 use crate::monte_carlo::rng::fbm::FractionalNoiseGenerator;
 use crate::monte_carlo::rng::volterra::RiemannLiouvilleVolterra;
 use crate::monte_carlo::traits::{PathState, Payoff};

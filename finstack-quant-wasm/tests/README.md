@@ -48,7 +48,7 @@ the bindings exercise the typed Rust helpers instead.
 | `src/api/margin/tests.rs`         | `VmCalculator` and canonical CSA roundtrips                                  |
 | `wasm_math.rs`                    | linear algebra, statistics, summation wrappers                               |
 | `wasm_metric_keys.rs`             | canonical valuation metric-key validation                                    |
-| `wasm_models_analytic.rs`         | closed-form and COS option kernels                                           |
+| `wasm_models_closed_form.rs`      | closed-form and COS option kernels                                           |
 | `wasm_models_correlation.rs`      | correlation-matrix validation and repair                                     |
 | `wasm_models_credit.rs`           | Merton, recovery, endogenous hazard and toggle-exercise models               |
 | `wasm_models_liquidity.rs`        | liquidity estimators                                                         |

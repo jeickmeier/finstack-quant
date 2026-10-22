@@ -156,7 +156,7 @@ from finstack_quant.reporting import performance_tearsheet,attribution_tearsheet
 from finstack_quant.reporting.document import TearSheet,Section,KPI
 from finstack_quant.reporting.theme import INSTITUTIONAL
 from finstack_quant.reporting.charts import line_chart,waterfall_chart
-from finstack_quant.models.factor.risk import parametric_var_decomposition,parametric_es_decomposition
+from finstack_quant.models.factor.risk import parametric_var_decomposition
 from _shared.analyst_liquidity import position_factor_panel
 perf_report=performance_tearsheet(perf_source["book_performance"],sections=["summary","stats","cumulative","drawdown"],title="Account performance: January 15-October 15, 2025",subtitle="Three observed periods; base holdings before the report-date loan purchase",generated=report_date)
 # Add verified provenance: Performance carries no numeric-mode stamp, so the helper prints none.
@@ -182,8 +182,7 @@ report_ids=[p["position_id"] for p in report_spec["positions"]]
 proxy_exposures=[100_000*p["quantity"] for p in report_spec["positions"]]
 proxy_cov=proxy_panel[report_ids].cov().to_numpy()
 report_var=parametric_var_decomposition(report_ids,proxy_exposures,proxy_cov,confidence=.99)
-report_es=parametric_es_decomposition(report_ids,proxy_exposures,proxy_cov,confidence=.99)
-risk_report=portfolio_risk_tearsheet(report_var.to_json(),es=report_es.to_json(),title="Current holdings: synthetic proxy risk",subtitle="99% one-day Gaussian; USD 100,000 fixed risk capital per full contract; not actual historical book returns",generated=report_date)
+risk_report=portfolio_risk_tearsheet(report_var.to_json(),es=report_var.to_json(),title="Current holdings: synthetic proxy risk",subtitle="99% one-day Gaussian; USD 100,000 fixed risk capital per full contract; not actual historical book returns",generated=report_date)
 risk_report.save("proxy-risk-report.html")
 scenario_report=scenario_tearsheet(scenarios={"USD-OIS zero +100 bp, fixed hazard":float(stress_pnl)},title="Current book full repricing",subtitle="Immediate curve-space shock; unchanged cash; no quote-space risk request",generated=report_date)
 scenario_report.meta_lines=["Native currency PVs and f64 scenario differences; display formatting only"]

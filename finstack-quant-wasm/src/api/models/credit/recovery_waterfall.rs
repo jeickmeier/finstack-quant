@@ -53,7 +53,7 @@ pub fn allocate_recovery(estate_value: JsValue, claims: JsValue) -> Result<JsVal
 ///   collateral_value: null,
 ///   collateral_haircut: 0,
 /// };
-/// console.log(models.credit.recoveryClaimTotalClaim(claim)); // 106
+/// console.log(models.credit.recoveryWaterfall.recoveryClaimTotalClaim(claim)); // 106
 /// ```
 ///
 /// # Errors

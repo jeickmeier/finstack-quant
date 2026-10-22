@@ -13,7 +13,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::correlation::RecoverySpec;
-use finstack_quant_models::credit::pool::prepayment::StochasticPrepaySpec;
+use finstack_quant_models::credit::pool::StochasticPrepaySpec;
 use finstack_quant_models::credit::pool::{CorrelationStructure, StochasticDefaultSpec};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::results::structured_credit::{

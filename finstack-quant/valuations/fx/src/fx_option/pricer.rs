@@ -10,7 +10,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_models::closed_form::vanilla::{bs_greeks_unchecked, bs_price_unchecked};
+use finstack_quant_models::closed_form::{bs_greeks_unchecked, bs_price_unchecked};
 use finstack_quant_models::types::OptionType;
 
 const STRIKE_ZERO_TOL: f64 = 1e-12;
@@ -190,7 +190,7 @@ pub(crate) fn compute_greeks(
         inst.option_type,
         inst.metric_pricing_overrides.theta_days_per_year(),
     );
-    let (d1, d2) = finstack_quant_models::volatility::d1_d2(spot, inst.strike, r_d, sigma, t, r_f);
+    let (d1, d2) = finstack_quant_models::closed_form::d1_d2(spot, inst.strike, r_d, sigma, t, r_f);
     let cdf_d1 = finstack_quant_core::math::special_functions::norm_cdf(d1);
     let cdf_d2 = finstack_quant_core::math::special_functions::norm_cdf(d2);
     let exp_rd_t = (-r_d * t).exp();

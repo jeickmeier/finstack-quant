@@ -2,7 +2,7 @@
 
 use crate::instruments::common_impl::helpers::get_unitless_scalar_strict;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_models::closed_form::heston::HestonPricingParams;
+use finstack_quant_models::closed_form::HestonPricingParams;
 
 /// Resolve all required Heston scalars from a valuation market context.
 ///

@@ -142,7 +142,7 @@ fn run_fixture(fixture: &SabrFixture) -> Result<Vec<String>, String> {
     let mut failures = Vec::new();
     for strike in &fixture.strikes {
         let actual = params
-            .implied_volatility(fixture.forward, strike.strike, fixture.time_to_expiry)
+            .implied_vol(fixture.forward, strike.strike, fixture.time_to_expiry)
             .map_err(|error| format!("price strike '{}': {error}", strike.key))?;
         let expected = fixture.expected[&strike.key];
         let tolerance = &fixture.tolerances[&strike.key];

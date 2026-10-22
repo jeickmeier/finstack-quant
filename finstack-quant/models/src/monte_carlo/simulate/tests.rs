@@ -3,7 +3,8 @@
 
 use super::*;
 use crate::monte_carlo::engine::{McEngineConfig, PathCaptureConfig};
-use crate::monte_carlo::payoff::vanilla::EuropeanCall;
+use crate::monte_carlo::payoff::vanilla::European;
+use crate::types::OptionType;
 use crate::volatility::local_vol::LocalVolSurface;
 use finstack_quant_core::currency::Currency;
 
@@ -444,7 +445,7 @@ where
             process,
             scheme,
             x0,
-            &EuropeanCall::new(0.0, 1.0, 6),
+            &European::new(OptionType::Call, 0.0, 1.0, 6),
             Currency::USD,
             1.0,
             process.metadata(),

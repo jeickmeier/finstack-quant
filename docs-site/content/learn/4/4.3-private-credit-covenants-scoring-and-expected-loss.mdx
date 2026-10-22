@@ -219,7 +219,7 @@ from finstack_quant.models.credit import migration
 
 rating_scale = migration.RatingScale.custom(["A","B","D"])
 annual_transition = migration.TransitionMatrix(rating_scale,[[0.94,0.05,0.01],[0.01,0.94,0.05],[0,0,1]],1.0)
-credit_generator = migration.GeneratorMatrix.from_transition_matrix_with_tol(annual_transition,1e-8)
+credit_generator = migration.GeneratorMatrix.from_transition_matrix(annual_transition,1e-8)
 one_year = migration.project(credit_generator,1.0)
 five_year = migration.project(credit_generator,5.0)
 pd_term = [(t,migration.project(credit_generator,t).probability("B","D")) for t in [0.5,1,2,3,5]]

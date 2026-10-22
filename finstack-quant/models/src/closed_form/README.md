@@ -13,8 +13,8 @@ The module serves two roles:
 
 ## Position in the stack
 
-Within the crate, `closed_form` reaches for
-[`models::volatility::black`](../volatility/) (the `d1`/`d2` helpers) and for
+Within the crate, `closed_form` owns the Black-family `d1`/`d2` helpers
+(`closed_form::{d1_d2, d1_d2_black76}`, in [`black.rs`](black.rs)) and reaches for
 `crate::instruments::common_impl` — `parameters::OptionType` on every
 call/put-selecting entry point, and `helpers::get_unitless_scalar_strict` in
 the Heston parameter validator. From core it uses `math::special_functions`
@@ -36,7 +36,9 @@ by the Python/WASM bindings via [`dispatch.rs`](dispatch.rs).
 
 | File | Contents |
 |------|----------|
-| [`mod.rs`](mod.rs) | Re-exports and module-level references |
+| [`mod.rs`](mod.rs) | The `closed_form::` facade (children are private) and module-level references |
+| [`black.rs`](black.rs) | `d1_d2`, `d1_d2_black76`, unit-annuity Black-76 price and Greeks kernels |
+| [`bachelier.rs`](bachelier.rs) | Unit-annuity Bachelier price and Greeks kernels, `bachelier_price_with_annuity` |
 | [`vanilla.rs`](vanilla.rs) | Black-Scholes/Garman-Kohlhagen price, Greeks, Black-76, payoff and finiteness guards |
 | [`asian.rs`](asian.rs) | Geometric (Kemna-Vorst) and arithmetic (Turnbull-Wakeman) average-price options |
 | [`barrier.rs`](barrier.rs) | All eight continuously monitored barrier types, touch probabilities, rebates |
@@ -86,13 +88,13 @@ References: Black & Scholes (1973); Merton (1973); Garman & Kohlhagen (1983).
 
 | Item | Notes |
 |------|-------|
-| `geometric_asian_call` / `_put` | Exact under geometric averaging (Kemna-Vorst) |
-| `arithmetic_asian_call_tw` / `_put_tw` | Turnbull-Wakeman two-moment lognormal match |
+| `geometric_asian_price` | Exact under geometric averaging (Kemna-Vorst) |
+| `arithmetic_asian_tw_price` | Turnbull-Wakeman two-moment lognormal match |
 | `geometric_asian_price_times` | Arbitrary (unequally spaced) fixing schedule, `-> Result<f64>` |
 | `arithmetic_asian_tw_price_times` | Same, Turnbull-Wakeman |
 
 Equal-spacing entry points take `(spot, strike, time, rate, div_yield, vol,
-num_fixings)`. `num_fixings == 0` selects the continuous-monitoring limit for
+num_fixings, option_type)`; the `_times` variants also end in `option_type`. `num_fixings == 0` selects the continuous-monitoring limit for
 the geometric forms; for the arithmetic forms it returns `0.0` (no average can
 be formed).
 
@@ -208,8 +210,8 @@ C        = e^(-r_dom·T) · [F_adj·N(d₁) - K·N(d₂)]
 ```
 
 `quanto_drift_adjustment(correlation, vol_asset, vol_fx)` returns `-ρ·σ_S·σ_X`.
-`quanto_call` / `quanto_put` take `(spot, strike, time, rate_domestic,
-rate_foreign, div_yield, vol_asset, vol_fx, correlation)` and return the price
+`quanto_price` takes `(spot, strike, time, rate_domestic, rate_foreign,
+div_yield, vol_asset, vol_fx, correlation, option_type)` and returns the price
 in domestic currency per unit of foreign notional.
 
 References: Garman & Kohlhagen (1983); Derman, Karasinski & Wecker (1990);
@@ -284,7 +286,7 @@ vol, expiry, ...)`, matching `bs_price`.
 
 | Function | Selectors |
 |----------|-----------|
-| `barrier_call` / `barrier_put` | `direction ∈ {"up","down"}`, `knock ∈ {"in","out"}` |
+| `barrier_option_price` | `direction ∈ {"up","down"}`, `knock ∈ {"in","out"}` |
 | `asian_option_price` | `averaging ∈ {"arithmetic","geometric"}`; hosts default to `DEFAULT_ASIAN_AVERAGING` (`"arithmetic"`) |
 | `lookback_option_price` | `strike_type ∈ {"fixed","floating"}`; hosts default to `DEFAULT_LOOKBACK_STRIKE_TYPE` (`"fixed"`) |
 | `quanto_option_price` | call/put only |
@@ -321,9 +323,12 @@ Decimal/f64 split.
 ```rust
 use finstack_quant_core::types::BarrierType;
 use finstack_quant_models::types::OptionType;
-use finstack_quant_models::closed_form::{barrier::{barrier_price, BarrierParams}, heston::{heston_call_price_fourier, HestonPricingParams}};
-use finstack_quant_models::closed_form::vanilla::{bs_greeks, bs_price};
-use finstack_quant_models::closed_form::bs_implied_vol;
+use finstack_quant_models::closed_form::{
+    barrier::{barrier_price, BarrierParams},
+    bs_greeks, bs_price,
+    heston::{heston_call_price_fourier, HestonPricingParams},
+    implied_vol::bs_implied_vol,
+};
 
 let (spot, strike, r, q, vol, t) = (100.0, 100.0, 0.05, 0.02, 0.20, 1.0);
 
@@ -354,11 +359,11 @@ Both hosts (Python `finstack_quant.models`, WASM `models` namespace) bind
 `bs_price`, `vanilla_expiry_payoff`, `bs_greeks` (default
 `DEFAULT_THETA_DAYS_PER_YEAR`), `bs_implied_vol`, `black76_implied_vol`,
 `black76_price`, `black76_greeks`, `bachelier_price`, `bachelier_greeks`,
-`black_shifted_price`, `black_shifted_vega`, `barrier_call`, `barrier_put`,
+`black_shifted_price`, `black_shifted_vega`, `barrier_option_price`,
 `asian_option_price`, `lookback_option_price`, `quanto_option_price` and
 `heston_price` under the same names (camelCase in WASM). Each binding converts
-`is_call` to `OptionType` and makes one call. Lookback and Asian put/`_df`/`_times`
-variants are Rust-only.
+`is_call` to `OptionType` and makes one call. The Asian `_times` variants are
+Rust-only.
 
 ## Verification
 

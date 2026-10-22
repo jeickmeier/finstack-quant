@@ -43,7 +43,7 @@ use super::super::paths::ProcessParams;
 #[cfg(test)]
 use super::super::traits::state_keys;
 use super::super::traits::StochasticProcess;
-use super::metadata::ProcessMetadata;
+use crate::monte_carlo::traits::ProcessMetadata;
 
 /// Maximum number of LMM factors supported.
 const MAX_FACTORS: usize = 3;

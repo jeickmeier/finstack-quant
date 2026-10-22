@@ -57,7 +57,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
-use finstack_quant_models::trees::{HullWhiteTree, HullWhiteTreeConfig};
+use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_core::pricer::Pricer;
 use finstack_quant_valuations_exotics::exotics::tarn::{Tarn, TarnPricer};
