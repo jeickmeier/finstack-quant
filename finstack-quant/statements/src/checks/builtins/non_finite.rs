@@ -35,8 +35,8 @@ impl Check for NonFiniteCheck {
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
         let mut findings = Vec::new();
 
-        if self.nodes.is_empty() {
-            for (node_id, period_map) in &context.results.nodes {
+        let mut inspect_node = |node_id: &str| {
+            if let Some(period_map) = context.results.nodes.get(node_id) {
                 for (period_id, &value) in period_map {
                     if !value.is_finite() {
                         findings.push(CheckFinding {
@@ -54,27 +54,14 @@ impl Check for NonFiniteCheck {
                     }
                 }
             }
+        };
+        if self.nodes.is_empty() {
+            for node_id in context.results.nodes.keys() {
+                inspect_node(node_id);
+            }
         } else {
             for node in &self.nodes {
-                if let Some(period_map) = context.results.nodes.get(node.as_str()) {
-                    for (period_id, &value) in period_map {
-                        if !value.is_finite() {
-                            findings.push(CheckFinding {
-                                check_id: self.id().to_string(),
-                                severity: Severity::Error,
-                                message: format!(
-                                    "Non-finite value ({value}) for node '{}' \
-                                     in period {period_id}",
-                                    node.as_str()
-                                ),
-                                period: Some(*period_id),
-                                materiality: None,
-                                nodes: vec![node.clone()],
-                                comparison: None,
-                            });
-                        }
-                    }
-                }
+                inspect_node(node.as_str());
             }
         }
 
