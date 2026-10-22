@@ -283,8 +283,6 @@ impl InterpolationStrategy for LogLinearStrategy {
 ///   [De Boor Splines](../../../../docs/REFERENCES.md#de-boor-splines).
 #[derive(Debug, Clone)]
 pub struct PiecewiseQuadraticForwardStrategy {
-    /// Knot locations (copied for boundary evaluation).
-    knots: Box<[f64]>,
     /// Cubic spline coefficients for log discount factor: y = a + b s + c s² + d s³.
     a: Box<[f64]>,
     b: Box<[f64]>,
@@ -364,7 +362,6 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
         }
 
         Ok(Self {
-            knots: knots.to_vec().into_boxed_slice(),
             a: a_coeff.into_boxed_slice(),
             b: b_coeff.into_boxed_slice(),
             c: c_coeff.into_boxed_slice(),
@@ -390,13 +387,13 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
             knots,
             extrapolation,
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => self.boundary_df(0),
-                ExtrapolationPolicy::FlatForward => self.flat_forward_df(x, 0),
+                ExtrapolationPolicy::FlatZero => self.boundary_df(knots, 0),
+                ExtrapolationPolicy::FlatForward => self.flat_forward_df(x, knots, 0),
                 _ => f64::NAN,
             },
             |policy| match policy {
-                ExtrapolationPolicy::FlatZero => self.boundary_df(knots.len() - 1),
-                ExtrapolationPolicy::FlatForward => self.flat_forward_df(x, knots.len() - 1),
+                ExtrapolationPolicy::FlatZero => self.boundary_df(knots, knots.len() - 1),
+                ExtrapolationPolicy::FlatForward => self.flat_forward_df(x, knots, knots.len() - 1),
                 _ => f64::NAN,
             },
         ) {
@@ -428,12 +425,14 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
             extrapolation,
             |policy| match policy {
                 ExtrapolationPolicy::FlatZero => 0.0,
-                ExtrapolationPolicy::FlatForward => self.flat_forward_df_prime(x, 0),
+                ExtrapolationPolicy::FlatForward => self.flat_forward_df_prime(x, knots, 0),
                 _ => f64::NAN,
             },
             |policy| match policy {
                 ExtrapolationPolicy::FlatZero => 0.0,
-                ExtrapolationPolicy::FlatForward => self.flat_forward_df_prime(x, knots.len() - 1),
+                ExtrapolationPolicy::FlatForward => {
+                    self.flat_forward_df_prime(x, knots, knots.len() - 1)
+                }
                 _ => f64::NAN,
             },
         ) {
@@ -452,12 +451,12 @@ impl InterpolationStrategy for PiecewiseQuadraticForwardStrategy {
 
 impl PiecewiseQuadraticForwardStrategy {
     #[inline]
-    fn boundary_df(&self, boundary_index: usize) -> f64 {
+    fn boundary_df(&self, knots: &[f64], boundary_index: usize) -> f64 {
         if boundary_index == 0 {
             (-self.a[0]).exp()
         } else {
             let last_seg = self.a.len() - 1;
-            let h = self.knots[boundary_index] - self.knots[boundary_index - 1];
+            let h = knots[boundary_index] - knots[boundary_index - 1];
             let y = self.a[last_seg]
                 + self.b[last_seg] * h
                 + self.c[last_seg] * h * h
@@ -467,29 +466,29 @@ impl PiecewiseQuadraticForwardStrategy {
     }
 
     #[inline]
-    fn boundary_slope(&self, boundary_index: usize) -> f64 {
+    fn boundary_slope(&self, knots: &[f64], boundary_index: usize) -> f64 {
         if boundary_index == 0 {
             self.b[0]
         } else {
             let last_seg = self.a.len() - 1;
-            let h = self.knots[boundary_index] - self.knots[boundary_index - 1];
+            let h = knots[boundary_index] - knots[boundary_index - 1];
             self.b[last_seg] + 2.0 * self.c[last_seg] * h + 3.0 * self.d[last_seg] * h * h
         }
     }
 
     #[inline]
-    fn flat_forward_df(&self, x: f64, boundary_index: usize) -> f64 {
-        let t0 = self.knots[boundary_index];
-        let y0 = -self.boundary_df(boundary_index).ln();
-        let slope = self.boundary_slope(boundary_index);
+    fn flat_forward_df(&self, x: f64, knots: &[f64], boundary_index: usize) -> f64 {
+        let t0 = knots[boundary_index];
+        let y0 = -self.boundary_df(knots, boundary_index).ln();
+        let slope = self.boundary_slope(knots, boundary_index);
         let y = y0 + slope * (x - t0);
         (-y).exp()
     }
 
     #[inline]
-    fn flat_forward_df_prime(&self, x: f64, boundary_index: usize) -> f64 {
-        let df = self.flat_forward_df(x, boundary_index);
-        let slope = self.boundary_slope(boundary_index);
+    fn flat_forward_df_prime(&self, x: f64, knots: &[f64], boundary_index: usize) -> f64 {
+        let df = self.flat_forward_df(x, knots, boundary_index);
+        let slope = self.boundary_slope(knots, boundary_index);
         -slope * df
     }
 }
