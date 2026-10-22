@@ -510,7 +510,7 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
     let default_date = Date::from_calendar_date(2025, Month::June, 1).unwrap();
     let recovery_date = Date::from_calendar_date(2025, Month::December, 1).unwrap();
 
-    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_parts(
+    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
         vec![
             CashFlow::new(
                 default_date,
@@ -532,7 +532,8 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
         Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
-    );
+    )
+    .expect("valid cashflow rows");
 
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(base)
@@ -572,7 +573,7 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
     let default_date = Date::from_calendar_date(2025, Month::June, 1).unwrap();
     let recovery_date = Date::from_calendar_date(2025, Month::December, 1).unwrap();
 
-    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_parts(
+    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
         vec![
             CashFlow::new(
                 default_date,
@@ -594,7 +595,8 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
         Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
-    );
+    )
+    .expect("valid cashflow rows");
 
     let periods = vec![Period {
         id: PeriodId::annual(2025),

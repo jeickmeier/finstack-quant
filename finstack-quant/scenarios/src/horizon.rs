@@ -1159,13 +1159,11 @@ mod tests {
             _: Date,
         ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule>
         {
-            Ok(
-                finstack_quant_cashflows::builder::CashFlowSchedule::from_parts(
-                    Vec::new(),
-                    finstack_quant_cashflows::builder::Notional::par(100.0, Currency::USD)?,
-                    DayCount::Act365F,
-                    Default::default(),
-                ),
+            finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
+                Vec::new(),
+                finstack_quant_cashflows::builder::Notional::par(100.0, Currency::USD)?,
+                DayCount::Act365F,
+                Default::default(),
             )
         }
     }

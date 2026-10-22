@@ -1479,7 +1479,7 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
         let maturity = date!(2026 - 01 - 01);
         let money = |amount| Money::new(amount, Currency::USD).expect("valid money fixture");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows(
             vec![
                 CashFlow::new(issue, None, money(-1_000.0), CFKind::Notional, 0.0, None),
                 CashFlow::new(
@@ -1507,7 +1507,8 @@ mod tests {
                 maturity: Some(maturity),
                 ..CashFlowMeta::default()
             },
-        );
+        )
+        .expect("valid cashflow rows");
         let mut bond =
             Bond::from_cashflows("SEASONED-PIK", schedule, "USD-OIS", None).expect("custom bond");
         bond.call_put = Some(CallPutSchedule {
@@ -1543,7 +1544,7 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
         let maturity = date!(2026 - 01 - 01);
         let money = |amount| Money::new(amount, Currency::USD).expect("valid money fixture");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows(
             vec![
                 CashFlow::new(issue, None, money(-1_000.0), CFKind::Notional, 0.0, None),
                 CashFlow::new(as_of, None, money(50.0), CFKind::Fixed, 0.0, None),
@@ -1557,7 +1558,8 @@ mod tests {
                 maturity: Some(maturity),
                 ..CashFlowMeta::default()
             },
-        );
+        )
+        .expect("valid cashflow rows");
         let mut bond =
             Bond::from_cashflows("SAME-DAY-EXERCISE", schedule, "USD-OIS", None).expect("bond");
         bond.call_put = Some(CallPutSchedule {

@@ -498,7 +498,7 @@ fn previously_paid_redemption_cannot_extinguish_later_pik_principal() {
     let payment_date = date!(2025 - 03 - 28);
     let cutoff = date!(2025 - 03 - 31);
     let economic_date = date!(2025 - 04 - 02);
-    let schedule = CashFlowSchedule::from_parts(
+    let schedule = CashFlowSchedule::from_flows(
         vec![
             CashFlow::new(payment_date, None, usd(100.0), CFKind::Notional, 0.0, None)
                 .with_principal_delta(usd(-100.0))
@@ -510,7 +510,8 @@ fn previously_paid_redemption_cannot_extinguish_later_pik_principal() {
             issue_date: Some(issue),
             ..Default::default()
         },
-    );
+    )
+    .expect("valid cashflow rows");
     // Redemption cash of 100 was already paid. A subsequent PIK toggle adds
     // 10 to closing principal before that redemption becomes economic.
     let mut state = state_with_balance(schedule, 110.0);

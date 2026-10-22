@@ -1456,7 +1456,7 @@ mod tests {
     fn terminal_exercise_replaces_contractual_redemption() {
         let issue = date!(2025 - 01 - 01);
         let maturity = date!(2026 - 01 - 01);
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows(
             vec![
                 CashFlow::new(
                     issue,
@@ -1490,7 +1490,8 @@ mod tests {
                 maturity: Some(maturity),
                 ..CashFlowMeta::default()
             },
-        );
+        )
+        .expect("valid cashflow rows");
 
         let (principal, replaced) = RedemptionBasis::new(
             &schedule,

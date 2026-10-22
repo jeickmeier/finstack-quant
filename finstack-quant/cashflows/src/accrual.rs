@@ -1092,7 +1092,7 @@ mod tests {
             .is_ex_coupon(payment, payment)
             .expect("payment boundary"));
 
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![CashFlow::new(
                 payment,
                 None,

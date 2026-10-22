@@ -479,7 +479,7 @@ mod tests {
         let amort_date = date!(2025 - 01 - 01);
         let maturity = date!(2026 - 01 - 01);
         let money = |amount| Money::new(amount, Currency::USD).expect("valid money fixture");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows(
             vec![
                 CashFlow::new(issue, None, money(-1_000.0), CFKind::Notional, 0.0, None),
                 CashFlow::new(pik_date, None, money(50.0), CFKind::Pik, 0.0, None),
@@ -509,7 +509,8 @@ mod tests {
                 maturity: Some(maturity),
                 ..CashFlowMeta::default()
             },
-        );
+        )
+        .expect("valid cashflow rows");
         let bond = Bond::from_cashflows("SEASONED-PIK-AMORT", schedule, "USD-OIS", None)
             .expect("custom bond");
 
