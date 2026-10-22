@@ -276,7 +276,7 @@ fn bare_string_returns_are_named_or_allowlisted() {
         // Display formatting of the amount.
         ("Money", "formatWith"),
         // Canonical return-frequency label.
-        ("Performance", "frequency"),
+        ("Performance", "getFrequency"),
         // Canonical liquidity-tier label.
         ("LiquidityNamespace", "liquidityTier"),
         // Canonical formula text (re-parseable), the Python `parse_formula` twin.

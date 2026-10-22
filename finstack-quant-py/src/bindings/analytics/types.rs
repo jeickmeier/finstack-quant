@@ -540,10 +540,7 @@ impl PyLookbackReturns {
     }
 }
 
-/// Date-indexed numeric series returned by the rolling-window analytics.
-///
-/// Wraps Rust `DatedSeries`, whose `value_column` (a `RollingMetric`) names the
-/// metric and becomes the DataFrame column name.
+#[doc = pydoc!("finstack_quant.analytics", "DatedSeries")]
 #[pyclass(name = "DatedSeries", module = "finstack_quant.analytics", frozen)]
 pub struct PyDatedSeries {
     pub(super) inner: DatedSeries,
@@ -551,25 +548,23 @@ pub struct PyDatedSeries {
 
 #[pymethods]
 impl PyDatedSeries {
-    /// Numeric values, one per window.
+    #[doc = pydoc!("finstack_quant.analytics", "DatedSeries.values")]
     #[getter]
     fn values<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         PyArray1::from_slice(py, &self.inner.values)
     }
-    /// Window-end dates aligned 1:1 with [`values`](Self::values).
+    #[doc = pydoc!("finstack_quant.analytics", "DatedSeries.dates")]
     #[getter]
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
         dates_to_pylist(py, &self.inner.dates)
     }
-    /// Metric name of the series (Rust `RollingMetric`), also the column name
-    /// used by [`to_dataframe`](Self::to_dataframe).
+    #[doc = pydoc!("finstack_quant.analytics", "DatedSeries.value_column")]
     #[getter]
     fn value_column(&self) -> &'static str {
         self.inner.value_column.as_str()
     }
 
-    /// Convert to a pandas ``DataFrame`` with a ``DatetimeIndex`` and a
-    /// single value column named after [`value_column`](Self::value_column).
+    #[doc = pydoc!("finstack_quant.analytics", "DatedSeries.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         data.set_item(
@@ -655,8 +650,16 @@ impl_repr_html_via_dataframe!(
     PyLookbackReturns,
     pydoc!("finstack_quant.analytics", "LookbackReturns._repr_html_")
 );
-wire_methods!(PyDatedSeries, DatedSeries, "DatedSeries");
-impl_repr_html_via_dataframe!(PyDatedSeries);
+wire_methods!(
+    PyDatedSeries,
+    DatedSeries,
+    "DatedSeries",
+    module = "finstack_quant.analytics"
+);
+impl_repr_html_via_dataframe!(
+    PyDatedSeries,
+    pydoc!("finstack_quant.analytics", "DatedSeries._repr_html_")
+);
 
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPeriodStats>()?;

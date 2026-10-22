@@ -99,6 +99,7 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
         "MultiFactorResult",
         "DrawdownEpisode",
         "LookbackReturns",
+        "DatedSeries",
     ),
     "finstack_quant.core.dates": ("PeriodKind",),
     "finstack_quant.statements": ("RollupSpec",),

@@ -197,33 +197,80 @@ pub struct PeriodId {
 }
 
 impl PeriodId {
-    /// Identify the Gregorian or ISO period containing a valid date.
+    /// Identify the calendar or fiscal period containing a date.
+    ///
+    /// Gregorian weeks use ISO week-years. Fiscal weeks are seven-day blocks
+    /// from the configured year start, with a partial final week. Month-based
+    /// fiscal periods use the same clamped boundaries as [`build_fiscal_periods`].
     ///
     /// # Arguments
     ///
-    /// * `date` - Valid calendar date to assign to a period; weekly periods use its ISO week-year.
-    /// * `kind` - Calendar bucket granularity. Annual periods use the Gregorian year, not a fiscal label.
-    pub fn from_date(date: Date, kind: PeriodKind) -> Self {
-        let mut year = date.year();
-        let month = u16::from(date.month() as u8);
-        let index = match kind {
-            PeriodKind::Daily => date.ordinal(),
-            PeriodKind::Weekly => {
-                let (y, week, _) = date.to_iso_week_date();
-                year = y;
-                u16::from(week)
-            }
-            PeriodKind::Monthly => month,
-            PeriodKind::Quarterly => (month - 1) / 3 + 1,
-            PeriodKind::SemiAnnual => (month - 1) / 6 + 1,
-            PeriodKind::Annual => 1,
+    /// * `date` - Calendar date to classify within an inclusive-start, exclusive-end period.
+    /// * `kind` - Daily, weekly, monthly, quarterly, semi-annual, or annual granularity.
+    /// * `fiscal_config` - `None` uses Gregorian periods and ISO weeks. `Some(config)`
+    ///   uses fiscal boundaries and an `FY` year label at every granularity.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if either boundary of the containing period
+    /// cannot be represented in the supported date range.
+    pub fn from_date(
+        date: Date,
+        kind: PeriodKind,
+        fiscal_config: Option<FiscalConfig>,
+    ) -> crate::Result<Self> {
+        let (calendar, year, index) = if let Some(config) = fiscal_config {
+            let calendar = PeriodCalendar::Fiscal(config);
+            let year = date.fiscal_year(config);
+            let index = match kind {
+                PeriodKind::Daily | PeriodKind::Weekly => {
+                    let offset = (date - config.year_start(year)?).whole_days() as u16;
+                    if kind == PeriodKind::Daily {
+                        offset + 1
+                    } else {
+                        offset / 7 + 1
+                    }
+                }
+                _ => {
+                    let mut index = 1;
+                    while index < kind.periods_per_year()
+                        && date >= calendar.bounds(year, kind, index)?.1
+                    {
+                        index += 1;
+                    }
+                    index
+                }
+            };
+            (calendar, year, index)
+        } else {
+            let mut year = date.year();
+            let month = u16::from(date.month() as u8);
+            let index = match kind {
+                PeriodKind::Daily => date.ordinal(),
+                PeriodKind::Weekly => {
+                    let (iso_year, week, _) = date.to_iso_week_date();
+                    year = iso_year;
+                    u16::from(week)
+                }
+                PeriodKind::Monthly => month,
+                PeriodKind::Quarterly => (month - 1) / 3 + 1,
+                PeriodKind::SemiAnnual => (month - 1) / 6 + 1,
+                PeriodKind::Annual => 1,
+            };
+            (PeriodCalendar::Gregorian, year, index)
         };
-        Self {
+        let (start, end) = calendar.bounds(year, kind, index)?;
+        if !(start..end).contains(&date) {
+            return Err(crate::Error::Validation(format!(
+                "date {date} is outside the resolved {kind} period [{start}, {end})"
+            )));
+        }
+        Ok(Self {
             year,
             index,
             kind,
-            fiscal: false,
-        }
+            fiscal: calendar.is_fiscal(),
+        })
     }
 
     /// Try to build a daily identifier from an ordinal day (1..=366).
@@ -470,7 +517,7 @@ impl PeriodId {
                         start.checked_add(time::Duration::days(i64::from(periods) * days))
                     })
                     .ok_or_else(out_of_range)?;
-                Ok(Self::from_date(date, self.kind))
+                Self::from_date(date, self.kind, None)
             }
             _ => {
                 let n = i64::from(max);

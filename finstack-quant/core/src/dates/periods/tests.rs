@@ -680,3 +680,162 @@ fn period_year_stepping_rejects_integer_overflow() {
         .next_fiscal(FiscalConfig::us_federal())
         .is_err());
 }
+
+#[test]
+fn from_date_matches_calendar_and_fiscal_plan_boundaries() {
+    let kinds = [
+        (PeriodKind::Daily, "D001"),
+        (PeriodKind::Weekly, "W01"),
+        (PeriodKind::Monthly, "M01"),
+        (PeriodKind::Quarterly, "Q1"),
+        (PeriodKind::SemiAnnual, "H1"),
+        (PeriodKind::Annual, ""),
+    ];
+    let configs = [
+        None,
+        Some(FiscalConfig::calendar_year()),
+        Some(FiscalConfig::us_federal()),
+        Some(FiscalConfig::uk()),
+        Some(FiscalConfig::new(1, 15).unwrap()),
+        Some(FiscalConfig::new(1, 31).unwrap()),
+        Some(FiscalConfig::new(2, 29).unwrap()),
+    ];
+    for config in configs {
+        for (kind, suffix) in kinds {
+            let prefix = if config.is_some() { "FY" } else { "" };
+            let range = format!("{prefix}2024{suffix}..{prefix}2025{suffix}");
+            let plan = match config {
+                Some(config) => build_fiscal_periods(&range, config, None),
+                None => build_periods(&range, None),
+            }
+            .expect("representable period plan");
+            for period in plan.periods {
+                let midpoint = period
+                    .start
+                    .add_days((period.end - period.start).whole_days() / 2)
+                    .unwrap();
+                for date in [period.start, midpoint, period.end.previous_day().unwrap()] {
+                    assert_eq!(
+                        PeriodId::from_date(date, kind, config).unwrap(),
+                        period.id,
+                        "{date}, {kind}, {config:?}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn from_date_observes_midmonth_clamping_leap_days_and_partial_weeks() {
+    let federal = Some(FiscalConfig::us_federal());
+    assert_eq!(
+        PeriodId::from_date(d(2025, Month::September, 30), PeriodKind::Weekly, federal)
+            .unwrap()
+            .to_string(),
+        "FY2025W53"
+    );
+    assert_eq!(
+        PeriodId::from_date(d(2025, Month::October, 1), PeriodKind::Weekly, federal)
+            .unwrap()
+            .to_string(),
+        "FY2026W01"
+    );
+    let uk = Some(FiscalConfig::uk());
+    assert_eq!(
+        PeriodId::from_date(d(2024, Month::April, 5), PeriodKind::Annual, uk)
+            .unwrap()
+            .to_string(),
+        "FY2024"
+    );
+    assert_eq!(
+        PeriodId::from_date(d(2024, Month::April, 6), PeriodKind::Annual, uk)
+            .unwrap()
+            .to_string(),
+        "FY2025"
+    );
+    let january = Some(FiscalConfig::new(1, 15).unwrap());
+    assert_eq!(
+        PeriodId::from_date(d(2024, Month::February, 14), PeriodKind::Monthly, january)
+            .unwrap()
+            .to_string(),
+        "FY2025M01"
+    );
+    assert_eq!(
+        PeriodId::from_date(d(2024, Month::February, 15), PeriodKind::Monthly, january)
+            .unwrap()
+            .to_string(),
+        "FY2025M02"
+    );
+    let month_end = Some(FiscalConfig::new(1, 31).unwrap());
+    assert_eq!(
+        PeriodId::from_date(d(2024, Month::February, 28), PeriodKind::Monthly, month_end)
+            .unwrap()
+            .to_string(),
+        "FY2025M01"
+    );
+    assert_eq!(
+        PeriodId::from_date(d(2024, Month::February, 29), PeriodKind::Monthly, month_end)
+            .unwrap()
+            .to_string(),
+        "FY2025M02"
+    );
+    let february = Some(FiscalConfig::new(2, 29).unwrap());
+    assert_eq!(
+        PeriodId::from_date(d(2023, Month::March, 27), PeriodKind::Monthly, february)
+            .unwrap()
+            .to_string(),
+        "FY2024M01"
+    );
+    assert_eq!(
+        PeriodId::from_date(d(2023, Month::March, 28), PeriodKind::Monthly, february)
+            .unwrap()
+            .to_string(),
+        "FY2024M02"
+    );
+    assert_eq!(
+        PeriodId::from_date(d(2024, Month::January, 1), PeriodKind::Weekly, None)
+            .unwrap()
+            .to_string(),
+        "2024W01"
+    );
+    assert_eq!(
+        PeriodId::from_date(d(2021, Month::January, 1), PeriodKind::Weekly, None)
+            .unwrap()
+            .to_string(),
+        "2020W53"
+    );
+}
+
+#[test]
+fn from_date_rejects_unrepresentable_period_boundaries() {
+    for kind in [
+        PeriodKind::Daily,
+        PeriodKind::Weekly,
+        PeriodKind::Monthly,
+        PeriodKind::Quarterly,
+        PeriodKind::SemiAnnual,
+        PeriodKind::Annual,
+    ] {
+        for config in [
+            None,
+            Some(FiscalConfig::calendar_year()),
+            Some(FiscalConfig::us_federal()),
+        ] {
+            assert!(
+                PeriodId::from_date(Date::MAX, kind, config).is_err(),
+                "{kind}, {config:?}"
+            );
+        }
+    }
+    assert!(PeriodId::from_date(Date::MIN, PeriodKind::Daily, None).is_ok());
+    assert!(PeriodId::from_date(
+        Date::MIN,
+        PeriodKind::Monthly,
+        Some(FiscalConfig::new(1, 15).unwrap())
+    )
+    .is_err());
+    assert!(
+        PeriodId::from_date(Date::MAX.previous_day().unwrap(), PeriodKind::Daily, None).is_ok()
+    );
+}

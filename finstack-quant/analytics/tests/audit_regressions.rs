@@ -541,3 +541,101 @@ fn burke_uses_the_worst_episode_depths_without_date_metadata() {
         close(perf.burke_ratio(0.01, n).unwrap()[0], excess_cagr / rms);
     }
 }
+
+#[test]
+fn fiscal_period_stats_matches_shared_boundary_groups() {
+    #[derive(serde::Deserialize)]
+    struct Case {
+        name: String,
+        start_month: u8,
+        start_day: u8,
+        dates: Vec<String>,
+        returns: Vec<f64>,
+        groups: std::collections::BTreeMap<String, Vec<Vec<usize>>>,
+    }
+    let cases: Vec<Case> = serde_json::from_str(include_str!("data/fiscal_buckets.json")).unwrap();
+    for case in cases {
+        let dates = case
+            .dates
+            .iter()
+            .map(|s| finstack_quant_core::dates::parse_iso_date(s).unwrap())
+            .collect();
+        let config =
+            finstack_quant_core::dates::FiscalConfig::new(case.start_month, case.start_day)
+                .unwrap();
+        let mut perf = Performance::from_returns(
+            dates,
+            vec![case.returns.clone()],
+            vec!["FUND".into()],
+            None,
+            PeriodKind::Daily,
+        )
+        .unwrap();
+        for trim in [false, true] {
+            if trim {
+                let first = perf.get_dates()[1];
+                let last = perf.get_dates()[case.returns.len() - 2];
+                perf.reset_date_range(first, last);
+            }
+            for (label, groups) in &case.groups {
+                let expected: Vec<f64> = groups
+                    .iter()
+                    .filter_map(|group| {
+                        let indices: Vec<_> = group
+                            .iter()
+                            .filter(|i| !trim || (**i > 0 && **i + 1 < case.returns.len()))
+                            .collect();
+                        (!indices.is_empty()).then(|| {
+                            indices
+                                .iter()
+                                .map(|i| 1.0 + case.returns[**i])
+                                .product::<f64>()
+                                - 1.0
+                        })
+                    })
+                    .collect();
+                let stats = perf
+                    .period_stats(0, label.parse().unwrap(), Some(config))
+                    .unwrap();
+                let best = expected.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+                let worst = expected.iter().copied().fold(f64::INFINITY, f64::min);
+                assert!((stats.best - best).abs() < 1e-12, "{} {label}", case.name);
+                assert!((stats.worst - worst).abs() < 1e-12, "{} {label}", case.name);
+                close(
+                    stats.avg_return,
+                    expected.iter().sum::<f64>() / expected.len() as f64,
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn aggregation_propagates_unrepresentable_boundaries() {
+    let perf = Performance::from_returns(
+        vec![Date::MAX.previous_day().unwrap(), Date::MAX],
+        vec![vec![0.01, 0.02]],
+        vec!["FUND".into()],
+        None,
+        PeriodKind::Daily,
+    )
+    .unwrap();
+    for kind in [
+        PeriodKind::Daily,
+        PeriodKind::Weekly,
+        PeriodKind::Monthly,
+        PeriodKind::Quarterly,
+        PeriodKind::SemiAnnual,
+        PeriodKind::Annual,
+    ] {
+        assert!(perf.periodic_returns(kind).is_err());
+        assert!(perf.period_stats(0, kind, None).is_err());
+        assert!(perf
+            .period_stats(
+                0,
+                kind,
+                Some(finstack_quant_core::dates::FiscalConfig::us_federal())
+            )
+            .is_err());
+    }
+}

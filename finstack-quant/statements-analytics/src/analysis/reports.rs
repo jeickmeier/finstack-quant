@@ -831,7 +831,8 @@ mod tests {
             let end = Date::from_calendar_date(end.0, end.1, end.2).expect("end");
             let mut results = StatementResult::new();
             while date < end {
-                let period = PeriodId::from_date(date, PeriodKind::Daily);
+                let period =
+                    PeriodId::from_date(date, PeriodKind::Daily, None).expect("daily period");
                 results
                     .nodes
                     .entry("ebitda".into())
@@ -839,7 +840,12 @@ mod tests {
                     .insert(period, 1.0);
                 date = date.next_day().expect("next day");
             }
-            let at = PeriodId::from_date(end.previous_day().expect("last day"), PeriodKind::Daily);
+            let at = PeriodId::from_date(
+                end.previous_day().expect("last day"),
+                PeriodKind::Daily,
+                None,
+            )
+            .expect("daily period");
             assert_eq!(trailing_sum_at(&results, "ebitda", &at), Some(expected));
         }
     }

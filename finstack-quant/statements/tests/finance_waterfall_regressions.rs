@@ -45,7 +45,7 @@ fn context_for(period: PeriodId, values: &[(&str, f64)]) -> EvaluationContext {
 
 fn dated_period(start: Date, end: Date) -> Period {
     Period {
-        id: PeriodId::from_date(start, PeriodKind::Daily),
+        id: PeriodId::from_date(start, PeriodKind::Daily, None).expect("daily period"),
         start,
         end,
         is_actual: false,

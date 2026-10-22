@@ -108,6 +108,10 @@ link against this crate.
   return `NaN` on empty or invalid series. Parametric and CF horizon
   `None` is one period, not `ann()`.
 - Drawdown and compounding share one log-space Neumaier wealth engine.
+- Fiscal `period_stats` uses core `PeriodId::from_date` at all six frequencies,
+  including clamped month boundaries and partial final fiscal weeks.
+  `periodic_returns` remains calendar-only. Both propagate unrepresentable
+  period boundaries as errors.
 - FYTD is the first observation on or after the fiscal calendar start;
   holidays are not skipped with `Following`.
 - Calmar is CAGR / |max DD| over the **active window**, not Young's
@@ -157,7 +161,9 @@ dates, compact return columns and spans, unique ticker names, benchmark, frequen
 and active window. Deserialization validates all invariants and rebuilds drawdown
 caches. Unknown fields, including serialized caches, are rejected. `LookbackReturns`, `PeriodStats`, `DrawdownEpisode`, `BetaResult`,
 `GreeksResult`, `MultiFactorResult`, `RollingGreeks`, and `DatedSeries` derive
-`Serialize`/`Deserialize`. The `PeriodStats` fields that can legitimately be
+`Serialize`/`Deserialize`. Result objects reject unknown fields; regression
+observation counts, beta confidence levels, and drawdown truncation metadata
+are required. The `PeriodStats` fields that can legitimately be
 `±∞` (`payoff_ratio`, `profit_factor`, `cpc_ratio`, `kelly_criterion`) go through
 `finstack_quant_core::wire::non_finite_f64` so JSON round-trips exactly. See
 [`docs/SERDE_STABILITY.md`](../../docs/SERDE_STABILITY.md).
