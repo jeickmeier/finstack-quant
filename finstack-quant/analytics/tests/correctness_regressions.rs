@@ -204,7 +204,7 @@ fn performance_new_accepts_edge_ragged_price_columns() {
     .expect("edge-ragged price panel should build");
 
     assert_eq!(
-        perf.active_dates_for_ticker(1)
+        perf.get_active_dates_for_ticker(1)
             .expect("active ticker dates"),
         &dates[3..5]
     );
@@ -227,11 +227,11 @@ fn performance_from_returns_accepts_edge_ragged_return_columns() {
     .expect("edge-ragged return panel should build");
 
     assert_eq!(
-        perf.active_dates_for_ticker(1)
+        perf.get_active_dates_for_ticker(1)
             .expect("active ticker dates"),
         &dates[1..4]
     );
-    assert_eq!(perf.drawdown_series()[1].len(), 3);
+    assert_eq!(perf.get_drawdown_series()[1].len(), 3);
 }
 
 #[test]
@@ -345,7 +345,7 @@ fn drawdown_series_rebases_after_date_window_reset() {
 
     perf.reset_date_range(d(2024, Month::January, 4), d(2024, Month::January, 4));
 
-    let drawdowns = perf.drawdown_series();
+    let drawdowns = perf.get_drawdown_series();
     assert_eq!(drawdowns.len(), 1);
     assert_eq!(
         drawdowns[0],
@@ -380,13 +380,13 @@ fn drawdown_cache_refreshes_across_repeated_date_window_resets() {
 
     perf.reset_date_range(d(2024, Month::January, 4), d(2024, Month::January, 4));
     assert_eq!(
-        perf.drawdown_series()[0],
+        perf.get_drawdown_series()[0],
         vec![0.0],
         "positive one-period window should rebase to zero drawdown"
     );
 
     perf.reset_date_range(d(2024, Month::January, 5), d(2024, Month::January, 5));
-    let refreshed = perf.drawdown_series();
+    let refreshed = perf.get_drawdown_series();
     let refreshed_port = &refreshed[0];
     assert_eq!(refreshed_port.len(), 1);
     assert!(
@@ -428,7 +428,7 @@ fn benchmark_drawdown_views_follow_benchmark_switch_with_active_window() {
         "PORT should lag a flat benchmark by its own rebased drawdown"
     );
     assert!(
-        perf.drawdown_details(perf.benchmark_idx(), 1)
+        perf.drawdown_details(perf.get_benchmark_idx(), 1)
             .expect("benchmark drawdown details")
             .is_empty(),
         "positive benchmark window should have no drawdown episodes"
@@ -443,7 +443,7 @@ fn benchmark_drawdown_views_follow_benchmark_switch_with_active_window() {
     );
 
     let bench_episodes = perf
-        .drawdown_details(perf.benchmark_idx(), 1)
+        .drawdown_details(perf.get_benchmark_idx(), 1)
         .expect("benchmark drawdown details after switch");
     assert_eq!(bench_episodes.len(), 1);
     assert!(

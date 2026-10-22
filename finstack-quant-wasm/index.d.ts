@@ -8669,34 +8669,42 @@ declare class Performance {
    * @returns Ticker labels in column order as a JavaScript string array.
    * @throws Error - Rejects if the ticker-name vector cannot be serialized to JavaScript.
    */
-  tickerNames(): string[];
+  getTickerNames(): string[];
+  /**
+   * Resolve an exact, case-sensitive ticker label.
+   * @param ticker - Case-sensitive ticker label supplied when the panel was constructed.
+   * @param ticker - Exact, case-sensitive ticker label from getTickerNames().
+   * @returns Zero-based column index for the loaded ticker.
+   * @throws Error - Rejects a non-string value or a name absent from the panel.
+   */
+  getTickerIndex(ticker: string): number;
   /**
    * Benchmark column index.
-   * @returns Zero-based index of the benchmark ticker in `tickerNames()`.
+   * @returns Zero-based index of the benchmark ticker in `getTickerNames()`.
    */
-  benchmarkIdx(): number;
+  getBenchmarkIdx(): number;
   /**
    * Observation frequency token.
    * @returns Frequency string such as `"daily"` or `"monthly"`.
    */
-  frequency(): string;
+  getFrequency(): string;
   /**
    * Full return-aligned date grid as ISO date strings (independent of any active window).
    * @returns Full panel dates as ISO-8601 strings, ignoring any `resetDateRange` window.
    */
-  dates(): string[];
+  getDates(): string[];
   /**
    * Dates of the currently active analysis window as ISO date strings.
    * @returns ISO-8601 dates of the active analysis window, in chronological order.
    */
-  activeDates(): string[];
+  getActiveDates(): string[];
   /**
    * Dates for one ticker's active return series as ISO date strings.
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
    * @returns ISO-8601 dates for that ticker's active return series, in chronological order.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns.
    */
-  activeDatesForTicker(tickerIdx: number): string[];
+  getActiveDatesForTicker(tickerIdx: number): string[];
   /**
    * Compound annual growth rate per asset.
    *
@@ -8707,95 +8715,95 @@ declare class Performance {
    * (Python additionally accepts the `DayCount` object itself).
    * @param dayCount - Optional day-count: `"act365_25"` or a core name such as `"act_365f"`; defaults to Act/365.25.
    * @param calendarId - Optional holiday-calendar id, or `+`-joined ids for a union calendar (`"nyse+gblo"`); required for `bus_252`.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    * @throws Error - Rejects an unknown day-count (kind `validation`), an unknown calendar id (kind `not_found`, with suggestions), a missing calendar when `bus_252` is requested, or a ticker whose active range has no positive holding period.
    */
   cagr(dayCount?: string, calendarId?: string): Float64Array;
   /**
    * Mean periodic return per asset (annualized by default).
    * @param annualize - Whether to annualize by the configured frequency; defaults to true.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   meanReturn(annualize?: boolean): Float64Array;
   /**
    * Return volatility per asset (annualized by default).
    * @param annualize - Whether to annualize by the configured frequency; defaults to true.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   volatility(annualize?: boolean): Float64Array;
   /**
    * Sharpe ratio per asset for the given risk-free rate.
    * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   sharpe(riskFreeRate?: number): Float64Array;
   /**
    * Sortino ratio; mar is a per-period threshold.
    * @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   sortino(mar?: number): Float64Array;
   /**
    * Calmar ratio (CAGR / |max drawdown|) over the active window, not
    * Young's 36-month CTA definition.
    * With zero drawdown, nonzero CAGR gives signed infinity and zero CAGR gives `0`.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    * @throws Error - Rejects when any ticker's active range has no positive holding period and therefore cannot produce CAGR.
    */
   calmar(): Float64Array;
   /**
    * Maximum drawdown per asset.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   maxDrawdown(): Float64Array;
   /**
    * Mean drawdown per asset.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   meanDrawdown(): Float64Array;
   /**
    * Historical value-at-risk per asset at the given confidence level.
    * @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    * @throws Error - Rejects a `confidence` outside the open interval (0, 1).
    */
   valueAtRisk(confidence?: number): Float64Array;
   /**
    * Expected shortfall (CVaR) per asset at the given confidence level.
    * @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    * @throws Error - Rejects a `confidence` outside the open interval (0, 1).
    */
   expectedShortfall(confidence?: number): Float64Array;
   /**
    * Tracking error versus the benchmark per asset.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   trackingError(): Float64Array;
   /**
    * Information ratio versus the benchmark per asset.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   informationRatio(): Float64Array;
   /**
    * Return skewness per asset.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   skewness(): Float64Array;
   /**
    * Excess kurtosis of returns per asset.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   kurtosis(): Float64Array;
   /**
    * Geometric mean return per asset.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   geometricMean(): Float64Array;
   /**
    * Downside deviation; mar is a per-period threshold.
    * @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   downsideDeviation(mar?: number): Float64Array;
   /**
@@ -8806,23 +8814,23 @@ declare class Performance {
   maxDrawdownDuration(): number[];
   /**
    * Empyrical-style annualized geometric up-capture.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   upCapture(): Float64Array;
   /**
    * Empyrical-style annualized geometric down-capture.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   downCapture(): Float64Array;
   /**
    * Empyrical-style annualized geometric up/down capture ratio.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   captureRatio(): Float64Array;
   /**
    * Omega ratio per asset for the given threshold return.
    * @param threshold - Per-period threshold return as a decimal; defaults to 0.0.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   omegaRatio(threshold?: number): Float64Array;
   /**
@@ -8831,59 +8839,59 @@ declare class Performance {
    * `1e-10`, nonzero finite excess return gives signed infinity and zero
    * excess return gives `0`.
    * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   treynor(riskFreeRate?: number): Float64Array;
   /**
    * Gain-to-pain ratio per asset.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   gainToPain(): Float64Array;
   /**
    * Ulcer index per asset.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   ulcerIndex(): Float64Array;
   /**
    * Martin ratio (CAGR divided by Ulcer Index) per asset.
    * With zero Ulcer Index, nonzero CAGR gives signed infinity and zero CAGR gives `0`.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    * @throws Error - Rejects when any ticker's active range has no positive holding period and therefore cannot produce CAGR.
    */
   martinRatio(): Float64Array;
   /**
    * Recovery factor (total return over max drawdown) per asset.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   recoveryFactor(): Float64Array;
   /**
    * Pain index (mean drawdown magnitude) per asset.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   painIndex(): Float64Array;
   /**
    * Pain ratio ((CAGR - annual risk-free rate) / pain index) per asset.
    * Non-finite risk-free rates give `NaN`, including when the pain index is zero.
    * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    * @throws Error - Rejects when any ticker's active range has no positive holding period and therefore cannot produce CAGR.
    */
   painRatio(riskFreeRate?: number): Float64Array;
   /**
    * Tail ratio of upper to lower return quantiles per asset.
    * @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    * @throws Error - Rejects a `confidence` outside the open interval (0, 1).
    */
   tailRatio(confidence?: number): Float64Array;
   /**
    * R-squared of returns against the benchmark per asset.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   rSquared(): Float64Array;
   /**
    * Share of periods beating the benchmark per asset.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   battingAverage(): Float64Array;
   /**
@@ -8893,7 +8901,7 @@ declare class Performance {
    * mean by `h` and volatility by `√h`.
    * @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
    * @param horizonPeriods - Optional horizon in observation periods; omitted is one-period VaR.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    * @throws Error - Rejects a `confidence` outside the open interval (0, 1).
    */
   parametricVar(confidence?: number, horizonPeriods?: number): Float64Array;
@@ -8904,21 +8912,21 @@ declare class Performance {
    * Cornish–Fisher moments to that horizon.
    * @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
    * @param horizonPeriods - Optional horizon in observation periods; omitted is one-period VaR.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    * @throws Error - Rejects a `confidence` outside the open interval (0, 1).
    */
   cornishFisherVar(confidence?: number, horizonPeriods?: number): Float64Array;
   /**
    * Conditional drawdown-at-risk per asset at the given confidence level.
    * @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    * @throws Error - Rejects a `confidence` outside the open interval (0, 1).
    */
   cdar(confidence?: number): Float64Array;
   /**
    * M-squared (Modigliani) risk-adjusted return per asset.
    * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    */
   mSquared(riskFreeRate?: number): Float64Array;
   /**
@@ -8927,7 +8935,7 @@ declare class Performance {
    * The panel frequency supplies the periods-per-year scaling for both terms, including the horizon decay of skewness and excess kurtosis; the denominator is not one-period VaR.
    * @param riskFreeRate - Annualized decimal risk-free rate, decompounded to the panel frequency before constructing annualized excess return; defaults to 0.0.
    * @param confidence - Annual-horizon tail confidence as a decimal probability; defaults to 0.95.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    * @throws Error - Rejects a `confidence` outside the open interval (0, 1).
    */
   modifiedSharpe(riskFreeRate?: number, confidence?: number): Float64Array;
@@ -8936,7 +8944,7 @@ declare class Performance {
    * Non-finite risk-free rates give `NaN`, including when no drawdowns are observed.
    * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
    * @param n - Finite non-negative integer count of largest drawdowns; defaults to 5. Invalid numeric values are rejected.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    * @throws Error - Rejects when any ticker's active range has no positive holding period and therefore cannot produce CAGR.
    */
   sterlingRatio(riskFreeRate?: number, n?: number): Float64Array;
@@ -8945,7 +8953,7 @@ declare class Performance {
    * Non-finite risk-free rates give `NaN`, including when no drawdowns are observed.
    * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
    * @param n - Finite non-negative integer count of largest drawdowns; defaults to 5. Invalid numeric values are rejected.
-   * @returns Per-ticker values as a Float64Array in `tickerNames()` order.
+   * @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
    * @throws Error - Rejects when any ticker's active range has no positive holding period and therefore cannot produce CAGR.
    */
   burkeRatio(riskFreeRate?: number, n?: number): Float64Array;
@@ -8956,19 +8964,19 @@ declare class Performance {
    * it over `excessReturns` with an all-zero risk-free series or un-compounding
    * `cumulativeReturns`. Series are span-aware and therefore ragged across
    * assets on edge-ragged panels.
-   * @returns One Float64Array of simple decimal returns per ticker in `tickerNames()` order.
+   * @returns One Float64Array of simple decimal returns per ticker in `getTickerNames()` order.
    */
-  returns(): Float64Array[];
+  getReturns(): Float64Array[];
   /**
    * Per-period simple returns for one asset, as decimal fractions (0.01 = +1%).
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
    * @returns Simple decimal returns for the selected ticker, in date order.
    * @throws Error - Rejects when `ticker_idx` is outside the loaded ticker columns.
    */
-  returnsForTicker(tickerIdx: number): Float64Array;
+  getReturnsForTicker(tickerIdx: number): Float64Array;
   /**
    * Cumulative return series per asset.
-   * @returns One Float64Array per ticker in `tickerNames()` order.
+   * @returns One Float64Array per ticker in `getTickerNames()` order.
    */
   cumulativeReturns(): Float64Array[];
   /**
@@ -8984,7 +8992,7 @@ declare class Performance {
   /**
    * Calendar-bucketed compounded returns for every ticker.
    *
-   * The outer array is ticker-major in `tickerNames()` order. Each inner
+   * The outer array is ticker-major in `getTickerNames()` order. Each inner
    * array contains chronological Rust `PeriodicReturn` points. Chaining one ticker's
    * decimal `value` fields reconciles with its final `cumulativeReturns()`
    * value.
@@ -9008,9 +9016,9 @@ declare class Performance {
   periodicReturns(frequency?: string): PeriodicReturn[][];
   /**
    * Drawdown series per asset.
-   * @returns One Float64Array per ticker in `tickerNames()` order.
+   * @returns One Float64Array per ticker in `getTickerNames()` order.
    */
-  drawdownSeries(): Float64Array[];
+  getDrawdownSeries(): Float64Array[];
   /**
    * Return the correlation matrix across assets and whether it was repaired.
    *
@@ -9018,18 +9026,18 @@ declare class Performance {
    * two overlapping points; otherwise pairwise intersecting spans. A raw
    * estimate that is not a valid correlation matrix is Higham-repaired to
    * the nearest valid correlation matrix.
-   * @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `tickerNames()` order, and `true` when Higham repair was applied.
+   * @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, and `true` when Higham repair was applied.
    * @throws Error - Rejects a degenerate pair or a matrix that cannot be repaired to a valid correlation matrix.
    */
   correlationMatrix(): { matrix: Float64Array[]; repaired: boolean };
   /**
    * Cumulative outperformance versus the benchmark per asset.
-   * @returns One Float64Array per ticker in `tickerNames()` order.
+   * @returns One Float64Array per ticker in `getTickerNames()` order.
    */
   cumulativeReturnsOutperformance(): Float64Array[];
   /**
    * Difference between asset and benchmark drawdown series.
-   * @returns One Float64Array per ticker in `tickerNames()` order.
+   * @returns One Float64Array per ticker in `getTickerNames()` order.
    */
   drawdownDifference(): Float64Array[];
   /**
@@ -9040,20 +9048,20 @@ declare class Performance {
    * pass `1` when `rf` is already periodic.
    * @param rf - Risk-free return series as decimal values aligned with active panel dates.
    * @param nperiods - Optional periods per year used to decompound annual `rf`; omit to use the engine frequency, or pass `1` for already-periodic `rf`.
-   * @returns One Float64Array per ticker in `tickerNames()` order.
+   * @returns One Float64Array per ticker in `getTickerNames()` order.
    * @throws Error - Rejects when `rf` is neither a numeric JavaScript array nor a `Float64Array`, or when its length differs from the active panel.
    */
   excessReturns(rf: NumericArray, nperiods?: number): Float64Array[];
   /**
    * OLS beta versus the benchmark per asset, with standard error and 95% CI.
-   * @returns Per-ticker `{ beta, std_err, ci_lower, ci_upper, n_obs, confidence_level }` objects in `tickerNames()` order; `n_obs` is the paired-observation count and `confidence_level` the decimal level (0.95) of the bounds.
+   * @returns Per-ticker `{ beta, std_err, ci_lower, ci_upper, n_obs, confidence_level }` objects in `getTickerNames()` order; `n_obs` is the paired-observation count and `confidence_level` the decimal level (0.95) of the bounds.
    * @throws Error - Rejects if the beta results cannot be serialized to JavaScript.
    */
   beta(): BetaResult[];
   /**
    * Benchmark regression annualized Jensen alpha/beta statistics per asset.
    * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
-   * @returns Per-ticker `{ alpha, beta, r_squared, adjusted_r_squared, n_obs }` objects in `tickerNames()` order; `n_obs` is the paired-observation count.
+   * @returns Per-ticker `{ alpha, beta, r_squared, adjusted_r_squared, n_obs }` objects in `getTickerNames()` order; `n_obs` is the paired-observation count.
    * @throws Error - Rejects if the regression results cannot be serialized to JavaScript.
    */
   greeks(riskFreeRate?: number): GreeksResult[];

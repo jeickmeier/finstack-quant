@@ -24,7 +24,7 @@ def panel(frequency: str = "daily") -> Performance:
 @pytest.mark.parametrize("label", CANONICAL)
 def test_canonical_frequencies_are_accepted(label: str) -> None:
     assert str(PeriodKind.from_name(label)) == label
-    assert panel(label).frequency == label
+    assert panel(label).get_frequency() == label
     assert panel().periodic_returns(label)
 
 
@@ -52,3 +52,34 @@ def test_cagr_aliases_are_rejected(label: str) -> None:
 
 def test_canonical_cagr_is_accepted() -> None:
     assert len(panel().cagr(day_count="act365_25")) == 1
+
+
+def test_performance_accessors_are_canonical_methods() -> None:
+    perf = panel()
+    names = (
+        "dates",
+        "active_dates",
+        "active_dates_for_ticker",
+        "ticker_names",
+        "ticker_index",
+        "benchmark_idx",
+        "frequency",
+        "returns",
+        "returns_for_ticker",
+        "drawdown_series",
+    )
+    for name in names:
+        assert not hasattr(perf, name)
+        assert callable(getattr(perf, f"get_{name}"))
+    assert perf.get_ticker_names() == ["FUND"]
+    assert perf.get_ticker_index("FUND") == 0
+    assert perf.get_benchmark_idx() == 0
+    assert perf.get_frequency() == "daily"
+    assert perf.get_dates() == perf.get_active_dates()
+    assert perf.get_active_dates_for_ticker("FUND") == perf.get_dates()
+    assert perf.get_returns_for_ticker("FUND") == perf.get_returns()[0]
+    assert len(perf.get_drawdown_series()[0]) == len(perf.get_dates())
+    with pytest.raises(KeyError):
+        perf.get_ticker_index("fund")
+    with pytest.raises(KeyError):
+        perf.get_ticker_index("MISSING")

@@ -87,9 +87,9 @@ fn from_returns_exposes_active_dates() {
     let perf = build_perf();
     // `dates()` is the full constructed grid; `activeDates()` matches it
     // until a window is set.
-    let dates = perf.dates();
+    let dates = perf.get_dates();
     assert_eq!(dates.len(), fixture().dates.len());
-    let active = perf.active_dates();
+    let active = perf.get_active_dates();
     assert_eq!(active, dates);
 }
 
@@ -116,7 +116,8 @@ fn from_returns_exposes_ticker_specific_active_dates() {
     .unwrap();
 
     assert_eq!(
-        perf.active_dates_for_ticker(JsValue::from(1.0)).unwrap(),
+        perf.get_active_dates_for_ticker(JsValue::from(1.0))
+            .unwrap(),
         vec!["2025-01-02".to_string(), "2025-01-03".to_string()]
     );
 }
@@ -124,10 +125,11 @@ fn from_returns_exposes_ticker_specific_active_dates() {
 #[wasm_bindgen_test]
 fn ticker_names_round_trip() {
     let perf = build_perf();
-    let names: Vec<String> = serde_wasm_bindgen::from_value(perf.ticker_names().unwrap()).unwrap();
+    let names: Vec<String> =
+        serde_wasm_bindgen::from_value(perf.get_ticker_names().unwrap()).unwrap();
     assert_eq!(names, vec!["TARGET", "BENCH"]);
-    assert_eq!(perf.benchmark_idx(), 1);
-    assert_eq!(perf.frequency(), "daily");
+    assert_eq!(perf.get_benchmark_idx(), 1);
+    assert_eq!(perf.get_frequency(), "daily");
 }
 
 // ---- Scalar metrics ----
@@ -196,7 +198,7 @@ fn cumulative_and_drawdown_series_are_per_ticker_panels() {
     assert_eq!(cum.len(), 2);
     assert_eq!(cum[0].len(), fixture().dates.len());
 
-    let dd = typed_matrix(perf.drawdown_series());
+    let dd = typed_matrix(perf.get_drawdown_series());
     assert_eq!(dd.len(), 2);
     assert!(dd[0].iter().all(|v| v <= &0.0));
 }
@@ -462,19 +464,19 @@ fn period_stats_emit_win_rate() {
 #[wasm_bindgen_test]
 fn reset_date_range_narrows_active_dates() {
     let mut perf = build_perf();
-    let full_len = perf.dates().len();
+    let full_len = perf.get_dates().len();
     perf.reset_date_range(JsValue::from("2025-01-05"), JsValue::from("2025-01-10"))
         .unwrap();
-    let active = perf.active_dates();
+    let active = perf.get_active_dates();
     assert!(active.first().map(String::as_str) == Some("2025-01-05"));
     assert!(active.last().map(String::as_str) == Some("2025-01-10"));
     // `dates()` keeps Rust semantics: the full constructed grid.
-    assert_eq!(perf.dates().len(), full_len);
+    assert_eq!(perf.get_dates().len(), full_len);
 }
 
 #[wasm_bindgen_test]
 fn reset_bench_ticker_updates_index() {
     let mut perf = build_perf();
     perf.reset_bench_ticker(JsValue::from("TARGET")).unwrap();
-    assert_eq!(perf.benchmark_idx(), 0);
+    assert_eq!(perf.get_benchmark_idx(), 0);
 }

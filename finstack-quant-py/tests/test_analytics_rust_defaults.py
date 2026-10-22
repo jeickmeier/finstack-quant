@@ -64,7 +64,7 @@ def test_omitted_arguments_equal_the_rust_defaults(perf: Performance) -> None:
         perf.multi_factor_greeks(0, [BENCH]).to_json() == perf.multi_factor_greeks(0, [BENCH], "excess", 0.0).to_json()
     )
     assert perf.cagr().equals(perf.cagr("act365_25"))
-    assert Performance.from_arrays(_dates(3), [[100.0, 101.0, 102.0]], ["A"]).frequency == "daily"
+    assert Performance.from_arrays(_dates(3), [[100.0, 101.0, 102.0]], ["A"]).get_frequency() == "daily"
 
 
 def test_partial_fiscal_start_follows_fiscal_config_from_parts(perf: Performance) -> None:

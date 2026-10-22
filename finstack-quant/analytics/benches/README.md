@@ -22,7 +22,7 @@ intentionally public `correlation::nearest_correlation` repair helper and
 |--------------|---------------|
 | `bench_tail_risk` | `Performance::value_at_risk 2.5k`, `Performance::expected_shortfall 2.5k`, `Performance::value_at_risk 100k`, `Performance::expected_shortfall 100k` |
 | `bench_return_based` | `Performance::volatility 2.5k`, `Performance::sharpe 2.5k` |
-| `bench_drawdown` | `Performance::drawdown_series 10k` |
+| `bench_drawdown` | `Performance::get_drawdown_series 10k` |
 | `bench_performance` | `Performance::new 750x2 daily` (construction from price levels), `Performance::sharpe 750x2`, `Performance::value_at_risk 750x2` |
 | `bench_rolling_greeks` | `Performance::rolling_greeks 2.5k window=63` |
 | `bench_multi_factor_greeks` | `Performance::multi_factor_greeks 2.5k k=3` — OLS against three factor columns |

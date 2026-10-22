@@ -46,7 +46,7 @@ let perf = Performance::new(
 )
 .unwrap();
 
-assert_eq!(perf.ticker_names(), &["SPY"]);
+assert_eq!(perf.get_ticker_names(), &["SPY"]);
 let sharpe = perf.sharpe(0.0); // Vec<f64>, one entry per ticker
 assert_eq!(sharpe.len(), 1);
 ```
@@ -57,11 +57,11 @@ Method families on `Performance`:
 |--------|--------|----------|
 | Scalars | [`performance/scalar.rs`](src/performance/scalar.rs) | `cagr`, `mean_return`, `volatility`, `sharpe`, `sortino`, `calmar`, `omega_ratio`, `gain_to_pain`, `modified_sharpe`, `geometric_mean`, `downside_deviation` |
 | Tail risk | [`performance/scalar.rs`](src/performance/scalar.rs) | `value_at_risk`, `expected_shortfall`, `parametric_var`, `cornish_fisher_var`, `tail_ratio`, `skewness`, `kurtosis`, `cdar` |
-| Drawdown | [`performance/scalar.rs`](src/performance/scalar.rs), [`performance/aggregation.rs`](src/performance/aggregation.rs) | `max_drawdown`, `mean_drawdown`, `max_drawdown_duration`, `drawdown_series`, `drawdown_details`, `ulcer_index`, `martin_ratio`, `sterling_ratio`, `burke_ratio`, `pain_index`, `pain_ratio`, `recovery_factor` |
+| Drawdown | [`performance/scalar.rs`](src/performance/scalar.rs), [`performance/aggregation.rs`](src/performance/aggregation.rs) | `max_drawdown`, `mean_drawdown`, `max_drawdown_duration`, `get_drawdown_series`, `drawdown_details`, `ulcer_index`, `martin_ratio`, `sterling_ratio`, `burke_ratio`, `pain_index`, `pain_ratio`, `recovery_factor` |
 | Benchmark-relative | [`performance/benchmark.rs`](src/performance/benchmark.rs) | `beta`, `greeks`, `rolling_greeks`, `multi_factor_greeks`, `tracking_error`, `information_ratio`, `r_squared`, `treynor`, `m_squared`, `up_capture`, `down_capture`, `capture_ratio`, `batting_average` |
 | Rolling series | [`performance/rolling.rs`](src/performance/rolling.rs) | `rolling_returns`, `rolling_volatility`, `rolling_sharpe`, `rolling_sortino` |
-| Panels and periods | [`performance/aggregation.rs`](src/performance/aggregation.rs) | `returns`, `cumulative_returns`, `excess_returns`, `correlation_matrix`, `periodic_returns`, `period_stats`, `lookback_returns`, `cumulative_returns_outperformance`, `drawdown_difference` |
-| Window and benchmark reset | [`performance/mod.rs`](src/performance/mod.rs) | `reset_date_range`, `reset_bench_ticker`, `active_dates`, `active_dates_for_ticker`, `returns_for_ticker` |
+| Panels and periods | [`performance/aggregation.rs`](src/performance/aggregation.rs) | `get_returns`, `cumulative_returns`, `excess_returns`, `correlation_matrix`, `periodic_returns`, `period_stats`, `lookback_returns`, `cumulative_returns_outperformance`, `drawdown_difference` |
+| Window and benchmark reset | [`performance/mod.rs`](src/performance/mod.rs) | `reset_date_range`, `reset_bench_ticker`, `get_active_dates`, `get_active_dates_for_ticker`, `get_returns_for_ticker` |
 
 The per-domain modules `returns`, `risk_metrics`, `drawdown`, `benchmark`,
 `aggregation`, and `lookback` are `pub(crate)`; only the result and config

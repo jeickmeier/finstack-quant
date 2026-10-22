@@ -76,7 +76,7 @@ def _section_summary(perf: Any, t: int, rf: float) -> Section:
 
 
 def _section_relative(perf: Any, t: int, theme: Theme) -> Section:
-    dates = perf.active_dates()
+    dates = perf.get_active_dates()
     op = perf.cumulative_returns_outperformance()[t]
     dd = perf.drawdown_difference()[t]
     n_op = min(len(dates), len(op))
@@ -218,8 +218,8 @@ def benchmark_tearsheet(
     """
     wanted = _resolve_sections(sections, ALL_SECTIONS)
 
-    names = list(perf.ticker_names)
-    bench_idx = perf.benchmark_idx
+    names = list(perf.get_ticker_names())
+    bench_idx = perf.get_benchmark_idx()
     t = ticker if ticker is not None else next((i for i in range(len(names)) if i != bench_idx), 0)
 
     secs: list[Section] = []

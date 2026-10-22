@@ -11,7 +11,7 @@ Examples:
 >>> from datetime import date
 >>> from finstack_quant.analytics import Performance
 >>> perf = Performance.from_returns_arrays([date(2024, 1, 1), date(2024, 1, 2)], [[0.01, 0.02]], ["FUND"])
->>> perf.ticker_names
+>>> perf.get_ticker_names()
 ['FUND']
 """
 

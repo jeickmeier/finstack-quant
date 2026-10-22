@@ -352,7 +352,7 @@ fn build_synthetic_price_dates(
 
 impl Performance {
     fn global_active_span(&self) -> TickerSpan {
-        TickerSpan::new(self.start_idx, self.end_idx.min(self.dates().len()))
+        TickerSpan::new(self.start_idx, self.end_idx.min(self.get_dates().len()))
     }
 
     fn active_span_for_ticker(&self, ticker_idx: usize) -> TickerSpan {
@@ -400,7 +400,7 @@ impl Performance {
     }
 
     fn dates_for_span(&self, span: TickerSpan) -> &[Date] {
-        let dates = self.dates();
+        let dates = self.get_dates();
         let end = span.end.min(dates.len());
         &dates[span.start.min(end)..end]
     }
@@ -492,7 +492,7 @@ impl Performance {
     ///     None,
     ///     PeriodKind::Daily,
     /// ).unwrap();
-    /// assert_eq!(perf.ticker_names(), &["SPY"]);
+    /// assert_eq!(perf.get_ticker_names(), &["SPY"]);
     /// ```
     #[tracing::instrument(level = "debug", skip(dates, prices, ticker_names, benchmark_ticker), fields(n_tickers = prices.len(), n_dates = dates.len(), frequency = ?frequency))]
     pub fn new(
@@ -693,7 +693,7 @@ impl Performance {
     /// over. As a consequence:
     ///
     /// - [`Self::max_drawdown`], [`Self::mean_drawdown`],
-    ///   [`Self::drawdown_series`], [`Self::drawdown_details`],
+    ///   [`Self::get_drawdown_series`], [`Self::drawdown_details`],
     ///   [`Self::ulcer_index`], [`Self::pain_index`], [`Self::cdar`],
     ///   [`Self::recovery_factor`], [`Self::sterling_ratio`],
     ///   [`Self::burke_ratio`], [`Self::martin_ratio`],
@@ -708,9 +708,9 @@ impl Performance {
     /// * `start` - First date to include (inclusive).
     /// * `end`   - Last date to include (inclusive).
     pub fn reset_date_range(&mut self, start: Date, end: Date) {
-        self.start_idx = self.dates().partition_point(|&d| d < start);
+        self.start_idx = self.get_dates().partition_point(|&d| d < start);
         self.end_idx = self
-            .dates()
+            .get_dates()
             .partition_point(|&d| d <= end)
             .max(self.start_idx);
         self.refresh_active_drawdown_cache();
@@ -744,7 +744,7 @@ impl Performance {
     }
 
     fn using_full_range(&self) -> bool {
-        self.start_idx == 0 && self.end_idx >= self.dates().len()
+        self.start_idx == 0 && self.end_idx >= self.get_dates().len()
     }
 
     fn refresh_active_drawdown_cache(&mut self) {
@@ -774,7 +774,7 @@ impl Performance {
     ///
     /// Returns [`finstack_quant_core::InputError::NotFound`] when `ticker` is not
     /// among the loaded ticker names.
-    pub fn ticker_index(&self, ticker: &str) -> finstack_quant_core::Result<usize> {
+    pub fn get_ticker_index(&self, ticker: &str) -> finstack_quant_core::Result<usize> {
         self.ticker_names
             .iter()
             .position(|name| name == ticker)
@@ -857,8 +857,8 @@ impl Performance {
     ///
     /// The series is span-aware: on edge-ragged panels it excludes the
     /// leading/trailing missing observations for this ticker, so its length
-    /// matches [`Self::active_dates_for_ticker`] rather than
-    /// [`Self::active_dates`].
+    /// matches [`Self::get_active_dates_for_ticker`] rather than
+    /// [`Self::get_active_dates`].
     ///
     /// # Errors
     ///
@@ -868,25 +868,28 @@ impl Performance {
     /// # Arguments
     ///
     /// * `ticker_idx` - Zero-based ticker column index, in
-    ///   [`Self::ticker_names`] order.
+    ///   [`Self::get_ticker_names`] order.
     ///
     /// # Returns
     ///
     /// The ticker's simple (non-compounded) returns as decimal fractions,
     /// e.g. `0.01` for `+1%`, in date order.
-    pub fn returns_for_ticker(&self, ticker_idx: usize) -> finstack_quant_core::Result<Vec<f64>> {
+    pub fn get_returns_for_ticker(
+        &self,
+        ticker_idx: usize,
+    ) -> finstack_quant_core::Result<Vec<f64>> {
         self.ensure_ticker_idx(ticker_idx)?;
         Ok(self.active_returns(ticker_idx).to_vec())
     }
 
     /// Date slice corresponding to the currently active analysis window.
-    pub fn active_dates(&self) -> &[Date] {
+    pub fn get_active_dates(&self) -> &[Date] {
         self.dates_for_span(self.global_active_span())
     }
 
     /// Date slice corresponding to a ticker's currently active return series.
     ///
-    /// On edge-ragged panels this may be shorter than [`Self::active_dates`]
+    /// On edge-ragged panels this may be shorter than [`Self::get_active_dates`]
     /// because leading/trailing missing observations are excluded per ticker.
     ///
     /// # Errors
@@ -897,7 +900,7 @@ impl Performance {
     /// # Arguments
     ///
     /// * `ticker_idx` - Zero-based column index of the ticker in the loaded performance panel.
-    pub fn active_dates_for_ticker(
+    pub fn get_active_dates_for_ticker(
         &self,
         ticker_idx: usize,
     ) -> finstack_quant_core::Result<&[Date]> {
@@ -957,8 +960,8 @@ impl Performance {
     ///
     /// Returns the date grid that pairs with each row of internal returns,
     /// covering the full constructed range. To get just the dates inside
-    /// the currently selected analysis window, use [`Self::active_dates`].
-    pub fn dates(&self) -> &[Date] {
+    /// the currently selected analysis window, use [`Self::get_active_dates`].
+    pub fn get_dates(&self) -> &[Date] {
         &self.price_dates[1..]
     }
     /// Ticker names in column order.
@@ -966,7 +969,7 @@ impl Performance {
     /// # Returns
     ///
     /// The names supplied at construction time.
-    pub fn ticker_names(&self) -> &[String] {
+    pub fn get_ticker_names(&self) -> &[String] {
         &self.ticker_names
     }
     /// Index of the benchmark ticker.
@@ -974,7 +977,7 @@ impl Performance {
     /// # Returns
     ///
     /// The zero-based index of the active benchmark ticker.
-    pub fn benchmark_idx(&self) -> usize {
+    pub fn get_benchmark_idx(&self) -> usize {
         self.benchmark_idx
     }
     /// Observation frequency.
@@ -982,7 +985,7 @@ impl Performance {
     /// # Returns
     ///
     /// The frequency used to annualize facade-level metrics.
-    pub fn frequency(&self) -> PeriodKind {
+    pub fn get_frequency(&self) -> PeriodKind {
         self.frequency
     }
 }

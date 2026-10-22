@@ -56,8 +56,8 @@ fn bench_return_based(c: &mut Criterion) {
 
 fn bench_drawdown(c: &mut Criterion) {
     let perf = perf_from_returns(10_000, 11);
-    c.bench_function("Performance::drawdown_series 10k", |b| {
-        b.iter(|| black_box(perf.drawdown_series()));
+    c.bench_function("Performance::get_drawdown_series 10k", |b| {
+        b.iter(|| black_box(perf.get_drawdown_series()));
     });
 }
 

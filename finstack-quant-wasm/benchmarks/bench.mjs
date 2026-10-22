@@ -607,7 +607,7 @@ async function main() {
   });
 
   bench('analytics', 'drawdownSeries', 6000, () => {
-    returnPerf.drawdownSeries();
+    returnPerf.getDrawdownSeries();
   });
 
   bench('analytics', 'maxDrawdown', 8000, () => {
@@ -811,7 +811,7 @@ async function main() {
   });
 
   bench('analytics', 'drawdownSeries', 4000, () => {
-    returnPerf.drawdownSeries();
+    returnPerf.getDrawdownSeries();
   });
 
   bench('analytics', 'rollingSharpe', 2000, () => {

@@ -19,7 +19,7 @@ Examples
 >>> from datetime import date
 >>> from finstack_quant.analytics import Performance
 >>> perf = Performance.from_returns_arrays([date(2024, 1, 1), date(2024, 1, 2)], [[0.01, 0.02]], ["FUND"])
->>> perf.ticker_names
+>>> perf.get_ticker_names()
 ['FUND']
 """
 
@@ -1704,7 +1704,7 @@ class Performance:
     ...     {"FUND": [100.0, 101.0, 103.0]},
     ...     index=pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-03"]),
     ... )
-    >>> Performance(prices).ticker_names
+    >>> Performance(prices).get_ticker_names()
     ['FUND']
     """
 
@@ -1792,7 +1792,7 @@ class Performance:
         ...     [[100.0, 101.0, 103.0]],
         ...     ["FUND"],
         ... )
-        >>> perf.ticker_names
+        >>> perf.get_ticker_names()
         ['FUND']
         """
 
@@ -1840,7 +1840,7 @@ class Performance:
         ...     {"FUND": [0.01, 0.02]},
         ...     index=pd.to_datetime(["2024-01-01", "2024-01-02"]),
         ... )
-        >>> Performance.from_returns(returns).ticker_names
+        >>> Performance.from_returns(returns).get_ticker_names()
         ['FUND']
         """
 
@@ -1886,7 +1886,7 @@ class Performance:
         >>> from datetime import date
         >>> from finstack_quant.analytics import Performance
         >>> perf = Performance.from_returns_arrays([date(2024, 1, 1), date(2024, 1, 2)], [[0.01, 0.02]], ["FUND"])
-        >>> perf.ticker_names
+        >>> perf.get_ticker_names()
         ['FUND']
         """
 
@@ -1928,8 +1928,7 @@ class Performance:
 
     # -- Getters --
 
-    @property
-    def ticker_names(self) -> list[str]:
+    def get_ticker_names(self) -> list[str]:
         """
         Ticker names in column order.
 
@@ -1943,8 +1942,27 @@ class Performance:
         This accessor does not raise; it returns the stored value.
         """
 
-    @property
-    def benchmark_idx(self) -> int:
+    def get_ticker_index(self, ticker: str) -> int:
+        """
+        Resolve an exact ticker name to its zero-based column index.
+
+        Parameters
+        ----------
+        ticker : str
+            Case-sensitive column label supplied when constructing the panel.
+
+        Returns
+        -------
+        int
+            Zero-based index in ``get_ticker_names()`` order.
+
+        Raises
+        ------
+        KeyError
+            If ``ticker`` is not a loaded column label.
+        """
+
+    def get_benchmark_idx(self) -> int:
         """
         Zero-based column index of the benchmark series.
 
@@ -1958,8 +1976,7 @@ class Performance:
         This accessor does not raise; it returns the stored value.
         """
 
-    @property
-    def frequency(self) -> str:
+    def get_frequency(self) -> str:
         """
         Observation frequency as the canonical lowercase token.
 
@@ -1973,7 +1990,7 @@ class Performance:
         This accessor does not raise; it returns the stored value.
         """
 
-    def dates(self) -> list[datetime.date]:
+    def get_dates(self) -> list[datetime.date]:
         """
         Full return-aligned date grid (independent of any active window).
 
@@ -1987,7 +2004,7 @@ class Performance:
         This accessor does not raise; it returns the stored or derived value.
         """
 
-    def active_dates(self) -> list[datetime.date]:
+    def get_active_dates(self) -> list[datetime.date]:
         """
         Observation dates of the currently active analysis window.
 
@@ -2001,7 +2018,7 @@ class Performance:
         This accessor does not raise; it returns the stored or derived value.
         """
 
-    def active_dates_for_ticker(self, ticker_idx: int | str) -> list[datetime.date]:
+    def get_active_dates_for_ticker(self, ticker_idx: int | str) -> list[datetime.date]:
         """
         Observation dates for one ticker's active return series.
 
@@ -2009,7 +2026,7 @@ class Performance:
         ----------
         ticker_idx : int or str
             Zero-based ticker column index, or a ticker name resolved through
-            Rust ``Performance::ticker_index``.
+            Rust ``Performance::get_ticker_index``.
 
         Returns
         -------
@@ -2866,7 +2883,7 @@ class Performance:
 
     # -- Vector-per-ticker methods --
 
-    def returns(self) -> list[list[float]]:
+    def get_returns(self) -> list[list[float]]:
         """
         Per-period simple returns for each ticker.
 
@@ -2886,7 +2903,7 @@ class Performance:
         This method does not raise; it returns the stored or derived value.
         """
 
-    def returns_for_ticker(self, ticker_idx: int | str) -> list[float]:
+    def get_returns_for_ticker(self, ticker_idx: int | str) -> list[float]:
         """
         Per-period simple returns for a single ticker.
 
@@ -2894,7 +2911,7 @@ class Performance:
         ----------
         ticker_idx : int or str
             Zero-based ticker column index, or a ticker name resolved through
-            Rust ``Performance::ticker_index``.
+            Rust ``Performance::get_ticker_index``.
 
         Returns
         -------
@@ -2924,7 +2941,7 @@ class Performance:
         This method does not raise; it returns the stored or derived value.
         """
 
-    def drawdown_series(self) -> list[list[float]]:
+    def get_drawdown_series(self) -> list[list[float]]:
         """
         Drawdown series for each ticker.
 
@@ -3085,7 +3102,7 @@ class Performance:
         ----------
         ticker_idx : int or str
             Zero-based ticker column index, or a ticker name resolved through
-            Rust ``Performance::ticker_index``.
+            Rust ``Performance::get_ticker_index``.
         window : int, default 63
             Rolling window size in observations (must be ``>= 1``; longer
             than the active series yields an empty result).
@@ -3113,7 +3130,7 @@ class Performance:
         ----------
         ticker_idx : int or str
             Zero-based ticker column index, or a ticker name resolved through
-            Rust ``Performance::ticker_index``.
+            Rust ``Performance::get_ticker_index``.
         window : int, default 63
             Rolling window size in observations (must be ``>= 1``; longer
             than the active series yields an empty result).
@@ -3139,7 +3156,7 @@ class Performance:
         ----------
         ticker_idx : int or str
             Zero-based ticker column index, or a ticker name resolved through
-            Rust ``Performance::ticker_index``.
+            Rust ``Performance::get_ticker_index``.
         window : int, default 63
             Rolling window size in observations (must be ``>= 1``; longer
             than the active series yields an empty result).
@@ -3172,7 +3189,7 @@ class Performance:
         ----------
         ticker_idx : int or str
             Zero-based ticker column index, or a ticker name resolved through
-            Rust ``Performance::ticker_index``.
+            Rust ``Performance::get_ticker_index``.
         window : int, default 63
             Rolling window size in observations (must be ``>= 1``; longer
             than the active series yields an empty result).
@@ -3200,7 +3217,7 @@ class Performance:
         ----------
         ticker_idx : int or str
             Zero-based ticker column index, or a ticker name resolved through
-            Rust ``Performance::ticker_index``.
+            Rust ``Performance::get_ticker_index``.
         window : int
             Rolling window size in observations (must be ``>= 1``; longer
             than the active series yields an empty result).
@@ -3226,7 +3243,7 @@ class Performance:
         ----------
         ticker_idx : int or str
             Zero-based ticker column index, or a ticker name resolved through
-            Rust ``Performance::ticker_index``.
+            Rust ``Performance::get_ticker_index``.
         n : int, default 5
             Number of largest drawdown episodes to return.
 
@@ -3264,7 +3281,7 @@ class Performance:
         ----------
         ticker_idx : int or str
             Zero-based ticker column index, or a ticker name resolved through
-            Rust ``Performance::ticker_index``.
+            Rust ``Performance::get_ticker_index``.
         factor_returns : list[list[float]]
             Already-excess factor return matrix; ``factor_returns[i]`` is the
             return series for factor ``i``.
@@ -3348,7 +3365,7 @@ class Performance:
         ----------
         ticker_idx : int or str
             Zero-based ticker column index, or a ticker name resolved through
-            Rust ``Performance::ticker_index``.
+            Rust ``Performance::get_ticker_index``.
         aggregation_frequency : str, optional
             Aggregation frequency (``"daily"``, ``"weekly"``, ``"monthly"``,
             ``"quarterly"``, ``"semi_annual"``, ``"annual"``); ``None`` uses the Rust default
@@ -3505,7 +3522,7 @@ class Performance:
         >>> from datetime import date
         >>> from finstack_quant.analytics import Performance
         >>> perf = Performance.from_returns_arrays([date(2024, 1, 1), date(2024, 1, 2)], [[0.01, 0.02]], ["FUND"])
-        >>> Performance.from_json(perf.to_json()).ticker_names
+        >>> Performance.from_json(perf.to_json()).get_ticker_names()
         ['FUND']
         """
         ...
