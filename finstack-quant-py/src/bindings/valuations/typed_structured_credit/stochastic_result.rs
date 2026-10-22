@@ -28,7 +28,7 @@ use finstack_quant_valuations::results::structured_credit::StochasticPricingResu
 /// >>> from finstack_quant.valuations.instruments import (
 /// ...     AssetPool,
 /// ...     RepLine,
-/// ...     StructuredCredit,
+/// ...     StandardDealParams, StructuredCredit,
 /// ...     Tranche,
 /// ...     TrancheStructure,
 /// ... )
@@ -56,7 +56,7 @@ use finstack_quant_valuations::results::structured_credit::StochasticPricingResu
 /// ...     .maturity(maturity)
 /// ...     .build()
 /// ... )
-/// >>> deal = StructuredCredit.new_abs("ABS-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC")
+/// >>> deal = StructuredCredit.new_standard("abs", StandardDealParams("ABS-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC"))
 /// >>> envelope = json.loads(deal.to_json())
 /// >>> envelope["instrument"]["spec"]["calendar_id"] = "nyse"
 /// >>> deal = StructuredCredit.from_json(json.dumps(envelope))

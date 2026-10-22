@@ -94,9 +94,20 @@ fn clo(tests: Vec<CoverageTestSpec>) -> StructuredCredit {
     .expect("structure");
     let mut deal = StructuredCredit {
         coverage_triggers: tests,
-        ..StructuredCredit::new_clo("CLO-TRIGGERS", pool, tranches, CLOSE, MATURITY, "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse")
+        ..StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "CLO-TRIGGERS".into(),
+                pool,
+                tranches,
+                closing_date: CLOSE,
+                maturity: MATURITY,
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse")
     };
     deal.fees = None;
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);

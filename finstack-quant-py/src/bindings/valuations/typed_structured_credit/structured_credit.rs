@@ -16,8 +16,8 @@ use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_equity_metrics, run_simulation_with_diagnostics, CreditModelConfig, DealFees,
-    DealType, LossAllocationPolicy, LossRecognition, MarketConditions, Metadata,
-    StandardDealParams, StructuredCredit, TrancheDraw, TrancheReadvance, WaterfallRules,
+    DealType, LossAllocationPolicy, LossRecognition, MarketConditions, Metadata, StructuredCredit,
+    TrancheDraw, TrancheReadvance, WaterfallRules,
 };
 
 use super::super::convert::{enum_from_str, instrument_expiry};
@@ -55,195 +55,15 @@ instrument_pricing_methods!(PyStructuredCredit, "StructuredCredit");
 
 #[pymethods]
 impl PyStructuredCredit {
-    /// Create a new ABS deal with registry-calibrated defaults.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique instrument identifier.
-    /// pool : AssetPool
-    ///     Asset pool definition.
-    /// tranches : TrancheStructure
-    ///     Tranche capital structure.
-    /// closing_date : datetime.date
-    ///     Deal closing date (issuance).
-    /// maturity : datetime.date
-    ///     Legal final maturity date.
-    /// discount_curve_id : str
-    ///     Discount curve identifier for valuation.
-    /// calendar_id : str, optional
-    ///     Holiday calendar for the payment schedule (e.g. ``"nyse"``);
-    ///     required before pricing, so pass it here or set it on the JSON.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCredit
-    ///     The validated ABS deal.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the deal fails pricing validation or its first registry payment period exceeds the supported calendar range.
-    ///
-    /// Examples
-    /// --------
-    /// >>> import datetime
-    /// >>> from finstack_quant.core.currency import Currency
-    /// >>> from finstack_quant.core.dates import DayCount
-    /// >>> from finstack_quant.core.money import Money
-    /// >>> from finstack_quant.valuations.instruments import (
-    /// ...     AssetPool, RepLine, StructuredCredit, Tranche, TrancheStructure,
-    /// ... )
-    /// >>> pool = AssetPool("POOL-1", "abs", Currency("USD")).with_rep_lines([
-    /// ...     RepLine(
-    /// ...         "LINE-1", Money(80_000_000.0, Currency("USD")), 0.07,
-    /// ...         datetime.date(2031, 1, 15), 12, DayCount.ACT_360, asset_type={"type": "first_lien_loan"},
-    /// ...     )
-    /// ... ])
-    /// >>> senior = (
-    /// ...     Tranche.builder().id("A").attach_pct(10.0).detach_pct(100.0)
-    /// ...     .seniority("senior").original_balance(Money(72_000_000.0, Currency("USD")))
-    /// ...     .coupon_fixed(0.05).maturity(datetime.date(2031, 1, 15)).build()
-    /// ... )
-    /// >>> equity = (
-    /// ...     Tranche.builder().id("E").attach_pct(0.0).detach_pct(10.0)
-    /// ...     .seniority("equity").original_balance(Money(8_000_000.0, Currency("USD")))
-    /// ...     .coupon_fixed(0.0).maturity(datetime.date(2031, 1, 15)).build()
-    /// ... )
-    /// >>> deal = StructuredCredit.new_abs(
-    /// ...     "ABS-1", pool, TrancheStructure([senior, equity]),
-    /// ...     datetime.date(2024, 1, 15), datetime.date(2031, 1, 15), "USD-SOFR-DISC",
-    /// ... )
-    /// >>> "ABS-1" in repr(deal)
-    /// True
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "StructuredCredit.new_standard")]
     #[staticmethod]
-    #[pyo3(signature = (id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None))]
-    #[pyo3(
-        text_signature = "(id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None)"
-    )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn new_abs(
-        id: &str,
-        pool: PyRef<'_, PyAssetPool>,
-        tranches: PyRef<'_, PyTrancheStructure>,
-        closing_date: &Bound<'_, PyAny>,
-        maturity: &Bound<'_, PyAny>,
-        discount_curve_id: &str,
-        calendar_id: Option<&str>,
+    #[pyo3(text_signature = "(deal_type, params)")]
+    fn new_standard(
+        deal_type: &str,
+        params: PyRef<'_, super::PyStandardDealParams>,
     ) -> PyResult<Self> {
-        let params = StandardDealParams {
-            id: id.into(),
-            pool: pool.inner.clone(),
-            tranches: tranches.inner.clone(),
-            closing_date: py_to_date(closing_date)?,
-            maturity: py_to_date(maturity)?,
-            discount_curve_id: discount_curve_id.into(),
-            calendar_id: calendar_id.map(Into::into),
-        };
-        StructuredCredit::new_standard(DealType::Abs, params)
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
-    }
-
-    /// Create a new CLO deal with registry-calibrated defaults.
-    ///
-    /// See :meth:`new_abs` for parameter and return documentation; the
-    /// signature is identical, only the deal-type calibration differs.
-    #[staticmethod]
-    #[pyo3(signature = (id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None))]
-    #[pyo3(
-        text_signature = "(id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None)"
-    )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn new_clo(
-        id: &str,
-        pool: PyRef<'_, PyAssetPool>,
-        tranches: PyRef<'_, PyTrancheStructure>,
-        closing_date: &Bound<'_, PyAny>,
-        maturity: &Bound<'_, PyAny>,
-        discount_curve_id: &str,
-        calendar_id: Option<&str>,
-    ) -> PyResult<Self> {
-        let params = StandardDealParams {
-            id: id.into(),
-            pool: pool.inner.clone(),
-            tranches: tranches.inner.clone(),
-            closing_date: py_to_date(closing_date)?,
-            maturity: py_to_date(maturity)?,
-            discount_curve_id: discount_curve_id.into(),
-            calendar_id: calendar_id.map(Into::into),
-        };
-        StructuredCredit::new_standard(DealType::Clo, params)
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
-    }
-
-    /// Create a new CMBS deal with registry-calibrated defaults.
-    ///
-    /// See :meth:`new_abs` for parameter and return documentation; the
-    /// signature is identical, only the deal-type calibration differs.
-    #[staticmethod]
-    #[pyo3(signature = (id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None))]
-    #[pyo3(
-        text_signature = "(id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None)"
-    )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn new_cmbs(
-        id: &str,
-        pool: PyRef<'_, PyAssetPool>,
-        tranches: PyRef<'_, PyTrancheStructure>,
-        closing_date: &Bound<'_, PyAny>,
-        maturity: &Bound<'_, PyAny>,
-        discount_curve_id: &str,
-        calendar_id: Option<&str>,
-    ) -> PyResult<Self> {
-        let params = StandardDealParams {
-            id: id.into(),
-            pool: pool.inner.clone(),
-            tranches: tranches.inner.clone(),
-            closing_date: py_to_date(closing_date)?,
-            maturity: py_to_date(maturity)?,
-            discount_curve_id: discount_curve_id.into(),
-            calendar_id: calendar_id.map(Into::into),
-        };
-        StructuredCredit::new_standard(DealType::Cmbs, params)
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
-    }
-
-    /// Create a new RMBS deal with registry-calibrated defaults.
-    ///
-    /// See :meth:`new_abs` for parameter and return documentation; the
-    /// signature is identical, only the deal-type calibration differs.
-    #[staticmethod]
-    #[pyo3(signature = (id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None))]
-    #[pyo3(
-        text_signature = "(id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None)"
-    )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn new_rmbs(
-        id: &str,
-        pool: PyRef<'_, PyAssetPool>,
-        tranches: PyRef<'_, PyTrancheStructure>,
-        closing_date: &Bound<'_, PyAny>,
-        maturity: &Bound<'_, PyAny>,
-        discount_curve_id: &str,
-        calendar_id: Option<&str>,
-    ) -> PyResult<Self> {
-        let params = StandardDealParams {
-            id: id.into(),
-            pool: pool.inner.clone(),
-            tranches: tranches.inner.clone(),
-            closing_date: py_to_date(closing_date)?,
-            maturity: py_to_date(maturity)?,
-            discount_curve_id: discount_curve_id.into(),
-            calendar_id: calendar_id.map(Into::into),
-        };
-        StructuredCredit::new_standard(DealType::Rmbs, params)
+        let deal_type = enum_from_str::<DealType>(deal_type, "DealType")?;
+        StructuredCredit::new_standard(deal_type, params.inner.clone())
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }

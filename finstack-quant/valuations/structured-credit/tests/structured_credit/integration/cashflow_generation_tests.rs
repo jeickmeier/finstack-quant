@@ -157,13 +157,17 @@ fn create_test_market() -> MarketContext {
 #[test]
 fn test_clo_generates_cashflows() {
     // Arrange
-    let clo = StructuredCredit::new_clo(
-        "TEST_CLO",
-        create_test_pool(),
-        create_test_tranches(),
-        closing_date(),
-        maturity_date(),
-        "USD_OIS",
+    let clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "TEST_CLO".into(),
+            pool: create_test_pool(),
+            tranches: create_test_tranches(),
+            closing_date: closing_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -192,13 +196,17 @@ fn test_clo_generates_cashflows() {
 #[test]
 fn test_abs_generates_cashflows() {
     // Arrange
-    let abs = StructuredCredit::new_abs(
-        "TEST_ABS",
-        create_test_pool(),
-        create_test_tranches(),
-        closing_date(),
-        maturity_date(),
-        "USD_OIS",
+    let abs = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "TEST_ABS".into(),
+            pool: create_test_pool(),
+            tranches: create_test_tranches(),
+            closing_date: closing_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -217,13 +225,17 @@ fn test_abs_generates_cashflows() {
 #[test]
 fn test_rmbs_generates_cashflows() {
     // Arrange
-    let rmbs = StructuredCredit::new_rmbs(
-        "TEST_RMBS",
-        create_test_pool(),
-        create_test_tranches(),
-        closing_date(),
-        maturity_date(),
-        "USD_OIS",
+    let rmbs = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Rmbs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "TEST_RMBS".into(),
+            pool: create_test_pool(),
+            tranches: create_test_tranches(),
+            closing_date: closing_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -242,13 +254,17 @@ fn test_rmbs_generates_cashflows() {
 #[test]
 fn test_cmbs_generates_cashflows() {
     // Arrange
-    let cmbs = StructuredCredit::new_cmbs(
-        "TEST_CMBS",
-        create_test_pool(),
-        create_test_tranches(),
-        closing_date(),
-        maturity_date(),
-        "USD_OIS",
+    let cmbs = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Cmbs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "TEST_CMBS".into(),
+            pool: create_test_pool(),
+            tranches: create_test_tranches(),
+            closing_date: closing_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -267,13 +283,17 @@ fn test_cmbs_generates_cashflows() {
 #[test]
 fn test_cashflow_dates_respect_payment_frequency() {
     // Arrange: CLO with quarterly payments
-    let clo = StructuredCredit::new_clo(
-        "TEST_CLO",
-        create_test_pool(),
-        create_test_tranches(),
-        closing_date(),
-        maturity_date(),
-        "USD_OIS",
+    let clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "TEST_CLO".into(),
+            pool: create_test_pool(),
+            tranches: create_test_tranches(),
+            closing_date: closing_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -306,13 +326,17 @@ fn test_cashflow_dates_respect_payment_frequency() {
 #[test]
 fn test_cashflow_amounts_are_positive() {
     // Arrange
-    let clo = StructuredCredit::new_clo(
-        "TEST_CLO",
-        create_test_pool(),
-        create_test_tranches(),
-        closing_date(),
-        maturity_date(),
-        "USD_OIS",
+    let clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "TEST_CLO".into(),
+            pool: create_test_pool(),
+            tranches: create_test_tranches(),
+            closing_date: closing_date(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");

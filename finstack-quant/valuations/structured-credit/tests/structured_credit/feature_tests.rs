@@ -130,13 +130,17 @@ fn build_tranches(senior: f64, mezz: f64, equity: f64) -> TrancheStructure {
 }
 
 fn build_clo(cpr: f64, cdr: f64, recovery: f64, lag: u32) -> StructuredCredit {
-    let mut clo = StructuredCredit::new_clo(
-        "FEAT_CLO",
-        build_pool(10, 10_000_000.0),
-        build_tranches(70_000_000.0, 20_000_000.0, 10_000_000.0),
-        closing(),
-        maturity_5y(),
-        "USD_OIS",
+    let mut clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "FEAT_CLO".into(),
+            pool: build_pool(10, 10_000_000.0),
+            tranches: build_tranches(70_000_000.0, 20_000_000.0, 10_000_000.0),
+            closing_date: closing(),
+            maturity: maturity_5y(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -446,10 +450,20 @@ mod afc_tests {
             .unwrap(),
         ])
         .unwrap();
-        let mut sc =
-            StructuredCredit::new_abs("ABS-AFC", pool, tranches, closing(), maturity(), "USD-OIS")
-                .expect("valid structured-credit dates")
-                .with_calendar_id("nyse");
+        let mut sc = StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "ABS-AFC".into(),
+                pool,
+                tranches,
+                closing_date: closing(),
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -544,13 +558,17 @@ mod afc_tests {
             .unwrap(),
         ])
         .unwrap();
-        let mut sc = StructuredCredit::new_abs(
-            "ABS-AFC-NET",
-            pool,
-            tranches,
-            closing(),
-            maturity(),
-            "USD-OIS",
+        let mut sc = StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "ABS-AFC-NET".into(),
+                pool,
+                tranches,
+                closing_date: closing(),
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
         )
         .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
@@ -661,10 +679,20 @@ mod excess_spread_tests {
             .unwrap(),
         ])
         .unwrap();
-        let mut sc =
-            StructuredCredit::new_abs("ABS-ES", pool, tranches, closing(), maturity(), "USD-OIS")
-                .expect("valid structured-credit dates")
-                .with_calendar_id("nyse");
+        let mut sc = StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "ABS-ES".into(),
+                pool,
+                tranches,
+                closing_date: closing(),
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.02);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -818,10 +846,20 @@ mod excess_spread_tests {
             .unwrap(),
         ])
         .unwrap();
-        let mut sc =
-            StructuredCredit::new_abs("ABS-DRAW", pool, tranches, closing(), maturity(), "USD-OIS")
-                .expect("valid structured-credit dates")
-                .with_calendar_id("nyse");
+        let mut sc = StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "ABS-DRAW".into(),
+                pool,
+                tranches,
+                closing_date: closing(),
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -966,10 +1004,20 @@ mod step_down_tests {
             .unwrap(),
         ])
         .unwrap();
-        let mut sc =
-            StructuredCredit::new_abs("ABS-SD", pool, tranches, closing(), maturity(), "USD-OIS")
-                .expect("valid structured-credit dates")
-                .with_calendar_id("nyse");
+        let mut sc = StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "ABS-SD".into(),
+                pool,
+                tranches,
+                closing_date: closing(),
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -1214,10 +1262,20 @@ mod shifting_interest_tests {
             .unwrap(),
         ])
         .unwrap();
-        let mut sc =
-            StructuredCredit::new_abs("ABS-SI", pool, tranches, closing(), maturity(), "USD-OIS")
-                .expect("valid structured-credit dates")
-                .with_calendar_id("nyse");
+        let mut sc = StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "ABS-SI".into(),
+                pool,
+                tranches,
+                closing_date: closing(),
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -1345,10 +1403,20 @@ mod shifting_interest_tests {
             .unwrap(),
         ])
         .unwrap();
-        let mut sc =
-            StructuredCredit::new_rmbs("RMBS-SI", pool, tranches, closing(), maturity(), "USD-OIS")
-                .expect("valid structured-credit dates")
-                .with_calendar_id("nyse");
+        let mut sc = StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Rmbs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "RMBS-SI".into(),
+                pool,
+                tranches,
+                closing_date: closing(),
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -1445,10 +1513,20 @@ mod shifting_interest_tests {
             .unwrap(),
         ])
         .unwrap();
-        let mut sc =
-            StructuredCredit::new_abs("ABS-SI2", pool, tranches, closing(), maturity(), "USD-OIS")
-                .expect("valid structured-credit dates")
-                .with_calendar_id("nyse");
+        let mut sc = StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "ABS-SI2".into(),
+                pool,
+                tranches,
+                closing_date: closing(),
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -1580,10 +1658,20 @@ mod early_amortization_tests {
             .unwrap(),
         ])
         .unwrap();
-        let mut sc =
-            StructuredCredit::new_abs("ABS-EA", pool, tranches, closing(), maturity(), "USD-OIS")
-                .expect("valid structured-credit dates")
-                .with_calendar_id("nyse");
+        let mut sc = StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "ABS-EA".into(),
+                pool,
+                tranches,
+                closing_date: closing(),
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -1707,10 +1795,20 @@ mod controlled_accumulation_tests {
             .unwrap(),
         ])
         .unwrap();
-        let mut sc =
-            StructuredCredit::new_abs("ABS-CA", pool, tranches, closing(), maturity(), "USD-OIS")
-                .expect("valid structured-credit dates")
-                .with_calendar_id("nyse");
+        let mut sc = StructuredCredit::new_standard(
+            finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+            finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+                id: "ABS-CA".into(),
+                pool,
+                tranches,
+                closing_date: closing(),
+                maturity: maturity(),
+                discount_curve_id: "USD-OIS".into(),
+                calendar_id: None,
+            },
+        )
+        .expect("valid structured-credit dates")
+        .with_calendar_id("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);

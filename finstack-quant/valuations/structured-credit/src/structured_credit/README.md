@@ -18,7 +18,7 @@ There is **no `prelude` module** — import the names you need directly.
 
 | Item | Purpose |
 |------|---------|
-| `StructuredCredit` | The instrument. `new_abs`/`new_clo`/`new_cmbs`/`new_rmbs` apply deal-type defaults; `builder()` for full control; `example()` for a canonical deal. |
+| `StructuredCredit` | The instrument. `new_standard(deal_type, params)` apply deal-type defaults; `builder()` for full control; `example()` for a canonical deal. |
 | `DealType`, `AssetType`, `TrancheSeniority` | `DealType::{Clo, Cbo, Abs, Rmbs, Cmbs, Auto, Card}` and pool/tranche taxonomy. Only `Abs`, `Clo`, `Cmbs` and `Rmbs` have `new_*` constructors and registry profiles. |
 | `AssetPool`, `PoolAsset`, `RepLine`, `PoolStats`, `calculate_pool_stats` | Collateral pool and its aggregates. Floating rows (`forward_curve_id` + `spread_bp`) may carry `index_floor_bp`, a floor on the index in basis points applied before the spread. |
 | `Tranche`, `TrancheBuilder`, `TrancheStructure` | Capital structure; tranche coupons are the cashflows `RateSpec`. |
@@ -64,7 +64,7 @@ structured_credit/
 ├── assumptions.rs # embedded assumption registry loader
 ├── types/
 │   ├── instrument.rs / structured_credit_impl.rs  # the StructuredCredit struct and its impls
-│   ├── constructors.rs   # new_abs / new_clo / new_cmbs / new_rmbs / example
+│   ├── constructors.rs   # new_standard / example
 │   ├── pricing_methods.rs# advanced-only value_tranche / price_stochastic; hosts use ModelKey
 │   ├── stochastic.rs     # enable_stochastic, with_stochastic_* setters
 │   ├── constants.rs enums.rs pool.rs pool_state.rs tranches.rs waterfall.rs
@@ -108,14 +108,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Str
 
 // Deal-type constructors take (id, pool, tranches, closing_date, maturity, discount_curve_id)
 // and apply the registry defaults for that deal type.
-let clo = StructuredCredit::new_clo(
-    "MY_CLO",
-    pool,        // AssetPool
-    tranches,    // TrancheStructure
-    closing_date,
-    legal_maturity,
-    "USD-OIS",
-).expect("closing date supports the first registry payment period");
+let clo = StructuredCredit::example()?;
 
 // Or start from the canonical example.
 let deal = StructuredCredit::example().expect("example");
@@ -260,7 +253,7 @@ this to senior fees and every non-deferrable coupon when
 for CLO/CBO deals, off for every other deal type; explicit `Some(_)`
 overrides), via `Waterfall::fund_senior_interest_from_principal`. A coupon is
 non-deferrable by seniority convention (senior notes only) unless the class
-sets `Tranche::non_deferrable`; `new_clo` makes mezzanine and subordinated
+sets `Tranche::non_deferrable`; the CLO standard profile makes mezzanine and subordinated
 notes defer with accretion (`pik_enabled`). Custom waterfalls set
 `WaterfallTier::funding` per tier.
 
@@ -478,7 +471,7 @@ Deterministic (single path, `PrepaymentModelSpec` / `DefaultModelSpec` /
 | PSA | Prepayment | RMBS standard ramp |
 | Constant CPR | Prepayment | Flat annual rate |
 | CMBS lockout | Prepayment | Zero for `lockout_months`, then constant CPR |
-| ABS speed (`PrepaymentModelSpec::abs`) | Prepayment | Auto/consumer ABS: `SMM_t = ABS / (1 − ABS·(t − 1))` (Fabozzi); `new_abs` uses the registry's 1.5% ABS |
+| ABS speed (`PrepaymentModelSpec::abs`) | Prepayment | Auto/consumer ABS: `SMM_t = ABS / (1 − ABS·(t − 1))` (Fabozzi); the ABS standard profile uses the registry's 1.5% ABS |
 | Vector (`PrepaymentModelSpec::vector`) | Prepayment | Explicit annual CPR per seasoning month, last value held |
 | SDA | Default | RMBS standard ramp |
 | Constant CDR | Default | Flat annual rate |

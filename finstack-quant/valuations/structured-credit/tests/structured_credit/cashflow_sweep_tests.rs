@@ -162,13 +162,17 @@ fn create_market() -> MarketContext {
 
 /// Build a CLO with specified behavioral parameters.
 fn build_clo(cpr: f64, cdr: f64, recovery: f64, recovery_lag: u32) -> StructuredCredit {
-    let mut clo = StructuredCredit::new_clo(
-        "SWEEP_CLO",
-        create_pool(),
-        create_tranches(),
-        closing(),
-        maturity(),
-        "USD_OIS",
+    let mut clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "SWEEP_CLO".into(),
+            pool: create_pool(),
+            tranches: create_tranches(),
+            closing_date: closing(),
+            maturity: maturity(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");

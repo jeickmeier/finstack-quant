@@ -95,10 +95,20 @@ fn npl_deal(spec: LiquidationSpec) -> StructuredCredit {
         .expect("E"),
     ])
     .expect("structure");
-    let mut deal =
-        StructuredCredit::new_rmbs("NPL-T18", pool, tranches, close(), maturity(), "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse");
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Rmbs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "NPL-T18".into(),
+            pool,
+            tranches,
+            closing_date: close(),
+            maturity: maturity(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
+    )
+    .expect("valid structured-credit dates")
+    .with_calendar_id("nyse");
     deal.fees = None;
     deal.loss_allocation = Some(LossAllocationPolicy::ParPreserving);
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
@@ -226,27 +236,27 @@ fn full_liquidation_retires_the_loan_and_full_reperformance_keeps_the_coupon() {
 /// resolution must fall inside the deal's life.
 #[test]
 fn liquidation_terms_are_validated() {
-    let mut flagged = npl_deal(workout());
+    let valid = npl_deal(workout());
+    let mut flagged = valid.clone();
     flagged.pool.assets[0].defaulted = true;
     assert!(flagged.validate_invariants().is_err());
 
-    let mut late = npl_deal(LiquidationSpec {
-        months_to_resolution: 120,
-        ..workout()
-    });
+    let mut late = valid.clone();
     late.pool.assets[0].liquidation = Some(LiquidationSpec {
         months_to_resolution: 120,
         ..workout()
     });
     assert!(late.validate_invariants().is_err());
 
-    let proceeds = npl_deal(LiquidationSpec {
+    let mut proceeds = valid.clone();
+    proceeds.pool.assets[0].liquidation = Some(LiquidationSpec {
         proceeds_pct: 150.0,
         ..workout()
     });
     assert!(proceeds.validate_invariants().is_err());
 
-    let prob = npl_deal(LiquidationSpec {
+    let mut prob = valid;
+    prob.pool.assets[0].liquidation = Some(LiquidationSpec {
         reperformance_prob: 1.5,
         ..workout()
     });

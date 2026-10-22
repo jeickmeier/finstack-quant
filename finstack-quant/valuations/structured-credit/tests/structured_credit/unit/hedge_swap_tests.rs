@@ -108,10 +108,20 @@ fn abs(hedged: bool) -> StructuredCredit {
         .expect("equity"),
     ])
     .expect("structure");
-    let mut deal =
-        StructuredCredit::new_abs("ABS-HEDGE", pool, tranches, CLOSE, MATURITY, "USD-OIS")
-            .expect("valid structured-credit dates")
-            .with_calendar_id("nyse");
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "ABS-HEDGE".into(),
+            pool,
+            tranches,
+            closing_date: CLOSE,
+            maturity: MATURITY,
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
+    )
+    .expect("valid structured-credit dates")
+    .with_calendar_id("nyse");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.4, 0);

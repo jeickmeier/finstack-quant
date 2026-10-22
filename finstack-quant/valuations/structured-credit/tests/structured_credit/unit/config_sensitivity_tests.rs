@@ -92,13 +92,17 @@ fn tranches() -> TrancheStructure {
 /// Both variants of every test share this deal id, so `derive_seed` gives
 /// them identical Monte Carlo draws — any output difference is the config.
 fn structured_credit() -> StructuredCredit {
-    let mut sc = StructuredCredit::new_abs(
-        "ABS-CFG-SENS",
-        pool(),
-        tranches(),
-        closing_date(),
-        legal_maturity(),
-        "USD-OIS",
+    let mut sc = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "ABS-CFG-SENS".into(),
+            pool: pool(),
+            tranches: tranches(),
+            closing_date: closing_date(),
+            maturity: legal_maturity(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");

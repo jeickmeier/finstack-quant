@@ -149,13 +149,17 @@ fn build_simple_clo(
     recovery: f64,
     recovery_lag: u32,
 ) -> StructuredCredit {
-    let mut clo = StructuredCredit::new_clo(
-        "E2E_CLO",
-        single_asset_pool(pool_balance, pool_rate, pool_maturity),
-        simple_tranches(senior, mezz, equity, pool_maturity),
-        closing(),
-        pool_maturity,
-        "USD_OIS",
+    let mut clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "E2E_CLO".into(),
+            pool: single_asset_pool(pool_balance, pool_rate, pool_maturity),
+            tranches: simple_tranches(senior, mezz, equity, pool_maturity),
+            closing_date: closing(),
+            maturity: pool_maturity,
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -963,13 +967,17 @@ fn e2e_multi_asset_pool_aggregates_correctly() {
     }
 
     let tranches = simple_tranches(70_000_000.0, 20_000_000.0, 10_000_000.0, maturity_5y());
-    let mut clo = StructuredCredit::new_clo(
-        "MULTI_CLO",
-        pool,
-        tranches,
-        closing(),
-        maturity_5y(),
-        "USD_OIS",
+    let mut clo = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "MULTI_CLO".into(),
+            pool,
+            tranches,
+            closing_date: closing(),
+            maturity: maturity_5y(),
+            discount_curve_id: "USD_OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");

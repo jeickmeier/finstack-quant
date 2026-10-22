@@ -226,13 +226,17 @@ fn deal(tranches: TrancheStructure) -> StructuredCredit {
             DayCount::Act360,
         ));
     }
-    let mut deal = StructuredCredit::new_clo(
-        "CLO-AP",
-        pool,
-        tranches,
-        d(2024, 1, 1),
-        maturity(),
-        "USD-OIS",
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO-AP".into(),
+            pool,
+            tranches,
+            closing_date: d(2024, 1, 1),
+            maturity: maturity(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");

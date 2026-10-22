@@ -108,7 +108,7 @@ fn structured_credit_instrument_json() -> String {
     ])
     .unwrap();
     let mut sc =
-        StructuredCredit::new_abs("ABS-STOCH-PV", pool, tranches, closing, maturity, "USD-OIS")
+        StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Abs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "ABS-STOCH-PV".into(), pool, tranches, closing_date: closing, maturity, discount_curve_id: "USD-OIS".into(), calendar_id: None })
             .expect("valid structured-credit dates")
             .with_calendar_id("nyse");
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);

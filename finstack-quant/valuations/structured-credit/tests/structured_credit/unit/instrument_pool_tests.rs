@@ -102,13 +102,17 @@ pub(crate) fn deal_with(spec: DealSpec) -> StructuredCredit {
         .expect("senior"),
     ])
     .expect("tranches");
-    let mut deal = StructuredCredit::new_clo(
-        "POOL-DEAL",
-        pool,
-        tranches,
-        spec.closing,
-        spec.maturity,
-        "USD-OIS",
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "POOL-DEAL".into(),
+            pool,
+            tranches,
+            closing_date: spec.closing,
+            maturity: spec.maturity,
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");

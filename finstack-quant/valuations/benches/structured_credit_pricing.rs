@@ -122,10 +122,10 @@ fn create_deal(deal_type: DealType, num_assets: usize) -> StructuredCredit {
     let id = format!("{deal_type:?}-BENCHMARK");
     let (close, legal) = (closing_date(), maturity_date());
     match deal_type {
-        DealType::Clo => StructuredCredit::new_clo(id, pool, tranches, close, legal, "USD-OIS"),
-        DealType::Cmbs => StructuredCredit::new_cmbs(id, pool, tranches, close, legal, "USD-OIS"),
-        DealType::Rmbs => StructuredCredit::new_rmbs(id, pool, tranches, close, legal, "USD-OIS"),
-        DealType::Abs => StructuredCredit::new_abs(id, pool, tranches, close, legal, "USD-OIS"),
+        DealType::Clo => StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Clo, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: id.into(), pool, tranches, closing_date: close, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
+        DealType::Cmbs => StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Cmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: id.into(), pool, tranches, closing_date: close, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
+        DealType::Rmbs => StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Rmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: id.into(), pool, tranches, closing_date: close, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
+        DealType::Abs => StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Abs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: id.into(), pool, tranches, closing_date: close, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
         other => panic!("benchmark has no deal profile for {other:?}"),
     }
     .expect("valid structured-credit dates")

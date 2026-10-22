@@ -5128,7 +5128,7 @@
   "valuations.instruments.StructuredCredit": {
     "kind": "class",
     "constructor": false,
-    "statics": ["builder", "example", "fromJson", "newAbs", "newClo", "newCmbs", "newRmbs"],
+    "statics": ["builder", "example", "fromJson", "newStandard"],
     "methods": [
       "createWaterfall",
       "disableStochastic",

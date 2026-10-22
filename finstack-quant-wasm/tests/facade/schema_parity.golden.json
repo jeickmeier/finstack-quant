@@ -2703,6 +2703,13 @@
             "bytes": 1659
           },
           {
+            "path": "schemas/common/1/standard_deal_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
+            "type_name": "StandardDealParams",
+            "kind": "component",
+            "bytes": 229361
+          },
+          {
             "path": "schemas/common/1/swaption_conventions.schema.json",
             "$id": "https://finstack_quant.dev/schemas/common/1/swaption_conventions.schema.json",
             "type_name": "SwaptionConventions",
@@ -4707,6 +4714,14 @@
             "type_name": "ScenarioPricingOverrides",
             "kind": "component",
             "bytes": 1659
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/common/1/standard_deal_params.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
+            "type_name": "StandardDealParams",
+            "kind": "component",
+            "bytes": 229361
           },
           {
             "domain": "valuations",

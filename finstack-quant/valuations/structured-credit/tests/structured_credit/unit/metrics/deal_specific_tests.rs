@@ -47,13 +47,17 @@ fn rmbs_instrument() -> StructuredCredit {
     )
     .unwrap();
 
-    StructuredCredit::new_rmbs(
-        "RMBS-TEST",
-        pool,
-        TrancheStructure::new(vec![tranche]).unwrap(),
-        Date::from_calendar_date(2025, Month::January, 1).unwrap(),
-        Date::from_calendar_date(2030, Month::January, 1).unwrap(),
-        "USD-OIS",
+    StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Rmbs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "RMBS-TEST".into(),
+            pool,
+            tranches: TrancheStructure::new(vec![tranche]).unwrap(),
+            closing_date: Date::from_calendar_date(2025, Month::January, 1).unwrap(),
+            maturity: Date::from_calendar_date(2030, Month::January, 1).unwrap(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse")
@@ -93,13 +97,17 @@ fn cmbs_instrument() -> StructuredCredit {
     .unwrap();
     let tranches = TrancheStructure::new(vec![tranche]).unwrap();
 
-    StructuredCredit::new_cmbs(
-        "CMBS-TEST",
-        pool,
-        tranches,
-        Date::from_calendar_date(2025, Month::January, 1).unwrap(),
-        Date::from_calendar_date(2030, Month::January, 1).unwrap(),
-        "USD-OIS",
+    StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Cmbs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CMBS-TEST".into(),
+            pool,
+            tranches,
+            closing_date: Date::from_calendar_date(2025, Month::January, 1).unwrap(),
+            maturity: Date::from_calendar_date(2030, Month::January, 1).unwrap(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
 }
@@ -143,13 +151,17 @@ fn abs_instrument() -> StructuredCredit {
     .unwrap();
     let tranches = TrancheStructure::new(vec![senior, subordinate]).unwrap();
 
-    StructuredCredit::new_abs(
-        "ABS-TEST",
-        pool,
-        tranches,
-        Date::from_calendar_date(2025, Month::January, 1).unwrap(),
-        Date::from_calendar_date(2030, Month::January, 1).unwrap(),
-        "USD-OIS",
+    StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "ABS-TEST".into(),
+            pool,
+            tranches,
+            closing_date: Date::from_calendar_date(2025, Month::January, 1).unwrap(),
+            maturity: Date::from_calendar_date(2030, Month::January, 1).unwrap(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
 }
@@ -198,13 +210,17 @@ fn test_abs_charge_off_and_credit_enhancement_handle_zero_balances() {
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
     )
     .unwrap();
-    let empty_abs = StructuredCredit::new_abs(
-        "ABS-EMPTY",
-        empty_pool,
-        TrancheStructure::new(vec![zero_tranche]).unwrap(),
-        as_of,
-        Date::from_calendar_date(2030, Month::January, 1).unwrap(),
-        "USD-OIS",
+    let empty_abs = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Abs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "ABS-EMPTY".into(),
+            pool: empty_pool,
+            tranches: TrancheStructure::new(vec![zero_tranche]).unwrap(),
+            closing_date: as_of,
+            maturity: Date::from_calendar_date(2030, Month::January, 1).unwrap(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates");
 

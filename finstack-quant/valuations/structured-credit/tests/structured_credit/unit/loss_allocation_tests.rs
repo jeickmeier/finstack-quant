@@ -102,13 +102,17 @@ fn clo(policy: Option<LossAllocationPolicy>) -> (StructuredCredit, Date) {
         ),
     ])
     .expect("structure");
-    let mut deal = StructuredCredit::new_clo(
-        "CLO-LOSS-POLICY",
-        pool,
-        tranches,
-        close,
-        maturity,
-        "USD-OIS",
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "CLO-LOSS-POLICY".into(),
+            pool,
+            tranches,
+            closing_date: close,
+            maturity,
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
@@ -290,13 +294,17 @@ fn rmbs(recognition: Option<LossRecognition>) -> (StructuredCredit, Date) {
         ),
     ])
     .expect("structure");
-    let mut deal = StructuredCredit::new_rmbs(
-        "RMBS-LOSS-TIMING",
-        pool,
-        tranches,
-        close,
-        maturity,
-        "USD-OIS",
+    let mut deal = StructuredCredit::new_standard(
+        finstack_quant_valuations_structured_credit::structured_credit::DealType::Rmbs,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "RMBS-LOSS-TIMING".into(),
+            pool,
+            tranches,
+            closing_date: close,
+            maturity,
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
     )
     .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
