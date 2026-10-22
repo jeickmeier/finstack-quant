@@ -136,11 +136,13 @@ impl Performance {
     ) -> finstack_quant_core::Result<RollingGreeks> {
         self.ensure_ticker_idx(ticker_idx)?;
         Self::ensure_window(window)?;
-        let (r, bench) = self.active_pair_returns(ticker_idx);
+        let span = self.active_two_ticker_span(ticker_idx, self.benchmark_idx);
+        let r = self.returns_for_span(ticker_idx, span);
+        let bench = self.returns_for_span(self.benchmark_idx, span);
         Ok(rolling_greeks(
             r,
             bench,
-            self.active_pair_dates(ticker_idx),
+            self.dates_for_span(span),
             window,
             self.ann(),
             risk_free_rate,

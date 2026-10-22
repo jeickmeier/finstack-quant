@@ -363,12 +363,6 @@ impl Performance {
             .intersect(self.global_active_span())
     }
 
-    fn active_pair_span(&self, ticker_idx: usize) -> TickerSpan {
-        let ticker_span = self.active_span_for_ticker(ticker_idx);
-        let bench_span = self.active_span_for_ticker(self.benchmark_idx);
-        ticker_span.intersect(bench_span)
-    }
-
     fn active_two_ticker_span(&self, lhs_idx: usize, rhs_idx: usize) -> TickerSpan {
         self.active_span_for_ticker(lhs_idx)
             .intersect(self.active_span_for_ticker(rhs_idx))
@@ -397,14 +391,6 @@ impl Performance {
         &series[range]
     }
 
-    fn active_pair_returns(&self, ticker_idx: usize) -> (&[f64], &[f64]) {
-        let span = self.active_pair_span(ticker_idx);
-        (
-            self.returns_for_span(ticker_idx, span),
-            self.returns_for_span(self.benchmark_idx, span),
-        )
-    }
-
     fn active_two_ticker_returns(&self, lhs_idx: usize, rhs_idx: usize) -> (&[f64], &[f64]) {
         let span = self.active_two_ticker_span(lhs_idx, rhs_idx);
         (
@@ -417,10 +403,6 @@ impl Performance {
         let dates = self.dates();
         let end = span.end.min(dates.len());
         &dates[span.start.min(end)..end]
-    }
-
-    fn active_pair_dates(&self, ticker_idx: usize) -> &[Date] {
-        self.dates_for_span(self.active_pair_span(ticker_idx))
     }
 
     fn active_holding_period_for_ticker(&self, ticker_idx: usize) -> Option<(Date, Date)> {
@@ -966,7 +948,7 @@ impl Performance {
         F: FnMut(&[f64], &[f64]) -> T,
     {
         self.map_tickers(|i| {
-            let (r, bench) = self.active_pair_returns(i);
+            let (r, bench) = self.active_two_ticker_returns(i, self.benchmark_idx);
             f(r, bench)
         })
     }
