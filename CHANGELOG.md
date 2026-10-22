@@ -31,6 +31,8 @@
 
 #### Changed
 
+- Waterfall failures leave capital-structure runtime state unchanged. Successful allocations commit balances, PIK state, and carried claims together.
+
 - Accounting identity checks report period-level error findings when sums, differences, tolerances, or materiality calculations overflow. They publish no non-finite comparison payload for that period and continue checking later periods.
 
 - `CapitalStructureCashflows::get_component(component, instrument_or_total, period_id)` replaces the 16 per-component and total getters in Rust and Python; WASM exposes `capitalStructureCashflowsGetComponent`. Instrument lookups retain native currency and `total` reads the reporting-currency aggregate.

@@ -259,11 +259,31 @@ fn apply_named_prepay(
 /// Returns an error if required statement nodes are missing, if the waterfall
 /// references inconsistent currencies, if sweep / PIK calculations fail, or if
 /// computed allocations or balances cannot be represented as monetary values.
+/// On any error, `state` is unchanged; warnings and flows are published only on success.
 ///
 /// # References
 ///
 /// - Fixed-income capital structure context: `docs/REFERENCES.md#tuckman-serrat-fixed-income`
 pub fn execute_waterfall(
+    _period_id: &PeriodId,
+    context: &EvaluationContext,
+    waterfall_spec: &WaterfallSpec,
+    state: &mut CapitalStructureState,
+    contractual_flows: &IndexMap<String, CashflowBreakdown>,
+) -> Result<WaterfallPeriodResult> {
+    let mut staged_state = state.clone();
+    let result = execute_waterfall_inner(
+        _period_id,
+        context,
+        waterfall_spec,
+        &mut staged_state,
+        contractual_flows,
+    )?;
+    *state = staged_state;
+    Ok(result)
+}
+
+fn execute_waterfall_inner(
     _period_id: &PeriodId,
     context: &EvaluationContext,
     waterfall_spec: &WaterfallSpec,
@@ -2770,5 +2790,79 @@ mod tests {
         let back: CashflowBreakdown = serde_json::from_value(json).expect("deserialize");
         assert!(back.scheduled_principal.is_none());
         assert!(back.opening_balance.is_none());
+    }
+    #[test]
+    fn waterfall_errors_preserve_state_and_retry_matches_a_clean_run() {
+        let period = PeriodId::quarter(2025, 1).unwrap();
+        let mut flow = CashflowBreakdown::with_currency(Currency::USD);
+        flow.interest_expense_cash = Money::from((100_i64, Currency::USD));
+        flow.principal_payment = Money::from((50_i64, Currency::USD));
+        flow.debt_balance = Money::from((950_i64, Currency::USD));
+        let contractual = IndexMap::from([("TL-1".to_string(), flow)]);
+        let mut initial = CapitalStructureState::new();
+        initial
+            .opening_balances
+            .insert("TL-1".into(), Money::from((1000_i64, Currency::USD)));
+        initial
+            .interest_shortfall
+            .insert("TL-1".into(), Money::from((20_i64, Currency::USD)));
+        initial
+            .fee_shortfall
+            .insert("TL-1".into(), Money::from((10_i64, Currency::USD)));
+        let valid_spec = WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+                PaymentPriority::MandatoryPrepayment,
+                PaymentPriority::Equity,
+            ],
+            available_cash_node: "cash".into(),
+            pik_toggle: Some(PikToggleSpec {
+                liquidity_metric: "liquidity".into(),
+                threshold: 100.0,
+                target_instrument_ids: Some(vec!["TL-1".into()]),
+                min_periods_in_pik: 3,
+            }),
+            mandatory_prepay_node: Some("0".into()),
+            ..Default::default()
+        };
+        let valid_context = build_context(period, &[("liquidity", 50.0), ("cash", 1000.0)]);
+        for late in [false, true] {
+            let mut spec = valid_spec.clone();
+            let context = if late {
+                spec.mandatory_prepay_node = Some("1 / 0".into());
+                valid_context.clone()
+            } else {
+                build_context(period, &[("liquidity", 50.0), ("cash", 1e100)])
+            };
+            let mut state = initial.clone();
+            let before = format!("{state:?}");
+            assert!(execute_waterfall(&period, &context, &spec, &mut state, &contractual).is_err());
+            assert_eq!(
+                format!("{state:?}"),
+                before,
+                "failed waterfall changed runtime state"
+            );
+            let retry = execute_waterfall(
+                &period,
+                &valid_context,
+                &valid_spec,
+                &mut state,
+                &contractual,
+            )
+            .unwrap();
+            let mut clean_state = initial.clone();
+            let clean = execute_waterfall(
+                &period,
+                &valid_context,
+                &valid_spec,
+                &mut clean_state,
+                &contractual,
+            )
+            .unwrap();
+            assert_eq!(format!("{state:?}"), format!("{clean_state:?}"));
+            assert_eq!(format!("{retry:?}"), format!("{clean:?}"));
+        }
     }
 }
