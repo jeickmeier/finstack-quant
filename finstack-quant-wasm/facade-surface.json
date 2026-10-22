@@ -429,7 +429,6 @@
       "mergeCashflowSchedules",
       "notionalPar",
       "notionalValidate",
-      "prepaymentModelSpecPsa100",
       "prepaymentModelSpecSmm",
       "prepaymentModelSpecValidate",
       "recoveryModelSpecRecoveryRate",
@@ -596,9 +595,6 @@
     "kind": "function"
   },
   "cashflows.notionalValidate": {
-    "kind": "function"
-  },
-  "cashflows.prepaymentModelSpecPsa100": {
     "kind": "function"
   },
   "cashflows.prepaymentModelSpecSmm": {

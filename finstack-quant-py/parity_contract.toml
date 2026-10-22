@@ -2362,7 +2362,7 @@ renames = { par = { js = "cashflows.notionalPar", reason = "WASM Notional values
 excluded = { currency = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.PrepaymentModelSpec"]
-renames = { psa_100 = { js = "cashflows.prepaymentModelSpecPsa100", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::psa_100 function is a free function over the wire value" }, smm = { js = "cashflows.prepaymentModelSpecSmm", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::smm function is a free function over the wire value" }, validate = { js = "cashflows.prepaymentModelSpecValidate", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::validate function is a free function over the wire value" } }
+renames = { smm = { js = "cashflows.prepaymentModelSpecSmm", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::smm function is a free function over the wire value" }, validate = { js = "cashflows.prepaymentModelSpecValidate", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::validate function is a free function over the wire value" } }
 excluded = { abs = "literal", cmbs_with_lockout = "literal", constant_cpr = "literal", psa = "literal", vector = "literal" }
 
 [parity.members."finstack_quant.cashflows.builder.RecoveryModelSpec"]

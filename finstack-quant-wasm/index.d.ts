@@ -14341,14 +14341,6 @@ export interface CashflowsNamespace {
   ): number | undefined;
 
   /**
-   * 100% PSA, the standard prepayment assumption.
-   *
-   * @returns `PrepaymentModelSpec` wire object `{ curve: "psa", speed_multiplier: 1.0 }`.
-   * @throws If the model cannot be serialized.
-   */
-  prepaymentModelSpecPsa100(): generated.cashflows.PrepaymentModelSpec;
-
-  /**
    * Check a prepayment model's curve parameters.
    *
    * @param spec - `PrepaymentModelSpec` wire object.

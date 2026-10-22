@@ -392,7 +392,7 @@ def _prepayment_models() -> Any:
     models = [
         PrepaymentModelSpec.constant_cpr(0.06),
         PrepaymentModelSpec.psa(1.5),
-        PrepaymentModelSpec.psa_100(),
+        PrepaymentModelSpec.psa(1.0),
         PrepaymentModelSpec.cmbs_with_lockout(60, 0.1),
         PrepaymentModelSpec.abs(0.015),
         PrepaymentModelSpec.vector([0.02, 0.05, 0.08]),

@@ -1441,7 +1441,7 @@ class TestTypedTwinsAndWire:
             Notional.par(1.0, "USD"),
             FeeBase.undrawn(Money(10.0, "USD")),
             FeeSpec.periodic_bp(FeeBase.DRAWN, 25, "3M", DayCount.ACT_360, "weekends_only"),
-            PrepaymentModelSpec.psa_100(),
+            PrepaymentModelSpec.psa(1.0),
             RecoveryModelSpec(0.4, 12),
         ]
         for spec in specs:

@@ -435,7 +435,7 @@ const cases = {
     const models = [
       { curve: 'constant', cpr: 0.06 },
       { curve: 'psa', speed_multiplier: 1.5 },
-      cashflows.prepaymentModelSpecPsa100(),
+      { curve: 'psa', speed_multiplier: 1.0 },
       { curve: 'cmbs_lockout', lockout_months: 60, post_lockout_cpr: 0.1 },
       { curve: 'abs', speed: 0.015 },
       { curve: 'vector', monthly_cpr: [0.02, 0.05, 0.08] },
@@ -638,7 +638,7 @@ test('spec functions validate through Rust and reject wrong host types', () => {
     kind('validation', /must be a decimal in \[0,1\]; got -0\.1/)
   );
   assert.equal(
-    cashflows.prepaymentModelSpecValidate(cashflows.prepaymentModelSpecPsa100()),
+    cashflows.prepaymentModelSpecValidate({ curve: 'psa', speed_multiplier: 1.0 }),
     undefined
   );
   assert.throws(

@@ -107,7 +107,6 @@ const EXPORTED_KEYS = [
   'mergeCashflowSchedules',
   'notionalPar',
   'notionalValidate',
-  'prepaymentModelSpecPsa100',
   'prepaymentModelSpecSmm',
   'prepaymentModelSpecValidate',
   'recoveryModelSpecRecoveryRate',

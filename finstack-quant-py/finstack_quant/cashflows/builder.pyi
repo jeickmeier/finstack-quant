@@ -4066,7 +4066,7 @@ class PrepaymentModelSpec:
     Prepayment rate model used to project prepayments across a pool.
 
     Constructed via named factories (:meth:`constant_cpr`, :meth:`psa`,
-    :meth:`psa_100`, :meth:`cmbs_with_lockout`) mirroring the Rust curve
+    :meth:`cmbs_with_lockout`) mirroring the Rust curve
     presets.
 
     Examples
@@ -4126,28 +4126,6 @@ class PrepaymentModelSpec:
         --------
         >>> from finstack_quant.cashflows.builder import PrepaymentModelSpec
         >>> PrepaymentModelSpec.psa(1.0) is not None
-        True
-        """
-        ...
-
-    @staticmethod
-    def psa_100() -> PrepaymentModelSpec:
-        """
-        100% PSA (standard prepayment assumption).
-
-        Returns
-        -------
-        PrepaymentModelSpec
-            A prepayment model at the 100% PSA speed.
-
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
-
-        Examples
-        --------
-        >>> from finstack_quant.cashflows.builder import PrepaymentModelSpec
-        >>> PrepaymentModelSpec.psa_100() is not None
         True
         """
         ...
@@ -4309,7 +4287,7 @@ class PrepaymentModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import PrepaymentModelSpec
-        >>> isinstance(PrepaymentModelSpec.psa_100().to_json(), str)
+        >>> isinstance(PrepaymentModelSpec.psa(1.0).to_json(), str)
         True
         """
         ...
@@ -4337,7 +4315,7 @@ class PrepaymentModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import PrepaymentModelSpec
-        >>> value = PrepaymentModelSpec.psa_100()
+        >>> value = PrepaymentModelSpec.psa(1.0)
         >>> PrepaymentModelSpec.from_json(value.to_json()).to_json() == value.to_json()
         True
         """
