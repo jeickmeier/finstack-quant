@@ -206,7 +206,7 @@ fn infer_bin_op_dimension(op: StmtBinOp, left: Dimension, right: Dimension) -> R
         }
         StmtBinOp::Mul => multiply_dimensions(left, right),
         StmtBinOp::Div => divide_dimensions(left, right),
-        StmtBinOp::Mod => require_scalar_operands("modulo", left, right),
+        StmtBinOp::Mod => require_scalar_arguments("modulo", &[left, right]),
         StmtBinOp::Eq
         | StmtBinOp::Ne
         | StmtBinOp::Lt
@@ -216,7 +216,9 @@ fn infer_bin_op_dimension(op: StmtBinOp, left: Dimension, right: Dimension) -> R
             compatible_dimensions("comparison operands", left, right)?;
             Ok(Dimension::Scalar)
         }
-        StmtBinOp::And | StmtBinOp::Or => require_scalar_operands("logical operands", left, right),
+        StmtBinOp::And | StmtBinOp::Or => {
+            require_scalar_arguments("logical operands", &[left, right])
+        }
     }
 }
 
@@ -262,10 +264,6 @@ fn divide_dimensions(left: Dimension, right: Dimension) -> Result<Dimension> {
             "Dimensional mismatch in division: cannot divide scalar by {ccy}"
         ))),
     }
-}
-
-fn require_scalar_operands(context: &str, left: Dimension, right: Dimension) -> Result<Dimension> {
-    require_scalar_arguments(context, &[left, right])
 }
 
 fn require_scalar_arguments(context: &str, dimensions: &[Dimension]) -> Result<Dimension> {
