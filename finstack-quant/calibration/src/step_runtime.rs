@@ -20,9 +20,9 @@ use crate::targets::hazard::HazardCurveTarget;
 use crate::targets::inflation::InflationCurveTarget;
 use crate::targets::parametric::ParametricCurveTarget;
 use crate::targets::student_t::StudentTTarget;
-use crate::targets::svi::SviSurfaceTarget;
-use crate::targets::swaption::SwaptionVolTarget;
-use crate::targets::vol::VolSurfaceTarget;
+use crate::targets::svi;
+use crate::targets::swaption;
+use crate::targets::vol;
 use crate::targets::xccy_basis::XccyBasisTarget;
 use crate::validation::surfaces::validate_surface;
 use crate::validation::CurveValidator;
@@ -136,7 +136,7 @@ fn prepare_hw_swaption_input(
     };
     vol_quote.validate()?;
     let is_normal_vol = hw_quote_is_normal(*quote_type)?;
-    let conventions = SwaptionVolTarget::resolve_quote_leg_conventions(vol_quote)?;
+    let conventions = swaption::resolve_quote_leg_conventions(vol_quote)?;
     if conventions.currency != expected_currency {
         return Err(finstack_quant_core::Error::Validation(format!(
             "Hull-White step currency {expected_currency} conflicts with swaption convention currency {}",
@@ -144,11 +144,9 @@ fn prepare_hw_swaption_input(
         )));
     }
 
-    let (swap_start, swap_end) =
-        SwaptionVolTarget::resolve_underlying_dates(vol_quote, &conventions)?;
-    let periods = SwaptionVolTarget::build_fixed_leg_periods(swap_start, swap_end, &conventions)?;
-    let floating_periods =
-        SwaptionVolTarget::build_float_leg_periods(swap_start, swap_end, &conventions)?;
+    let (swap_start, swap_end) = swaption::resolve_underlying_dates(vol_quote, &conventions)?;
+    let periods = swaption::build_fixed_leg_periods(swap_start, swap_end, &conventions)?;
+    let floating_periods = swaption::build_float_leg_periods(swap_start, swap_end, &conventions)?;
     use finstack_quant_cashflows::builder::FloatingLegCompounding;
     let floating_is_compounded = match conventions.float_compounding {
         FloatingLegCompounding::Simple => false,
@@ -376,7 +374,7 @@ fn execute_params(
             })
         }
         StepParams::VolSurface(p) => {
-            let (surface, report) = VolSurfaceTarget::solve(p, quotes, context, global_config)?;
+            let (surface, report) = vol::solve(p, quotes, context, global_config)?;
             let mut new_report = report;
             if global_config.explain.enabled {
                 new_report
@@ -405,7 +403,7 @@ fn execute_params(
             })
         }
         StepParams::SwaptionVol(p) => {
-            let (cube, report) = SwaptionVolTarget::solve(p, quotes, context, global_config)?;
+            let (cube, report) = swaption::solve(p, quotes, context, global_config)?;
             Ok(StepOutcome {
                 output: StepOutput::VolCube(cube.into()),
                 credit_index_update: None,
@@ -622,7 +620,7 @@ fn execute_params(
             }
         }
         StepParams::SviSurface(p) => {
-            let (surface, report) = SviSurfaceTarget::solve(p, quotes, context, global_config)?;
+            let (surface, report) = svi::solve(p, quotes, context, global_config)?;
             Ok(StepOutcome {
                 output: StepOutput::Surface(surface.into()),
                 credit_index_update: None,
@@ -803,14 +801,12 @@ mod tests {
     }
 
     fn set_atm_strike(quote: &mut VolQuote, discount: &DiscountCurve) {
-        let conventions =
-            SwaptionVolTarget::resolve_quote_leg_conventions(quote).expect("conventions");
-        let (start, end) =
-            SwaptionVolTarget::resolve_underlying_dates(quote, &conventions).expect("dates");
+        let conventions = swaption::resolve_quote_leg_conventions(quote).expect("conventions");
+        let (start, end) = swaption::resolve_underlying_dates(quote, &conventions).expect("dates");
         let periods =
-            SwaptionVolTarget::build_fixed_leg_periods(start, end, &conventions).expect("schedule");
-        let floating_periods = SwaptionVolTarget::build_float_leg_periods(start, end, &conventions)
-            .expect("floating schedule");
+            swaption::build_fixed_leg_periods(start, end, &conventions).expect("schedule");
+        let floating_periods =
+            swaption::build_float_leg_periods(start, end, &conventions).expect("floating schedule");
         let annuity: f64 = periods
             .iter()
             .map(|period| {

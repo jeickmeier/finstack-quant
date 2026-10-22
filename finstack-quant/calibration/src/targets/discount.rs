@@ -7,8 +7,8 @@ use crate::constants::*;
 use crate::quotes::rates::RateQuote;
 use crate::quotes::ExtractQuotes;
 use crate::quotes::MarketQuote;
-use crate::solver::bootstrap::SequentialBootstrapper;
-use crate::solver::global::GlobalFitOptimizer;
+use crate::solver::bootstrap;
+use crate::solver::global;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
 use crate::targets::rate_recipe::rate_calibration_recipe;
 use crate::targets::util::{
@@ -393,7 +393,7 @@ impl DiscountCurveTarget {
         {
             let seed_quotes = Clone::clone(&prepared_quotes);
 
-            match SequentialBootstrapper::bootstrap(
+            match bootstrap::bootstrap(
                 &target,
                 &seed_quotes,
                 vec![(0.0, 1.0)],
@@ -412,7 +412,7 @@ impl DiscountCurveTarget {
 
         let (mut curve, mut report) = match params.method {
             CalibrationMethod::Bootstrap => {
-                let (seed_curve, seed_report) = SequentialBootstrapper::bootstrap(
+                let (seed_curve, seed_report) = bootstrap::bootstrap(
                     &target,
                     &prepared_quotes,
                     vec![(0.0, 1.0)],
@@ -432,16 +432,10 @@ impl DiscountCurveTarget {
                     // the same fit tolerance.
                     target.initial_curve = Some(seed_curve);
 
-                    GlobalFitOptimizer::optimize(
-                        &target,
-                        &prepared_quotes,
-                        &config,
-                        success_tolerance,
-                        true,
-                    )?
+                    global::optimize(&target, &prepared_quotes, &config, success_tolerance, true)?
                 }
             }
-            CalibrationMethod::GlobalSolve { .. } => GlobalFitOptimizer::optimize(
+            CalibrationMethod::GlobalSolve { .. } => global::optimize(
                 &target,
                 &prepared_quotes,
                 &config,
@@ -887,7 +881,7 @@ impl GlobalSolveTarget for DiscountCurveTarget {
 mod tests {
     use super::*;
     use crate::build::prepared::PreparedQuote;
-    use crate::solver::global::GlobalFitOptimizer;
+    use crate::solver::global;
     use crate::solver::traits::BootstrapTarget;
     use finstack_quant_core::dates::{BusinessDayConvention, DayCountContext};
     use finstack_quant_core::market_data::term_structures::{
@@ -973,7 +967,7 @@ mod tests {
 
     #[test]
     fn global_solve_discount_curve_sanity_check() {
-        // Sanity check that GlobalFitOptimizer runs with DiscountCurveTarget.
+        // Sanity check that global runs with DiscountCurveTarget.
         let base_date = Date::from_calendar_date(2025, Month::December, 10).expect("base_date");
         let mut config = CalibrationConfig::default();
         config.solver = config.solver.with_tolerance(1e-9);
@@ -1026,7 +1020,7 @@ mod tests {
         let pq = PreparedQuote::new(std::sync::Arc::new(quote), instrument, maturity, p_time);
         let quotes = vec![pq];
 
-        let (_curve, report) = GlobalFitOptimizer::optimize(
+        let (_curve, report) = global::optimize(
             &target,
             &quotes,
             &config,
@@ -1102,7 +1096,7 @@ mod tests {
                 quotes.push(pq);
             }
 
-            let (curve, report) = GlobalFitOptimizer::optimize(
+            let (curve, report) = global::optimize(
                 &target,
                 &quotes,
                 &config,

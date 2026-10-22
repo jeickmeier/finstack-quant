@@ -42,7 +42,7 @@ use finstack_quant_models::rates::hull_white::{hw_b, hw_bond_vol, hw_ln_a};
 ///    schedules use error-controlled one-dimensional Gaussian integration of
 ///    the full delayed-floating-minus-fixed payoff.
 /// 3. The Levenberg-Marquardt solver minimises the sum of squared price errors,
-///    routed through `GlobalFitOptimizer` so HW1F shares the same numeric
+///    routed through `global` so HW1F shares the same numeric
 ///    plumbing (multi-start, diagnostics, error reporting) as curve calibration.
 /// 4. Uses the unconstrained parameterisation: `(ln κ, ln σ)`.
 ///

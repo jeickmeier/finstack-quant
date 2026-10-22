@@ -7,8 +7,8 @@ use crate::config::{CalibrationConfig, CalibrationMethod, HazardCurveSolveConfig
 use crate::constants::WEIGHT_MIN_FLOOR;
 use crate::quotes::cds::CdsQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
-use crate::solver::bootstrap::SequentialBootstrapper;
-use crate::solver::global::GlobalFitOptimizer;
+use crate::solver::bootstrap;
+use crate::solver::global;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
 use crate::targets::util::{
     scheme_factor, sorted_knot_grid, validate_global_knot_grid, ContextScratch,
@@ -376,7 +376,7 @@ impl HazardCurveTarget {
         let success_tolerance = config.hazard_curve.validation_tolerance;
 
         let (curve, report) = match params.method {
-            CalibrationMethod::Bootstrap => SequentialBootstrapper::bootstrap(
+            CalibrationMethod::Bootstrap => bootstrap::bootstrap(
                 &target,
                 &prepared_quotes,
                 Vec::new(),
@@ -385,7 +385,7 @@ impl HazardCurveTarget {
             )?,
             CalibrationMethod::GlobalSolve {
                 use_analytical_jacobian,
-            } => GlobalFitOptimizer::optimize(
+            } => global::optimize(
                 &target,
                 &prepared_quotes,
                 &config,
