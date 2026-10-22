@@ -121,7 +121,6 @@ fn valid_series_transforms_preserve_currency() {
         "std(usd)",
         "quantile(usd, 0.5)",
         "ttm(usd)",
-        "ltm(usd)",
         "ytd(usd)",
         "qtd(usd)",
         "fiscal_ytd(usd, 4)",

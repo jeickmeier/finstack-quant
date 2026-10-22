@@ -361,26 +361,10 @@ impl PyForecastSpec {
         ))
     }
 
-    /// Explicit per-period override spec.
-    ///
-    /// Forecast periods listed in ``overrides`` take the supplied value; any
-    /// forecast period without an entry inherits the most recent value
-    /// (forward fill), so a sparse mapping pins a few anchor periods.
-    ///
-    /// Parameters
-    /// ----------
-    /// overrides : Mapping[str, float] | Sequence[tuple[str, float]] | pd.Series
-    ///     Period identifier (``"2025Q3"``) to value, in the node's own
-    ///     units (a currency amount for monetary nodes, a decimal ratio for
-    ///     scalar nodes). Periods must belong to the model timeline.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a period identifier does not parse or a value is not numeric.
+    #[doc = pydoc!("finstack_quant.statements", "ForecastSpec.overrides")]
     #[staticmethod]
-    #[pyo3(name = "override", text_signature = "(overrides)")]
-    fn override_(overrides: &Bound<'_, PyAny>) -> PyResult<Self> {
+    #[pyo3(text_signature = "(overrides)")]
+    fn overrides(overrides: &Bound<'_, PyAny>) -> PyResult<Self> {
         let pairs = super::extract_scalar_series(overrides)?;
         let map: IndexMap<finstack_quant_core::dates::PeriodId, f64> = pairs.into_iter().collect();
         Ok(Self::wrap(

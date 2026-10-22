@@ -1388,7 +1388,7 @@ class ForecastSpec:
         ...
 
     @staticmethod
-    def override(overrides: Mapping[str, float] | Sequence[tuple[str, float]] | pd.Series) -> ForecastSpec:
+    def overrides(overrides: Mapping[str, float] | Sequence[tuple[str, float]] | pd.Series) -> ForecastSpec:
         """Pin selected forecast periods and forward-fill the periods between them.
 
         Parameters
@@ -1411,7 +1411,7 @@ class ForecastSpec:
         Examples
         --------
         >>> from finstack_quant.statements import ForecastSpec
-        >>> ForecastSpec.override({"2025Q2": 120.0}).method.kind
+        >>> ForecastSpec.overrides({"2025Q2": 120.0}).method.kind
         'override'
         """
         ...
@@ -3187,7 +3187,7 @@ class Registry:
         """
         ...
 
-    def dependencies(self, qualified_id: str) -> list[str]:
+    def get_dependencies(self, qualified_id: str) -> list[str]:
         """List transitive registry dependencies in construction order.
 
         Parameters

@@ -31081,13 +31081,13 @@ export interface Registry extends WasmOwned {
   /**
    * Metrics one metric depends on, transitively.
    *
-   * Twin of Python `Registry.dependencies` (Rust
-   * `Registry::get_metric_dependencies`).
+   * Twin of Python `Registry.get_dependencies` (Rust
+   * `Registry::get_dependencies`).
    * @param qualifiedId - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
    * @returns Qualified identifiers of the metrics to add before `qualifiedId`, in dependency order.
    * @throws Error with kind `not_found` if the metric or one of its dependencies is not registered, and kind `validation` if the dependencies form a cycle.
    */
-  dependencies(qualifiedId: string): string[];
+  getDependencies(qualifiedId: string): string[];
 }
 
 /**

@@ -7,6 +7,22 @@ await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
 });
 
+test('canonical registry name and compiled trailing-period function', () => {
+  const registry = statements.Registry.withBuiltins();
+  try {
+    assert.equal(registry.dependencies, undefined);
+    assert.ok(registry.getDependencies('fin.gross_margin').includes('fin.gross_profit'));
+  } finally {
+    registry.free();
+  }
+  assert.doesNotThrow(() => statements.parseFormula('ltm(revenue)'));
+  assert.throws(
+    () => statements.parseAndCompile('ltm(revenue)'),
+    /Function 'ltm' is not supported/
+  );
+  assert.equal(statements.parseAndCompile('ttm(revenue)'), undefined);
+});
+
 /** One-shot `Evaluator.evaluate`, the branch twin of the retired `evaluateModel`. */
 function evaluateModel(input) {
   const evaluator = new statements.Evaluator();

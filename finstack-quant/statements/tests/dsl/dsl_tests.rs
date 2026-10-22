@@ -208,7 +208,6 @@ fn function_names_arities_and_core_mappings_stay_in_sync() {
             Function::AnnualizeRate,
         ),
         ("ttm(ebitda)", "ttm", 1, Function::Ttm),
-        ("ltm(ebitda)", "ltm", 1, Function::Ttm),
         ("ytd(revenue)", "ytd", 1, Function::Ytd),
         ("qtd(revenue)", "qtd", 1, Function::Qtd),
         (
@@ -329,6 +328,7 @@ fn malformed_and_unsupported_formulas_fail_at_the_public_boundary() {
         "annualize()",
         "annualize_rate(rate, 4)",
         "ttm(revenue, 4)",
+        "ltm(revenue)",
         "ltm(revenue, 4)",
         "ytd()",
         "qtd(revenue, 4)",

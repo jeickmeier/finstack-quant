@@ -307,7 +307,11 @@ impl Registry {
     /// Valid registries loaded through [`load_registry`](Self::load_registry)
     /// normally avoid the latter case because formulas are checked at load
     /// time.
-    pub fn get_metric_dependencies(&self, qualified_id: &str) -> Result<Vec<String>> {
+    /// # Arguments
+    ///
+    /// * `qualified_id` - Fully qualified registry metric identifier whose
+    ///   transitive, same-namespace dependencies should be returned.
+    pub fn get_dependencies(&self, qualified_id: &str) -> Result<Vec<String>> {
         let mut all_deps = IndexSet::new();
         let mut visited = IndexSet::new();
         self.collect_transitive_dependencies(qualified_id, &mut all_deps, &mut visited)?;

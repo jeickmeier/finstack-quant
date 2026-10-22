@@ -514,7 +514,7 @@
         "type": "monetary",
         "currency": "USD"
       },
-      "formula_text": "ltm(ebitda)"
+      "formula_text": "ttm(ebitda)"
     },
     "leverage": {
       "node_id": "leverage",

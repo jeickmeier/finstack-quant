@@ -273,7 +273,7 @@ fn test_circular_dependency_detection() {
 }
 
 #[test]
-fn test_get_metric_dependencies() {
+fn test_get_dependencies() {
     let json = r#"{
         "namespace": "test",
         "schema_version": 1,
@@ -302,7 +302,7 @@ fn test_get_metric_dependencies() {
         .expect("should load valid JSON");
 
     let deps = registry
-        .get_metric_dependencies("test.c")
+        .get_dependencies("test.c")
         .expect("metric should exist");
     assert_eq!(deps.len(), 2);
     assert!(deps.contains(&"test.a".to_string()));
@@ -349,7 +349,7 @@ fn test_transitive_dependencies() {
         .expect("should load valid JSON");
 
     let deps = registry
-        .get_metric_dependencies("test.level3")
+        .get_dependencies("test.level3")
         .expect("metric should exist");
     assert_eq!(deps.len(), 2);
     assert!(deps.contains(&"test.level1".to_string()));
@@ -390,7 +390,7 @@ fn test_mixed_dependencies() {
     assert!(registry.has("test.ebitda_margin"));
 
     let deps = registry
-        .get_metric_dependencies("test.ebitda_margin")
+        .get_dependencies("test.ebitda_margin")
         .expect("metric should exist");
     assert_eq!(deps.len(), 2);
     assert!(deps.contains(&"test.gross_profit".to_string()));
