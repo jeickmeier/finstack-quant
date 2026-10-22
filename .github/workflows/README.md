@@ -32,8 +32,10 @@ release practice is in [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md).
 
 CI does not reimplement the build. Almost every job provisions the pinned
 toolchain with `jdx/mise-action` and then runs a canonical `mise` task, so
-those jobs run exactly the commands you can run locally. Toolchain versions live
-in [`../../mise.toml`](../../mise.toml); nothing here pins a compiler.
+those jobs run exactly the commands you can run locally. The exception is the
+per-test time cap, which is CI-only; reproduce it with
+`NEXTEST_PROFILE=ci mise run rust-test`. Toolchain versions live in
+[`../../mise.toml`](../../mise.toml); nothing here pins a compiler.
 
 ## Workflows
 
@@ -66,8 +68,10 @@ other jobs then run in parallel, and each fails the run on its own:
 
 The tier's budget is under 15 minutes wall clock on a warm `master` cache. The
 `ci` nextest profile (`.config/nextest.toml`) reports a test as slow at 20 s
-and kills it at 60 s. A test that needs longer belongs in the slow suite: mark
-it `#[ignore = "slow: <reason>"]`, and `mise run rust-test --slow` runs it, as
+and kills it at 180 s, a runaway guard. The per-test budget is 60 s, and the
+cap tightens to it once the slow tests are measured on CI and moved out. A
+test that needs more than 60 s belongs in the slow suite: mark it
+`#[ignore = "slow: <reason>"]`, and `mise run rust-test --slow` runs it, as
 does the full tier.
 
 Each job with a Rust build has its own `Swatinem/rust-cache` key (`lint`,
@@ -105,7 +109,7 @@ Its `prime-cache` job restores the mise cache read-only; `checks.yml`'s
 | Python coverage | `mise run python-test --coverage` | The fast pytest suite with coverage; writes a Job Summary from `coverage/python/{junit.xml,coverage.xml}` and uploads `coverage/python/coverage.xml`. |
 | SonarQube | `SonarSource/sonarqube-scan-action` | `master` only, after both coverage jobs, so it is skipped in a release run and on a dispatched branch. Scan only: it imports the two coverage artifacts, runs no tests and no clippy (`sonar.rust.clippy.enabled=false`; Lint owns clippy), and writes the Quality Gate and project measures to the Job Summary. |
 | Documentation | `mise run all-doc`, then `rust-test`, `python-test` and `wasm-test` with `--doctest` | Strict rustdoc, the public-API input-doc and deprecation contracts, the Python and WASM documentation contracts, and the benchmark documents; then the Rust doctests, the Python stub and module doctests, and the WASM documented code samples. Installs nightly for `cargo public-api`. |
-| Test ignored Rust suite | `mise run rust-test --slow` | The `#[ignore]`d suite, outside the `ci` nextest profile's 60 s cap. |
+| Test ignored Rust suite | `mise run rust-test --slow` | The `#[ignore]`d suite, outside the `ci` nextest profile's per-test cap. |
 | Test slow Python suite | `mise run python-test --slow` | Golden pricing comparisons and Monte Carlo. |
 
 Rust coverage and Documentation own the `coverage-rust` and `docs` rust-cache
@@ -155,9 +159,9 @@ Runs at 06:00 UTC and on manual dispatch, on `master` only:
    parallel, every night, including when `master` did not move (the
    supply-chain audit can fail on new advisories alone). This run saves the
    Rust caches that pull requests and tags restore.
-2. **Plan nightly build**, once both tiers pass: compares `master` with the commit the `nightly` tag
-   points at. A scheduled run skips the build when they match; a manual
-   dispatch always builds. The version is the `Cargo.toml` workspace version
+2. **Plan nightly build**, once both tiers pass: compares `master` with the
+   commit the `nightly` tag points at. A scheduled run skips the build when
+   they match; a manual dispatch always builds. The version is the `Cargo.toml` workspace version
    plus `-dev.` and the commit time in UTC as `YYYYMMDDHHMM`, e.g.
    `0.12.0-dev.202610210600` (Python `0.12.0.dev202610210600`). `master`
    carries the next unreleased version, so a nightly orders below that
