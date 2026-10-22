@@ -46,34 +46,36 @@
 //! let issue_date = date!(2025-01-15);
 //! let maturity_date = date!(2030-01-15);
 //!
-//! let model = ModelBuilder::new("LBO Model")
-//!     .periods("2025Q1..2025Q4", Some("2025Q1"))?
-//!     .value("revenue", &[
+//! let model = {
+//!     let mut model_builder = ModelBuilder::new("LBO Model");
+//!     model_builder.periods("2025Q1..2025Q4", Some("2025Q1"))?;
+//!     model_builder.value("revenue", &[
 //!         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0)),
 //!         (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(110.0)),
 //!         (PeriodId::quarter(2025, 3).expect("valid period fixture"), AmountOrScalar::scalar(120.0)),
 //!         (PeriodId::quarter(2025, 4).expect("valid period fixture"), AmountOrScalar::scalar(130.0)),
-//!     ])
-//!     .availability_dates(
+//!     ]);
+//!     model_builder.availability_dates(
 //!         "revenue",
 //!         &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), issue_date)],
-//!     )?
+//!     )?;
 //!     // Add debt instruments
-//!     .add_bond(
+//!     model_builder.add_bond(
 //!         "BOND-001",
 //!         Money::from((10_000_000_i64, Currency::USD)),
 //!         0.05, // 5% coupon
 //!         issue_date,
 //!         maturity_date,
 //!         "USD-OIS",
-//!     )?
+//!     )?;
 //!     // Reference in formulas
-//!     .compute("interest_expense", "cs.interest_expense.BOND-001")?
-//!     .compute(
+//!     model_builder.compute("interest_expense", "cs.interest_expense.BOND-001")?;
+//!     model_builder.compute(
 //!         "total_debt_service",
 //!         "cs.interest_expense.total + cs.principal_payment.total",
-//!     )?
-//!     .build()?;
+//!     )?;
+//!     model_builder.build()?
+//! };
 //!
 //! let market_ctx = MarketContext::new().insert(
 //!     DiscountCurve::builder("USD-OIS")

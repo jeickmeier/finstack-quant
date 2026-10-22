@@ -52,13 +52,13 @@ exclusive end date.
 | `builder` | `ModelBuilder`, `MixedNodeBuilder`, `validate_node_id` |
 | `types` | `FinancialModelSpec`, `NodeSpec`, `NodeId`, `NodeType`, `NodeValueType`, `AmountOrScalar`, `ForecastSpec`, `ForecastMethod`, `CapitalStructureSpec` |
 | `evaluator` | `Evaluator`, `StatementResult`, `PreparedEvaluation`, `EvaluationContext`, `DependencyGraph`, `MonteCarloConfig`/`MonteCarloResults`, `node_to_dated_schedule` |
-| `dsl` | `parse_formula`, `compile`, `parse_and_compile`, `extract_all_identifiers`, `StmtExpr`, `BinOp`, `UnaryOp` |
+| `dsl` | `parse_formula`, `compile`, `parse_and_compile`, `extract_all_identifiers`, `StmtExpr` |
 | `registry` | `Registry`, `MetricRegistry`, `MetricDefinition`, `UnitType` — the `fin.*` built-in catalog and user namespaces |
 | `capital_structure` | `WaterfallSpec`, `EcfSweepSpec`, `PikToggleSpec`, `CapitalStructureCashflows`, `CashflowBreakdown`, `calculate_period_flows` |
 | `checks` | `CheckSuite`, `CheckSuiteSpec`, `Check`, `CheckReport`, `FormulaCheckSpec`, and the `builtins` implementations |
 | `adjustments` | `normalize`, `merge_into_results`, `NormalizationConfig`, `Adjustment`, `AdjustmentValue`, `AdjustmentCap` |
 | `schema` | `ARTIFACTS` schema registry |
-| `error` | `Error`, `Result`; both are also re-exported at the crate root |
+| Crate root | `Error`, `Result` |
 | `prelude` | The `builder`, `checks`, `error`, and `types` surfaces, the headline `evaluator` items (`Evaluator`, `NumericMode`, `PreparedEvaluation`, `StatementResult`), `registry::Registry`, and core `Money`, `Currency`, `Date`, `PeriodId`, `Tenor` |
 
 The prelude deliberately stops short of `dsl`, `capital_structure`, `adjustments`,

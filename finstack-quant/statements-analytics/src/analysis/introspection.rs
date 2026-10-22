@@ -126,12 +126,14 @@ impl<'a> DependencyTracer<'a> {
     /// # use finstack_quant_statements::evaluator::DependencyGraph;
     /// # use finstack_quant_statements_analytics::analysis::DependencyTracer;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let model = ModelBuilder::new("demo")
-    /// #     .periods("2025Q1..Q2", None)?
-    /// #     .compute("a", "10")?
-    /// #     .compute("b", "a * 2")?
-    /// #     .compute("c", "a + b")?
-    /// #     .build()?;
+    /// # let model = {
+    /// #     let mut model_builder = ModelBuilder::new("demo");
+    /// #     model_builder.periods("2025Q1..Q2", None)?;
+    /// #     model_builder.compute("a", "10")?;
+    /// #     model_builder.compute("b", "a * 2")?;
+    /// #     model_builder.compute("c", "a + b")?;
+    /// #     model_builder.build()?
+    /// # };
     /// # let graph = DependencyGraph::from_model(&model)?;
     /// let tracer = DependencyTracer::new(&model, &graph);
     /// let tree = tracer.dependency_tree("c")?;
@@ -174,11 +176,13 @@ impl<'a> DependencyTracer<'a> {
     /// # use finstack_quant_statements::evaluator::DependencyGraph;
     /// # use finstack_quant_statements_analytics::analysis::DependencyTracer;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let model = ModelBuilder::new("demo")
-    /// #     .periods("2025Q1..Q2", None)?
-    /// #     .compute("a", "10")?
-    /// #     .compute("b", "a * 2")?
-    /// #     .build()?;
+    /// # let model = {
+    /// #     let mut model_builder = ModelBuilder::new("demo");
+    /// #     model_builder.periods("2025Q1..Q2", None)?;
+    /// #     model_builder.compute("a", "10")?;
+    /// #     model_builder.compute("b", "a * 2")?;
+    /// #     model_builder.build()?
+    /// # };
     /// # let graph = DependencyGraph::from_model(&model)?;
     /// let tracer = DependencyTracer::new(&model, &graph);
     /// assert_eq!(tracer.dependency_tree_text("b")?, "b (a * 2)\n└── a (10)\n");
@@ -332,12 +336,14 @@ impl DependencyTree {
 /// # use finstack_quant_statements::evaluator::DependencyGraph;
 /// # use finstack_quant_statements_analytics::analysis::{DependencyTracer, render_tree_ascii};
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # let model = ModelBuilder::new("demo")
-/// #     .periods("2025Q1..Q2", None)?
-/// #     .compute("revenue", "100000")?
-/// #     .compute("cogs", "revenue * 0.4")?
-/// #     .compute("gross_profit", "revenue - cogs")?
-/// #     .build()?;
+/// # let model = {
+/// #     let mut model_builder = ModelBuilder::new("demo");
+/// #     model_builder.periods("2025Q1..Q2", None)?;
+/// #     model_builder.compute("revenue", "100000")?;
+/// #     model_builder.compute("cogs", "revenue * 0.4")?;
+/// #     model_builder.compute("gross_profit", "revenue - cogs")?;
+/// #     model_builder.build()?
+/// # };
 /// # let graph = DependencyGraph::from_model(&model)?;
 /// let tracer = DependencyTracer::new(&model, &graph);
 /// let tree = tracer.dependency_tree("gross_profit")?;
@@ -382,12 +388,14 @@ pub fn render_tree_ascii(tree: &DependencyTree) -> String {
 /// # use finstack_quant_statements_analytics::analysis::{DependencyTracer, render_tree_detailed};
 /// # use finstack_quant_core::dates::PeriodId;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # let model = ModelBuilder::new("demo")
-/// #     .periods("2025Q1..Q2", None)?
-/// #     .compute("revenue", "100000")?
-/// #     .compute("cogs", "revenue * 0.4")?
-/// #     .compute("gross_profit", "revenue - cogs")?
-/// #     .build()?;
+/// # let model = {
+/// #     let mut model_builder = ModelBuilder::new("demo");
+/// #     model_builder.periods("2025Q1..Q2", None)?;
+/// #     model_builder.compute("revenue", "100000")?;
+/// #     model_builder.compute("cogs", "revenue * 0.4")?;
+/// #     model_builder.compute("gross_profit", "revenue - cogs")?;
+/// #     model_builder.build()?
+/// # };
 /// # let mut evaluator = Evaluator::new();
 /// # let results = evaluator.evaluate(&model)?;
 /// # let graph = DependencyGraph::from_model(&model)?;

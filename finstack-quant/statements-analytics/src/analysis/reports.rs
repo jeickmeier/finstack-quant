@@ -168,11 +168,13 @@ impl Default for TableBuilder {
 /// # use finstack_quant_core::dates::PeriodId;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-/// # let model = ModelBuilder::new("demo")
-/// #     .periods("2025Q1..Q2", None)?
-/// #     .compute("revenue", "100000")?
-/// #     .compute("cogs", "40000")?
-/// #     .build()?;
+/// # let model = {
+/// #     let mut model_builder = ModelBuilder::new("demo");
+/// #     model_builder.periods("2025Q1..Q2", None)?;
+/// #     model_builder.compute("revenue", "100000")?;
+/// #     model_builder.compute("cogs", "40000")?;
+/// #     model_builder.build()?
+/// # };
 /// # let mut evaluator = Evaluator::new();
 /// # let results = evaluator.evaluate(&model)?;
 /// let report = PLSummaryReport::new(&results, vec!["revenue", "cogs"], vec![period]);
@@ -462,10 +464,12 @@ impl CreditAssessment {
 /// # use finstack_quant_core::dates::PeriodId;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-/// # let model = ModelBuilder::new("demo")
-/// #     .periods("2025Q1..Q2", None)?
-/// #     .compute("revenue", "100000")?
-/// #     .build()?;
+/// # let model = {
+/// #     let mut model_builder = ModelBuilder::new("demo");
+/// #     model_builder.periods("2025Q1..Q2", None)?;
+/// #     model_builder.compute("revenue", "100000")?;
+/// #     model_builder.build()?
+/// # };
 /// # let mut evaluator = Evaluator::new();
 /// # let results = evaluator.evaluate(&model)?;
 /// let report = CreditAssessmentReport::new(&results, period);

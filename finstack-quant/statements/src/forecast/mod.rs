@@ -76,6 +76,9 @@ use timeseries::{seasonal_forecast, timeseries_forecast};
 use crate::error::Result;
 use crate::types::ForecastSpec;
 use finstack_quant_core::dates::PeriodId;
+
+/// Per-period forecast levels or standard-normal shocks.
+type ForecastSeries = indexmap::IndexMap<PeriodId, f64>;
 /// Apply a forecast for a specific node in single-run (non-Monte-Carlo) mode.
 ///
 /// Runs the method selected by `spec` and applies its `min`/`max` bounds,
@@ -95,7 +98,7 @@ pub(crate) fn apply_forecast_for_node(
 ) -> Result<indexmap::IndexMap<PeriodId, f64>> {
     use crate::types::ForecastMethod;
 
-    let mut results = match spec.method {
+    let (mut results, _) = match spec.method {
         // Stochastic (seeded) methods get the node-seed mix. Correlation
         // (`correlation_with`) is a Monte Carlo-only feature; the single-run
         // path produces independent draws. Warn loudly so a configured
@@ -126,50 +129,66 @@ pub(crate) fn apply_forecast_for_node(
 ///
 /// Stochastic methods (normal, log-normal, mean-reverting, bootstrap) mix
 /// `node_id` into their configured seed so different nodes on the same run do
-/// not reuse identical draws. `stream` selects an independent Philox stream
+/// not reuse identical draws. `stream` selects an independent RNG stream
 /// for Monte Carlo path `stream`; `None` is the single-run stream.
 /// Deterministic methods ignore both. Monte Carlo callers apply
 /// [`apply_bounds`] themselves, after recording correlation shocks.
+///
+/// Returns the generated levels and the sampled Gaussian shocks, or `None`
+/// for methods that do not draw Gaussian shocks. Zero-volatility forecasts
+/// retain zero shocks so they cannot serve as stochastic correlation peers.
 pub(crate) fn apply_forecast(
     spec: &ForecastSpec,
     base_value: f64,
     forecast_periods: &[PeriodId],
     node_id: &str,
     stream: Option<u64>,
-) -> Result<indexmap::IndexMap<PeriodId, f64>> {
+) -> Result<(ForecastSeries, Option<ForecastSeries>)> {
     use crate::types::ForecastMethod;
     use statistical::{
         bootstrap_forecast_with_stream, lognormal_forecast_with_stream,
         mean_reverting_forecast_with_stream, normal_forecast_with_stream,
     };
-
-    // Single dispatch point for every method, so an unknown key cannot slip
-    // through on any path.
     validate_params(spec.method, &spec.params)?;
-
     let seeded = || mix_node_seed(&spec.params, node_id);
     match spec.method {
         ForecastMethod::Normal => {
             normal_forecast_with_stream(base_value, forecast_periods, &seeded(), stream)
+                .map(|(values, shocks)| (values, Some(shocks)))
         }
         ForecastMethod::LogNormal => {
             lognormal_forecast_with_stream(base_value, forecast_periods, &seeded(), stream)
+                .map(|(values, shocks)| (values, Some(shocks)))
         }
         ForecastMethod::MeanReverting => {
             mean_reverting_forecast_with_stream(base_value, forecast_periods, &seeded(), stream)
+                .map(|(values, shocks)| (values, Some(shocks)))
         }
         ForecastMethod::Bootstrap => {
             bootstrap_forecast_with_stream(base_value, forecast_periods, &seeded(), stream)
+                .map(|values| (values, None))
         }
-        ForecastMethod::ForwardFill => forward_fill(base_value, forecast_periods),
-        ForecastMethod::GrowthPct => growth_pct(base_value, forecast_periods, &spec.params),
-        ForecastMethod::CurvePct => curve_pct(base_value, forecast_periods, &spec.params),
-        ForecastMethod::Override => apply_override(base_value, forecast_periods, &spec.params),
+        ForecastMethod::ForwardFill => {
+            forward_fill(base_value, forecast_periods).map(|values| (values, None))
+        }
+        ForecastMethod::GrowthPct => {
+            growth_pct(base_value, forecast_periods, &spec.params).map(|values| (values, None))
+        }
+        ForecastMethod::CurvePct => {
+            curve_pct(base_value, forecast_periods, &spec.params).map(|values| (values, None))
+        }
+        ForecastMethod::Override => {
+            apply_override(base_value, forecast_periods, &spec.params).map(|values| (values, None))
+        }
         ForecastMethod::TimeSeries => {
             timeseries_forecast(base_value, forecast_periods, &spec.params)
+                .map(|values| (values, None))
         }
-        ForecastMethod::Seasonal => seasonal_forecast(base_value, forecast_periods, &spec.params),
-        ForecastMethod::FadeToTarget => fade_to_target(base_value, forecast_periods, &spec.params),
+        ForecastMethod::Seasonal => seasonal_forecast(base_value, forecast_periods, &spec.params)
+            .map(|values| (values, None)),
+        ForecastMethod::FadeToTarget => {
+            fade_to_target(base_value, forecast_periods, &spec.params).map(|values| (values, None))
+        }
     }
 }
 
@@ -321,9 +340,8 @@ fn validate_param_types(params: &indexmap::IndexMap<String, serde_json::Value>) 
 /// Non-finite observations are preserved so bounds cannot hide missing data
 /// or suppress the evaluator's non-finite-value diagnostics.
 ///
-/// In Monte Carlo mode the evaluator applies this **after** Z-score
-/// recording, so correlation shocks are always inverted from the unclamped
-/// series.
+/// In Monte Carlo mode the evaluator applies bounds after retaining the
+/// sampled shocks. Clipping the reported levels leaves those shocks unchanged.
 ///
 /// # Arguments
 ///
@@ -521,9 +539,8 @@ mod tests {
     }
 
     /// Monte Carlo path: `apply_forecast` must return **unclamped**
-    /// values. Z-score recording inverts the generating recurrence from the
-    /// series, so clamping before recording would corrupt every correlated
-    /// peer's shocks. The evaluator applies bounds after recording.
+    /// values. The recurrence evolves without bounds; the evaluator clamps
+    /// only the reported levels after retaining the sampled shocks.
     #[test]
     fn seeded_mc_forecast_is_not_clamped_before_z_recording() {
         let periods = quarters(8);
@@ -531,7 +548,7 @@ mod tests {
         spec.params.insert("min".into(), serde_json::json!(99.0));
         spec.params.insert("max".into(), serde_json::json!(101.0));
 
-        let seeded =
+        let (seeded, _) =
             apply_forecast(&spec, 100.0, &periods, "node", Some(3)).expect("seeded forecast");
         // With sigma = 50 and tight bounds, an unclamped walk must escape
         // [99, 101] somewhere in 8 periods.

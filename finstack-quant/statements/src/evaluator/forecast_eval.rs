@@ -4,8 +4,7 @@ use crate::error::{Error, Result};
 use crate::evaluator::context::EvaluationContext;
 use crate::forecast;
 use crate::forecast::statistical::{
-    monte_carlo_correlated_series, parse_correlation_params, record_independent_z_scores_for_mc,
-    CorrelatedMonteCarloSeries,
+    monte_carlo_correlated_series, parse_correlation_params, CorrelatedMonteCarloSeries,
 };
 use crate::types::{FinancialModelSpec, ForecastMethod, NodeId, NodeSpec};
 use finstack_quant_core::dates::{Date, PeriodId};
@@ -93,73 +92,51 @@ pub(crate) fn evaluate_forecast(
     )?;
 
     let forecast_results = if let Some(offset) = seed_offset {
-        let mut series = match mc_z_cache.as_mut() {
-            Some(cache) => match forecast_spec.method {
-                ForecastMethod::Normal
-                | ForecastMethod::LogNormal
-                | ForecastMethod::MeanReverting => {
-                    if let Some((peer, rho)) = parse_correlation_params(&forecast_spec.params)? {
-                        if model.get_node(peer.as_str()).is_none() {
-                            return Err(Error::forecast(format!(
-                                "correlation_with references unknown node '{peer}'"
-                            )));
-                        }
-                        let (series, z_map) =
-                            monte_carlo_correlated_series(CorrelatedMonteCarloSeries {
-                                method: forecast_spec.method,
-                                params: &forecast_spec.params,
-                                base_value,
-                                forecast_periods: &forecast_periods,
-                                seed_offset: offset,
-                                node_id: node_spec.node_id.as_str(),
-                                peer_id: peer.as_str(),
-                                rho,
-                                mc_z_cache: cache,
-                            })?;
-                        cache
-                            .entry(node_spec.node_id.clone())
-                            .or_default()
-                            .extend(z_map);
-                        series
-                    } else {
-                        let series = forecast::apply_forecast(
-                            forecast_spec,
-                            base_value,
-                            &forecast_periods,
-                            node_spec.node_id.as_str(),
-                            Some(offset),
-                        )?;
-                        record_independent_z_scores_for_mc(
-                            forecast_spec.method,
-                            &forecast_spec.params,
-                            &forecast_periods,
-                            &series,
-                            base_value,
-                            &node_spec.node_id,
-                            cache,
-                        )?;
-                        series
-                    }
+        let correlation = if mc_z_cache.is_some()
+            && matches!(
+                forecast_spec.method,
+                ForecastMethod::Normal | ForecastMethod::LogNormal | ForecastMethod::MeanReverting
+            ) {
+            parse_correlation_params(&forecast_spec.params)?
+        } else {
+            None
+        };
+        let (mut series, shocks) =
+            if let (Some(cache), Some((peer, rho))) = (mc_z_cache.as_deref(), correlation) {
+                if model.get_node(peer.as_str()).is_none() {
+                    return Err(Error::forecast(format!(
+                        "correlation_with references unknown node '{peer}'"
+                    )));
                 }
-                _ => forecast::apply_forecast(
+                let (series, shocks) = monte_carlo_correlated_series(CorrelatedMonteCarloSeries {
+                    method: forecast_spec.method,
+                    params: &forecast_spec.params,
+                    base_value,
+                    forecast_periods: &forecast_periods,
+                    seed_offset: offset,
+                    node_id: node_spec.node_id.as_str(),
+                    peer_id: peer.as_str(),
+                    rho,
+                    mc_z_cache: cache,
+                })?;
+                (series, Some(shocks))
+            } else {
+                forecast::apply_forecast(
                     forecast_spec,
                     base_value,
                     &forecast_periods,
                     node_spec.node_id.as_str(),
                     Some(offset),
-                )?,
-            },
-            None => forecast::apply_forecast(
-                forecast_spec,
-                base_value,
-                &forecast_periods,
-                node_spec.node_id.as_str(),
-                Some(offset),
-            )?,
-        };
-        // Bounds are applied after Z-score recording so correlation shocks
-        // always invert the unclamped recurrence; the single-run path below
-        // clamps inside `apply_forecast_for_node`.
+                )?
+            };
+        if let (Some(cache), Some(shocks)) = (mc_z_cache.as_mut(), shocks) {
+            cache
+                .entry(node_spec.node_id.clone())
+                .or_default()
+                .extend(shocks);
+        }
+        // Cache sampled shocks before applying output bounds. Clipping the
+        // reported levels does not change the latent correlation process.
         forecast::apply_bounds(&forecast_spec.params, &mut series)?;
         series
     } else {

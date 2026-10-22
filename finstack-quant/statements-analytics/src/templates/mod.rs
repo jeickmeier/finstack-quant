@@ -51,10 +51,13 @@
 //!
 //! # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 //! # let values: &[(PeriodId, AmountOrScalar)] = &[];
-//! let builder = ModelBuilder::new("demo")
-//!     .periods("2025Q1..2025Q4", None)?
-//!     .value("additions", values)
-//!     .value("disposals", values);
+//! let builder = {
+//!     let mut model_builder = ModelBuilder::new("demo");
+//!     model_builder.periods("2025Q1..2025Q4", None)?;
+//!     model_builder.value("additions", values);
+//!     model_builder.value("disposals", values);
+//!     model_builder
+//! };
 //! let model = add_roll_forward(builder, "inventory", &["additions"], &["disposals"]).build()?;
 //! # let _ = model;
 //! # Ok(())
