@@ -52,19 +52,25 @@ pub(crate) struct InflationCurveTarget {
 }
 
 /// Parse an inflation observation lag the delivered curve can represent:
-/// a month lag, or none (an empty spec).
+/// a month lag, or none (an empty spec). `Some(0)` preserves monthly anchoring.
+///
+/// # Arguments
+///
+/// * `spec` - Month-lag label such as `3M`, `none`, or an empty string. Day lags
+///   are rejected because the delivered curve cannot represent them.
 ///
 /// # Errors
 ///
 /// Returns an error if `spec` does not parse or is a day-based lag, which an
 /// inflation curve cannot carry.
-pub(crate) fn parse_observation_lag(spec: &str) -> Result<InflationLag> {
+pub(crate) fn parse_observation_lag(spec: &str) -> Result<Option<u8>> {
     if spec.trim().is_empty() {
-        return Ok(InflationLag::None);
+        return Ok(None);
     }
     let lag = spec.parse::<InflationLag>()?;
     match lag {
-        InflationLag::Months(_) | InflationLag::None => Ok(lag),
+        InflationLag::Months(months) => Ok(Some(months)),
+        InflationLag::None => Ok(None),
         _ => Err(finstack_quant_core::Error::Validation(format!(
             "Inflation calibration observation_lag '{spec}' is unsupported: use a month lag or no lag; inflation curves cannot represent day-based observation lags"
         ))),
@@ -154,7 +160,7 @@ impl InflationCurveTarget {
                     .discount_curve_id(self.params.discount_curve_id.clone())
                     .day_count(conventions.day_count)
                     .side(PayReceive::Pay)
-                    .lag_opt(Some(lag))
+                    .lag_opt(Some(lag.map_or(InflationLag::None, InflationLag::Months)))
                     .interpolation_opt(Some(conventions.interpolation))
                     .business_day_convention(conventions.business_day_convention)
                     .calendar_id_opt(Some(conventions.calendar_id.clone().into()))
@@ -172,7 +178,7 @@ impl InflationCurveTarget {
                     .discount_curve_id(self.params.discount_curve_id.clone())
                     .day_count(conventions.day_count)
                     .side(PayReceive::Pay)
-                    .lag_opt(Some(lag))
+                    .lag_opt(Some(lag.map_or(InflationLag::None, InflationLag::Months)))
                     .interpolation_opt(Some(conventions.interpolation))
                     .base_cpi_opt(Some(base_cpi))
                     .business_day_convention(conventions.business_day_convention)
@@ -184,7 +190,7 @@ impl InflationCurveTarget {
 
         // The final required monthly anchor bounds projection exposure. A daily
         // reference index after day one consumes the next monthly observation.
-        let fixing_date = if let InflationLag::Months(months) = lag {
+        let fixing_date = if let Some(months) = lag {
             let first = maturity
                 .replace_day(1)
                 .map_err(|_| finstack_quant_core::InputError::InvalidDateRange)?;
@@ -213,21 +219,19 @@ impl InflationCurveTarget {
 
     /// Preserve the calibration lag for instruments that inherit curve metadata.
     fn indexation_lag_months(&self) -> Result<u32> {
-        Ok(match parse_observation_lag(&self.params.observation_lag)? {
-            InflationLag::Months(months) => u32::from(months),
-            _ => 0,
-        })
+        Ok(u32::from(
+            parse_observation_lag(&self.params.observation_lag)?.unwrap_or(0),
+        ))
     }
 
     /// Apply an observation lag to a date.
     fn apply_lag(
         date: finstack_quant_core::dates::Date,
-        lag: InflationLag,
+        lag: Option<u8>,
     ) -> finstack_quant_core::Result<finstack_quant_core::dates::Date> {
         match lag {
-            InflationLag::Months(m) => date.add_months(-(m as i32)),
-            InflationLag::Days(d) => date.add_days(-i64::from(d)),
-            _ => Ok(date),
+            Some(months) => date.add_months(-i32::from(months)),
+            None => Ok(date),
         }
     }
 
