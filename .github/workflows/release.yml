@@ -115,6 +115,8 @@ jobs:
       - name: Require every commit to be on master
         run: python3 scripts/check_release_upstream.py check origin/master "$GITHUB_SHA"
 
+  # Publish checks and semver build cold: nothing on master saves a cache for
+  # them, and caches saved on a tag are visible only to that tag.
   publish-checks:
     name: Rust Publish Checks
     needs: version
