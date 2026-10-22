@@ -808,7 +808,7 @@ mod tests {
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::{
         currency::Currency,
-        dates::{Date, DayCount},
+        dates::{Date, DayCount, DayCountContext},
         market_data::{
             context::MarketContext, scalars::MarketScalar, term_structures::DiscountCurve,
         },
@@ -817,7 +817,6 @@ mod tests {
     };
     use finstack_quant_models::closed_form::bs_price_unchecked;
     use finstack_quant_models::types::{ExerciseStyle, OptionType};
-    use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
     use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::SettlementType;
@@ -1233,7 +1232,9 @@ mod tests {
         let inputs = pricing::collect_inputs(&option, &curves, as_of)
             .expect("collect_inputs should succeed");
         let discount_curve = curves.get_discount(DISC_ID).expect("discount curve");
-        let curve_time = year_fraction(discount_curve.day_count(), as_of, expiry)
+        let curve_time = discount_curve
+            .day_count()
+            .year_fraction(as_of, expiry, DayCountContext::default())
             .expect("curve day-count fraction");
 
         // ACT/360: 365 days / 360 = 1.01389 years
