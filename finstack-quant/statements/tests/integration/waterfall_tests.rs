@@ -646,7 +646,7 @@ mod period_flow_waterfall_integration {
         for pre in [q1, q2] {
             assert_eq!(
                 cashflows
-                    .get_debt_balance("DDTL-1", &pre)
+                    .get_component("debt_balance", "DDTL-1", &pre)
                     .expect("balance present"),
                 0.0,
                 "pre-issuance period {pre} must report zero debt balance"
@@ -654,7 +654,7 @@ mod period_flow_waterfall_integration {
         }
         assert_eq!(
             cashflows
-                .get_debt_balance("DDTL-1", &q3)
+                .get_component("debt_balance", "DDTL-1", &q3)
                 .expect("balance present"),
             1_000_000.0,
             "post-issuance balance must equal the funded notional"

@@ -3816,22 +3816,7 @@
       "MixedNodeBuilder",
       "ModelBuilder",
       "Registry",
-      "capitalStructureCashflowsGetAccruedInterest",
-      "capitalStructureCashflowsGetDebtBalance",
-      "capitalStructureCashflowsGetFees",
-      "capitalStructureCashflowsGetInterest",
-      "capitalStructureCashflowsGetInterestCash",
-      "capitalStructureCashflowsGetInterestIncome",
-      "capitalStructureCashflowsGetInterestPik",
-      "capitalStructureCashflowsGetPrincipal",
-      "capitalStructureCashflowsGetTotalAccruedInterest",
-      "capitalStructureCashflowsGetTotalDebtBalance",
-      "capitalStructureCashflowsGetTotalFees",
-      "capitalStructureCashflowsGetTotalInterest",
-      "capitalStructureCashflowsGetTotalInterestCash",
-      "capitalStructureCashflowsGetTotalInterestIncome",
-      "capitalStructureCashflowsGetTotalInterestPik",
-      "capitalStructureCashflowsGetTotalPrincipal",
+      "capitalStructureCashflowsGetComponent",
       "checkConfigValidate",
       "checkReportFindingsBySeverity",
       "checkReportHasErrors",
@@ -4008,54 +3993,6 @@
     "kind": "function"
   },
   "statements.checkReportFindingsBySeverity": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetInterest": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetInterestCash": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetInterestPik": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetPrincipal": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetDebtBalance": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetFees": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetAccruedInterest": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetTotalInterest": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetTotalPrincipal": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetTotalDebtBalance": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetTotalFees": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetTotalInterestCash": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetTotalInterestIncome": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetTotalInterestPik": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetTotalAccruedInterest": {
-    "kind": "function"
-  },
-  "statements.capitalStructureCashflowsGetInterestIncome": {
     "kind": "function"
   },
   "statements.normalizationConfigAddAdjustment": {
@@ -6055,6 +5992,9 @@
     "kind": "function"
   },
   "valuations.valuationResultFailedCovenants": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetComponent": {
     "kind": "function"
   }
 }
