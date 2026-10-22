@@ -25,14 +25,11 @@ pub(crate) fn register_fx_swap_metrics(
     use finstack_quant_valuations_core::metrics::sensitivities::fx01::GenericFx01Calculator;
     use finstack_quant_valuations_core::pricer::InstrumentType;
 
-    // Fx01 and FxDelta are the same quantity (PV change per 1% relative spot
-    // move); both ids are kept because consumers ask for either name.
     finstack_quant_valuations_core::register_metrics! {
         registry: registry,
         instrument: InstrumentType::FxSwap,
         metrics: [
             (Fx01, GenericFx01Calculator),
-            (FxDelta, GenericFx01Calculator),
             (Dv01Domestic, ir01::FxSwapIr01(ir01::Ir01Curve::Domestic)),
             (Dv01Foreign, ir01::FxSwapIr01(ir01::Ir01Curve::Foreign)),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),

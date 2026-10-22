@@ -141,7 +141,6 @@
     "FX": [
       "base_amount",
       "fx01",
-      "fx_delta",
       "fx_vega",
       "inverse_rate",
       "spot_rate"
