@@ -1118,11 +1118,6 @@ pub fn cholesky_solve(chol: &[f64], b: &[f64], x: &mut [f64]) -> Result<()> {
         }
         // diag is the same L[i][i]
         let diag = chol[i * n + i];
-        if diag.abs() < singular_threshold {
-            return Err(crate::Error::Validation(
-                "Cholesky factor has a near-zero diagonal; the matrix is singular".to_string(),
-            ));
-        }
         x[i] = (x[i] - sum) / diag;
         if !x[i].is_finite() {
             return Err(crate::InputError::NonFiniteValue {
