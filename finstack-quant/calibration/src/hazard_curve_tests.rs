@@ -312,6 +312,67 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         "zero-shock replay must be identical"
     );
 
+    // The direct boundary and independently callable provider must reject the
+    // same malformed quote shocks before an unmatched tenor can become a no-op.
+    use finstack_quant_valuations_core::recalibration::{
+        HazardRecalibrationAction, HazardRecalibrationRequest, RecalibrationProvider,
+    };
+    let provider = crate::recalibration::CachedRecalibrationProvider::default();
+    let market = std::sync::Arc::new(ctx.clone());
+    let replay = |bump: &QuoteBump| {
+        provider.rebuild_hazard_curve(&HazardRecalibrationRequest {
+            hazard: std::sync::Arc::clone(&curve),
+            source_market: std::sync::Arc::clone(&market),
+            target_market: std::sync::Arc::clone(&market),
+            discount_curve_id: CurveId::new("TEST-DISC"),
+            doc_clause: None,
+            cds_valuation_convention: None,
+            deal_quote_override: None,
+            action: HazardRecalibrationAction::SpreadBump(bump.clone()),
+        })
+    };
+    for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        for bump in [
+            QuoteBump::ParallelBp(invalid),
+            QuoteBump::TenorsBp(vec![(invalid, 1.0)]),
+            QuoteBump::TenorsBp(vec![(invalid, 0.0)]),
+            QuoteBump::TenorsBp(vec![(1.0, invalid)]),
+        ] {
+            let direct_error =
+                bump_hazard_spreads(&curve, &ctx, &bump, &CurveId::new("TEST-DISC"), None, None)
+                    .expect_err("invalid direct bump");
+            let provider_error = replay(&bump).expect_err("invalid provider bump");
+            assert!(
+                direct_error.to_string().contains("finite"),
+                "{direct_error}"
+            );
+            assert_eq!(direct_error.to_string(), provider_error.to_string());
+        }
+    }
+    let first_tenor = recipe.spread_risk_inputs()[0].pillar_time;
+    for bump in [
+        QuoteBump::ParallelBp(0.0),
+        QuoteBump::TenorsBp(vec![(first_tenor, 0.0)]),
+        QuoteBump::TenorsBp(vec![(first_tenor, 1.0)]),
+    ] {
+        let direct =
+            bump_hazard_spreads(&curve, &ctx, &bump, &CurveId::new("TEST-DISC"), None, None)
+                .expect("valid direct bump");
+        let provided = replay(&bump).expect("valid provider bump");
+        assert_eq!(
+            direct.knot_points().collect::<Vec<_>>(),
+            provided.knot_points().collect::<Vec<_>>()
+        );
+        if bump.is_zero() {
+            assert_eq!(
+                direct.knot_points().collect::<Vec<_>>(),
+                curve.knot_points().collect::<Vec<_>>()
+            );
+        } else {
+            assert!(direct.hazard_rate(first_tenor) > curve.hazard_rate(first_tenor));
+        }
+    }
+
     let up = bump_hazard_spreads(
         curve.as_ref(),
         &ctx,
