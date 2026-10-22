@@ -31,6 +31,7 @@ from typing import Sequence
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+from finstack_quant.core import FinstackError
 from finstack_quant.core.dates import DayCount
 
 __all__ = [
@@ -53,7 +54,7 @@ __all__ = [
 
 # Errors
 
-class AnalyticsError(ValueError):
+class AnalyticsError(FinstackError):
     """
     Analytics validation or calculation failure.
 

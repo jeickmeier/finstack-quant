@@ -89,6 +89,7 @@ _INSTRUMENT_MACRO_OWNERS = (
 )
 
 CONVERTED: dict[str, tuple[str, ...] | None] = {
+    "finstack_quant.analytics": ("AnalyticsError",),
     "finstack_quant.valuations.composite": None,
     "finstack_quant.valuations.market": None,
     "finstack_quant.valuations.schema": None,
