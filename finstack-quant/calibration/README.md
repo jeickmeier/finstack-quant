@@ -17,7 +17,7 @@ recalibration contract with `CachedRecalibrationProvider`; no valuations
 crate depends on it. The umbrella `finstack-quant-valuations` is a
 dev-dependency only (its tests round-trip `InstrumentJson` envelopes), so a
 structured-credit, equity, FX or exotics edit never rebuilds calibration.
-`lmm::calibrate_bermudan_lmm_base_vol_from_json` reads its envelope through
+`calibrate_bermudan_lmm_base_vol_from_json` reads its envelope through
 `BermudanSwaption::from_envelope_json` rather than the closed instrument
 union.
 
@@ -27,8 +27,11 @@ Public modules:
 - `quotes`: raw market quote contracts.
 - `recalibration`: cached implementations of the valuations replay port.
 - `hull_white`: explicit Hull-White parameter calibration.
-- `lmm`: explicit Bermudan LMM base-volatility calibration.
-- `versions`: methodology identifiers recorded on `CalibrationReport::model_version`.
+- `validation`: curve/surface validators and validation policy types.
+- `json_schema` (with the default `json-schema` feature): published schema registry.
+
+The crate root exports the two `calibrate_bermudan_lmm_base_vol*` functions.
+Their implementation module and methodology-version constants are private.
 
 Quote-to-instrument construction lives in crate-private `build/`.
 

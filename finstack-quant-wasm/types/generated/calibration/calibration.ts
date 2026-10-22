@@ -4960,20 +4960,22 @@ export interface QuoteQuality {
    * Market quote the calibration instrument was built from, in the quote's
    * native units: decimal rate for deposits, FRAs, swaps and inflation
    * swaps; price for rate futures; basis points for CDS par spreads and
-   * cross-currency basis; percent for CDS and tranche upfronts.
+   * cross-currency basis; decimal fractions for CDS and tranche upfronts.
    *
    * Absent when the target's quotes carry no single scalar value or
    * diagnostics were not computed.
    */
   quote_value?: number | null;
   /**
-   * Signed calibration residual: the value of the instrument built at
-   * `quote_value`, priced on the calibrated curve and divided by the
-   * target's residual notional. The calibration target is zero.
+   * Signed calibration error in the report's `residual_units`: typically
+   * instrument PV per unit notional or a decimal volatility difference.
+   * The calibration target is zero.
    */
   residual: number;
   /**
-   * Local sensitivity: dOutput/dParam (via finite difference or Jacobian diagonal).
+   * Absolute residual derivative for the solved bootstrap knot, or the
+   * largest absolute derivative across global-fit parameters. `NaN` when
+   * no sensitivity was recorded.
    */
   sensitivity: number;
 }

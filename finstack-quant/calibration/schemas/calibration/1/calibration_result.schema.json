@@ -2199,7 +2199,7 @@
           "type": "string"
         },
         "quote_value": {
-          "description": "Market quote the calibration instrument was built from, in the quote's\nnative units: decimal rate for deposits, FRAs, swaps and inflation\nswaps; price for rate futures; basis points for CDS par spreads and\ncross-currency basis; percent for CDS and tranche upfronts.\n\nAbsent when the target's quotes carry no single scalar value or\ndiagnostics were not computed.",
+          "description": "Market quote the calibration instrument was built from, in the quote's\nnative units: decimal rate for deposits, FRAs, swaps and inflation\nswaps; price for rate futures; basis points for CDS par spreads and\ncross-currency basis; decimal fractions for CDS and tranche upfronts.\n\nAbsent when the target's quotes carry no single scalar value or\ndiagnostics were not computed.",
           "format": "double",
           "type": [
             "number",
@@ -2207,12 +2207,12 @@
           ]
         },
         "residual": {
-          "description": "Signed calibration residual: the value of the instrument built at\n`quote_value`, priced on the calibrated curve and divided by the\ntarget's residual notional. The calibration target is zero.",
+          "description": "Signed calibration error in the report's `residual_units`: typically\ninstrument PV per unit notional or a decimal volatility difference.\nThe calibration target is zero.",
           "format": "double",
           "type": "number"
         },
         "sensitivity": {
-          "description": "Local sensitivity: dOutput/dParam (via finite difference or Jacobian diagonal).",
+          "description": "Absolute residual derivative for the solved bootstrap knot, or the\nlargest absolute derivative across global-fit parameters. `NaN` when\nno sensitivity was recorded.",
           "format": "double",
           "type": "number"
         }

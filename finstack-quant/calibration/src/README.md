@@ -18,24 +18,28 @@ only to replay an already-calibrated context.
 | `quotes/` | public | Raw market quote DTOs and quote identifiers |
 | `build/` | crate-private | Quote-to-instrument construction and date resolution |
 | `hull_white/` | public | Hull-White 1F calibration to swaptions and cap/floors |
-| `solver.rs` + `solver/` | crate-private | Sequential bootstrap, global fit (Newton/LM), multi-start, shared helpers; re-exports `SolverConfig` |
-| `targets/` | crate-private | Per-step targets: discount, forward, hazard, inflation, vol, swaption, SVI, LMM, base correlation, Student-t, XCCY basis, parametric |
-| `validation/` | public | Curve/surface validators, preflight checks, rate bounds |
+| `solver/` | crate-private | Sequential bootstrap, global fit (Newton/LM), multi-start, shared helpers; re-exports `SolverConfig` |
+| `targets/` | crate-private | Per-step targets: discount, forward, hazard, inflation, vol, swaption, SVI, base correlation, Student-t, XCCY basis, parametric |
+| `validation/` | public | Curve/surface validators and rate bounds; preflight implementation is private |
 | `config.rs` | re-exported | `CalibrationConfig` and the per-curve solve configs |
 | `report.rs` | re-exported | `CalibrationReport`, `CalibrationDiagnostics`, `QuoteQuality` |
 | `step_runtime.rs` | crate-private | Step execution plumbing |
-| `prepared.rs` | crate-private | Calibration-side wrappers around `build::prepared::PreparedQuote` |
+| `lmm.rs` | private | Bermudan LMM implementation; its two calibration functions are exported at the crate root |
+| `versions.rs` | crate-private | Methodology identifiers recorded in reports |
 | `constants.rs` | crate-private | Shared numerical thresholds for the solvers and targets |
 
 Public re-exports from `finstack_quant_calibration`: `CalibrationConfig`,
 `CalibrationMethod`, `DiscountCurveSolveConfig`, `ForwardCurveSolveConfig`,
 `HazardCurveSolveConfig`, `InflationCurveSolveConfig`, `VolSurfaceSolveConfig`,
-`RatesStepConventions`,
-`ResidualWeightingScheme`,
-`SolverConfig`, `RateBounds`, `RateBoundsPolicy`, `ValidationConfig`,
-`ValidationMode`, `CalibrationReport`, `CalibrationDiagnostics`, `QuoteQuality`.
-Surface no-arbitrage validators and `CurveValidator` live on
-`finstack_quant_calibration::validation`.
+`RatesStepConventions`, `ResidualWeightingScheme`, `MarketFreshnessPolicy`,
+`MarketQuoteSide`, `SolverConfig`, `CalibrationReport`, `CalibrationDiagnostics`,
+`QuoteQuality`, `ResidualUnits`, `SolverMethod`, `FittedSlice`, and
+`FittedSliceParameters`. The root also exports
+`calibrate_bermudan_lmm_base_vol` and `calibrate_bermudan_lmm_base_vol_from_json`.
+`RateBounds`, `RateBoundsPolicy`, `ValidationConfig`, `ValidationMode`,
+`CurveValidator`, and the surface validators live in
+`finstack_quant_calibration::validation`. Quote types are exported directly
+from `quotes`; their implementation submodules are private.
 
 ## Envelope structure
 
@@ -100,23 +104,24 @@ in `core::Result` functions.
 
 Both hosts take the same envelope JSON but hand back different shapes.
 `finstack_quant.calibration.calibrate(envelope_json)` returns a
-`CalibrationResult` object whose `.market` getter rebuilds a `MarketContext`,
-alongside `.success`, `.report_json`, `.step_ids`, `.iterations`,
-`.max_residual`, and `.rmse`. The WASM `calibration.calibrate(envelope)` has no
+`CalibrationResultEnvelope` object whose `.market` getter rebuilds a
+`MarketContext`, alongside `.success`, `.report`, `.step_ids`, and `.iterations`.
+Per-step reports are available through `.step_report(step_id)`; residual
+statistics are fields of these reports. The WASM `calibration.calibrate(envelope)` has no
 such wrapper: it returns a plain `CalibrationResultEnvelope` object mirroring
 the Rust wire type, so a caller writes `calibrate(env).result.final_market` and
 re-ingests that sub-document rather than reading a `.market` property. Runnable
 envelope examples live in
-[`../../examples/market_bootstrap/`](../../examples/market_bootstrap/README.md).
+[`../examples/market_bootstrap/`](../examples/market_bootstrap/README.md).
 
 ## Configuration
 
 ### Two tolerances
 
 1. **Solver tolerance** (`config.solver.tolerance()`, default `1e-12`) — when
-   the numerical root finder stops. `SolverConfig` wraps
-   `finstack_quant_core::math::solver::BrentSolver`; this is convergence in
-   parameter space, not economic fit.
+   the numerical solver stops. `SolverConfig` stores the convergence tolerance
+   and iteration budget shared by the root-finding and global solvers; this
+   stopping criterion is distinct from economic fit.
 2. **Validation tolerance** — whether the calibration counts as successful.
    After the solver converges, final residuals are compared against the
    step's success tolerance; any residual above the threshold marks the
@@ -225,10 +230,25 @@ Global-solve failures always include the three worst-fit quotes in
 `CalibrationReport` carries `success`, `residuals` (a `BTreeMap` keyed by
 instrument id, so ordering is stable), `iterations`, `objective_value`,
 `max_residual`, `rmse`, `validation_passed`, `validation_error`,
-`convergence_reason`, `metadata`, `solver_config`, and `results_meta`, plus five
-optional fields: `diagnostics` (populated only when `compute_diagnostics` is
-on), `worst_quote_id` and `worst_quote_residual`, `explanation`, and
-`model_version`.
+`convergence_reason`, `metadata`, `solver_config`, and `results_meta`.
+`solver_method` and `residual_units` are typed fields; missing units remain
+unknown. The metadata map does not provide a fallback. Optional diagnostics
+include `diagnostics`, `worst_quote_id`, `worst_quote_residual`, `explanation`,
+and `model_version`; fitted surface parameters are stored in `fitted_slices`.
+
+Per-quote rows contain `quote_label`, `quote_value`, `residual`, and
+`sensitivity`. Quote values retain their native units, including decimal
+fractions for CDS/tranche upfronts. Residuals use the report's declared units.
+Rows without recorded diagnostics omit `quote_value` and carry `NaN` for
+`sensitivity`; Python's DataFrame represents the missing quote value as `NaN`.
+
+Surface validation requires one positive finite forward per expiry. The
+standalone validators return errors for acceptance violations. Within a plan,
+`validation_mode=error` marks the report unsuccessful; `warn` records a
+`validation_warning` without changing existing fit success. Disabling
+`check_arbitrage` skips arbitrage checks while retaining forward-input and
+volatility-bound validation. `fail_on_bad_fit` controls whether an unsuccessful
+report aborts execution.
 
 ## Recalibration
 

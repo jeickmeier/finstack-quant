@@ -35,8 +35,8 @@ correlation solver needs a seed. Their own plan steps overwrite both. Each file'
 
 `plan.quote_sets` holds named lists of quote **IDs**; the quote bodies live once
 in the envelope-level `market_data` array. See
-[`../../schemas/README.md`](../../schemas/README.md) for the full field
-reference.
+[the calibration schema](../../schemas/calibration/1/calibration.schema.json)
+for the full field reference.
 
 ## Editor autocomplete and validation
 
@@ -49,8 +49,8 @@ this up automatically and provide:
 - Inline validation of bad fields before the envelope hits the calibrator.
 
 For project-wide coverage of calibration JSON outside this directory, add a
-`json.schemas` mapping to your own `.vscode/settings.json` — see the IDE
-Autocompletion section of [`../../schemas/README.md`](../../schemas/README.md).
+`json.schemas` mapping to `.vscode/settings.json` that points matching files to
+the calibration schema above.
 
 ## The catalog
 
@@ -105,7 +105,7 @@ every static error without solving.
 Same pattern in Python and JavaScript:
 
 ```python
-result = finstack_quant.calibration.calibrate(envelope_json)  # -> CalibrationResult
+result = finstack_quant.calibration.calibrate(envelope_json)  # -> CalibrationResultEnvelope
 market = result.market                                        # -> MarketContext
 ```
 
@@ -117,7 +117,7 @@ const state = result.result.final_market;
 ## Verification
 
 ```bash
-cargo nextest run -p finstack-quant-calibration --test calibration reference_envelopes
+mise run rust-test-filter -- finstack-quant-calibration reference_envelopes
 ```
 
 The envelopes are hand-maintained, not generated: edit the JSON and re-run that
