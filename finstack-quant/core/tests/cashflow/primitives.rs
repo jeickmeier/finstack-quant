@@ -396,7 +396,7 @@ fn cashflow_valid_with_all_fields_populated() {
 fn cashflow_multiple_invalid_fields_first_error_wins() {
     // Multiple invalid fields: accrual_factor and rate are invalid
     // Validation should fail on the first non-amount check (accrual_factor)
-    // Note: Can't test invalid amount since Money::new panics on non-finite
+    // Money rejects non-finite input at construction, before cashflow validation.
     let cf = CashFlow {
         date: d(2025, 1, 15),
         reset_date: Some(d(2025, 1, 20)), // After payment - invalid
@@ -462,4 +462,27 @@ fn accrual_metadata_round_trips() {
     let decoded: CashFlow = serde_json::from_str(&encoded).unwrap();
     assert_eq!(decoded, flow);
     assert_eq!(decoded.accrual, Some(accrual));
+}
+
+#[test]
+fn monetary_representation_is_validated_at_construction() {
+    for amount in [
+        rust_decimal::Decimal::MIN,
+        rust_decimal::Decimal::ZERO,
+        rust_decimal::Decimal::MAX,
+    ] {
+        let flow = CashFlow::new(
+            d(2025, 6, 15),
+            None,
+            Money::from_decimal(amount, Currency::USD),
+            CFKind::Fixed,
+            0.25,
+            Some(0.03),
+        );
+        assert!(flow.validate().is_ok());
+        assert_eq!(flow.amount.amount_decimal(), amount);
+    }
+    for amount in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        assert!(Money::new(amount, Currency::USD).is_err());
+    }
 }

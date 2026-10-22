@@ -111,7 +111,6 @@ impl FxSwap {
                 self.base_currency
             )));
         }
-        finstack_quant_core::validation::validate_money_finite(self.notional, "FxSwap notional")?;
         finstack_quant_core::validation::validate_money_gt(self.notional, 0.0, "FxSwap notional")?;
         if self.near_date > self.far_date {
             return Err(finstack_quant_core::Error::Validation(format!(

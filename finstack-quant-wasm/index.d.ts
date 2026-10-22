@@ -8530,7 +8530,7 @@ export interface CoreNamespace {
    * Check a cashflow's invariants.
    *
    * @param flow - `CashFlow` wire object.
-   * @throws If `flow` is not a `CashFlow`, its amount, accrual factor or rate is non-finite, its accrual factor is negative, its reset date is after its payment date, or its principal delta is in another currency (kind `validation`).
+   * @throws If `flow` is not a `CashFlow`, its accrual factor or rate is non-finite, its accrual factor is negative, its reset date is after its payment date, or its principal delta is in another currency (kind `validation`).
    */
   cashFlowValidate(flow: generated.cashflows.CashFlow): void;
 }

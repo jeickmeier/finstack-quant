@@ -423,7 +423,6 @@ impl Bond {
             )
         })?;
 
-        validation::validate_money_finite(self.notional, "bond notional")?;
         validation::require_with(self.notional.amount() > 0.0, || {
             format!(
                 "Bond notional must be positive, got {}",

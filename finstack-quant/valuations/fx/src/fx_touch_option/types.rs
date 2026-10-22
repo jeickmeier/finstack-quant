@@ -163,10 +163,6 @@ impl FxTouchOption {
             self.payout_amount.amount(),
             "FxTouchOption payout_amount",
         )?;
-        finstack_quant_core::validation::validate_money_finite(
-            self.payout_amount,
-            "FxTouchOption payout_amount",
-        )?;
         // Pricing discounts the payout at the domestic (quote-currency) rate;
         // a base-currency payout would need the foreign-cash touch formula.
         // Reject rather than silently mispricing.

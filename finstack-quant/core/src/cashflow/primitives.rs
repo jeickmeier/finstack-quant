@@ -540,7 +540,7 @@ impl CashFlow {
     ///
     /// # Validation Rules
     ///
-    /// - Amount must be finite (not NaN or Infinity); zero is allowed
+    /// - Zero monetary amounts are allowed; `Money` guarantees representability
     /// - Accrual factor must be finite (not NaN or Infinity)
     /// - Rate (if present) must be finite (not NaN or Infinity)
     /// - Reset date (if present) must not be after the payment date
@@ -548,11 +548,6 @@ impl CashFlow {
     /// - Accrual metadata (if present) must have start before end, a coupon
     ///   period with start before end, and a finite projected index rate
     pub fn validate(&self) -> crate::Result<()> {
-        if !self.amount.amount().is_finite() {
-            let kind = NonFiniteKind::classify(self.amount.amount());
-            return Err(InputError::NonFiniteValue { kind }.into());
-        }
-
         if !self.accrual_factor.is_finite() {
             let kind = NonFiniteKind::classify(self.accrual_factor);
             return Err(InputError::NonFiniteValue { kind }.into());

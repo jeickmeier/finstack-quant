@@ -160,10 +160,6 @@ impl FxDigitalOption {
             0.0,
             "FxDigitalOption notional",
         )?;
-        finstack_quant_core::validation::validate_money_finite(
-            self.notional,
-            "FxDigitalOption notional",
-        )?;
         if self.notional.currency() != self.base_currency {
             return Err(finstack_quant_core::Error::CurrencyMismatch {
                 expected: self.base_currency,
