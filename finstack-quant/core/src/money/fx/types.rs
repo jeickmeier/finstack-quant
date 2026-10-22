@@ -43,7 +43,7 @@ impl std::str::FromStr for FxConversionPolicy {
 ///
 /// Contains only the essential parameters for currency conversion.
 ///
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FxQuery {
     /// Currency being converted from.
