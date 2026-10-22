@@ -66,9 +66,8 @@ where
 ///
 /// `Display`, `FromStr`, and serde share one snake_case label per kind
 /// (`"fixed"`, `"float_reset"`, `"pre_payment"`). `FromStr` is ASCII
-/// case-insensitive and also accepts the reporting aliases `"coupon"`
-/// ([`CFKind::Fixed`]) and `"principal"` ([`CFKind::Notional`]); serde
-/// accepts only the canonical label.
+/// case-insensitive and ignores surrounding whitespace; serde accepts only
+/// the canonical label.
 #[non_exhaustive]
 #[derive(
     Clone,
@@ -80,22 +79,15 @@ where
     serde::Serialize,
     serde::Deserialize,
     strum_macros::Display,
-    strum_macros::EnumString,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
-#[strum(
-    serialize_all = "snake_case",
-    ascii_case_insensitive,
-    parse_err_ty = String,
-    parse_err_fn = unknown_cf_kind
-)]
+#[strum(serialize_all = "snake_case")]
 pub enum CFKind {
     /// Fixed-rate coupon cash-flow.
     ///
     /// Periodic interest payment calculated as: `notional × rate × accrual_factor`.
     /// The `rate` field on [`CashFlow`] stores the coupon rate used.
-    #[strum(to_string = "fixed", serialize = "coupon")]
     Fixed,
 
     /// Floating-rate coupon cash-flow (or index fixing event).
@@ -153,7 +145,6 @@ pub enum CFKind {
     /// Used for initial notional payment (at inception), final notional repayment
     /// (at maturity), or intermediate notional exchanges in cross-currency swaps.
     /// For bonds: initial = purchase price, final = par redemption.
-    #[strum(to_string = "notional", serialize = "principal")]
     Notional,
 
     /// Payment-in-kind interest capitalization.
@@ -257,6 +248,14 @@ pub enum CFKind {
     /// When a counterparty substitutes collateral, this represents the return
     /// of the original collateral being replaced.
     CollateralSubstitutionOut,
+}
+
+impl std::str::FromStr for CFKind {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        crate::wire::serde_parse(&s.trim().to_ascii_lowercase()).map_err(|_| unknown_cf_kind(s))
+    }
 }
 
 fn unknown_cf_kind(s: &str) -> String {
@@ -877,11 +876,12 @@ mod tests {
     }
 
     #[test]
-    fn cfkind_fromstr_accepts_aliases_and_mixed_case() {
-        assert_eq!("coupon".parse::<CFKind>().expect("alias"), CFKind::Fixed);
+    fn cfkind_fromstr_accepts_canonical_labels_and_mixed_case() {
+        assert!("coupon".parse::<CFKind>().is_err());
+        assert!("principal".parse::<CFKind>().is_err());
         assert_eq!(
-            "principal".parse::<CFKind>().expect("alias"),
-            CFKind::Notional
+            " Fixed ".parse::<CFKind>().expect("canonical label"),
+            CFKind::Fixed
         );
         assert_eq!(
             "Notional".parse::<CFKind>().expect("mixed case"),
@@ -1049,13 +1049,20 @@ mod tests {
 
     #[test]
     fn cfkind_from_str_rejects_noncanonical_spellings() {
-        // ASCII case is folded, but punctuation, whitespace and retired labels
-        // are not: the wire label is `pre_payment`, never `prepayment`.
+        // Only surrounding whitespace and ASCII case are normalized.
+        // The wire label is `pre_payment`, never `prepayment`.
         assert_eq!(
             "FIXED".parse::<CFKind>().expect("case-folded"),
             CFKind::Fixed
         );
-        for rejected in ["amort", "prepayment", "Float-Reset", " fixed"] {
+        for rejected in [
+            "amort",
+            "prepayment",
+            "Float-Reset",
+            "float reset",
+            "principal",
+            "coupon",
+        ] {
             assert!(rejected.parse::<CFKind>().is_err(), "{rejected:?}");
         }
     }

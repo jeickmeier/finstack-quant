@@ -256,7 +256,7 @@ class RollupSpec:
     ----------
     frequency : str
         Target frequency: ``"quarterly"``, ``"semi_annual"`` or ``"annual"``
-        (pandas aliases such as ``"Q"`` and ``"A"`` are accepted). It must be
+        (surrounding whitespace and ASCII case are ignored). It must be
         coarser than the model's periods and hold a whole number of them.
     methods : dict[str, str] or None
         Rollup method per node id: ``"sum"`` (flows, the default for nodes not
@@ -280,7 +280,7 @@ class RollupSpec:
         ----------
         frequency : str
             Target frequency label (``"quarterly"``, ``"semi_annual"``,
-            ``"annual"`` or a pandas alias).
+            ``"annual"``; surrounding whitespace and ASCII case are ignored).
         methods : dict[str, str] or None, default None
             Node id to ``"sum"``, ``"period_end"`` or ``"formula"``; nodes not
             listed are summed.

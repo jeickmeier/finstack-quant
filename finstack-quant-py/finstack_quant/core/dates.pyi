@@ -328,9 +328,8 @@ class DayCount:
         -------
         DayCount
 
-            Day-count convention for the name; case, spaces, ``/`` and ``-`` are
-            normalised, so term-sheet spellings such as ``"ACT/360"`` or
-            ``"Act/Act ICMA"`` are accepted.
+            Day-count convention for the canonical name, ignoring surrounding
+            whitespace and ASCII case. Other spellings are rejected.
 
         Raises
         ------
@@ -1226,8 +1225,8 @@ class Tenor:
             Holiday calendar (object or id such as ``"usny"``; ``"nyse+gblo"``
             joins calendars). ``None`` skips adjustment.
         business_day_convention : BusinessDayConvention | str
-            Roll rule applied when *calendar* is given; short codes
-            ``MF``/``F``/``P``/``MP`` accepted.
+            Roll rule applied when *calendar* is given; canonical names ignore
+            surrounding whitespace and ASCII case.
 
         Returns
         -------
@@ -2438,7 +2437,7 @@ class BusinessDayConvention:
     >>> from finstack_quant.core.dates import BusinessDayConvention
     >>> str(BusinessDayConvention.MODIFIED_FOLLOWING)
     'modified_following'
-    >>> BusinessDayConvention.from_name("MF") == BusinessDayConvention.MODIFIED_FOLLOWING
+    >>> BusinessDayConvention.from_name(" MODIFIED_FOLLOWING ") == BusinessDayConvention.MODIFIED_FOLLOWING
     True
 
     """
@@ -2464,9 +2463,8 @@ class BusinessDayConvention:
         Parameters
         ----------
         name : str
-            snake_case name (``"following"``, ``"modified_following"``) or
-            short code (``"MF"``, ``"F"``, ``"P"``, ``"MP"``, ``"NONE"``),
-            case-insensitive.
+            Canonical snake_case name (``"following"``, ``"modified_following"``),
+            ignoring surrounding whitespace and ASCII case.
 
         Returns
         -------
@@ -2724,7 +2722,7 @@ def adjust(
         ``YYYY-MM-DD`` string).
     convention : BusinessDayConvention | str
         Roll rule: a ``BusinessDayConvention`` or its name
-        (``"modified_following"``; short codes ``MF``/``F``/``P``/``MP``/``NONE``).
+        (for example ``"modified_following"``), ignoring outer whitespace and ASCII case.
     calendar : HolidayCalendar | str
         Holiday calendar object or registry id (``"usny"``; ``"nyse+gblo"``
         joins calendars).
@@ -3267,7 +3265,7 @@ class ScheduleBuilder:
         Parameters
         ----------
         convention : BusinessDayConvention | str
-            Roll rule (``"modified_following"``; short codes ``MF``/``F``/``P``).
+            Roll rule (for example ``"modified_following"``), ignoring outer whitespace and ASCII case.
         calendar : HolidayCalendar | str
             Holiday calendar object or registry id (``"target2"``;
             ``"nyse+gblo"`` joins calendars). A string id is resolved at

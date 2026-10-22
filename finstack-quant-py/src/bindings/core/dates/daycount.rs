@@ -15,9 +15,8 @@ use pyo3::types::PyModule;
 ///
 /// Immutable, hashable enum-style type with a class attribute per supported
 /// convention. ``str()`` gives the canonical snake_case name
-/// (``"act_360"``), which ``from_name`` parses along with term-sheet
-/// spellings (``"ACT/360"``, ``"Act/Act ICMA"``): case, spaces, ``/`` and
-/// ``-`` are normalised.
+/// (``"act_360"``), which ``from_name`` parses after trimming surrounding
+/// whitespace and normalizing ASCII case. Other spellings are rejected.
 ///
 /// Examples
 /// --------
@@ -25,7 +24,7 @@ use pyo3::types::PyModule;
 /// >>> from finstack_quant.core.dates import DayCount
 /// >>> DayCount.ACT_360.year_fraction(datetime.date(2024, 1, 1), datetime.date(2024, 7, 1))
 /// 0.5055555555555555
-/// >>> DayCount.from_name("ACT/ACT ICMA") == DayCount.ACT_ACT_ISMA
+/// >>> DayCount.from_name(" ACT_ACT_ISMA ") == DayCount.ACT_ACT_ISMA
 /// True
 #[pyclass(
     name = "DayCount",

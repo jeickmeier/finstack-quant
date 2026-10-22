@@ -199,8 +199,8 @@ fn epoch_day_pair(value: &JsValue, label: &str) -> Result<(Date, Date), JsValue>
 /// - `30_360_it` (Italian) → `DayCount.thirty360It`
 /// - `bus_252` → `DayCount.bus252`
 ///
-/// Term-sheet spellings such as `"ACT/360"` or `"30/360 ISDA"` go through the
-/// lenient `DayCount.parse`.
+/// `fromName` accepts these canonical names after trimming surrounding
+/// whitespace and normalizing ASCII case. Other spellings are rejected.
 ///
 /// @example
 /// ```javascript
@@ -229,9 +229,8 @@ impl JsDayCount {
     ///
     /// @returns The matching `DayCount`.
     /// @throws `TypeError` if `name` is not a string; `FinstackError` (kind
-    /// `validation`) if no convention matches. Case, spaces, `/` and `-` are
-    /// normalised, so term-sheet spellings such as `"ACT/360"` or
-    /// `"Act/Act ICMA"` are accepted.
+    /// `validation`) if no convention matches. Canonical names ignore surrounding
+    /// whitespace and ASCII case; other spellings are rejected.
     #[wasm_bindgen(js_name = fromName)]
     pub fn from_name(name: JsValue) -> Result<JsDayCount, JsValue> {
         let name: &str = &js_string(&name, "name")?;
@@ -915,14 +914,16 @@ mod tests {
     }
 
     #[test]
-    fn daycount_nl365_factory_and_lenient_parse() {
+    fn daycount_nl365_factory_and_canonical_parse() {
         assert_eq!(JsDayCount::nl365().to_string(), "nl_365");
         assert_eq!(
-            "Act/Act ICMA".parse::<RustDayCount>().expect("lenient"),
+            " Act_Act_Isma "
+                .parse::<RustDayCount>()
+                .expect("normalized"),
             RustDayCount::ActActIsma
         );
         assert_eq!(
-            "ACT/360".parse::<RustDayCount>().expect("lenient"),
+            " ACT_360 ".parse::<RustDayCount>().expect("normalized"),
             RustDayCount::Act360
         );
         assert!("act360".parse::<RustDayCount>().is_err());

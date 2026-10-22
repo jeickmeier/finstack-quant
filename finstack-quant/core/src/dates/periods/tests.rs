@@ -223,14 +223,32 @@ fn period_kind_display_parse_and_counts() {
     );
     assert_eq!(PeriodKind::from_str("annual"), Ok(PeriodKind::Annual));
     assert_eq!(
-        PeriodKind::from_str("semiannual"),
+        PeriodKind::from_str(" Quarterly "),
+        Ok(PeriodKind::Quarterly)
+    );
+    assert_eq!(
+        PeriodKind::from_str(" SEMI_ANNUAL "),
         Ok(PeriodKind::SemiAnnual)
     );
-    assert_eq!(PeriodKind::from_str("Y"), Ok(PeriodKind::Annual));
-    assert_eq!(PeriodKind::from_str("B"), Ok(PeriodKind::Daily));
-    assert_eq!(PeriodKind::from_str("Q"), Ok(PeriodKind::Quarterly));
-    for noncanonical in ["q", "SemiAnnual", " quarterly"] {
-        assert!(PeriodKind::from_str(noncanonical).is_err());
+    for noncanonical in [
+        "semiannual",
+        "D",
+        "B",
+        "W",
+        "M",
+        "ME",
+        "Q",
+        "QE",
+        "A",
+        "Y",
+        "YE",
+        "q",
+        "SemiAnnual",
+    ] {
+        assert!(
+            PeriodKind::from_str(noncanonical).is_err(),
+            "{noncanonical}"
+        );
     }
     assert!(PeriodKind::from_str("unknown").is_err());
 

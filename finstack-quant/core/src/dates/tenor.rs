@@ -324,14 +324,14 @@ impl Tenor {
     /// assert!(Tenor::parse("1D").is_ok());
     /// assert!(Tenor::parse("3m").is_ok()); // Case-insensitive
     /// assert!(Tenor::parse("10Y").is_ok());
-    /// assert_eq!(Tenor::parse("ON")?, Tenor::daily()); // money-market alias
+    /// assert_eq!(Tenor::parse(" 1d ")?, Tenor::daily());
     /// assert!(Tenor::parse("").is_err());
     /// assert!(Tenor::parse("XY").is_err());
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     ///
-    /// The money-market aliases `ON`, `TN` and `SN` (also `O/N`, `T/N`,
-    /// `S/N`) parse as the one-day tenor.
+    /// Parsing ignores surrounding whitespace and ASCII case. Only a positive
+    /// integer followed by `D`, `W`, `M` or `Y` is accepted.
     ///
     /// # Errors
     ///
@@ -350,13 +350,7 @@ impl Tenor {
         }
 
         // Find where the unit character starts (last character)
-        let s_upper = s.to_uppercase();
-
-        // Money-market aliases: overnight, tom-next and spot-next are all a
-        // one-day tenor once the settlement lag has been applied.
-        if matches!(s_upper.as_str(), "ON" | "TN" | "SN" | "O/N" | "T/N" | "S/N") {
-            return Ok(Self::daily());
-        }
+        let s_upper = s.to_ascii_uppercase();
 
         // Find position of first alphabetic character
         let unit_pos =
@@ -373,6 +367,14 @@ impl Tenor {
             return Err(InputError::InvalidTenor {
                 tenor: s.to_string(),
                 reason: "no count found; expected format like '3M' or '1Y'".to_string(),
+            }
+            .into());
+        }
+
+        if !count_str.bytes().all(|byte| byte.is_ascii_digit()) {
+            return Err(InputError::InvalidTenor {
+                tenor: s.to_string(),
+                reason: "count must contain only ASCII digits".to_string(),
             }
             .into());
         }
@@ -824,9 +826,9 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_money_market_aliases_are_one_day() {
+    fn test_parse_rejects_money_market_aliases() {
         for alias in ["ON", "on", "TN", "SN", "O/N", "t/n", "S/N", " ON "] {
-            assert_eq!(Tenor::parse(alias).expect(alias), Tenor::daily(), "{alias}");
+            assert!(Tenor::parse(alias).is_err(), "{alias}");
         }
     }
 

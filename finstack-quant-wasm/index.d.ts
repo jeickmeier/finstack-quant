@@ -2582,7 +2582,7 @@ export interface DayCountConstructor {
    *
    * @param name - Canonical snake_case convention name, for example `"act_360"`, `"30_360"` or `"act_act"` (see the class list).
    * @returns The matching `DayCount`.
-   * @throws `TypeError` if `name` is not a string; `FinstackError` (kind `validation`) if no convention matches. Case, spaces, `/` and `-` are normalised, so term-sheet spellings such as `"ACT/360"` or `"Act/Act ICMA"` are accepted.
+   * @throws `TypeError` if `name` is not a string; `FinstackError` (kind `validation`) if no convention matches. Canonical names ignore surrounding whitespace and ASCII case; other spellings are rejected.
    */
   fromName(name: string): DayCount;
   /**
@@ -8544,8 +8544,8 @@ export interface CoreNamespace {
   /**
    * Parse a cashflow kind label into its `CFKind` wire string.
    *
-   * Parsed by Rust `CFKind::from_str`: the snake_case wire string, ASCII case
-   * ignored, plus the aliases `"coupon"` and `"principal"`.
+   * Parsed by Rust `CFKind::from_str`: the canonical snake_case wire string,
+   * ignoring surrounding whitespace and ASCII case.
    *
    * @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
    * @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.
@@ -9070,7 +9070,7 @@ declare class Performance {
    * const [[point]] = perf.periodicReturns();
    * console.log(point.date, point.value); // "2024-01-02", 0.0302
    * ```
-   * @param frequency - Optional calendar frequency token: `"daily"`, `"weekly"`, `"monthly"`, `"quarterly"`, `"semi_annual"`, or `"annual"` (pandas offset aliases `D`/`B`, `W`, `M`/`ME`, `Q`/`QE`, `A`/`Y`/`YE` are accepted too); defaults to `"monthly"`.
+   * @param frequency - Optional calendar frequency token: `"daily"`, `"weekly"`, `"monthly"`, `"quarterly"`, `"semi_annual"`, or `"annual"`, ignoring outer whitespace and ASCII case; defaults to `"monthly"`.
    * @returns Ticker-major nested arrays of chronological Rust `PeriodicReturn` `{ date, value }` points with simple decimal returns.
    * @throws Error - Rejects an unsupported frequency or a panel that cannot be serialized to JavaScript.
    */
