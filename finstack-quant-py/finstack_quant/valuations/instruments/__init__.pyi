@@ -26399,10 +26399,10 @@ class StructuredCredit:
 
     def disable_stochastic(self) -> StructuredCredit:
         """
-        Return a copy with the stochastic prepayment, default and correlation specs cleared.
+        Return a copy with the stochastic prepayment, default, recovery and correlation specs cleared.
 
         Mirrors Rust ``StructuredCredit::disable_stochastic``, the inverse of
-        ``enable_stochastic``; ``stochastic_recovery_spec`` is kept.
+        ``enable_stochastic``; this also clears ``stochastic_recovery_spec``.
 
         Returns
         -------
@@ -26450,7 +26450,7 @@ class StructuredCredit:
     @property
     def is_stochastic(self) -> bool:
         """
-        Whether a stochastic prepayment, default or correlation spec is set.
+        Whether a stochastic prepayment, default, recovery or correlation spec is set.
 
         Returns
         -------

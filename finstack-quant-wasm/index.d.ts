@@ -21590,7 +21590,7 @@ export interface StructuredCredit extends WasmOwned {
    */
   readonly expiry: string | null;
   /**
-   * Whether a stochastic prepayment, default or correlation spec is set (mirrors Rust `StructuredCredit::is_stochastic`).
+   * Whether a stochastic prepayment, default, recovery or correlation spec is set (mirrors Rust `StructuredCredit::is_stochastic`).
    * @returns `true` when `priceStochastic` has specs to simulate.
    */
   readonly isStochastic: boolean;
@@ -21655,7 +21655,7 @@ export interface StructuredCredit extends WasmOwned {
   /**
    * Return a copy of this deal with every stochastic specification cleared.
    *
-   * Mirrors Rust `StructuredCredit::disable_stochastic`, the inverse of `enableStochastic`: clears the stochastic prepayment, default and correlation specs (the stochastic recovery spec is kept). The receiver is not modified.
+   * Mirrors Rust `StructuredCredit::disable_stochastic`, the inverse of `enableStochastic`: clears the stochastic prepayment, default, recovery and correlation specs. The receiver is not modified.
    * @returns A new deal priced deterministically.
    */
   disableStochastic(): StructuredCredit;

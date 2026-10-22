@@ -837,3 +837,29 @@ def test_cashflow_frame_rejects_mixed_currency_components() -> None:
     mixed = TrancheCashflows.from_json(json.dumps(document))
     with pytest.raises(ValueError, match="Currency mismatch"):
         mixed.to_dataframe()
+
+
+@pytest.mark.parametrize(
+    "recovery",
+    [
+        {"type": "constant", "rate": 0.4},
+        {"type": "market_correlated", "mean_recovery": 0.4, "recovery_volatility": 0.25, "factor_correlation": 0.4},
+    ],
+)
+def test_recovery_only_configuration_is_reported_and_fully_disabled(recovery: dict[str, object]) -> None:
+    document = json.loads(StructuredCredit.example().to_json())
+    document["instrument"]["spec"]["stochastic_recovery_spec"] = recovery
+    deal = StructuredCredit.from_json(json.dumps(document))
+    assert deal.is_stochastic
+    assert deal.stochastic_recovery_spec == recovery
+    disabled = deal.disable_stochastic()
+    for _ in range(2):
+        assert not disabled.is_stochastic
+        assert disabled.stochastic_recovery_spec is None
+        assert disabled.stochastic_prepay_spec is None
+        assert disabled.stochastic_default_spec is None
+        assert disabled.correlation_structure is None
+        assert disabled.recovery_spec.to_json() == deal.recovery_spec.to_json()
+        disabled = disabled.disable_stochastic()
+    assert deal.is_stochastic
+    assert deal.stochastic_recovery_spec == recovery

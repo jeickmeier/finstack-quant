@@ -526,8 +526,8 @@ impl PyStructuredCredit {
     /// Returns
     /// -------
     /// StructuredCredit
-    ///     A new deal without the stochastic prepayment, default and
-    ///     correlation specs (``stochastic_recovery_spec`` is kept).
+    ///     A new deal without stochastic prepayment, default, recovery or
+    ///     correlation specifications.
     #[pyo3(text_signature = "($self)")]
     fn disable_stochastic(&self) -> Self {
         let mut deal = self.inner.clone();
@@ -597,7 +597,7 @@ crate::bindings::macros::py_getters!(PyStructuredCredit |s| {
     /// Custom priority of payments, or ``None`` when the template applies.
     waterfall -> Option<PyWaterfall> = s.inner.waterfall.clone().map(|inner| PyWaterfall { inner });
 
-    /// ``True`` when a stochastic prepayment, default or correlation spec is set
+    /// ``True`` when a stochastic prepayment, default, recovery or correlation spec is set
     /// (mirrors Rust ``StructuredCredit::is_stochastic``).
     is_stochastic -> bool = s.inner.is_stochastic();
 

@@ -797,3 +797,33 @@ test('commodity spot cash claim survives JSON replay without an optionality mark
   assert.ok(Math.abs(Number(price('2024-01-15').value.amount) - 10000) < 1e-8);
   assert.equal(Number(price('2024-01-21').value.amount), 0);
 });
+
+test('structured credit recovery-only specifications are reported and fully disabled', () => {
+  for (const recovery of [
+    { type: 'constant', rate: 0.4 },
+    {
+      type: 'market_correlated',
+      mean_recovery: 0.4,
+      recovery_volatility: 0.25,
+      factor_correlation: 0.4,
+    },
+  ]) {
+    const document = JSON.parse(instruments.StructuredCredit.example().toJson());
+    document.instrument.spec.stochastic_recovery_spec = recovery;
+    const deal = instruments.StructuredCredit.fromJson(JSON.stringify(document));
+    assert.equal(deal.isStochastic, true);
+    assert.deepEqual(deal.stochasticRecoverySpec, recovery);
+    let disabled = deal.disableStochastic();
+    for (let i = 0; i < 2; i++) {
+      assert.equal(disabled.isStochastic, false);
+      assert.equal(disabled.stochasticRecoverySpec, null);
+      assert.equal(disabled.stochasticPrepaySpec, null);
+      assert.equal(disabled.stochasticDefaultSpec, null);
+      assert.equal(disabled.correlationStructure, null);
+      assert.deepEqual(disabled.recoverySpec, deal.recoverySpec);
+      disabled = disabled.disableStochastic();
+    }
+    assert.equal(deal.isStochastic, true);
+    assert.deepEqual(deal.stochasticRecoverySpec, recovery);
+  }
+});
