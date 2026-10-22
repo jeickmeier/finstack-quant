@@ -1,7 +1,6 @@
 //! Duration calculators for structured credit.
 
 use crate::structured_credit::metrics::discounted_flows;
-use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
@@ -139,7 +138,7 @@ pub(crate) const DEFAULT_DURATION_YTM_BUMP_BP: f64 = 1.0;
 ///
 /// Modified duration in years
 pub fn calculate_tranche_duration(
-    cashflows: &DatedFlows,
+    cashflows: &[(Date, Money)],
     discount_curve: &DiscountCurve,
     as_of: Date,
     pv: Money,
@@ -201,7 +200,7 @@ mod time_basis_tests {
             .expect("curve")
     }
 
-    fn flows() -> DatedFlows {
+    fn flows() -> Vec<(Date, Money)> {
         (1..=10)
             .map(|y| {
                 (

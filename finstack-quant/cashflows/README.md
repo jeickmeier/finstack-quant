@@ -32,8 +32,8 @@ The flow types themselves (`CashFlow`, `CFKind`, `CashFlowAccrual`) live in
 Crate-root exports also include `CashflowScheduleSource`, `CashflowProvider`,
 `ScheduleBuildOpts`, the `schedule_from_*` adapters, the serde JSON surface
 (`CashflowScheduleBuildSpec`, `build_cashflow_schedule_json`,
-`validate_cashflow_schedule_json`, `dated_flows_json`), and the type aliases
-`DatedFlow = (Date, Money)` and `DatedFlows = Vec<DatedFlow>`.
+`validate_cashflow_schedule_json`, `dated_flows_json`). Dated amounts use
+`(Date, Money)` tuples, collected as `Vec<(Date, Money)>` for schedules.
 
 ## Building a schedule
 

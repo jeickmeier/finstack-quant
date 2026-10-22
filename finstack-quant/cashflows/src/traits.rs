@@ -7,7 +7,6 @@
 //! ad-hoc flow lists using [`ScheduleBuildOpts`].
 
 use crate::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-use crate::DatedFlows;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
@@ -150,7 +149,7 @@ pub trait CashflowProvider: CashflowScheduleSource {
         &self,
         curves: &MarketContext,
         as_of: Date,
-    ) -> finstack_quant_core::Result<DatedFlows> {
+    ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
         let schedule = self.cashflow_schedule(curves, as_of)?;
         Ok(schedule.settlement_rows())
     }
@@ -200,7 +199,7 @@ impl<T> CashflowProvider for T where T: CashflowScheduleSource + ?Sized {}
 /// assert_eq!(schedule.get_day_count(), DayCount::Thirty360);
 /// ```
 pub fn schedule_from_dated_flows(
-    flows: DatedFlows,
+    flows: Vec<(Date, Money)>,
     kind: CFKind,
     day_count: DayCount,
     opts: ScheduleBuildOpts,
@@ -378,7 +377,7 @@ mod tests {
             decoded
                 .into_iter()
                 .map(|flow| (flow.date, flow.amount))
-                .collect::<DatedFlows>(),
+                .collect::<Vec<(Date, Money)>>(),
             expected
         );
     }
@@ -422,7 +421,7 @@ mod tests {
             decoded
                 .into_iter()
                 .map(|flow| (flow.date, flow.amount))
-                .collect::<DatedFlows>(),
+                .collect::<Vec<(Date, Money)>>(),
             typed
         );
     }

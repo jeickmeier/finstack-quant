@@ -101,14 +101,6 @@ pub use traits::{
     CashflowScheduleSource, ScheduleBuildOpts,
 };
 
-use finstack_quant_core::{dates::Date, money::Money};
-
-/// Single dated amount in a specific currency.
-pub type DatedFlow = (Date, Money);
-
-/// Currency-preserving schedule as a list of dated amounts.
-pub type DatedFlows = Vec<DatedFlow>;
-
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///
 /// The README is *not* included in the rendered crate documentation — this

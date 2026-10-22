@@ -6,7 +6,6 @@ use crate::structured_credit::types::constants::{
 };
 use crate::structured_credit::StructuredCredit;
 use finstack_quant_cashflows::builder::RateSpec;
-use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -244,7 +243,7 @@ impl MetricCalculator for SpreadDurationCalculator {
 ///
 /// Z-spread in basis points
 pub fn calculate_tranche_z_spread(
-    cashflows: &DatedFlows,
+    cashflows: &[(Date, Money)],
     discount_curve: &DiscountCurve,
     target_pv: Money,
     as_of: Date,
@@ -360,7 +359,7 @@ pub fn calculate_tranche_cs01(
 ///
 /// Returns an error if a year fraction or discount factor cannot be computed.
 pub(crate) fn calculate_tranche_spread_convexity(
-    cashflows: &DatedFlows,
+    cashflows: &[(Date, Money)],
     discount_curve: &DiscountCurve,
     z_spread: f64,
     as_of: Date,
