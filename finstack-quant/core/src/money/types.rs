@@ -443,6 +443,23 @@ impl Money {
         self.currency
     }
 
+    /// Compare exact Decimal amounts after requiring the same currency.
+    ///
+    /// No conversion through floating point or FX conversion is performed.
+    ///
+    /// # Arguments
+    ///
+    /// * `rhs` - Money in the same currency to compare with this amount.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::CurrencyMismatch` when the currencies differ.
+    #[inline]
+    pub fn checked_cmp(self, rhs: Self) -> Result<core::cmp::Ordering, Error> {
+        ensure_same_currency(&self, &rhs)?;
+        Ok(self.amount.cmp(&rhs.amount))
+    }
+
     // Checked arithmetic
 
     /// Add two amounts, returning an error when currencies do not match.
@@ -753,6 +770,24 @@ mod tests {
         let m = Money::from((100_i64, Currency::USD));
         assert_eq!(m.amount(), 100.0);
         assert_eq!(m.currency(), Currency::USD);
+    }
+
+    #[test]
+    fn checked_comparison_is_exact_and_requires_matching_currencies() {
+        use core::cmp::Ordering;
+        let lower = Money::from((9_007_199_254_740_992_u64, Currency::USD));
+        let higher = Money::from((9_007_199_254_740_993_u64, Currency::USD));
+        assert_eq!(lower.amount(), higher.amount());
+        assert_eq!(lower.checked_cmp(higher), Ok(Ordering::Less));
+        assert_eq!(higher.checked_cmp(lower), Ok(Ordering::Greater));
+        assert_eq!(lower.checked_cmp(lower), Ok(Ordering::Equal));
+        assert!(matches!(
+            lower.checked_cmp(Money::from((1_i64, Currency::EUR))),
+            Err(Error::CurrencyMismatch {
+                expected: Currency::USD,
+                actual: Currency::EUR
+            })
+        ));
     }
 
     #[test]
