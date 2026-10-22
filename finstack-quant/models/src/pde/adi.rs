@@ -234,17 +234,12 @@ impl CraigSneydStepper {
     }
 
     /// Generate time levels from maturity backward to 0.
+    ///
+    /// # Arguments
+    ///
+    /// * `maturity` - Terminal time in years, divided into this stepper's equal time intervals.
     pub fn time_levels(&self, maturity: f64) -> Vec<f64> {
-        let n = self.n_steps;
-        if n == 0 {
-            return vec![maturity];
-        }
-        let dt = maturity / n as f64;
-        let mut levels: Vec<f64> = (0..n)
-            .map(|i| (maturity - i as f64 * dt).max(0.0))
-            .collect();
-        levels.push(0.0);
-        levels
+        super::stepper::backward_time_levels(maturity, self.n_steps)
     }
 
     /// Execute one Modified Craig-Sneyd ADI step from `t_from` to `t_to`

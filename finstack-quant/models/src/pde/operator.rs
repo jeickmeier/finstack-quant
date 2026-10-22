@@ -159,22 +159,15 @@ impl TridiagOperator {
             source[k] = problem.source(x, t);
         }
 
-        let bc_lower = problem.lower_boundary(t);
-        let bc_upper = problem.upper_boundary(t);
-
-        let bc_lower_rhs = apply_lower_boundary(bc_lower, &mut lower, &mut main, &mut upper, grid);
-        let bc_upper_rhs =
-            apply_upper_boundary(bc_upper, &mut lower, &mut main, &mut upper, grid, n);
-
-        Self {
+        Self::from_parts(
             lower,
             main,
             upper,
             source,
-            bc_lower_rhs,
-            bc_upper_rhs,
-            n,
-        }
+            problem.lower_boundary(t),
+            problem.upper_boundary(t),
+            grid,
+        )
     }
 
     /// Construct a tridiagonal operator from pre-computed diagonals and boundary conditions.
