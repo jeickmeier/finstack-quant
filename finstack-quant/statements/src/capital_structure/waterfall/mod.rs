@@ -414,7 +414,7 @@ pub fn execute_waterfall(
             // mismatch as a hard error rather than dropping the claim.
             if shortfall.amount() > 0.0 {
                 if shortfall.currency() != currency {
-                    return Err(crate::error::Error::currency_mismatch(
+                    return Err(crate::error::Error::CurrencyMismatch(
                         currency,
                         shortfall.currency(),
                     ));
@@ -427,7 +427,7 @@ pub fn execute_waterfall(
         if let Some(shortfall) = state.fee_shortfall.shift_remove(instrument_id.as_str()) {
             if shortfall.amount() > 0.0 {
                 if shortfall.currency() != currency {
-                    return Err(crate::error::Error::currency_mismatch(
+                    return Err(crate::error::Error::CurrencyMismatch(
                         currency,
                         shortfall.currency(),
                     ));

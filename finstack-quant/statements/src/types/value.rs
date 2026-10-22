@@ -130,7 +130,7 @@ where
             (Some(NodeValueType::Monetary { currency }), AmountOrScalar::Amount(money))
                 if money.currency() == currency => {}
             (Some(NodeValueType::Monetary { currency }), AmountOrScalar::Amount(money)) => {
-                return Err(Error::currency_mismatch(currency, money.currency()));
+                return Err(Error::CurrencyMismatch(currency, money.currency()));
             }
             (Some(NodeValueType::Scalar), AmountOrScalar::Amount(money)) => {
                 return Err(Error::invalid_input(format!(

@@ -91,7 +91,7 @@ impl PrincipalAllocation {
         carried.sort_by_key(|claim| (claim.payment_date, claim.balance_date));
         for claim in &carried_advances {
             if claim.amount.currency() != currency {
-                return Err(Error::currency_mismatch(currency, claim.amount.currency()));
+                return Err(Error::CurrencyMismatch(currency, claim.amount.currency()));
             }
             if claim.amount.amount() < 0.0 {
                 return Err(Error::capital_structure(
@@ -176,7 +176,7 @@ impl PrincipalAllocation {
         }
         for claim in &claims {
             if claim.claim.amount.currency() != currency {
-                return Err(Error::currency_mismatch(
+                return Err(Error::CurrencyMismatch(
                     currency,
                     claim.claim.amount.currency(),
                 ));
@@ -309,7 +309,7 @@ impl PrincipalAllocation {
 
 fn validate_payment(amount: Money, capacity: Money) -> Result<()> {
     if amount.currency() != capacity.currency() {
-        return Err(Error::currency_mismatch(
+        return Err(Error::CurrencyMismatch(
             capacity.currency(),
             amount.currency(),
         ));

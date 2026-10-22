@@ -202,7 +202,7 @@ pub fn compute_credit_context(
         if let Some(NodeValueType::Monetary { currency }) = statement.node_value_types.get(node_id)
         {
             if *currency != reporting_currency {
-                return Err(Error::currency_mismatch(reporting_currency, *currency));
+                return Err(Error::CurrencyMismatch(reporting_currency, *currency));
             }
         }
     }
@@ -224,14 +224,14 @@ pub fn compute_credit_context(
                 crate::analysis::units::node_unit_at(statement, node, &period.id)?
             {
                 if currency != reporting_currency {
-                    return Err(Error::currency_mismatch(reporting_currency, currency));
+                    return Err(Error::CurrencyMismatch(reporting_currency, currency));
                 }
             }
         }
         cf.validate_currency_invariant()?;
         let instrument_currency = cf.interest_expense_cash.currency();
         if instrument_currency != reporting_currency {
-            return Err(Error::currency_mismatch(
+            return Err(Error::CurrencyMismatch(
                 reporting_currency,
                 instrument_currency,
             ));

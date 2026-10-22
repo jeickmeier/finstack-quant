@@ -379,10 +379,10 @@ fn test_error_constructors() {
     let node_err = Error::node_not_found("test_node");
     assert!(node_err.to_string().contains("test_node"));
 
-    let circ_err = Error::circular_dependency(vec!["a".into(), "b".into(), "a".into()]);
+    let circ_err = Error::CircularDependency(vec!["a".into(), "b".into(), "a".into()]);
     assert!(circ_err.to_string().contains("→"));
 
-    let curr_err = Error::currency_mismatch(Currency::USD, Currency::EUR);
+    let curr_err = Error::CurrencyMismatch(Currency::USD, Currency::EUR);
     assert!(curr_err.to_string().contains("USD"));
     assert!(curr_err.to_string().contains("EUR"));
 

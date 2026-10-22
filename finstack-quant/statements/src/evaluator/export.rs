@@ -15,103 +15,122 @@ fn table_metadata(layout: &str) -> IndexMap<String, serde_json::Value> {
     metadata
 }
 
-/// Export results to a long-format table.
-///
-/// Schema: `(node_id, period_id, value, value_money, currency, value_type, source)`.
-/// Monetary nodes populate both `value` and `value_money`; scalar nodes leave
-/// `value_money` and `currency` null. `source` is the cell's
-/// [`CellSource`](super::CellSource) label, null when none was recorded.
-pub(crate) fn to_table_long(results: &StatementResult) -> Result<TableEnvelope> {
-    let mut node_ids = Vec::new();
-    let mut period_ids = Vec::new();
-    let mut values = Vec::new();
-    let mut money_values = Vec::new();
-    let mut currencies = Vec::new();
-    let mut value_types = Vec::new();
-    let mut sources = Vec::new();
+impl StatementResult {
+    /// Export to a long-format table.
+    ///
+    /// Schema: `(node_id, period_id, value, value_money, currency, value_type, source)`.
+    /// Rows preserve the result's node and period declaration order. Monetary
+    /// nodes duplicate their numerical value in `value_money` and set
+    /// `currency`; scalar nodes leave those two fields null. `source` is the
+    /// cell's [`CellSource`](super::CellSource) label (`value`, `forecast`, `formula`,
+    /// `where_masked`), or null when the result records no source for it.
+    ///
+    /// # Errors
+    ///
+    /// Returns a table-construction error if the result cannot be represented
+    /// as a valid [`finstack_quant_core::table::TableEnvelope`]. Empty results
+    /// are valid and produce an empty table with the full seven-column schema.
+    pub fn to_table_long(&self) -> Result<TableEnvelope> {
+        let mut node_ids = Vec::new();
+        let mut period_ids = Vec::new();
+        let mut values = Vec::new();
+        let mut money_values = Vec::new();
+        let mut currencies = Vec::new();
+        let mut value_types = Vec::new();
+        let mut sources = Vec::new();
 
-    for (node_id, period_map) in &results.nodes {
-        let node_value_type = results.node_value_types.get(node_id);
+        for (node_id, period_map) in &self.nodes {
+            let node_value_type = self.node_value_types.get(node_id);
 
-        for (period_id, value) in period_map {
-            node_ids.push(node_id.clone());
-            period_ids.push(period_id.to_string());
-            values.push(*value);
-            sources.push(
-                results
-                    .get_source(node_id, period_id)
-                    .map(|source| source.as_str().to_string()),
-            );
+            for (period_id, value) in period_map {
+                node_ids.push(node_id.clone());
+                period_ids.push(period_id.to_string());
+                values.push(*value);
+                sources.push(
+                    self.get_source(node_id, period_id)
+                        .map(|source| source.as_str().to_string()),
+                );
 
-            if let Some(NodeValueType::Monetary { currency }) = node_value_type {
-                money_values.push(Some(*value));
-                currencies.push(Some(currency.to_string()));
-                value_types.push("monetary".to_string());
-            } else {
-                money_values.push(None);
-                currencies.push(None);
-                value_types.push("scalar".to_string());
+                if let Some(NodeValueType::Monetary { currency }) = node_value_type {
+                    money_values.push(Some(*value));
+                    currencies.push(Some(currency.to_string()));
+                    value_types.push("monetary".to_string());
+                } else {
+                    money_values.push(None);
+                    currencies.push(None);
+                    value_types.push("scalar".to_string());
+                }
             }
         }
+
+        TableEnvelope::new(
+            vec![
+                TableColumn::new("node_id", TableColumnData::String(node_ids))
+                    .with_role(TableColumnRole::Dimension),
+                TableColumn::new("period_id", TableColumnData::String(period_ids))
+                    .with_role(TableColumnRole::Index),
+                TableColumn::new("value", TableColumnData::Float64(values))
+                    .with_role(TableColumnRole::Measure),
+                TableColumn::new(
+                    "value_money",
+                    TableColumnData::NullableFloat64(money_values),
+                )
+                .with_role(TableColumnRole::Measure),
+                TableColumn::new("currency", TableColumnData::NullableString(currencies))
+                    .with_role(TableColumnRole::Attribute),
+                TableColumn::new("value_type", TableColumnData::String(value_types))
+                    .with_role(TableColumnRole::Attribute),
+                TableColumn::new("source", TableColumnData::NullableString(sources))
+                    .with_role(TableColumnRole::Attribute),
+            ],
+            table_metadata("long"),
+        )
+        .map_err(Into::into)
     }
 
-    TableEnvelope::new(
-        vec![
-            TableColumn::new("node_id", TableColumnData::String(node_ids))
-                .with_role(TableColumnRole::Dimension),
-            TableColumn::new("period_id", TableColumnData::String(period_ids))
-                .with_role(TableColumnRole::Index),
-            TableColumn::new("value", TableColumnData::Float64(values))
-                .with_role(TableColumnRole::Measure),
-            TableColumn::new(
-                "value_money",
-                TableColumnData::NullableFloat64(money_values),
-            )
-            .with_role(TableColumnRole::Measure),
-            TableColumn::new("currency", TableColumnData::NullableString(currencies))
-                .with_role(TableColumnRole::Attribute),
-            TableColumn::new("value_type", TableColumnData::String(value_types))
-                .with_role(TableColumnRole::Attribute),
-            TableColumn::new("source", TableColumnData::NullableString(sources))
-                .with_role(TableColumnRole::Attribute),
-        ],
-        table_metadata("long"),
-    )
-    .map_err(Into::into)
-}
+    /// Export to a wide-format table.
+    ///
+    /// Schema: `(period_id, <node1>, <node2>, ...)`. One row is emitted per
+    /// unique period in ascending chronological order, and node columns follow
+    /// result declaration order. Missing node-period observations are encoded
+    /// as `NaN`, not zero, so downstream analytics can distinguish absence from
+    /// an evaluated zero.
+    ///
+    /// # Errors
+    ///
+    /// Returns a table-construction error if a node identifier or result shape
+    /// cannot be represented in a valid table envelope. Empty results are valid
+    /// and produce a zero-row table containing only `period_id`.
+    pub fn to_table_wide(&self) -> Result<TableEnvelope> {
+        let mut all_periods: Vec<PeriodId> = self
+            .nodes
+            .values()
+            .flat_map(|period_map| period_map.keys().cloned())
+            .collect();
+        all_periods.sort();
+        all_periods.dedup();
 
-/// Export results to a wide-format table.
-///
-/// Returns a table with one row per unique period and one measure column per
-/// node. Missing `(node, period)` values are encoded as `NaN`.
-pub(crate) fn to_table_wide(results: &StatementResult) -> Result<TableEnvelope> {
-    let mut all_periods: Vec<PeriodId> = results
-        .nodes
-        .values()
-        .flat_map(|period_map| period_map.keys().cloned())
-        .collect();
-    all_periods.sort();
-    all_periods.dedup();
+        let period_strings: Vec<String> = all_periods.iter().map(ToString::to_string).collect();
+        let mut columns =
+            vec![
+                TableColumn::new("period_id", TableColumnData::String(period_strings))
+                    .with_role(TableColumnRole::Index),
+            ];
 
-    let period_strings: Vec<String> = all_periods.iter().map(ToString::to_string).collect();
-    let mut columns = vec![
-        TableColumn::new("period_id", TableColumnData::String(period_strings))
-            .with_role(TableColumnRole::Index),
-    ];
+        for (node_id, period_map) in &self.nodes {
+            let mut node_values = Vec::with_capacity(all_periods.len());
+            for period_id in &all_periods {
+                node_values.push(period_map.get(period_id).copied().unwrap_or(f64::NAN));
+            }
 
-    for (node_id, period_map) in &results.nodes {
-        let mut node_values = Vec::with_capacity(all_periods.len());
-        for period_id in &all_periods {
-            node_values.push(period_map.get(period_id).copied().unwrap_or(f64::NAN));
+            columns.push(
+                TableColumn::new(node_id.clone(), TableColumnData::Float64(node_values))
+                    .with_role(TableColumnRole::Measure),
+            );
         }
 
-        columns.push(
-            TableColumn::new(node_id.clone(), TableColumnData::Float64(node_values))
-                .with_role(TableColumnRole::Measure),
-        );
+        TableEnvelope::new(columns, table_metadata("wide")).map_err(Into::into)
     }
-
-    TableEnvelope::new(columns, table_metadata("wide")).map_err(Into::into)
 }
 
 #[cfg(test)]
@@ -194,7 +213,7 @@ mod tests {
     #[test]
     fn test_to_table_long() {
         let results = create_test_results();
-        let table = to_table_long(&results).expect("should convert to table");
+        let table = results.to_table_long().expect("should convert to table");
 
         assert_eq!(table.row_count, 6); // 3 nodes × 2 periods
         assert_eq!(table.columns.len(), 7);
@@ -209,7 +228,7 @@ mod tests {
     #[test]
     fn test_to_table_wide() {
         let results = create_test_results();
-        let table = to_table_wide(&results).expect("should convert to table");
+        let table = results.to_table_wide().expect("should convert to table");
 
         assert_eq!(table.row_count, 2); // 2 periods
         assert_eq!(table.columns.len(), 4); // period_id + 3 nodes
@@ -230,7 +249,7 @@ mod tests {
     #[test]
     fn test_to_table_wide_period_order() {
         let results = create_test_results();
-        let table = to_table_wide(&results).expect("should convert to table");
+        let table = results.to_table_wide().expect("should convert to table");
 
         let period_ids = string_column(&table, "period_id");
         assert_eq!(period_ids[0], "2025Q1");
@@ -241,13 +260,13 @@ mod tests {
     fn test_empty_results() {
         let results = StatementResult::default();
 
-        let table_long = to_table_long(&results).unwrap();
+        let table_long = results.to_table_long().unwrap();
         assert_eq!(table_long.row_count, 0);
         assert_eq!(table_long.columns.len(), 7);
         assert_eq!(nullable_float_column(&table_long, "value_money").len(), 0);
         assert_eq!(nullable_string_column(&table_long, "currency").len(), 0);
 
-        let table_wide = to_table_wide(&results).unwrap();
+        let table_wide = results.to_table_wide().unwrap();
         assert_eq!(table_wide.row_count, 0);
         assert_eq!(table_wide.columns.len(), 1);
     }
