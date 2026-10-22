@@ -309,7 +309,7 @@ documented deviations from strict crate mirroring live there:
   mirrors `finstack_quant_models::correlation` (copulas, `CreditExposure`,
   portfolio-loss simulation); the shared correlation-matrix helpers
   (`validate_correlation_matrix`, `nearest_correlation`, and
-  `cholesky_decompose`, which binds core `cholesky_correlation`) are owned by
+  `cholesky_correlation`) are owned by
   `finstack_quant_core::math::linalg` and the joint-probability helpers by
   `finstack_quant_core::math::probability`; the bindings call core directly.
   `nearest_correlation` uses the same canonical name in Rust and Python (WASM:

@@ -18,11 +18,16 @@ permissions:
 
 env:
   UV_PYTHON_DOWNLOADS: never
+  # rustup's shared download cache is not concurrency-safe. mise installs
+  # multiple `cargo:*` tools in parallel by default, and concurrent component
+  # fetches race on ~/.rustup/downloads/*.partial; on a mise cache miss every
+  # job installs.
+  MISE_JOBS: "1"
 
 jobs:
   # ============================================
-  # Prime mise cache — read-only here: callers also run checks.yml, whose
-  # prime-cache job is the single writer of the mise cache key.
+  # Prime mise cache — restore only: checks.yml's prime-cache job, on master,
+  # is the only writer of the mise cache key.
   # ============================================
   prime-cache:
     name: Prime mise cache
@@ -38,11 +43,6 @@ jobs:
         with:
           cache: true
           cache_save: false
-        env:
-          # rustup's shared download cache is not concurrency-safe. mise
-          # installs multiple `cargo:*` tools in parallel by default, and
-          # concurrent component fetches race on ~/.rustup/downloads/*.partial.
-          MISE_JOBS: "1"
 
   # ============================================
   # Rust coverage — cargo llvm-cov nextest, LCOV for SonarQube
@@ -250,9 +250,6 @@ jobs:
         with:
           cache: true
           cache_save: false
-        env:
-          # rustup download cache is not concurrency-safe under parallel cargo:*.
-          MISE_JOBS: "1"
 
       # Keeps the image's Rust out of the rust-cache key (see Lint in checks.yml).
       - name: Remove the runner image's Rust toolchain
@@ -331,9 +328,6 @@ jobs:
         with:
           cache: true
           cache_save: false
-        env:
-          # rustup download cache is not concurrency-safe under parallel cargo:*.
-          MISE_JOBS: "1"
 
       # Keeps the image's Rust out of the rust-cache key (see Lint in checks.yml).
       - name: Remove the runner image's Rust toolchain
@@ -379,9 +373,6 @@ jobs:
         with:
           cache: true
           cache_save: false
-        env:
-          # rustup download cache is not concurrency-safe under parallel cargo:*.
-          MISE_JOBS: "1"
 
       # Keeps the image's Rust out of the rust-cache key (see Lint in checks.yml).
       - name: Remove the runner image's Rust toolchain
