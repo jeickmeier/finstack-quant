@@ -303,10 +303,6 @@ impl JsSabrParameters {
     pub(crate) fn from_inner(inner: SabrParameters) -> Self {
         Self { inner }
     }
-
-    fn clone_inner(&self) -> SabrParameters {
-        self.inner.clone()
-    }
 }
 
 /// Volatility smile generator for a fixed `(forward, t)` pair.
@@ -332,7 +328,7 @@ impl JsSabrSmile {
         let forward = js_f64(&forward, "forward")?;
         let t = js_f64(&t, "t")?;
         Ok(Self {
-            inner: SabrSmile::new(params.clone_inner(), forward, t),
+            inner: SabrSmile::new(params.inner.clone(), forward, t),
         })
     }
 

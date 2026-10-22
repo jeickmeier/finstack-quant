@@ -2,6 +2,7 @@
 //!
 use super::config::{McEngineConfig, MAX_CAPTURED_PATHS, MAX_NUM_PATHS};
 use super::path_capture::PathCaptureMode;
+use super::simulation::{run_path_loop, NoiseHook};
 use crate::monte_carlo::captured_path_stats::apply_captured_path_statistics;
 use crate::monte_carlo::estimate::Estimate;
 use crate::monte_carlo::paths::{PathDataset, PathSamplingMethod, ProcessParams, SimulatedPath};
@@ -584,7 +585,7 @@ impl McEngine {
             capture_enabled,
         )?;
 
-        self.finalize_captured_result(estimate, collected_paths, currency, Some(process_params))
+        self.finalize_captured_result(estimate, collected_paths, currency, process_params)
     }
 
     /// Assemble a [`MonteCarloResult`] from a raw [`Estimate`] and the paths
@@ -595,16 +596,12 @@ impl McEngine {
     /// captured-path statistics, currency tagging, dataset construction) lives
     /// in exactly one place.
     ///
-    /// `process_params` is optional because Sobol validation currently happens
-    /// in the pricer layer and does not require the engine to revalidate the
-    /// metadata; supplying `Some(..)` is equivalent to calling the public
-    /// [`Self::price_with_capture`] entry point.
     pub(crate) fn finalize_captured_result(
         &self,
         mut estimate: Estimate,
         mut collected_paths: Vec<SimulatedPath>,
         currency: Currency,
-        process_params: Option<ProcessParams>,
+        process_params: ProcessParams,
     ) -> finstack_quant_core::Result<MonteCarloResult> {
         let capture_enabled = self.config.path_capture.enabled;
         let paths = if capture_enabled {
@@ -618,8 +615,7 @@ impl McEngine {
             // Sort for deterministic ordering (parallel chunks arrive out of order;
             // serial is already sorted so this is O(n) in that case).
             collected_paths.sort_by_key(|p| p.path_id);
-            let params = process_params.unwrap_or_else(|| ProcessParams::new("unspecified"));
-            let mut dataset = PathDataset::new(estimate.num_paths, sampling_method, params);
+            let mut dataset = PathDataset::new(estimate.num_paths, sampling_method, process_params);
             for path in collected_paths {
                 dataset.add_path(path);
             }
@@ -787,8 +783,9 @@ impl McEngine {
                 inputs.currency,
             )?
         } else {
-            self.simulate_path(
+            run_path_loop(
                 rng,
+                &self.config.time_grid,
                 inputs.process,
                 inputs.disc,
                 inputs.initial_state,
@@ -797,7 +794,7 @@ impl McEngine {
                 &mut s.z,
                 &mut s.z_raw,
                 &mut s.work,
-                inputs.correlation,
+                NoiseHook::Correlation(inputs.correlation),
                 inputs.currency,
             )?
         };

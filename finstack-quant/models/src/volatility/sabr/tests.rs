@@ -306,7 +306,7 @@ fn test_sabr_chi_function_stability() {
     // Test small z values
     let small_z_values = vec![1e-8, 1e-6, 1e-4];
     for z in small_z_values {
-        let chi = model.calculate_chi_robust(z);
+        let chi = super::expansion::chi(z, model.rho);
         assert!(chi.is_ok());
         assert!(chi.expect("Chi should be Some").is_finite());
     }
@@ -314,13 +314,13 @@ fn test_sabr_chi_function_stability() {
     // Test rho ≈ 1 case
     let model_rho_one =
         SabrParameters::new(0.2, 0.5, 0.3, 0.999).expect("SABR parameters should be valid in test");
-    let chi_rho_one = model_rho_one.calculate_chi_robust(0.1);
+    let chi_rho_one = super::expansion::chi(0.1, model_rho_one.rho);
     assert!(chi_rho_one.is_ok());
 
     // Test rho ≈ -1 case
     let model_rho_minus_one = SabrParameters::new(0.2, 0.5, 0.3, -0.999)
         .expect("SABR parameters should be valid in test");
-    let chi_rho_minus_one = model_rho_minus_one.calculate_chi_robust(0.1);
+    let chi_rho_minus_one = super::expansion::chi(0.1, model_rho_minus_one.rho);
     assert!(chi_rho_minus_one.is_ok());
 }
 
@@ -332,7 +332,7 @@ fn test_sabr_chi_rho_one_uses_exact_log_limit() {
     let model = SabrParameters::new(0.2, 0.5, 0.3, 1.0).expect("rho = 1 is a valid bound");
 
     for &z in &[0.05_f64, 0.3, 0.7, 0.95] {
-        let chi = model.calculate_chi_robust(z).expect("chi at rho=1, z<1");
+        let chi = super::expansion::chi(z, model.rho).expect("chi at rho=1, z<1");
         let exact = -(1.0 - z).ln();
         assert!(
             (chi - exact).abs() < 1e-12,
@@ -351,7 +351,7 @@ fn test_sabr_chi_rho_one_uses_exact_log_limit() {
     // Continuity with the near-limit generic formula.
     let near = SabrParameters::new(0.2, 0.5, 0.3, 1.0 - 1e-9).expect("valid params");
     let z = 0.4_f64;
-    let chi_near = near.calculate_chi_robust(z).expect("chi near rho=1");
+    let chi_near = super::expansion::chi(z, near.rho).expect("chi near rho=1");
     let chi_limit = -(1.0 - z).ln();
     assert!(
         (chi_near - chi_limit).abs() < 1e-4,
@@ -359,8 +359,8 @@ fn test_sabr_chi_rho_one_uses_exact_log_limit() {
     );
 
     // z ≥ 1 is outside the Hagan expansion's domain at rho=1.
-    assert!(model.calculate_chi_robust(1.0).is_err());
-    assert!(model.calculate_chi_robust(1.5).is_err());
+    assert!(super::expansion::chi(1.0, model.rho).is_err());
+    assert!(super::expansion::chi(1.5, model.rho).is_err());
 }
 
 /// The `z/χ(z)` correction (`factor2`) must use the well-defined `z→0` limit
@@ -379,9 +379,7 @@ fn test_sabr_z_over_chi_uses_series_not_fabricated_one() {
     // i.e. it must be measurably different from a fabricated 1.0.
     let z = 1e-6_f64;
     // χ(z) for this z (exact formula) — well above the 1e-14 underflow guard.
-    let chi = model
-        .calculate_chi_robust(z)
-        .expect("χ(z) should compute for small z");
+    let chi = super::expansion::chi(z, model.rho).expect("χ(z) should compute for small z");
     let ratio = model
         .z_over_chi(z, chi)
         .expect("z/χ(z) should compute for small z");
@@ -408,9 +406,7 @@ fn test_sabr_z_over_chi_uses_series_not_fabricated_one() {
 
     // Exact-division branch for a normal (non-small) z still works.
     let z_big = 0.3_f64;
-    let chi_big = model
-        .calculate_chi_robust(z_big)
-        .expect("χ should compute for moderate z");
+    let chi_big = super::expansion::chi(z_big, model.rho).expect("χ should compute for moderate z");
     let ratio_big = model
         .z_over_chi(z_big, chi_big)
         .expect("z/χ(z) should compute for moderate z");
@@ -1302,9 +1298,8 @@ fn test_chi_series_matches_exact_near_crossover() {
             // Exact χ(z) = ln((√(1−2ρz+z²)+z−ρ)/(1−ρ)), well-conditioned here.
             let disc = (1.0 - 2.0 * rho * z + z * z).sqrt();
             let exact = ((disc + z - rho) / (1.0 - rho)).ln();
-            let robust = model
-                .calculate_chi_robust(z)
-                .expect("chi should compute for small z");
+            let robust =
+                super::expansion::chi(z, model.rho).expect("chi should compute for small z");
             // Tolerance: series truncation is O(z⁵); the dominant term is the
             // ~1e-16/(1−ρ) floating-point noise of the exact reference itself.
             assert!(
@@ -1334,17 +1329,15 @@ fn chi_rho_minus_one_rejects_z_at_or_below_minus_one() {
     let model =
         SabrParameters::new(0.2, 0.5, 0.3, -1.0).expect("rho=-1 boundary should be accepted");
     assert!(
-        model.calculate_chi_robust(-1.5).is_err(),
+        super::expansion::chi(-1.5, model.rho).is_err(),
         "z < -1 at rho=-1 must be a domain error"
     );
     assert!(
-        model.calculate_chi_robust(-1.0).is_err(),
+        super::expansion::chi(-1.0, model.rho).is_err(),
         "z = -1 at rho=-1 must be a domain error"
     );
     // Inside the domain the stable form equals ln(1+z) exactly.
-    let chi = model
-        .calculate_chi_robust(0.5)
-        .expect("z > -1 should compute");
+    let chi = super::expansion::chi(0.5, model.rho).expect("z > -1 should compute");
     assert!(
         (chi - 1.5_f64.ln()).abs() < 1e-12,
         "rho=-1 chi(0.5) should be ln(1.5), got {chi}"

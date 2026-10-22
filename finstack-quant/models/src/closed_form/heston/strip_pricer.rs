@@ -1,38 +1,11 @@
 use super::fourier_prices::validate_heston_inputs;
 use super::params::HESTON_TAIL_DIAGNOSTIC_THRESHOLD;
 use super::{HestonFourierSettings, HestonPricingParams};
-use crate::volatility::heston::HestonCfStatus;
+use crate::volatility::heston::{heston_pj_characteristic_function, HestonCfStatus};
 use finstack_quant_core::math::integration::gauss_legendre_grid;
 use finstack_quant_core::{Error, Result};
 use num_complex::Complex;
 use std::f64::consts::PI;
-
-pub(super) fn heston_pj_characteristic_function(
-    j: u8,
-    phi: f64,
-    time: f64,
-    log_spot: f64,
-    params: &HestonPricingParams,
-) -> (Complex<f64>, HestonCfStatus) {
-    crate::volatility::heston::heston_pj_characteristic_function(
-        j,
-        phi,
-        log_spot,
-        params.r,
-        params.q,
-        time,
-        &params.model,
-    )
-}
-
-fn composite_gauss_legendre_grid(
-    a: f64,
-    b: f64,
-    order: usize,
-    panels: usize,
-) -> Option<Vec<(f64, f64)>> {
-    gauss_legendre_grid(a, b, order, panels).ok()
-}
 
 /// Fraction of the upper integration range whose absolute integrand mass is
 /// used to estimate the truncated Gil-Pelaez tail.
@@ -94,7 +67,7 @@ impl HestonStripPricer {
             return None;
         }
         let grid =
-            composite_gauss_legendre_grid(0.0, settings.u_max, settings.gl_order, settings.panels)?;
+            gauss_legendre_grid(0.0, settings.u_max, settings.gl_order, settings.panels).ok()?;
         let i = Complex::new(0.0, 1.0);
         let log_spot = spot.ln();
         let mut psi1_over_iphi = Vec::with_capacity(grid.len());
@@ -121,10 +94,24 @@ impl HestonStripPricer {
 
             interior_nodes += 1;
             let denom = i * *phi;
-            let (psi1, status1) =
-                heston_pj_characteristic_function(1, *phi, time, log_spot, params);
-            let (psi2, status2) =
-                heston_pj_characteristic_function(2, *phi, time, log_spot, params);
+            let (psi1, status1) = heston_pj_characteristic_function(
+                1,
+                *phi,
+                log_spot,
+                params.r,
+                params.q,
+                time,
+                &params.model,
+            );
+            let (psi2, status2) = heston_pj_characteristic_function(
+                2,
+                *phi,
+                log_spot,
+                params.r,
+                params.q,
+                time,
+                &params.model,
+            );
 
             if status1 == HestonCfStatus::Overflow || status2 == HestonCfStatus::Overflow {
                 corrupted_nodes += 1;
@@ -295,8 +282,7 @@ pub(super) fn heston_pj_with_diagnostics(
     params: &HestonPricingParams,
     settings: &HestonFourierSettings,
 ) -> HestonPjDiagnostics {
-    let Some(grid) =
-        composite_gauss_legendre_grid(0.0, settings.u_max, settings.gl_order, settings.panels)
+    let Ok(grid) = gauss_legendre_grid(0.0, settings.u_max, settings.gl_order, settings.panels)
     else {
         return HestonPjDiagnostics {
             probability: f64::NAN,
@@ -336,7 +322,15 @@ pub(super) fn heston_pj_on_grid(
         }
         interior_nodes += 1;
 
-        let (psi, status) = heston_pj_characteristic_function(j, *phi, time, log_spot, params);
+        let (psi, status) = heston_pj_characteristic_function(
+            j,
+            *phi,
+            log_spot,
+            params.r,
+            params.q,
+            time,
+            &params.model,
+        );
         if status == HestonCfStatus::Overflow {
             corrupted_nodes += 1;
         }

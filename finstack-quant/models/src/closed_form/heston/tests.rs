@@ -1,4 +1,5 @@
 use super::*;
+use crate::volatility::heston::heston_pj_characteristic_function;
 
 /// Test that ψ_j(0) ≈ 1 for both probability characteristic functions.
 #[test]
@@ -7,7 +8,15 @@ fn test_pj_char_function_at_zero() {
     let log_spot = 100.0_f64.ln();
 
     for j in [1u8, 2u8] {
-        let (psi, _status) = heston_pj_characteristic_function(j, 1e-10, 1.0, log_spot, &params);
+        let (psi, _status) = heston_pj_characteristic_function(
+            j,
+            1e-10,
+            log_spot,
+            params.r,
+            params.q,
+            1.0,
+            &params.model,
+        );
         assert!(
             (psi.re - 1.0).abs() < 0.01,
             "ψ_{}(0) real part should be ~1, got {}",
@@ -478,7 +487,15 @@ fn strip_pricer_no_false_corruption_on_normal_params() {
 #[test]
 fn test_characteristic_function_handles_extreme_inputs() {
     let params = HestonPricingParams::new(0.05, 0.0, 0.1, 0.04, 1.0, 0.9, 0.04).expect("valid");
-    let (psi, _status) = heston_pj_characteristic_function(1, 0.0, 1.0, 100.0_f64.ln(), &params);
+    let (psi, _status) = heston_pj_characteristic_function(
+        1,
+        0.0,
+        100.0_f64.ln(),
+        params.r,
+        params.q,
+        1.0,
+        &params.model,
+    );
     assert!(
         psi.is_finite(),
         "characteristic function should stay finite"
