@@ -2,8 +2,10 @@ name: Full checks
 
 # The full tier, on top of checks.yml: Rust and Python coverage and the
 # SonarQube scan, documentation and every doc example, and the ignored Rust and
-# slow Python suites. nightly.yml and release.yml call it;
-# dispatch it on any branch with `gh workflow run full-checks.yml --ref <branch>`.
+# slow Python suites. nightly.yml and release.yml call it with
+# `secrets: inherit` (SONAR_TOKEN); dispatch it on any branch with
+# `gh workflow run full-checks.yml --ref <branch>`. `mise run all-ci --full`
+# runs it locally, without coverage.
 #
 # No workflow-level `concurrency`: as a called workflow it would share the
 # caller's group and cancel or deadlock the caller's run.

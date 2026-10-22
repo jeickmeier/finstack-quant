@@ -1,13 +1,13 @@
 name: Checks
 
-# The standard check set: lint, the standard fast tests on all three surfaces,
-# supply-chain audit, and the SonarQube scan. No doctests and no slow tests:
-# `rust-test`, `python-test` and `wasm-test` run neither without `--doctest` or
-# `--slow`, and release.yml runs those variants. Every job runs a
+# The fast tier: lint, generated-artifact drift, the uninstrumented fast tests
+# on all three surfaces, and the supply-chain audit, all in parallel after
+# prime-cache. Budget: under 15 minutes wall clock on a warm master cache. No
+# coverage, doctests or slow tests; full-checks.yml runs those. Every job runs a
 # canonical mise task, so a failure reproduces locally with the same command
-# (`mise run all-ci` runs the set). nightly.yml runs it on schedule before
-# building, release.yml as the base gate for a tagged release, and pr.yml for
-# every pull request.
+# (`mise run all-ci` runs the set). pr.yml runs it for every pull request,
+# nightly.yml every night on master (saving the caches pull requests restore),
+# and release.yml as a gate for a tagged release.
 #
 # No workflow-level `concurrency`: as a called workflow it would share the
 # caller's group and cancel or deadlock the caller's run.
@@ -19,17 +19,17 @@ permissions:
   contents: read
 
 # Managed toolchain versions are pinned in mise.toml.
-# CI uses jdx/mise-action@v4 to provision them, then runs canonical mise tasks.
+# CI uses jdx/mise-action (v5.2.0) to provision them, then runs canonical mise tasks.
 
 env:
   UV_PYTHON_DOWNLOADS: never
 
 jobs:
   # ============================================
-  # Prime mise cache — single writer to avoid parallel
-  # `actions/cache/save` races across jobs that share the
-  # same mise.toml-derived cache key. All other jobs read
-  # from this cache with `cache_save: false`.
+  # Prime mise cache — the single writer of the mise.toml-derived cache key,
+  # and only on master: parallel `actions/cache/save` calls on one key race.
+  # Pull requests and tags only restore it; every other job reads it with
+  # `cache_save: false`.
   # ============================================
   prime-cache:
     name: Prime mise cache

@@ -30,7 +30,7 @@ permissions:
   contents: read
 
 # Managed toolchain versions are pinned in mise.toml.
-# CI uses jdx/mise-action@v4 to provision them, then runs canonical mise tasks.
+# CI uses jdx/mise-action (v5.2.0) to provision them, then runs canonical mise tasks.
 
 env:
   UV_PYTHON_DOWNLOADS: never

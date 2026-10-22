@@ -359,10 +359,10 @@ description = "Regenerate the schema registries in clean-room trees and run the 
 hide = true
 run = [
   # Locally the rust-test build holds every gen_* binary (a no-op right after
-  # rust-test). CI's Lint job has no test build, so it builds the bins plus
-  # gen-check's generate_contracts example: an example build turns on
-  # dev-dependency features, so building the two apart compiles the workspace
-  # twice.
+  # rust-test). CI's Generated artifacts job has no test build, so it builds
+  # the bins plus gen-check's generate_contracts example: an example build
+  # turns on dev-dependency features, so building the two apart compiles the
+  # workspace twice.
   '''
   if [ -n "${CI:-}" ]; then
     cargo build --workspace --exclude finstack-quant-py --bins --example generate_contracts
@@ -374,10 +374,10 @@ run = [
   # Runs the gen_* binaries: inventory, $ref graph, and two clean-room trees
   # compared with each other and with the checked-in bytes.
   "uv run --no-sync python scripts/check_schema_generation.py",
-  # Schema-contract tests. Skipped in CI, where `rust-test --coverage` runs them.
+  # Schema-contract tests. Skipped in CI, where Test Rust's `rust-test` runs them.
   """
   if [ -n "${CI:-}" ]; then
-    echo "CI: schema-contract tests run in rust-test --coverage"
+    echo "CI: schema-contract tests run in rust-test"
     exit 0
   fi
   cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' \

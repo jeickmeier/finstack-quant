@@ -1,12 +1,13 @@
 name: PR
 
-# Runs the standard check set (checks.yml) unchanged on every pull request into
-# master or a release branch. Running it unchanged, coverage included, keeps
-# each job's build identical to master's, so the caches master saves apply; the
-# SonarQube scan is master-only and skipped. Pull requests into release/** also
-# run the upstream check: every commit must already be on master. `PR gate` is
-# the one status check the rulesets require, so jobs in checks.yml can change
-# without editing the rulesets.
+# Runs the fast tier (checks.yml) on every pull request into master or a
+# release branch. Each job builds exactly what the nightly run on master built,
+# so it restores the caches that run saved; pull requests save none. The full
+# tier (full-checks.yml) does not run here; dispatch it on a branch with
+# `gh workflow run full-checks.yml --ref <branch>`. Pull requests into
+# release/** also run the upstream check: every commit must already be on
+# master. `PR gate` is the one status check the rulesets require, so jobs in
+# checks.yml can change without editing the rulesets.
 on:
   pull_request:
     branches: [master, "release/**"]

@@ -1,6 +1,7 @@
 name: Nightly
 
-# Every night: run the standard check set (checks.yml) on master, then, if
+# Every night: run both check tiers on master (checks.yml and full-checks.yml;
+# this run saves the Rust caches pull requests restore), then, if both pass and
 # master moved since the last nightly build, build the release artifacts
 # (build-artifacts.yml) at version X.Y.Z-dev.YYYYMMDDHHMM and publish them as
 # the rolling `nightly` GitHub pre-release.
