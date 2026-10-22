@@ -128,7 +128,9 @@ without a QuantLib install.
 | Script | Purpose | Driven by |
 | --- | --- | --- |
 | `cargo_publish_checks.py` | Derives the crate publish order from internal dependencies, validates internal dependency versions, and dry-runs the first crate. | `mise run rust-publish-checks`, CI `Rust Publish Checks` |
-| `smoke_python_wheel.py` | Imports the installed `finstack_quant` wheel, walks every public subpackage, and exercises `Currency`/`Money`, `models.bs_price`, and `EuropeanPricer.price_gbm`. Runs against the built wheel on every release platform except linux-arm64. | `.github/workflows/release.yml`, `finstack-quant-py/tests/test_smoke_python_wheel.py` |
+| `smoke_python_wheel.py` | Imports the installed `finstack_quant` wheel, walks every public subpackage, and exercises `Currency`/`Money`, `models.bs_price`, and `EuropeanPricer.price_gbm`. Runs against the built wheel on every release platform except linux-arm64. | `.github/workflows/build-artifacts.yml`, `finstack-quant-py/tests/test_smoke_python_wheel.py` |
+| `stamp_version.py` | Writes a SemVer version into the workspace `Cargo.toml`, every intra-workspace path dependency requirement, and the WASM `package.json` and lockfile. CI stamps nightly (`X.Y.Z-dev.N`), candidate, and release versions before building; maintainers use it to bump `master`. | `mise run stamp-version`, `.github/workflows/build-artifacts.yml`, `.github/workflows/release.yml` |
+| `check_release_upstream.py` | `check`: fails when a release-branch commit has no counterpart on `master` (same patch, `cherry-pick -x` trailer, or squash-merged `(#N)`). `missing`: lists the `master` commits a release candidate leaves out. | `mise run release-check-upstream`, `.github/workflows/pr.yml`, `.github/workflows/release.yml` |
 
 ## Notebook examples
 
@@ -142,7 +144,7 @@ without a QuantLib install.
 | --- | --- | --- |
 | `check_loc.py` | Lists source files above a line limit (default 1000; positional override). Rust files are counted after stripping `#[test]` functions and `#[cfg(test)]` modules. `--ci` exits 1 on violations. | `uv run --no-sync python scripts/check_loc.py` |
 | `audit_hardcoded_assumptions.py` | Flags source lines carrying market-convention, rating-agency, regulatory, accounting, or product assumptions that belong in a data registry. Reviewed matches live in `hardcoded_assumptions_allowlist.json`. `--format {text,markdown,json}`, `--include-allowed`, `--fail-on-candidates`. | `python3 scripts/audit_hardcoded_assumptions.py` |
-| `ci_report.py` | Formats Rust (`nextest` JUnit + LCOV), Python (`pytest` JUnit + Cobertura), WASM (`wasm-test` log), and SonarQube (`.scannerwork/report-task.txt` + SonarQube Cloud API) results into GitHub Actions `$GITHUB_STEP_SUMMARY` Markdown tables and workflow annotations. | `.github/workflows/nightly.yml` |
+| `ci_report.py` | Formats Rust (`nextest` JUnit + LCOV), Python (`pytest` JUnit + Cobertura), WASM (`wasm-test` log), and SonarQube (`.scannerwork/report-task.txt` + SonarQube Cloud API) results into GitHub Actions `$GITHUB_STEP_SUMMARY` Markdown tables and workflow annotations. | `.github/workflows/checks.yml` |
 | `clean_workspace.py` | Removes build artifacts, virtualenvs, and caches. `--incremental` drops only Cargo incremental caches; `--wasm` drops only wasm-pack output and wasm32 target artifacts. | `mise run all-clean` |
 
 ## Tests
