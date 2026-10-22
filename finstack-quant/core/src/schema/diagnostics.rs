@@ -111,11 +111,6 @@ fn const_union_values(branches: &[Value]) -> Option<Vec<String>> {
         .collect()
 }
 
-/// Join a parent instance pointer with a child's relative pointer.
-fn join_pointer(parent: &str, child: &str) -> String {
-    format!("{parent}{child}")
-}
-
 /// Turn one validation error into the most specific failures available.
 fn expand_failure(
     error: &jsonschema::ValidationError<'_>,
@@ -168,7 +163,7 @@ fn expand_failure(
     }
     best.into_iter()
         .map(|failure| Failure {
-            pointer: join_pointer(&here.pointer, &failure.pointer),
+            pointer: format!("{}{}", here.pointer, failure.pointer),
             message: failure.message,
         })
         .collect()

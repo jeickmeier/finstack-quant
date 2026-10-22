@@ -27,9 +27,7 @@ use crate::decimal::f64_to_decimal;
 use crate::{Error, InputError};
 use core::fmt;
 
-use super::rounding::{
-    amount_from_repr, repr_add, repr_div_f64, repr_mul_f64, repr_sub, try_round_f64, AmountRepr,
-};
+use super::rounding::{repr_add, repr_div_f64, repr_mul_f64, repr_sub, try_round_f64};
 
 /// Format an integer string (optionally prefixed by `-`) with thousands
 /// separator `sep`.
@@ -190,7 +188,7 @@ pub struct Money {
     /// configuration applies the selected ingest scale; raw construction does not.
     #[serde(with = "crate::wire::decimal")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DecimalWire"))]
-    amount: AmountRepr,
+    amount: rust_decimal::Decimal,
     /// ISO 4217 currency of `amount`. Arithmetic between two `Money` values
     /// requires this to match; there is no implicit conversion.
     currency: Currency,
@@ -416,7 +414,7 @@ impl Money {
     /// range should avoid this lossy view and keep values on Decimal-backed APIs.
     #[inline]
     pub fn amount(&self) -> f64 {
-        amount_from_repr(self.amount)
+        self.amount.as_f64()
     }
 
     /// Lossless amount accessor as the internal [`rust_decimal::Decimal`].
@@ -724,7 +722,7 @@ macro_rules! from_integer_tuple {
             #[inline]
             fn from(value: ($t, Currency)) -> Self {
                 Self {
-                    amount: AmountRepr::from(value.0),
+                    amount: rust_decimal::Decimal::from(value.0),
                     currency: value.1,
                 }
             }
