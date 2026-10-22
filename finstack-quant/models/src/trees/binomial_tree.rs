@@ -44,7 +44,7 @@ struct OptionValuator {
 impl OptionValuator {
     fn ex_spot(&self, state: &NodeState) -> Result<f64> {
         let spot = state
-            .spot()
+            .spot
             .ok_or_else(|| Error::Internal("option node state missing spot".into()))?;
         match &self.ex_dividend_values {
             None => Ok(spot),
@@ -57,7 +57,7 @@ impl OptionValuator {
 
     fn cum_spot(&self, state: &NodeState) -> Result<f64> {
         let spot = state
-            .spot()
+            .spot
             .ok_or_else(|| Error::Internal("option node state missing spot".into()))?;
         match &self.cum_dividend_values {
             None => Ok(spot),
@@ -118,20 +118,6 @@ impl BinomialTree {
             steps
         };
         Self { steps, tree_type }
-    }
-
-    /// Create a Leisen-Reimer tree with the next positive odd interval count.
-    ///
-    /// # Arguments
-    ///
-    /// * `steps` - Positive requested interval count; 100 becomes 101 and 99 stays 99.
-    pub fn leisen_reimer(steps: usize) -> Self {
-        Self::new(steps, TreeType::LeisenReimer)
-    }
-
-    /// Create a standard CRR tree
-    pub fn crr(steps: usize) -> Self {
-        Self::new(steps, TreeType::CRR)
     }
 
     /// Calculate tree parameters based on model type
@@ -464,15 +450,39 @@ mod tests {
     /// state plumbing must not perturb the backward induction arithmetic.
     #[test]
     fn binomial_tree_prices_are_bit_pinned() {
-        let put = OptionMarketParams::put(100.0, 110.0, 0.05, 0.20, 1.0);
-        let call = OptionMarketParams::call(100.0, 95.0, 0.04, 0.25, 0.75);
+        let put = OptionMarketParams {
+            spot: 100.0,
+            strike: 110.0,
+            rate: 0.05,
+            volatility: 0.20,
+            time_to_expiry: 1.0,
+            dividend_yield: 0.0,
+            option_type: crate::types::OptionType::Put,
+        };
+        let call = OptionMarketParams {
+            spot: 100.0,
+            strike: 95.0,
+            rate: 0.04,
+            volatility: 0.25,
+            time_to_expiry: 0.75,
+            dividend_yield: 0.0,
+            option_type: crate::types::OptionType::Call,
+        };
         let prices = [
-            BinomialTree::crr(50).price_american(&put, &[]),
-            BinomialTree::crr(50).price_european(&put),
-            BinomialTree::leisen_reimer(51).price_european(&call),
-            BinomialTree::leisen_reimer(51).price_bermudan(&put, &[0.25, 0.5, 0.75], &[]),
-            BinomialTree::crr(40).price_american(&call, &[(0.3, 2.0)]),
-            BinomialTree::crr(40).price_bermudan(&put, &[0.5], &[(0.25, 1.5), (0.6, 1.5)]),
+            BinomialTree::new(50, crate::trees::binomial_tree::TreeType::CRR)
+                .price_american(&put, &[]),
+            BinomialTree::new(50, crate::trees::binomial_tree::TreeType::CRR).price_european(&put),
+            BinomialTree::new(51, crate::trees::binomial_tree::TreeType::LeisenReimer)
+                .price_european(&call),
+            BinomialTree::new(51, crate::trees::binomial_tree::TreeType::LeisenReimer)
+                .price_bermudan(&put, &[0.25, 0.5, 0.75], &[]),
+            BinomialTree::new(40, crate::trees::binomial_tree::TreeType::CRR)
+                .price_american(&call, &[(0.3, 2.0)]),
+            BinomialTree::new(40, crate::trees::binomial_tree::TreeType::CRR).price_bermudan(
+                &put,
+                &[0.5],
+                &[(0.25, 1.5), (0.6, 1.5)],
+            ),
         ];
         let bits: Vec<u64> = prices
             .into_iter()
@@ -493,10 +503,21 @@ mod tests {
 
     #[test]
     fn vanilla_tree_entry_points_reject_invalid_prices() {
-        for tree in [BinomialTree::crr(20), BinomialTree::leisen_reimer(21)] {
+        for tree in [
+            BinomialTree::new(20, crate::trees::binomial_tree::TreeType::CRR),
+            BinomialTree::new(21, crate::trees::binomial_tree::TreeType::LeisenReimer),
+        ] {
             for invalid in [0.0, -100.0, f64::NAN, f64::INFINITY] {
                 for (spot, strike) in [(invalid, 100.0), (100.0, invalid)] {
-                    let params = OptionMarketParams::call(spot, strike, 0.05, 0.2, 1.0);
+                    let params = OptionMarketParams {
+                        spot,
+                        strike,
+                        rate: 0.05,
+                        volatility: 0.2,
+                        time_to_expiry: 1.0,
+                        dividend_yield: 0.0,
+                        option_type: crate::types::OptionType::Call,
+                    };
                     assert!(tree.price_european(&params).is_err());
                     assert!(tree.price_american(&params, &[]).is_err());
                     assert!(tree.price_bermudan(&params, &[0.5], &[]).is_err());
@@ -509,18 +530,21 @@ mod tests {
 
     #[test]
     fn cash_dividend_tree_preserves_continuous_carry_in_deterministic_limit() {
-        for tree in [BinomialTree::crr(100), BinomialTree::leisen_reimer(101)] {
+        for tree in [
+            BinomialTree::new(100, crate::trees::binomial_tree::TreeType::CRR),
+            BinomialTree::new(101, crate::trees::binomial_tree::TreeType::LeisenReimer),
+        ] {
             for yield_rate in [-0.02, 0.0, 0.03, 0.08] {
                 for option_type in [OptionType::Call, OptionType::Put] {
-                    let params = OptionMarketParams::new(
-                        100.0,
-                        100.0,
-                        0.05,
-                        0.0,
-                        1.0,
-                        yield_rate,
+                    let params = OptionMarketParams {
+                        spot: 100.0,
+                        strike: 100.0,
+                        rate: 0.05,
+                        volatility: 0.0,
+                        time_to_expiry: 1.0,
+                        dividend_yield: yield_rate,
                         option_type,
-                    );
+                    };
                     let actual = tree
                         .price_bermudan(&params, &[], &[(0.5, 2.0)])
                         .expect("deterministic cash dividend and continuous carry");
@@ -539,9 +563,20 @@ mod tests {
 
     #[test]
     fn vanishing_cash_dividend_converges_to_continuous_yield_price() {
-        let mut params = OptionMarketParams::call(100.0, 100.0, 0.05, 0.2, 1.0);
+        let mut params = OptionMarketParams {
+            spot: 100.0,
+            strike: 100.0,
+            rate: 0.05,
+            volatility: 0.2,
+            time_to_expiry: 1.0,
+            dividend_yield: 0.0,
+            option_type: crate::types::OptionType::Call,
+        };
         params.dividend_yield = 0.05;
-        for tree in [BinomialTree::crr(100), BinomialTree::leisen_reimer(101)] {
+        for tree in [
+            BinomialTree::new(100, crate::trees::binomial_tree::TreeType::CRR),
+            BinomialTree::new(101, crate::trees::binomial_tree::TreeType::LeisenReimer),
+        ] {
             let without_cash = tree.price_american(&params, &[]).expect("continuous yield");
             let with_cash = tree
                 .price_american(&params, &[(0.5, 1e-8)])
@@ -555,10 +590,18 @@ mod tests {
 
     #[test]
     fn test_crr_european_converges_to_black_scholes() {
-        let market_params = OptionMarketParams::call(100.0, 100.0, 0.05, 0.20, 1.0);
+        let market_params = OptionMarketParams {
+            spot: 100.0,
+            strike: 100.0,
+            rate: 0.05,
+            volatility: 0.20,
+            time_to_expiry: 1.0,
+            dividend_yield: 0.0,
+            option_type: crate::types::OptionType::Call,
+        };
 
-        let tree_50 = BinomialTree::crr(50);
-        let tree_200 = BinomialTree::crr(200);
+        let tree_50 = BinomialTree::new(50, crate::trees::binomial_tree::TreeType::CRR);
+        let tree_200 = BinomialTree::new(200, crate::trees::binomial_tree::TreeType::CRR);
 
         let price_50 = tree_50
             .price_european(&market_params)
@@ -589,10 +632,18 @@ mod tests {
 
     #[test]
     fn test_leisen_reimer_better_convergence() {
-        let market_params = OptionMarketParams::call(100.0, 100.0, 0.05, 0.20, 1.0);
+        let market_params = OptionMarketParams {
+            spot: 100.0,
+            strike: 100.0,
+            rate: 0.05,
+            volatility: 0.20,
+            time_to_expiry: 1.0,
+            dividend_yield: 0.0,
+            option_type: crate::types::OptionType::Call,
+        };
 
-        let crr = BinomialTree::crr(401);
-        let lr = BinomialTree::leisen_reimer(401);
+        let crr = BinomialTree::new(401, crate::trees::binomial_tree::TreeType::CRR);
+        let lr = BinomialTree::new(401, crate::trees::binomial_tree::TreeType::LeisenReimer);
 
         let crr_price = crr.price_european(&market_params).expect("should succeed");
         let lr_price = lr.price_european(&market_params).expect("should succeed");
@@ -617,9 +668,17 @@ mod tests {
 
     #[test]
     fn test_leisen_reimer_converges_put() {
-        let market_params = OptionMarketParams::put(100.0, 100.0, 0.05, 0.20, 1.0);
+        let market_params = OptionMarketParams {
+            spot: 100.0,
+            strike: 100.0,
+            rate: 0.05,
+            volatility: 0.20,
+            time_to_expiry: 1.0,
+            dividend_yield: 0.0,
+            option_type: crate::types::OptionType::Put,
+        };
 
-        let lr = BinomialTree::leisen_reimer(201);
+        let lr = BinomialTree::new(201, crate::trees::binomial_tree::TreeType::LeisenReimer);
         let lr_put = lr.price_european(&market_params).expect("should succeed");
 
         // P = C − S e^{−qT} + K e^{−rT}
@@ -647,7 +706,7 @@ mod tests {
         let t_small = 1e-3;
 
         for &sigma in &[0.01, 0.10, 0.50] {
-            let tree = BinomialTree::leisen_reimer(51);
+            let tree = BinomialTree::new(51, crate::trees::binomial_tree::TreeType::LeisenReimer);
             let (u, d, p) = tree
                 .calculate_parameters(spot, strike, r, sigma, t_small, q)
                 .expect("LR params should compute");
@@ -665,9 +724,17 @@ mod tests {
     #[test]
     fn test_american_put_early_exercise_premium() {
         // American put should be worth more than European put
-        let market_params = OptionMarketParams::put(100.0, 110.0, 0.05, 0.20, 1.0);
+        let market_params = OptionMarketParams {
+            spot: 100.0,
+            strike: 110.0,
+            rate: 0.05,
+            volatility: 0.20,
+            time_to_expiry: 1.0,
+            dividend_yield: 0.0,
+            option_type: crate::types::OptionType::Put,
+        };
 
-        let tree = BinomialTree::crr(100); // Use CRR since LR has issues
+        let tree = BinomialTree::new(100, crate::trees::binomial_tree::TreeType::CRR); // Use CRR since LR has issues
 
         let american = tree
             .price_american(&market_params, &[])
@@ -693,9 +760,17 @@ mod tests {
     #[test]
     fn test_bermudan_between_european_and_american() {
         // Bermudan should be between European and American
-        let market_params = OptionMarketParams::put(100.0, 110.0, 0.05, 0.20, 1.0);
+        let market_params = OptionMarketParams {
+            spot: 100.0,
+            strike: 110.0,
+            rate: 0.05,
+            volatility: 0.20,
+            time_to_expiry: 1.0,
+            dividend_yield: 0.0,
+            option_type: crate::types::OptionType::Put,
+        };
 
-        let tree = BinomialTree::leisen_reimer(100);
+        let tree = BinomialTree::new(100, crate::trees::binomial_tree::TreeType::LeisenReimer);
 
         // Exercise allowed quarterly
         let exercise_dates = vec![0.25, 0.5, 0.75, 1.0];
@@ -729,13 +804,13 @@ mod tests {
     #[test]
     fn test_leisen_reimer_helper() {
         // Test that leisen_reimer rounds to nearest odd
-        let tree_even = BinomialTree::leisen_reimer(100);
+        let tree_even = BinomialTree::new(100, crate::trees::binomial_tree::TreeType::LeisenReimer);
         assert_eq!(tree_even.steps, 101, "Even steps should round up to odd");
 
-        let tree_odd = BinomialTree::leisen_reimer(99);
+        let tree_odd = BinomialTree::new(99, crate::trees::binomial_tree::TreeType::LeisenReimer);
         assert_eq!(tree_odd.steps, 99, "Odd steps should stay as-is");
 
-        let tree_200 = BinomialTree::leisen_reimer(200);
+        let tree_200 = BinomialTree::new(200, crate::trees::binomial_tree::TreeType::LeisenReimer);
         assert_eq!(tree_200.steps, 201, "200 should become 201");
     }
 
@@ -749,11 +824,19 @@ mod tests {
     fn test_golden_crr_atm_vs_black_scholes() {
         // ATM call: S=K=100, r=5%, σ=20%, T=1Y
         // Black-Scholes analytical: C ≈ 10.4506
-        let market_params = OptionMarketParams::call(100.0, 100.0, 0.05, 0.20, 1.0);
+        let market_params = OptionMarketParams {
+            spot: 100.0,
+            strike: 100.0,
+            rate: 0.05,
+            volatility: 0.20,
+            time_to_expiry: 1.0,
+            dividend_yield: 0.0,
+            option_type: crate::types::OptionType::Call,
+        };
         let bs_analytical = 10.4506;
 
         // CRR with high steps should be within 0.1% of BS
-        let tree = BinomialTree::crr(500);
+        let tree = BinomialTree::new(500, crate::trees::binomial_tree::TreeType::CRR);
         let crr_price = tree.price_european(&market_params).expect("should succeed");
 
         let relative_error = ((crr_price - bs_analytical) / bs_analytical).abs();
@@ -769,11 +852,19 @@ mod tests {
     /// Golden test: LR odd-step tree achieves better convergence
     #[test]
     fn test_golden_lr_odd_converges_faster() {
-        let market_params = OptionMarketParams::call(100.0, 100.0, 0.05, 0.20, 1.0);
+        let market_params = OptionMarketParams {
+            spot: 100.0,
+            strike: 100.0,
+            rate: 0.05,
+            volatility: 0.20,
+            time_to_expiry: 1.0,
+            dividend_yield: 0.0,
+            option_type: crate::types::OptionType::Call,
+        };
         let bs_analytical = 10.4506;
 
         // LR with odd steps (101) should be within 1 cent of BS
-        let lr_tree = BinomialTree::leisen_reimer(100);
+        let lr_tree = BinomialTree::new(100, crate::trees::binomial_tree::TreeType::LeisenReimer);
         assert_eq!(lr_tree.steps, 101, "Should be rounded to odd");
 
         let lr_price = lr_tree
@@ -792,7 +883,7 @@ mod tests {
 
     #[test]
     fn test_calculate_parameters_rejects_invalid_time_or_volatility() {
-        let tree = BinomialTree::crr(100);
+        let tree = BinomialTree::new(100, crate::trees::binomial_tree::TreeType::CRR);
 
         let time_err = tree
             .calculate_parameters(100.0, 100.0, 0.05, 0.2, 0.0, 0.0)
@@ -821,7 +912,7 @@ mod tests {
         let steps = 100;
 
         // CRR: must return an explicit degenerate error
-        let crr_tree = BinomialTree::crr(steps);
+        let crr_tree = BinomialTree::new(steps, crate::trees::binomial_tree::TreeType::CRR);
         let crr_err = crr_tree
             .calculate_parameters(100.0, 100.0, 0.05, epsilon_vol, 1.0, 0.0)
             .expect_err("CRR with degenerate vol should fail");
@@ -834,7 +925,7 @@ mod tests {
 
     #[test]
     fn test_leisen_reimer_rejects_missing_spot_or_strike() {
-        let tree = BinomialTree::leisen_reimer(51);
+        let tree = BinomialTree::new(51, crate::trees::binomial_tree::TreeType::LeisenReimer);
         for (spot, strike) in [(0.0, 100.0), (100.0, 0.0), (-1.0, 100.0), (f64::NAN, 100.0)] {
             assert!(tree
                 .calculate_parameters(spot, strike, 0.03, 0.25, 1.0, 0.01)
@@ -844,10 +935,18 @@ mod tests {
 
     #[test]
     fn leisen_reimer_deterministic_limit_is_finite() {
-        let tree = BinomialTree::leisen_reimer(201);
+        let tree = BinomialTree::new(201, crate::trees::binomial_tree::TreeType::LeisenReimer);
         for spot in [50.0, 100.0, 200.0] {
             for volatility in [0.0, 1e-8, 1e-4] {
-                let mut params = OptionMarketParams::call(spot, 100.0, 0.05, volatility, 1.0);
+                let mut params = OptionMarketParams {
+                    spot,
+                    strike: 100.0,
+                    rate: 0.05,
+                    volatility,
+                    time_to_expiry: 1.0,
+                    dividend_yield: 0.0,
+                    option_type: crate::types::OptionType::Call,
+                };
                 params.dividend_yield = 0.02;
                 let actual = tree
                     .price_european(&params)
@@ -863,8 +962,16 @@ mod tests {
 
     #[test]
     fn cash_dividend_at_maturity_is_ex_dividend_at_expiry() {
-        let tree = BinomialTree::crr(100);
-        let params = OptionMarketParams::new(100.0, 90.0, 0.05, 0.0, 1.0, 0.0, OptionType::Call);
+        let tree = BinomialTree::new(100, crate::trees::binomial_tree::TreeType::CRR);
+        let params = OptionMarketParams {
+            spot: 100.0,
+            strike: 90.0,
+            rate: 0.05,
+            volatility: 0.0,
+            time_to_expiry: 1.0,
+            dividend_yield: 0.0,
+            option_type: OptionType::Call,
+        };
         let div_amount = 5.0;
         let actual = tree
             .price_bermudan(&params, &[], &[(1.0, div_amount)])

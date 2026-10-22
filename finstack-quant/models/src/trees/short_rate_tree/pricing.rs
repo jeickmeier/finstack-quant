@@ -94,31 +94,6 @@ impl ShortRateTree {
 }
 
 impl ShortRateTree {
-    /// Price an instrument by backward induction over the calibrated lattice
-    /// with a continuously compounded option-adjusted spread.
-    ///
-    /// Works for every [`ShortRateModel`]: Ho-Lee and Black-Derman-Toy roll
-    /// back on the binomial lattice, Black-Karasinski on its trinomial one.
-    /// The horizon is the one the tree was calibrated to.
-    ///
-    /// # Arguments
-    ///
-    /// * `oas_bp` - Option-adjusted spread in basis points, continuously
-    ///   compounded, added to every node short rate for discounting and
-    ///   passed to the valuator as [`NodeState::oas_bp`]. Zero prices on the
-    ///   calibrated curve.
-    /// * `valuator` - Instrument payoff and exercise logic applied at each
-    ///   node.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the tree has not been calibrated, its stored
-    /// lattice is inconsistent with its configuration, or the valuator fails.
-    #[must_use = "pricing result should not be discarded"]
-    pub fn price<V: TreeValuator>(&self, oas_bp: f64, valuator: &V) -> Result<f64> {
-        self.price_with_oas_compounding(oas_bp, Compounding::Continuous, valuator)
-    }
-
     /// Price an instrument by backward induction with an option-adjusted
     /// spread quoted on `oas_compounding`.
     ///
@@ -133,7 +108,7 @@ impl ShortRateTree {
     /// * `oas_bp` - Option-adjusted spread in basis points on
     ///   `oas_compounding`. Zero prices on the calibrated curve.
     /// * `oas_compounding` - Compounding basis of `oas_bp`;
-    ///   [`Compounding::Continuous`] reproduces [`Self::price`].
+    ///   [`Compounding::Continuous`] applies a continuous annual spread.
     /// * `valuator` - Instrument payoff and exercise logic applied at each
     ///   node.
     ///
@@ -142,7 +117,7 @@ impl ShortRateTree {
     /// Returns an error when the tree has not been calibrated, its stored
     /// lattice is inconsistent with its configuration, or the valuator fails.
     #[must_use = "pricing result should not be discarded"]
-    pub fn price_with_oas_compounding<V: TreeValuator>(
+    pub fn price<V: TreeValuator>(
         &self,
         oas_bp: f64,
         oas_compounding: Compounding,

@@ -635,7 +635,7 @@ impl OasPricer<'_> {
                 valuator.price_with_hw_tree(tree, oas_bp, compounding)?
             }
             PreparedTree::ShortRate { tree, valuator } => {
-                tree.price_with_oas_compounding(oas_bp, compounding, valuator)?
+                tree.price(oas_bp, compounding, valuator)?
             }
         };
         Ok(TreePriceOutcome::deterministic(amount))

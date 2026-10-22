@@ -15,21 +15,24 @@ fn b6_lr_matches_quantlib_for_all_exercise_styles() {
         .map(|day| day.as_f64().expect("day") / 365.0)
         .collect();
     for case in fixture["cases"].as_array().expect("cases") {
-        let params = OptionMarketParams::new(
-            100.0,
-            100.0,
-            0.05,
-            case["volatility"].as_f64().expect("sigma"),
-            1.0,
-            0.02,
-            if case["side"] == "call" {
+        let params = OptionMarketParams {
+            spot: 100.0,
+            strike: 100.0,
+            rate: 0.05,
+            volatility: case["volatility"].as_f64().expect("sigma"),
+            time_to_expiry: 1.0,
+            dividend_yield: 0.02,
+            option_type: if case["side"] == "call" {
                 OptionType::Call
             } else {
                 OptionType::Put
             },
-        );
+        };
         let steps = case["steps"].as_u64().expect("steps") as usize;
-        let tree = BinomialTree::leisen_reimer(steps);
+        let tree = BinomialTree::new(
+            steps,
+            finstack_quant_models::trees::binomial_tree::TreeType::LeisenReimer,
+        );
         let price = match case["style"].as_str().expect("style") {
             "european" => tree.price_european(&params),
             "american" => tree.price_american(&params, &[]),
@@ -47,7 +50,14 @@ fn b6_lr_matches_quantlib_for_all_exercise_styles() {
 
 #[test]
 fn b6_lr_even_step_request_uses_the_next_odd_grid() {
-    assert_eq!(BinomialTree::leisen_reimer(200).steps, 201);
+    assert_eq!(
+        BinomialTree::new(
+            200,
+            finstack_quant_models::trees::binomial_tree::TreeType::LeisenReimer
+        )
+        .steps,
+        201
+    );
 }
 
 #[test]
