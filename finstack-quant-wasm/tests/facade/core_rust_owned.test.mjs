@@ -255,3 +255,54 @@ test('tiny annual zero rates avoid subtractive cancellation', () => {
   });
   assert.ok(Math.abs(curve.zeroRate(1, 'annual') - (1 - df) / df) < 1e-23);
 });
+
+test('plain-object constructor factories use Rust validation and defaults', () => {
+  assert.deepEqual(core.toleranceConfigNew(), { generic_epsilon: 1e-10 });
+  assert.deepEqual(core.toleranceConfigNew(null), core.toleranceConfigNew());
+  for (const epsilon of [0, -1, NaN, Infinity]) {
+    assert.throws(
+      () => core.toleranceConfigNew(epsilon),
+      (error) => error.kind === 'validation'
+    );
+  }
+  assert.throws(
+    () => core.toleranceConfigNew('small'),
+    (error) => error.kind === 'invalid_type'
+  );
+  for (const [name, score, minimum] of [
+    ['', 50, 40],
+    ['A', 101, 90],
+    ['A', 50, -1],
+    ['A', NaN, 40],
+    ['A', 50, Infinity],
+  ]) {
+    assert.throws(
+      () => core.ratingLevelTryNew(name, score, minimum),
+      (error) => error.kind === 'validation'
+    );
+  }
+  const high = core.ratingLevelTryNew('A', 90, 85);
+  const low = core.ratingLevelTryNew('B', 70, 65);
+  for (const ratings of [[], [high, high], [low, high]]) {
+    assert.throws(
+      () => core.scorecardScaleTryNew('invalid', null, ratings),
+      (error) => error.kind === 'validation'
+    );
+  }
+  assert.equal('description' in core.scorecardScaleTryNew('valid', undefined, [high, low]), false);
+  for (const params of [
+    [0, 0.5, 0.4, -0.3],
+    [0.2, 1.1, 0.4, -0.3],
+    [0.2, 0.5, -0.1, -0.3],
+    [0.2, 0.5, 0.4, 1],
+    [NaN, 0.5, 0.4, -0.3],
+    [0.2, 0.5, 0.4, -0.3, Infinity],
+  ]) {
+    assert.throws(
+      () => core.sabrParameterDataNew(...params),
+      (error) => error.kind === 'validation'
+    );
+  }
+  assert.equal('shift' in core.sabrParameterDataNew(0.2, 0.5, 0.4, -0.3), false);
+  assert.equal(core.sabrParameterDataNew(0.2, 0.5, 0.4, -0.3, -0.01).shift, -0.01);
+});

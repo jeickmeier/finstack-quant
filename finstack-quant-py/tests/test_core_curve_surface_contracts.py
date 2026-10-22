@@ -58,3 +58,19 @@ def test_bus252_discount_curve_counts_business_days_on_its_own_calendar() -> Non
         DiscountCurve("BRL-CDI", "2025-01-06", [(0.0, 1.0), (1.0, 0.9)], day_count="bus_252")
     with pytest.raises(KeyError):
         DiscountCurve("BRL-CDI", "2025-01-06", [(0.0, 1.0), (1.0, 0.9)], day_count="bus_252", calendar_id="nope")
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        (0, 0.5, 0.4, -0.3),
+        (0.2, 1.1, 0.4, -0.3),
+        (0.2, 0.5, -0.1, -0.3),
+        (0.2, 0.5, 0.4, 1),
+        (float("nan"), 0.5, 0.4, -0.3),
+        (0.2, 0.5, 0.4, -0.3, float("inf")),
+    ],
+)
+def test_sabr_parameter_constructor_rejects_invalid_domains(params: tuple[float, ...]) -> None:
+    with pytest.raises(ValueError, match=r"alpha|beta|nu|rho|shift|SABR|finite"):
+        SabrParameterData(*params)

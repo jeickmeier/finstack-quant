@@ -147,6 +147,17 @@ const SERIES = [100.0, 101.5, 99.75, 102.25, 103.0];
 const money = (amount, code) => new core.Money(amount, new core.Currency(code));
 
 const CASES = {
+  tolerance_config_new: () => [core.toleranceConfigNew(), core.toleranceConfigNew(1e-8)],
+  rating_level_try_new: () => core.ratingLevelTryNew('AAA', 95, 90),
+  scorecard_scale_try_new: () =>
+    core.scorecardScaleTryNew('custom', 'fixture', [
+      core.ratingLevelTryNew('A', 90, 85),
+      core.ratingLevelTryNew('B', 70, 65),
+    ]),
+  sabr_parameter_data_new: () => [
+    core.sabrParameterDataNew(0.2, 1, 0, -0.5),
+    core.sabrParameterDataNew(0.2, 0.5, 0.4, -0.3, -0.01),
+  ],
   // --- dates: IMM, CDS and option rules ---------------------------------------
   third_wednesday: () => iso(core.thirdWednesday(3, 2025)),
   third_friday: () => iso(core.thirdFriday(3, 2025)),
