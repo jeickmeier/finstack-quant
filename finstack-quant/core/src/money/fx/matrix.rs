@@ -445,6 +445,7 @@ impl FxMatrix {
     ///     Currency::EUR,
     ///     Currency::USD,
     ///     Date::from_calendar_date(2024, Month::March, 1).expect("Valid date"),
+    ///     FxConversionPolicy::default(),
     /// );
     /// let result = matrix.rate(query).expect("FX rate lookup should succeed");
     /// assert!(result.rate > 1.0);
@@ -575,6 +576,7 @@ impl FxMatrix {
     ///     Currency::GBP,
     ///     Currency::USD,
     ///     Date::from_calendar_date(2024, Month::April, 1).expect("Valid date"),
+    ///     FxConversionPolicy::default(),
     /// )).expect("FX rate lookup should succeed");
     /// assert_eq!(res.rate, 1.3);
     /// ```

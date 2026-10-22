@@ -58,6 +58,8 @@ fn create_option_market(
         &[0.25, 0.5, 1.0, 2.0],
         &[50.0, 75.0, 100.0, 125.0, 150.0],
         &[vol; 20], // 4 expiries × 5 strikes
+        Default::default(),
+        None,
     )
     .unwrap();
 

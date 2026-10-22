@@ -132,6 +132,8 @@ fn create_market() -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0, 5.0],     // Expiry times
         &[0.02, 0.03, 0.04, 0.05, 0.06], // Strike rates
         &[0.20; 25],                     // Flat 20% vol
+        Default::default(),
+        None,
     )
     .unwrap();
 
