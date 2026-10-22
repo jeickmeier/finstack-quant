@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### Valuations: one path per capability
+
+#### Changed
+
+- Structured credit has one per-tranche API: `tranche_metrics(deal, tranche_id, market, as_of, market_price_pct, metrics)` (was `calculate_tranche_metrics`, and absorbs `value_tranche_with_metrics` / `TrancheValuation`). `TrancheMetrics` renames `price_pct` → `clean_price_pct`, `modified_duration` → `effective_duration`, `convexity` → `effective_convexity`, and gains `dirty_price_pct`, `accrued`, `ytm` and requested registry `metrics`. The other tranche analytics are `tranche_oas`, `tranche_discount_margin`, `tranche_breakeven_cdr` and `tranche_scenario_table` in Rust and Python (was `structured_credit_tranche_*`) and `trancheMetrics` etc. in WASM (was `structuredCreditTranche*`).
+- WASM: the `valuations.fx` namespace is folded into `valuations.instruments`, and FX TypeScript types take their Rust names (`FxForward`, `FxOption`, ...).
+- `X::builder()` is the one construction entry point: `#[derive(FinancialBuilder)]` no longer emits `XBuilder::new()`, and the `*FutureOption::new`, `EquityOption::new`, `FxSpot::new` and `TrancheBuilder::new` constructors are gone. `PrivateMarketsFund::new` returns `Result`; `CdsTranche::new` runs the full validation.
+- `EquityOptionParams::new` defaults settlement to Cash (was Physical), matching the instrument's serde and builder default.
+- `CashflowSpec::fixed_rate`, `floating_bp` and `floating_with_reset_lag` are gone; use `fixed` and `floating(.., reset_lag_days: Option<i32>)`.
+- Commodity forwards pay on maturity plus the convention's settlement days on a registered exchange calendar (NYMEX, COMEX and CBOT on `cme`, ICE Brent and LME on `gblo`, power on the new `nerc` calendar), so PV and cashflows discount to that payment date.
+- MBS Monte Carlo OAS takes its path count and seed from `model_config` (`mc_paths`, `mc_seed`) like the other MC pricers.
+- Ten instruments (FX spot, forward, swap, NDF, quanto option; equity TRS, DCF, cliquet, autocallable; real-estate asset) deserialize with `#[serde(remote = "Self")]` and `validate_on_deserialize!` instead of hand-written `*Unchecked` mirrors; their published schema property docs now come from the real structs.
+- `BrentSolver::solve_fallible` propagates objective errors; YTM, Z-spread and DM now report the pricer's error instead of the solver's.
+- Missing-metric errors use the metric's wire id (`metric:z_spread`).
+- Python docstrings come from the `.pyi` stubs for the converted modules (`valuations.market`, `valuations.composite`, the typed instruments and every domain's `schema`); `finstack_quant.valuations.{instruments, composite, market}` are the compiled modules (the `.py` re-export shims are gone).
+- Stricter edge cases where duplicate code paths disagreed: an FX variance swap with no return interval is an error, commodity Black-76 rejects degenerate inputs, a configured but missing FI-TRS index yield is NotFound (Python `KeyError`), out-of-range SMM/MDR conversions error, `FxOption::validate` rejects a non-finite or negative strike, and a quanto whose `fx_spot_id` scalar is missing fails instead of using the FX matrix.
+
+#### Removed
+
+- Wire fields and variants that changed no number: `ClawbackSpec.settle_on` and `ClawbackSettle` (clawback settles at fund end), `CdsOption.exercise_style` and `premium_settlement_date`, `CommoditySpotOption.{convention, premium_settlement_days}`, `VolatilityIndexFuture.discount_curve_id`, `BermudanSchedule.notice_days`, and `YieldCompounding::TreasuryActual`. JSON carrying these fields is rejected.
+- Always-zero metrics: repo `collateral_haircut01` / `collateral_price01` and CDS tranche `tail_dependence`.
+- Setters that shadowed builders or public fields (swaption, cap/floor, IR future, Bermudan schedule, basis swap, structured credit, pool asset, tranche, FX spot, CDS index and option, `ValuationResult::with_covenant(s)`).
+- Dead public API with no callers, including `extract_risk_factors`, `ListedDeliveryObligation`, `CdsPricerConfig`, the CDS index `*_detailed` results, `StructuredCredit::{generate_cashflows, apply_deal_defaults}`, `BasketCalculator`, `CompositeInstrument::new`, `instrument_cashflows_json` and `format_bucket_label_cow` (`format_bucket_label` returns `Cow`).
+- Python `ValuationResult.{price_decimal, metric_keys, metric_count}`, the composite JSON twins `execution_trades_json` / `trades_json` / `instrument_json` (`CompositeHistoryResult.row` is the typed twin of `row_json`), and WASM `weightingMethodFixedQuantity`, `weightingMethodNotionalWeighted`, `rebalanceRuleManual` and the FX bare-spec constructor.
+
 ### Statements: one path per capability
 
 #### Changed
