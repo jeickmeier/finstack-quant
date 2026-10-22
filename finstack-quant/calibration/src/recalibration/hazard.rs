@@ -785,7 +785,11 @@ pub(super) fn recalibrate_hazard_with_recovery(
     doc_clause: Option<CdsDocClause>,
     cds_valuation_convention: Option<CdsValuationConvention>,
 ) -> finstack_quant_core::Result<HazardCurve> {
-    let new_recovery = new_recovery.clamp(0.0, 0.999_999);
+    if !new_recovery.is_finite() || !(0.0..1.0).contains(&new_recovery) {
+        return Err(finstack_quant_core::Error::Validation(
+            "hazard recovery replay requires a finite recovery rate in [0, 1)".to_string(),
+        ));
+    }
     recalibrate_from_par_spreads(HazardParRecalibration {
         hazard,
         context,
@@ -884,6 +888,120 @@ mod tests {
             .hazard_calibration(recipe)
             .build()
             .expect("deal quote curve")
+    }
+
+    #[test]
+    fn recovery_replay_preserves_accepted_values_and_rejects_invalid_inputs() {
+        use finstack_quant_valuations_core::recalibration::{
+            HazardRecalibrationAction, HazardRecalibrationRequest, RecalibrationProvider,
+        };
+        let original: serde_json::Value = serde_json::from_str(include_str!(
+            "../../examples/market_bootstrap/03_single_name_hazard.json"
+        ))
+        .expect("source document");
+        for small_spreads in [false, true] {
+            let mut document = original.clone();
+            if small_spreads {
+                for datum in document["market_data"].as_array_mut().expect("market data") {
+                    if datum["kind"] == "cds_quote" {
+                        datum["spread_bp"] = serde_json::json!(0.001);
+                    }
+                }
+            }
+            let envelope = crate::api::validate::parse_envelope(&document.to_string())
+                .expect("source envelope");
+            let result = crate::api::engine::calibrate(&envelope).expect("source calibration");
+            let market = Arc::new(
+                MarketContext::try_from(result.result.final_market).expect("source market"),
+            );
+            let source = market.get_hazard("ISSUER-A-CDS").expect("source hazard");
+            let discount_id = CurveId::new("USD-OIS");
+            let provider = crate::recalibration::CachedRecalibrationProvider::default();
+            let direct = |recovery| {
+                recalibrate_hazard_with_recovery(
+                    &source,
+                    recovery,
+                    &market,
+                    &discount_id,
+                    None,
+                    None,
+                )
+            };
+            let provided = |recovery| {
+                provider.rebuild_hazard_curve(&HazardRecalibrationRequest {
+                    hazard: Arc::clone(&source),
+                    source_market: Arc::clone(&market),
+                    target_market: Arc::clone(&market),
+                    discount_curve_id: discount_id.clone(),
+                    doc_clause: None,
+                    cds_valuation_convention: None,
+                    deal_quote_override: None,
+                    action: HazardRecalibrationAction::RecoveryRateReplay {
+                        recovery_rate: recovery,
+                    },
+                })
+            };
+            if !small_spreads {
+                for invalid in [-0.01, 1.0, 1.01, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+                    let error = direct(invalid).expect_err("invalid recovery");
+                    assert!(error.to_string().contains("finite recovery rate in [0, 1)"));
+                    assert_eq!(
+                        error.to_string(),
+                        provided(invalid)
+                            .expect_err("invalid provider recovery")
+                            .to_string()
+                    );
+                }
+                // These recoveries are valid inputs, but the observed spreads cannot
+                // be fitted inside the existing hazard bounds. Do not clamp or fall back.
+                for recovery in [0.999_999_5, f64::from_bits(1.0_f64.to_bits() - 1)] {
+                    let error = direct(recovery).expect_err("unattainable hazard fit");
+                    assert_eq!(
+                        error.to_string(),
+                        provided(recovery)
+                            .expect_err("unattainable provider fit")
+                            .to_string()
+                    );
+                    assert!(!error.to_string().contains("finite recovery rate in [0, 1)"));
+                }
+            }
+            let recoveries = if small_spreads {
+                vec![0.999_999_5]
+            } else {
+                vec![0.0, 0.25]
+            };
+            for recovery in recoveries {
+                let rebuilt = direct(recovery).expect("accepted recovery replay");
+                let host = provided(recovery).expect("accepted provider replay");
+                assert_eq!(rebuilt.recovery_rate().to_bits(), recovery.to_bits());
+                assert_eq!(host.recovery_rate().to_bits(), recovery.to_bits());
+                assert_eq!(
+                    rebuilt.knot_points().collect::<Vec<_>>(),
+                    host.knot_points().collect::<Vec<_>>()
+                );
+                let recipe = rebuilt.hazard_calibration().expect("rebuilt recipe");
+                assert_eq!(
+                    recipe.hazard_params()["recovery_rate"]
+                        .as_f64()
+                        .expect("recipe recovery")
+                        .to_bits(),
+                    recovery.to_bits()
+                );
+                for quote in recipe
+                    .calibration_inputs()
+                    .iter()
+                    .chain(recipe.spread_risk_inputs())
+                {
+                    assert_eq!(
+                        quote.quote["recovery_rate"]
+                            .as_f64()
+                            .expect("quote recovery")
+                            .to_bits(),
+                        recovery.to_bits()
+                    );
+                }
+            }
+        }
     }
 
     #[test]
