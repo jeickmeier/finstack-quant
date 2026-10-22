@@ -1,7 +1,8 @@
 name: Full checks
 
-# The full tier, on top of checks.yml: coverage and the SonarQube scan, docs
-# and doctests, and the slow suites. nightly.yml and release.yml call it;
+# The full tier, on top of checks.yml: Rust and Python coverage and the
+# SonarQube scan, documentation and every doc example, and the ignored Rust and
+# slow Python suites. nightly.yml and release.yml call it;
 # dispatch it on any branch with `gh workflow run full-checks.yml --ref <branch>`.
 #
 # No workflow-level `concurrency`: as a called workflow it would share the
@@ -211,3 +212,194 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: python3 scripts/ci_report.py sonarqube
+
+  # ============================================
+  # Documentation — strict docs, then every Rust, Python and WASM doc example
+  # ============================================
+  docs:
+    name: Documentation
+    needs: prime-cache
+    runs-on: ubuntu-24.04
+    # Rustdoc and the Rust doctests, then the Python extension and the WASM web
+    # package for their doc examples; sized for a cold cache.
+    timeout-minutes: 150
+
+    env:
+      CARGO_BUILD_JOBS: 4
+      CARGO_INCREMENTAL: 0
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
+      # Must include the getrandom cfg: this env replaces crate `.cargo/config.toml`
+      # rustflags rather than appending. `debuginfo=0` avoids the rust-lld
+      # SIGBUS on huge wasm-bindgen describe-export lists (LLVM #195482).
+      CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: "--cfg getrandom_backend=\"wasm_js\" -C debuginfo=0"
+      PYO3_PYTHON: python3
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up swap space
+        uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
+        with:
+          swap-size-gb: 10
+
+      - name: Provision toolchain (mise)
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        with:
+          cache: true
+          cache_save: false
+        env:
+          # rustup download cache is not concurrency-safe under parallel cargo:*.
+          MISE_JOBS: "1"
+
+      # Keeps the image's Rust out of the rust-cache key (see Lint in checks.yml).
+      - name: Remove the runner image's Rust toolchain
+        run: rustup toolchain uninstall stable
+
+      # Before the nightly update below: the key hashes the toolchains installed
+      # at restore time, and a freshly updated nightly would change it daily.
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          shared-key: docs
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+
+      # cargo-public-api (scripts/check_public_api_input_docs.py) needs nightly
+      # rustdoc JSON. mise.toml provisions nightly; this step makes the job
+      # self-sufficient when the shared mise cache was primed without it.
+      - name: Ensure nightly for rustdoc JSON
+        run: rustup toolchain install nightly --profile minimal
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+
+      - name: Set up Python environment
+        run: |
+          uv venv --python 3.14
+          echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
+          uv sync --locked --no-build --no-install-project
+
+      - name: Install WASM dependencies
+        run: npm ci --ignore-scripts
+        working-directory: finstack-quant-wasm
+
+      # Strict rustdoc, the public-API input-doc and deprecation contracts, the
+      # Python and WASM IntelliSense contracts, and the benchmark documents.
+      - name: Check documentation
+        run: mise run all-doc
+
+      - name: Run Rust doctests
+        run: mise run rust-test --doctest
+
+      - name: Run Python stub and module doctests
+        run: mise run python-test --doctest
+
+      - name: Run WASM documented code samples
+        run: mise run wasm-test --doctest
+
+  # ============================================
+  # Slow Rust — the ignored and slow tests, outside nextest's `ci` profile
+  # ============================================
+  slow-rust:
+    name: Test ignored Rust suite
+    needs: prime-cache
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+
+    # Must match Test Rust's CARGO_* env in checks.yml: rust-cache hashes it into the key.
+    env:
+      CARGO_BUILD_JOBS: 4
+      CARGO_INCREMENTAL: 0
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up swap space
+        uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
+        with:
+          swap-size-gb: 10
+
+      - name: Provision toolchain (mise)
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        with:
+          cache: true
+          cache_save: false
+        env:
+          # rustup download cache is not concurrency-safe under parallel cargo:*.
+          MISE_JOBS: "1"
+
+      # Keeps the image's Rust out of the rust-cache key (see Lint in checks.yml).
+      - name: Remove the runner image's Rust toolchain
+        run: rustup toolchain uninstall stable
+
+      # checks.yml's Test Rust builds the same artifacts and is the single writer of this key.
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          shared-key: test-rust
+          save-if: false
+
+      - name: Run ignored and slow Rust tests
+        run: mise run rust-test --slow
+
+  # ============================================
+  # Slow Python — maturin build + the slow pytest suite
+  # ============================================
+  slow-python:
+    name: Test slow Python suite
+    needs: prime-cache
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    # Must match Test Python's CARGO_* env in checks.yml: rust-cache hashes it into the key.
+    env:
+      CARGO_BUILD_JOBS: 4
+      CARGO_INCREMENTAL: 0
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
+      PYO3_PYTHON: python3
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up swap space
+        uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
+        with:
+          swap-size-gb: 10
+
+      - name: Provision toolchain (mise)
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        with:
+          cache: true
+          cache_save: false
+        env:
+          # rustup download cache is not concurrency-safe under parallel cargo:*.
+          MISE_JOBS: "1"
+
+      # Keeps the image's Rust out of the rust-cache key (see Lint in checks.yml).
+      - name: Remove the runner image's Rust toolchain
+        run: rustup toolchain uninstall stable
+
+      # checks.yml's Test Python builds the same extension and is the single writer of these keys.
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          shared-key: test-python
+          save-if: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          save-cache: false
+
+      - name: Set up Python environment
+        run: |
+          uv venv --python 3.14
+          echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
+          uv sync --locked --no-build --no-install-project
+
+      # Golden pricing comparisons and Monte Carlo.
+      - name: Build extension and run slow Python tests
+        run: mise run python-test --slow
