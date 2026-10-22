@@ -34,7 +34,13 @@ fn failed_recalibration_preserves_rates_times_and_transition_lattice() {
         let mut tree = ShortRateTree::new(config);
         tree.calibrate(&curve, 1.0).expect("initial calibration");
         let before = tree.clone();
-        let value_before = tree.price(0.0, &ConstantValuator).expect("price");
+        let value_before = tree
+            .price(
+                0.0,
+                finstack_quant_core::math::Compounding::Continuous,
+                &ConstantValuator,
+            )
+            .expect("price");
         assert!(tree.calibrate(&InvalidDiscountCurve(&curve), 2.0).is_err());
         assert_eq!(tree.time_steps, before.time_steps);
         assert_eq!(tree.rates, before.rates);
@@ -44,7 +50,11 @@ fn failed_recalibration_preserves_rates_times_and_transition_lattice() {
         assert_eq!(quality.converged, before_quality.converged);
         assert_eq!(quality.max_error_bp, before_quality.max_error_bp);
         let value_after = tree
-            .price(0.0, &ConstantValuator)
+            .price(
+                0.0,
+                finstack_quant_core::math::Compounding::Continuous,
+                &ConstantValuator,
+            )
             .expect("price after failure");
         assert_eq!(value_after, value_before);
     }
@@ -144,7 +154,7 @@ struct RateCallValuator {
 impl TreeValuator for RateCallValuator {
     fn value_at_maturity(&self, state: &NodeState) -> Result<f64> {
         let rate = state
-            .interest_rate()
+            .interest_rate
             .ok_or_else(|| Error::Internal("rate-call node missing interest rate".into()))?;
         Ok((rate - self.strike).max(0.0))
     }
@@ -185,7 +195,11 @@ fn ho_lee_stored_lattice_prices_zero_coupon_to_calibration_curve() {
         .expect("Ho-Lee calibration");
 
     let actual = tree
-        .price(0.0, &ConstantValuator)
+        .price(
+            0.0,
+            finstack_quant_core::math::Compounding::Continuous,
+            &ConstantValuator,
+        )
         .expect("Ho-Lee zero-coupon price");
     let expected = curve.df(maturity);
 
@@ -223,7 +237,11 @@ fn ho_lee_noncontinuous_compounding_reprices_curve() {
         );
 
         let actual = tree
-            .price(0.0, &ConstantValuator)
+            .price(
+                0.0,
+                finstack_quant_core::math::Compounding::Continuous,
+                &ConstantValuator,
+            )
             .expect("zero-coupon price");
         let expected = curve.df(maturity);
         assert!(
@@ -344,7 +362,11 @@ fn test_bdt_stored_lattice_prices_zero_coupon_to_calibration_curve() {
 
     let oas_bp = 0.0;
     let actual = tree
-        .price(oas_bp, &ConstantValuator)
+        .price(
+            oas_bp,
+            finstack_quant_core::math::Compounding::Continuous,
+            &ConstantValuator,
+        )
         .expect("BDT zero coupon price");
     let expected = curve.df(maturity);
 
@@ -461,7 +483,13 @@ fn test_bdt_mean_reversion_calibrates_and_tightens_rate_dispersion() {
     );
 
     let oas_bp = 0.0;
-    let zcb = tree_mr.price(oas_bp, &ConstantValuator).expect("ZCB price");
+    let zcb = tree_mr
+        .price(
+            oas_bp,
+            finstack_quant_core::math::Compounding::Continuous,
+            &ConstantValuator,
+        )
+        .expect("ZCB price");
     let target = curve.df(2.0);
     assert!(
         (zcb - target).abs() < 1e-6,
@@ -486,7 +514,13 @@ fn bk_trinomial_reprices_curve_to_a_tenth_bp() {
         "BK calibration must reprice the curve to <0.1bp, got {quality:?}"
     );
 
-    let zcb = tree.price(0.0, &ConstantValuator).expect("ZCB price");
+    let zcb = tree
+        .price(
+            0.0,
+            finstack_quant_core::math::Compounding::Continuous,
+            &ConstantValuator,
+        )
+        .expect("ZCB price");
     let target = curve.df(maturity);
     let error_bp = ((zcb - target) / target).abs() * 10_000.0;
     assert!(
@@ -541,12 +575,24 @@ fn bk_kappa_to_zero_converges_to_bdt() {
 
     let mut bdt = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, sigma));
     bdt.calibrate(&curve, maturity).expect("BDT(κ=0)");
-    let price_bdt = bdt.price(oas_bp, &valuator).expect("BDT price");
+    let price_bdt = bdt
+        .price(
+            oas_bp,
+            finstack_quant_core::math::Compounding::Continuous,
+            &valuator,
+        )
+        .expect("BDT price");
 
     let mut bk = ShortRateTree::new(ShortRateTreeConfig::black_karasinski(steps, sigma, 1e-4));
     bk.calibrate(&curve, maturity).expect("BK(κ→0)");
     assert!(bk.bk_trinomial.is_some(), "Black-Karasinski is trinomial");
-    let price_bk = bk.price(oas_bp, &valuator).expect("BK price");
+    let price_bk = bk
+        .price(
+            oas_bp,
+            finstack_quant_core::math::Compounding::Continuous,
+            &valuator,
+        )
+        .expect("BK price");
 
     // Tiny terminal dispersion check: at κ→0 the OU limit is σ√T.
     let (xs, dist) = bk_terminal_x_distribution(&bk);
@@ -925,7 +971,11 @@ fn test_calibrate_rejects_zero_steps_and_non_positive_horizon() {
 fn test_price_rejects_uncalibrated_tree() {
     let tree = ShortRateTree::new(ShortRateTreeConfig::ho_lee(5, 0.01));
     let err = tree
-        .price(0.0, &ConstantValuator)
+        .price(
+            0.0,
+            finstack_quant_core::math::Compounding::Continuous,
+            &ConstantValuator,
+        )
         .expect_err("uncalibrated tree should error");
     assert!(err.to_string().contains("must be calibrated"));
 }
@@ -1066,22 +1116,22 @@ struct NodeProbeValuator;
 impl TreeValuator for NodeProbeValuator {
     fn value_at_maturity(&self, state: &NodeState) -> Result<f64> {
         let rate = state
-            .interest_rate()
+            .interest_rate
             .ok_or_else(|| Error::Internal("probe node missing interest rate".into()))?;
         let oas_bp = state.oas_bp;
         Ok((rate - 0.03).max(0.0) + oas_bp / 10_000.0)
     }
 
     fn value_at_node(&self, state: &NodeState, continuation_value: f64, dt: f64) -> Result<f64> {
-        let rate = state.interest_rate().unwrap_or(0.0);
+        let rate = state.interest_rate.unwrap_or(0.0);
         let oas_bp = state.oas_bp;
         Ok(continuation_value
             + 1e-3 * rate * dt
             + 1e-6 * oas_bp
             + 1e-9 * state.step as f64
-            + state.hazard_rate().unwrap_or(0.0)
-            + state.spot().unwrap_or(0.0)
-            + state.discount_factor().unwrap_or(0.0))
+            + state.hazard_rate.unwrap_or(0.0)
+            + state.spot.unwrap_or(0.0)
+            + state.df.unwrap_or(0.0))
     }
 }
 
@@ -1100,9 +1150,13 @@ fn short_rate_tree_prices_are_bit_pinned() {
         let mut tree = ShortRateTree::new(config);
         tree.calibrate(&curve, 2.0).expect("calibration");
         let oas_bp = 125.0;
-        tree.price(oas_bp, &NodeProbeValuator)
-            .expect("price")
-            .to_bits()
+        tree.price(
+            oas_bp,
+            finstack_quant_core::math::Compounding::Continuous,
+            &NodeProbeValuator,
+        )
+        .expect("price")
+        .to_bits()
     })
     .collect();
     assert_eq!(
@@ -1141,15 +1195,21 @@ fn periodic_oas_is_added_to_each_node_rate_on_its_own_compounding() {
     tree.calibrate(&curve, 2.0).expect("calibrate");
 
     let oas_bp = 150.0;
-    let continuous = tree.price(oas_bp, &ConstantValuator).expect("continuous");
+    let continuous = tree
+        .price(
+            oas_bp,
+            finstack_quant_core::math::Compounding::Continuous,
+            &ConstantValuator,
+        )
+        .expect("continuous");
     let same = tree
-        .price_with_oas_compounding(oas_bp, Compounding::Continuous, &ConstantValuator)
+        .price(oas_bp, Compounding::Continuous, &ConstantValuator)
         .expect("continuous via compounding");
     assert_eq!(continuous, same);
     assert!((continuous - (-2.0 * (flat_rate + 0.015)).exp()).abs() < 1e-10);
 
     let semiannual = tree
-        .price_with_oas_compounding(oas_bp, Compounding::SEMI_ANNUAL, &ConstantValuator)
+        .price(oas_bp, Compounding::SEMI_ANNUAL, &ConstantValuator)
         .expect("semiannual");
     let z = 2.0 * ((flat_rate / 2.0).exp() - 1.0);
     let expected = (1.0 + (z + 0.015) / 2.0).powf(-4.0);

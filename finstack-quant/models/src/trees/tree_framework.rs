@@ -59,32 +59,6 @@ pub struct NodeState {
     pub df: Option<f64>,
 }
 
-impl NodeState {
-    /// Get spot price
-    #[inline]
-    pub fn spot(&self) -> Option<f64> {
-        self.spot
-    }
-
-    /// Get interest rate
-    #[inline]
-    pub fn interest_rate(&self) -> Option<f64> {
-        self.interest_rate
-    }
-
-    /// Get hazard rate
-    #[inline]
-    pub fn hazard_rate(&self) -> Option<f64> {
-        self.hazard_rate
-    }
-
-    /// Get discount factor
-    #[inline]
-    pub fn discount_factor(&self) -> Option<f64> {
-        self.df
-    }
-}
-
 /// Per-node discount-factor conventions of the short-rate trees, expressed
 /// over the canonical core [`Compounding`].
 ///
@@ -579,10 +553,10 @@ mod tests {
             ..NodeState::default()
         };
         assert_eq!(seen, [node(1, 50.0), node(1, 200.0), node(0, 100.0)]);
-        assert_eq!(seen[0].spot(), Some(50.0));
-        assert_eq!(seen[0].interest_rate(), Some(0.03));
-        assert_eq!(seen[0].hazard_rate(), None);
-        assert_eq!(seen[0].discount_factor(), None);
+        assert_eq!(seen[0].spot, Some(50.0));
+        assert_eq!(seen[0].interest_rate, Some(0.03));
+        assert_eq!(seen[0].hazard_rate, None);
+        assert_eq!(seen[0].df, None);
     }
 
     #[test]

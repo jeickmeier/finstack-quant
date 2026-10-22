@@ -341,7 +341,10 @@ fn leisen_reimer_tree(inst: &EquityOption) -> BinomialTree {
         .model_config
         .tree_steps
         .unwrap_or(201);
-    BinomialTree::leisen_reimer(steps)
+    BinomialTree::new(
+        steps,
+        finstack_quant_models::trees::binomial_tree::TreeType::LeisenReimer,
+    )
 }
 
 /// Contractual Bermudan exercise dates.

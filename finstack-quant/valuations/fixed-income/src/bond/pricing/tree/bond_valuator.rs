@@ -1178,8 +1178,8 @@ impl TreeValuator for BondValuator {
         let risky_continuation = if let Some(hazard) = state.hazard_rate {
             let hazard = hazard.max(0.0);
             let survival = (-hazard * dt).exp();
-            let interval_df = state.discount_factor().unwrap_or_else(|| {
-                let rate = state.interest_rate().unwrap_or(0.0) + oas_rate;
+            let interval_df = state.df.unwrap_or_else(|| {
+                let rate = state.interest_rate.unwrap_or(0.0) + oas_rate;
                 (-rate * dt).exp()
             });
             let recovery_weight = continuous_frp_weight(interval_df, survival)?;

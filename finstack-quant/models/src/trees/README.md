@@ -52,7 +52,7 @@ trait over the trees.
 
 | Tree | Valuator-driven entry point |
 |------|-----------------------------|
-| `ShortRateTree` | `price(oas_bp, &valuator)` |
+| `ShortRateTree` | `price(oas_bp, oas_compounding, &valuator)` |
 | `RatesCreditTree` | `price_with_node_coupons(oas_bp, &valuator, &node_coupons)` |
 | `BinomialTree` | `price_european` / `price_american` / `price_bermudan` (option payoffs built in) |
 
@@ -89,18 +89,16 @@ Two variants share the `price_recombining_tree` engine:
 use finstack_quant_valuations::instruments::{OptionMarketParams, OptionType};
 use finstack_quant_models::trees::binomial_tree::BinomialTree;
 
-let params = OptionMarketParams::new(
-    100.0, // spot
-    100.0, // strike
-    0.05,  // rate
-    0.20,  // volatility
-    1.0,   // time_to_expiry
-    0.02,  // dividend_yield
-    OptionType::Put,
-);
+let params = OptionMarketParams { spot: 100.0, strike: // spot
+    100.0, rate: // strike
+    0.05, volatility: // rate
+    0.20, time_to_expiry: // volatility
+    1.0, dividend_yield: // time_to_expiry
+    0.02, option_type: // dividend_yield
+    OptionType::Put };
 
 // leisen_reimer rounds an even request up (200 -> 201).
-let tree = BinomialTree::leisen_reimer(200);
+let tree = BinomialTree::new(200, finstack_quant_models::trees::binomial_tree::TreeType::LeisenReimer);
 assert_eq!(tree.steps, 201);
 
 let american = tree.price_american(&params, &[])?;
@@ -109,7 +107,7 @@ assert!(american >= european - 1e-9); // early exercise never destroys value
 # Ok::<(), finstack_quant_core::Error>(())
 ```
 
-`BinomialTree::leisen_reimer(steps)` rounds positive even requests up to the next odd step count. Additional entry points:
+`BinomialTree::new(steps, finstack_quant_models::trees::binomial_tree::TreeType::LeisenReimer)` rounds positive even requests up to the next odd step count. Additional entry points:
 `price_bermudan(&params, &exercise_times, &dividends)`; both `price_american`
 and `price_bermudan` take a cash-dividend schedule `&[(time_in_years, amount)]`
 (empty for none).
@@ -311,8 +309,8 @@ model as `None`.
 
 | Instrument | Model | Location |
 |------------|-------|----------|
-| American / Bermudan equity options | `BinomialTree::leisen_reimer` | `instruments/equity/equity_option/pricing/black.rs` |
-| Commodity options | `BinomialTree::leisen_reimer` | `instruments/commodity/commodity_spot_option/types.rs` |
+| American / Bermudan equity options | `BinomialTree::new` with `TreeType::LeisenReimer` | `instruments/equity/equity_option/pricing/black.rs` |
+| Commodity options | `BinomialTree::new` with `TreeType::LeisenReimer` | `instruments/commodity/commodity_spot_option/types.rs` |
 | Callable / putable bonds | `ShortRateTree`, `RatesCreditTree`, `HullWhiteTree` | `instruments/fixed_income/bond/pricing/tree/` |
 | Term loans | `ShortRateTree`, `RatesCreditTree` | `instruments/fixed_income/term_loan/pricing/tree_engine.rs` |
 | Bermudan swaptions | `HullWhiteTree::calibrate` | `instruments/rates/swaption/` |
