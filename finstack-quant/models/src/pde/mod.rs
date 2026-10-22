@@ -13,7 +13,7 @@
 //! ```text
 //! PdeProblem2D (2D coefficients + cross-derivative + 4-edge boundaries)
 //!   → Operators2D (directional tridiag per axis + explicit cross-derivative)
-//!     → CraigSneydStepper (Modified Craig-Sneyd ADI splitting)
+//!     → McsStepper (Modified Craig-Sneyd ADI splitting)
 //!       → PdeSolution2D (bilinear interpolation + Greeks)
 //! ```
 //!
@@ -68,7 +68,7 @@ mod solver;
 mod solver2d;
 mod stepper;
 
-pub use adi::CraigSneydStepper;
+pub use adi::McsStepper;
 pub use boundary::BoundaryCondition;
 pub use bridge::BlackScholesPde;
 pub use bridge2d::HestonPde;

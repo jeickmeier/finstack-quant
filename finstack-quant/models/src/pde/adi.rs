@@ -67,7 +67,7 @@ use super::stepper::StepperError;
 ///
 /// Sized to the largest grid the caller intends to step. Reusing this across
 /// timesteps (and across grids of identical shape) lets `Solver2D` skip
-/// per-step allocations in [`CraigSneydStepper::step`].
+/// per-step allocations in [`McsStepper::step`].
 #[derive(Clone, Default)]
 pub struct AdiWorkBuffers {
     x_line: Vec<f64>,
@@ -151,7 +151,7 @@ const MCS_THETA: f64 = 1.0 / 3.0;
 /// The type name is retained for API stability; the implemented scheme is the
 /// Modified Craig-Sneyd scheme (plain Craig-Sneyd is the `theta = 1/2` special
 /// case — see the module documentation).
-pub struct CraigSneydStepper {
+pub struct McsStepper {
     /// MCS `theta` parameter for the implicit weight.
     theta: f64,
     /// Number of initial intervals using two implicit-Euler split halfsteps.
@@ -168,7 +168,7 @@ pub struct CraigSneydStepper {
     apply_mcs_corrector: bool,
 }
 
-impl CraigSneydStepper {
+impl McsStepper {
     /// Modified Craig-Sneyd ADI stepper with the standard `theta = 1/3`.
     ///
     /// # Arguments
@@ -764,7 +764,7 @@ mod tests {
             }
         }
 
-        let stepper = CraigSneydStepper::new(n_time);
+        let stepper = McsStepper::new(n_time);
         let levels = stepper.time_levels(t_mat);
         let mut buffers = AdiWorkBuffers::for_grid(&grid);
 
@@ -805,7 +805,7 @@ mod tests {
         let maturity = 100.0;
         let eigenvalue = -2.0 / std::f64::consts::FRAC_PI_2.powi(2);
         let expected = (1.0 - 0.5 * maturity * eigenvalue).powi(-4);
-        let solution = super::super::Solver2D::new(grid, CraigSneydStepper::with_damping(1, 1))
+        let solution = super::super::Solver2D::new(grid, McsStepper::with_damping(1, 1))
             .solve(&Heat2D, maturity)
             .expect("implicit damping");
         let actual = solution.values[4];
@@ -910,7 +910,7 @@ mod tests {
             .max(0.0);
         let initial_min = u_int.iter().copied().fold(f64::INFINITY, f64::min).min(0.0);
 
-        let stepper = CraigSneydStepper::new(100);
+        let stepper = McsStepper::new(100);
         let mut buffers = AdiWorkBuffers::for_grid(&grid);
         // March several steps: instability would amplify step over step.
         let mut t_from = 0.25;
@@ -960,7 +960,7 @@ mod tests {
         let mut u_full = vec![1.0; nx * ny];
         let mut u_int = vec![1.0; nx_int * ny_int];
 
-        let stepper = CraigSneydStepper::new(10);
+        let stepper = McsStepper::new(10);
         let mut buffers = AdiWorkBuffers::for_grid(&grid);
         let zero = stepper.step(
             &Heat2D,
