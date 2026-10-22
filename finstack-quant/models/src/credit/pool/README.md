@@ -17,8 +17,9 @@ constructs explicit specs with the constructors in this module.
 
 ```rust
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec};
-use finstack_quant_models::credit::pool::{CorrelationStructure, StochasticDefaultSpec};
-use finstack_quant_models::credit::pool::prepayment::StochasticPrepaySpec;
+use finstack_quant_models::credit::pool::{
+    CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
+};
 
 let prepay = StochasticPrepaySpec::factor_correlated(
     PrepaymentModelSpec::constant_cpr(0.12),

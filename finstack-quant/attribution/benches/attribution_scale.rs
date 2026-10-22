@@ -38,7 +38,8 @@ use finstack_quant_factor::credit::hierarchy::{
     DateRange, FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
     IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
 };
-use finstack_quant_factor::{FactorCovarianceMatrix, FactorModelConfig, MatchingConfig};
+use finstack_quant_factor::MatchingConfig;
+use finstack_quant_factor::{FactorCovarianceMatrix, FactorModelConfig};
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PricingOptions;

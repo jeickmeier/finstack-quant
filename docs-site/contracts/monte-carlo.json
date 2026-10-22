@@ -23,8 +23,7 @@
       "finstack_quant.models.monte_carlo.finite_diff_delta",
       "finstack_quant.models.monte_carlo.finite_diff_gamma",
       "finstack_quant.models.monte_carlo.heston_satisfies_feller",
-      "finstack_quant.models.monte_carlo.price_heston_call",
-      "finstack_quant.models.monte_carlo.price_heston_put",
+      "finstack_quant.models.monte_carlo.price_heston",
       "finstack_quant.models.monte_carlo.simulate_paths"
     ],
     "models": [],
@@ -122,7 +121,7 @@
       "finstack_quant.core.market_data.DiscountCurve",
       "finstack_quant.core.market_data.MarketContext",
       "finstack_quant.models.asian_option_price",
-      "finstack_quant.models.barrier_call",
+      "finstack_quant.models.barrier_option_price",
       "finstack_quant.models.bs_price",
       "finstack_quant.models.monte_carlo.EuropeanPricer",
       "finstack_quant.models.monte_carlo.LsmcPricer",
@@ -158,7 +157,7 @@
     ],
     "support_notes": [
       "asian_option_price with arithmetic averaging is the Turnbull-Wakeman approximation; geometric averaging uses the exact benchmark. One terminal fixing reduces both to the matched European contract.",
-      "barrier_call prices continuous monitoring and accepts no monitoring-frequency parameter. The discrete sweep uses nested observations on the same captured fine paths.",
+      "barrier_option_price prices continuous monitoring and accepts no monitoring-frequency parameter. The discrete sweep uses nested observations on the same captured fine paths.",
       "price_american_put_unbiased evaluates a fitted exercise policy on independent pricing paths. Its Monte Carlo interval does not include exercise-grid or learned-policy error.",
       "No exercise-boundary object is exposed by LsmcPricer. A clearly labelled prescribed schematic is independent of engine output; actual spot-price and path-count plots report held-out policy values with sampling bars and explicit policy/grid-error limits.",
       "Fixed-strike lookback is computed directly on captured GBM paths and dominates the matched terminal vanilla payoff path by path. The continuous fixed-strike helper is deliberately excluded: its M>=K branch calls the floating-strike formula, creating a discontinuity at K=M (17.216802 at K=100 versus 19.167624 at K=100.000001 for S=M=100, r=5%, q=0, sigma=20%, T=1). No analytical accuracy claim is made for the substituted discrete payoff.",

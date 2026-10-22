@@ -29,11 +29,11 @@ fn check_binary_indicator(field: &'static str, value: f64) -> Result<(), CreditS
 /// Ohlson's published optimal probability cutoff P* = 0.038 (O ≈ −3.23),
 /// the Distress zone boundary. Source: Ohlson (1980), Table 6 — the cutoff
 /// minimizing total misclassification on the estimation sample.
-pub const OHLSON_OPTIMAL_CUTOFF_PD: f64 = 0.038;
+const OHLSON_OPTIMAL_CUTOFF_PD: f64 = 0.038;
 
 /// Safe/Grey boundary at P*/2 (house convention caution band below
 /// Ohlson's optimal cutoff).
-pub const OHLSON_GREY_PD: f64 = OHLSON_OPTIMAL_CUTOFF_PD / 2.0;
+const OHLSON_GREY_PD: f64 = OHLSON_OPTIMAL_CUTOFF_PD / 2.0;
 
 /// Input for the Ohlson O-Score logistic model (1980).
 ///
@@ -128,8 +128,7 @@ pub struct OhlsonOScoreInput {
 /// for the recommended input shape.
 ///
 /// ```
-/// use finstack_quant_models::credit::scoring::ScoringZone;
-/// use finstack_quant_models::credit::scoring::ohlson::{ohlson_o_score, OhlsonOScoreInput};
+/// use finstack_quant_models::credit::scoring::{ohlson_o_score, OhlsonOScoreInput, ScoringZone};
 ///
 /// let healthy = OhlsonOScoreInput {
 ///     log_total_assets_adjusted: 12.0,

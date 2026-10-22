@@ -251,9 +251,9 @@ const CAP_PERIODS = [
 
 const list = (values) => Array.from(values);
 const merton = () => new credit.MertonModel(...MERTON);
-const scale = () => credit.RatingScale.custom(['A', 'B', 'D']);
-const generator = () => new credit.GeneratorMatrix(scale(), GENERATOR);
-const masterScale = () => new credit.MasterScale(GRADES);
+const scale = () => credit.migration.RatingScale.custom(['A', 'B', 'D']);
+const generator = () => new credit.migration.GeneratorMatrix(scale(), GENERATOR);
+const masterScale = () => new credit.pd.MasterScale(GRADES);
 const panel = () => new dtsm.YieldPanel(TENORS, YIELDS);
 const money = (estimate) => [Number(estimate.mean.amount), estimate.stderr];
 /**
@@ -283,7 +283,7 @@ const cube = () =>
     ],
     [0.03, 0.035]
   );
-const surfaceVols = (surface) => surface.vols_row_major;
+const surfaceVols = (surface) => Array.from(surface.vols);
 const discountCurve = (rate) =>
   new core.DiscountCurve({
     id: 'USD-OIS',
@@ -364,100 +364,100 @@ const CASES = {
     credit.RatingFactorTable.moodysStandard().getFactor('Baa3'),
     credit.RatingFactorTable.moodysStandard().defaultFactor,
   ],
-  'liability_management.hurdle': () => credit.tenderRecommendationHurdle(),
+  'liability_management.hurdle': () => credit.liabilityManagement.tenderRecommendationHurdle(),
 
   'lgd.beta_recovery': () => {
-    const beta = new credit.BetaRecovery(0.4, 0.2);
+    const beta = new credit.lgd.BetaRecovery(0.4, 0.2);
     return [
       beta.alpha,
       beta.betaParam,
       beta.variance,
       beta.meanLgd,
       beta.quantile(0.05),
-      new credit.BetaRecovery(0.4, 0.2).quantile(0.95),
+      new credit.lgd.BetaRecovery(0.4, 0.2).quantile(0.95),
     ];
   },
   'lgd.beta_recovery_samples': () => [
-    list(new credit.BetaRecovery(0.4, 0.2).sampleSeeded(4, 42)),
-    list(new credit.BetaRecovery(0.4, 0.2).sampleSeeded(4, 42)),
+    list(new credit.lgd.BetaRecovery(0.4, 0.2).sampleSeeded(4, 42)),
+    list(new credit.lgd.BetaRecovery(0.4, 0.2).sampleSeeded(4, 42)),
   ],
   'lgd.seniority_recovery_stats': () => [
-    credit.seniorityRecoveryStats('senior_unsecured').mean,
-    credit.seniorityRecoveryStats('senior_unsecured').stdDev,
-    credit.seniorityRecoveryStats('senior_secured', 'sp').mean,
+    credit.lgd.seniorityRecoveryStats('senior_unsecured').mean,
+    credit.lgd.seniorityRecoveryStats('senior_unsecured').stdDev,
+    credit.lgd.seniorityRecoveryStats('senior_secured', 'sp').mean,
   ],
   'lgd.workout': () => {
-    const workout = credit.WorkoutLgd.builder()
+    const workout = credit.lgd.WorkoutLgd.builder()
       .collateral({ collateral_type: 'real_estate', book_value: 800_000.0, haircut: 0.3 })
       .collateralPieces([{ collateral_type: 'cash', book_value: 50_000.0, haircut: 0.0 }])
       .workoutYears(2.0)
       .discountRate(0.05)
-      .costs(new credit.WorkoutCosts(0.05, 0.03))
+      .costs(new credit.lgd.WorkoutCosts(0.05, 0.03))
       .build();
     return [
       workout.evaluate(1_000_000.0),
       workout.netRecovery(1_000_000.0),
-      credit.workoutLgd(1_000_000.0, [['real_estate', 800_000.0, 0.3]], 0.05, 0.03, 2.0, 0.05),
-      credit.WorkoutCosts.standard().totalRate,
+      credit.lgd.workoutLgd(1_000_000.0, [['real_estate', 800_000.0, 0.3]], 0.05, 0.03, 2.0, 0.05),
+      credit.lgd.WorkoutCosts.standard().totalRate,
     ];
   },
   'lgd.downturn': () => [
-    credit.DownturnLgd.stressed(0.15, 0.3, 0.999).adjust(0.35),
-    credit.DownturnLgd.regulatoryFloor(0.08, 0.1).adjust(0.35),
-    credit.DownturnLgd.stressed(0.15, 0.3, 0.999).adjust(0.35),
-    credit.DownturnLgd.regulatoryFloor(0.08, 0.1).adjust(0.35),
-    credit.DownturnLgd.baselSecured().adjust(0.2),
-    credit.DownturnLgd.baselUnsecured().adjust(0.2),
+    credit.lgd.DownturnLgd.stressed(0.15, 0.3, 0.999).adjust(0.35),
+    credit.lgd.DownturnLgd.regulatoryFloor(0.08, 0.1).adjust(0.35),
+    credit.lgd.DownturnLgd.stressed(0.15, 0.3, 0.999).adjust(0.35),
+    credit.lgd.DownturnLgd.regulatoryFloor(0.08, 0.1).adjust(0.35),
+    credit.lgd.DownturnLgd.baselSecured().adjust(0.2),
+    credit.lgd.DownturnLgd.baselUnsecured().adjust(0.2),
   ],
   'lgd.ead': () => {
-    const ead = new credit.EadCalculator(600.0, 400.0, 0.75);
+    const ead = new credit.lgd.EadCalculator(600.0, 400.0, 0.75);
     return [
       ead.ead,
       ead.utilization,
       ead.totalCommitment,
       ead.leqFromObservedEad(800.0),
-      credit.EadCalculator.revolver(600.0, 400.0).ead,
-      credit.EadCalculator.termLoan(500.0).ead,
-      credit.EadCalculator.termLoan(500.0).ead,
-      new credit.EadCalculator(600.0, 400.0, 0.75).ead,
+      credit.lgd.EadCalculator.revolver(600.0, 400.0).ead,
+      credit.lgd.EadCalculator.termLoan(500.0).ead,
+      credit.lgd.EadCalculator.termLoan(500.0).ead,
+      new credit.lgd.EadCalculator(600.0, 400.0, 0.75).ead,
     ];
   },
   'pd.cycle': () => [
-    credit.pitToTtc(0.02, 0.15, -1.0),
-    credit.ttcToPit(0.02, 0.15, -1.0),
-    credit.centralTendency([0.01, 0.02, 0.015]),
-    credit.applyBaselIrbPdFloor(0.0001),
-    credit.baselIrbPdFloor(),
+    credit.pd.pitToTtc(0.02, 0.15, -1.0),
+    credit.pd.ttcToPit(0.02, 0.15, -1.0),
+    credit.pd.centralTendency([0.01, 0.02, 0.015]),
+    credit.pd.applyBaselIrbPdFloor(0.0001),
+    credit.pd.baselIrbPdFloor(),
   ],
   'pd.master_scale': () => [
     masterScale().mapPd(0.02),
     masterScale()
       .mapPds([0.5, 0.001, 0.05])
       .map((row) => row.grade),
-    masterScale().mapScore(credit.zmijewskiScore(0.05, 0.6, 1.5)).grade,
-    credit.MasterScale.spAssumptions().nGrades,
-    credit.MasterScale.moodysAssumptions().nGrades,
+    masterScale().mapScore(credit.scoring.zmijewskiScore(0.05, 0.6, 1.5)).grade,
+    credit.pd.MasterScale.spAssumptions().nGrades,
+    credit.pd.MasterScale.moodysAssumptions().nGrades,
   ],
   scoring: () => [
-    credit.altmanZScore(0.1, 0.2, 0.15, 1.5, 1.1),
-    credit.altmanZPrime(0.1, 0.2, 0.15, 0.9, 1.1),
-    credit.altmanZDoublePrime(0.1, 0.2, 0.15, 0.9),
-    credit.altmanEmScore(0.1, 0.2, 0.15, 0.9),
-    credit.ohlsonOScore(5.0, 0.6, 0.1, 0.8, 0.0, 0.05, 0.2, 0.0, 0.1),
-    credit.zmijewskiScore(0.05, 0.6, 1.5),
+    credit.scoring.altmanZScore(0.1, 0.2, 0.15, 1.5, 1.1),
+    credit.scoring.altmanZPrime(0.1, 0.2, 0.15, 0.9, 1.1),
+    credit.scoring.altmanZDoublePrime(0.1, 0.2, 0.15, 0.9),
+    credit.scoring.altmanEmScore(0.1, 0.2, 0.15, 0.9),
+    credit.scoring.ohlsonOScore(5.0, 0.6, 0.1, 0.8, 0.0, 0.05, 0.2, 0.0, 0.1),
+    credit.scoring.zmijewskiScore(0.05, 0.6, 1.5),
   ],
-  recovery_waterfall: () => credit.allocateRecovery(120.0, CLAIMS),
+  recovery_waterfall: () => credit.recoveryWaterfall.allocateRecovery(120.0, CLAIMS),
   'migration.scale': () => [
-    credit.RatingScale.standard().nStates,
-    credit.RatingScale.notched().nStates,
-    credit.RatingScale.standardWithNr().labels(),
-    credit.RatingScale.standard().indexOf('BBB'),
-    credit.RatingScale.standard().warf('B'),
-    credit.RatingScale.standard().ratingFromWarf(610.0),
+    credit.migration.RatingScale.standard().nStates,
+    credit.migration.RatingScale.notched().nStates,
+    credit.migration.RatingScale.standardWithNr().labels(),
+    credit.migration.RatingScale.standard().indexOf('BBB'),
+    credit.migration.RatingScale.standard().warf('B'),
+    credit.migration.RatingScale.standard().ratingFromWarf(610.0),
     scale().defaultState(),
   ],
   'migration.transition_matrix': () => {
-    const matrix = () => new credit.TransitionMatrix(scale(), TRANSITIONS, 1.0);
+    const matrix = () => new credit.migration.TransitionMatrix(scale(), TRANSITIONS, 1.0);
     return [
       matrix().probability('A', 'D'),
       matrix().probabilityByIndex(1, 2),
@@ -469,13 +469,13 @@ const CASES = {
   'migration.generator': () => [
     generator().exitRate('A'),
     generator().intensity('A', 'B'),
-    credit.project(generator(), 2.0).toMatrix(),
-    credit.GeneratorMatrix.fromTransitionMatrix(
-      new credit.TransitionMatrix(scale(), TRANSITIONS, 1.0)
+    credit.migration.project(generator(), 2.0).toMatrix(),
+    credit.migration.GeneratorMatrix.fromTransitionMatrix(
+      new credit.migration.TransitionMatrix(scale(), TRANSITIONS, 1.0)
     ).toMatrix(),
   ],
   'migration.simulate': () => {
-    const simulator = new credit.MigrationSimulator(generator(), 5.0);
+    const simulator = new credit.migration.MigrationSimulator(generator(), 5.0);
     const batch = simulator.simulate(0, 50, 7);
     return [
       batch.defaultRate,
@@ -611,7 +611,10 @@ const CASES = {
 
   'monte_carlo.european': () => {
     const european = new monteCarlo.EuropeanPricer(2000, 42, false);
-    return [money(european.priceCall(...GBM)), money(european.pricePut(...GBM, 16, 'EUR'))];
+    return [
+      money(european.priceGbm(...GBM, true)),
+      money(european.priceGbm(...GBM, false, 16, 'EUR')),
+    ];
   },
   'monte_carlo.asian': () => {
     const asian = new monteCarlo.PathDependentPricer(2000, 42, false);
@@ -650,7 +653,7 @@ const CASES = {
     monteCarlo.hestonSatisfiesFeller(0.5, 0.04, 0.5),
   ],
   'monte_carlo.relative_stderr': () => {
-    const estimate = new monteCarlo.EuropeanPricer(2000, 42, false).priceCall(...GBM);
+    const estimate = new monteCarlo.EuropeanPricer(2000, 42, false).priceGbm(...GBM, true);
     return [
       monteCarlo.relativeStderr(estimate),
       estimate.stderr / Math.abs(Number(estimate.mean.amount)),
@@ -711,12 +714,19 @@ const CASES = {
   },
 
   'volatility.local_vol': () => {
-    const localVol = volatility.localVolFromImpliedVol(LV_IMPLIED, LV_FORWARDS);
+    const localVol = volatility.localVolFromImpliedVol(
+      core.VolSurface.fromJson(LV_IMPLIED),
+      LV_FORWARDS
+    );
     return [
       localVol,
       volatility.localVolValue(localVol, 0.75, 95.0),
       volatility.localVolValue(localVol, 5.0, 60.0),
-      volatility.localVolFromImpliedVolSmoothed(LV_IMPLIED, LV_FORWARDS, 10.0),
+      volatility.localVolFromImpliedVolSmoothed(
+        core.VolSurface.fromJson(LV_IMPLIED),
+        LV_FORWARDS,
+        10.0
+      ),
     ];
   },
   'volatility.svi': () => [
@@ -739,7 +749,7 @@ const CASES = {
       surfaceVols(volatility.materializeCubeExpirySlice(cube(), 1.0, strikes)),
       surfaceVols(volatility.materializeCubeExpirySliceNormal(cube(), 1.0, strikes)),
       volatility.getSurfaceVol(tenorSlice, 1.5, 0.025),
-      volatility.getSurfaceVolClamped(JSON.stringify(tenorSlice), 9.0, 0.5),
+      volatility.getSurfaceVolClamped(tenorSlice, 9.0, 0.5),
     ];
   },
   'volatility.cube_expiry_slice': () => {
@@ -750,14 +760,14 @@ const CASES = {
       [2.0, 5.0],
       [0.02, 0.03, 0.04],
       [0.3, 0.25, 0.27, 0.28, 0.24, 0.26]
-    ).toJson();
+    );
     return [
-      expirySlice,
+      json(expirySlice),
       volatility.getCubeExpirySliceVol(expirySlice, 5.0, 0.025),
-      volatility.getCubeExpirySliceVolClamped(JSON.stringify(expirySlice), 9.0, 0.5),
+      volatility.getCubeExpirySliceVolClamped(expirySlice, 9.0, 0.5),
       volatility.getCubeExpirySliceVol(gridSlice, 3.0, 0.025),
       volatility.getCubeExpirySliceVolClamped(gridSlice, 0.5, 0.01),
-      volatility.getCubeExpirySliceVolClamped(JSON.parse(gridSlice), 9.0, 0.035),
+      volatility.getCubeExpirySliceVolClamped(gridSlice, 9.0, 0.035),
     ];
   },
   'volatility.fx_delta_surface': () =>
@@ -781,7 +791,7 @@ const CASES = {
       100.0,
       1.5
     );
-    return [smile.forward, smile.t];
+    return [smile.forward, smile.timeToExpiry];
   },
   'models.bs_greeks_is_valid': () =>
     models.bsGreeksIsValid(models.bsGreeks(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, true)),
@@ -794,13 +804,13 @@ const CASES = {
     models.bachelierGreeks(-0.002, 0.001, 0.0075, 2.0, false),
     models.blackShiftedVega(-0.002, 0.001, 0.3, 2.0, 0.03),
   ],
-  'closed_form.barrier_call': () =>
+  'closed_form.barrier_option_price': () =>
     [
       [120.0, 'up'],
       [85.0, 'down'],
     ].flatMap(([barrier, direction]) =>
       ['in', 'out'].map((knock) =>
-        models.barrierCall(100.0, 100.0, barrier, 0.05, 0.01, 0.2, 1.0, direction, knock)
+        models.barrierOptionPrice(100.0, 100.0, barrier, 0.05, 0.01, 0.2, 1.0, direction, knock)
       )
     ),
   'closed_form.asian': () => [

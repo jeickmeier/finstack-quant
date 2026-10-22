@@ -102,19 +102,49 @@ impl TryFrom<RawSviParams> for SviParams {
     type Error = finstack_quant_core::Error;
 
     fn try_from(raw: RawSviParams) -> finstack_quant_core::Result<Self> {
-        let params = Self {
-            a: raw.a,
-            b: raw.b,
-            rho: raw.rho,
-            m: raw.m,
-            sigma: raw.sigma,
-        };
-        params.validate()?;
-        Ok(params)
+        Self::new(raw.a, raw.b, raw.rho, raw.m, raw.sigma)
     }
 }
 
 impl SviParams {
+    /// Build validated raw-SVI parameters.
+    ///
+    /// # Arguments
+    ///
+    /// * `a` - Overall total-variance level (variance x years); with the other
+    ///   parameters it must keep the minimum total variance non-negative.
+    /// * `b` - Wing slope; finite and `>= 0`.
+    /// * `rho` - Rotation / asymmetry; strictly inside `(-1, 1)`.
+    /// * `m` - Log-moneyness translation of the variance minimum; finite.
+    /// * `sigma` - Curvature at the vertex; finite and `> 0`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Self::validate`] error when a parameter is out of range or
+    /// the slice violates the Roger Lee / no-negative-variance bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_models::volatility::svi::SviParams;
+    ///
+    /// let params = SviParams::new(0.04, 0.4, -0.4, 0.0, 0.1)?;
+    /// assert!(params.total_variance(0.0) > 0.0);
+    /// assert!(SviParams::new(0.04, -0.1, 0.0, 0.0, 0.1).is_err());
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn new(a: f64, b: f64, rho: f64, m: f64, sigma: f64) -> finstack_quant_core::Result<Self> {
+        let params = Self {
+            a,
+            b,
+            rho,
+            m,
+            sigma,
+        };
+        params.validate()?;
+        Ok(params)
+    }
+
     /// Compute the total implied variance `w(k) = σ²T` at log-moneyness `k`.
     ///
     /// # Arguments

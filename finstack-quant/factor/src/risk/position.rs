@@ -455,7 +455,7 @@ pub fn build_stress_attribution(
 
 // Shared math helpers
 
-use super::math::{tail_multipliers, VARIANCE_TOLERANCE};
+use super::{tail_multipliers, VARIANCE_TOLERANCE};
 
 use finstack_quant_core::math::special_functions::standard_normal_inv_cdf;
 
@@ -504,7 +504,7 @@ fn validate_decomposition_inputs(
     // which are valid risk inputs: Euler allocation only requires
     // `σ_p = √(wᵀΣw) ≥ 0`.
     if n > 0 {
-        super::math::validate_covariance(covariance, n)?;
+        crate::covariance::validate_covariance(covariance, n)?;
     }
 
     Ok(())
@@ -767,34 +767,6 @@ pub fn parametric_var_decomposition(
     })
 }
 
-/// Decompose portfolio Expected Shortfall via parametric Euler allocation.
-///
-/// Runs [`parametric_var_decomposition`] (without incremental VaR) and returns
-/// the full [`PositionRiskDecomposition`], whose [`PositionRiskDecomposition::es_contributions`]
-/// and [`PositionRiskDecomposition::portfolio_es`] provide the Expected Shortfall attribution.
-///
-/// # Arguments
-///
-/// * `position_ids` - Position identifiers aligned with `weights`.
-/// * `weights` - Position weights or exposures (length `n_positions`).
-/// * `covariance` - Position-return covariance matrix (`n x n`, row-major,
-///   symmetric positive semidefinite).
-/// * `confidence` - ES tail confidence as a decimal probability strictly
-///   inside `(0.5, 1)`. `None` defaults to `0.95`.
-///
-/// # Errors
-///
-/// Returns a validation error if dimensions are inconsistent, the covariance
-/// matrix is invalid, or the confidence level is out of bounds.
-pub fn parametric_es_decomposition(
-    position_ids: &[String],
-    weights: &[f64],
-    covariance: &[f64],
-    confidence: Option<f64>,
-) -> finstack_quant_core::Result<PositionRiskDecomposition> {
-    parametric_var_decomposition(position_ids, weights, covariance, confidence, false)
-}
-
 // Historical simulation engine
 
 /// Decompose portfolio VaR and ES from per-position scenario P&Ls via
@@ -1033,42 +1005,6 @@ pub fn historical_var_decomposition(
     })
 }
 
-/// Flatten a row-major nested matrix after validating squareness against `n`.
-///
-/// # Errors
-///
-/// Returns [`finstack_quant_core::Error::Validation`] when the matrix has the
-/// wrong number of rows or any row has the wrong number of columns.
-///
-/// # Arguments
-///
-/// * `matrix` - Row-major nested vector with one inner vector per row.
-/// * `n` - Expected square dimension.
-/// * `label` - Caller-provided label included in validation messages.
-pub fn flatten_square_matrix(
-    matrix: Vec<Vec<f64>>,
-    n: usize,
-    label: &str,
-) -> finstack_quant_core::Result<Vec<f64>> {
-    if matrix.len() != n {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "{label} must have {n} rows, got {}",
-            matrix.len()
-        )));
-    }
-    let mut flat = Vec::with_capacity(n * n);
-    for (index, row) in matrix.into_iter().enumerate() {
-        if row.len() != n {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "{label} row {index} must have {n} columns, got {}",
-                row.len()
-            )));
-        }
-        flat.extend(row);
-    }
-    Ok(flat)
-}
-
 /// Flatten per-position scenario P&Ls into a scenario-major buffer.
 ///
 /// # Errors
@@ -1116,17 +1052,6 @@ mod tests {
     use super::*;
 
     type TestResult = finstack_quant_core::Result<()>;
-
-    #[test]
-    fn flatten_square_matrix_validates_shape() {
-        let flat = flatten_square_matrix(vec![vec![1.0, 2.0], vec![3.0, 4.0]], 2, "cov")
-            .expect("valid matrix");
-        assert_eq!(flat, vec![1.0, 2.0, 3.0, 4.0]);
-        assert!(flatten_square_matrix(vec![vec![1.0, 2.0]], 2, "cov").is_err());
-        assert!(
-            flatten_square_matrix(vec![vec![1.0, 2.0, 3.0], vec![1.0, 2.0]], 2, "cov").is_err()
-        );
-    }
 
     fn entry_point_inputs() -> (Vec<String>, Vec<f64>, Vec<f64>, Vec<f64>, usize) {
         let ids: Vec<String> = vec!["A".into(), "B".into(), "C".into()];
@@ -1320,7 +1245,8 @@ mod tests {
             ),
         ];
         for (confidence, portfolio_es, components) in es_cases {
-            let view = parametric_es_decomposition(&ids, &weights, &covariance, confidence)?;
+            let view =
+                parametric_var_decomposition(&ids, &weights, &covariance, confidence, false)?;
             assert_eq!(view.portfolio_es.to_bits(), portfolio_es);
             let bits: Vec<u64> = view
                 .es_contributions

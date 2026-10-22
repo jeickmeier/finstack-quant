@@ -10,8 +10,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_models::closed_form::vanilla::{bs_greeks_unchecked, bs_price_unchecked};
-use finstack_quant_models::trees::BinomialTree;
+use finstack_quant_models::closed_form::{bs_greeks_unchecked, bs_price_unchecked};
+use finstack_quant_models::trees::binomial_tree::BinomialTree;
 use finstack_quant_models::types::ExerciseStyle;
 use finstack_quant_models::types::{OptionMarketParams, OptionType};
 use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
@@ -42,11 +42,7 @@ pub(crate) fn compute_pv(
         ExerciseStyle::American => {
             let tree = leisen_reimer_tree(inst);
             let (params, dividends) = early_exercise_market_params(inst, curves, as_of)?;
-            if dividends.is_empty() {
-                tree.price_american(&params)?
-            } else {
-                tree.price_american_with_discrete_dividends(&params, &dividends)?
-            }
+            tree.price_american(&params, &dividends)?
         }
         ExerciseStyle::Bermudan => {
             let schedule = bermudan_schedule(inst)?;
@@ -54,15 +50,11 @@ pub(crate) fn compute_pv(
             let (params, dividends) = early_exercise_market_params(inst, curves, as_of)?;
             let exercise_times =
                 bermudan_exercise_times(inst, schedule, as_of, params.time_to_expiry)?;
-            if dividends.is_empty() {
-                tree.price_bermudan(&params, &exercise_times)?
-            } else {
-                tree.price_bermudan_with_discrete_dividends(&params, &exercise_times, &dividends)?
-            }
+            tree.price_bermudan(&params, &exercise_times, &dividends)?
         }
     };
 
-    let unit_price = finstack_quant_models::closed_form::vanilla::checked_closed_form_value(
+    let unit_price = finstack_quant_models::closed_form::checked_closed_form_value(
         unit_price,
         "equity option unit price",
     )?;
@@ -305,11 +297,7 @@ pub(crate) fn compute_greeks(
             let price_fn = |market_params: &OptionMarketParams| -> Result<f64> {
                 let elapsed = params.time_to_expiry - market_params.time_to_expiry;
                 let dividends = remaining_dividends(&dividends, elapsed);
-                if dividends.is_empty() {
-                    tree.price_american(market_params)
-                } else {
-                    tree.price_american_with_discrete_dividends(market_params, &dividends)
-                }
+                tree.price_american(market_params, &dividends)
             };
             tree_finite_difference_greeks(
                 &params,
@@ -334,15 +322,7 @@ pub(crate) fn compute_greeks(
                         (remaining > 0.0).then_some(remaining)
                     })
                     .collect();
-                if dividends.is_empty() {
-                    tree.price_bermudan(market_params, &exercise_times)
-                } else {
-                    tree.price_bermudan_with_discrete_dividends(
-                        market_params,
-                        &exercise_times,
-                        &dividends,
-                    )
-                }
+                tree.price_bermudan(market_params, &exercise_times, &dividends)
             };
             tree_finite_difference_greeks(
                 &params,

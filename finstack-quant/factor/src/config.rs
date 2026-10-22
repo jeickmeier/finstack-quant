@@ -8,8 +8,8 @@
 
 use super::covariance::FactorCovarianceMatrix;
 use super::matching::MatchingConfig;
-use super::primitives::definition::FactorDefinition;
-use super::primitives::factor_types::{FactorId, FactorType};
+use crate::FactorDefinition;
+use crate::{FactorId, FactorType};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
@@ -353,9 +353,9 @@ fn check_no_duplicate_issuer_rows(matching: &MatchingConfig) -> finstack_quant_c
 mod tests {
     use super::*;
 
+    use crate::matching::MatchingConfig;
     use crate::{
-        FactorCovarianceMatrix, FactorDefinition, FactorType, MarketMapping, MatchingConfig,
-        UnmatchedPolicy,
+        FactorCovarianceMatrix, FactorDefinition, FactorType, MarketMapping, UnmatchedPolicy,
     };
     use finstack_quant_core::market_data::bumps::BumpUnits;
     use finstack_quant_core::types::CurveId;
@@ -667,7 +667,7 @@ mod tests {
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
-        use crate::{CreditHierarchicalConfig, DependencyFilter};
+        use crate::matching::{CreditHierarchicalConfig, DependencyFilter};
         use finstack_quant_core::types::IssuerId;
         use std::collections::BTreeMap;
 
@@ -751,9 +751,9 @@ mod tests {
         let config = FactorModelConfig {
             factors,
             covariance,
-            matching: MatchingConfig::MappingTable(vec![crate::MappingRule {
-                dependency_filter: crate::DependencyFilter::default(),
-                attribute_filter: crate::AttributeFilter::default(),
+            matching: MatchingConfig::MappingTable(vec![crate::matching::MappingRule {
+                dependency_filter: crate::matching::DependencyFilter::default(),
+                attribute_filter: crate::matching::AttributeFilter::default(),
                 factor_id,
             }]),
 
@@ -795,7 +795,7 @@ mod tests {
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
-        use crate::CreditHierarchicalConfig;
+        use crate::matching::CreditHierarchicalConfig;
         use finstack_quant_core::types::IssuerId;
         use std::collections::BTreeMap;
 
@@ -862,7 +862,7 @@ mod tests {
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
-        use crate::CreditHierarchicalConfig;
+        use crate::matching::CreditHierarchicalConfig;
         use finstack_quant_core::types::IssuerId;
         use std::collections::BTreeMap;
 

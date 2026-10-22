@@ -16,7 +16,7 @@ use finstack_quant_valuations_core::pricer::{
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 
-use finstack_quant_models::closed_form::{quanto_call, quanto_put};
+use finstack_quant_models::closed_form::quanto_price;
 
 /// Helper to collect inputs for quanto option pricing.
 fn collect_quanto_inputs(
@@ -176,30 +176,18 @@ impl Pricer for QuantoOptionAnalyticalPricer {
             ));
         }
 
-        let price = match quanto.option_type {
-            finstack_quant_models::types::OptionType::Call => quanto_call(
-                spot,
-                quanto.strike,
-                t,
-                r_dom,
-                r_for,
-                q,
-                sigma_equity,
-                sigma_fx,
-                quanto.correlation,
-            ),
-            finstack_quant_models::types::OptionType::Put => quanto_put(
-                spot,
-                quanto.strike,
-                t,
-                r_dom,
-                r_for,
-                q,
-                sigma_equity,
-                sigma_fx,
-                quanto.correlation,
-            ),
-        };
+        let price = quanto_price(
+            spot,
+            quanto.strike,
+            t,
+            r_dom,
+            r_for,
+            q,
+            sigma_equity,
+            sigma_fx,
+            quanto.correlation,
+            quanto.option_type,
+        );
 
         let scale = payoff_scale(quanto)?;
         let pv = Money::new(price * scale, quanto.quote_currency).map_err(|error| {

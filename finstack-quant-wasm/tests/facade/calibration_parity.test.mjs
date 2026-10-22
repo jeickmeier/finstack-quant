@@ -320,17 +320,21 @@ test('bootstrapHullWhiteSigmaScheduleToCapFloors matches the Python bootstrap', 
   const expected = HW.piecewise;
   assert.equal(report.success, expected.success);
   assert.equal(params.kappa, expected.params.kappa);
-  assert.deepEqual(Array.from(params.volatility.times), expected.params.volatility.times);
-  params.volatility.values.forEach((value, index) =>
+  assert.deepEqual(Array.from(params.times), expected.params.volatility.times);
+  params.values.forEach((value, index) =>
     close(value, expected.params.volatility.values[index], 1e-8, `sigma[${index}]`)
   );
+  close(params.sigma(1.5), expected.sigma_at_1_5, 1e-8, 'sigma(1.5)');
+  close(params.sigma(0.5), expected.sigma_at_0_5, 1e-8, 'sigma(0.5)');
+  const exact = models.rates.hullWhite.HullWhiteParams.fromJson(expected.params);
+  assert.equal(exact.sigma(1.5), expected.sigma_at_1_5);
   const [explicit] = calibration.bootstrapHullWhiteSigmaScheduleToCapFloors(
     curve,
     JSON.stringify(HW.cap_floor_quotes),
     JSON.stringify(HW.piecewise_config),
     curve
   );
-  assert.deepEqual(plain(explicit), plain(params));
+  assert.deepEqual(JSON.parse(explicit.toJson()), JSON.parse(params.toJson()));
   assert.throws(
     () =>
       calibration.bootstrapHullWhiteSigmaScheduleToCapFloors(curve, HW.cap_floor_quotes, {
@@ -339,17 +343,6 @@ test('bootstrapHullWhiteSigmaScheduleToCapFloors matches the Python bootstrap', 
       }),
     validation
   );
-});
-
-test('the bootstrapped HullWhiteParams reads its piecewise sigma through models.rates.hullWhite', () => {
-  const expected = HW.piecewise;
-  const params = models.rates.hullWhite.HullWhiteParams.piecewise(
-    expected.params.kappa,
-    expected.params.volatility.times,
-    expected.params.volatility.values
-  );
-  assert.equal(params.sigma(1.5), expected.sigma_at_1_5);
-  assert.equal(params.sigma(0.5), expected.sigma_at_0_5);
 });
 
 test('calibrateHullWhiteToCapFloors matches the Python fixed-kappa fit', () => {

@@ -11,22 +11,11 @@
 
 use finstack_quant_core::schema::SchemaArtifact;
 
-use crate::closed_form::heston::HestonPricingParams;
-use crate::closed_form::vanilla::BsGreeks;
-use crate::closed_form::ForwardGreeks;
-use crate::credit::dynamic_recovery::DynamicRecoverySpec;
-use crate::credit::endogenous_hazard::EndogenousHazardSpec;
-use crate::credit::pool::prepayment::StochasticPrepaySpec;
-use crate::credit::scoring::ohlson::OhlsonOScoreInput;
-use crate::credit::toggle_exercise::{CreditState, ToggleExerciseModel};
-use crate::monte_carlo::process::brownian::BrownianParams;
-use crate::monte_carlo::process::gbm::GbmParams;
-use crate::monte_carlo::process::multi_ou::MultiOuParams;
+use crate::closed_form::{BsGreeks, ForwardGreeks, HestonPricingParams};
 use crate::monte_carlo::simulate::{
     FbmSpec, PathSimulationSpec, PathSummary, ProcessSpec, SchemeSpec,
 };
 use crate::types::{ExerciseStyle, OptionType};
-use crate::volatility::sabr::SabrParameters;
 use crate::{
     correlation::CreditExposure, correlation::LatentFactorSpec, correlation::PortfolioLossConfig,
     correlation::PortfolioLossResult, correlation::RecoverySpec,
@@ -36,21 +25,25 @@ use crate::{
     credit::migration::MigrationSimulator, credit::migration::RatingPath,
     credit::migration::TransitionMatrix, credit::pd::MasterScale, credit::pd::MasterScaleResult,
     credit::pd::PdCycleParams, credit::pool::CorrelationStructure, credit::pool::PoolGranularity,
-    credit::pool::StochasticDefaultSpec, credit::recovery_waterfall::RecoveryClaim,
-    credit::recovery_waterfall::RecoveryWaterfallResult, credit::scoring::AltmanZDoublePrimeInput,
-    credit::scoring::AltmanZPrimeInput, credit::scoring::AltmanZScoreInput,
-    credit::scoring::ScoringResult, credit::scoring::ZmijewskiInput, credit::MertonModel,
-    credit::RatingFactorTable, credit::SimulatedPaths,
+    credit::pool::StochasticDefaultSpec, credit::pool::StochasticPrepaySpec,
+    credit::recovery_waterfall::RecoveryClaim, credit::recovery_waterfall::RecoveryWaterfallResult,
+    credit::scoring::AltmanZDoublePrimeInput, credit::scoring::AltmanZPrimeInput,
+    credit::scoring::AltmanZScoreInput, credit::scoring::OhlsonOScoreInput,
+    credit::scoring::ScoringResult, credit::scoring::ZmijewskiInput, credit::CreditState,
+    credit::DynamicRecoverySpec, credit::EndogenousHazardSpec, credit::MertonModel,
+    credit::RatingFactorTable, credit::SimulatedPaths, credit::ToggleExerciseModel,
     fourier::characteristic_function::BlackScholesCf,
     fourier::characteristic_function::MertonJumpCf,
-    fourier::characteristic_function::VarianceGammaCf, fourier::CosConfig,
+    fourier::characteristic_function::VarianceGammaCf, fourier::cos::CosConfig,
     liquidity::AlmgrenChrissModel, liquidity::ExecutionTrajectory, liquidity::ImpactEstimate,
     liquidity::KyleLambdaModel, liquidity::LiquidityTier, liquidity::LvarBangiaScalar,
     liquidity::TradeParams, monte_carlo::estimate::Estimate, monte_carlo::greeks::lrm::LrmGreeks,
     monte_carlo::payoff::asian::AveragingMethod, monte_carlo::pricer::basis::BasisKind,
+    monte_carlo::process::brownian::BrownianParams,
     monte_carlo::process::cheyette_rough::CheyetteRoughVolParams,
-    monte_carlo::process::cir::CirParams, monte_carlo::process::lmm::LmmParams,
-    monte_carlo::process::local_vol::LocalVolParams, monte_carlo::process::ou::HullWhite1FParams,
+    monte_carlo::process::cir::CirParams, monte_carlo::process::gbm::GbmParams,
+    monte_carlo::process::lmm::LmmParams, monte_carlo::process::local_vol::LocalVolParams,
+    monte_carlo::process::multi_ou::MultiOuParams, monte_carlo::process::ou::HullWhite1FParams,
     monte_carlo::process::rough_bergomi::RoughBergomiParams,
     monte_carlo::process::rough_heston::RoughHestonParams,
     monte_carlo::process::schwartz_smith::SchwartzSmithParams,
@@ -60,8 +53,8 @@ use crate::{
     volatility::arbitrage::ArbitrageCheckConfig, volatility::arbitrage::ArbitrageReport,
     volatility::heston::HestonParams, volatility::local_vol::LocalVolSurface,
     volatility::rough_heston::RoughHestonFourierParams,
-    volatility::sabr::ArbitrageValidationResult, volatility::svi::SviParams,
-    volatility::VolatilityConvention,
+    volatility::sabr::ArbitrageValidationResult, volatility::sabr::SabrParameters,
+    volatility::svi::SviParams, volatility::VolatilityConvention,
 };
 
 /// The crate's complete schema registry.

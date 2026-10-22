@@ -151,7 +151,7 @@ bypasses the error-chain preservation the helpers provide and is a review reject
 | `core_to_py` | `finstack_quant_core::Error` — by far the most common |
 | `display_to_py` | Any `Display` error without a dedicated mapper |
 | `portfolio_to_py`, `statements_to_py`, `scenarios_to_py`, `analytics_to_py` | Crate-specific root errors |
-| `pd_calibration_to_py`, `migration_to_py`, `decomposition_error_to_py`, `correlation_to_py` | `models` sub-errors |
+| `kinded_to_py` (PD calibration, migration, scoring, factor decomposition), `correlation_to_py` | `models` / `factor` sub-errors |
 | `kind_to_py` | Any error that exposes `kind()` but has no dedicated mapper |
 | `contract_to_py`, `materialization_to_py`, `diagnostics_to_py` | Persisted-contract and materialization paths that attach structured diagnostics |
 | `value_error`, `serde_json_to_py` | Constructing a new error in binding code |

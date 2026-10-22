@@ -40,7 +40,7 @@
 //!
 //! ```
 //! use finstack_quant_core::math::special_functions::norm_cdf;
-//! use finstack_quant_models::volatility::d1_d2;
+//! use finstack_quant_models::closed_form::d1_d2;
 //!
 //! let spot = 100.0;
 //! let strike = 105.0;
@@ -62,13 +62,11 @@
 //!
 //! # See Also
 //!
-//! - [`SabrParameters`](crate::volatility::sabr::SabrParameters) for SABR smile interpolation
+//! - [`sabr::SabrParameters`] for SABR smile interpolation
 //! - [`FxVolSurfaceBuilder`] for FX delta-quoted smile materialization
 //! - [`crate::closed_form`] for analytical formulas
 
 pub mod arbitrage;
-pub(crate) mod black;
-mod conventions;
 mod convert;
 mod dupire;
 mod fx;
@@ -82,9 +80,7 @@ pub mod svi;
 /// Carr-Madan discrete variance replication for variance swaps.
 pub mod variance_replication;
 
-pub use black::{d1_d2, d1_d2_black76};
-pub use conventions::VolatilityConvention;
-pub use convert::convert_atm_volatility;
+pub use convert::{convert_atm_volatility, VolatilityConvention};
 pub use implied::{implied_vol_bachelier, implied_vol_black};
 pub use source::{
     get_cube_expiry_slice_vol, get_cube_expiry_slice_vol_clamped, get_cube_normal_vol,

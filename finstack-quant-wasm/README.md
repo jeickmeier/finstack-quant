@@ -284,7 +284,7 @@ plain object/array, and objects get the same unknown-field checks as text;
 Returned 64-bit values (Monte Carlo seeds, `DayCount.calendarDays`) are `bigint`.
 
 **Determinism.** Simulation entry points are seeded; where the seed is optional
-(`models.monteCarlo.priceHestonCall/Put`) the Rust registry supplies a fixed
+(`models.monteCarlo.priceHeston`) the Rust registry supplies a fixed
 default, so the same seed and path count always reproduce the same estimate.
 
 **Serde strictness.** JSON envelopes deny unknown fields and are versioned

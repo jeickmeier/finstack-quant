@@ -334,7 +334,8 @@ mod tests {
         FactorCorrelationMatrix, FactorVolModel, GenericFactorSpec, HierarchyDimension,
         IssuerBetaPolicy, LevelsAtAnchor, VolState,
     };
-    use crate::{FactorDefinition, FactorId, FactorType, MarketMapping, MatchingConfig};
+    use crate::matching::MatchingConfig;
+    use crate::{FactorDefinition, FactorId, FactorType, MarketMapping};
     use finstack_quant_core::dates::create_date;
     use finstack_quant_core::market_data::bumps::BumpUnits;
     use finstack_quant_core::types::CurveId;

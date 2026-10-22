@@ -16,10 +16,11 @@ use crate::credit::hierarchy::{
     FactorVolModel, FitQuality, FoldUpRecord, IdiosyncraticVolModel, IssuerBetaMode, IssuerBetaRow,
     IssuerBetas, IssuerTags, LevelAnchor, LevelsAtAnchor, VolState,
 };
-use crate::{CreditHierarchicalConfig, CREDIT_GENERIC_FACTOR_ID};
+use crate::matching::MatchingConfig;
+use crate::matching::{CreditHierarchicalConfig, CREDIT_GENERIC_FACTOR_ID};
 use crate::{
     FactorCovarianceMatrix, FactorDefinition, FactorId, FactorModelConfig, FactorType,
-    MarketMapping, MatchingConfig,
+    MarketMapping,
 };
 
 /// Anchor-step output: anchor levels + per-issuer adder values at as_of.

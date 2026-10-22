@@ -26,8 +26,7 @@ ForwardGreeks = _models.ForwardGreeks
 asian_option_price = _models.asian_option_price
 bachelier_greeks = _models.bachelier_greeks
 bachelier_price = _models.bachelier_price
-barrier_call = _models.barrier_call
-barrier_put = _models.barrier_put
+barrier_option_price = _models.barrier_option_price
 black76_greeks = _models.black76_greeks
 black76_implied_vol = _models.black76_implied_vol
 black76_price = _models.black76_price
@@ -50,8 +49,7 @@ __all__: list[str] = [
     "asian_option_price",
     "bachelier_greeks",
     "bachelier_price",
-    "barrier_call",
-    "barrier_put",
+    "barrier_option_price",
     "black76_greeks",
     "black76_implied_vol",
     "black76_price",

@@ -16,8 +16,26 @@
 //! it requires time-step convergence. This makes the reported payoff consistent with the path-level dynamics
 //! under stochastic-vol models; for deterministic-vol processes the state
 //! carries no variance entry and the configured sigma is used unchanged.
+//!
+//! # Brownian-bridge modelling assumptions
+//!
+//! The bridge formula behind the continuous crossing test is derived under
+//! the assumption that, conditional on `(S_t, S_{t+Δt})`, `ln S_u` is a
+//! linear Brownian bridge on `[t, t+Δt]` with **constant** instantaneous volatility `σ`. This is exact for GBM
+//! with deterministic (piecewise-constant) volatility on the interval and is
+//! widely used as a first-order correction for:
+//!
+//! - Local-volatility models, provided `σ` is set to an effective local
+//!   volatility over the step (bias is `O(σ'·Δt)`).
+//! - Stochastic-volatility models (Heston, SABR, …) only over sub-steps
+//!   short enough that the variance process is approximately frozen.
+//!
+//! It is **not** appropriate for jump-diffusion models, for rough
+//! volatility (fBM-driven) paths, or for multi-factor processes where the
+//! underlying has non-trivial correlation with other state variables. In
+//! those cases prefer finer monitoring or a model-specific exit
+//! distribution.
 
-use super::super::barriers::bridge::check_barrier_hit;
 use crate::monte_carlo::traits::PathState;
 use crate::monte_carlo::traits::Payoff;
 use crate::types::OptionType;
@@ -26,6 +44,31 @@ use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::BarrierDirection;
 use finstack_quant_core::types::BarrierType;
+
+/// Continuity-correction coefficient `β = −ζ(1/2)/√(2π)`.
+///
+/// Under discrete monitoring with equal time steps, evaluating a *continuous*
+/// barrier formula at the shifted barrier `B · exp(±β · σ · √Δt)` reproduces
+/// the discretely-monitored price up to `o(1/√n)` error in the number of
+/// monitoring points. The shift moves the barrier *away* from spot (down for
+/// a down barrier, up for an up barrier), because discrete monitoring misses
+/// crossings and so knocks out less often than continuous monitoring.
+///
+/// The adjusted barrier is `B' = B · exp(±β · σ · √Δt)`: `exp(−…)` for a
+/// down barrier, `exp(+…)` for an up barrier.
+///
+/// # Numerical value
+///
+/// Using `ζ(1/2) = -1.4603545088095868…` and `√(2π) = 2.5066282746310002…`
+/// gives `β ≈ 0.5825971579390106`, i.e. full f64 precision.
+///
+/// References:
+/// - Broadie, Glasserman & Kou (1997). "A Continuity Correction for Discrete
+///   Barrier Options." *Mathematical Finance*, 7(4), 325–349.
+/// - Gobet & Miri (2001). "Weak approximation of averaged diffusion
+///   processes" (extension to local-volatility models; same leading
+///   coefficient β).
+pub const GOBET_MIRI_BETA: f64 = 0.582_597_157_939_010_6;
 
 /// Simulation-step representation of a barrier's monitoring contract.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -341,10 +384,7 @@ impl Payoff for BarrierOptionPayoff {
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
         if self.is_active() {
-            let intrinsic = match self.option_type {
-                OptionType::Call => (self.terminal_spot - self.strike).max(0.0),
-                OptionType::Put => (self.strike - self.terminal_spot).max(0.0),
-            };
+            let intrinsic = self.option_type.intrinsic(self.terminal_spot, self.strike);
             Money::new(intrinsic * self.notional, currency)
         } else {
             // Rebate payment. With at-hit timing configured and an actual
@@ -370,6 +410,125 @@ impl Payoff for BarrierOptionPayoff {
 
     fn max_event_step(&self) -> Option<usize> {
         Some(self.maturity_step)
+    }
+}
+
+/// Compute probability of hitting a barrier between two observations.
+///
+/// For a Brownian bridge from `S(t)` to `S(t+Δt)`, compute the probability
+/// that the path crosses barrier `B` at some point in `[t, t+Δt]` assuming
+/// log-normal GBM dynamics with constant volatility `σ`.
+///
+/// # Arguments
+///
+/// * `s_t` - Underlying spot observed at the start of the monitoring interval,
+///   in the same price units as `barrier`.
+/// * `s_t_dt` - Spot at time t+Δt
+/// * `barrier` - Continuously monitored barrier level in the same price units
+///   as the two spot observations.
+/// * `sigma` - Instantaneous volatility over the step (constant assumption)
+/// * `dt` - Positive monitoring-interval length in years; non-positive values
+///   return zero unless discrete observations already cross the barrier.
+///
+/// # Returns
+///
+/// Probability of hitting the barrier in `[t, t+Δt]`.
+///
+/// # Algorithm
+///
+/// For log-space Brownian motion `X = ln(S)`, the closed-form hit
+/// probability of the Brownian bridge (see Glasserman 2003, §6.4) is
+///
+/// ```text
+/// p_hit ≈ exp(−2 · ln(S_t/B) · ln(S_{t+Δt}/B) / (σ² · Δt))
+/// ```
+///
+/// when both `S_t` and `S_{t+Δt}` are on the same side of `B`; otherwise a
+/// crossing is guaranteed.
+#[must_use]
+fn bridge_hit_probability(s_t: f64, s_t_dt: f64, barrier: f64, sigma: f64, dt: f64) -> f64 {
+    // A barrier between the two observations is a guaranteed crossing
+    // regardless of σ or Δt, so this check must run before the
+    // degenerate-input guard: σ = 0 or Δt = 0 must not turn a definite
+    // discrete crossing into probability 0.
+    let min_s = s_t.min(s_t_dt);
+    let max_s = s_t.max(s_t_dt);
+    if barrier >= min_s && barrier <= max_s {
+        return 1.0;
+    }
+
+    if dt <= 0.0 || sigma <= 0.0 {
+        return 0.0;
+    }
+
+    // Both observations on same side of barrier
+    if (s_t > barrier && s_t_dt > barrier) || (s_t < barrier && s_t_dt < barrier) {
+        // Use log-space approximation
+        let ln_ratio_t = (s_t / barrier).ln();
+        let ln_ratio_t_dt = (s_t_dt / barrier).ln();
+
+        // Brownian bridge formula
+        let numerator = -2.0 * ln_ratio_t * ln_ratio_t_dt;
+        let denominator = sigma * sigma * dt;
+
+        if numerator / denominator < -20.0 {
+            // Avoid numerical issues for very small probabilities
+            return 0.0;
+        }
+
+        (numerator / denominator).exp().min(1.0)
+    } else {
+        // Observations on different sides - must have crossed
+        1.0
+    }
+}
+
+/// Check if a barrier was hit using bridge correction.
+///
+/// # Arguments
+///
+/// * `s_t` - Underlying spot at the start of the monitoring interval, in the
+///   same price units as `barrier`.
+/// * `s_t_dt` - Spot at time t+Δt
+/// * `barrier` - Up or down barrier level in the same price units as the spot
+///   observations.
+/// * `barrier_type` - Type of barrier (up or down)
+/// * `sigma` - Constant annualized volatility assumed over the interval.
+/// * `dt` - Monitoring-interval length in years used by the bridge correction.
+/// * `uniform_random` - Uniform random number in [0, 1)
+///
+/// # Returns
+///
+/// true if barrier was hit, false otherwise
+#[allow(clippy::too_many_arguments)]
+fn check_barrier_hit(
+    s_t: f64,
+    s_t_dt: f64,
+    barrier: f64,
+    barrier_type: BarrierDirection,
+    sigma: f64,
+    dt: f64,
+    uniform_random: f64,
+) -> bool {
+    match barrier_type {
+        BarrierDirection::Up => {
+            if s_t >= barrier || s_t_dt >= barrier {
+                return true;
+            }
+            let p_hit = bridge_hit_probability(s_t, s_t_dt, barrier, sigma, dt);
+            // Textbook inverse-CDF test: hit iff u < p. `fill_u01`
+            // guarantees u ∈ (0, 1), so no boundary guard is needed.
+            uniform_random < p_hit
+        }
+        BarrierDirection::Down => {
+            if s_t <= barrier || s_t_dt <= barrier {
+                return true;
+            }
+            let p_hit = bridge_hit_probability(s_t, s_t_dt, barrier, sigma, dt);
+            // Textbook inverse-CDF test: hit iff u < p. `fill_u01`
+            // guarantees u ∈ (0, 1), so no boundary guard is needed.
+            uniform_random < p_hit
+        }
     }
 }
 
@@ -855,5 +1014,99 @@ mod tests {
                 .amount(),
             0.0
         );
+    }
+}
+
+#[cfg(test)]
+mod bridge_tests {
+    use super::*;
+
+    #[test]
+    fn test_bridge_hit_probability_definite_hit() {
+        let p = bridge_hit_probability(90.0, 110.0, 100.0, 0.2, 0.1);
+        assert_eq!(p, 1.0);
+    }
+
+    #[test]
+    fn test_bridge_hit_probability_same_side() {
+        // Both above barrier
+        let p = bridge_hit_probability(110.0, 120.0, 100.0, 0.2, 0.1);
+        assert!(p > 0.0 && p < 1.0);
+    }
+
+    #[test]
+    fn test_bridge_hit_probability_far_apart() {
+        // Far from barrier - low probability
+        let p = bridge_hit_probability(150.0, 160.0, 100.0, 0.2, 0.1);
+        assert!(p < 0.01);
+    }
+
+    #[test]
+    fn test_barrier_check_discrete_hit_up() {
+        assert!(check_barrier_hit(
+            95.0,
+            105.0,
+            100.0,
+            BarrierDirection::Up,
+            0.2,
+            0.1,
+            0.5
+        ));
+        assert!(check_barrier_hit(
+            105.0,
+            110.0,
+            100.0,
+            BarrierDirection::Up,
+            0.2,
+            0.1,
+            0.5
+        ));
+    }
+
+    #[test]
+    fn test_barrier_check_no_hit_up() {
+        // Well below barrier: the bridge hit probability here is ≈ 1.3e-8,
+        // so any ordinary uniform draw must report no hit. (`fill_u01`
+        // guarantees u ∈ (0, 1), so exactly-zero draws cannot occur.)
+        assert!(!check_barrier_hit(
+            80.0,
+            85.0,
+            100.0,
+            BarrierDirection::Up,
+            0.2,
+            0.1,
+            0.5
+        ));
+    }
+
+    #[test]
+    fn test_barrier_check_discrete_hit_down() {
+        assert!(check_barrier_hit(
+            105.0,
+            95.0,
+            100.0,
+            BarrierDirection::Down,
+            0.2,
+            0.1,
+            0.5
+        ));
+        assert!(check_barrier_hit(
+            95.0,
+            90.0,
+            100.0,
+            BarrierDirection::Down,
+            0.2,
+            0.1,
+            0.5
+        ));
+    }
+
+    #[test]
+    fn test_barrier_symmetry() {
+        // Up and down should be symmetric
+        let p_up = bridge_hit_probability(110.0, 120.0, 100.0, 0.2, 0.1);
+        let p_down = bridge_hit_probability(90.0, 80.0, 100.0, 0.2, 0.1);
+
+        assert!((p_up - p_down).abs() < 0.1);
     }
 }

@@ -406,7 +406,7 @@ impl Discretization<HestonProcess> for QeHeston {
 mod tests {
     use super::super::super::process::heston::HestonProcess;
     use super::*;
-    use crate::closed_form::heston::HestonPricingParams;
+    use crate::closed_form::HestonPricingParams;
 
     #[test]
     fn test_qe_heston_variance_positive() {

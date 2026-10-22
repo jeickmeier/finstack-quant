@@ -7,25 +7,17 @@
 //!
 //! # Components
 //!
-//! - `crate::correlation::copula`: Copula models for default correlation (Gaussian, Student-t, RFL, Multi-factor)
-//! - `crate::correlation::recovery`: Recovery rate models (constant, market-correlated)
-//! - `crate::correlation::latent_factor`: Factor models for correlated behavior
+//! - [`Copula`] / [`CopulaSpec`]: Copula models for default correlation (Gaussian, Student-t, RFL, Multi-factor)
+//! - [`RecoveryModel`] / [`RecoverySpec`]: Recovery rate models (constant, market-correlated)
+//! - [`LatentFactorSpec`]: Factor models for correlated behavior
+//! - [`simulate_portfolio_loss`]: Monte Carlo portfolio loss distribution
 //!
-//! Joint probability utilities ([`finstack_quant_core::math::probability::CorrelatedBernoulli`],
-//! [`finstack_quant_core::math::probability::correlation_bounds`],
-//! [`finstack_quant_core::math::probability::joint_probabilities`]) are re-exported from
-//! [`finstack_quant_core::math::probability`].
-//!
-//! Matrix-validation helpers (`validate_correlation_matrix`,
-//! `nearest_correlation`, `NearestCorrelationOpts`) are re-exported from
-//! [`finstack_quant_core::math::linalg`]. [`Error`] / [`Result`] are
-//! models-owned: they wrap core matrix failures and add credit-domain
-//! variants (volatilities, recovery, Student-t df).
-//!
-//! # Utilities
-//!
-//! - [`finstack_quant_core::math::linalg::validate_correlation_matrix`]: Validate correlation matrices
-//! - [`finstack_quant_core::math::probability::correlation_bounds`]: Fréchet-Hoeffding bounds for correlated Bernoulli
+//! Joint probability utilities (`CorrelatedBernoulli`, `correlation_bounds`,
+//! `joint_probabilities`) live in [`finstack_quant_core::math::probability`];
+//! matrix helpers (`validate_correlation_matrix`, `nearest_correlation`,
+//! `cholesky_correlation`) live in [`finstack_quant_core::math::linalg`].
+//! [`Error`] / [`Result`] are models-owned: they wrap core matrix failures and
+//! add credit-domain variants (volatilities, recovery, Student-t df).
 //!
 //! # Conventions
 //!
@@ -43,11 +35,11 @@
 //! - Factor-model and portfolio-risk context: `docs/REFERENCES.md#meucci-risk-and-asset-allocation`
 //!
 
-pub(crate) mod copula;
+mod copula;
 mod error;
-pub(crate) mod latent_factor;
-pub(crate) mod portfolio_loss;
-pub(crate) mod recovery;
+mod latent_factor;
+mod portfolio_loss;
+mod recovery;
 
 pub use copula::{
     Copula, CopulaSpec, FactorPairIntegrand, GaussianCopula, MultiFactorCopula,
@@ -58,7 +50,7 @@ pub use latent_factor::{
     LatentFactorKind, LatentFactorSpec, LatentMultiFactor, LatentSingleFactor, LatentTwoFactor,
 };
 pub use portfolio_loss::{
-    simulate_portfolio_loss, simulate_portfolio_loss_with_recovery, CreditExposure,
-    PortfolioLossConfig, PortfolioLossResult, TrancheLossStatistics, MAX_PORTFOLIO_LOSS_PATHS,
+    simulate_portfolio_loss, CreditExposure, PortfolioLossConfig, PortfolioLossResult,
+    TrancheLossStatistics, MAX_PORTFOLIO_LOSS_PATHS,
 };
 pub use recovery::{ConstantRecovery, CorrelatedRecovery, RecoveryModel, RecoverySpec};

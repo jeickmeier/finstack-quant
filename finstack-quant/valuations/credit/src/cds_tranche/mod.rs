@@ -74,7 +74,7 @@
 //!
 //! - [`CdsTranche`](crate::cds_tranche::CdsTranche) for instrument struct
 //! - [`finstack_quant_valuations_core::instruments::PayReceive`] for buyer (`Pay`) vs seller (`Receive`)
-//! - `finstack_quant_models::correlation::copula` for copula model implementations
+//! - [`finstack_quant_models::correlation`] for copula model implementations
 //! - Base correlation calibration via plan-driven `calibration::api`
 
 pub(crate) mod metrics;

@@ -510,7 +510,7 @@ impl Pricer for LookbackOptionAnalyticalPricer {
         let currency = lookback.currency;
         // Closed-form leaves signal out-of-domain input with a NaN sentinel;
         // convert to an error before `Money::new` panics on non-finite.
-        let price = finstack_quant_models::closed_form::vanilla::checked_closed_form_value(
+        let price = finstack_quant_models::closed_form::checked_closed_form_value(
             price,
             "lookback closed-form price",
         )?;

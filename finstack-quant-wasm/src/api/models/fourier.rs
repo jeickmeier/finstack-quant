@@ -11,10 +11,11 @@
 
 use crate::utils::input::{js_bool, js_f64, js_opt_uint};
 use crate::utils::to_js_err;
-use finstack_quant_models::fourier::{
+use finstack_quant_models::fourier::cos::{
     bs_cos_price as rust_bs_cos_price, merton_jump_cos_price as rust_merton_jump_cos_price,
     vg_cos_price as rust_vg_cos_price, CosMarketParams,
 };
+use finstack_quant_models::types::OptionType;
 use wasm_bindgen::prelude::*;
 
 /// Price a European option under the Black-Scholes model using the COS method.
@@ -65,7 +66,7 @@ pub fn bs_cos_price(
             rate,
             div_yield,
             expiry,
-            is_call,
+            option_type: OptionType::from(is_call),
             n_terms,
         },
         vol,
@@ -127,7 +128,7 @@ pub fn vg_cos_price(
             rate,
             div_yield,
             expiry,
-            is_call,
+            option_type: OptionType::from(is_call),
             n_terms,
         },
         sigma,
@@ -195,7 +196,7 @@ pub fn merton_jump_cos_price(
             rate,
             div_yield,
             expiry,
-            is_call,
+            option_type: OptionType::from(is_call),
             n_terms,
         },
         sigma,

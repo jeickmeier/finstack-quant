@@ -83,7 +83,7 @@ impl<P: StochasticProcess> Discretization<P> for EulerMaruyama {
 /// ```
 ///
 /// This ensures positivity for processes with proportional diffusion. For plain
-/// GBM, prefer [`crate::monte_carlo::discretization::ExactGbm`], which uses the
+/// GBM, prefer [`crate::monte_carlo::discretization::exact::ExactGbm`], which uses the
 /// analytical transition and has no time-discretization error.
 #[derive(Debug, Clone, Default)]
 pub struct LogEuler;

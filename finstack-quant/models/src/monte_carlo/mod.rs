@@ -32,11 +32,12 @@
 //! # Module map
 //!
 //! - Models and simulation inputs: [`rng`], [`process`], and [`discretization`].
-//! - Engine contracts and execution: [`traits`], [`TimeGrid`](finstack_quant_core::math::time_grid::TimeGrid), [`engine`], and
-//!   [`engine_fractional`].
-//! - Products and analytics: [`payoff`], [`pricer`], [`barriers`], [`greeks`], and
-//!   [`variance_reduction`].
-//! - Results and diagnostics: [`estimate`], [`OnlineStats`](finstack_quant_core::math::stats::OnlineStats), [`paths`], and [`results`].
+//! - Engine contracts and execution: [`traits`],
+//!   [`TimeGrid`](finstack_quant_core::math::time_grid::TimeGrid), and [`engine`].
+//! - Products and analytics: [`payoff`], [`pricer`], [`greeks`], and
+//!   [`control_variate`].
+//! - Results and diagnostics: [`estimate`],
+//!   [`OnlineStats`](finstack_quant_core::math::stats::OnlineStats), [`paths`], and [`results`].
 //! - Runtime defaults and reproducibility: [`registry`] and [`seed`].
 //!
 //! # Conventions
@@ -58,7 +59,8 @@
 //!
 //! ```
 //! use finstack_quant_core::currency::Currency;
-//! use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
+//! use finstack_quant_models::monte_carlo::payoff::vanilla::European;
+//! use finstack_quant_models::types::OptionType;
 //! use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
 //! use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 //!
@@ -67,7 +69,7 @@
 //!     .with_seed(19)
 //!     .with_parallel(false);
 //! let process = GbmProcess::with_params(0.03, 0.01, 0.20).unwrap();
-//! let payoff = EuropeanCall::new(100.0, 1.0, 252);
+//! let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 //! let result = pricer
 //!     .price(&process, 100.0, 1.0, 252, &payoff, Currency::USD, (-0.03_f64).exp())
 //!     .expect("pricing should succeed");
@@ -89,10 +91,9 @@ pub mod process;
 pub mod rng;
 pub mod traits;
 
-pub mod barriers;
+pub mod control_variate;
 pub mod convenience;
 pub mod engine;
-pub mod engine_fractional;
 pub mod greeks;
 pub mod payoff;
 pub mod pricer;
@@ -100,7 +101,6 @@ pub mod registry;
 pub mod results;
 pub mod seed;
 pub mod simulate;
-pub mod variance_reduction;
 
 #[cfg(test)]
 mod mc_process_params_serialization;

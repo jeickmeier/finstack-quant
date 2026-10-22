@@ -6,9 +6,9 @@ use finstack_quant_valuations_core::results::structured_credit::StructuredCredit
 
 use finstack_quant_models::correlation::LatentFactorSpec;
 use finstack_quant_models::correlation::RecoverySpec;
-use finstack_quant_models::credit::pool::prepayment::StochasticPrepaySpec;
 use finstack_quant_models::credit::pool::PoolGranularity;
 use finstack_quant_models::credit::pool::StochasticDefaultSpec;
+use finstack_quant_models::credit::pool::StochasticPrepaySpec;
 use std::sync::Arc;
 
 /// Configuration for stochastic pricer.

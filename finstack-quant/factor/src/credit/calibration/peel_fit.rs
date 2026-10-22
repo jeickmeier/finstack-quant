@@ -7,8 +7,8 @@ use super::panel::WorkingPanel;
 use crate::credit::hierarchy::{
     dimension_key, CreditHierarchySpec, FitQuality, IssuerBetaMode, IssuerBetas, IssuerTags,
 };
+use crate::matching::{bucket_factor_id, CREDIT_GENERIC_FACTOR_ID};
 use crate::FactorId;
-use crate::{bucket_factor_id, CREDIT_GENERIC_FACTOR_ID};
 
 /// Outcome of the PC + per-level peel (steps 4 + 5).
 pub(super) struct PeelOutcome {

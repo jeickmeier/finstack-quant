@@ -2,7 +2,7 @@
 //!
 //! One evaluation of the Dupire formula on an implied-volatility grid, shared
 //! by the arbitrage check
-//! ([`LocalVolDensityCheck`](crate::volatility::arbitrage::checks::LocalVolDensityCheck))
+//! ([`LocalVolDensityCheck`](crate::volatility::arbitrage::LocalVolDensityCheck))
 //! and the local-volatility extractor
 //! ([`LocalVolSurface`](crate::volatility::local_vol::LocalVolSurface)).
 //!

@@ -279,5 +279,14 @@ def test_simulate_portfolio_loss_accepts_dataframe() -> None:
 
     config = PortfolioLossConfig(100, 7, 0.95, CopulaSpec.gaussian())
     typed = simulate_portfolio_loss([CreditExposure("A", 100.0, 0.05, 0.6, [0.3])], config)
-    frame = pd.DataFrame({"id": ["A"], "notional": [100.0], "pd": [0.05], "lgd": [0.6], "factor_loading": [0.3]})
+    # Columns are the CreditExposure field names; loadings are one list per name.
+    frame = pd.DataFrame({
+        "id": ["A"],
+        "notional": [100.0],
+        "default_probability": [0.05],
+        "lgd": [0.6],
+        "factor_loadings": [[0.3]],
+    })
     assert simulate_portfolio_loss(frame, config).losses == typed.losses
+    with pytest.raises(ValueError, match="default_probability"):
+        simulate_portfolio_loss(frame.rename(columns={"default_probability": "pd"}), config)
