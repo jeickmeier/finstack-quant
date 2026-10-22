@@ -52,7 +52,6 @@ use crate::Result;
 
 /// Pre-allocated scratch buffers for finite-difference Jacobian computation.
 struct JacobianScratch {
-    jacobian: Vec<f64>,
     params_plus: Vec<f64>,
     params_minus: Vec<f64>,
     r_plus: Vec<f64>,
@@ -62,7 +61,6 @@ struct JacobianScratch {
 impl JacobianScratch {
     fn new(n_params: usize, n_residuals: usize) -> Self {
         Self {
-            jacobian: vec![0.0; n_residuals * n_params],
             params_plus: vec![0.0; n_params],
             params_minus: vec![0.0; n_params],
             r_plus: vec![0.0; n_residuals],
@@ -263,7 +261,7 @@ impl LevenbergMarquardtSolver {
 
     /// Compute Jacobian for a system of residuals into a pre-allocated buffer.
     ///
-    /// Writes a flat row-major Jacobian into `scratch.jacobian`: `J[i * n_params + j]`.
+    /// Writes a flat row-major Jacobian into `out`: `J[i * n_params + j]`.
     fn compute_jacobian_system_into<Res>(
         &self,
         residuals: &Res,
@@ -271,6 +269,7 @@ impl LevenbergMarquardtSolver {
         n_residuals: usize,
         residual_eval_counter: &mut usize,
         scratch: &mut JacobianScratch,
+        out: &mut [f64],
     ) where
         Res: Fn(&[f64], &mut [f64]),
     {
@@ -292,8 +291,7 @@ impl LevenbergMarquardtSolver {
             *residual_eval_counter += 2;
 
             for i in 0..n_residuals {
-                scratch.jacobian[i * n_params + j] =
-                    (scratch.r_plus[i] - scratch.r_minus[i]) / (2.0 * h);
+                out[i * n_params + j] = (scratch.r_plus[i] - scratch.r_minus[i]) / (2.0 * h);
             }
             scratch.params_plus[j] = p_j;
             scratch.params_minus[j] = p_j;
@@ -544,8 +542,8 @@ impl LevenbergMarquardtSolver {
                 n_residuals,
                 eval_counter,
                 &mut jac_scratch,
+                out,
             );
-            out.copy_from_slice(&jac_scratch.jacobian);
         };
 
         self.solve_lm_core_with_stats(initial.to_vec(), &residuals, jacobian_func, n_residuals)
@@ -591,8 +589,8 @@ impl LevenbergMarquardtSolver {
                 n_residuals,
                 eval_counter,
                 &mut jac_scratch,
+                out,
             );
-            out.copy_from_slice(&jac_scratch.jacobian);
         };
 
         self.solve_lm_core_with_stats(initial.to_vec(), &residuals, jacobian_func, n_residuals)
