@@ -5,7 +5,8 @@ name: Checks
 # prime-cache. Budget: under 15 minutes wall clock on a warm master cache. No
 # coverage, doctests or slow tests; full-checks.yml runs those. Every job runs a
 # canonical mise task, so a failure reproduces locally with the same command
-# (`mise run all-ci` runs the set). pr.yml runs it for every pull request,
+# (`mise run all-ci` runs the set); the per-test time cap is CI-only and
+# reproduces with `NEXTEST_PROFILE=ci mise run rust-test`. pr.yml runs it for every pull request,
 # nightly.yml every night on master (saving the caches pull requests restore),
 # and release.yml as a gate for a tagged release.
 #
@@ -23,6 +24,11 @@ permissions:
 
 env:
   UV_PYTHON_DOWNLOADS: never
+  # rustup's shared download cache is not concurrency-safe. mise installs
+  # multiple `cargo:*` tools in parallel by default, and concurrent component
+  # fetches race on ~/.rustup/downloads/*.partial; on a mise cache miss every
+  # job installs.
+  MISE_JOBS: "1"
 
 jobs:
   # ============================================
@@ -47,11 +53,6 @@ jobs:
           # Pull requests restore master's toolchain cache; a per-PR save is
           # ~310 MB and evicts master's Rust caches.
           cache_save: ${{ github.ref == 'refs/heads/master' }}
-        env:
-          # rustup's shared download cache is not concurrency-safe. mise
-          # installs multiple `cargo:*` tools in parallel by default, and
-          # concurrent component fetches race on ~/.rustup/downloads/*.partial.
-          MISE_JOBS: "1"
 
   # ============================================
   # Supply-chain security: cargo-deny (advisories, licenses, bans), then
@@ -226,7 +227,7 @@ jobs:
 
   # ============================================
   # Test Rust — uninstrumented cargo nextest lib and integration tests under
-  # the `ci` profile, which kills any test still running after 60 s
+  # the `ci` profile, which reports tests slow at 20 s and kills them at 180 s
   # ============================================
   test-rust:
     name: Test Rust
