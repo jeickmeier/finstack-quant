@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
-      "bytes": 31774,
+      "bytes": 31583,
       "kind": "output",
       "path": "schemas/statements/1/monte_carlo_results.schema.json",
       "summary": "Percentile summaries of a Monte Carlo statement-model evaluation.",
@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
-      "bytes": 71242,
+      "bytes": 71051,
       "kind": "output",
       "path": "schemas/statements/1/statement_result.schema.json",
       "summary": "Evaluated node values per period, with policy stamps.",

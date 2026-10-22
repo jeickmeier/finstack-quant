@@ -276,16 +276,15 @@ pub fn calculate_period_flows(
         let residual_scale = opening_balance.amount() / scheduled_opening.amount();
         if (residual_scale - 1.0).abs() > RESIDUAL_SCALE_TOLERANCE {
             tracing::warn!(
-                raw_scale = residual_scale,
+                applied_ratio = residual_scale,
                 period = ?period.id,
                 "Residual schedule opening diverges from the stateful opening \
                  (|scale - 1| > {RESIDUAL_SCALE_TOLERANCE}); this signals a rebuild bug."
             );
             warnings.push(EvalWarning::CapitalStructure {
                 period: period.id,
-                warning: CapitalStructureWarning::ScaleClamped {
-                    raw_ratio: residual_scale,
-                    clamped_ratio: 1.0,
+                warning: CapitalStructureWarning::ResidualScaleMismatch {
+                    applied_ratio: residual_scale,
                 },
             });
         }
@@ -1060,7 +1059,7 @@ mod tests {
     /// Regression test for the scale-denominator off-by-one (review B2):
     /// a quarterly amortizing loan whose payments land exactly on period
     /// boundaries must produce per-period interest equal to the raw schedule
-    /// with scale = 1.0 and no `scale_clamped` warning. The old
+    /// with scale = 1.0 and no `residual_scale_mismatch` warning. The old
     /// `*d <= period.start` filter took the post-payment balance as the
     /// scheduled opening, inflating every flow by opening/post-payment.
     #[test]
@@ -1297,7 +1296,7 @@ mod tests {
             breakdown.interest_expense_cash.amount()
         );
 
-        // The clamp must also surface as a structured EvalWarning so callers
+        // The mismatch must also surface as a structured EvalWarning so callers
         // see the divergence in their results envelope, not only in tracing
         // output. A regression that drops the warning push would be silent
         // without this assertion.
@@ -1307,7 +1306,7 @@ mod tests {
                 matches!(
                     w,
                     EvalWarning::CapitalStructure {
-                        warning: CapitalStructureWarning::ScaleClamped { .. },
+                        warning: CapitalStructureWarning::ResidualScaleMismatch { .. },
                         ..
                     }
                 )
@@ -1316,8 +1315,22 @@ mod tests {
         assert_eq!(
             scale_warnings.len(),
             1,
-            "expected exactly one scale_clamped warning, got: {warnings:?}"
+            "expected exactly one residual_scale_mismatch warning, got: {warnings:?}"
         );
+        let wire = serde_json::to_value(scale_warnings[0]).expect("serializable warning");
+        let warning = &wire["capital_structure"]["warning"];
+        assert_eq!(warning["kind"], "residual_scale_mismatch");
+        assert_eq!(warning["applied_ratio"].as_f64(), Some(100_000.0 / 0.01));
+        assert!(warning.get("raw_ratio").is_none());
+        assert!(warning.get("clamped_ratio").is_none());
+        let restored: EvalWarning = serde_json::from_value(wire.clone()).expect("valid warning");
+        assert_eq!(
+            serde_json::to_value(restored).expect("serializable warning"),
+            wire
+        );
+        let obsolete =
+            serde_json::json!({"kind": "scale_clamped", "raw_ratio": 10.0, "clamped_ratio": 1.0});
+        assert!(serde_json::from_value::<CapitalStructureWarning>(obsolete).is_err());
     }
 
     /// Coupon and amort dated on the first period start belong to that period

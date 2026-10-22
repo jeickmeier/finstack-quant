@@ -154,27 +154,21 @@
       "description": "Typed reason for a capital-structure evaluation warning.",
       "oneOf": [
         {
-          "description": "A schedule-to-model balance ratio exceeded the safety bound and was clamped.",
+          "description": "The residual schedule opening differs from the stateful opening balance.",
           "properties": {
-            "clamped_ratio": {
-              "description": "Ratio used after applying the safety bound.",
+            "applied_ratio": {
+              "description": "Actual ratio of stateful to scheduled opening applied to the cashflows.",
               "format": "double",
               "type": "number"
             },
             "kind": {
-              "const": "scale_clamped",
+              "const": "residual_scale_mismatch",
               "type": "string"
-            },
-            "raw_ratio": {
-              "description": "Unbounded ratio calculated from model and schedule balances.",
-              "format": "double",
-              "type": "number"
             }
           },
           "required": [
             "kind",
-            "raw_ratio",
-            "clamped_ratio"
+            "applied_ratio"
           ],
           "type": "object"
         },

@@ -66,3 +66,24 @@ def test_ordinary_missing_results_survive_json_and_pickle() -> None:
     for restored in [s.StatementResult.from_json(result.to_json()), pickled]:
         assert math.isnan(restored.get("lagged", "2025Q1"))
         assert restored.get("lagged", "2025Q2") == 1.0
+
+
+def test_residual_scale_warning_reports_the_applied_ratio() -> None:
+    document = json.loads(s.Evaluator().evaluate(money_model()).to_json())
+    warning = {
+        "capital_structure": {
+            "period": "2025Q1",
+            "warning": {"kind": "residual_scale_mismatch", "applied_ratio": 10_000_000.0},
+        }
+    }
+    document["meta"]["warnings"] = [warning]
+    restored = s.StatementResult.from_json(json.dumps(document))
+    assert restored.warnings == [warning]
+    assert json.loads(restored.to_json())["meta"]["warnings"] == [warning]
+    document["meta"]["warnings"][0]["capital_structure"]["warning"] = {
+        "kind": "scale_clamped",
+        "raw_ratio": 10_000_000.0,
+        "clamped_ratio": 1.0,
+    }
+    with pytest.raises(ValueError, match="scale_clamped"):
+        s.StatementResult.from_json(json.dumps(document))
