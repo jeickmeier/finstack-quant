@@ -20,10 +20,10 @@ use finstack_quant_statements::types::{AmountOrScalar, ForecastSpec, NodeType};
 
 #[test]
 fn test_money_preserves_currency_usd() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value_money(
             "revenue",
             &[
                 (
@@ -35,9 +35,9 @@ fn test_money_preserves_currency_usd() {
                     Money::new(110_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -72,18 +72,18 @@ fn test_money_preserves_currency_usd() {
 
 #[test]
 fn test_money_preserves_currency_eur() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value_money(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 Money::new(50_000.0, Currency::EUR).expect("valid money fixture"),
             )],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -99,25 +99,25 @@ fn test_money_preserves_currency_eur() {
 
 #[test]
 fn test_money_multi_currency_tracking() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value_money(
             "usd_revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
             )],
-        )
-        .value_money(
+        );
+        model_builder.value_money(
             "eur_revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 Money::new(50_000.0, Currency::EUR).expect("valid money fixture"),
             )],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -144,10 +144,10 @@ fn test_money_multi_currency_tracking() {
 
 #[test]
 fn test_scalar_values_work_correctly() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value_scalar(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value_scalar(
             "gross_margin_pct",
             &[
                 (
@@ -159,9 +159,9 @@ fn test_scalar_values_work_correctly() {
                     0.37,
                 ),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -193,32 +193,32 @@ fn test_scalar_values_work_correctly() {
 
 #[test]
 fn test_mixed_monetary_and_scalar_nodes() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value_money(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
             )],
-        )
-        .value_scalar(
+        );
+        model_builder.value_scalar(
             "count",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 42.0,
             )],
-        )
-        .value_scalar(
+        );
+        model_builder.value_scalar(
             "ratio",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 0.15,
             )],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -248,19 +248,19 @@ fn test_mixed_monetary_and_scalar_nodes() {
 fn test_forecast_determinism_with_seed() {
     let forecast_spec = ForecastSpec::normal(100_000.0, 15_000.0, 42);
 
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q1"))
-        .unwrap()
-        .value_scalar(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+        model_builder.value_scalar(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 100_000.0,
             )],
-        )
-        .forecast("revenue", forecast_spec)
-        .build()
-        .unwrap();
+        );
+        model_builder.forecast("revenue", forecast_spec);
+        model_builder.build().unwrap()
+    };
 
     // Evaluate twice
     let mut evaluator1 = Evaluator::new();
@@ -304,33 +304,33 @@ fn test_forecast_determinism_with_seed() {
 
 #[test]
 fn test_forecast_different_seeds_produce_different_results() {
-    let model1 = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", Some("2025Q1"))
-        .unwrap()
-        .value_scalar(
+    let model1 = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", Some("2025Q1")).unwrap();
+        model_builder.value_scalar(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 100_000.0,
             )],
-        )
-        .forecast("revenue", ForecastSpec::normal(100_000.0, 15_000.0, 42))
-        .build()
-        .unwrap();
+        );
+        model_builder.forecast("revenue", ForecastSpec::normal(100_000.0, 15_000.0, 42));
+        model_builder.build().unwrap()
+    };
 
-    let model2 = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", Some("2025Q1"))
-        .unwrap()
-        .value_scalar(
+    let model2 = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", Some("2025Q1")).unwrap();
+        model_builder.value_scalar(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 100_000.0,
             )],
-        )
-        .forecast("revenue", ForecastSpec::normal(100_000.0, 15_000.0, 99))
-        .build()
-        .unwrap();
+        );
+        model_builder.forecast("revenue", ForecastSpec::normal(100_000.0, 15_000.0, 99));
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results1 = evaluator.evaluate(&model1).unwrap();
@@ -353,19 +353,19 @@ fn test_forecast_different_seeds_produce_different_results() {
 fn test_lognormal_forecast_determinism() {
     let forecast_spec = ForecastSpec::log_normal(11.5, 0.15, 42);
 
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q3", Some("2025Q1"))
-        .unwrap()
-        .value_scalar(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q3", Some("2025Q1")).unwrap();
+        model_builder.value_scalar(
             "price",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 100_000.0,
             )],
-        )
-        .forecast("price", forecast_spec)
-        .build()
-        .unwrap();
+        );
+        model_builder.forecast("price", forecast_spec);
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator1 = Evaluator::new();
     let results1 = evaluator1.evaluate(&model).unwrap();
@@ -390,18 +390,18 @@ fn test_lognormal_forecast_determinism() {
 
 #[test]
 fn test_results_metadata_includes_numeric_mode() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value_scalar(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value_scalar(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 100_000.0,
             )],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -414,10 +414,10 @@ fn test_results_metadata_includes_numeric_mode() {
 
 #[test]
 fn test_results_metadata_timing() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value_scalar(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value_scalar(
             "revenue",
             &[
                 (
@@ -437,9 +437,9 @@ fn test_results_metadata_timing() {
                     130_000.0,
                 ),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -453,18 +453,18 @@ fn test_results_metadata_timing() {
 
 #[test]
 fn test_value_method_with_amount_or_scalar() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -480,20 +480,19 @@ fn test_value_method_with_amount_or_scalar() {
 
 #[test]
 fn test_compute_method_with_formula() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value_scalar(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value_scalar(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 100_000.0,
             )],
-        )
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -511,22 +510,22 @@ fn test_compute_method_with_formula() {
 
 #[test]
 fn test_formula_with_monetary_nodes() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value_money(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
             )],
-        )
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -561,28 +560,31 @@ fn test_formula_with_monetary_nodes() {
 
 #[test]
 fn test_formula_dimension_propagation_rejects_indirect_currency_mix() {
-    let result = ModelBuilder::new("indirect-currency-mix")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value_money(
+    let result = {
+        let mut model_builder = ModelBuilder::new("indirect-currency-mix");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value_money(
             "usd_revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
             )],
-        )
-        .value_money(
+        );
+        model_builder.value_money(
             "eur_cost",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 Money::new(50_000.0, Currency::EUR).expect("valid money fixture"),
             )],
-        )
-        .compute("eur_total", "eur_cost * 1.1")
-        .unwrap()
-        .compute("invalid_total", "usd_revenue + eur_total")
-        .unwrap()
-        .build();
+        );
+        model_builder
+            .compute("eur_total", "eur_cost * 1.1")
+            .unwrap();
+        model_builder
+            .compute("invalid_total", "usd_revenue + eur_total")
+            .unwrap();
+        model_builder.build()
+    };
 
     let error = result.expect_err("indirect USD/EUR addition must fail");
     assert!(error.to_string().contains("cannot combine USD and EUR"));
@@ -592,18 +594,18 @@ fn test_formula_dimension_propagation_rejects_indirect_currency_mix() {
 
 #[test]
 fn test_get_scalar_returns_none_for_monetary() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value_money(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
             )],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -628,18 +630,18 @@ fn test_get_scalar_returns_none_for_monetary() {
 
 #[test]
 fn test_get_money_returns_none_for_scalar() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value_scalar(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value_scalar(
             "ratio",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 0.15,
             )],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -717,10 +719,10 @@ fn test_numeric_mode_serialization() {
 
 #[test]
 fn test_value_money_builder_api() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value_money(
             "revenue",
             &[
                 (
@@ -732,9 +734,9 @@ fn test_value_money_builder_api() {
                     Money::new(110_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     assert!(model.has_node("revenue"));
     let node = model.get_node("revenue").unwrap();
@@ -749,10 +751,10 @@ fn test_value_money_builder_api() {
 
 #[test]
 fn test_value_money_rejects_mixed_currencies() {
-    let err = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value_money(
+    let err = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value_money(
             "revenue",
             &[
                 (
@@ -764,27 +766,29 @@ fn test_value_money_rejects_mixed_currencies() {
                     Money::new(90_000.0, Currency::EUR).expect("valid money fixture"),
                 ),
             ],
-        )
-        .build()
-        .expect_err("mixed-currency monetary nodes must not build");
+        );
+        model_builder
+            .build()
+            .expect_err("mixed-currency monetary nodes must not build")
+    };
 
     assert!(err.to_string().contains("Currency mismatch"));
 }
 
 #[test]
 fn test_value_scalar_builder_api() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value_scalar(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value_scalar(
             "margin_pct",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 0.35,
             )],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let node = model.get_node("margin_pct").unwrap();
     assert_eq!(node.node_type, NodeType::Value);

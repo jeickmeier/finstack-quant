@@ -23,12 +23,14 @@ use serde::{Deserialize, Serialize};
 /// # use finstack_quant_statements::evaluator::DependencyGraph;
 /// # use finstack_quant_statements_analytics::analysis::DependencyTracer;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let model = ModelBuilder::new("demo")
-///     .periods("2025Q1..Q2", None)?
-///     .compute("revenue", "100000")?
-///     .compute("cogs", "revenue * 0.4")?
-///     .compute("gross_profit", "revenue - cogs")?
-///     .build()?;
+/// let model = {
+///     let mut model_builder = ModelBuilder::new("demo");
+///     model_builder.periods("2025Q1..Q2", None)?;
+///     model_builder.compute("revenue", "100000")?;
+///     model_builder.compute("cogs", "revenue * 0.4")?;
+///     model_builder.compute("gross_profit", "revenue - cogs")?;
+///     model_builder.build()?
+/// };
 ///
 /// let graph = DependencyGraph::from_model(&model)?;
 /// let tracer = DependencyTracer::new(&model, &graph);
@@ -487,12 +489,14 @@ fn render_tree_lines(
 /// # use finstack_quant_statements_analytics::analysis::explain_formula;
 /// # use finstack_quant_core::dates::PeriodId;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let model = ModelBuilder::new("demo")
-///     .periods("2025Q1..Q2", None)?
-///     .compute("revenue", "100000")?
-///     .compute("cogs", "revenue * 0.4")?
-///     .compute("gross_profit", "revenue - cogs")?
-///     .build()?;
+/// let model = {
+///     let mut model_builder = ModelBuilder::new("demo");
+///     model_builder.periods("2025Q1..Q2", None)?;
+///     model_builder.compute("revenue", "100000")?;
+///     model_builder.compute("cogs", "revenue * 0.4")?;
+///     model_builder.compute("gross_profit", "revenue - cogs")?;
+///     model_builder.build()?
+/// };
 ///
 /// let mut evaluator = Evaluator::new();
 /// let results = evaluator.evaluate(&model)?;
@@ -846,17 +850,20 @@ mod tests {
 
     #[test]
     fn test_direct_dependencies() {
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .expect("valid operation")
-            .compute("a", "10")
-            .expect("valid operation")
-            .compute("b", "a * 2")
-            .expect("valid operation")
-            .compute("c", "a + b")
-            .expect("valid operation")
-            .build()
-            .expect("valid operation");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("valid operation");
+            model_builder_1.compute("a", "10").expect("valid operation");
+            model_builder_1
+                .compute("b", "a * 2")
+                .expect("valid operation");
+            model_builder_1
+                .compute("c", "a + b")
+                .expect("valid operation");
+            model_builder_1.build().expect("valid operation")
+        };
 
         let graph = DependencyGraph::from_model(&model).expect("should build dependency graph");
         let tracer = DependencyTracer::new(&model, &graph);
@@ -882,19 +889,23 @@ mod tests {
 
     #[test]
     fn test_all_dependencies() {
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .expect("valid operation")
-            .compute("a", "10")
-            .expect("valid operation")
-            .compute("b", "a * 2")
-            .expect("valid operation")
-            .compute("c", "b + 5")
-            .expect("valid operation")
-            .compute("d", "c - a")
-            .expect("valid operation")
-            .build()
-            .expect("valid operation");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("valid operation");
+            model_builder_1.compute("a", "10").expect("valid operation");
+            model_builder_1
+                .compute("b", "a * 2")
+                .expect("valid operation");
+            model_builder_1
+                .compute("c", "b + 5")
+                .expect("valid operation");
+            model_builder_1
+                .compute("d", "c - a")
+                .expect("valid operation");
+            model_builder_1.build().expect("valid operation")
+        };
 
         let graph = DependencyGraph::from_model(&model).expect("should build dependency graph");
         let tracer = DependencyTracer::new(&model, &graph);
@@ -910,17 +921,22 @@ mod tests {
 
     #[test]
     fn test_dependency_tree() {
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .expect("valid operation")
-            .compute("revenue", "100000")
-            .expect("valid operation")
-            .compute("cogs", "revenue * 0.4")
-            .expect("valid operation")
-            .compute("gross_profit", "revenue - cogs")
-            .expect("valid operation")
-            .build()
-            .expect("valid operation");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("valid operation");
+            model_builder_1
+                .compute("revenue", "100000")
+                .expect("valid operation");
+            model_builder_1
+                .compute("cogs", "revenue * 0.4")
+                .expect("valid operation");
+            model_builder_1
+                .compute("gross_profit", "revenue - cogs")
+                .expect("valid operation");
+            model_builder_1.build().expect("valid operation")
+        };
 
         let graph = DependencyGraph::from_model(&model).expect("should build dependency graph");
         let tracer = DependencyTracer::new(&model, &graph);
@@ -936,17 +952,20 @@ mod tests {
 
     #[test]
     fn test_dependents() {
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .expect("valid operation")
-            .compute("a", "10")
-            .expect("valid operation")
-            .compute("b", "a * 2")
-            .expect("valid operation")
-            .compute("c", "a + 5")
-            .expect("valid operation")
-            .build()
-            .expect("valid operation");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("valid operation");
+            model_builder_1.compute("a", "10").expect("valid operation");
+            model_builder_1
+                .compute("b", "a * 2")
+                .expect("valid operation");
+            model_builder_1
+                .compute("c", "a + 5")
+                .expect("valid operation");
+            model_builder_1.build().expect("valid operation")
+        };
 
         let graph = DependencyGraph::from_model(&model).expect("should build dependency graph");
         let tracer = DependencyTracer::new(&model, &graph);
@@ -962,13 +981,14 @@ mod tests {
 
     #[test]
     fn test_node_not_found() {
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .expect("valid operation")
-            .compute("a", "10")
-            .expect("valid operation")
-            .build()
-            .expect("valid operation");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("valid operation");
+            model_builder_1.compute("a", "10").expect("valid operation");
+            model_builder_1.build().expect("valid operation")
+        };
 
         let graph = DependencyGraph::from_model(&model).expect("should build dependency graph");
         let tracer = DependencyTracer::new(&model, &graph);
@@ -979,17 +999,22 @@ mod tests {
 
     #[test]
     fn test_render_tree_ascii() {
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .expect("test should succeed")
-            .compute("a", "10")
-            .expect("test should succeed")
-            .compute("b", "a * 2")
-            .expect("test should succeed")
-            .compute("c", "a + b")
-            .expect("test should succeed")
-            .build()
-            .expect("test should succeed");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("test should succeed");
+            model_builder_1
+                .compute("a", "10")
+                .expect("test should succeed");
+            model_builder_1
+                .compute("b", "a * 2")
+                .expect("test should succeed");
+            model_builder_1
+                .compute("c", "a + b")
+                .expect("test should succeed");
+            model_builder_1.build().expect("test should succeed")
+        };
 
         let graph = DependencyGraph::from_model(&model).expect("test should succeed");
         let tracer = DependencyTracer::new(&model, &graph);
@@ -1039,17 +1064,22 @@ mod tests {
     #[test]
     fn test_render_tree_detailed() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .expect("test should succeed")
-            .compute("revenue", "100000")
-            .expect("test should succeed")
-            .compute("cogs", "revenue * 0.4")
-            .expect("test should succeed")
-            .compute("gross_profit", "revenue - cogs")
-            .expect("test should succeed")
-            .build()
-            .expect("test should succeed");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("test should succeed");
+            model_builder_1
+                .compute("revenue", "100000")
+                .expect("test should succeed");
+            model_builder_1
+                .compute("cogs", "revenue * 0.4")
+                .expect("test should succeed");
+            model_builder_1
+                .compute("gross_profit", "revenue - cogs")
+                .expect("test should succeed");
+            model_builder_1.build().expect("test should succeed")
+        };
 
         let mut evaluator = Evaluator::new();
         let results = evaluator.evaluate(&model).expect("test should succeed");
@@ -1068,13 +1098,16 @@ mod tests {
 
     #[test]
     fn test_render_empty_tree() {
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .expect("test should succeed")
-            .compute("a", "10")
-            .expect("test should succeed")
-            .build()
-            .expect("test should succeed");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("test should succeed");
+            model_builder_1
+                .compute("a", "10")
+                .expect("test should succeed");
+            model_builder_1.build().expect("test should succeed")
+        };
 
         let graph = DependencyGraph::from_model(&model).expect("test should succeed");
         let tracer = DependencyTracer::new(&model, &graph);
@@ -1089,18 +1122,20 @@ mod tests {
     fn test_explain_value_node() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .expect("test should succeed")
-            .value(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("test should succeed");
+            model_builder_1.value(
                 "revenue",
                 &[
                     (period, AmountOrScalar::scalar(100_000.0)),
                     (period2, AmountOrScalar::scalar(110_000.0)),
                 ],
-            )
-            .build()
-            .expect("test should succeed");
+            );
+            model_builder_1.build().expect("test should succeed")
+        };
 
         let mut evaluator = Evaluator::new();
         let results = evaluator.evaluate(&model).expect("test should succeed");
@@ -1125,13 +1160,15 @@ mod tests {
         use finstack_quant_statements::types::{ForecastMethod, ForecastSpec};
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", Some("2025Q1"))
-            .expect("test should succeed")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-            .forecast("revenue", ForecastSpec::growth(0.05))
-            .build()
-            .expect("test should succeed");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", Some("2025Q1"))
+                .expect("test should succeed");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder_1.forecast("revenue", ForecastSpec::growth(0.05));
+            model_builder_1.build().expect("test should succeed")
+        };
         let results = Evaluator::new()
             .evaluate(&model)
             .expect("test should succeed");
@@ -1170,14 +1207,17 @@ mod tests {
         };
 
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q1", None)
-            .expect("test should succeed")
-            .value("ebit", &[(period, AmountOrScalar::scalar(100.0))])
-            .compute("pretax", "ebit - cs.interest_expense.TL")
-            .expect("test should succeed")
-            .build()
-            .expect("test should succeed");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("test should succeed");
+            model_builder_1.value("ebit", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder_1
+                .compute("pretax", "ebit - cs.interest_expense.TL")
+                .expect("test should succeed");
+            model_builder_1.build().expect("test should succeed")
+        };
 
         let mut cashflows = CapitalStructureCashflows::new();
         cashflows.by_instrument.insert(
@@ -1230,19 +1270,23 @@ mod tests {
     #[test]
     fn test_explain_operations_reconcile_for_additive_formulas() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q1", None)
-            .expect("test should succeed")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-            .value("cogs", &[(period, AmountOrScalar::scalar(40.0))])
-            .value("opex", &[(period, AmountOrScalar::scalar(25.0))])
-            .value("other", &[(period, AmountOrScalar::scalar(5.0))])
-            .compute("ebit", "revenue - (cogs + opex) + other")
-            .expect("test should succeed")
-            .compute("margin", "ebit / revenue")
-            .expect("test should succeed")
-            .build()
-            .expect("test should succeed");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("test should succeed");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder_1.value("cogs", &[(period, AmountOrScalar::scalar(40.0))]);
+            model_builder_1.value("opex", &[(period, AmountOrScalar::scalar(25.0))]);
+            model_builder_1.value("other", &[(period, AmountOrScalar::scalar(5.0))]);
+            model_builder_1
+                .compute("ebit", "revenue - (cogs + opex) + other")
+                .expect("test should succeed");
+            model_builder_1
+                .compute("margin", "ebit / revenue")
+                .expect("test should succeed");
+            model_builder_1.build().expect("test should succeed")
+        };
         let results = Evaluator::new()
             .evaluate(&model)
             .expect("test should succeed");
@@ -1288,22 +1332,26 @@ mod tests {
     fn test_explain_calculated_node() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .expect("test should succeed")
-            .value(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("test should succeed");
+            model_builder_1.value(
                 "revenue",
                 &[
                     (period, AmountOrScalar::scalar(100_000.0)),
                     (period2, AmountOrScalar::scalar(110_000.0)),
                 ],
-            )
-            .compute("cogs", "revenue * 0.4")
-            .expect("test should succeed")
-            .compute("gross_profit", "revenue - cogs")
-            .expect("test should succeed")
-            .build()
-            .expect("test should succeed");
+            );
+            model_builder_1
+                .compute("cogs", "revenue * 0.4")
+                .expect("test should succeed");
+            model_builder_1
+                .compute("gross_profit", "revenue - cogs")
+                .expect("test should succeed");
+            model_builder_1.build().expect("test should succeed")
+        };
 
         let mut evaluator = Evaluator::new();
         let results = evaluator.evaluate(&model).expect("test should succeed");
@@ -1324,20 +1372,23 @@ mod tests {
     fn test_explain_non_finite_value_round_trips() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .expect("test should succeed")
-            .value(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("test should succeed");
+            model_builder_1.value(
                 "revenue",
                 &[
                     (period, AmountOrScalar::scalar(100.0)),
                     (period2, AmountOrScalar::scalar(110.0)),
                 ],
-            )
-            .compute("lagged", "lag(revenue, 1)")
-            .expect("test should succeed")
-            .build()
-            .expect("test should succeed");
+            );
+            model_builder_1
+                .compute("lagged", "lag(revenue, 1)")
+                .expect("test should succeed");
+            model_builder_1.build().expect("test should succeed")
+        };
         let results = Evaluator::new()
             .evaluate(&model)
             .expect("test should succeed");
@@ -1359,20 +1410,23 @@ mod tests {
     fn test_explain_to_text() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .expect("test should succeed")
-            .value(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("test should succeed");
+            model_builder_1.value(
                 "revenue",
                 &[
                     (period, AmountOrScalar::scalar(100_000.0)),
                     (period2, AmountOrScalar::scalar(110_000.0)),
                 ],
-            )
-            .compute("cogs", "revenue * 0.4")
-            .expect("test should succeed")
-            .build()
-            .expect("test should succeed");
+            );
+            model_builder_1
+                .compute("cogs", "revenue * 0.4")
+                .expect("test should succeed");
+            model_builder_1.build().expect("test should succeed")
+        };
 
         let mut evaluator = Evaluator::new();
         let results = evaluator.evaluate(&model).expect("test should succeed");
@@ -1390,18 +1444,20 @@ mod tests {
     fn test_explain_nonexistent_node() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .expect("test should succeed")
-            .value(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("test should succeed");
+            model_builder_1.value(
                 "revenue",
                 &[
                     (period, AmountOrScalar::scalar(100_000.0)),
                     (period2, AmountOrScalar::scalar(110_000.0)),
                 ],
-            )
-            .build()
-            .expect("test should succeed");
+            );
+            model_builder_1.build().expect("test should succeed")
+        };
 
         let mut evaluator = Evaluator::new();
         let results = evaluator.evaluate(&model).expect("test should succeed");

@@ -49,10 +49,12 @@ fn non_finite_suite() -> CheckSuite {
 fn test_full_lbo_analysis() {
     // Build a simple LBO model:
     // Revenue -> EBITDA -> UFCF with a bond in capital structure
-    let model = ModelBuilder::new("lbo-test")
-        .periods("2025Q1..Q4", None)
-        .expect("valid periods")
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("lbo-test");
+        model_builder
+            .periods("2025Q1..Q4", None)
+            .expect("valid periods");
+        model_builder.value_money(
             "revenue",
             &[
                 (
@@ -72,23 +74,26 @@ fn test_full_lbo_analysis() {
                     Money::new(11_500_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
-        )
-        .compute("ebitda", "revenue * 0.25")
-        .expect("ebitda formula")
-        .compute("ufcf", "ebitda * 0.6")
-        .expect("ufcf formula")
-        .add_bond(
-            "SENIOR-BOND",
-            Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
-            0.06,
-            time::macros::date!(2025 - 01 - 01),
-            time::macros::date!(2030 - 01 - 01),
-            "USD-OIS",
-        )
-        .expect("valid bond")
-        .with_meta("currency", serde_json::json!("USD"))
-        .build()
-        .expect("valid model");
+        );
+        model_builder
+            .compute("ebitda", "revenue * 0.25")
+            .expect("ebitda formula");
+        model_builder
+            .compute("ufcf", "ebitda * 0.6")
+            .expect("ufcf formula");
+        model_builder
+            .add_bond(
+                "SENIOR-BOND",
+                Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
+                0.06,
+                time::macros::date!(2025 - 01 - 01),
+                time::macros::date!(2030 - 01 - 01),
+                "USD-OIS",
+            )
+            .expect("valid bond");
+        model_builder.with_meta("currency", serde_json::json!("USD"));
+        model_builder.build().expect("valid model")
+    };
 
     let market = MarketContext::new();
 
@@ -151,10 +156,12 @@ fn test_full_lbo_analysis() {
 
 #[test]
 fn test_statement_only_no_equity_no_credit() {
-    let model = ModelBuilder::new("simple")
-        .periods("2025Q1..Q2", None)
-        .expect("valid periods")
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("simple");
+        model_builder
+            .periods("2025Q1..Q2", None)
+            .expect("valid periods");
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -166,9 +173,9 @@ fn test_statement_only_no_equity_no_credit() {
                     AmountOrScalar::scalar(105_000.0),
                 ),
             ],
-        )
-        .build()
-        .expect("valid model");
+        );
+        model_builder.build().expect("valid model")
+    };
 
     let analysis = CorporateAnalysisBuilder::new(model)
         .analyze()
@@ -189,10 +196,12 @@ fn test_statement_only_no_equity_no_credit() {
 #[test]
 fn test_mixed_currency_capital_structure_requires_reporting_fx() {
     let as_of = time::macros::date!(2025 - 01 - 01);
-    let model = ModelBuilder::new("mixed-currency")
-        .periods("2025Q1..Q2", None)
-        .expect("valid periods")
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("mixed-currency");
+        model_builder
+            .periods("2025Q1..Q2", None)
+            .expect("valid periods");
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -204,28 +213,30 @@ fn test_mixed_currency_capital_structure_requires_reporting_fx() {
                     AmountOrScalar::scalar(1_100_000.0),
                 ),
             ],
-        )
-        .add_bond(
-            "USD-BOND",
-            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-            0.05,
-            as_of,
-            time::macros::date!(2030 - 01 - 01),
-            "USD-OIS",
-        )
-        .expect("usd bond")
-        .add_bond(
-            "EUR-BOND",
-            Money::new(8_000_000.0, Currency::EUR).expect("valid money fixture"),
-            0.04,
-            as_of,
-            time::macros::date!(2030 - 01 - 01),
-            "EUR-OIS",
-        )
-        .expect("eur bond")
-        .with_meta("currency", serde_json::json!("USD"))
-        .build()
-        .expect("valid model");
+        );
+        model_builder
+            .add_bond(
+                "USD-BOND",
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+                0.05,
+                as_of,
+                time::macros::date!(2030 - 01 - 01),
+                "USD-OIS",
+            )
+            .expect("usd bond");
+        model_builder
+            .add_bond(
+                "EUR-BOND",
+                Money::new(8_000_000.0, Currency::EUR).expect("valid money fixture"),
+                0.04,
+                as_of,
+                time::macros::date!(2030 - 01 - 01),
+                "EUR-OIS",
+            )
+            .expect("eur bond");
+        model_builder.with_meta("currency", serde_json::json!("USD"));
+        model_builder.build().expect("valid model")
+    };
 
     let market = MarketContext::new()
         .insert(flat_discount_curve(0.05, as_of, "USD-OIS"))

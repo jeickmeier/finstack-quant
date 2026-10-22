@@ -132,13 +132,15 @@ impl StatementResult {
     ///         .map(|(q, v)| Ok((PeriodId::quarter(2025, q)?, AmountOrScalar::scalar(v))))
     ///         .collect()
     /// };
-    /// let model = ModelBuilder::new("rollup")
-    ///     .periods("2025Q1..Q4", None)?
-    ///     .value("revenue", &quarterly([100.0; 4])?)
-    ///     .value("cash", &quarterly([10.0, 20.0, 30.0, 40.0])?)
-    ///     .compute("ebitda", "revenue * 0.25")?
-    ///     .compute("margin", "ebitda / revenue")?
-    ///     .build()?;
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("rollup");
+    ///     model_builder.periods("2025Q1..Q4", None)?;
+    ///     model_builder.value("revenue", &quarterly([100.0; 4])?);
+    ///     model_builder.value("cash", &quarterly([10.0, 20.0, 30.0, 40.0])?);
+    ///     model_builder.compute("ebitda", "revenue * 0.25")?;
+    ///     model_builder.compute("margin", "ebitda / revenue")?;
+    ///     model_builder.build()?
+    /// };
     /// let quarterly = Evaluator::new().evaluate(&model)?;
     ///
     /// let spec = RollupSpec {

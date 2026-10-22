@@ -49,32 +49,32 @@ fn identities(tolerance: Option<f64>) -> Vec<Box<dyn Check>> {
 }
 
 fn money_model(currency: Currency) -> FinancialModelSpec {
-    ModelBuilder::new("units")
-        .periods("2025Q1..Q2", Some("2025Q1"))
-        .unwrap()
-        .value(
+    {
+        let mut model_builder = ModelBuilder::new("units");
+        model_builder.periods("2025Q1..Q2", Some("2025Q1")).unwrap();
+        model_builder.value(
             "a",
             &[
                 (q(1), AmountOrScalar::amount(100.0, Currency::USD).unwrap()),
                 (q(2), AmountOrScalar::amount(110.0, Currency::USD).unwrap()),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "b",
             &[
                 (q(1), AmountOrScalar::amount(60.0, currency).unwrap()),
                 (q(2), AmountOrScalar::amount(60.0, currency).unwrap()),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "c",
             &[
                 (q(1), AmountOrScalar::amount(40.0, currency).unwrap()),
                 (q(2), AmountOrScalar::amount(50.0, currency).unwrap()),
             ],
-        )
-        .build()
-        .unwrap()
+        );
+        model_builder.build().unwrap()
+    }
 }
 
 #[test]
@@ -238,22 +238,20 @@ fn precomputed_checks_reject_explicit_currency_changes_with_stale_declarations()
 
 #[test]
 fn precomputed_inferred_money_units_keep_valid_results_and_missing_node_warnings() {
-    let model = ModelBuilder::new("inferred units")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("inferred units");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "a",
             &[
                 (q(1), AmountOrScalar::amount(100.0, Currency::USD).unwrap()),
                 (q(2), AmountOrScalar::amount(200.0, Currency::USD).unwrap()),
             ],
-        )
-        .compute("b", "a * 0.6")
-        .unwrap()
-        .compute("c", "a * 0.4")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("b", "a * 0.6").unwrap();
+        model_builder.compute("c", "a * 0.4").unwrap();
+        model_builder.build().unwrap()
+    };
     let mut results = Evaluator::new().evaluate(&model).unwrap();
     let suite = CheckSuite::builder("inferred precomputed units")
         .add_check(BalanceSheetArticulation {
@@ -335,10 +333,10 @@ fn check_configs_reject_invalid_numeric_policies_even_for_empty_suites() {
 
 #[test]
 fn shared_formula_check_history_preserves_temporal_results_and_visibility() {
-    let model = ModelBuilder::new("history")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("history");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
             "x",
             &[
                 (q(1), 10.0.into()),
@@ -346,11 +344,12 @@ fn shared_formula_check_history_preserves_temporal_results_and_visibility() {
                 (q(3), 30.0.into()),
                 (q(4), 40.0.into()),
             ],
-        )
-        .compute("expected", "coalesce(lag(x, 1), 0) + rolling_mean(x, 2, 1)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("expected", "coalesce(lag(x, 1), 0) + rolling_mean(x, 2, 1)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
     let results = Evaluator::new().evaluate(&model).unwrap();
     let check = FormulaCheckSpec {
         id: "temporal".into(),

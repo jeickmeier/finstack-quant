@@ -29,11 +29,13 @@ impl DependencyGraph {
     /// ```rust
     /// # use finstack_quant_statements::builder::ModelBuilder;
     /// # use finstack_quant_statements::evaluator::DependencyGraph;
-    /// let model = ModelBuilder::new("demo")
-    ///     .periods("2025Q1..Q2", None)?
-    ///     .compute("a", "10")?
-    ///     .compute("b", "a * 2")?
-    ///     .build()?;
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("demo");
+    ///     model_builder.periods("2025Q1..Q2", None)?;
+    ///     model_builder.compute("a", "10")?;
+    ///     model_builder.compute("b", "a * 2")?;
+    ///     model_builder.build()?
+    /// };
     ///
     /// let graph = DependencyGraph::from_model(&model)?;
     /// assert!(graph.dependencies["b"].contains("a"));
@@ -373,17 +375,14 @@ mod tests {
 
     #[test]
     fn test_simple_dag() {
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .unwrap()
-            .compute("a", "10")
-            .unwrap()
-            .compute("b", "a * 2")
-            .unwrap()
-            .compute("c", "b + a")
-            .unwrap()
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1.periods("2025Q1..Q2", None).unwrap();
+            model_builder_1.compute("a", "10").unwrap();
+            model_builder_1.compute("b", "a * 2").unwrap();
+            model_builder_1.compute("c", "b + a").unwrap();
+            model_builder_1.build().unwrap()
+        };
 
         let graph = DependencyGraph::from_model(&model).unwrap();
 
@@ -395,17 +394,14 @@ mod tests {
 
     #[test]
     fn test_topological_sort() {
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .unwrap()
-            .compute("a", "10")
-            .unwrap()
-            .compute("b", "a * 2")
-            .unwrap()
-            .compute("c", "b + a")
-            .unwrap()
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1.periods("2025Q1..Q2", None).unwrap();
+            model_builder_1.compute("a", "10").unwrap();
+            model_builder_1.compute("b", "a * 2").unwrap();
+            model_builder_1.compute("c", "b + a").unwrap();
+            model_builder_1.build().unwrap()
+        };
 
         let graph = DependencyGraph::from_model(&model).unwrap();
         let order = evaluate_order(&graph).unwrap();
@@ -421,16 +417,14 @@ mod tests {
     #[test]
     fn test_cycle_detection() {
         // Cycles are now caught at build time by ModelBuilder::build()
-        let result = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .unwrap()
-            .compute("a", "b + 1")
-            .unwrap()
-            .compute("b", "c + 1")
-            .unwrap()
-            .compute("c", "a + 1")
-            .unwrap()
-            .build();
+        let result = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1.periods("2025Q1..Q2", None).unwrap();
+            model_builder_1.compute("a", "b + 1").unwrap();
+            model_builder_1.compute("b", "c + 1").unwrap();
+            model_builder_1.compute("c", "a + 1").unwrap();
+            model_builder_1.build()
+        };
 
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
@@ -512,15 +506,13 @@ mod tests {
 
     #[test]
     fn test_lag_breaks_cycle() {
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .unwrap()
-            .compute("a", "lag(b, 1)") // a depends on b (lagged)
-            .unwrap()
-            .compute("b", "a + 1") // b depends on a (direct)
-            .unwrap()
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1.periods("2025Q1..Q2", None).unwrap();
+            model_builder_1.compute("a", "lag(b, 1)").unwrap(); // lagged dependency
+            model_builder_1.compute("b", "a + 1").unwrap(); // direct dependency
+            model_builder_1.build().unwrap()
+        };
 
         let graph = DependencyGraph::from_model(&model).unwrap();
 
@@ -564,18 +556,16 @@ mod tests {
 
     #[test]
     fn test_where_clause_adds_dependencies() {
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .unwrap()
-            .value("revenue", &[])
-            .mixed("margin")
-            .formula("1.0")
-            .unwrap()
-            .build()
-            .unwrap()
-            .where_clause("revenue > 0.0")
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1.periods("2025Q1..Q2", None).unwrap();
+            model_builder_1.value("revenue", &[]);
+            let mut model_builder_1 = model_builder_1.mixed("margin");
+            model_builder_1.formula("1.0").unwrap();
+            let mut model_builder_1 = model_builder_1.build().unwrap();
+            model_builder_1.where_clause("revenue > 0.0");
+            model_builder_1.build().unwrap()
+        };
 
         let graph = DependencyGraph::from_model(&model).unwrap();
         assert!(graph.dependencies["margin"].contains("revenue"));

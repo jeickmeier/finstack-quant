@@ -9,31 +9,33 @@ use finstack_quant_statements_analytics::templates::{roll_forward, vintage};
 #[test]
 fn test_roll_forward_pattern_arr() -> Result<()> {
     let model = roll_forward::add_roll_forward(
-        ModelBuilder::new("SaaS Model")
-            .periods("2025Q1..2025Q4", None)?
-            // Inputs
-            .value_scalar(
-                "new_arr",
-                &[
-                    (
-                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                        100.0,
-                    ),
-                    (
-                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                        120.0,
-                    ),
-                    (
-                        PeriodId::quarter(2025, 3).expect("valid period fixture"),
-                        140.0,
-                    ),
-                    (
-                        PeriodId::quarter(2025, 4).expect("valid period fixture"),
-                        160.0,
-                    ),
-                ],
-            )
-            .value_scalar(
+        {
+            let mut model_builder = ModelBuilder::new("SaaS Model");
+            model_builder.periods("2025Q1..2025Q4", None)?;
+            model_builder
+                // Inputs
+                .value_scalar(
+                    "new_arr",
+                    &[
+                        (
+                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                            100.0,
+                        ),
+                        (
+                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                            120.0,
+                        ),
+                        (
+                            PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                            140.0,
+                        ),
+                        (
+                            PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                            160.0,
+                        ),
+                    ],
+                );
+            model_builder.value_scalar(
                 "churn_arr",
                 &[
                     (
@@ -53,7 +55,9 @@ fn test_roll_forward_pattern_arr() -> Result<()> {
                         16.0,
                     ),
                 ],
-            ),
+            );
+            model_builder
+        },
         "arr",
         &["new_arr"],
         &["churn_arr"],
@@ -120,9 +124,10 @@ fn test_vintage_buildup_pattern_revenue() -> Result<()> {
     let decay_curve = vec![1.0, 0.8, 0.5, 0.0];
 
     let model = vintage::add_vintage_buildup(
-        ModelBuilder::new("Cohort Model")
-            .periods("2025Q1..2025Q4", None)?
-            .value_scalar(
+        {
+            let mut model_builder = ModelBuilder::new("Cohort Model");
+            model_builder.periods("2025Q1..2025Q4", None)?;
+            model_builder.value_scalar(
                 "new_sales",
                 &[
                     (
@@ -142,7 +147,9 @@ fn test_vintage_buildup_pattern_revenue() -> Result<()> {
                         400.0,
                     ),
                 ],
-            ),
+            );
+            model_builder
+        },
         "revenue",
         "new_sales",
         &decay_curve,

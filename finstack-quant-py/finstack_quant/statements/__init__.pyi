@@ -2079,7 +2079,8 @@ class ModelBuilder:
     Configuration methods mutate the builder in place *and* return it, so they
     can be chained or called as separate statements. ``build`` and ``mixed``
     are terminal: they consume the builder, and any later configuration call
-    raises ``ValueError``.
+    raises ``ValueError``. A rejected configuration argument leaves the
+    accumulated model unchanged, so a corrected setter can be retried.
 
     Examples
     --------
@@ -2902,14 +2903,18 @@ class MixedNodeBuilder:
 
     Note
     ----
-    Methods on this class mutate the builder in place and return ``None``.
-    Call them sequentially rather than chaining.
+    Setters mutate this builder and return it for chaining. A rejected
+    formula leaves its values, forecast, name, and parent model unchanged.
+    ``build`` consumes the mixed-node builder and returns its parent model
+    builder; further calls on the consumed mixed-node builder raise ``ValueError``.
 
     Examples
     --------
     >>> from finstack_quant.statements import ModelBuilder
     >>> builder = ModelBuilder("demo")
     >>> _ = builder.periods("2025Q1..Q1")
+    >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
+    >>> _ = builder.value("cost", [("2025Q1", 60.0)])
     >>> mixed = builder.mixed("profit")
     >>> _ = mixed.values([("2025Q1", 40.0)])
     >>> _ = mixed.formula("revenue - cost")

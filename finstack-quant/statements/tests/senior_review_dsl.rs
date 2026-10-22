@@ -17,10 +17,10 @@ fn monetary_quantile_preserves_currency_and_supports_same_currency_arithmetic() 
     let q1 = PeriodId::quarter(2025, 1).expect("quarter");
     let q2 = PeriodId::quarter(2025, 2).expect("quarter");
     let q3 = PeriodId::quarter(2025, 3).expect("quarter");
-    let model = ModelBuilder::new("usd_quantile")
-        .periods("2025Q1..Q3", None)
-        .expect("periods")
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("usd_quantile");
+        model_builder.periods("2025Q1..Q3", None).expect("periods");
+        model_builder.value(
             "cash_flow",
             &[
                 (
@@ -36,13 +36,17 @@ fn monetary_quantile_preserves_currency_and_supports_same_currency_arithmetic() 
                     AmountOrScalar::amount(200.0, Currency::USD).expect("USD amount"),
                 ),
             ],
-        )
-        .compute("lower_quartile", "quantile(cash_flow, 0.25)")
-        .expect("quantile formula")
-        .compute("combined", "lower_quartile + cash_flow")
-        .expect("USD arithmetic")
-        .build()
-        .expect("quantile carries USD through dependent formulas");
+        );
+        model_builder
+            .compute("lower_quartile", "quantile(cash_flow, 0.25)")
+            .expect("quantile formula");
+        model_builder
+            .compute("combined", "lower_quartile + cash_flow")
+            .expect("USD arithmetic");
+        model_builder
+            .build()
+            .expect("quantile carries USD through dependent formulas")
+    };
 
     let result = Evaluator::new().evaluate(&model).expect("evaluation");
     assert_eq!(result.get("lower_quartile", &q3), Some(150.0));
@@ -67,14 +71,15 @@ fn monetary_quantile_preserves_currency_and_supports_same_currency_arithmetic() 
 fn scalar_quantile_remains_scalar() {
     let q1 = PeriodId::quarter(2025, 1).expect("quarter");
     let q2 = PeriodId::quarter(2025, 2).expect("quarter");
-    let model = ModelBuilder::new("scalar_quantile")
-        .periods("2025Q1..Q2", None)
-        .expect("periods")
-        .value("margin", &[(q1, 0.1.into()), (q2, 0.3.into())])
-        .compute("median_margin", "quantile(margin, 0.5)")
-        .expect("formula")
-        .build()
-        .expect("scalar model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("scalar_quantile");
+        model_builder.periods("2025Q1..Q2", None).expect("periods");
+        model_builder.value("margin", &[(q1, 0.1.into()), (q2, 0.3.into())]);
+        model_builder
+            .compute("median_margin", "quantile(margin, 0.5)")
+            .expect("formula");
+        model_builder.build().expect("scalar model")
+    };
     let result = Evaluator::new().evaluate(&model).expect("evaluation");
     assert_eq!(result.get("median_margin", &q2), Some(0.2));
     assert_eq!(
@@ -94,27 +99,30 @@ fn quantile_rejects_a_monetary_level_and_cross_currency_arithmetic() {
             "cannot combine USD and EUR",
         ),
     ] {
-        let error = ModelBuilder::new("invalid_quantile_units")
-            .periods("2025Q1..Q1", None)
-            .expect("periods")
-            .value(
+        let error = {
+            let mut model_builder = ModelBuilder::new("invalid_quantile_units");
+            model_builder.periods("2025Q1..Q1", None).expect("periods");
+            model_builder.value(
                 "usd_flow",
                 &[(
                     q1,
                     AmountOrScalar::amount(100.0, Currency::USD).expect("USD amount"),
                 )],
-            )
-            .value(
+            );
+            model_builder.value(
                 "eur_flow",
                 &[(
                     q1,
                     AmountOrScalar::amount(0.5, Currency::EUR).expect("EUR amount"),
                 )],
-            )
-            .compute("result", formula)
-            .expect("parseable formula")
-            .build()
-            .expect_err("invalid quantile units must fail construction");
+            );
+            model_builder
+                .compute("result", formula)
+                .expect("parseable formula");
+            model_builder
+                .build()
+                .expect_err("invalid quantile units must fail construction")
+        };
         assert!(
             error.to_string().contains(expected_message),
             "{formula}: {error}"
@@ -125,23 +133,29 @@ fn quantile_rejects_a_monetary_level_and_cross_currency_arithmetic() {
 #[test]
 fn coalesce_skips_nan_and_both_infinities_and_retains_finite_zero() {
     let period = PeriodId::quarter(2025, 1).expect("quarter");
-    let model = ModelBuilder::new("nonfinite_fallbacks")
-        .periods("2025Q1..Q1", None)
-        .expect("periods")
-        .compute("positive_infinity", "coalesce(exp(1000), 7)")
-        .expect("formula")
-        .compute("negative_infinity", "coalesce(-exp(1000), 8)")
-        .expect("formula")
-        .compute("mixed", "coalesce(0 / 0, exp(1000), -exp(1000), 9)")
-        .expect("formula")
-        .compute("all_missing", "coalesce(exp(1000), -exp(1000), 0 / 0)")
-        .expect("formula")
-        .compute("zero", "coalesce(0, 10)")
-        .expect("formula")
-        .compute("short_circuit", "coalesce(3, 1 / 0)")
-        .expect("formula")
-        .build()
-        .expect("model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("nonfinite_fallbacks");
+        model_builder.periods("2025Q1..Q1", None).expect("periods");
+        model_builder
+            .compute("positive_infinity", "coalesce(exp(1000), 7)")
+            .expect("formula");
+        model_builder
+            .compute("negative_infinity", "coalesce(-exp(1000), 8)")
+            .expect("formula");
+        model_builder
+            .compute("mixed", "coalesce(0 / 0, exp(1000), -exp(1000), 9)")
+            .expect("formula");
+        model_builder
+            .compute("all_missing", "coalesce(exp(1000), -exp(1000), 0 / 0)")
+            .expect("formula");
+        model_builder
+            .compute("zero", "coalesce(0, 10)")
+            .expect("formula");
+        model_builder
+            .compute("short_circuit", "coalesce(3, 1 / 0)")
+            .expect("formula");
+        model_builder.build().expect("model")
+    };
     let result = Evaluator::new().evaluate(&model).expect("evaluation");
     for (node, expected) in [
         ("positive_infinity", 7.0),
@@ -173,20 +187,26 @@ fn ranks_honor_direction_and_minimum_ties_while_skipping_missing_history() {
         .copied()
         .zip([20.0, 30.0, f64::NAN, 30.0, 20.0, 10.0].map(AmountOrScalar::scalar))
         .collect();
-    let model = ModelBuilder::new("ranking")
-        .periods("2025M01..M06", None)
-        .expect("periods")
-        .value("observations", &observations)
-        .compute("descending_flag", "0")
-        .expect("formula")
-        .compute("default_rank", "rank(observations)")
-        .expect("formula")
-        .compute("ascending_rank", "rank(observations, 1)")
-        .expect("formula")
-        .compute("descending_rank", "rank(observations, descending_flag)")
-        .expect("formula")
-        .build()
-        .expect("model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("ranking");
+        model_builder
+            .periods("2025M01..M06", None)
+            .expect("periods");
+        model_builder.value("observations", &observations);
+        model_builder
+            .compute("descending_flag", "0")
+            .expect("formula");
+        model_builder
+            .compute("default_rank", "rank(observations)")
+            .expect("formula");
+        model_builder
+            .compute("ascending_rank", "rank(observations, 1)")
+            .expect("formula");
+        model_builder
+            .compute("descending_rank", "rank(observations, descending_flag)")
+            .expect("formula");
+        model_builder.build().expect("model")
+    };
     let result = Evaluator::new().evaluate(&model).expect("evaluation");
     for (index, ascending, descending) in [(3, 2.0, 1.0), (4, 1.0, 3.0), (5, 1.0, 5.0)] {
         assert_eq!(result.get("default_rank", &periods[index]), Some(ascending));
@@ -237,14 +257,15 @@ fn rank_rejects_invalid_arity_at_compilation_and_standalone_evaluation() {
 fn rank_rejects_nonfinite_and_monetary_direction_flags() {
     let period = PeriodId::quarter(2025, 1).expect("quarter");
     for direction in ["exp(1000)", "0 / 0"] {
-        let model = ModelBuilder::new("invalid_rank_direction")
-            .periods("2025Q1..Q1", None)
-            .expect("periods")
-            .value("observations", &[(period, 10.0.into())])
-            .compute("ranked", format!("rank(observations, {direction})"))
-            .expect("formula")
-            .build()
-            .expect("dimensionless flag");
+        let model = {
+            let mut model_builder = ModelBuilder::new("invalid_rank_direction");
+            model_builder.periods("2025Q1..Q1", None).expect("periods");
+            model_builder.value("observations", &[(period, 10.0.into())]);
+            model_builder
+                .compute("ranked", format!("rank(observations, {direction})"))
+                .expect("formula");
+            model_builder.build().expect("dimensionless flag")
+        };
         let error = Evaluator::new()
             .evaluate(&model)
             .expect_err("nonfinite direction");
@@ -252,20 +273,23 @@ fn rank_rejects_nonfinite_and_monetary_direction_flags() {
             .to_string()
             .contains("rank() ascending flag must be finite"));
     }
-    let error = ModelBuilder::new("monetary_rank_direction")
-        .periods("2025Q1..Q1", None)
-        .expect("periods")
-        .value("observations", &[(period, 10.0.into())])
-        .value(
+    let error = {
+        let mut model_builder = ModelBuilder::new("monetary_rank_direction");
+        model_builder.periods("2025Q1..Q1", None).expect("periods");
+        model_builder.value("observations", &[(period, 10.0.into())]);
+        model_builder.value(
             "direction",
             &[(
                 period,
                 AmountOrScalar::amount(1.0, Currency::USD).expect("USD amount"),
             )],
-        )
-        .compute("ranked", "rank(observations, direction)")
-        .expect("formula")
-        .build()
-        .expect_err("direction flags must be scalar");
+        );
+        model_builder
+            .compute("ranked", "rank(observations, direction)")
+            .expect("formula");
+        model_builder
+            .build()
+            .expect_err("direction flags must be scalar")
+    };
     assert!(error.to_string().contains("rank ascending flag"));
 }

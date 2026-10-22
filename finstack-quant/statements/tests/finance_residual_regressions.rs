@@ -426,16 +426,20 @@ fn model_preserves_economic_amortization_across_quarter_end_with_optional_sweep(
         })
         .collect();
     for (waterfall, sweep) in [(false, false), (true, false), (true, true)] {
-        let builder = ModelBuilder::new("quarter-end-principal")
-            .periods("2024Q1..2024Q4", None)
-            .expect("reporting quarters")
-            .value("cash", &cash)
-            .value("ebitda", &ebitda)
-            .add_debt(
+        let mut builder = {
+            let mut model_builder = ModelBuilder::new("quarter-end-principal");
+            model_builder
+                .periods("2024Q1..2024Q4", None)
+                .expect("reporting quarters");
+            model_builder.value("cash", &cash);
+            model_builder.value("ebitda", &ebitda);
+            model_builder.add_debt(
                 INSTRUMENT,
                 FinancialStatementInstrument::TermLoan(loan.clone()),
             );
-        let builder = if waterfall {
+            model_builder
+        };
+        if waterfall {
             builder.waterfall(WaterfallSpec {
                 ecf_sweep: sweep.then_some(EcfSweepSpec {
                     ebitda_node: "ebitda".into(),
@@ -447,17 +451,20 @@ fn model_preserves_economic_amortization_across_quarter_end_with_optional_sweep(
                     target_instrument_id: Some(INSTRUMENT.into()),
                 }),
                 ..Default::default()
-            })
-        } else {
-            builder
+            });
+        }
+        let model = {
+            let mut model_builder_1 = builder;
+            model_builder_1
+                .compute("balance", "cs.debt_balance.LOAN")
+                .expect("balance formula");
+            model_builder_1
+                .compute("principal", "cs.principal_payment.LOAN")
+                .expect("principal formula");
+            model_builder_1
+                .build()
+                .expect("canonical amortizing-loan model")
         };
-        let model = builder
-            .compute("balance", "cs.debt_balance.LOAN")
-            .expect("balance formula")
-            .compute("principal", "cs.principal_payment.LOAN")
-            .expect("principal formula")
-            .build()
-            .expect("canonical amortizing-loan model");
         let result = Evaluator::new()
             .evaluate_with_market(&model, &market, issue)
             .expect("amortizing-loan model evaluation");

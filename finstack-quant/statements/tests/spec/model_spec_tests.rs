@@ -92,10 +92,10 @@ fn test_model_spec_get_node_none() {
 
 #[test]
 fn test_results_get_node() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -107,9 +107,9 @@ fn test_results_get_node() {
                     AmountOrScalar::scalar(110.0),
                 ),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -121,10 +121,10 @@ fn test_results_get_node() {
 
 #[test]
 fn test_results_all_periods() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q3", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q3", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -140,9 +140,9 @@ fn test_results_all_periods() {
                     AmountOrScalar::scalar(120.0),
                 ),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -153,18 +153,18 @@ fn test_results_all_periods() {
 
 #[test]
 fn test_results_get_or() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0),
             )],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -186,14 +186,14 @@ fn test_results_get_or() {
 
 #[test]
 fn test_model_spec_with_metadata() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .with_meta("author", serde_json::json!("Test Author"))
-        .with_meta("version", serde_json::json!("1.0.0"))
-        .with_meta("created_at", serde_json::json!("2025-01-01"))
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        model_builder.with_meta("author", serde_json::json!("Test Author"));
+        model_builder.with_meta("version", serde_json::json!("1.0.0"));
+        model_builder.with_meta("created_at", serde_json::json!("2025-01-01"));
+        model_builder.build().unwrap()
+    };
 
     assert_eq!(model.meta.len(), 3);
     assert_eq!(model.meta.get("author").unwrap(), "Test Author");
@@ -205,10 +205,10 @@ fn test_model_spec_with_metadata() {
 
 #[test]
 fn test_where_clause_masking() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -228,12 +228,11 @@ fn test_where_clause_masking() {
                     AmountOrScalar::scalar(1_500_000.0),
                 ),
             ],
-        )
-        .compute("bonus", "revenue * 0.01")
-        .unwrap()
-        .where_clause("revenue > 1000000")
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("bonus", "revenue * 0.01").unwrap();
+        model_builder.where_clause("revenue > 1000000");
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -285,10 +284,10 @@ fn test_where_clause_masking() {
 
 #[test]
 fn test_where_clause_with_complex_condition() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -300,8 +299,8 @@ fn test_where_clause_with_complex_condition() {
                     AmountOrScalar::scalar(120_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "margin",
             &[
                 (
@@ -313,12 +312,13 @@ fn test_where_clause_with_complex_condition() {
                     AmountOrScalar::scalar(0.2),
                 ),
             ],
-        )
-        .compute("incentive", "revenue * 0.05")
-        .unwrap()
-        .where_clause("revenue > 100000 and margin > 0.15")
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("incentive", "revenue * 0.05")
+            .unwrap();
+        model_builder.where_clause("revenue > 100000 and margin > 0.15");
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -567,18 +567,20 @@ fn test_node_id_hyphenated_builder_accepted() {
 
     // Hyphenated node IDs must be accepted by the builder and remain retrievable
     // via string lookup after build.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        model_builder.value(
             "lease-1",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(500.0),
             )],
-        )
-        .build()
-        .expect("hyphenated node id should be valid");
+        );
+        model_builder
+            .build()
+            .expect("hyphenated node id should be valid")
+    };
 
     assert!(
         model.has_node("lease-1"),

@@ -31130,7 +31130,7 @@ export interface ModelBuilder extends WasmOwned {
   /**
    * Define the model periods from a range expression.
    *
-   * Twin of Python `ModelBuilder.periods` (Rust `ModelBuilder::try_periods`).
+   * Twin of Python `ModelBuilder.periods` (Rust `ModelBuilder::periods`).
    * A failed call leaves the builder usable.
    * @param range - Period range `<start>..<end>` in one period kind, e.g. `"2025Q1..Q4"`, `"2024M10..2025M03"` or `"2025..2030"`.
    * @param actualsUntil - Last actual period (inclusive), e.g. `"2025Q2"`; later periods are forecast. Omit to treat every period as forecast.
@@ -31143,7 +31143,7 @@ export interface ModelBuilder extends WasmOwned {
    * Twin of Python `ModelBuilder.periods_explicit` (Rust
    * `ModelBuilder::periods_explicit`).
    * @param periods - Array of `Period` objects (`id`, ISO `start`, exclusive ISO `end`, `is_actual`) in timeline order (array or JSON).
-   * @throws Error with kind `validation` if `periods` is malformed, empty, unordered or overlapping, periods were already set, or the builder was consumed.
+   * @throws Error with kind `validation` if `periods` is malformed or empty, periods were already set, or the builder was consumed.
    */
   periodsExplicit(periods: generated.statements.Period[] | string): void;
   /**
@@ -31180,7 +31180,7 @@ export interface ModelBuilder extends WasmOwned {
    * Record the dates on which a node's period values became available.
    *
    * Twin of Python `ModelBuilder.availability_dates` (Rust
-   * `ModelBuilder::try_availability_dates`). A failed call leaves the
+   * `ModelBuilder::availability_dates`). A failed call leaves the
    * builder usable.
    * @param nodeId - Existing node whose values the dates describe.
    * @param availabilityDates - Object mapping period id (e.g. `"2025Q1"`) to the ISO 8601 date its value was published.
@@ -31190,7 +31190,7 @@ export interface ModelBuilder extends WasmOwned {
   /**
    * Add a calculated node defined by a DSL formula.
    *
-   * Twin of Python `ModelBuilder.compute` (Rust `ModelBuilder::try_compute`).
+   * Twin of Python `ModelBuilder.compute` (Rust `ModelBuilder::compute`).
    * A failed call leaves the builder usable.
    * @param nodeId - Node identifier, unique within the model.
    * @param formula - Statements DSL expression, e.g. `"revenue - cogs"`.
@@ -31248,7 +31248,7 @@ export interface ModelBuilder extends WasmOwned {
    * Add every built-in statement metric (`fin.*` namespace).
    *
    * Twin of Python `ModelBuilder.with_builtin_metrics` (Rust
-   * `ModelBuilder::try_with_builtin_metrics`). A failed call leaves the
+   * `ModelBuilder::with_builtin_metrics`). A failed call leaves the
    * builder usable.
    * @throws Error with kind `validation` if the built-in catalog cannot be loaded or the builder was consumed.
    */
@@ -31257,7 +31257,7 @@ export interface ModelBuilder extends WasmOwned {
    * Add one metric and its dependencies from a registry.
    *
    * Twin of Python `ModelBuilder.add_metric_from_registry` (Rust
-   * `ModelBuilder::try_add_metric_from_registry`). A failed call leaves the
+   * `ModelBuilder::add_metric_from_registry`). A failed call leaves the
    * builder usable.
    * @param qualifiedId - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
    * @param registry - `Registry` holding the metric and its dependencies.
@@ -31267,7 +31267,7 @@ export interface ModelBuilder extends WasmOwned {
   /**
    * Add a fixed-rate bond to the capital structure (US conventions: 30/360, semi-annual).
    *
-   * Twin of Python `ModelBuilder.add_bond` (Rust `ModelBuilder::try_add_bond`).
+   * Twin of Python `ModelBuilder.add_bond` (Rust `ModelBuilder::add_bond`).
    * A failed call leaves the builder usable.
    * @param id - Unique instrument identifier.
    * @param notional - Principal as a `Money` wire object (`{amount, currency}`).
@@ -31289,7 +31289,7 @@ export interface ModelBuilder extends WasmOwned {
    * Add a fixed-rate bond with a market convention preset.
    *
    * Twin of Python `ModelBuilder.add_bond_with_convention` (Rust
-   * `ModelBuilder::try_add_bond_with_convention`). A failed call leaves
+   * `ModelBuilder::add_bond_with_convention`). A failed call leaves
    * the builder usable.
    * @param id - Unique instrument identifier.
    * @param notional - Principal as a `Money` wire object (`{amount, currency}`).
@@ -31312,7 +31312,7 @@ export interface ModelBuilder extends WasmOwned {
   /**
    * Add a pay-fixed interest rate swap to the capital structure (US conventions).
    *
-   * Twin of Python `ModelBuilder.add_swap` (Rust `ModelBuilder::try_add_swap`).
+   * Twin of Python `ModelBuilder.add_swap` (Rust `ModelBuilder::add_swap`).
    * A failed call leaves the builder usable.
    * @param id - Unique instrument identifier.
    * @param notional - Swap notional as a `Money` wire object (`{amount, currency}`).
@@ -31336,7 +31336,7 @@ export interface ModelBuilder extends WasmOwned {
    * Add a pay-fixed interest rate swap with explicit leg conventions.
    *
    * Twin of Python `ModelBuilder.add_swap_with_conventions` (Rust
-   * `ModelBuilder::try_add_swap_with_conventions`). A failed call leaves
+   * `ModelBuilder::add_swap_with_conventions`). A failed call leaves
    * the builder usable.
    * @param id - Unique instrument identifier.
    * @param notional - Swap notional as a `Money` wire object (`{amount, currency}`).
@@ -31505,7 +31505,7 @@ export interface MixedNodeBuilder extends WasmOwned {
    * Set the fallback formula used when no value or forecast applies.
    *
    * Twin of Python `MixedNodeBuilder.formula` (Rust
-   * `MixedNodeBuilder::try_formula`). A failed call leaves the builder
+   * `MixedNodeBuilder::formula`). A failed call leaves the builder
    * usable.
    * @param formula - Statements DSL expression, e.g. `"lag(revenue, 1) * 1.05"`.
    * @throws Error with kind `validation` if the formula is blank or does not parse and compile, or the builder was consumed.

@@ -26,10 +26,10 @@ fn float_column<'a>(table: &'a finstack_quant_core::table::TableEnvelope, name: 
 
 #[test]
 fn test_export_to_table_long() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -41,13 +41,13 @@ fn test_export_to_table_long() {
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
-        )
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -68,10 +68,10 @@ fn test_export_to_table_long() {
 
 #[test]
 fn test_export_to_table_wide() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -83,13 +83,13 @@ fn test_export_to_table_wide() {
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
-        )
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -120,47 +120,51 @@ fn test_export_to_table_wide() {
 
 #[test]
 fn test_export_complete_pl_model() {
-    let model = ModelBuilder::new("Complete P&L")
-        .periods("2025Q1..2025Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("Complete P&L");
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q1"))
+            .unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::GrowthPct,
                 params: indexmap! { "rate".into() => json!(0.05) },
             },
-        )
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .value(
+        );
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder.value(
             "opex",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(20_000.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "opex",
             ForecastSpec {
                 method: ForecastMethod::ForwardFill,
                 params: indexmap! {},
             },
-        )
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .compute("operating_income", "gross_profit - opex")
-        .unwrap()
-        .compute("gross_margin", "gross_profit / revenue")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder
+            .compute("operating_income", "gross_profit - opex")
+            .unwrap();
+        model_builder
+            .compute("gross_margin", "gross_profit / revenue")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -184,10 +188,10 @@ fn test_export_complete_pl_model() {
 
 #[test]
 fn test_export_with_multiple_periods() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -207,11 +211,10 @@ fn test_export_with_multiple_periods() {
                     AmountOrScalar::scalar(130_000.0),
                 ),
             ],
-        )
-        .compute("doubled", "revenue * 2")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("doubled", "revenue * 2").unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -235,10 +238,10 @@ fn test_export_with_multiple_periods() {
 
 #[test]
 fn test_export_with_builtin_metrics() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -250,8 +253,8 @@ fn test_export_with_builtin_metrics() {
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cogs",
             &[
                 (
@@ -263,13 +266,15 @@ fn test_export_with_builtin_metrics() {
                     AmountOrScalar::scalar(66_000.0),
                 ),
             ],
-        )
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .compute("gross_margin", "gross_profit / revenue")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder
+            .compute("gross_margin", "gross_profit / revenue")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -300,10 +305,10 @@ fn test_empty_results_export() {
 
 #[test]
 fn test_export_preserves_period_order() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "value",
             &[
                 (
@@ -323,9 +328,9 @@ fn test_export_preserves_period_order() {
                     AmountOrScalar::scalar(3.0),
                 ),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();

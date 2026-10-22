@@ -23,15 +23,15 @@ fn s(v: f64) -> AmountOrScalar {
 
 #[test]
 fn growth_within_bounds_passes() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q3", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q3", None).unwrap();
+        model_builder.value(
             "revenue",
             &[(q(1), s(100.0)), (q(2), s(110.0)), (q(3), s(120.0))],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -52,12 +52,12 @@ fn growth_within_bounds_passes() {
 #[test]
 fn growth_spike_flags_warning() {
     // Q2 = 200, Q1 = 100 → 100% growth, exceeds max_period_growth_pct = 50%
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("revenue", &[(q(1), s(100.0)), (q(2), s(200.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("revenue", &[(q(1), s(100.0)), (q(2), s(200.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -79,12 +79,12 @@ fn growth_spike_flags_warning() {
 #[test]
 fn sharp_decline_flags_warning() {
     // Q2 = 50, Q1 = 100 → -50% decline, exceeds max_decline_pct = -30%
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("revenue", &[(q(1), s(100.0)), (q(2), s(50.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("revenue", &[(q(1), s(100.0)), (q(2), s(50.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -106,13 +106,13 @@ fn sharp_decline_flags_warning() {
 
 #[test]
 fn etr_within_range_passes() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("tax", &[(q(1), s(25.0)), (q(2), s(30.0))])
-        .value("pretax", &[(q(1), s(100.0)), (q(2), s(120.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("tax", &[(q(1), s(25.0)), (q(2), s(30.0))]);
+        model_builder.value("pretax", &[(q(1), s(100.0)), (q(2), s(120.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -132,13 +132,13 @@ fn etr_within_range_passes() {
 #[test]
 fn etr_outside_range_flags_info() {
     // ETR = 5/100 = 5%, below 15% floor
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("tax", &[(q(1), s(5.0))])
-        .value("pretax", &[(q(1), s(100.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("tax", &[(q(1), s(5.0))]);
+        model_builder.value("pretax", &[(q(1), s(100.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -157,13 +157,13 @@ fn etr_outside_range_flags_info() {
 
 #[test]
 fn etr_skips_negative_pretax() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("tax", &[(q(1), s(-10.0))])
-        .value("pretax", &[(q(1), s(-50.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("tax", &[(q(1), s(-10.0))]);
+        model_builder.value("pretax", &[(q(1), s(-50.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -187,14 +187,14 @@ fn wc_consistent_passes() {
     // NWC(Q1) = 200 - 100 = 100, NWC(Q2) = 220 - 110 = 110
     // ΔNWC = 110 - 100 = 10
     // Expected WC change on CFS = -10
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("wc_cf", &[(q(1), s(0.0)), (q(2), s(-10.0))])
-        .value("ar", &[(q(1), s(200.0)), (q(2), s(220.0))])
-        .value("ap", &[(q(1), s(100.0)), (q(2), s(110.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("wc_cf", &[(q(1), s(0.0)), (q(2), s(-10.0))]);
+        model_builder.value("ar", &[(q(1), s(200.0)), (q(2), s(220.0))]);
+        model_builder.value("ap", &[(q(1), s(100.0)), (q(2), s(110.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -216,14 +216,14 @@ fn wc_consistent_passes() {
 fn wc_mismatch_flags_warning() {
     // NWC(Q1) = 200 - 100 = 100, NWC(Q2) = 220 - 110 = 110
     // Expected WC change on CFS = -10, but CFS shows 0 → diff = 10
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("wc_cf", &[(q(1), s(0.0)), (q(2), s(0.0))])
-        .value("ar", &[(q(1), s(200.0)), (q(2), s(220.0))])
-        .value("ap", &[(q(1), s(100.0)), (q(2), s(110.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("wc_cf", &[(q(1), s(0.0)), (q(2), s(0.0))]);
+        model_builder.value("ar", &[(q(1), s(200.0)), (q(2), s(220.0))]);
+        model_builder.value("ap", &[(q(1), s(100.0)), (q(2), s(110.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();

@@ -225,17 +225,17 @@ fn lbo_suite_merges_both() {
 
 #[test]
 fn three_statement_suite_runs_against_balanced_model() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("total_assets", &[(q(1), s(1000.0)), (q(2), s(1100.0))])
-        .value("total_liabilities", &[(q(1), s(600.0)), (q(2), s(650.0))])
-        .value("total_equity", &[(q(1), s(400.0)), (q(2), s(450.0))])
-        .value("cash", &[(q(1), s(200.0)), (q(2), s(220.0))])
-        .value("retained_earnings", &[(q(1), s(300.0)), (q(2), s(350.0))])
-        .value("net_income", &[(q(1), s(50.0)), (q(2), s(50.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("total_assets", &[(q(1), s(1000.0)), (q(2), s(1100.0))]);
+        model_builder.value("total_liabilities", &[(q(1), s(600.0)), (q(2), s(650.0))]);
+        model_builder.value("total_equity", &[(q(1), s(400.0)), (q(2), s(450.0))]);
+        model_builder.value("cash", &[(q(1), s(200.0)), (q(2), s(220.0))]);
+        model_builder.value("retained_earnings", &[(q(1), s(300.0)), (q(2), s(350.0))]);
+        model_builder.value("net_income", &[(q(1), s(50.0)), (q(2), s(50.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();

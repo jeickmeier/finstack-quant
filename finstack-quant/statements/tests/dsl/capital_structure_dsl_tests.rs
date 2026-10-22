@@ -245,10 +245,10 @@ fn test_context_get_cs_value_invalid_component() {
 #[test]
 fn test_evaluate_model_with_cs_mock() {
     // Create a simple model that references capital structure
-    let model_result = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model_result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -260,8 +260,8 @@ fn test_evaluate_model_with_cs_mock() {
                     AmountOrScalar::scalar(1_100_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cogs",
             &[
                 (
@@ -273,8 +273,9 @@ fn test_evaluate_model_with_cs_mock() {
                     AmountOrScalar::scalar(650_000.0),
                 ),
             ],
-        )
-        .build();
+        );
+        model_builder.build()
+    };
 
     assert!(model_result.is_ok());
     let model = model_result.unwrap();
@@ -291,26 +292,28 @@ fn test_model_with_bond_builder() {
     let issue_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity_date = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
-    let model_result = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model_result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(1_000_000.0),
             )],
-        )
-        .add_bond(
-            "BOND-001",
-            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-            0.05,
-            issue_date,
-            maturity_date,
-            "USD-OIS",
-        )
-        .unwrap()
-        .build();
+        );
+        model_builder
+            .add_bond(
+                "BOND-001",
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+                0.05,
+                issue_date,
+                maturity_date,
+                "USD-OIS",
+            )
+            .unwrap();
+        model_builder.build()
+    };
 
     assert!(model_result.is_ok());
     let model = model_result.unwrap();

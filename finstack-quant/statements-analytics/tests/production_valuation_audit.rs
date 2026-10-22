@@ -7,14 +7,15 @@ use finstack_quant_statements_analytics::analysis::goal_seek;
 fn discontinuous_objective_is_rejected_without_mutation() {
     let q = PeriodId::quarter(2025, 1).unwrap();
     for bounds in [None, Some((-1., 1.))] {
-        let model = ModelBuilder::new("discontinuous")
-            .periods("2025Q1..Q1", None)
-            .unwrap()
-            .value("driver", &[(q, AmountOrScalar::scalar(1.))])
-            .compute("target", "if(driver < 0, 0, 1)")
-            .unwrap()
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder = ModelBuilder::new("discontinuous");
+            model_builder.periods("2025Q1..Q1", None).unwrap();
+            model_builder.value("driver", &[(q, AmountOrScalar::scalar(1.))]);
+            model_builder
+                .compute("target", "if(driver < 0, 0, 1)")
+                .unwrap();
+            model_builder.build().unwrap()
+        };
         let before = serde_json::to_value(&model).unwrap();
         let error = goal_seek(&model, "target", q, 0.5, "driver", q, true, bounds)
             .expect_err("no attainable target");
@@ -32,26 +33,26 @@ fn credit_reports_and_checks_reject_mixed_currency_ratios() {
         CoverageFloorCheck, CreditAssessment, LeverageRangeCheck,
     };
     let period = PeriodId::annual(2025);
-    let model = ModelBuilder::new("mixed credit units")
-        .periods("2025..2025", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("mixed credit units");
+        model_builder.periods("2025..2025", None).unwrap();
+        model_builder.value(
             "total_debt",
             &[(
                 period,
                 AmountOrScalar::amount(100.0, Currency::USD).unwrap(),
             )],
-        )
-        .value(
+        );
+        model_builder.value(
             "ebitda",
             &[(period, AmountOrScalar::amount(10.0, Currency::EUR).unwrap())],
-        )
-        .value(
+        );
+        model_builder.value(
             "interest_expense",
             &[(period, AmountOrScalar::amount(2.0, Currency::GBP).unwrap())],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
     let mut results = Evaluator::new().evaluate(&model).unwrap();
     let report = CreditAssessment::compute(&results, period);
     assert_eq!(report.leverage_ratio, None);
@@ -86,13 +87,13 @@ fn credit_checks_reject_overflowing_ratios() {
     use finstack_quant_statements::evaluator::Evaluator;
     use finstack_quant_statements_analytics::analysis::{CoverageFloorCheck, LeverageRangeCheck};
     let period = PeriodId::annual(2025);
-    let model = ModelBuilder::new("overflowing credit ratio")
-        .periods("2025..2025", None)
-        .unwrap()
-        .value("large", &[(period, AmountOrScalar::scalar(100.0))])
-        .value("small", &[(period, AmountOrScalar::scalar(1e-320))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("overflowing credit ratio");
+        model_builder.periods("2025..2025", None).unwrap();
+        model_builder.value("large", &[(period, AmountOrScalar::scalar(100.0))]);
+        model_builder.value("small", &[(period, AmountOrScalar::scalar(1e-320))]);
+        model_builder.build().unwrap()
+    };
     let results = Evaluator::new().evaluate(&model).unwrap();
     let context = CheckContext::new(&model, &results);
     assert!(LeverageRangeCheck {
@@ -119,16 +120,16 @@ fn credit_reports_reject_contradictory_numeric_and_monetary_values() {
     use finstack_quant_statements::evaluator::Evaluator;
     use finstack_quant_statements_analytics::analysis::CreditAssessment;
     let period = PeriodId::annual(2025);
-    let model = ModelBuilder::new("contradictory monetary projection")
-        .periods("2025..2025", None)
-        .unwrap()
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("contradictory monetary projection");
+        model_builder.periods("2025..2025", None).unwrap();
+        model_builder.value_money(
             "total_debt",
             &[(period, Money::from((500_i64, Currency::USD)))],
-        )
-        .value_money("ebitda", &[(period, Money::from((100_i64, Currency::USD)))])
-        .build()
-        .unwrap();
+        );
+        model_builder.value_money("ebitda", &[(period, Money::from((100_i64, Currency::USD)))]);
+        model_builder.build().unwrap()
+    };
     let mut results = Evaluator::new().evaluate(&model).unwrap();
     assert_eq!(
         CreditAssessment::compute(&results, period).leverage_ratio,
@@ -168,25 +169,25 @@ fn working_capital_rejects_currency_change_without_metadata() {
     use finstack_quant_statements_analytics::analysis::WorkingCapitalConsistency;
     let first = PeriodId::quarter(2025, 1).unwrap();
     let second = PeriodId::quarter(2025, 2).unwrap();
-    let model = ModelBuilder::new("changed working capital currency")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("changed working capital currency");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value_money(
             "wc",
             &[
                 (first, Money::from((0_i64, Currency::USD))),
                 (second, Money::from((-10_i64, Currency::USD))),
             ],
-        )
-        .value_money(
+        );
+        model_builder.value_money(
             "assets",
             &[
                 (first, Money::from((100_i64, Currency::USD))),
                 (second, Money::from((110_i64, Currency::USD))),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
     let mut results = Evaluator::new().evaluate(&model).unwrap();
     results.node_value_types.clear();
     results
@@ -221,13 +222,13 @@ fn growth_terminal_flow_rejects_missing_calendar_quarters() {
             })
         })
         .collect();
-    let mut model = ModelBuilder::new("sparse terminal year")
-        .periods("2025Q1..2026Q4", None)
-        .unwrap()
-        .value_money("ufcf", &values)
-        .with_meta("currency", serde_json::json!("USD"))
-        .build()
-        .unwrap();
+    let mut model = {
+        let mut model_builder = ModelBuilder::new("sparse terminal year");
+        model_builder.periods("2025Q1..2026Q4", None).unwrap();
+        model_builder.value_money("ufcf", &values);
+        model_builder.with_meta("currency", serde_json::json!("USD"));
+        model_builder.build().unwrap()
+    };
     let terminal = TerminalValueSpec::GordonGrowth {
         stable_growth_rate: 0.02,
     };
@@ -284,13 +285,13 @@ fn growth_terminal_flow_rejects_partial_week_at_calendar_year_boundary() {
             )
         })
         .collect();
-    let model = ModelBuilder::new("unaligned weekly terminal year")
-        .periods("2025W01..W52", None)
-        .unwrap()
-        .value_money("ufcf", &values)
-        .with_meta("currency", serde_json::json!("USD"))
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("unaligned weekly terminal year");
+        model_builder.periods("2025W01..W52", None).unwrap();
+        model_builder.value_money("ufcf", &values);
+        model_builder.with_meta("currency", serde_json::json!("USD"));
+        model_builder.build().unwrap()
+    };
     let error = evaluate_dcf(
         &model,
         0.10,
@@ -313,18 +314,20 @@ fn growth_terminal_flow_rejects_annual_identifier_on_partial_year() {
     use finstack_quant_statements_analytics::analysis::{evaluate_dcf, DcfOptions};
     use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
     let period = PeriodId::annual(2025);
-    let model = ModelBuilder::new("annual stub")
-        .periods_explicit(vec![Period {
-            id: period,
-            start: time::macros::date!(2025 - 07 - 01),
-            end: time::macros::date!(2026 - 01 - 01),
-            is_actual: false,
-        }])
-        .unwrap()
-        .value_money("ufcf", &[(period, Money::from((100_i64, Currency::USD)))])
-        .with_meta("currency", serde_json::json!("USD"))
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("annual stub");
+        model_builder
+            .periods_explicit(vec![Period {
+                id: period,
+                start: time::macros::date!(2025 - 07 - 01),
+                end: time::macros::date!(2026 - 01 - 01),
+                is_actual: false,
+            }])
+            .unwrap();
+        model_builder.value_money("ufcf", &[(period, Money::from((100_i64, Currency::USD)))]);
+        model_builder.with_meta("currency", serde_json::json!("USD"));
+        model_builder.build().unwrap()
+    };
     let error = evaluate_dcf(
         &model,
         0.10,
@@ -348,32 +351,34 @@ fn growth_terminal_flow_uses_complete_year_across_annual_stub_identifiers() {
     use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
     let actual = PeriodId::annual(2024);
     let forecast = PeriodId::annual(2025);
-    let model = ModelBuilder::new("complete year across annual stubs")
-        .periods_explicit(vec![
-            Period {
-                id: actual,
-                start: time::macros::date!(2024 - 07 - 01),
-                end: time::macros::date!(2025 - 01 - 01),
-                is_actual: true,
-            },
-            Period {
-                id: forecast,
-                start: time::macros::date!(2025 - 01 - 01),
-                end: time::macros::date!(2025 - 07 - 01),
-                is_actual: false,
-            },
-        ])
-        .unwrap()
-        .value_money(
+    let model = {
+        let mut model_builder = ModelBuilder::new("complete year across annual stubs");
+        model_builder
+            .periods_explicit(vec![
+                Period {
+                    id: actual,
+                    start: time::macros::date!(2024 - 07 - 01),
+                    end: time::macros::date!(2025 - 01 - 01),
+                    is_actual: true,
+                },
+                Period {
+                    id: forecast,
+                    start: time::macros::date!(2025 - 01 - 01),
+                    end: time::macros::date!(2025 - 07 - 01),
+                    is_actual: false,
+                },
+            ])
+            .unwrap();
+        model_builder.value_money(
             "ufcf",
             &[
                 (actual, Money::from((100_i64, Currency::USD))),
                 (forecast, Money::from((100_i64, Currency::USD))),
             ],
-        )
-        .with_meta("currency", serde_json::json!("USD"))
-        .build()
-        .unwrap();
+        );
+        model_builder.with_meta("currency", serde_json::json!("USD"));
+        model_builder.build().unwrap()
+    };
     let result = evaluate_dcf(
         &model,
         0.10,

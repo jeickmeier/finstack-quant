@@ -1,7 +1,7 @@
 //! Python wrapper for `ModelBuilder`.
 //!
 //! Every fallible configuration step goes through the crate's non-consuming
-//! `try_*` twins, so a typo in a formula, period range, or metric id raises
+//! mutable setters, so a typo in a formula, period range, or metric id raises
 //! without discarding the model accumulated so far.
 
 use super::capital_structure::PyWaterfallSpec;
@@ -12,6 +12,7 @@ use crate::bindings::core::currency::PyCurrency;
 use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::py_to_date;
+use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, statements_to_py, value_error};
 use finstack_quant_core::dates::{Period, PeriodId};
 use finstack_quant_core::money::fx::FxConversionPolicy;
@@ -22,36 +23,13 @@ use finstack_quant_statements::capital_structure::{
 use finstack_quant_statements::types::{AmountOrScalar, FinancialStatementInstrument};
 use pyo3::prelude::*;
 
-/// Builder for financial models.
-///
-/// Every configuration method returns the builder, so calls chain::
-///
-///     model = (
-///         ModelBuilder("Acme Corp")
-///         .periods("2025Q1..Q4", "2025Q2")
-///         .value("revenue", {"2025Q1": 10_000_000.0, "2025Q2": 11_000_000.0})
-///         .compute("cogs", "revenue * 0.6")
-///         .build()
-///     )
-///
-/// Statement-per-line style works identically, since each call also mutates in
-/// place::
-///
-///     builder = ModelBuilder("Acme Corp")
-///     builder.periods("2025Q1..Q4", "2025Q2")
-///     builder.compute("cogs", "revenue * 0.6")
-///     model = builder.build()
-///
-/// ``build()`` and ``mixed()`` are terminal: they consume the builder, so no
-/// further configuration call may follow on the same object. A rejected
-/// argument (bad period id, invalid formula, unknown metric) raises and
-/// leaves the builder usable.
+#[doc = pydoc!("finstack_quant.statements", "ModelBuilder")]
 #[pyclass(name = "ModelBuilder", module = "finstack_quant.statements")]
 pub struct PyModelBuilder {
     inner: Option<ModelBuilder>,
 }
 
-/// Fluent builder for a mixed statement node.
+#[doc = pydoc!("finstack_quant.statements", "MixedNodeBuilder")]
 #[pyclass(name = "MixedNodeBuilder", module = "finstack_quant.statements")]
 pub struct PyMixedNodeBuilder {
     inner: Option<MixedNodeBuilder>,
@@ -59,44 +37,18 @@ pub struct PyMixedNodeBuilder {
 
 #[pymethods]
 impl PyMixedNodeBuilder {
-    /// Set explicit values for the mixed node.
-    ///
-    /// Parameters
-    /// ----------
-    /// values : Mapping[str, float | Money] | Sequence[tuple[str, float | Money]] | pd.Series
-    ///     Period id to value; ``Money`` cells make the node monetary.
-    ///
-    /// Returns
-    /// -------
-    /// MixedNodeBuilder
-    ///     This builder, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a period id does not parse or the builder was consumed.
+    #[doc = pydoc!("finstack_quant.statements", "MixedNodeBuilder.values")]
     #[pyo3(text_signature = "($self, values)")]
     fn values<'py>(
         mut slf: PyRefMut<'py, Self>,
         values: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let parsed = extract_value_series(values)?;
-        let builder = slf.take()?;
-        slf.inner = Some(builder.values(&parsed));
+        slf.builder_mut()?.values(&parsed);
         Ok(slf)
     }
 
-    /// Set monetary explicit values for the mixed node.
-    ///
-    /// Parameters
-    /// ----------
-    /// values : Mapping[str, Money] | Sequence[tuple[str, Money]] | pd.Series
-    ///     Period id to ``Money`` amount.
-    ///
-    /// Returns
-    /// -------
-    /// MixedNodeBuilder
-    ///     This builder, for chaining.
+    #[doc = pydoc!("finstack_quant.statements", "MixedNodeBuilder.values_money")]
     #[pyo3(text_signature = "($self, values)")]
     fn values_money<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -106,60 +58,34 @@ impl PyMixedNodeBuilder {
             .into_iter()
             .map(|(pid, money)| (pid, AmountOrScalar::Amount(money)))
             .collect();
-        let builder = slf.take()?;
-        slf.inner = Some(builder.values(&parsed));
+        slf.builder_mut()?.values(&parsed);
         Ok(slf)
     }
 
-    /// Set the forecast specification.
-    ///
-    /// Returns
-    /// -------
-    /// MixedNodeBuilder
-    ///     This builder, for chaining.
+    #[doc = pydoc!("finstack_quant.statements", "MixedNodeBuilder.forecast")]
     fn forecast<'py>(
         mut slf: PyRefMut<'py, Self>,
         forecast_spec: PyRef<'_, PyForecastSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let builder = slf.take()?;
-        slf.inner = Some(builder.forecast(forecast_spec.inner.clone()));
+        slf.builder_mut()?.forecast(forecast_spec.inner.clone());
         Ok(slf)
     }
 
-    /// Set the fallback formula.
-    ///
-    /// The formula is syntax-checked immediately; an invalid formula raises
-    /// and leaves the builder (and its parent model) intact.
-    ///
-    /// Returns
-    /// -------
-    /// MixedNodeBuilder
-    ///     This builder, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the formula is blank or does not parse and compile.
+    #[doc = pydoc!("finstack_quant.statements", "MixedNodeBuilder.formula")]
     fn formula<'py>(mut slf: PyRefMut<'py, Self>, formula: &str) -> PyResult<PyRefMut<'py, Self>> {
         slf.builder_mut()?
-            .try_formula(formula)
+            .formula(formula)
             .map_err(statements_to_py)?;
         Ok(slf)
     }
 
-    /// Set the human-readable name.
-    ///
-    /// Returns
-    /// -------
-    /// MixedNodeBuilder
-    ///     This builder, for chaining.
+    #[doc = pydoc!("finstack_quant.statements", "MixedNodeBuilder.name")]
     fn name<'py>(mut slf: PyRefMut<'py, Self>, name: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let builder = slf.take()?;
-        slf.inner = Some(builder.name(name));
+        slf.builder_mut()?.name(name);
         Ok(slf)
     }
 
-    /// Build the mixed node and return a ready model builder.
+    #[doc = pydoc!("finstack_quant.statements", "MixedNodeBuilder.build")]
     fn build(&mut self) -> PyResult<PyModelBuilder> {
         let builder = self.take()?;
         let ready = builder.build().map_err(statements_to_py)?;
@@ -191,7 +117,7 @@ impl PyMixedNodeBuilder {
 
 #[pymethods]
 impl PyModelBuilder {
-    /// Create a new model builder awaiting ``periods(...)``.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.__init__")]
     #[new]
     #[pyo3(text_signature = "(id)")]
     fn new(id: &str) -> Self {
@@ -200,23 +126,7 @@ impl PyModelBuilder {
         }
     }
 
-    /// Reconstruct a ready builder from an existing model specification.
-    ///
-    /// Parameters
-    /// ----------
-    /// spec : FinancialModelSpec
-    ///     Typed model whose periods, nodes, metadata, and capital structure
-    ///     seed the builder.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     Ready builder that can accept additional transformations.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the model has no periods.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.from_spec")]
     #[staticmethod]
     fn from_spec(spec: &PyFinancialModelSpec) -> PyResult<Self> {
         let builder = ModelBuilder::from_spec(spec.inner.clone()).map_err(statements_to_py)?;
@@ -225,31 +135,7 @@ impl PyModelBuilder {
         })
     }
 
-    /// Define periods using a range expression (e.g. ``"2025Q1..Q4"``).
-    ///
-    /// Parameters
-    /// ----------
-    /// range : str
-    ///     Period range ``<start>..<end>`` in one period kind:
-    ///     ``"2025Q1..Q4"``, ``"2024M10..2025M03"``, ``"2025..2030"``. Period
-    ///     ids have no separators (``2025Q1``, ``2025M3``, ``2025W7``,
-    ///     ``2025H1``, ``2025``/``FY2025``).
-    /// actuals_until : str | None
-    ///     Optional inclusive cutoff (same kind as ``range``) through which
-    ///     periods are labelled actuals; later periods are forecasts.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the range or cutoff does not parse (the message restates the
-    ///     accepted grammar), the kinds differ, the range is reversed or
-    ///     empty, periods were already set, or the builder was consumed. The
-    ///     builder stays usable after a rejected range.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.periods")]
     #[pyo3(signature = (range, actuals_until=None), text_signature = "($self, range, actuals_until=None)")]
     fn periods<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -257,7 +143,7 @@ impl PyModelBuilder {
         actuals_until: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         slf.builder_mut()?
-            .try_periods(range, actuals_until)
+            .periods(range, actuals_until)
             .map_err(|error| {
                 value_error(format!(
                     "invalid period range {range:?}: {error}; {PERIOD_GRAMMAR}"
@@ -266,101 +152,32 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    /// Define the timeline from explicit ``Period`` objects.
-    ///
-    /// Use this for timelines the range grammar cannot express (a fiscal
-    /// calendar from ``core.dates.build_fiscal_periods``, or a hand-built
-    /// list). The periods are kept in the given order; ``build()`` rejects
-    /// timelines that are not strictly increasing, whose intervals are empty
-    /// or overlapping, or whose actuals do not form a prefix. Gaps are allowed.
-    ///
-    /// Parameters
-    /// ----------
-    /// periods : list[finstack_quant.core.dates.Period]
-    ///     Non-empty period list, typically ``plan.periods`` from a
-    ///     ``PeriodPlan``.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``periods`` is empty, periods were already set, or the builder
-    ///     was consumed.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.periods_explicit")]
     #[pyo3(text_signature = "($self, periods)")]
     fn periods_explicit<'py>(
         mut slf: PyRefMut<'py, Self>,
         periods: Vec<PyRef<'_, PyPeriod>>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let periods: Vec<Period> = periods.iter().map(|p| p.inner.clone()).collect();
-        if periods.is_empty() {
-            return Err(value_error("Period list must contain at least one period"));
-        }
-        if !slf.builder_mut()?.periods_slice().is_empty() {
-            return Err(value_error("Periods already set"));
-        }
-        let builder = slf.take()?;
-        slf.inner = Some(
-            builder
-                .periods_explicit(periods)
-                .map_err(statements_to_py)?,
-        );
+        slf.builder_mut()?
+            .periods_explicit(periods)
+            .map_err(statements_to_py)?;
         Ok(slf)
     }
 
-    /// Add a value node with explicit period values.
-    ///
-    /// Parameters
-    /// ----------
-    /// node_id : str
-    ///     Node identifier.
-    /// values : Mapping[str, float | Money] | Sequence[tuple[str, float | Money]] | pd.Series
-    ///     Period id (``"2025Q1"``) to value. A ``dict``, a pandas ``Series``
-    ///     indexed by period id, or ``(period, value)`` pairs are all
-    ///     accepted; ``Money`` cells make the node monetary.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a period id does not parse or the
-    ///     builder was consumed.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.value")]
     #[pyo3(text_signature = "($self, node_id, values)")]
     fn value<'py>(
         mut slf: PyRefMut<'py, Self>,
         node_id: &str,
         values: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        // Parse arguments BEFORE `take_ready()` so a bad period string does not
-        // permanently consume the in-progress builder.
         let parsed = extract_value_series(values)?;
-        let state = slf.take()?;
-        let ready = state.value(node_id, &parsed);
-        slf.inner = Some(ready);
+        slf.builder_mut()?.value(node_id, &parsed);
         Ok(slf)
     }
 
-    /// Add a scalar value node with explicit period values.
-    ///
-    /// Parameters
-    /// ----------
-    /// node_id : str
-    ///     Node identifier.
-    /// values : Mapping[str, float] | Sequence[tuple[str, float]] | pd.Series
-    ///     Period id to unitless scalar (ratio, count, percentage as a
-    ///     decimal fraction).
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.value_scalar")]
     #[pyo3(text_signature = "($self, node_id, values)")]
     fn value_scalar<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -368,25 +185,11 @@ impl PyModelBuilder {
         values: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let parsed = extract_scalar_series(values)?;
-        let state = slf.take()?;
-        let ready = state.value_scalar(node_id, &parsed);
-        slf.inner = Some(ready);
+        slf.builder_mut()?.value_scalar(node_id, &parsed);
         Ok(slf)
     }
 
-    /// Add a monetary value node with explicit period values.
-    ///
-    /// Parameters
-    /// ----------
-    /// node_id : str
-    ///     Node identifier.
-    /// values : Mapping[str, Money] | Sequence[tuple[str, Money]] | pd.Series
-    ///     Period id to ``Money`` amount; all amounts must share a currency.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.value_money")]
     #[pyo3(text_signature = "($self, node_id, values)")]
     fn value_money<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -394,44 +197,11 @@ impl PyModelBuilder {
         values: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let parsed = extract_money_series(values)?;
-        let state = slf.take()?;
-        let ready = state.value_money(node_id, &parsed);
-        slf.inner = Some(ready);
+        slf.builder_mut()?.value_money(node_id, &parsed);
         Ok(slf)
     }
 
-    /// Bulk-load value nodes from a wide pandas ``DataFrame``.
-    ///
-    /// Rows are nodes and columns are period ids. When periods have not been
-    /// set yet, the timeline is taken from the first and last column
-    /// (``"<first>..<last>"``) with ``actuals_until`` as the cutoff; when
-    /// they have, the columns must belong to the existing timeline. Each row
-    /// becomes a scalar ``value`` node; ``NaN`` / ``None`` cells are skipped.
-    ///
-    /// Parameters
-    /// ----------
-    /// df : pd.DataFrame
-    ///     Wide frame with period-id column labels (``"2025Q1"``, ...) and
-    ///     node ids as the index (or in ``node_id_column``).
-    /// actuals_until : str | None
-    ///     Inclusive actuals cutoff used only when the timeline is derived
-    ///     from the columns.
-    /// node_id_column : str | None
-    ///     Column holding node ids when they are not the index.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the frame has no columns, a column label is invalid or outside
-    ///     the model timeline, a node id is reserved, a cell is not numeric,
-    ///     or the builder was consumed. Column labels are checked even when
-    ///     all their cells are missing. Rejected input leaves the builder
-    ///     unchanged.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.from_dataframe")]
     #[pyo3(signature = (df, actuals_until=None, node_id_column=None), text_signature = "($self, df, actuals_until=None, node_id_column=None)")]
     fn from_dataframe<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -479,41 +249,19 @@ impl PyModelBuilder {
             rows.push((node_id, pairs));
         }
 
-        let mut builder = slf.take()?;
+        let builder = slf.builder_mut()?;
         if builder.periods_slice().is_empty() {
-            builder = builder
+            builder
                 .periods_explicit(periods)
                 .map_err(statements_to_py)?;
         }
         for (node_id, pairs) in rows {
-            builder = builder.value(node_id, &pairs);
+            builder.value(node_id, &pairs);
         }
-        slf.inner = Some(builder);
         Ok(slf)
     }
 
-    /// Set point-in-time availability dates for explicit observations.
-    ///
-    /// Parameters
-    /// ----------
-    /// node_id : str
-    ///     Existing value or mixed node.
-    /// availability_dates : Mapping[str, date | str] | Sequence[tuple[str, date | str]]
-    ///     Period ids paired with the date each observation became
-    ///     available; ``datetime.date``, ``datetime.datetime``,
-    ///     ``pandas.Timestamp`` and ISO ``YYYY-MM-DD`` strings are accepted.
-    ///     Unspecified observations default to the period's exclusive end.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a period/date is invalid or the node does not exist. The
-    ///     builder stays usable.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.availability_dates")]
     #[pyo3(text_signature = "($self, node_id, availability_dates)")]
     fn availability_dates<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -525,33 +273,12 @@ impl PyModelBuilder {
             .map(|(period, date)| Ok((super::parse_period_id(&period)?, py_to_date(&date)?)))
             .collect::<PyResult<Vec<_>>>()?;
         slf.builder_mut()?
-            .try_availability_dates(node_id, &parsed)
+            .availability_dates(node_id, &parsed)
             .map_err(statements_to_py)?;
         Ok(slf)
     }
 
-    /// Add a computed node with a formula.
-    ///
-    /// The node id and formula are validated before anything changes, so an
-    /// invalid formula raises and leaves the builder usable.
-    ///
-    /// Parameters
-    /// ----------
-    /// node_id : str
-    ///     Node identifier.
-    /// formula : str
-    ///     DSL formula expression (e.g. ``"revenue - cogs"``).
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the node id is reserved, the formula is blank or does not
-    ///     compile or the builder was consumed.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.compute")]
     #[pyo3(text_signature = "($self, node_id, formula)")]
     fn compute<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -559,28 +286,12 @@ impl PyModelBuilder {
         formula: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         slf.builder_mut()?
-            .try_compute(node_id, formula)
+            .compute(node_id, formula)
             .map_err(statements_to_py)?;
         Ok(slf)
     }
 
-    /// Insert a pre-built node specification, replacing any node with the
-    /// same id.
-    ///
-    /// This is the escape hatch for template code that assembles
-    /// ``NodeSpec`` objects directly; prefer ``value`` / ``compute`` /
-    /// ``mixed`` for ordinary construction. The node is validated with the
-    /// rest of the model at ``build()``.
-    ///
-    /// Parameters
-    /// ----------
-    /// node : NodeSpec
-    ///     Fully configured node specification.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.insert_node")]
     #[pyo3(text_signature = "($self, node)")]
     fn insert_node<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -591,7 +302,7 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    /// Start configuring a mixed node.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.mixed")]
     #[pyo3(text_signature = "($self, node_id)")]
     fn mixed(&mut self, node_id: &str) -> PyResult<PyMixedNodeBuilder> {
         let state = self.take()?;
@@ -600,66 +311,29 @@ impl PyModelBuilder {
         })
     }
 
-    /// Attach a forecast specification to an existing or new node.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.forecast")]
     #[pyo3(text_signature = "($self, node_id, forecast_spec)")]
     fn forecast<'py>(
         mut slf: PyRefMut<'py, Self>,
         node_id: &str,
         forecast_spec: PyRef<'_, PyForecastSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let state = slf.take()?;
-        let ready = state.forecast(node_id, forecast_spec.inner.clone());
-        slf.inner = Some(ready);
+        slf.builder_mut()?
+            .forecast(node_id, forecast_spec.inner.clone());
         Ok(slf)
     }
 
-    /// Attach a where clause to the last added node.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.where_clause")]
     #[pyo3(text_signature = "($self, where_clause)")]
     fn where_clause<'py>(
         mut slf: PyRefMut<'py, Self>,
         where_clause: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let state = slf.take()?;
-        let ready = state.where_clause(where_clause);
-        slf.inner = Some(ready);
+        slf.builder_mut()?.where_clause(where_clause);
         Ok(slf)
     }
 
-    /// Add model-level metadata.
-    ///
-    /// Parameters
-    /// ----------
-    /// key : str
-    ///     Metadata key (``"currency"`` is read by the evaluator to infer a
-    ///     reporting currency for ``cs.*`` formulas).
-    /// value : Any
-    ///     Any JSON-serializable value: ``"USD"``, ``42``, ``{"source":
-    ///     "erp"}``, a list. A string that parses as JSON is stored as that
-    ///     JSON value; any other string is stored verbatim.
-    ///     For ``key="currency"``, supply a supported three-letter currency-code
-    ///     string such as ``"USD"``; ``build()`` raises ``ValueError`` for malformed
-    ///     currency metadata.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not JSON-serializable or
-    ///     the builder was consumed.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.with_meta")]
     #[pyo3(text_signature = "($self, key, value)")]
     fn with_meta<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -668,47 +342,20 @@ impl PyModelBuilder {
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let value = crate::bindings::module_utils::py_to_json_value(py, value, "meta value")?;
-        let state = slf.take()?;
-        let ready = state.with_meta(key, value);
-        slf.inner = Some(ready);
+        slf.builder_mut()?.with_meta(key, value);
         Ok(slf)
     }
 
-    /// Add all built-in statement metrics (``fin.*`` namespace).
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the built-in catalog cannot be loaded or
-    ///     the builder was consumed.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.with_builtin_metrics")]
     #[pyo3(text_signature = "($self)")]
     fn with_builtin_metrics(mut slf: PyRefMut<'_, Self>) -> PyResult<PyRefMut<'_, Self>> {
         slf.builder_mut()?
-            .try_with_builtin_metrics()
+            .with_builtin_metrics()
             .map_err(statements_to_py)?;
         Ok(slf)
     }
 
-    /// Add one metric and its dependencies from a registry.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If ``qualified_id`` or one of its dependencies is not in
-    ///     ``registry``. The builder stays usable.
-    /// ValueError
-    ///     If the id is not ``namespace.metric`` shaped or the builder was
-    ///     consumed.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.add_metric_from_registry")]
     #[pyo3(text_signature = "($self, qualified_id, registry)")]
     fn add_metric_from_registry<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -716,30 +363,15 @@ impl PyModelBuilder {
         registry: PyRef<'_, PyRegistry>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         slf.builder_mut()?
-            .try_add_metric_from_registry(qualified_id, &registry.inner)
+            .add_metric_from_registry(qualified_id, &registry.inner)
             .map_err(statements_to_py)?;
         Ok(slf)
     }
 
-    /// Add a fixed-rate bond to the capital structure (US conventions: 30/360, semi-annual).
-    ///
-    /// Rejected input leaves this builder usable with its accumulated model intact.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique instrument identifier.
-    /// notional : Money
-    ///     Principal amount (must be in a valid Currency).
-    /// coupon_rate : float
-    ///     Annual coupon rate as a decimal fraction (e.g. 0.05 for 5%).
-    /// issue_date, maturity_date : datetime.date | str
-    ///     Bond issue and maturity dates (date-like or ISO ``YYYY-MM-DD``).
-    /// discount_curve_id : str
-    ///     Discount curve identifier used for pricing.
     #[pyo3(
         text_signature = "($self, id, notional, coupon_rate, issue_date, maturity_date, discount_curve_id)"
     )]
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.add_bond")]
     fn add_bond<'py>(
         mut slf: PyRefMut<'py, Self>,
         id: &str,
@@ -753,7 +385,7 @@ impl PyModelBuilder {
         let issue = py_to_date(issue_date)?;
         let maturity = py_to_date(maturity_date)?;
         slf.builder_mut()?
-            .try_add_bond(
+            .add_bond(
                 id,
                 notional,
                 coupon_rate,
@@ -765,25 +397,10 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    /// Add an interest rate swap to the capital structure (US conventions).
-    ///
-    /// Rejected input leaves this builder usable with its accumulated model intact.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique instrument identifier.
-    /// notional : Money
-    ///     Swap notional.
-    /// fixed_rate : float
-    ///     Fixed leg rate as a decimal fraction (e.g. 0.04 for 4%).
-    /// start_date, maturity_date : datetime.date | str
-    ///     Effective and maturity dates (date-like or ISO ``YYYY-MM-DD``).
-    /// discount_curve_id, forward_curve_id : str
-    ///     Discount curve and floating-leg forward curve identifiers.
     #[pyo3(
         text_signature = "($self, id, notional, fixed_rate, start_date, maturity_date, discount_curve_id, forward_curve_id)"
     )]
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.add_swap")]
     #[allow(clippy::too_many_arguments)]
     fn add_swap<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -808,38 +425,15 @@ impl PyModelBuilder {
             forward_curve_id: forward_curve_id.to_string(),
         };
         slf.builder_mut()?
-            .try_add_swap(params)
+            .add_swap(params)
             .map_err(statements_to_py)?;
         Ok(slf)
     }
 
-    /// Add a fixed-rate bond with a market convention preset.
-    ///
-    /// Applies regional day-count, coupon-frequency, and calendar conventions
-    /// automatically; ``add_bond`` uses US corporate conventions instead.
-    ///
-    /// Rejected input leaves this builder usable with its accumulated model intact.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique instrument identifier.
-    /// notional : Money
-    ///     Principal amount (must be in a valid Currency).
-    /// coupon_rate : float
-    ///     Annual coupon rate as a decimal fraction (e.g. ``0.03`` for 3%).
-    /// issue_date, maturity_date : datetime.date | str
-    ///     Bond issue and maturity dates (date-like or ISO ``YYYY-MM-DD``).
-    /// convention : str
-    ///     Regional convention preset, as the canonical snake_case
-    ///     identifier: ``"us_treasury"``, ``"us_agency"``, ``"german_bund"``,
-    ///     ``"uk_gilt"``, ``"french_oat"``, ``"jgb"``, ``"us_corporate"``,
-    ///     or ``"eur_corporate"``.
-    /// discount_curve_id : str
-    ///     Discount curve identifier used for pricing.
     #[pyo3(
         text_signature = "($self, id, notional, coupon_rate, issue_date, maturity_date, convention, discount_curve_id)"
     )]
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.add_bond_with_convention")]
     #[allow(clippy::too_many_arguments)]
     fn add_bond_with_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -874,45 +468,16 @@ impl PyModelBuilder {
             discount_curve_id: discount_curve_id.to_string(),
         };
         slf.builder_mut()?
-            .try_add_bond_with_convention(params)
+            .add_bond_with_convention(params)
             .map_err(statements_to_py)?;
         Ok(slf)
     }
 
-    /// Add an interest rate swap with custom leg conventions.
-    ///
-    /// Exposes day-count, frequency, and business-day-convention parameters
-    /// for non-USD swaps (e.g. EUR annual ACT/360 fixed legs); ``add_swap``
-    /// uses US conventions instead.
-    ///
-    /// Rejected input leaves this builder usable with its accumulated model intact.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique instrument identifier.
-    /// notional : Money
-    ///     Swap notional.
-    /// fixed_rate : float
-    ///     Fixed leg rate as a decimal fraction (e.g. ``0.04`` for 4%).
-    /// start_date, maturity_date : datetime.date | str
-    ///     Effective and maturity dates of the swap schedule.
-    /// discount_curve_id, forward_curve_id : str
-    ///     Discount curve and floating-leg forward curve identifiers.
-    /// fixed_frequency : Tenor or str
-    ///     Payment frequency of the fixed leg (e.g. ``"1Y"``).
-    /// fixed_day_count : DayCount
-    ///     Day-count convention applied to the fixed leg.
-    /// float_frequency : Tenor or str
-    ///     Payment / fixing frequency of the floating leg (e.g. ``"3M"``).
-    /// float_day_count : DayCount
-    ///     Day-count convention applied to the floating leg.
-    /// business_day_convention : BusinessDayConvention or str, optional
-    ///     Schedule-date rolling convention (default Modified Following).
     #[pyo3(
         signature = (id, notional, fixed_rate, start_date, maturity_date, discount_curve_id, forward_curve_id, fixed_frequency, fixed_day_count, float_frequency, float_day_count, business_day_convention=None),
         text_signature = "($self, id, notional, fixed_rate, start_date, maturity_date, discount_curve_id, forward_curve_id, fixed_frequency, fixed_day_count, float_frequency, float_day_count, business_day_convention=None)"
     )]
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.add_swap_with_conventions")]
     #[allow(clippy::too_many_arguments)]
     fn add_swap_with_conventions<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -959,36 +524,12 @@ impl PyModelBuilder {
             business_day_convention: resolved_business_day_convention,
         };
         slf.builder_mut()?
-            .try_add_swap_with_conventions(params, conventions)
+            .add_swap_with_conventions(params, conventions)
             .map_err(statements_to_py)?;
         Ok(slf)
     }
 
-    /// Add a debt instrument to the capital structure.
-    ///
-    /// Use this for supported capital-structure instruments not covered by the
-    /// convenience constructors: bonds, convertible bonds, term loans, RCFs,
-    /// interest-rate swaps, caps/floors, and swaptions.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique instrument identifier.
-    /// instrument : Bond | TermLoan | RevolvingCredit | ConvertibleBond | InterestRateSwap | CapFloor | Swaption | str
-    ///     A typed ``finstack_quant.valuations.instruments`` object, or its
-    ///     ``finstack_quant.instrument/1`` envelope JSON string. Bare
-    ///     instrument payloads without the envelope are rejected.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the envelope is invalid or the instrument type is not supported
-    ///     in a financial-statement capital structure (e.g. equity, CDS).
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.add_debt")]
     #[pyo3(text_signature = "($self, id, instrument)")]
     fn add_debt<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -999,39 +540,22 @@ impl PyModelBuilder {
             .into_instrument_json()
             .map_err(core_to_py)?;
         let spec = FinancialStatementInstrument::try_from(spec).map_err(statements_to_py)?;
-        let builder = slf.take()?;
-        slf.inner = Some(builder.add_debt(id, spec));
+        slf.builder_mut()?.add_debt(id, spec);
         Ok(slf)
     }
 
-    /// Set the reporting currency used for capital-structure totals.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.reporting_currency")]
     #[pyo3(text_signature = "($self, currency)")]
     fn reporting_currency<'py>(
         mut slf: PyRefMut<'py, Self>,
         currency: PyRef<'_, PyCurrency>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let ccy = currency.inner;
-        let builder = slf.take()?;
-        slf.inner = Some(builder.reporting_currency(ccy));
+        slf.builder_mut()?.reporting_currency(ccy);
         Ok(slf)
     }
 
-    /// Set the FX conversion policy for capital-structure cashflows.
-    ///
-    /// Parameters
-    /// ----------
-    /// policy : str
-    ///     One of ``"cashflow_date"``, ``"period_end"``, ``"period_average"``.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.fx_policy")]
     #[pyo3(text_signature = "($self, policy)")]
     fn fx_policy<'py>(mut slf: PyRefMut<'py, Self>, policy: &str) -> PyResult<PyRefMut<'py, Self>> {
         let parsed: FxConversionPolicy =
@@ -1040,57 +564,22 @@ impl PyModelBuilder {
                     "invalid fx_policy {policy:?}: {e}; expected one of cashflow_date, period_end, period_average"
                 ))
             })?;
-        let builder = slf.take()?;
-        slf.inner = Some(builder.fx_policy(parsed));
+        slf.builder_mut()?.fx_policy(parsed);
         Ok(slf)
     }
 
-    /// Attach a waterfall specification (priority-of-payments, ECF sweep,
-    /// PIK toggle, payment classes, and optional prepay nodes).
-    ///
-    /// Parameters
-    /// ----------
-    /// waterfall_spec : WaterfallSpec
-    ///     Validated or pending waterfall configuration attached to the
-    ///     capital structure. Bond / ConvertibleBond plus a sweep is rejected
-    ///     at model build.
-    ///
-    /// Returns
-    /// -------
-    /// ModelBuilder
-    ///     This builder, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder has already been consumed.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.waterfall")]
     #[pyo3(text_signature = "($self, waterfall_spec)")]
     fn waterfall<'py>(
         mut slf: PyRefMut<'py, Self>,
         waterfall_spec: PyRef<'_, PyWaterfallSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec = waterfall_spec.inner.clone();
-        let builder = slf.take()?;
-        slf.inner = Some(builder.waterfall(spec));
+        slf.builder_mut()?.waterfall(spec);
         Ok(slf)
     }
 
-    /// Build the model specification.
-    ///
-    /// Validates node identities, explicit-value periods, forecasts, formula
-    /// dimensions, and positive, nonoverlapping timeline intervals. The node
-    /// identifier ``period_id`` is reserved for the result-export timeline.
-    ///
-    /// Returns
-    /// -------
-    /// FinancialModelSpec
-    ///     The completed model specification.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was consumed or its model (including its timeline) violates a
-    ///     semantic invariant. This terminal method consumes the ready builder.
+    #[doc = pydoc!("finstack_quant.statements", "ModelBuilder.build")]
     #[pyo3(text_signature = "($self)")]
     fn build(&mut self) -> PyResult<PyFinancialModelSpec> {
         let state = self.take()?;

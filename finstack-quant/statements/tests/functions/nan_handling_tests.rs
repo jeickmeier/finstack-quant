@@ -8,19 +8,19 @@ use finstack_quant_statements::types::AmountOrScalar;
 #[test]
 fn test_sum_with_nan() {
     // Create a model with NaN values using division by zero
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .compute("value1", "10.0")
-        .unwrap()
-        .compute("value2", "0.0 / 0.0") // Produces NaN
-        .unwrap()
-        .compute("value3", "20.0")
-        .unwrap()
-        .compute("total", "sum(value1, value2, value3)")
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        model_builder.compute("value1", "10.0").unwrap();
+        model_builder
+            .compute("value2", "0.0 / 0.0") // Produces NaN
+            .unwrap();
+        model_builder.compute("value3", "20.0").unwrap();
+        model_builder
+            .compute("total", "sum(value1, value2, value3)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -37,19 +37,19 @@ fn test_sum_with_nan() {
 
 #[test]
 fn test_mean_with_nan() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .compute("value1", "10.0")
-        .unwrap()
-        .compute("value2", "0.0 / 0.0") // Produces NaN
-        .unwrap()
-        .compute("value3", "20.0")
-        .unwrap()
-        .compute("average", "mean(value1, value2, value3)")
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        model_builder.compute("value1", "10.0").unwrap();
+        model_builder
+            .compute("value2", "0.0 / 0.0") // Produces NaN
+            .unwrap();
+        model_builder.compute("value3", "20.0").unwrap();
+        model_builder
+            .compute("average", "mean(value1, value2, value3)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -66,19 +66,23 @@ fn test_mean_with_nan() {
 
 #[test]
 fn test_all_nan_values() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .compute("value1", "0.0 / 0.0") // NaN
-        .unwrap()
-        .compute("value2", "0.0 / 0.0") // NaN
-        .unwrap()
-        .compute("sum_result", "sum(value1, value2)")
-        .unwrap()
-        .compute("mean_result", "mean(value1, value2)")
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        model_builder
+            .compute("value1", "0.0 / 0.0") // NaN
+            .unwrap();
+        model_builder
+            .compute("value2", "0.0 / 0.0") // NaN
+            .unwrap();
+        model_builder
+            .compute("sum_result", "sum(value1, value2)")
+            .unwrap();
+        model_builder
+            .compute("mean_result", "mean(value1, value2)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -109,19 +113,23 @@ fn test_all_nan_values() {
 
 #[test]
 fn test_coalesce_with_nan() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .compute("value1", "0.0 / 0.0") // NaN
-        .unwrap()
-        .compute("value2", "0.0") // Zero
-        .unwrap()
-        .compute("value3", "10.0") // Valid value
-        .unwrap()
-        .compute("result", "coalesce(value1, value2, value3)")
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        model_builder
+            .compute("value1", "0.0 / 0.0") // NaN
+            .unwrap();
+        model_builder
+            .compute("value2", "0.0") // Zero
+            .unwrap();
+        model_builder
+            .compute("value3", "10.0") // Valid value
+            .unwrap();
+        model_builder
+            .compute("result", "coalesce(value1, value2, value3)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -141,15 +149,17 @@ fn test_coalesce_with_nan() {
 
 #[test]
 fn test_annualize_with_nan() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .compute("quarterly_value", "0.0 / 0.0") // NaN
-        .unwrap()
-        .compute("annual", "annualize(quarterly_value, 4)")
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        model_builder
+            .compute("quarterly_value", "0.0 / 0.0") // NaN
+            .unwrap();
+        model_builder
+            .compute("annual", "annualize(quarterly_value, 4)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -170,10 +180,10 @@ fn test_annualize_with_nan() {
 #[test]
 fn test_ttm_with_nan() {
     // Create revenue with one NaN value in the middle
-    let model = ModelBuilder::new("test")
-        .periods("2024Q1..2024Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2024Q1..2024Q4", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -193,11 +203,12 @@ fn test_ttm_with_nan() {
                     AmountOrScalar::scalar(200.0),
                 ),
             ],
-        )
-        .compute("revenue_ttm", "ttm(revenue)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("revenue_ttm", "ttm(revenue)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -222,22 +233,21 @@ fn test_ttm_with_nan() {
 
 #[test]
 fn test_mixed_operations_with_nan() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .compute("a", "10.0")
-        .unwrap()
-        .compute("b", "0.0 / 0.0") // NaN
-        .unwrap()
-        .compute("c", "20.0")
-        .unwrap()
-        .compute("d", "0.0")
-        .unwrap()
-        // Complex formula mixing custom functions
-        .compute("result", "mean(sum(a, b), coalesce(d, c))")
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        model_builder.compute("a", "10.0").unwrap();
+        model_builder
+            .compute("b", "0.0 / 0.0") // NaN
+            .unwrap();
+        model_builder.compute("c", "20.0").unwrap();
+        model_builder.compute("d", "0.0").unwrap();
+        model_builder
+            // Complex formula mixing custom functions
+            .compute("result", "mean(sum(a, b), coalesce(d, c))")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -260,10 +270,14 @@ fn test_mixed_operations_with_nan() {
 #[test]
 fn test_sum_empty_args() {
     // Test that sum() with no arguments produces an error at compile time
-    let result = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .compute("total", "sum()");
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        match model_builder.compute("total", "sum()") {
+            Ok(_) => Ok(model_builder),
+            Err(error) => Err(error),
+        }
+    };
 
     assert!(
         result.is_err(),
@@ -274,10 +288,14 @@ fn test_sum_empty_args() {
 #[test]
 fn test_mean_empty_args() {
     // Test that mean() with no arguments produces an error at compile time
-    let result = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .compute("average", "mean()");
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        match model_builder.compute("average", "mean()") {
+            Ok(_) => Ok(model_builder),
+            Err(error) => Err(error),
+        }
+    };
 
     assert!(
         result.is_err(),
@@ -288,12 +306,15 @@ fn test_mean_empty_args() {
 #[test]
 fn test_coalesce_single_arg() {
     // Test that coalesce() with one argument produces an error
-    let result = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .compute("value", "10.0")
-        .unwrap()
-        .compute("result", "coalesce(value)");
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        model_builder.compute("value", "10.0").unwrap();
+        match model_builder.compute("result", "coalesce(value)") {
+            Ok(_) => Ok(model_builder),
+            Err(error) => Err(error),
+        }
+    };
 
     assert!(
         result.is_err(),

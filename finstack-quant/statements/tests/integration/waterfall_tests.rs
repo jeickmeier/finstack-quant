@@ -23,10 +23,12 @@ fn test_ecf_sweep_basic() {
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
 
-    let model = ModelBuilder::new("ecf_test")
-        .periods("2025Q1..2025Q2", None)
-        .expect("valid periods")
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("ecf_test");
+        model_builder
+            .periods("2025Q1..2025Q2", None)
+            .expect("valid periods");
+        model_builder.value(
             "cash",
             &[
                 (
@@ -38,8 +40,8 @@ fn test_ecf_sweep_basic() {
                     AmountOrScalar::scalar(1_000_000_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "ebitda",
             &[
                 (
@@ -51,8 +53,8 @@ fn test_ecf_sweep_basic() {
                     AmountOrScalar::scalar(1_100_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "taxes",
             &[
                 (
@@ -64,8 +66,8 @@ fn test_ecf_sweep_basic() {
                     AmountOrScalar::scalar(220_000.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "capex",
             &[
                 (
@@ -77,8 +79,8 @@ fn test_ecf_sweep_basic() {
                     AmountOrScalar::scalar(100_000.0),
                 ),
             ],
-        )
-        .add_debt(
+        );
+        model_builder.add_debt(
             "TL-001",
             FinancialStatementInstrument::TermLoan(
                 TermLoan::builder()
@@ -106,8 +108,8 @@ fn test_ecf_sweep_basic() {
                     .build()
                     .expect("valid term loan"),
             ),
-        )
-        .waterfall(WaterfallSpec {
+        );
+        model_builder.waterfall(WaterfallSpec {
             ecf_sweep: Some(EcfSweepSpec {
                 ebitda_node: "ebitda".to_string(),
                 taxes_node: Some("taxes".to_string()),
@@ -127,9 +129,9 @@ fn test_ecf_sweep_basic() {
             available_cash_node: "cash".into(),
             pik_toggle: None,
             ..Default::default()
-        })
-        .build()
-        .expect("model should build");
+        });
+        model_builder.build().expect("model should build")
+    };
 
     // Create market context
     let disc_curve = DiscountCurve::builder("USD-OIS")

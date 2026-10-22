@@ -200,12 +200,14 @@ impl GoalSeekResult {
 /// use finstack_quant_core::dates::PeriodId;
 ///
 /// # fn main() -> Result<()> {
-/// let model = ModelBuilder::new("example")
-///     .periods("2025Q1..Q1", None)?
-///     .value("revenue", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0))])
-///     .compute("profit_margin", "0.15")?
-///     .compute("net_income", "revenue * profit_margin")?
-///     .build()?;
+/// let model = {
+///     let mut model_builder = ModelBuilder::new("example");
+///     model_builder.periods("2025Q1..Q1", None)?;
+///     model_builder.value("revenue", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0))]);
+///     model_builder.compute("profit_margin", "0.15")?;
+///     model_builder.compute("net_income", "revenue * profit_margin")?;
+///     model_builder.build()?
+/// };
 ///
 /// // Verify model evaluates correctly first
 /// let mut evaluator = Evaluator::new();

@@ -46,10 +46,10 @@ fn assert_pandas_stat(actual: f64, expected: f64, message: &str) {
 
 #[test]
 fn test_rolling_mean_matches_pandas_full_window() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "data",
             &[
                 (
@@ -69,11 +69,12 @@ fn test_rolling_mean_matches_pandas_full_window() {
                     AmountOrScalar::scalar(40.0),
                 ),
             ],
-        )
-        .compute("rolling_mean_3", "rolling_mean(data, 3)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("rolling_mean_3", "rolling_mean(data, 3)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -100,10 +101,10 @@ fn test_rolling_mean_matches_pandas_full_window() {
 fn test_variance_uses_sample_not_population() {
     // Test that variance uses sample variance (n-1), not population variance (n)
     // Using rolling_var to compute variance over a window
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "data",
             &[
                 (
@@ -123,13 +124,15 @@ fn test_variance_uses_sample_not_population() {
                     AmountOrScalar::scalar(4.0),
                 ),
             ],
-        )
-        .compute("rolling_var_4", "rolling_var(data, 4)")
-        .unwrap()
-        .compute("rolling_std_4", "rolling_std(data, 4)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("rolling_var_4", "rolling_var(data, 4)")
+            .unwrap();
+        model_builder
+            .compute("rolling_std_4", "rolling_std(data, 4)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -180,22 +183,20 @@ fn test_variance_uses_sample_not_population() {
 #[test]
 fn test_variance_single_value_returns_nan() {
     // Market standard: Variance undefined for single value with sample variance
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q1", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q1", None).unwrap();
+        model_builder.value(
             "data",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0),
             )],
-        )
-        .compute("variance", "var(data)")
-        .unwrap()
-        .compute("std_dev", "std(data)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("variance", "var(data)").unwrap();
+        model_builder.compute("std_dev", "std(data)").unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -228,10 +229,10 @@ fn test_variance_single_value_returns_nan() {
 
 #[test]
 fn test_ttm_quarterly_data() {
-    let model = ModelBuilder::new("test")
-        .periods("2024Q1..2025Q1", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2024Q1..2025Q1", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -255,11 +256,12 @@ fn test_ttm_quarterly_data() {
                     AmountOrScalar::scalar(140.0),
                 ),
             ],
-        )
-        .compute("revenue_ttm", "ttm(revenue)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("revenue_ttm", "ttm(revenue)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -284,10 +286,10 @@ fn test_ttm_quarterly_data() {
 
 #[test]
 fn test_ttm_monthly_data() {
-    let model = ModelBuilder::new("test")
-        .periods("2024M01..2024M12", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2024M01..2024M12", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -339,11 +341,12 @@ fn test_ttm_monthly_data() {
                     AmountOrScalar::scalar(21.0),
                 ),
             ],
-        )
-        .compute("revenue_ttm", "ttm(revenue)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("revenue_ttm", "ttm(revenue)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -360,10 +363,10 @@ fn test_ttm_monthly_data() {
 
 #[test]
 fn test_ytd_quarterly_data() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -383,11 +386,12 @@ fn test_ytd_quarterly_data() {
                     AmountOrScalar::scalar(130.0),
                 ),
             ],
-        )
-        .compute("revenue_ytd", "ytd(revenue)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("revenue_ytd", "ytd(revenue)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -418,10 +422,10 @@ fn test_ytd_quarterly_data() {
 
 #[test]
 fn test_qtd_monthly_data() {
-    let model = ModelBuilder::new("test")
-        .periods("2025M01..2025M06", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025M01..2025M06", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -449,11 +453,12 @@ fn test_qtd_monthly_data() {
                     AmountOrScalar::scalar(120.0),
                 ),
             ],
-        )
-        .compute("revenue_qtd", "qtd(revenue)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("revenue_qtd", "qtd(revenue)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -484,10 +489,10 @@ fn test_qtd_monthly_data() {
 
 #[test]
 fn test_fiscal_ytd_monthly_data() {
-    let model = ModelBuilder::new("test")
-        .periods("2024M04..2025M06", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2024M04..2025M06", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -551,12 +556,13 @@ fn test_fiscal_ytd_monthly_data() {
                     AmountOrScalar::scalar(0.0),
                 ),
             ],
-        )
-        // April fiscal year
-        .compute("revenue_fiscal_ytd", "fiscal_ytd(revenue, 4)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            // April fiscal year
+            .compute("revenue_fiscal_ytd", "fiscal_ytd(revenue, 4)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -577,10 +583,10 @@ fn test_fiscal_ytd_monthly_data() {
 
 #[test]
 fn test_ttm_semi_annual_data() {
-    let model = ModelBuilder::new("test")
-        .periods("2024H1..2025H2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2024H1..2025H2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -600,11 +606,12 @@ fn test_ttm_semi_annual_data() {
                     AmountOrScalar::scalar(130.0),
                 ),
             ],
-        )
-        .compute("revenue_ttm", "ttm(revenue)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("revenue_ttm", "ttm(revenue)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -621,21 +628,22 @@ fn test_ttm_semi_annual_data() {
 
 #[test]
 fn test_ttm_annual_data() {
-    let model = ModelBuilder::new("test")
-        .periods("2023..2025", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2023..2025", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (PeriodId::annual(2023), AmountOrScalar::scalar(1000.0)),
                 (PeriodId::annual(2024), AmountOrScalar::scalar(1100.0)),
                 (PeriodId::annual(2025), AmountOrScalar::scalar(1200.0)),
             ],
-        )
-        .compute("revenue_ttm", "ttm(revenue)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("revenue_ttm", "ttm(revenue)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -650,17 +658,19 @@ fn test_ttm_annual_data() {
 #[test]
 fn test_exponential_smoothing_requires_alpha() {
     // Should error if alpha not provided
-    let result = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q1"))
+            .unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::TimeSeries,
@@ -671,8 +681,9 @@ fn test_exponential_smoothing_requires_alpha() {
                     // Missing alpha - should error
                 },
             },
-        )
-        .build();
+        );
+        model_builder.build()
+    };
 
     assert!(result.is_ok()); // Model builds fine
 
@@ -693,17 +704,19 @@ fn test_exponential_smoothing_requires_alpha() {
 #[test]
 fn test_exponential_smoothing_requires_beta() {
     // Should error if beta not provided
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q1"))
+            .unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::TimeSeries,
@@ -714,9 +727,9 @@ fn test_exponential_smoothing_requires_beta() {
                     // Missing beta - should error
                 },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let result = evaluator.evaluate(&model);
@@ -727,17 +740,19 @@ fn test_exponential_smoothing_requires_beta() {
 
 #[test]
 fn test_moving_average_requires_window() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q1"))
+            .unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::TimeSeries,
@@ -747,9 +762,9 @@ fn test_moving_average_requires_window() {
                     // Missing window - should error
                 },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let result = evaluator.evaluate(&model);
@@ -760,14 +775,19 @@ fn test_moving_average_requires_window() {
 
 #[test]
 fn test_seasonal_requires_mode() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q1"))
+            .unwrap();
+        model_builder.value(
             "revenue",
-            &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))],
-        )
-        .forecast(
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::Seasonal,
@@ -777,9 +797,9 @@ fn test_seasonal_requires_mode() {
                     // Missing mode - should error
                 },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let result = evaluator.evaluate(&model);
@@ -790,14 +810,19 @@ fn test_seasonal_requires_mode() {
 
 #[test]
 fn test_seasonal_decomposition_requires_season_length() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q1"))
+            .unwrap();
+        model_builder.value(
             "revenue",
-            &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))],
-        )
-        .forecast(
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::Seasonal,
@@ -807,9 +832,9 @@ fn test_seasonal_decomposition_requires_season_length() {
                     // Missing season_length - should error
                 },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let result = evaluator.evaluate(&model);
@@ -822,10 +847,10 @@ fn test_seasonal_decomposition_requires_season_length() {
 
 #[test]
 fn test_lag_quarterly_periods() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -845,11 +870,10 @@ fn test_lag_quarterly_periods() {
                     AmountOrScalar::scalar(130.0),
                 ),
             ],
-        )
-        .compute("lagged", "lag(revenue, 1)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("lagged", "lag(revenue, 1)").unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -876,10 +900,10 @@ fn test_lag_quarterly_periods() {
 
 #[test]
 fn test_lag_monthly_periods() {
-    let model = ModelBuilder::new("test")
-        .periods("2024M11..2025M02", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2024M11..2025M02", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -899,11 +923,10 @@ fn test_lag_monthly_periods() {
                     AmountOrScalar::scalar(130.0),
                 ),
             ],
-        )
-        .compute("lagged", "lag(revenue, 2)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("lagged", "lag(revenue, 2)").unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -933,14 +956,19 @@ fn test_lag_monthly_periods() {
 
 #[test]
 fn test_seasonal_mode_enum_additive() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q1"))
+            .unwrap();
+        model_builder.value(
             "revenue",
-            &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))],
-        )
-        .forecast(
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::Seasonal,
@@ -950,9 +978,9 @@ fn test_seasonal_mode_enum_additive() {
                     "mode".into() => serde_json::json!("additive"),
                 },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -985,14 +1013,19 @@ fn test_seasonal_mode_enum_additive() {
 
 #[test]
 fn test_seasonal_mode_enum_multiplicative() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q1"))
+            .unwrap();
+        model_builder.value(
             "revenue",
-            &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))],
-        )
-        .forecast(
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::Seasonal,
@@ -1002,9 +1035,9 @@ fn test_seasonal_mode_enum_multiplicative() {
                     "mode".into() => serde_json::json!("multiplicative"),
                 },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -1038,17 +1071,19 @@ fn test_seasonal_mode_enum_multiplicative() {
 #[test]
 fn test_seasonal_mode_typo_errors() {
     // Typo in mode should error, not silently default
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q1"))
+            .unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::Seasonal,
@@ -1058,9 +1093,9 @@ fn test_seasonal_mode_typo_errors() {
                     "mode".into() => serde_json::json!("additiv"), // Typo
                 },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let result = evaluator.evaluate(&model);
@@ -1077,10 +1112,10 @@ fn test_seasonal_mode_typo_errors() {
 fn test_rolling_window_with_limited_history() {
     // pandas parity: a partial window is NaN by default (min_periods = window);
     // pass an explicit min_periods to opt into expanding-until-full behavior.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -1092,13 +1127,15 @@ fn test_rolling_window_with_limited_history() {
                     AmountOrScalar::scalar(110.0),
                 ),
             ],
-        )
-        .compute("rolling_mean_4", "rolling_mean(revenue, 4)")
-        .unwrap()
-        .compute("rolling_mean_4_mp1", "rolling_mean(revenue, 4, 1)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("rolling_mean_4", "rolling_mean(revenue, 4)")
+            .unwrap();
+        model_builder
+            .compute("rolling_mean_4_mp1", "rolling_mean(revenue, 4, 1)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -1139,14 +1176,19 @@ fn test_rolling_window_with_limited_history() {
 #[test]
 fn test_seasonal_allows_negative_values() {
     // Seasonal forecast should allow negative values (not force non-negative)
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q1"))
+            .unwrap();
+        model_builder.value(
             "net_income",
-            &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(10.0))],
-        )
-        .forecast(
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(10.0),
+            )],
+        );
+        model_builder.forecast(
             "net_income",
             ForecastSpec {
                 method: ForecastMethod::Seasonal,
@@ -1156,9 +1198,9 @@ fn test_seasonal_allows_negative_values() {
                     "mode".into() => serde_json::json!("additive"),
                 },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -1195,10 +1237,10 @@ fn test_seasonal_allows_negative_values() {
 
 #[test]
 fn test_ewm_statistics_match_pandas_adjust_false() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2025Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder.value(
             "returns",
             &[
                 (
@@ -1218,19 +1260,24 @@ fn test_ewm_statistics_match_pandas_adjust_false() {
                     AmountOrScalar::scalar(0.08),
                 ),
             ],
-        )
-        .compute("mean", "ewm_mean(returns, 0.3)")
-        .unwrap()
-        .compute("variance_default", "ewm_var(returns, 0.3)")
-        .unwrap()
-        .compute("variance_unbiased", "ewm_var(returns, 0.3, 1.0)")
-        .unwrap()
-        .compute("variance_biased", "ewm_var(returns, 0.3, 0.0)")
-        .unwrap()
-        .compute("std_unbiased", "ewm_std(returns, 0.3, 1.0)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("mean", "ewm_mean(returns, 0.3)")
+            .unwrap();
+        model_builder
+            .compute("variance_default", "ewm_var(returns, 0.3)")
+            .unwrap();
+        model_builder
+            .compute("variance_unbiased", "ewm_var(returns, 0.3, 1.0)")
+            .unwrap();
+        model_builder
+            .compute("variance_biased", "ewm_var(returns, 0.3, 0.0)")
+            .unwrap();
+        model_builder
+            .compute("std_unbiased", "ewm_std(returns, 0.3, 1.0)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();

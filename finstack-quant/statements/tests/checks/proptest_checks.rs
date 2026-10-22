@@ -27,14 +27,14 @@ proptest! {
         let l = a * l_frac;
         let e = a - l;
 
-        let model = ModelBuilder::new("proptest")
-            .periods("2025Q1..Q1", None)
-            .unwrap()
-            .value("total_assets", &[(q1(), AmountOrScalar::scalar(a))])
-            .value("total_liabilities", &[(q1(), AmountOrScalar::scalar(l))])
-            .value("total_equity", &[(q1(), AmountOrScalar::scalar(e))])
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder = ModelBuilder::new("proptest");
+            model_builder.periods("2025Q1..Q1", None).unwrap();
+            model_builder.value("total_assets", &[(q1(), AmountOrScalar::scalar(a))]);
+            model_builder.value("total_liabilities", &[(q1(), AmountOrScalar::scalar(l))]);
+            model_builder.value("total_equity", &[(q1(), AmountOrScalar::scalar(e))]);
+            model_builder.build().unwrap()
+        };
 
         let mut ev = Evaluator::new();
         let results = ev.evaluate(&model).unwrap();
@@ -59,14 +59,14 @@ proptest! {
     ) {
         let e = a - l + gap; // intentional imbalance of `gap`
 
-        let model = ModelBuilder::new("proptest")
-            .periods("2025Q1..Q1", None)
-            .unwrap()
-            .value("total_assets", &[(q1(), AmountOrScalar::scalar(a))])
-            .value("total_liabilities", &[(q1(), AmountOrScalar::scalar(l))])
-            .value("total_equity", &[(q1(), AmountOrScalar::scalar(e))])
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder = ModelBuilder::new("proptest");
+            model_builder.periods("2025Q1..Q1", None).unwrap();
+            model_builder.value("total_assets", &[(q1(), AmountOrScalar::scalar(a))]);
+            model_builder.value("total_liabilities", &[(q1(), AmountOrScalar::scalar(l))]);
+            model_builder.value("total_equity", &[(q1(), AmountOrScalar::scalar(e))]);
+            model_builder.build().unwrap()
+        };
 
         let mut ev = Evaluator::new();
         let results = ev.evaluate(&model).unwrap();
@@ -91,12 +91,12 @@ proptest! {
     fn non_finite_always_catches_nan(
         base_val in -1e12f64..1e12,
     ) {
-        let model = ModelBuilder::new("proptest")
-            .periods("2025Q1..Q1", None)
-            .unwrap()
-            .value("good_node", &[(q1(), AmountOrScalar::scalar(base_val))])
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder = ModelBuilder::new("proptest");
+            model_builder.periods("2025Q1..Q1", None).unwrap();
+            model_builder.value("good_node", &[(q1(), AmountOrScalar::scalar(base_val))]);
+            model_builder.build().unwrap()
+        };
 
         let mut ev = Evaluator::new();
         let mut results = ev.evaluate(&model).unwrap();
@@ -117,12 +117,12 @@ proptest! {
     fn non_finite_always_catches_inf(
         base_val in -1e12f64..1e12,
     ) {
-        let model = ModelBuilder::new("proptest")
-            .periods("2025Q1..Q1", None)
-            .unwrap()
-            .value("good_node", &[(q1(), AmountOrScalar::scalar(base_val))])
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder = ModelBuilder::new("proptest");
+            model_builder.periods("2025Q1..Q1", None).unwrap();
+            model_builder.value("good_node", &[(q1(), AmountOrScalar::scalar(base_val))]);
+            model_builder.build().unwrap()
+        };
 
         let mut ev = Evaluator::new();
         let mut results = ev.evaluate(&model).unwrap();
@@ -143,12 +143,12 @@ proptest! {
     fn non_finite_always_catches_neg_inf(
         base_val in -1e12f64..1e12,
     ) {
-        let model = ModelBuilder::new("proptest")
-            .periods("2025Q1..Q1", None)
-            .unwrap()
-            .value("good_node", &[(q1(), AmountOrScalar::scalar(base_val))])
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder = ModelBuilder::new("proptest");
+            model_builder.periods("2025Q1..Q1", None).unwrap();
+            model_builder.value("good_node", &[(q1(), AmountOrScalar::scalar(base_val))]);
+            model_builder.build().unwrap()
+        };
 
         let mut ev = Evaluator::new();
         let mut results = ev.evaluate(&model).unwrap();
@@ -174,13 +174,13 @@ proptest! {
         v1 in 0.01f64..1e12,
         v2 in 0.01f64..1e12,
     ) {
-        let model = ModelBuilder::new("proptest")
-            .periods("2025Q1..Q1", None)
-            .unwrap()
-            .value("revenue", &[(q1(), AmountOrScalar::scalar(v1))])
-            .value("other_income", &[(q1(), AmountOrScalar::scalar(v2))])
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder = ModelBuilder::new("proptest");
+            model_builder.periods("2025Q1..Q1", None).unwrap();
+            model_builder.value("revenue", &[(q1(), AmountOrScalar::scalar(v1))]);
+            model_builder.value("other_income", &[(q1(), AmountOrScalar::scalar(v2))]);
+            model_builder.build().unwrap()
+        };
 
         let mut ev = Evaluator::new();
         let results = ev.evaluate(&model).unwrap();
@@ -200,12 +200,12 @@ proptest! {
     fn sign_convention_warns_when_negative(
         v in -1e12f64..-0.01,
     ) {
-        let model = ModelBuilder::new("proptest")
-            .periods("2025Q1..Q1", None)
-            .unwrap()
-            .value("revenue", &[(q1(), AmountOrScalar::scalar(v))])
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder = ModelBuilder::new("proptest");
+            model_builder.periods("2025Q1..Q1", None).unwrap();
+            model_builder.value("revenue", &[(q1(), AmountOrScalar::scalar(v))]);
+            model_builder.build().unwrap()
+        };
 
         let mut ev = Evaluator::new();
         let results = ev.evaluate(&model).unwrap();

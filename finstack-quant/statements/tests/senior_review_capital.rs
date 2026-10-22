@@ -138,11 +138,15 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
         assert_eq!(funding.amount(), 0.0);
 
         for waterfall in [false, true] {
-            let builder = ModelBuilder::new("signed-swap").add_debt(
-                "IRS",
-                FinancialStatementInstrument::InterestRateSwap(swap.clone()),
-            );
-            let builder = if waterfall {
+            let mut builder = {
+                let mut model_builder = ModelBuilder::new("signed-swap");
+                model_builder.add_debt(
+                    "IRS",
+                    FinancialStatementInstrument::InterestRateSwap(swap.clone()),
+                );
+                model_builder
+            };
+            if waterfall {
                 builder.waterfall(WaterfallSpec {
                     priority_of_payments: vec![
                         PaymentPriority::Fees,
@@ -151,22 +155,27 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
                         PaymentPriority::Equity,
                     ],
                     ..Default::default()
-                })
-            } else {
-                builder
+                });
+            }
+            let model = {
+                let mut model_builder_1 = builder;
+                model_builder_1
+                    .periods("2025..2025", None)
+                    .expect("valid annual period");
+                model_builder_1.value("cash", &[(period.id, AmountOrScalar::scalar(10_000.0))]);
+                model_builder_1
+                    .compute("balance", "cs.debt_balance.IRS")
+                    .expect("hedge balance");
+                model_builder_1
+                    .compute("expense", "cs.interest_expense_cash.IRS")
+                    .expect("expense formula");
+                model_builder_1
+                    .compute("income", "cs.interest_income.IRS")
+                    .expect("income formula");
+                model_builder_1
+                    .build()
+                    .expect("both swap sides are supported")
             };
-            let model = builder
-                .periods("2025..2025", None)
-                .expect("valid annual period")
-                .value("cash", &[(period.id, AmountOrScalar::scalar(10_000.0))])
-                .compute("balance", "cs.debt_balance.IRS")
-                .expect("hedge balance")
-                .compute("expense", "cs.interest_expense_cash.IRS")
-                .expect("expense formula")
-                .compute("income", "cs.interest_income.IRS")
-                .expect("income formula")
-                .build()
-                .expect("both swap sides are supported");
             let result = Evaluator::new()
                 .evaluate_with_market(&model, &market, as_of)
                 .expect("signed IRS evaluation");
@@ -224,16 +233,20 @@ fn canonical_negative_debt_coupons_are_income() {
         net < 0.0,
         "negative debt coupon must survive canonical emission"
     );
-    let model = ModelBuilder::new("negative-debt")
-        .add_debt("DEBT", spec)
-        .periods("2025..2025", None)
-        .expect("annual period")
-        .compute("expense", "cs.interest_expense_cash.DEBT")
-        .expect("expense")
-        .compute("income", "cs.interest_income.DEBT")
-        .expect("income")
-        .build()
-        .expect("negative-rate debt model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("negative-debt");
+        model_builder.add_debt("DEBT", spec);
+        model_builder
+            .periods("2025..2025", None)
+            .expect("annual period");
+        model_builder
+            .compute("expense", "cs.interest_expense_cash.DEBT")
+            .expect("expense");
+        model_builder
+            .compute("income", "cs.interest_income.DEBT")
+            .expect("income");
+        model_builder.build().expect("negative-rate debt model")
+    };
     let result = Evaluator::new()
         .evaluate_with_market(&model, &market, as_of)
         .expect("negative-rate debt evaluation");
@@ -260,12 +273,14 @@ fn placeholder_rate_option_schedule_is_rejected_explicitly() {
     )
     .expect_err("unmodeled contingent payouts must not appear as zero income");
     assert!(error.to_string().contains("placeholder cashflow schedule"));
-    let model = ModelBuilder::new("placeholder-option")
-        .add_debt("OPTION", FinancialStatementInstrument::CapFloor(option))
-        .periods("2025..2025", None)
-        .expect("annual period")
-        .build()
-        .expect("valid model specification");
+    let model = {
+        let mut model_builder = ModelBuilder::new("placeholder-option");
+        model_builder.add_debt("OPTION", FinancialStatementInstrument::CapFloor(option));
+        model_builder
+            .periods("2025..2025", None)
+            .expect("annual period");
+        model_builder.build().expect("valid model specification")
+    };
     let error = Evaluator::new()
         .evaluate_with_market(&model, &MarketContext::new(), as_of)
         .expect_err("runtime must reject the placeholder too");
@@ -300,37 +315,45 @@ fn pik_toggle_rejects_hedge_targets_and_keeps_explicit_debt_targets() {
         ..Default::default()
     };
     for targets in [Some(vec!["IRS".into()]), None] {
-        let error = ModelBuilder::new("hedge-pik")
-            .add_debt(
+        let error = {
+            let mut model_builder = ModelBuilder::new("hedge-pik");
+            model_builder.add_debt(
                 "IRS",
                 FinancialStatementInstrument::InterestRateSwap(swap.clone()),
-            )
-            .waterfall(waterfall(targets.clone()))
-            .periods("2025..2025", None)
-            .expect("annual period")
-            .value(
+            );
+            model_builder.waterfall(waterfall(targets.clone()));
+            model_builder
+                .periods("2025..2025", None)
+                .expect("annual period");
+            model_builder.value(
                 "cash",
                 &[(PeriodId::annual(2025), AmountOrScalar::scalar(10.0))],
-            )
-            .build()
-            .expect_err("hedge payments cannot become borrowing principal");
+            );
+            model_builder
+                .build()
+                .expect_err("hedge payments cannot become borrowing principal")
+        };
         assert!(error.to_string().contains(if targets.is_some() {
             "hedge or option"
         } else {
             "must explicitly list"
         }));
     }
-    ModelBuilder::new("debt-pik")
-        .add_debt("TL", FinancialStatementInstrument::TermLoan(loan(as_of)))
-        .waterfall(waterfall(Some(vec!["TL".into()])))
-        .periods("2025..2025", None)
-        .expect("annual period")
-        .value(
+    {
+        let mut model_builder = ModelBuilder::new("debt-pik");
+        model_builder.add_debt("TL", FinancialStatementInstrument::TermLoan(loan(as_of)));
+        model_builder.waterfall(waterfall(Some(vec!["TL".into()])));
+        model_builder
+            .periods("2025..2025", None)
+            .expect("annual period");
+        model_builder.value(
             "cash",
             &[(PeriodId::annual(2025), AmountOrScalar::scalar(10.0))],
-        )
-        .build()
-        .expect("explicit debt-only PIK target remains valid");
+        );
+        model_builder
+            .build()
+            .expect("explicit debt-only PIK target remains valid")
+    };
 }
 
 fn loan(issue: Date) -> TermLoan {
@@ -435,27 +458,31 @@ fn loan_issuance_is_funded_once_before_on_and_after_first_period_start() {
         date!(2025 - 01 - 15),
     ] {
         for waterfall in [false, true] {
-            let builder = ModelBuilder::new("issuance")
-                .add_debt("TL", FinancialStatementInstrument::TermLoan(loan(issue)));
-            let builder = if waterfall {
-                builder.waterfall(WaterfallSpec::default())
-            } else {
-                builder
+            let mut builder = {
+                let mut model_builder = ModelBuilder::new("issuance");
+                model_builder.add_debt("TL", FinancialStatementInstrument::TermLoan(loan(issue)));
+                model_builder
             };
-            let model = builder
-                .periods("2025Q1..2025Q2", None)
-                .expect("valid periods")
-                .value(
+            if waterfall {
+                builder.waterfall(WaterfallSpec::default());
+            }
+            let model = {
+                let mut model_builder_1 = builder;
+                model_builder_1
+                    .periods("2025Q1..2025Q2", None)
+                    .expect("valid periods");
+                model_builder_1.value(
                     "cash",
                     &[
                         (q1, AmountOrScalar::scalar(10.0)),
                         (q2, AmountOrScalar::scalar(10.0)),
                     ],
-                )
-                .compute("balance", "cs.debt_balance.TL")
-                .expect("valid capital-structure formula")
-                .build()
-                .expect("valid model");
+                );
+                model_builder_1
+                    .compute("balance", "cs.debt_balance.TL")
+                    .expect("valid capital-structure formula");
+                model_builder_1.build().expect("valid model")
+            };
             let results = Evaluator::new()
                 .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 01))
                 .expect("issuance evaluation");
@@ -476,21 +503,24 @@ fn plain_evaluate_generates_fixed_rate_capital_structure_cashflows() {
     let q2 = PeriodId::quarter(2025, 2).expect("valid quarter");
     let mut fixed = loan(date!(2024 - 01 - 01));
     fixed.rate = RateSpec::Fixed { rate: 0.08 };
-    let mut model = ModelBuilder::new("plain capital structure")
-        .add_debt("TL", FinancialStatementInstrument::TermLoan(fixed))
-        .periods("2025Q1..2025Q2", None)
-        .expect("valid periods")
-        .value(
+    let mut model = {
+        let mut model_builder = ModelBuilder::new("plain capital structure");
+        model_builder.add_debt("TL", FinancialStatementInstrument::TermLoan(fixed));
+        model_builder
+            .periods("2025Q1..2025Q2", None)
+            .expect("valid periods");
+        model_builder.value(
             "cash",
             &[
                 (q1, AmountOrScalar::scalar(10.0)),
                 (q2, AmountOrScalar::scalar(12.0)),
             ],
-        )
-        .compute("interest", "cs.interest_expense.TL")
-        .expect("valid capital-structure formula")
-        .build()
-        .expect("valid model");
+        );
+        model_builder
+            .compute("interest", "cs.interest_expense.TL")
+            .expect("valid capital-structure formula");
+        model_builder.build().expect("valid model")
+    };
 
     let plain = Evaluator::new().evaluate(&model).expect("plain evaluation");
     let empty_market = Evaluator::new()
@@ -558,13 +588,15 @@ fn plain_evaluate_names_instruments_that_need_market_data() {
     )
     .expect("canonical IRS");
     let q1 = PeriodId::quarter(2025, 1).expect("valid quarter");
-    let model = ModelBuilder::new("floating capital structure")
-        .add_debt("IRS", FinancialStatementInstrument::InterestRateSwap(swap))
-        .periods("2025Q1..2025Q1", None)
-        .expect("valid periods")
-        .value("cash", &[(q1, AmountOrScalar::scalar(10.0))])
-        .build()
-        .expect("valid model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("floating capital structure");
+        model_builder.add_debt("IRS", FinancialStatementInstrument::InterestRateSwap(swap));
+        model_builder
+            .periods("2025Q1..2025Q1", None)
+            .expect("valid periods");
+        model_builder.value("cash", &[(q1, AmountOrScalar::scalar(10.0))]);
+        model_builder.build().expect("valid model")
+    };
 
     let err = Evaluator::new()
         .evaluate(&model)
@@ -599,9 +631,12 @@ fn bond_issuance_is_funded_once_before_on_and_after_first_period_start() {
         )
         .expect("valid bond");
         for waterfall in [false, true] {
-            let builder = ModelBuilder::new("bond opening")
-                .add_debt("BOND", FinancialStatementInstrument::Bond(bond.clone()));
-            let builder = if waterfall {
+            let mut builder = {
+                let mut model_builder = ModelBuilder::new("bond opening");
+                model_builder.add_debt("BOND", FinancialStatementInstrument::Bond(bond.clone()));
+                model_builder
+            };
+            if waterfall {
                 builder.waterfall(WaterfallSpec {
                     priority_of_payments: vec![
                         PaymentPriority::Fees,
@@ -610,24 +645,27 @@ fn bond_issuance_is_funded_once_before_on_and_after_first_period_start() {
                         PaymentPriority::Equity,
                     ],
                     ..Default::default()
-                })
-            } else {
-                builder
-            };
-            let model = builder
-                .periods("2025Q1..2025Q2", None)
-                .expect("valid periods")
-                .value(
+                });
+            }
+            let model = {
+                let mut model_builder_1 = builder;
+                model_builder_1
+                    .periods("2025Q1..2025Q2", None)
+                    .expect("valid periods");
+                model_builder_1.value(
                     "cash",
                     &[
                         (q1, AmountOrScalar::scalar(10.0)),
                         (q2, AmountOrScalar::scalar(10.0)),
                     ],
-                )
-                .compute("balance", "cs.debt_balance.BOND")
-                .expect("valid capital-structure formula")
-                .build()
-                .expect("bond waterfall has no prepayment priority");
+                );
+                model_builder_1
+                    .compute("balance", "cs.debt_balance.BOND")
+                    .expect("valid capital-structure formula");
+                model_builder_1
+                    .build()
+                    .expect("bond waterfall has no prepayment priority")
+            };
             let results = Evaluator::new()
                 .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 01))
                 .expect("bond evaluation");
@@ -690,27 +728,32 @@ fn oid_funding_preserves_loan_face_and_cash_at_boundaries() {
                 if issue < periods[0].start { 0.0 } else { 100.0 }
             );
             for waterfall in [false, true] {
-                let builder = ModelBuilder::new("OID funding")
-                    .add_debt("TL", FinancialStatementInstrument::TermLoan(loan.clone()));
-                let builder = if waterfall {
-                    builder.waterfall(WaterfallSpec::default())
-                } else {
-                    builder
+                let mut builder = {
+                    let mut model_builder = ModelBuilder::new("OID funding");
+                    model_builder
+                        .add_debt("TL", FinancialStatementInstrument::TermLoan(loan.clone()));
+                    model_builder
                 };
-                let model = builder
-                    .periods("2025Q1..2025Q2", None)
-                    .expect("valid periods")
-                    .value(
+                if waterfall {
+                    builder.waterfall(WaterfallSpec::default());
+                }
+                let model = {
+                    let mut model_builder_1 = builder;
+                    model_builder_1
+                        .periods("2025Q1..2025Q2", None)
+                        .expect("valid periods");
+                    model_builder_1.value(
                         "cash",
                         &[
                             (periods[0].id, AmountOrScalar::scalar(10.0)),
                             (periods[1].id, AmountOrScalar::scalar(10.0)),
                         ],
-                    )
-                    .compute("balance", "cs.debt_balance.TL")
-                    .expect("balance formula")
-                    .build()
-                    .expect("valid OID model");
+                    );
+                    model_builder_1
+                        .compute("balance", "cs.debt_balance.TL")
+                        .expect("balance formula");
+                    model_builder_1.build().expect("valid OID model")
+                };
                 let result = Evaluator::new()
                     .evaluate_with_market(&model, &market, periods[0].start)
                     .expect("OID model evaluation");
@@ -789,9 +832,13 @@ fn oid_funding_preserves_custom_bond_face_with_separate_cash_dates() {
                 .expect("custom discounted issuance");
             assert_eq!(raw.get_flows()[0].amount.amount(), -98.0);
             for waterfall in [false, true] {
-                let builder = ModelBuilder::new("custom OID bond")
-                    .add_debt("BOND", FinancialStatementInstrument::Bond(bond.clone()));
-                let builder = if waterfall {
+                let mut builder = {
+                    let mut model_builder = ModelBuilder::new("custom OID bond");
+                    model_builder
+                        .add_debt("BOND", FinancialStatementInstrument::Bond(bond.clone()));
+                    model_builder
+                };
+                if waterfall {
                     builder.waterfall(WaterfallSpec {
                         priority_of_payments: vec![
                             PaymentPriority::Fees,
@@ -800,24 +847,25 @@ fn oid_funding_preserves_custom_bond_face_with_separate_cash_dates() {
                             PaymentPriority::Equity,
                         ],
                         ..Default::default()
-                    })
-                } else {
-                    builder
-                };
-                let model = builder
-                    .periods("2025Q1..2025Q2", None)
-                    .expect("valid periods")
-                    .value(
+                    });
+                }
+                let model = {
+                    let mut model_builder_1 = builder;
+                    model_builder_1
+                        .periods("2025Q1..2025Q2", None)
+                        .expect("valid periods");
+                    model_builder_1.value(
                         "cash",
                         &[
                             (periods[0].id, AmountOrScalar::scalar(10.0)),
                             (periods[1].id, AmountOrScalar::scalar(10.0)),
                         ],
-                    )
-                    .compute("balance", "cs.debt_balance.BOND")
-                    .expect("balance formula")
-                    .build()
-                    .expect("valid custom bond model");
+                    );
+                    model_builder_1
+                        .compute("balance", "cs.debt_balance.BOND")
+                        .expect("balance formula");
+                    model_builder_1.build().expect("valid custom bond model")
+                };
                 let result = Evaluator::new()
                     .evaluate_with_market(&model, &market, periods[0].start)
                     .expect("custom bond evaluation");
@@ -988,21 +1036,25 @@ fn newly_funded_loan_preserves_contractual_pik_in_its_first_period() {
         .amount();
     assert!(expected > 100.0, "in-period PIK must capitalize");
     for waterfall in [false, true] {
-        let builder = ModelBuilder::new("PIK issuance")
-            .add_debt("TL", FinancialStatementInstrument::TermLoan(loan.clone()));
-        let builder = if waterfall {
-            builder.waterfall(WaterfallSpec::default())
-        } else {
-            builder
+        let mut builder = {
+            let mut model_builder = ModelBuilder::new("PIK issuance");
+            model_builder.add_debt("TL", FinancialStatementInstrument::TermLoan(loan.clone()));
+            model_builder
         };
-        let model = builder
-            .periods("2025..2025", None)
-            .expect("valid annual period")
-            .value("cash", &[(period, AmountOrScalar::scalar(10.0))])
-            .compute("balance", "cs.debt_balance.TL")
-            .expect("valid capital-structure formula")
-            .build()
-            .expect("valid model");
+        if waterfall {
+            builder.waterfall(WaterfallSpec::default());
+        }
+        let model = {
+            let mut model_builder_1 = builder;
+            model_builder_1
+                .periods("2025..2025", None)
+                .expect("valid annual period");
+            model_builder_1.value("cash", &[(period, AmountOrScalar::scalar(10.0))]);
+            model_builder_1
+                .compute("balance", "cs.debt_balance.TL")
+                .expect("valid capital-structure formula");
+            model_builder_1.build().expect("valid model")
+        };
         let results = Evaluator::new()
             .evaluate_with_market(&model, &market, issue)
             .expect("PIK issuance evaluation");
@@ -1038,31 +1090,37 @@ fn contractual_pik_is_redeemed_at_maturity_and_capitalized_once() {
     let expected_principal = 100.0 + expected_pik;
     assert!(expected_pik > 0.0);
     for waterfall in [false, true] {
-        let builder = ModelBuilder::new("PIK maturity")
-            .add_debt("TL", FinancialStatementInstrument::TermLoan(loan.clone()));
-        let builder = if waterfall {
-            builder.waterfall(WaterfallSpec::default())
-        } else {
-            builder
+        let mut builder = {
+            let mut model_builder = ModelBuilder::new("PIK maturity");
+            model_builder.add_debt("TL", FinancialStatementInstrument::TermLoan(loan.clone()));
+            model_builder
         };
-        let model = builder
-            .periods("2025..2026", None)
-            .expect("valid annual periods")
-            .value(
+        if waterfall {
+            builder.waterfall(WaterfallSpec::default());
+        }
+        let model = {
+            let mut model_builder_1 = builder;
+            model_builder_1
+                .periods("2025..2026", None)
+                .expect("valid annual periods");
+            model_builder_1.value(
                 "cash",
                 &[
                     (period, AmountOrScalar::scalar(200.0)),
                     (next, AmountOrScalar::scalar(200.0)),
                 ],
-            )
-            .compute("balance", "cs.debt_balance.TL")
-            .expect("balance formula")
-            .compute("principal", "cs.principal_payment.TL")
-            .expect("principal formula")
-            .compute("pik", "cs.interest_expense_pik.TL")
-            .expect("PIK formula")
-            .build()
-            .expect("valid maturity model");
+            );
+            model_builder_1
+                .compute("balance", "cs.debt_balance.TL")
+                .expect("balance formula");
+            model_builder_1
+                .compute("principal", "cs.principal_payment.TL")
+                .expect("principal formula");
+            model_builder_1
+                .compute("pik", "cs.interest_expense_pik.TL")
+                .expect("PIK formula");
+            model_builder_1.build().expect("valid maturity model")
+        };
         let result = Evaluator::new()
             .evaluate_with_market(&model, &market, issue)
             .expect("PIK maturity evaluation");
@@ -1094,34 +1152,38 @@ fn loan_swept_after_issuance_stays_repaid_in_later_periods() {
     let periods: Vec<_> = (1..=3)
         .map(|quarter| PeriodId::quarter(2025, quarter).expect("quarter"))
         .collect();
-    let model = ModelBuilder::new("issuance then sweep")
-        .add_debt(
+    let model = {
+        let mut model_builder = ModelBuilder::new("issuance then sweep");
+        model_builder.add_debt(
             "TL",
             FinancialStatementInstrument::TermLoan(loan(date!(2025 - 01 - 15))),
-        )
-        .waterfall(WaterfallSpec {
+        );
+        model_builder.waterfall(WaterfallSpec {
             ecf_sweep: Some(EcfSweepSpec {
                 sweep_percentage: 1.0,
                 ..ecf_sweep()
             }),
             ..Default::default()
-        })
-        .periods("2025Q1..2025Q3", None)
-        .expect("quarterly periods")
-        .value(
+        });
+        model_builder
+            .periods("2025Q1..2025Q3", None)
+            .expect("quarterly periods");
+        model_builder.value(
             "cash",
             &[
                 (periods[0], AmountOrScalar::scalar(0.0)),
                 (periods[1], AmountOrScalar::scalar(100.0)),
                 (periods[2], AmountOrScalar::scalar(100.0)),
             ],
-        )
-        .compute("balance", "cs.debt_balance.TL")
-        .expect("balance formula")
-        .compute("principal", "cs.principal_payment.TL")
-        .expect("principal formula")
-        .build()
-        .expect("valid model");
+        );
+        model_builder
+            .compute("balance", "cs.debt_balance.TL")
+            .expect("balance formula");
+        model_builder
+            .compute("principal", "cs.principal_payment.TL")
+            .expect("principal formula");
+        model_builder.build().expect("valid model")
+    };
     let result = Evaluator::new()
         .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 01))
         .expect("issuance and sweep");

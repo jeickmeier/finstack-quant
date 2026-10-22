@@ -14,15 +14,14 @@ fn quarter() -> PeriodId {
 }
 
 fn currency_model() -> FinancialModelSpec {
-    ModelBuilder::new("engine currency checks")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value_money("usd", &[(quarter(), Money::from((100_i64, Currency::USD)))])
-        .value_money("eur", &[(quarter(), Money::from((100_i64, Currency::EUR)))])
-        .compute("total", "usd * 2")
-        .unwrap()
-        .build()
-        .unwrap()
+    {
+        let mut model_builder = ModelBuilder::new("engine currency checks");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value_money("usd", &[(quarter(), Money::from((100_i64, Currency::USD)))]);
+        model_builder.value_money("eur", &[(quarter(), Money::from((100_i64, Currency::EUR)))]);
+        model_builder.compute("total", "usd * 2").unwrap();
+        model_builder.build().unwrap()
+    }
 }
 
 #[test]
@@ -139,14 +138,13 @@ fn prepared_plan_rejects_calculated_overrides_and_orphaned_availability() {
 
 #[test]
 fn monetary_nonfinite_results_emit_one_diagnostic_per_cell() {
-    let model = ModelBuilder::new("nonfinite monetary diagnostics")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value_money("usd", &[(quarter(), Money::from((1_i64, Currency::USD)))])
-        .compute("undefined", "usd / 0")
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("nonfinite monetary diagnostics");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value_money("usd", &[(quarter(), Money::from((1_i64, Currency::USD)))]);
+        model_builder.compute("undefined", "usd / 0").unwrap();
+        model_builder.build().unwrap()
+    };
     let mut evaluator = Evaluator::new();
     let plan = evaluator.prepare(&model).unwrap();
     for result in [
@@ -172,14 +170,13 @@ fn monetary_nonfinite_results_emit_one_diagnostic_per_cell() {
 
 #[test]
 fn finite_money_overflow_retains_conversion_warning_in_both_paths() {
-    let model = ModelBuilder::new("money conversion diagnostics")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value_money("usd", &[(quarter(), Money::from((1_i64, Currency::USD)))])
-        .compute("large", "usd * 1e30")
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("money conversion diagnostics");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value_money("usd", &[(quarter(), Money::from((1_i64, Currency::USD)))]);
+        model_builder.compute("large", "usd * 1e30").unwrap();
+        model_builder.build().unwrap()
+    };
     let mut evaluator = Evaluator::new();
     let plan = evaluator.prepare(&model).unwrap();
     for result in [

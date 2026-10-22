@@ -13,13 +13,13 @@ fn quarter(index: u8) -> PeriodId {
 }
 
 fn forecast_model(base: f64, forecast: ForecastSpec) -> FinancialModelSpec {
-    ModelBuilder::new("forecast-regression")
-        .periods("2025Q1..Q4", Some("2025Q1"))
-        .unwrap()
-        .value("x", &[(quarter(1), base.into())])
-        .forecast("x", forecast)
-        .build()
-        .unwrap()
+    {
+        let mut model_builder = ModelBuilder::new("forecast-regression");
+        model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+        model_builder.value("x", &[(quarter(1), base.into())]);
+        model_builder.forecast("x", forecast);
+        model_builder.build().unwrap()
+    }
 }
 
 #[test]
@@ -34,13 +34,13 @@ fn override_period_aliases_apply_to_their_parsed_periods() {
                 .into_iter()
                 .collect(),
         };
-        let model = ModelBuilder::new("monthly-overrides")
-            .periods("2025M1..M3", Some("2025M1"))
-            .unwrap()
-            .value("x", &[(january, 100.0.into())])
-            .forecast("x", forecast)
-            .build()
-            .unwrap();
+        let model = {
+            let mut model_builder = ModelBuilder::new("monthly-overrides");
+            model_builder.periods("2025M1..M3", Some("2025M1")).unwrap();
+            model_builder.value("x", &[(january, 100.0.into())]);
+            model_builder.forecast("x", forecast);
+            model_builder.build().unwrap()
+        };
         let result = Evaluator::new().evaluate(&model).unwrap();
         assert_eq!(result.get("x", &february), Some(200.0), "{spelling}");
         assert_eq!(result.get("x", &march), Some(200.0), "{spelling}");

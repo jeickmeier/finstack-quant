@@ -15,32 +15,32 @@ fn q(quarter: u8) -> PeriodId {
 
 #[test]
 fn evaluator_with_checks_attaches_report() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "total_assets",
             &[
                 (q(1), AmountOrScalar::scalar(1000.0)),
                 (q(2), AmountOrScalar::scalar(1100.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_liabilities",
             &[
                 (q(1), AmountOrScalar::scalar(600.0)),
                 (q(2), AmountOrScalar::scalar(700.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_equity",
             &[
                 (q(1), AmountOrScalar::scalar(300.0)), // imbalance: 1000 - (600+300) = 100
                 (q(2), AmountOrScalar::scalar(400.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let suite = CheckSuite::builder("inline")
         .add_check(BalanceSheetArticulation {
@@ -69,12 +69,12 @@ fn evaluator_with_checks_attaches_report() {
 
 #[test]
 fn evaluator_without_checks_has_no_report() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("revenue", &[(q(1), AmountOrScalar::scalar(100.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("revenue", &[(q(1), AmountOrScalar::scalar(100.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let result = evaluator.evaluate(&model).unwrap();
@@ -84,32 +84,32 @@ fn evaluator_without_checks_has_no_report() {
 
 #[test]
 fn evaluator_with_checks_balanced_passes() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "total_assets",
             &[
                 (q(1), AmountOrScalar::scalar(1000.0)),
                 (q(2), AmountOrScalar::scalar(1100.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_liabilities",
             &[
                 (q(1), AmountOrScalar::scalar(600.0)),
                 (q(2), AmountOrScalar::scalar(700.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_equity",
             &[
                 (q(1), AmountOrScalar::scalar(400.0)),
                 (q(2), AmountOrScalar::scalar(400.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let suite = CheckSuite::builder("inline")
         .add_check(BalanceSheetArticulation {

@@ -31,82 +31,78 @@ fn bench_model_building(c: &mut Criterion) {
     // Simple model with value nodes
     group.bench_function("simple_value_model", |b| {
         b.iter(|| {
-            ModelBuilder::new("test")
-                .periods("2025Q1..Q4", None)
-                .unwrap()
-                .value(
-                    "revenue",
-                    &[
-                        (
-                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                            AmountOrScalar::scalar(100_000.0),
-                        ),
-                        (
-                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                            AmountOrScalar::scalar(110_000.0),
-                        ),
-                        (
-                            PeriodId::quarter(2025, 3).expect("valid period fixture"),
-                            AmountOrScalar::scalar(120_000.0),
-                        ),
-                        (
-                            PeriodId::quarter(2025, 4).expect("valid period fixture"),
-                            AmountOrScalar::scalar(130_000.0),
-                        ),
-                    ],
-                )
-                .build()
-                .unwrap()
+            let mut model_builder = ModelBuilder::new("test");
+            model_builder.periods("2025Q1..Q4", None).unwrap();
+            model_builder.value(
+                "revenue",
+                &[
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(100_000.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(110_000.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                        AmountOrScalar::scalar(120_000.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                        AmountOrScalar::scalar(130_000.0),
+                    ),
+                ],
+            );
+            model_builder.build().unwrap()
         })
     });
 
     // Model with computed nodes
     group.bench_function("computed_nodes_model", |b| {
         b.iter(|| {
-            ModelBuilder::new("test")
-                .periods("2025Q1..Q4", None)
-                .unwrap()
-                .value(
-                    "revenue",
-                    &[
-                        (
-                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                            AmountOrScalar::scalar(100_000.0),
-                        ),
-                        (
-                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                            AmountOrScalar::scalar(110_000.0),
-                        ),
-                        (
-                            PeriodId::quarter(2025, 3).expect("valid period fixture"),
-                            AmountOrScalar::scalar(120_000.0),
-                        ),
-                        (
-                            PeriodId::quarter(2025, 4).expect("valid period fixture"),
-                            AmountOrScalar::scalar(130_000.0),
-                        ),
-                    ],
-                )
-                .compute("cogs", "revenue * 0.6")
-                .unwrap()
+            let mut model_builder = ModelBuilder::new("test");
+            model_builder.periods("2025Q1..Q4", None).unwrap();
+            model_builder.value(
+                "revenue",
+                &[
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(100_000.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(110_000.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                        AmountOrScalar::scalar(120_000.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                        AmountOrScalar::scalar(130_000.0),
+                    ),
+                ],
+            );
+            model_builder.compute("cogs", "revenue * 0.6").unwrap();
+            model_builder
                 .compute("gross_profit", "revenue - cogs")
-                .unwrap()
-                .compute("opex", "revenue * 0.2")
-                .unwrap()
+                .unwrap();
+            model_builder.compute("opex", "revenue * 0.2").unwrap();
+            model_builder
                 .compute("ebitda", "gross_profit - opex")
-                .unwrap()
-                .build()
-                .unwrap()
+                .unwrap();
+            model_builder.build().unwrap()
         })
     });
 
     // Large model with many nodes
     group.bench_function("large_model_50_nodes", |b| {
         b.iter(|| {
-            let mut builder = ModelBuilder::new("test")
-                .periods("2025Q1..Q4", None)
-                .unwrap()
-                .value(
+            let mut builder = {
+                let mut model_builder = ModelBuilder::new("test");
+                model_builder.periods("2025Q1..Q4", None).unwrap();
+                model_builder.value(
                     "revenue",
                     &[
                         (
@@ -127,10 +123,12 @@ fn bench_model_building(c: &mut Criterion) {
                         ),
                     ],
                 );
+                model_builder
+            };
 
             // Add 49 computed nodes (50 total including revenue)
             for i in 1..50 {
-                builder = builder
+                builder
                     .compute(
                         format!("metric_{}", i),
                         format!("revenue * {}", 0.01 * i as f64),
@@ -151,139 +149,10 @@ fn bench_model_evaluation(c: &mut Criterion) {
     let mut group = c.benchmark_group("model_evaluation");
 
     // Simple value-only model
-    let simple_model = ModelBuilder::new("simple")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
-            "revenue",
-            &[
-                (
-                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    AmountOrScalar::scalar(100_000.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(110_000.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
-                    AmountOrScalar::scalar(120_000.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
-                    AmountOrScalar::scalar(130_000.0),
-                ),
-            ],
-        )
-        .build()
-        .unwrap();
-
-    group.bench_function("evaluate_value_only", |b| {
-        b.iter(|| {
-            let mut evaluator = Evaluator::new();
-            black_box(evaluator.evaluate(&simple_model).unwrap())
-        })
-    });
-
-    // Model with calculations
-    let calc_model = ModelBuilder::new("calc")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
-            "revenue",
-            &[
-                (
-                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    AmountOrScalar::scalar(100_000.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(110_000.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
-                    AmountOrScalar::scalar(120_000.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
-                    AmountOrScalar::scalar(130_000.0),
-                ),
-            ],
-        )
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .compute("opex", "revenue * 0.2")
-        .unwrap()
-        .compute("ebitda", "gross_profit - opex")
-        .unwrap()
-        .build()
-        .unwrap();
-
-    group.bench_function("evaluate_with_calculations", |b| {
-        b.iter(|| {
-            let mut evaluator = Evaluator::new();
-            black_box(evaluator.evaluate(&calc_model).unwrap())
-        })
-    });
-
-    // P&L model with time-series functions
-    let ts_model = ModelBuilder::new("timeseries")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
-            "revenue",
-            &[
-                (
-                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    AmountOrScalar::scalar(100_000.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(110_000.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
-                    AmountOrScalar::scalar(120_000.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
-                    AmountOrScalar::scalar(130_000.0),
-                ),
-            ],
-        )
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .compute("opex", "revenue * 0.2")
-        .unwrap()
-        .compute("ebitda", "gross_profit - opex")
-        .unwrap()
-        .compute("revenue_growth", "pct_change(revenue)")
-        .unwrap()
-        .compute("revenue_qoq", "diff(revenue)")
-        .unwrap()
-        .compute("revenue_ttm", "rolling_sum(revenue, 4)")
-        .unwrap()
-        .compute("revenue_avg_3q", "rolling_mean(revenue, 3)")
-        .unwrap()
-        .build()
-        .unwrap();
-
-    group.bench_function("evaluate_with_timeseries", |b| {
-        b.iter(|| {
-            let mut evaluator = Evaluator::new();
-            black_box(evaluator.evaluate(&ts_model).unwrap())
-        })
-    });
-
-    // Large model
-    let mut large_builder = ModelBuilder::new("large")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
+    let simple_model = {
+        let mut model_builder = ModelBuilder::new("simple");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -304,9 +173,144 @@ fn bench_model_evaluation(c: &mut Criterion) {
                 ),
             ],
         );
+        model_builder.build().unwrap()
+    };
+
+    group.bench_function("evaluate_value_only", |b| {
+        b.iter(|| {
+            let mut evaluator = Evaluator::new();
+            black_box(evaluator.evaluate(&simple_model).unwrap())
+        })
+    });
+
+    // Model with calculations
+    let calc_model = {
+        let mut model_builder = ModelBuilder::new("calc");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
+            "revenue",
+            &[
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(120_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(130_000.0),
+                ),
+            ],
+        );
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder.compute("opex", "revenue * 0.2").unwrap();
+        model_builder
+            .compute("ebitda", "gross_profit - opex")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
+
+    group.bench_function("evaluate_with_calculations", |b| {
+        b.iter(|| {
+            let mut evaluator = Evaluator::new();
+            black_box(evaluator.evaluate(&calc_model).unwrap())
+        })
+    });
+
+    // P&L model with time-series functions
+    let ts_model = {
+        let mut model_builder = ModelBuilder::new("timeseries");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
+            "revenue",
+            &[
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(120_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(130_000.0),
+                ),
+            ],
+        );
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder.compute("opex", "revenue * 0.2").unwrap();
+        model_builder
+            .compute("ebitda", "gross_profit - opex")
+            .unwrap();
+        model_builder
+            .compute("revenue_growth", "pct_change(revenue)")
+            .unwrap();
+        model_builder
+            .compute("revenue_qoq", "diff(revenue)")
+            .unwrap();
+        model_builder
+            .compute("revenue_ttm", "rolling_sum(revenue, 4)")
+            .unwrap();
+        model_builder
+            .compute("revenue_avg_3q", "rolling_mean(revenue, 3)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
+
+    group.bench_function("evaluate_with_timeseries", |b| {
+        b.iter(|| {
+            let mut evaluator = Evaluator::new();
+            black_box(evaluator.evaluate(&ts_model).unwrap())
+        })
+    });
+
+    // Large model
+    let mut large_builder = {
+        let mut model_builder = ModelBuilder::new("large");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
+            "revenue",
+            &[
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(120_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(130_000.0),
+                ),
+            ],
+        );
+        model_builder
+    };
 
     for i in 1..50 {
-        large_builder = large_builder
+        large_builder
             .compute(
                 format!("metric_{}", i),
                 format!("revenue * {}", 0.01 * i as f64),
@@ -332,18 +336,19 @@ fn bench_model_evaluation(c: &mut Criterion) {
         ));
     }
 
-    let monthly_model = ModelBuilder::new("monthly")
-        .periods("2025M01..2026M12", None)
-        .unwrap()
-        .value("revenue", &monthly_values)
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .compute("revenue_ttm", "rolling_sum(revenue, 12)")
-        .unwrap()
-        .build()
-        .unwrap();
+    let monthly_model = {
+        let mut model_builder = ModelBuilder::new("monthly");
+        model_builder.periods("2025M01..2026M12", None).unwrap();
+        model_builder.value("revenue", &monthly_values);
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder
+            .compute("revenue_ttm", "rolling_sum(revenue, 12)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     group.bench_function("evaluate_24_periods", |b| {
         b.iter(|| {
@@ -413,19 +418,19 @@ fn bench_forecast_methods(c: &mut Criterion) {
     let mut group = c.benchmark_group("forecast_methods");
 
     // Forward fill
-    let ff_model = ModelBuilder::new("forward_fill")
-        .periods("2025Q1..Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let ff_model = {
+        let mut model_builder = ModelBuilder::new("forward_fill");
+        model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
-        )
-        .forecast("revenue", ForecastSpec::forward_fill())
-        .build()
-        .unwrap();
+        );
+        model_builder.forecast("revenue", ForecastSpec::forward_fill());
+        model_builder.build().unwrap()
+    };
 
     group.bench_function("forecast_forward_fill", |b| {
         b.iter(|| {
@@ -435,19 +440,19 @@ fn bench_forecast_methods(c: &mut Criterion) {
     });
 
     // Growth rate
-    let growth_model = ModelBuilder::new("growth")
-        .periods("2025Q1..Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let growth_model = {
+        let mut model_builder = ModelBuilder::new("growth");
+        model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
-        )
-        .forecast("revenue", ForecastSpec::growth(0.05))
-        .build()
-        .unwrap();
+        );
+        model_builder.forecast("revenue", ForecastSpec::growth(0.05));
+        model_builder.build().unwrap()
+    };
 
     group.bench_function("forecast_growth_rate", |b| {
         b.iter(|| {
@@ -467,25 +472,25 @@ fn bench_forecast_methods(c: &mut Criterion) {
     seasonal_params.insert("season_length".into(), serde_json::json!(4));
     seasonal_params.insert("mode".into(), serde_json::json!("multiplicative"));
 
-    let seasonal_model = ModelBuilder::new("seasonal")
-        .periods("2025Q1..Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let seasonal_model = {
+        let mut model_builder = ModelBuilder::new("seasonal");
+        model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::Seasonal,
                 params: seasonal_params,
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     group.bench_function("forecast_seasonal", |b| {
         b.iter(|| {
@@ -495,19 +500,19 @@ fn bench_forecast_methods(c: &mut Criterion) {
     });
 
     // Log-normal distribution (deterministic with seed)
-    let lognormal_model = ModelBuilder::new("lognormal")
-        .periods("2025Q1..Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let lognormal_model = {
+        let mut model_builder = ModelBuilder::new("lognormal");
+        model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
-        )
-        .forecast("revenue", ForecastSpec::log_normal(0.05, 0.10, 42))
-        .build()
-        .unwrap();
+        );
+        model_builder.forecast("revenue", ForecastSpec::log_normal(0.05, 0.10, 42));
+        model_builder.build().unwrap()
+    };
 
     group.bench_function("forecast_lognormal", |b| {
         b.iter(|| {
@@ -559,10 +564,10 @@ fn bench_results_export(c: &mut Criterion) {
     let mut group = c.benchmark_group("results_export");
 
     // Small model export
-    let small_model = ModelBuilder::new("small")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
+    let small_model = {
+        let mut model_builder = ModelBuilder::new("small");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -582,13 +587,13 @@ fn bench_results_export(c: &mut Criterion) {
                     AmountOrScalar::scalar(130_000.0),
                 ),
             ],
-        )
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let small_results = evaluator.evaluate(&small_model).unwrap();
@@ -602,9 +607,11 @@ fn bench_results_export(c: &mut Criterion) {
     });
 
     // Large model export
-    let mut large_builder = ModelBuilder::new("large")
-        .periods("2025M01..2026M12", None)
-        .unwrap();
+    let mut large_builder = {
+        let mut model_builder = ModelBuilder::new("large");
+        model_builder.periods("2025M01..2026M12", None).unwrap();
+        model_builder
+    };
 
     let mut monthly_values = Vec::new();
     for m in 1..=24 {
@@ -615,10 +622,10 @@ fn bench_results_export(c: &mut Criterion) {
         ));
     }
 
-    large_builder = large_builder.value("revenue", &monthly_values);
+    large_builder.value("revenue", &monthly_values);
 
     for i in 1..=20 {
-        large_builder = large_builder
+        large_builder
             .compute(
                 format!("metric_{}", i),
                 format!("revenue * {}", 0.05 * i as f64),
@@ -646,10 +653,10 @@ fn bench_results_export(c: &mut Criterion) {
 fn bench_serialization(c: &mut Criterion) {
     let mut group = c.benchmark_group("serialization");
 
-    let model = ModelBuilder::new("serialize_test")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("serialize_test");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -669,17 +676,17 @@ fn bench_serialization(c: &mut Criterion) {
                     AmountOrScalar::scalar(130_000.0),
                 ),
             ],
-        )
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .compute("opex", "revenue * 0.2")
-        .unwrap()
-        .compute("ebitda", "gross_profit - opex")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder.compute("opex", "revenue * 0.2").unwrap();
+        model_builder
+            .compute("ebitda", "gross_profit - opex")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     group.bench_function("serialize_model_to_json", |b| {
         b.iter(|| black_box(serde_json::to_string(&model).unwrap()))
@@ -702,10 +709,10 @@ fn bench_end_to_end(c: &mut Criterion) {
     // Simple P&L model
     group.bench_function("simple_pl_model", |b| {
         b.iter(|| {
-            let model = ModelBuilder::new("pl")
-                .periods("2025Q1..Q4", Some("2025Q2"))
-                .unwrap()
-                .value(
+            let model = {
+                let mut model_builder = ModelBuilder::new("pl");
+                model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+                model_builder.value(
                     "revenue",
                     &[
                         (
@@ -717,20 +724,19 @@ fn bench_end_to_end(c: &mut Criterion) {
                             AmountOrScalar::scalar(1_100_000.0),
                         ),
                     ],
-                )
-                .forecast("revenue", ForecastSpec::growth(0.05))
-                .compute("cogs", "revenue * 0.6")
-                .unwrap()
-                .compute("gross_profit", "revenue - cogs")
-                .unwrap()
-                .compute("opex", "revenue * 0.15")
-                .unwrap()
-                .compute("ebitda", "gross_profit - opex")
-                .unwrap()
-                .compute("margin", "ebitda / revenue")
-                .unwrap()
-                .build()
-                .unwrap();
+                );
+                model_builder.forecast("revenue", ForecastSpec::growth(0.05));
+                model_builder.compute("cogs", "revenue * 0.6").unwrap();
+                model_builder
+                    .compute("gross_profit", "revenue - cogs")
+                    .unwrap();
+                model_builder.compute("opex", "revenue * 0.15").unwrap();
+                model_builder
+                    .compute("ebitda", "gross_profit - opex")
+                    .unwrap();
+                model_builder.compute("margin", "ebitda / revenue").unwrap();
+                model_builder.build().unwrap()
+            };
 
             let mut evaluator = Evaluator::new();
             black_box(evaluator.evaluate(&model).unwrap())
@@ -757,51 +763,54 @@ fn bench_end_to_end(c: &mut Criterion) {
             seasonal_params.insert("season_length".into(), serde_json::json!(4));
             seasonal_params.insert("mode".into(), serde_json::json!("multiplicative"));
 
-            let model = ModelBuilder::new("complex")
-                .periods("2025Q1..Q4", Some("2025Q1"))
-                .unwrap()
-                .value(
+            let model = {
+                let mut model_builder = ModelBuilder::new("complex");
+                model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+                model_builder.value(
                     "revenue",
                     &[(
                         PeriodId::quarter(2025, 1).expect("valid period fixture"),
                         AmountOrScalar::scalar(1_000_000.0),
                     )],
-                )
-                .forecast(
+                );
+                model_builder.forecast(
                     "revenue",
                     ForecastSpec {
                         method: ForecastMethod::Seasonal,
                         params: seasonal_params,
                     },
-                )
-                .compute("cogs", "revenue * 0.6")
-                .unwrap()
-                .compute("gross_profit", "revenue - cogs")
-                .unwrap()
-                .compute("opex", "revenue * 0.15")
-                .unwrap()
-                .compute("depreciation", "10000")
-                .unwrap()
-                .compute("ebitda", "gross_profit - opex")
-                .unwrap()
-                .compute("ebit", "ebitda - depreciation")
-                .unwrap()
-                .compute("interest_expense", "50000")
-                .unwrap()
-                .compute("ebt", "ebit - interest_expense")
-                .unwrap()
-                .compute("tax_expense", "ebt * 0.21")
-                .unwrap()
-                .compute("net_income", "ebt - tax_expense")
-                .unwrap()
-                .compute("revenue_growth", "pct_change(revenue)")
-                .unwrap()
-                .compute("revenue_ttm", "rolling_sum(revenue, 4)")
-                .unwrap()
-                .compute("ebitda_margin", "ebitda / revenue")
-                .unwrap()
-                .build()
-                .unwrap();
+                );
+                model_builder.compute("cogs", "revenue * 0.6").unwrap();
+                model_builder
+                    .compute("gross_profit", "revenue - cogs")
+                    .unwrap();
+                model_builder.compute("opex", "revenue * 0.15").unwrap();
+                model_builder.compute("depreciation", "10000").unwrap();
+                model_builder
+                    .compute("ebitda", "gross_profit - opex")
+                    .unwrap();
+                model_builder
+                    .compute("ebit", "ebitda - depreciation")
+                    .unwrap();
+                model_builder.compute("interest_expense", "50000").unwrap();
+                model_builder
+                    .compute("ebt", "ebit - interest_expense")
+                    .unwrap();
+                model_builder.compute("tax_expense", "ebt * 0.21").unwrap();
+                model_builder
+                    .compute("net_income", "ebt - tax_expense")
+                    .unwrap();
+                model_builder
+                    .compute("revenue_growth", "pct_change(revenue)")
+                    .unwrap();
+                model_builder
+                    .compute("revenue_ttm", "rolling_sum(revenue, 4)")
+                    .unwrap();
+                model_builder
+                    .compute("ebitda_margin", "ebitda / revenue")
+                    .unwrap();
+                model_builder.build().unwrap()
+            };
 
             let mut evaluator = Evaluator::new();
             black_box(evaluator.evaluate(&model).unwrap())

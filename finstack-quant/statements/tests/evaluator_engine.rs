@@ -10,10 +10,10 @@ use indexmap::IndexMap;
 
 #[test]
 fn test_simple_evaluation() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -25,9 +25,9 @@ fn test_simple_evaluation() {
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -50,10 +50,10 @@ fn test_simple_evaluation() {
 
 #[test]
 fn test_formula_evaluation() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -65,11 +65,10 @@ fn test_formula_evaluation() {
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
-        )
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -93,14 +92,13 @@ fn test_formula_evaluation() {
 #[test]
 fn test_circular_dependency_error() {
     // Cycles are now caught at build time by ModelBuilder::build()
-    let result = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .compute("a", "b + 1")
-        .unwrap()
-        .compute("b", "a + 1")
-        .unwrap()
-        .build();
+    let result = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.compute("a", "b + 1").unwrap();
+        model_builder.compute("b", "a + 1").unwrap();
+        model_builder.build()
+    };
 
     assert!(result.is_err());
     assert!(result
@@ -111,12 +109,14 @@ fn test_circular_dependency_error() {
 
 #[test]
 fn test_recompile_on_reuse() {
-    let periods = ModelBuilder::new("cache")
-        .periods("2025Q1..Q1", None)
-        .expect("valid periods")
-        .build()
-        .expect("build should succeed")
-        .periods;
+    let periods = {
+        let mut model_builder = ModelBuilder::new("cache");
+        model_builder
+            .periods("2025Q1..Q1", None)
+            .expect("valid periods");
+        model_builder.build().expect("build should succeed")
+    }
+    .periods;
 
     let mut model = FinancialModelSpec::new("cache", periods);
     let mut nodes = IndexMap::new();
@@ -164,14 +164,17 @@ fn test_recompile_on_reuse() {
 #[test]
 fn test_results_include_warnings() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let model = ModelBuilder::new("warnings")
-        .periods("2025Q1..Q1", None)
-        .expect("valid period")
-        .value("denominator", &[(period, AmountOrScalar::scalar(0.0))])
-        .compute("ratio", "1.0 / denominator")
-        .expect("valid formula")
-        .build()
-        .expect("valid model");
+    let model = {
+        let mut model_builder = ModelBuilder::new("warnings");
+        model_builder
+            .periods("2025Q1..Q1", None)
+            .expect("valid period");
+        model_builder.value("denominator", &[(period, AmountOrScalar::scalar(0.0))]);
+        model_builder
+            .compute("ratio", "1.0 / denominator")
+            .expect("valid formula");
+        model_builder.build().expect("valid model")
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).expect("evaluation succeeds");

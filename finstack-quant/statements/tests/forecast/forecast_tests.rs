@@ -8,10 +8,10 @@ use indexmap::indexmap;
 
 #[test]
 fn test_forward_fill_forecast() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -23,16 +23,16 @@ fn test_forward_fill_forecast() {
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::ForwardFill,
                 params: indexmap! {},
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -72,25 +72,25 @@ fn test_forward_fill_forecast() {
 
 #[test]
 fn test_growth_pct_forecast() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::GrowthPct,
                 params: indexmap! { "rate".into() => serde_json::json!(0.05) },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -131,25 +131,25 @@ fn test_growth_pct_forecast() {
 
 #[test]
 fn test_growth_pct_negative() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q3", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q3", Some("2025Q1")).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::GrowthPct,
                 params: indexmap! { "rate".into() => serde_json::json!(-0.1) }, // -10% decline
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -173,17 +173,17 @@ fn test_growth_pct_negative() {
 
 #[test]
 fn test_curve_pct_forecast() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::CurvePct,
@@ -191,9 +191,9 @@ fn test_curve_pct_forecast() {
                     "curve".into() => serde_json::json!([0.05, 0.06, 0.05])
                 },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -234,17 +234,17 @@ fn test_curve_pct_forecast() {
 
 #[test]
 fn test_override_forecast() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::Override,
@@ -255,9 +255,9 @@ fn test_override_forecast() {
                     })
                 },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -297,10 +297,10 @@ fn test_override_forecast() {
 
 #[test]
 fn test_forecast_with_formula_fallback() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -312,18 +312,17 @@ fn test_forecast_with_formula_fallback() {
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::GrowthPct,
                 params: indexmap! { "rate".into() => serde_json::json!(0.05) },
             },
-        )
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -349,10 +348,12 @@ fn test_forecast_with_formula_fallback() {
 
 #[test]
 fn test_multiple_periods_with_forecast() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..2026Q4", Some("2025Q2"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder
+            .periods("2025Q1..2026Q4", Some("2025Q2"))
+            .unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -364,16 +365,16 @@ fn test_multiple_periods_with_forecast() {
                     AmountOrScalar::scalar(105_000.0),
                 ),
             ],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::GrowthPct,
                 params: indexmap! { "rate".into() => serde_json::json!(0.03) },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -417,10 +418,12 @@ fn test_multiple_periods_with_forecast() {
 
 #[test]
 fn test_forecast_pl_model() {
-    let model = ModelBuilder::new("P&L with Forecasts")
-        .periods("2025Q1..2025Q4", Some("2025Q2"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("P&L with Forecasts");
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q2"))
+            .unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -432,17 +435,16 @@ fn test_forecast_pl_model() {
                     AmountOrScalar::scalar(11_000_000.0),
                 ),
             ],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::GrowthPct,
                 params: indexmap! { "rate".into() => serde_json::json!(0.05) },
             },
-        )
-        .compute("cogs", "revenue * 0.6")
-        .unwrap()
-        .value(
+        );
+        model_builder.compute("cogs", "revenue * 0.6").unwrap();
+        model_builder.value(
             "opex",
             &[
                 (
@@ -454,20 +456,22 @@ fn test_forecast_pl_model() {
                     AmountOrScalar::scalar(2_100_000.0),
                 ),
             ],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "opex",
             ForecastSpec {
                 method: ForecastMethod::ForwardFill,
                 params: indexmap! {},
             },
-        )
-        .compute("gross_profit", "revenue - cogs")
-        .unwrap()
-        .compute("operating_income", "gross_profit - opex")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("gross_profit", "revenue - cogs")
+            .unwrap();
+        model_builder
+            .compute("operating_income", "gross_profit - opex")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -513,17 +517,17 @@ fn test_forecast_pl_model() {
 
 #[test]
 fn test_normal_forecast_deterministic() {
-    let model1 = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model1 = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::Normal,
@@ -533,21 +537,21 @@ fn test_normal_forecast_deterministic() {
                     "seed".into() => serde_json::json!(42),
                 },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
-    let model2 = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model2 = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::Normal,
@@ -557,9 +561,9 @@ fn test_normal_forecast_deterministic() {
                     "seed".into() => serde_json::json!(42),
                 },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator1 = Evaluator::new();
     let results1 = evaluator1.evaluate(&model1).unwrap();
@@ -592,17 +596,17 @@ fn test_normal_forecast_deterministic() {
 
 #[test]
 fn test_lognormal_forecast_always_positive() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+        model_builder.value(
             "revenue",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::LogNormal,
@@ -612,9 +616,9 @@ fn test_lognormal_forecast_always_positive() {
                     "seed".into() => serde_json::json!(42),
                 },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -658,10 +662,10 @@ fn test_as_of_hidden_actuals_are_forecast_with_visible_base() {
     use finstack_quant_core::market_data::context::MarketContext;
     use time::Month;
 
-    let model = ModelBuilder::new("as-of-forecast")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("as-of-forecast");
+        model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (
@@ -674,16 +678,16 @@ fn test_as_of_hidden_actuals_are_forecast_with_visible_base() {
                     AmountOrScalar::scalar(999_000.0),
                 ),
             ],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::GrowthPct,
                 params: indexmap! { "rate".into() => serde_json::json!(0.10) },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     // Q1's explicit value becomes visible at its exclusive period end; Q2
     // remains hidden until its own period end.
@@ -737,27 +741,30 @@ fn test_explicit_availability_date_controls_actual_visibility() {
     let q1_2025 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let q2_2025 = PeriodId::quarter(2025, 2).expect("valid period fixture");
     let release_date = Date::from_calendar_date(2025, Month::May, 15).unwrap();
-    let model = ModelBuilder::new("dated-actual")
-        .periods("2024Q4..2025Q2", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("dated-actual");
+        model_builder
+            .periods("2024Q4..2025Q2", Some("2025Q1"))
+            .unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (q4_2024, AmountOrScalar::scalar(100.0)),
                 (q1_2025, AmountOrScalar::scalar(999.0)),
             ],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "revenue",
             ForecastSpec {
                 method: ForecastMethod::GrowthPct,
                 params: indexmap! { "rate".into() => serde_json::json!(0.10) },
             },
-        )
-        .availability_dates("revenue", &[(q1_2025, release_date)])
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .availability_dates("revenue", &[(q1_2025, release_date)])
+            .unwrap();
+        model_builder.build().unwrap()
+    };
 
     let before_release = Date::from_calendar_date(2025, Month::April, 1).unwrap();
     let mut evaluator = Evaluator::new();
@@ -779,17 +786,17 @@ fn test_explicit_availability_date_controls_actual_visibility() {
 /// effective seed, matching Monte Carlo mode).
 #[test]
 fn test_single_run_stochastic_nodes_with_shared_seed_diverge() {
-    let model = ModelBuilder::new("shared-seed")
-        .periods("2025Q1..Q4", Some("2025Q1"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("shared-seed");
+        model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+        model_builder.value(
             "a",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "a",
             ForecastSpec {
                 method: ForecastMethod::Normal,
@@ -799,15 +806,15 @@ fn test_single_run_stochastic_nodes_with_shared_seed_diverge() {
                     "seed".into() => serde_json::json!(42),
                 },
             },
-        )
-        .value(
+        );
+        model_builder.value(
             "b",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
-        )
-        .forecast(
+        );
+        model_builder.forecast(
             "b",
             ForecastSpec {
                 method: ForecastMethod::Normal,
@@ -817,9 +824,9 @@ fn test_single_run_stochastic_nodes_with_shared_seed_diverge() {
                     "seed".into() => serde_json::json!(42),
                 },
             },
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();

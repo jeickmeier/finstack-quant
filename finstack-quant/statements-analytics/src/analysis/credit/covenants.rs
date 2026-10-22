@@ -268,11 +268,12 @@ mod tests {
         assert!(forecast_breaches(
             &results,
             &engine,
-            &finstack_quant_statements::builder::ModelBuilder::new("calendar")
-                .periods("2025Q1..Q2", None)
-                .unwrap()
-                .build()
-                .unwrap(),
+            &{
+                let mut model_builder =
+                    finstack_quant_statements::builder::ModelBuilder::new("calendar");
+                model_builder.periods("2025Q1..Q2", None).unwrap();
+                model_builder.build().unwrap()
+            },
             CovenantForecastConfig::default()
         )
         .is_err());
@@ -312,11 +313,12 @@ mod tests {
         let breaches = forecast_breaches(
             &results,
             &engine,
-            &finstack_quant_statements::builder::ModelBuilder::new("calendar")
-                .periods("2025Q1..Q2", None)
-                .unwrap()
-                .build()
-                .unwrap(),
+            &{
+                let mut model_builder =
+                    finstack_quant_statements::builder::ModelBuilder::new("calendar");
+                model_builder.periods("2025Q1..Q2", None).unwrap();
+                model_builder.build().unwrap()
+            },
             config,
         )
         .expect("Forecast should succeed");

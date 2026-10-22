@@ -198,3 +198,35 @@ def test_adjustment_cap_requires_an_explicit_supported_base_mode() -> None:
         adjustment.with_cap("ebitda", 0.20)  # type: ignore[call-arg]
     with pytest.raises(ValueError, match="reported or progressive"):
         adjustment.with_cap("ebitda", 0.20, "same_period")
+
+
+def test_empty_explicit_periods_preserve_model_builder_for_retry() -> None:
+    builder = s.ModelBuilder("recoverable")
+    builder.value_scalar("revenue", {"2025Q1": 100.0})
+    builder.with_meta("marker", {"retained": True})
+    with pytest.raises(ValueError, match="at least one period"):
+        builder.periods_explicit([])
+    builder.periods("2025Q1..Q2", "2025Q1")
+    builder.forecast("revenue", s.ForecastSpec.forward_fill())
+    model = json.loads(builder.build().to_json())
+    assert model["nodes"]["revenue"]["values"]["2025Q1"] == 100.0
+    assert model["meta"]["marker"] == {"retained": True}
+
+
+def test_failed_mixed_formula_preserves_configuration_and_parent() -> None:
+    parent = s.ModelBuilder("mixed-recovery").periods("2025Q1..Q2", "2025Q1")
+    parent.value_scalar("base", {"2025Q1": 100.0})
+    parent.with_meta("marker", "retained")
+    mixed = parent.mixed("mixed")
+    assert mixed.values([("2025Q1", 40.0)]) is mixed
+    assert mixed.forecast(s.ForecastSpec.forward_fill()) is mixed
+    assert mixed.name("Retained name") is mixed
+    with pytest.raises(ValueError, match="parse"):
+        mixed.formula("(")
+    mixed.formula("base * 0.5")
+    model = json.loads(mixed.build().build().to_json())
+    assert model["nodes"]["mixed"]["values"]["2025Q1"] == 40.0
+    assert model["nodes"]["mixed"]["name"] == "Retained name"
+    assert model["nodes"]["mixed"]["formula_text"] == "base * 0.5"
+    assert model["meta"]["marker"] == "retained"
+    assert "base" in model["nodes"]

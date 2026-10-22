@@ -19,15 +19,15 @@ fn q(year: i32, quarter: u8) -> PeriodId {
 
 #[test]
 fn declared_units_must_match_observations() {
-    let model = ModelBuilder::new("units")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("units");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value(
             "x",
             &[(q(2025, 1), Money::from((100_i64, Currency::EUR)).into())],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
     for value_type in [
         NodeValueType::Scalar,
         NodeValueType::Monetary {
@@ -42,10 +42,10 @@ fn declared_units_must_match_observations() {
 
 #[test]
 fn sparse_periods_do_not_shorten_lags_or_fill_ttm() {
-    let mut model = ModelBuilder::new("sparse")
-        .periods("2024Q1..2025Q1", None)
-        .unwrap()
-        .value(
+    let mut model = {
+        let mut model_builder = ModelBuilder::new("sparse");
+        model_builder.periods("2024Q1..2025Q1", None).unwrap();
+        model_builder.value(
             "x",
             &[
                 (q(2024, 1), 100.0.into()),
@@ -54,15 +54,12 @@ fn sparse_periods_do_not_shorten_lags_or_fill_ttm() {
                 (q(2024, 4), 100.0.into()),
                 (q(2025, 1), 100.0.into()),
             ],
-        )
-        .compute("far", "lag(x,100)")
-        .unwrap()
-        .compute("ttm", "ttm(x)")
-        .unwrap()
-        .compute("previous_year", "lag(x,4)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("far", "lag(x,100)").unwrap();
+        model_builder.compute("ttm", "ttm(x)").unwrap();
+        model_builder.compute("previous_year", "lag(x,4)").unwrap();
+        model_builder.build().unwrap()
+    };
     model.periods.retain(|period| period.id != q(2024, 2));
     model
         .nodes
@@ -80,19 +77,19 @@ fn sparse_periods_do_not_shorten_lags_or_fill_ttm() {
 
 #[test]
 fn forecasts_rebase_at_each_visible_actual_without_looking_ahead() {
-    let mut model = ModelBuilder::new("availability")
-        .periods("2025Q1..Q4", Some("2025Q3"))
-        .unwrap()
-        .value(
+    let mut model = {
+        let mut model_builder = ModelBuilder::new("availability");
+        model_builder.periods("2025Q1..Q4", Some("2025Q3")).unwrap();
+        model_builder.value(
             "x",
             &[
                 (q(2025, 1), 100.0.into()),
                 (q(2025, 2), 200.0.into()),
                 (q(2025, 3), 300.0.into()),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
     let node = model.nodes.get_mut("x").unwrap();
     node.forecast =
         Some(serde_json::from_value(json!({"method":"growth_pct","params":{"rate":0.1}})).unwrap());
@@ -107,10 +104,10 @@ fn forecasts_rebase_at_each_visible_actual_without_looking_ahead() {
 
 #[test]
 fn ewm_normalizes_after_each_observation() {
-    let model = ModelBuilder::new("ewm")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("ewm");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value(
             "x",
             &[
                 (q(2025, 1), 1.0.into()),
@@ -118,13 +115,11 @@ fn ewm_normalizes_after_each_observation() {
                 (q(2025, 3), 3.0.into()),
                 (q(2025, 4), 4.0.into()),
             ],
-        )
-        .compute("mean", "ewm_mean(x,0.5)")
-        .unwrap()
-        .compute("var", "ewm_var(x,0.5)")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder.compute("mean", "ewm_mean(x,0.5)").unwrap();
+        model_builder.compute("var", "ewm_var(x,0.5)").unwrap();
+        model_builder.build().unwrap()
+    };
     let result = Evaluator::new().evaluate(&model).unwrap();
     assert!((result.get("mean", &q(2025, 4)).unwrap() - 19.0 / 6.0).abs() < 1e-12);
     assert!((result.get("var", &q(2025, 4)).unwrap() - 41.0 / 22.0).abs() < 1e-12);
@@ -132,19 +127,19 @@ fn ewm_normalizes_after_each_observation() {
 
 #[test]
 fn normalization_preserves_units_and_rejects_foreign_sources_and_caps() {
-    let model = ModelBuilder::new("normalization")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("normalization");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value(
             "usd",
             &[(q(2025, 1), Money::from((100_i64, Currency::USD)).into())],
-        )
-        .value(
+        );
+        model_builder.value(
             "eur",
             &[(q(2025, 1), Money::from((100_i64, Currency::EUR)).into())],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
     let mut result = Evaluator::new().evaluate(&model).unwrap();
     let invalid: NormalizationConfig = serde_json::from_value(json!({"target_node":"usd","adjustments":[{"id":"a","name":"a","value":{"type":"percentage_of_node","node_id":"eur","percentage":0.1}}]})).unwrap();
     assert!(normalize(&result, &invalid).is_err());
@@ -172,16 +167,16 @@ fn normalization_preserves_units_and_rejects_foreign_sources_and_caps() {
 #[test]
 fn every_cash_period_checks_its_components_even_without_a_prior_balance() {
     use finstack_quant_statements::checks::CheckSuiteSpec;
-    let model = ModelBuilder::new("cash")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("cash", &[(q(2025, 1), 100.0.into())])
-        .value("total", &[(q(2025, 1), 0.0.into())])
-        .value("cfo", &[(q(2025, 1), 100.0.into())])
-        .value("cfi", &[(q(2025, 1), 0.0.into())])
-        .value("cff", &[(q(2025, 1), 0.0.into())])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("cash");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("cash", &[(q(2025, 1), 100.0.into())]);
+        model_builder.value("total", &[(q(2025, 1), 0.0.into())]);
+        model_builder.value("cfo", &[(q(2025, 1), 100.0.into())]);
+        model_builder.value("cfi", &[(q(2025, 1), 0.0.into())]);
+        model_builder.value("cff", &[(q(2025, 1), 0.0.into())]);
+        model_builder.build().unwrap()
+    };
     let spec: CheckSuiteSpec = serde_json::from_value(json!({"name":"cash","builtin_checks":[{"type":"cash_reconciliation","cash_balance_node":"cash","total_cash_flow_node":"total","cfo_node":"cfo","cfi_node":"cfi","cff_node":"cff"}]})).unwrap();
     let result = Evaluator::new()
         .with_checks(spec.resolve().unwrap())
@@ -229,16 +224,18 @@ fn amortizing_loan_model(periods: &str, currency: Currency) -> FinancialModelSpe
         spec[key]=value.clone();
     }
     let loan = serde_json::from_value(spec).unwrap();
-    ModelBuilder::new("loan")
-        .periods(periods, None)
-        .unwrap()
-        .add_debt("LOAN", FinancialStatementInstrument::TermLoan(loan))
-        .compute("interest", "cs.interest_expense_cash.total")
-        .unwrap()
-        .compute("debt", "cs.debt_balance.total")
-        .unwrap()
-        .build()
-        .unwrap()
+    {
+        let mut model_builder = ModelBuilder::new("loan");
+        model_builder.periods(periods, None).unwrap();
+        model_builder.add_debt("LOAN", FinancialStatementInstrument::TermLoan(loan));
+        model_builder
+            .compute("interest", "cs.interest_expense_cash.total")
+            .unwrap();
+        model_builder
+            .compute("debt", "cs.debt_balance.total")
+            .unwrap();
+        model_builder.build().unwrap()
+    }
 }
 
 #[test]
@@ -337,14 +334,15 @@ fn single_currency_totals_are_converted_at_the_reporting_snapshot() {
 
 #[test]
 fn small_ewm_weights_do_not_disappear_through_subtraction() {
-    let model = ModelBuilder::new("small-alpha")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("x", &[(q(2025, 1), 0.0.into()), (q(2025, 2), 1e20.into())])
-        .compute("mean", "ewm_mean(x, 0.00000000000000000001)")
-        .unwrap()
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("small-alpha");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("x", &[(q(2025, 1), 0.0.into()), (q(2025, 2), 1e20.into())]);
+        model_builder
+            .compute("mean", "ewm_mean(x, 0.00000000000000000001)")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
     let result = Evaluator::new().evaluate(&model).unwrap();
     assert!((result.get("mean", &q(2025, 2)).unwrap() - 1.0).abs() < 1e-12);
 }

@@ -20,10 +20,10 @@ fn q(quarter: u8) -> PeriodId {
 #[test]
 fn missing_value_actual_is_error() {
     // Q1,Q2 actual; Q3,Q4 forecast. Build with all values, then remove some.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (q(1), AmountOrScalar::scalar(100.0)),
@@ -31,9 +31,9 @@ fn missing_value_actual_is_error() {
                 (q(3), AmountOrScalar::scalar(200.0)),
                 (q(4), AmountOrScalar::scalar(210.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let mut results = evaluator.evaluate(&model).unwrap();
@@ -75,10 +75,10 @@ fn missing_value_actual_is_error() {
 
 #[test]
 fn missing_value_actuals_only_scope() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (q(1), AmountOrScalar::scalar(100.0)),
@@ -86,9 +86,9 @@ fn missing_value_actuals_only_scope() {
                 (q(3), AmountOrScalar::scalar(200.0)),
                 (q(4), AmountOrScalar::scalar(210.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let mut results = evaluator.evaluate(&model).unwrap();
@@ -115,10 +115,10 @@ fn missing_value_actuals_only_scope() {
 
 #[test]
 fn missing_value_forecast_only_scope() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (q(1), AmountOrScalar::scalar(100.0)),
@@ -126,9 +126,9 @@ fn missing_value_forecast_only_scope() {
                 (q(3), AmountOrScalar::scalar(200.0)),
                 (q(4), AmountOrScalar::scalar(210.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let mut results = evaluator.evaluate(&model).unwrap();
@@ -158,18 +158,18 @@ fn missing_value_forecast_only_scope() {
 
 #[test]
 fn sign_convention_positive_violation() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (q(1), AmountOrScalar::scalar(-50.0)), // unexpected negative
                 (q(2), AmountOrScalar::scalar(200.0)), // fine
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -190,18 +190,18 @@ fn sign_convention_positive_violation() {
 
 #[test]
 fn sign_convention_negative_violation() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "expense",
             &[
                 (q(1), AmountOrScalar::scalar(-100.0)), // fine (expected negative)
                 (q(2), AmountOrScalar::scalar(50.0)),   // unexpected positive
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -222,25 +222,25 @@ fn sign_convention_negative_violation() {
 
 #[test]
 fn sign_convention_clean() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (q(1), AmountOrScalar::scalar(100.0)),
                 (q(2), AmountOrScalar::scalar(200.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "expense",
             &[
                 (q(1), AmountOrScalar::scalar(-50.0)),
                 (q(2), AmountOrScalar::scalar(-60.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -261,13 +261,13 @@ fn sign_convention_clean() {
 fn sign_convention_nan_is_surfaced_not_silently_passed() {
     // NaN compares false against both `< 0.0` and `> 0.0`, so without an
     // explicit guard a non-finite value would satisfy either expectation.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("revenue", &[(q(1), AmountOrScalar::scalar(100.0))])
-        .value("expense", &[(q(1), AmountOrScalar::scalar(-50.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("revenue", &[(q(1), AmountOrScalar::scalar(100.0))]);
+        model_builder.value("expense", &[(q(1), AmountOrScalar::scalar(-50.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let mut results = evaluator.evaluate(&model).unwrap();
@@ -306,18 +306,18 @@ fn sign_convention_nan_is_surfaced_not_silently_passed() {
 
 #[test]
 fn non_finite_nan_detected() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "good_node",
             &[
                 (q(1), AmountOrScalar::scalar(100.0)),
                 (q(2), AmountOrScalar::scalar(200.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let mut results = evaluator.evaluate(&model).unwrap();
@@ -347,18 +347,18 @@ fn non_finite_nan_detected() {
 
 #[test]
 fn non_finite_inf_detected() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "good_node",
             &[
                 (q(1), AmountOrScalar::scalar(100.0)),
                 (q(2), AmountOrScalar::scalar(200.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let mut results = evaluator.evaluate(&model).unwrap();
@@ -384,18 +384,18 @@ fn non_finite_inf_detected() {
 
 #[test]
 fn non_finite_all_finite_passes() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "good_node",
             &[
                 (q(1), AmountOrScalar::scalar(100.0)),
                 (q(2), AmountOrScalar::scalar(200.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
