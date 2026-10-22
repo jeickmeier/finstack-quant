@@ -1019,14 +1019,22 @@ impl PathDependentPricer {
             process_params,
         )?;
 
-        let paths = match &full.paths {
-            Some(dataset) if !dataset.paths.is_empty() => &dataset.paths,
+        let dataset = match &full.paths {
+            Some(dataset) if !dataset.paths.is_empty() => dataset,
             _ => {
                 return Err(Error::Validation(
                     "price_with_lrm_greeks: the simulation captured no paths".to_string(),
                 ));
             }
         };
+
+        let spot_index = dataset
+            .process_params
+            .factor_names
+            .iter()
+            .position(|name| name == "spot")
+            .ok_or_else(|| Error::Validation("captured GBM metadata is missing spot".to_owned()))?;
+        let paths = &dataset.paths;
 
         // Build undiscounted payoffs and per-path joint-density scores by
         // reconstructing each step's standardized shock from consecutive
@@ -1042,7 +1050,7 @@ impl PathDependentPricer {
             let spots: Vec<f64> = p
                 .points
                 .iter()
-                .filter_map(super::super::paths::PathPoint::spot)
+                .filter_map(|point| point.state.get(spot_index).copied())
                 .collect();
             // Grid points = steps + 1 (initial spot at step 0); an incomplete
             // capture would misalign the scores.

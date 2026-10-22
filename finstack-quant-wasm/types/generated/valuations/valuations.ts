@@ -19054,9 +19054,7 @@ export interface SimulatedPath {
  * # State Vector Layout
  *
  * The `state` vector contains the raw state variables in process-defined order.
- * For simple single-asset models, the crate's internal `state_indices`
- * constants provide common aliases.
- * For multi-asset or process-specific layouts, consult
+ * Interpret every layout using
  * [`PathDataset::process_params.factor_names`](PathDataset::process_params) or
  * [`PathDataset::state_var_keys`].
  */
@@ -19078,7 +19076,7 @@ export interface PathPoint {
   payoff_value?: number | null;
   /**
    * State variables at this point (spot, variance, rate, etc.)
-   * Indexed by position - see `state_indices` for standard layout
+   * Positions follow `PathDataset::process_params.factor_names`.
    */
   state: number[];
   /**

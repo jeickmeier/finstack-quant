@@ -157,22 +157,12 @@ pub trait RandomStream: Clone + Send + Sync {
 
 /// Standard named keys for values stored in [`PathState`].
 pub mod state_keys {
-    use std::sync::Mutex;
-
-    pub use crate::monte_carlo::indexed_spot_table::INDEXED_SPOT_INLINE;
-
-    use crate::monte_carlo::indexed_spot_table::INDEXED_SPOT_TABLE;
-
     /// Spot price (equity/FX)
     pub const SPOT: &str = "spot";
     /// Stochastic volatility (Heston, etc.)
     pub const VARIANCE: &str = "variance";
     /// Short rate (Hull-White, etc.)
     pub const SHORT_RATE: &str = "short_rate";
-    /// Time (in years from valuation)
-    pub const TIME: &str = "time";
-    /// Step index
-    pub const STEP: &str = "step";
     /// FX rate (for multi-asset/quanto products)
     pub const FX_RATE: &str = "fx_rate";
     /// Equity spot (for multi-asset, when SPOT refers to FX)
@@ -183,49 +173,6 @@ pub mod state_keys {
     pub const NPV_PREVIOUS: &str = "npv_previous";
     /// Mark-to-market P&L (change in NPV)
     pub const MTM_PNL: &str = "mtm_pnl";
-
-    static INDEXED_SPOT_OVERFLOW: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
-
-    /// Return the canonical state key for the indexed spot of a multi-asset process.
-    ///
-    /// Indices `0..INDEXED_SPOT_INLINE` (currently 128) map directly to static
-    /// `&str` literals with no allocation. Indices above that bound trigger an
-    /// interning step that **leaks one heap allocation per distinct index**
-    /// into a process-wide [`std::sync::Mutex`]-protected cache. This is
-    /// deliberate — the keys must outlive any path simulation and live for
-    /// `'static`, and `Box::leak` is the simplest way to obtain that guarantee.
-    ///
-    /// In practice the leak budget is tiny: a multi-asset basket of 200 names
-    /// leaks ~72 strings (indices 128..200) on first use, then nothing more.
-    /// Workloads that genuinely need thousands of indexed spots should consider
-    /// raising [`INDEXED_SPOT_INLINE`] at the source rather than relying on
-    /// the overflow path.
-    ///
-    /// # Arguments
-    ///
-    /// * `index` - Zero-based asset index whose canonical path-state key is
-    ///   required; values above the inline range are interned permanently.
-    pub fn indexed_spot(index: usize) -> &'static str {
-        if index < INDEXED_SPOT_INLINE {
-            INDEXED_SPOT_TABLE[index]
-        } else {
-            indexed_spot_overflow(index)
-        }
-    }
-
-    #[allow(clippy::expect_used)] // Mutex poisoning indicates prior panic; propagate.
-    fn indexed_spot_overflow(index: usize) -> &'static str {
-        let mut cache = INDEXED_SPOT_OVERFLOW
-            .lock()
-            .expect("indexed spot overflow cache mutex should not be poisoned");
-        let base = INDEXED_SPOT_INLINE;
-        while base + cache.len() <= index {
-            let next = base + cache.len();
-            let key = Box::leak(format!("spot_{next}").into_boxed_str());
-            cache.push(key);
-        }
-        cache[index - base]
-    }
 }
 
 /// Indexed state variable key for O(1) array access in the MC inner loop.
@@ -238,27 +185,23 @@ pub enum StateKey {
     Variance = 1,
     /// Short rate (Hull-White, etc.)
     ShortRate = 2,
-    /// Time in years from valuation
-    Time = 3,
-    /// Step index
-    Step = 4,
     /// FX rate (multi-asset/quanto)
-    FxRate = 5,
+    FxRate = 3,
     /// Equity spot (multi-asset, when Spot refers to FX)
-    EquitySpot = 6,
+    EquitySpot = 4,
     /// Current NPV of remaining cashflows
-    NpvCurrent = 7,
+    NpvCurrent = 5,
     /// NPV from previous timestep
-    NpvPrevious = 8,
+    NpvPrevious = 6,
     /// Mark-to-market P&L
-    MtmPnl = 9,
+    MtmPnl = 7,
     /// Credit spread
-    CreditSpread = 10,
+    CreditSpread = 8,
     /// Pathwise money-market account `B(t) = exp(∫₀ᵗ r(s) ds)` (numeraire)
-    BankAccount = 11,
+    BankAccount = 9,
 }
 
-const STATE_ARRAY_LEN: usize = 12;
+const STATE_ARRAY_LEN: usize = 10;
 
 /// Resolve a string key to its fixed-slot `StateKey`, if it matches a known key.
 fn resolve_key(key: &str) -> Option<StateKey> {
@@ -266,8 +209,6 @@ fn resolve_key(key: &str) -> Option<StateKey> {
         "spot" => Some(StateKey::Spot),
         "variance" => Some(StateKey::Variance),
         "short_rate" => Some(StateKey::ShortRate),
-        "time" => Some(StateKey::Time),
-        "step" => Some(StateKey::Step),
         "fx_rate" => Some(StateKey::FxRate),
         "equity_spot" => Some(StateKey::EquitySpot),
         "npv_current" => Some(StateKey::NpvCurrent),
@@ -309,11 +250,6 @@ pub struct PathState {
 }
 
 impl PathState {
-    fn sync_core_fields(&mut self) {
-        self.set_key(StateKey::Time, self.time);
-        self.set_key(StateKey::Step, self.step as f64);
-    }
-
     fn extras(&self) -> Option<&PathStateExtras> {
         self.extras.as_deref()
     }
@@ -326,16 +262,14 @@ impl PathState {
 
     /// Create a new path state.
     pub fn new(step: usize, time: f64) -> Self {
-        let mut state = Self {
+        Self {
             step,
             time,
             fixed: [0.0; STATE_ARRAY_LEN],
             fixed_set: 0,
             extras: None,
             uniform_random: 0.0,
-        };
-        state.sync_core_fields();
-        state
+        }
     }
 
     /// Set a state variable by indexed key (fast path, no hashing).
@@ -410,75 +344,15 @@ impl PathState {
         indexed_spots[index] = Some(value);
     }
 
-    /// Update the public step/time fields and their keyed representations together.
-    pub fn set_step_time(&mut self, step: usize, time: f64) {
-        self.step = step;
-        self.time = time;
-        self.sync_core_fields();
-    }
-
-    /// Merge all state variables into `out` (clears `out` first).
-    ///
-    /// Prefer this over [`Self::vars`] on hot paths to reuse a single `FxHashMap`
-    /// allocation instead of cloning the dynamic map and allocating a fresh map
-    /// on every call.
+    /// Update the path step index and elapsed model time together.
     ///
     /// # Arguments
     ///
-    /// * `out` - Caller-owned output buffer populated without allocating a replacement.
-    pub fn collect_vars(&self, out: &mut FxHashMap<&'static str, f64>) {
-        out.clear();
-
-        let dyn_len = self.extras().map(|e| e.dynamic.len()).unwrap_or(0);
-        let indexed_count = self
-            .extras()
-            .map(|e| e.indexed_spots.iter().filter(|v| v.is_some()).count())
-            .unwrap_or(0);
-        let fixed_count = self.fixed_set.count_ones() as usize;
-        out.reserve(dyn_len + indexed_count + fixed_count);
-
-        if let Some(extras) = self.extras() {
-            for (k, v) in &extras.dynamic {
-                out.insert(*k, *v);
-            }
-        }
-
-        let key_names: [&'static str; STATE_ARRAY_LEN] = [
-            state_keys::SPOT,
-            state_keys::VARIANCE,
-            state_keys::SHORT_RATE,
-            state_keys::TIME,
-            state_keys::STEP,
-            state_keys::FX_RATE,
-            state_keys::EQUITY_SPOT,
-            state_keys::NPV_CURRENT,
-            state_keys::NPV_PREVIOUS,
-            state_keys::MTM_PNL,
-            "credit_spread",
-            "bank_account",
-        ];
-        for (i, key_name) in key_names.iter().enumerate().take(STATE_ARRAY_LEN) {
-            if self.fixed_set & (1 << i) != 0 {
-                out.insert(*key_name, self.fixed[i]);
-            }
-        }
-
-        if let Some(extras) = self.extras() {
-            for (index, value) in extras.indexed_spots.iter().enumerate() {
-                if let Some(value) = value {
-                    out.insert(state_keys::indexed_spot(index), *value);
-                }
-            }
-        }
-    }
-
-    /// Collect all state variables into a FxHashMap.
-    /// Merges fixed-slot values with dynamic values. This allocates --
-    /// prefer `get`/`get_key` or [`Self::collect_vars`] on hot paths.
-    pub fn vars(&self) -> FxHashMap<&'static str, f64> {
-        let mut map = FxHashMap::<&'static str, f64>::default();
-        self.collect_vars(&mut map);
-        map
+    /// * `step` - Zero-based simulation event index.
+    /// * `time` - Elapsed model time in years from valuation.
+    pub fn set_step_time(&mut self, step: usize, time: f64) {
+        self.step = step;
+        self.time = time;
     }
 
     /// Get spot price (convenience method).
@@ -973,15 +847,12 @@ mod tests {
         let state = PathState::new(5, 0.5);
         assert_eq!(state.step, 5);
         assert_eq!(state.time, 0.5);
-        assert_eq!(state.get("step"), Some(5.0));
-        assert_eq!(state.get("time"), Some(0.5));
-        let vars = state.vars();
-        assert_eq!(vars.get(state_keys::STEP), Some(&5.0));
-        assert_eq!(vars.get(state_keys::TIME), Some(&0.5));
+        assert_eq!(state.get("step"), None);
+        assert_eq!(state.get("time"), None);
     }
 
     #[test]
-    fn test_path_state_vars() {
+    fn test_path_state_lookup() {
         let mut state = PathState::new(0, 0.0);
         state.set(state_keys::SPOT, 100.0);
         state.set(state_keys::VARIANCE, 0.04);
@@ -990,24 +861,20 @@ mod tests {
         assert_eq!(state.spot(), Some(100.0));
         assert_eq!(state.variance(), Some(0.04));
         assert_eq!(state.get("spot_1"), Some(120.0));
-        assert_eq!(state.vars().get("spot_1"), Some(&120.0));
-
-        let mut buf = FxHashMap::<&'static str, f64>::default();
-        state.collect_vars(&mut buf);
-        assert_eq!(buf.get("spot_1"), Some(&120.0));
-        buf.clear();
-        state.collect_vars(&mut buf);
-        assert_eq!(buf.get("spot_1"), Some(&120.0));
-
         assert_eq!(state.get("nonexistent"), None);
         assert_eq!(state.get_or("nonexistent", 42.0), 42.0);
     }
 
     #[test]
-    fn test_indexed_spot_inline_keys() {
-        assert_eq!(state_keys::indexed_spot(0), "spot_0");
-        assert_eq!(state_keys::indexed_spot(127), "spot_127");
-        assert_eq!(state_keys::indexed_spot(128), "spot_128");
+    fn indexed_spots_have_no_inline_limit() {
+        let mut state = PathState::new(0, 0.0);
+        for index in [0, 127, 128, 2048] {
+            state.set_indexed_spot(index, index as f64);
+            assert_eq!(state.get(&format!("spot_{index}")), Some(index as f64));
+        }
+        state.set_step_time(7, 0.75);
+        assert_eq!(state.step, 7);
+        assert_eq!(state.time, 0.75);
     }
 
     #[test]
