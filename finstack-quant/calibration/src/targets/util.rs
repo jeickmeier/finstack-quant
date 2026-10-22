@@ -8,6 +8,7 @@ use crate::constants::{OrderedF64, TOLERANCE_DUP_KNOTS, WEIGHT_MIN_FLOOR};
 use crate::quotes::rates::RateQuote;
 use crate::quotes::vol::VolQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
+use crate::solver::traits::TimeGridAndGuesses;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -507,7 +508,7 @@ pub(crate) fn scheme_factor(scheme: &ResidualWeightingScheme, t: f64) -> f64 {
 pub(crate) fn sorted_knot_grid<Q>(
     mut entries: Vec<(f64, f64, Q)>,
     label: &str,
-) -> Result<(Vec<f64>, Vec<f64>, Vec<Q>)> {
+) -> Result<TimeGridAndGuesses<Q>> {
     entries.sort_by(|a, b| a.0.total_cmp(&b.0));
     let mut times: Vec<f64> = Vec::with_capacity(entries.len());
     let mut initials = Vec::with_capacity(entries.len());
@@ -528,7 +529,11 @@ Ensure quotes map to strictly increasing year fractions."
         initials.push(guess);
         active_quotes.push(quote);
     }
-    Ok((times, initials, active_quotes))
+    Ok(TimeGridAndGuesses {
+        times,
+        initials,
+        quotes: active_quotes,
+    })
 }
 
 /// Interpolate implied volatility in expiry by linear interpolation of total

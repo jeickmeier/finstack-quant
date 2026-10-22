@@ -8,6 +8,7 @@ use crate::quotes::inflation::InflationQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
 use crate::solver::bootstrap;
 use crate::solver::global;
+use crate::solver::traits::TimeGridAndGuesses;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
 use crate::targets::util::{
     scheme_factor, sorted_knot_grid, validate_global_knot_grid, ContextScratch,
@@ -433,7 +434,7 @@ impl GlobalSolveTarget for InflationCurveTarget {
     fn build_time_grid_and_guesses(
         &self,
         quotes: &[Self::Quote],
-    ) -> Result<(Vec<f64>, Vec<f64>, Vec<Self::Quote>)> {
+    ) -> Result<TimeGridAndGuesses<Self::Quote>> {
         let base_cpi = self.effective_base_cpi()?;
 
         let mut entries = Vec::with_capacity(quotes.len());

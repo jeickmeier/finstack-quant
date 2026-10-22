@@ -9,6 +9,7 @@ use crate::quotes::ExtractQuotes;
 use crate::quotes::MarketQuote;
 use crate::solver::bootstrap;
 use crate::solver::global;
+use crate::solver::traits::TimeGridAndGuesses;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
 use crate::targets::rate_recipe::rate_calibration_recipe;
 use crate::targets::util::{
@@ -656,7 +657,7 @@ impl GlobalSolveTarget for DiscountCurveTarget {
     fn build_time_grid_and_guesses(
         &self,
         quotes: &[Self::Quote],
-    ) -> Result<(Vec<f64>, Vec<f64>, Vec<Self::Quote>)> {
+    ) -> Result<TimeGridAndGuesses<Self::Quote>> {
         let bounds = self
             .params
             .config

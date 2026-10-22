@@ -9,6 +9,7 @@ use crate::quotes::ExtractQuotes;
 use crate::quotes::MarketQuote;
 use crate::solver::global;
 use crate::solver::traits::GlobalSolveTarget;
+use crate::solver::traits::TimeGridAndGuesses;
 use crate::targets::rate_recipe::rate_calibration_recipe;
 use crate::targets::util::{
     discount_and_forward_curve_ids, prepare_rate_calibration_quotes, pv01_residual_weight,
@@ -365,7 +366,7 @@ impl GlobalSolveTarget for ForwardCurveTarget {
     fn build_time_grid_and_guesses(
         &self,
         quotes: &[Self::Quote],
-    ) -> Result<(Vec<f64>, Vec<f64>, Vec<Self::Quote>)> {
+    ) -> Result<TimeGridAndGuesses<Self::Quote>> {
         let projection_grid = self.projection_grid(quotes)?;
         let mut entries = Vec::with_capacity(quotes.len());
         let mut deposits = Vec::new();
@@ -477,7 +478,11 @@ impl GlobalSolveTarget for ForwardCurveTarget {
         }
         self.parameter_count.set(times.len());
         *self.projection_grid.borrow_mut() = Some(projection_grid);
-        Ok((times, initials, active_quotes))
+        Ok(TimeGridAndGuesses {
+            times,
+            initials,
+            quotes: active_quotes,
+        })
     }
 
     fn build_curve_from_params(&self, times: &[f64], params: &[f64]) -> Result<Self::Curve> {
@@ -907,8 +912,9 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (times, _, _) = GlobalSolveTarget::build_time_grid_and_guesses(&target, &quotes)
-            .expect("deposit parameter grid");
+        let TimeGridAndGuesses { times, .. } =
+            GlobalSolveTarget::build_time_grid_and_guesses(&target, &quotes)
+                .expect("deposit parameter grid");
         assert_eq!(times, vec![0.0, 0.25]);
 
         let (curve, report) = global::optimize(&target, &quotes, &config, 1e-8, true)

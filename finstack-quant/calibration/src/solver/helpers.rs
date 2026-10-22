@@ -354,7 +354,11 @@ pub(crate) fn bracket_solve_1d(
     // Robust bracket selection:
     // sort by x and choose the bracket whose midpoint is closest to the initial guess.
     valid_points.sort_by(|a, b| a.0.total_cmp(&b.0));
-    type Bracket = ((f64, f64), (f64, f64), f64); // ((x0,f0),(x1,f1),score)
+    struct Bracket {
+        left: (f64, f64),
+        right: (f64, f64),
+        score: f64,
+    }
     let mut best_bracket: Option<Bracket> = None;
     // Whether ANY adjacent pair of valid evaluations straddles zero — i.e. the
     // objective provably crosses zero somewhere in the scanned domain. This is
@@ -374,10 +378,14 @@ pub(crate) fn bracket_solve_1d(
         let score = (mid - initial).abs();
         let replace = match &best_bracket {
             None => true,
-            Some((_, _, best_score)) => score < *best_score,
+            Some(bracket) => score < bracket.score,
         };
         if replace {
-            best_bracket = Some(((x0, f0), (x1, f1), score));
+            best_bracket = Some(Bracket {
+                left: (x0, f0),
+                right: (x1, f1),
+                score,
+            });
         }
     }
 
@@ -395,7 +403,12 @@ pub(crate) fn bracket_solve_1d(
         }
     }
 
-    let Some(((mut a, mut fa), (mut b, mut fb), _)) = best_bracket else {
+    let Some(Bracket {
+        left: (mut a, mut fa),
+        right: (mut b, mut fb),
+        ..
+    }) = best_bracket
+    else {
         // No sign-change found. Run a bounded secant fallback from the best
         // observed point. NOTE: any result from this fallback is NOT a true
         // sign-change root; callers check `is_sign_change_bracket` to detect this.
