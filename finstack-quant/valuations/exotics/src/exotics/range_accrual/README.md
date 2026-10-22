@@ -208,7 +208,7 @@ finite-difference:
 | `Rho` | `UnifiedDv01Calculator` with `parallel_discount_only()` (central bump, selected model) |
 | `Dv01`, `BucketedDv01` | Parallel and triangular key-rate curve risk |
 
-`Theta` is registered universally by `metrics::standard_registry()`.
+`Theta` is registered universally by `pricer::STANDARD.metrics()`.
 
 ## Market dependencies
 

@@ -23,7 +23,8 @@ use finstack_quant_models::types::{ExerciseStyle, OptionType};
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::SettlementType;
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations::pricer::STANDARD;
 use std::sync::Arc;
 use time::macros::date;
 
@@ -128,7 +129,7 @@ fn test_equity_option_greek(
     metric_id: MetricId,
     analytical_fn: fn(&EquityOption, &MarketContext, Date) -> Result<f64>,
 ) {
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let pv = option.value(market, as_of).unwrap();
 
     // Compute analytical greek directly
@@ -294,7 +295,7 @@ fn test_bucketed_dv01_sums_to_parallel() {
         .unwrap();
 
     let market = MarketContext::new().insert(disc_curve);
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let pv = bond.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(bond),
@@ -400,7 +401,7 @@ fn test_bucketed_vega_reports_raw_total_and_residual() {
     };
 
     let market = create_option_market(as_of, 100.0, 0.25, 0.05);
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let pv = option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
         Arc::new(option),

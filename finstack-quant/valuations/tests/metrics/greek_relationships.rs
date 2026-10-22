@@ -18,7 +18,7 @@ use finstack_quant_models::types::{ExerciseStyle, OptionType};
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::SettlementType;
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::{MetricContext, MetricId};
 use std::sync::Arc;
 use time::macros::date;
 
@@ -65,7 +65,8 @@ fn metric_value(
         pv,
         MetricContext::default_config(),
     );
-    let results = standard_registry()
+    let results = finstack_quant_valuations::pricer::STANDARD
+        .metrics()
         .compute(std::slice::from_ref(&metric), &mut context)
         .unwrap_or_else(|error| panic!("{metric} computation failed: {error}"));
     let value = *results

@@ -33,7 +33,7 @@ Everything supported is re-exported from `crate::metrics`. `risk` is public.
 | `MetricCalculator` | `fn calculate(&self, &mut MetricContext) -> Result<f64>` plus `dependencies()` / `dynamic_dependencies()` |
 | `MetricContext` | Instrument, `MarketContext`, `as_of`, base PV, and the `computed` / series / matrix caches |
 | `MetricRegistry` | Calculator store with dependency resolution and strict, fail-fast errors |
-| `standard_registry()` | Process-wide registry with all built-in calculators registered |
+| `finstack_quant_valuations::pricer::STANDARD.metrics()` | Process-wide metric registry containing every built-in family, exposed by the umbrella crate |
 | `bump_surface_vol_absolute` | Absolute vol-point surface bump helper |
 | `STANDARD_BUCKETS_YEARS`, `STANDARD_BUCKET_LABELS`, `format_bucket_label` | Canonical key-rate bucket grid and labels |
 | `CrossFactorCalculator`, `CrossFactorPair` | Cross-gamma style two-factor sensitivities |

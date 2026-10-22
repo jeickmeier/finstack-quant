@@ -255,7 +255,8 @@ impl RequestedMetrics {
         match metrics {
             None => Ok(Self::Standard),
             Some(names) => Ok(Self::Only(
-                finstack_quant_valuations::metrics::standard_registry()
+                finstack_quant_valuations::pricer::STANDARD
+                    .metrics()
                     .resolve_metric_ids(&names)?,
             )),
         }

@@ -760,7 +760,7 @@ Registered for `InstrumentType::StructuredCredit`:
 | Deal-specific | `CmbsDscr`, `AbsChargeOff`, `AbsCreditEnhancement` |
 | Sensitivities | `Recovery01`, `Prepayment01`, `Default01`, `Severity01` |
 
-`Theta` is registered universally by `metrics::standard_registry()`.
+`Theta` is registered universally by `pricer::STANDARD.metrics()`.
 
 **Price basis**: note prices, quotes and spread solves are per CURRENT face
 (`Tranche::current_balance`); `TrancheMetrics::factor` reports

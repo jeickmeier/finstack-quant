@@ -47,7 +47,7 @@ in a different crate, reached by the MC instrument pricers.
 
 | Path | Contents | Visibility |
 |------|----------|------------|
-| [`mod.rs`](mod.rs) | `FAMILIES`, the `STANDARD` umbrella family, `standard_pricer_registry()`, the `register_generic!` macro, all re-exports | mixed |
+| [`mod.rs`](mod.rs) | `FAMILIES`, the `STANDARD` umbrella family, `STANDARD.pricers()`, the `register_generic!` macro, all re-exports | mixed |
 | [`keys.rs`](keys.rs) | `InstrumentType`, `ModelKey`, `PricerKey` — enums, `as_str`, `Display`, `FromStr`, serde | private mod, types re-exported |
 | [`registry.rs`](registry.rs) | `Pricer` trait, `PricerRegistry`, the pricing pipeline, `expect_inst`, FX-policy collection | private mod, items re-exported |
 | [`errors.rs`](errors.rs) | `PricingError`, `PricingErrorContext`, the two lossy conversions to/from `finstack_quant_core::Error` | private mod, types re-exported |
@@ -72,7 +72,7 @@ priced without an explicit registry resolves its own family through
 Re-exported from `crate::pricer` (and therefore public API):
 
 `InstrumentType`, `ModelKey`, `PricerKey`, `Pricer`, `PricerRegistry`,
-`PricingError`, `PricingErrorContext`, `standard_pricer_registry()`, `expect_inst`
+`PricingError`, `PricingErrorContext`, `STANDARD.pricers()`, `expect_inst`
 (marked `#[doc(hidden)]`), every `pub fn` in `json` and
 `ParsedInstrument`, and `STANDARD_OPTION_GREEKS`.
 
@@ -82,12 +82,12 @@ Internal, despite living next to the public surface:
 |------|-----------|------|
 | `register_generic!` | `#[macro_export]` | Registration boilerplate for `GenericInstrumentPricer`; the umbrella re-exports it at its root |
 | `PricerRegistry::price_raw` | hidden `pub` | Unrounded `f64` path for finite-difference risk |
-| `standard_pricer_registry()`, `FAMILIES`, `STANDARD`, the JSON pricing entry points | umbrella crate | The closed-world assembly lives in `finstack-quant-valuations`, not here |
+| `STANDARD.pricers()`, `FAMILIES`, `STANDARD`, the JSON pricing entry points | umbrella crate | The closed-world assembly lives in `finstack-quant-valuations`, not here |
 | `registry::attach_metric_measures` | `pub(super)` | |
 | `enrichment::*` | `pub(super)` | |
 
 `PricerRegistry` derives `Clone` and `Default`, so a caller can build a bespoke
-registry from `standard_pricer_registry().clone()` and mutate it, then pass it via
+registry from `STANDARD.pricers().clone()` and mutate it, then pass it via
 `PricingOptions::with_registry`.
 
 ## Keys
@@ -167,7 +167,7 @@ monkey-patching. `Family::build_pricers` and `Family::build_metrics` propagate
 registration errors; the family's lazily initialised registries treat a
 duplicate built-in registration as an invariant violation.
 
-`standard_pricer_registry()` returns a `&'static PricerRegistry` from a process-wide
+`STANDARD.pricers()` returns a `&'static PricerRegistry` from a process-wide
 `OnceLock<Arc<PricerRegistry>>`. When metrics are requested, the pricing path
 wraps a cheap clone in `Arc`; the registry's ordered pricer map is already
 `Arc`-backed, so this does not deep-clone the dispatch table.

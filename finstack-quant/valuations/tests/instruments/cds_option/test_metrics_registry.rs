@@ -11,7 +11,8 @@ use finstack_quant_core::market_data::term_structures::{
 };
 use finstack_quant_core::types::{CurveId, IndexId};
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations::recalibration::QuoteBump;
 use time::macros::date;
 
@@ -78,7 +79,7 @@ fn test_metrics_registry_delta() {
         MetricContext::default_config(),
     );
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry.compute(&[MetricId::Delta], &mut ctx).unwrap();
 
     assert!(results.contains_key(&MetricId::Delta));
@@ -234,7 +235,7 @@ fn test_metrics_registry_implied_vol() {
         MetricContext::default_config(),
     );
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry.compute(&[MetricId::ImpliedVol], &mut ctx).unwrap();
 
     let iv = *results.get(&MetricId::ImpliedVol).unwrap();
@@ -256,7 +257,7 @@ fn test_cs01_dependency_propagates_replay_error() {
         MetricContext::default_config(),
     );
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let error = registry
         .compute(&[MetricId::Delta, MetricId::Cs01], &mut ctx)
         .expect_err("standard option CS01 requires quote-space replay");
@@ -286,7 +287,7 @@ fn test_cds_option_cs01_requires_replay_recipe() {
         MetricContext::default_config(),
     );
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let error = registry
         .compute(&[MetricId::Cs01], &mut ctx)
         .expect_err("standard CDS option CS01 requires quote-space replay");
@@ -330,7 +331,7 @@ fn test_metrics_near_expiry() {
         MetricContext::default_config(),
     );
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let results = registry
         .compute(&[MetricId::Delta, MetricId::Vega], &mut ctx)
         .unwrap();

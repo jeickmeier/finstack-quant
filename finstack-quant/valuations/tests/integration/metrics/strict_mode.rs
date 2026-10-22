@@ -17,7 +17,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Error;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations::pricer::STANDARD;
 use std::sync::Arc;
 use time::macros::date;
 
@@ -89,7 +90,7 @@ fn test_all_metrics_succeed_strict_mode() {
         MetricId::Dv01,
     ];
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     // Compute with strict mode (default)
     let result = registry.compute(&metric_ids, &mut context);
@@ -172,7 +173,7 @@ fn test_unknown_metric_fails_strict_mode() {
         MetricId::Ytm,
     ];
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     // Compute with strict mode
     let result = registry.compute(&metric_ids, &mut context);
@@ -217,7 +218,7 @@ fn test_strict_is_default() {
 
     let metric_ids = vec![MetricId::CleanPrice, MetricId::custom("unknown_metric")];
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     // compute() should behave same as strict mode
     let default_result = registry.compute(&metric_ids, &mut context);
@@ -340,7 +341,7 @@ fn test_end_to_end_workflow() {
         MetricId::Dv01,
     ];
 
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let metrics = registry
         .compute(&all_bond_metrics, &mut context)
         .expect("All standard bond metrics should compute successfully");

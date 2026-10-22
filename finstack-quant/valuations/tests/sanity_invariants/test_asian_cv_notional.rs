@@ -23,9 +23,8 @@ mod cv_notional_tests {
     use finstack_quant_models::types::OptionType;
     use finstack_quant_valuations::instruments::exotics::asian_option::AsianOption;
     use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-    use finstack_quant_valuations::pricer::{
-        standard_pricer_registry, InstrumentType, ModelKey, PricerKey,
-    };
+    use finstack_quant_valuations::pricer::STANDARD;
+    use finstack_quant_valuations::pricer::{InstrumentType, ModelKey, PricerKey};
     use time::Month;
 
     const SPOT: f64 = 100.0;
@@ -101,7 +100,7 @@ mod cv_notional_tests {
         let market = market(as_of);
         let option = arithmetic_asian(option_type, notional, expiry);
 
-        let registry = standard_pricer_registry();
+        let registry = STANDARD.pricers();
         let pricer = registry
             .get_pricer(PricerKey::new(
                 InstrumentType::AsianOption,

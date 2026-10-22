@@ -317,7 +317,7 @@ Registered for `InstrumentType::Bond` in `metrics/mod.rs`:
 | Credit risk | `Cs01`, `BucketedCs01`, `CrossGammaRatesCredit` |
 | Return floor | `Moic`, `MoicToWorst`, `Xirr`, `XirrToWorst` |
 
-`Theta` is registered universally by `metrics::standard_registry()`.
+`Theta` is registered universally by `pricer::STANDARD.metrics()`.
 Duration and convexity switch to the effective (option-aware) computation in
 `metrics/effective.rs` when the bond carries a call/put schedule or return-floor
 rights. Deterministic return floors use the pricing-effective daily call

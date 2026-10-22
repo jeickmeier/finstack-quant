@@ -31,9 +31,8 @@ use finstack_quant_valuations::instruments::exotics::lookback_option::{
 };
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::{Instrument, Monitoring};
-use finstack_quant_valuations::pricer::{
-    standard_pricer_registry, InstrumentType, ModelKey, PricerKey,
-};
+use finstack_quant_valuations::pricer::STANDARD;
+use finstack_quant_valuations::pricer::{InstrumentType, ModelKey, PricerKey};
 use std::hint::black_box;
 use time::Month;
 
@@ -289,7 +288,7 @@ fn bench_barrier_monitoring(c: &mut Criterion) {
     option.div_yield_id = Some("SPOT_DIV".into());
     option.instrument_pricing_overrides =
         InstrumentPricingOverrides::default().with_mc_paths(2_500);
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
     let mut group = c.benchmark_group("barrier_monitoring");
     for (monitoring_name, monitoring) in [
         ("continuous", Monitoring::Continuous),
