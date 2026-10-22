@@ -635,7 +635,7 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
             return Err(PricingError::model_failure_with_context(
                 format!(
                     "Seasoned Geometric Asian analytical pricing not supported ({} of {} fixings already observed). \
-                    For seasoned options, use Monte Carlo pricing via `npv_mc()` method or set \
+                    For seasoned options, select `ModelKey::MonteCarloGBM` through `price_with_metrics`, or set \
                     `averaging_method = Arithmetic` which supports seasoning via Turnbull-Wakeman.",
                     count, total_fixings
                 ),
@@ -1775,7 +1775,19 @@ mod tests {
                 } else {
                     strike - average
                 };
-                let actual = option.npv_mc(&curves, as_of).expect("MC price").amount();
+                let actual = crate::EXOTICS
+                    .pricers()
+                    .price_with_metrics(
+                        &option,
+                        ModelKey::MonteCarloGBM,
+                        &curves,
+                        as_of,
+                        &[],
+                        finstack_quant_valuations_core::instruments::PricingOptions::default(),
+                    )
+                    .expect("MC price")
+                    .value
+                    .amount();
                 assert!(
                     (actual - expected).abs() < 1e-10,
                     "{averaging:?} {option_type:?}: {actual} vs {expected}"
@@ -1838,7 +1850,19 @@ mod tests {
                 .expect("analytical")
                 .value
                 .amount();
-            let mc = option.npv_mc(&curves, as_of).expect("MC").amount();
+            let mc = crate::EXOTICS
+                .pricers()
+                .price_with_metrics(
+                    &option,
+                    ModelKey::MonteCarloGBM,
+                    &curves,
+                    as_of,
+                    &[],
+                    finstack_quant_valuations_core::instruments::PricingOptions::default(),
+                )
+                .expect("MC")
+                .value
+                .amount();
             assert!((actual - expected).abs() < 1e-10, "{actual} vs {expected}");
             assert!((mc - expected).abs() < 1e-10, "{mc} vs {expected}");
         }
@@ -1875,7 +1899,19 @@ mod tests {
                 }
             };
             let expected = (average - 95.0) * payment_df;
-            let actual = option.npv_mc(&curves, as_of).expect("MC").amount();
+            let actual = crate::EXOTICS
+                .pricers()
+                .price_with_metrics(
+                    &option,
+                    ModelKey::MonteCarloGBM,
+                    &curves,
+                    as_of,
+                    &[],
+                    finstack_quant_valuations_core::instruments::PricingOptions::default(),
+                )
+                .expect("MC")
+                .value
+                .amount();
             assert!(
                 (actual - expected).abs() < 1e-10,
                 "{averaging:?}: {actual} vs {expected}"

@@ -470,30 +470,6 @@ impl CommoditySpotOption {
         })
     }
 
-    /// Price commodity option using Monte Carlo with Schwartz-Smith dynamics.
-    ///
-    /// Simulates paths under the Schwartz-Smith two-factor model and
-    /// computes discounted expected payoff.
-    ///
-    /// # Arguments
-    ///
-    /// * `mc_params` - Monte Carlo configuration (model, paths, steps, seed)
-    /// * `market` - Market data context for discount curves and forward prices
-    /// * `as_of` - Valuation date
-    ///
-    /// # Returns
-    ///
-    /// Present value as `Money` in the underlying currency.
-    pub fn npv_mc(
-        &self,
-        mc_params: &CommodityMcParams,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> Result<Money> {
-        self.price_mc(mc_params, market, as_of)
-            .map(|(value, _)| value)
-    }
-
     pub(crate) fn price_mc(
         &self,
         mc_params: &CommodityMcParams,
