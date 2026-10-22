@@ -167,8 +167,6 @@ pub(crate) fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<C
         ),
     };
 
-    finstack_quant_core::validation::validate_recovery_rate(recovery_rate)?;
-
     let conv = registry.resolve_cds(convention_key)?;
     let dates = resolve_cds_dates(ctx, conv, pillar)?;
 
