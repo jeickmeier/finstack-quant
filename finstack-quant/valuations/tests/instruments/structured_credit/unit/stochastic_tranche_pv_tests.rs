@@ -126,10 +126,10 @@ fn structured_credit(floating_senior: bool) -> StructuredCredit {
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
-    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::deterministic(
+    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::Deterministic(
         sc.credit_model.prepayment_spec.clone(),
     ));
-    sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::deterministic(
+    sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::Deterministic(
         sc.credit_model.default_spec.clone(),
     ));
     sc.instrument_pricing_overrides = InstrumentPricingOverrides::default();
@@ -210,10 +210,10 @@ fn deterministic_specs_stochastic_pv_matches_deterministic_for_a_dated_psa_sda_p
     sc.tranches.tranches[1].current_balance = sc.tranches.tranches[1].original_balance;
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::psa(2.0);
     sc.credit_model.default_spec = DefaultModelSpec::sda(2.0);
-    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::deterministic(
+    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::Deterministic(
         sc.credit_model.prepayment_spec.clone(),
     ));
-    sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::deterministic(
+    sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::Deterministic(
         sc.credit_model.default_spec.clone(),
     ));
     let market = fixed_market();
@@ -333,7 +333,7 @@ fn floating_coupon_market_data_error_propagates() {
 fn junior_expected_loss_comes_from_writedowns() {
     let mut sc = structured_credit(false);
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.95);
-    sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::deterministic(
+    sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::Deterministic(
         sc.credit_model.default_spec.clone(),
     ));
     let market = fixed_market();
@@ -416,10 +416,10 @@ fn non_pik_deferred_interest_cannot_consume_principal() {
     let mut sc = structured_credit(false);
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
-    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::deterministic(
+    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::Deterministic(
         sc.credit_model.prepayment_spec.clone(),
     ));
-    sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::deterministic(
+    sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::Deterministic(
         sc.credit_model.default_spec.clone(),
     ));
 
@@ -500,7 +500,7 @@ fn average_life_counts_only_paths_that_return_principal() {
     let mut sc = structured_credit(false);
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.95);
     sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.0, 0);
-    sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::deterministic(
+    sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::Deterministic(
         sc.credit_model.default_spec.clone(),
     ));
     let result = sc

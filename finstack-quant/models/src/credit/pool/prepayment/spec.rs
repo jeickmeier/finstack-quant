@@ -93,11 +93,6 @@ impl Default for StochasticPrepaySpec {
 }
 
 impl StochasticPrepaySpec {
-    /// Create a deterministic (non-stochastic) prepayment spec.
-    pub fn deterministic(spec: PrepaymentModelSpec) -> Self {
-        StochasticPrepaySpec::Deterministic(spec)
-    }
-
     /// Create a factor-correlated prepayment spec.
     pub fn factor_correlated(
         base_spec: PrepaymentModelSpec,
@@ -297,7 +292,7 @@ mod tests {
 
     #[test]
     fn test_deterministic_build_returns_none() {
-        let spec = StochasticPrepaySpec::deterministic(PrepaymentModelSpec::psa(1.0));
+        let spec = StochasticPrepaySpec::Deterministic(PrepaymentModelSpec::psa(1.0));
 
         assert!(!spec.is_stochastic());
         assert!(spec.build().is_none());

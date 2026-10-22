@@ -120,7 +120,7 @@ fn clo_deal(n_assets: usize, base_cdr: f64, correlation: f64) -> StructuredCredi
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
     let deterministic_prepay =
-        StochasticPrepaySpec::deterministic(sc.credit_model.prepayment_spec.clone());
+        StochasticPrepaySpec::Deterministic(sc.credit_model.prepayment_spec.clone());
     sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::gaussian_copula(
         base_cdr,
         correlation,

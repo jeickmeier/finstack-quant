@@ -75,11 +75,6 @@ impl Default for StochasticDefaultSpec {
 }
 
 impl StochasticDefaultSpec {
-    /// Create a deterministic (non-stochastic) default spec.
-    pub fn deterministic(spec: DefaultModelSpec) -> Self {
-        StochasticDefaultSpec::Deterministic(spec)
-    }
-
     /// Create a copula-based default spec with Gaussian copula.
     pub fn gaussian_copula(base_cdr: f64, correlation: f64) -> Self {
         StochasticDefaultSpec::Copula {
@@ -325,7 +320,7 @@ mod tests {
 
     #[test]
     fn test_deterministic_build_returns_none() {
-        let spec = StochasticDefaultSpec::deterministic(DefaultModelSpec::constant_cdr(0.02));
+        let spec = StochasticDefaultSpec::Deterministic(DefaultModelSpec::constant_cdr(0.02));
 
         assert!(!spec.is_stochastic());
         assert!(spec.build().expect("deterministic spec is valid").is_none());
