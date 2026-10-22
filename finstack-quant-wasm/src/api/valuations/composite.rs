@@ -6,7 +6,7 @@
 //! at the post-trade financed value. There is no separate `initializeFixed`
 //! export; `initialize` resolves `fixed_quantity` without history.
 
-use crate::utils::input::{from_js_json, js_string, json_text, opt_json_text};
+use crate::utils::input::{from_js_json, js_f64, js_string, js_uint, json_text, opt_json_text};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::composite::{
     history, history_from_spec, CompositeInstrument, CompositeMarketObservation, CompositeSpec,
@@ -63,12 +63,10 @@ pub fn initialize_composite(
     history_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let spec_json: &str = &json_text(&spec_json, "specJson")?;
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
     let history_json = opt_json_text(history_json.as_ref(), "historyJson")?;
     let spec = parse_spec(spec_json)?;
-    let market = super::pricing::parse_market_json(market_json)?;
-    let date = finstack_quant_core::dates::parse_iso_date(as_of).map_err(to_js_err)?;
+    let market = parse_market(&market_json)?;
+    let date = js_date(&as_of, "asOf")?;
     let history = parse_observations(history_json.as_deref())?;
     let result = spec
         .initialize(
@@ -109,12 +107,10 @@ pub fn rebalance_composite(
     history_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
     let history_json = opt_json_text(history_json.as_ref(), "historyJson")?;
     let instrument = parse_composite(instrument_json)?;
-    let market = super::pricing::parse_market_json(market_json)?;
-    let date = finstack_quant_core::dates::parse_iso_date(as_of).map_err(to_js_err)?;
+    let market = parse_market(&market_json)?;
+    let date = js_date(&as_of, "asOf")?;
     let history = parse_observations(history_json.as_deref())?;
     let result = instrument
         .rebalance(
@@ -155,11 +151,9 @@ pub fn composite_primitive_exposures(
     metrics: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
     let instrument = parse_composite(instrument_json)?;
-    let market = super::pricing::parse_market_json(market_json)?;
-    let date = finstack_quant_core::dates::parse_iso_date(as_of).map_err(to_js_err)?;
+    let market = parse_market(&market_json)?;
+    let date = js_date(&as_of, "asOf")?;
     let metrics = parse_metrics(metrics)?;
     let report = instrument
         .primitive_exposures(
@@ -305,29 +299,12 @@ pub fn composite_history(
 // are free functions that take and return the plain object.
 
 use super::typed::arg;
+use crate::api::valuations::pricing::parse_market;
+use crate::utils::wire::{js_date, js_opt_date, js_wire};
 use finstack_quant_valuations::instruments::composite::{
     CompositeHistoryRow, CompositeLegSpec, RebalanceRule, WeightingMethod,
 };
 use finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope;
-
-/// `WeightingMethod::FixedQuantity`: leg quantities are the leg scores.
-/// @returns The `WeightingMethod` plain object.
-/// @throws Error - Throws if the value cannot be converted to JavaScript.
-#[wasm_bindgen(js_name = weightingMethodFixedQuantity)]
-pub fn weighting_method_fixed_quantity() -> Result<JsValue, JsValue> {
-    to_js_value(&WeightingMethod::FixedQuantity)
-}
-
-/// `WeightingMethod::NotionalWeighted`: scale the legs to a gross notional.
-/// @param gross_notional - Target gross notional as a `Money` plain object in the reporting currency.
-/// @returns The `WeightingMethod` plain object.
-/// @throws Error - Throws with kind `validation` if `grossNotional` is not a `Money` plain object.
-#[wasm_bindgen(js_name = weightingMethodNotionalWeighted)]
-pub fn weighting_method_notional_weighted(gross_notional: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&WeightingMethod::NotionalWeighted {
-        gross_notional: arg::json(&gross_notional, "grossNotional")?,
-    })
-}
 
 /// `WeightingMethod::MetricWeighted`: size the legs by an additive metric.
 /// @param metric - Canonical additive metric identifier, e.g. `"dv01"` or `"delta"`.
@@ -346,7 +323,7 @@ pub fn weighting_method_metric_weighted(
     to_js_value(&WeightingMethod::MetricWeighted {
         metric: js_string(&metric, "metric")?.parse().map_err(to_js_err)?,
         anchor_leg_id: arg::id(&anchor_leg_id, "anchorLegId")?,
-        anchor_quantity: arg::num(&anchor_quantity, "anchorQuantity")?,
+        anchor_quantity: js_f64(&anchor_quantity, "anchorQuantity")?,
         neutralize: crate::utils::input::js_bool(&neutralize, "neutralize")?,
     })
 }
@@ -363,7 +340,7 @@ macro_rules! anchored_weighting {
         pub fn $name(anchor_leg_id: JsValue, anchor_quantity: JsValue) -> Result<JsValue, JsValue> {
             to_js_value(&WeightingMethod::$method(
                 js_string(&anchor_leg_id, "anchorLegId")?,
-                arg::num(&anchor_quantity, "anchorQuantity")?,
+                js_f64(&anchor_quantity, "anchorQuantity")?,
             ))
         }
     };
@@ -400,10 +377,10 @@ pub fn weighting_method_volatility_weighted(
 ) -> Result<JsValue, JsValue> {
     to_js_value(&WeightingMethod::volatility_weighted(
         js_string(&anchor_leg_id, "anchorLegId")?,
-        arg::num(&anchor_quantity, "anchorQuantity")?,
-        arg::uint(&lookback, "lookback")?,
-        arg::uint(&min_observations, "minObservations")?,
-        arg::num(&annualization_factor, "annualizationFactor")?,
+        js_f64(&anchor_quantity, "anchorQuantity")?,
+        js_uint(&lookback, "lookback")?,
+        js_uint(&min_observations, "minObservations")?,
+        js_f64(&annualization_factor, "annualizationFactor")?,
     ))
 }
 
@@ -411,14 +388,6 @@ pub fn weighting_method_volatility_weighted(
 fn rebalance_rule(rule: RebalanceRule) -> Result<JsValue, JsValue> {
     rule.validate().map_err(to_js_err)?;
     to_js_value(&rule)
-}
-
-/// `RebalanceRule::Manual`: holdings change only on explicit `rebalance` calls.
-/// @returns The `RebalanceRule` plain object.
-/// @throws Error - Throws if the value cannot be converted to JavaScript.
-#[wasm_bindgen(js_name = rebalanceRuleManual)]
-pub fn rebalance_rule_manual() -> Result<JsValue, JsValue> {
-    rebalance_rule(RebalanceRule::Manual)
 }
 
 /// `RebalanceRule::Dates`: rebalance on explicit dates.
@@ -449,13 +418,11 @@ pub fn rebalance_rule_calendar(
     end: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     rebalance_rule(RebalanceRule::Calendar {
-        start: arg::date(&start, "start")?,
-        end: crate::utils::input::js_opt_string(end.as_ref(), "end")?
-            .map(|text| crate::utils::parse_iso_date(&text))
-            .transpose()?,
-        frequency: arg::json(&frequency, "frequency")?,
+        start: js_date(&start, "start")?,
+        end: js_opt_date(end.as_ref(), "end")?,
+        frequency: from_js_json(&frequency, "frequency")?,
         calendar_id: js_string(&calendar_id, "calendarId")?,
-        business_day_convention: arg::en(&business_day_convention, "businessDayConvention")?,
+        business_day_convention: js_wire(&business_day_convention, "businessDayConvention")?,
     })
 }
 
@@ -481,7 +448,7 @@ pub fn composite_leg_spec_instrument_dict(leg: JsValue) -> Result<JsValue, JsVal
 #[wasm_bindgen(js_name = compositeHistoryResultRowJson)]
 pub fn composite_history_result_row_json(rows: JsValue, index: JsValue) -> Result<String, JsValue> {
     let rows: Vec<CompositeHistoryRow> = from_js_json(&rows, "rows")?;
-    let index: usize = arg::uint(&index, "index")?;
+    let index: usize = js_uint(&index, "index")?;
     let row = rows.get(index).ok_or_else(|| {
         to_js_err(finstack_quant_core::Error::Validation(format!(
             "history row index {index} is out of range"

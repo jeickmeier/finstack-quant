@@ -21,40 +21,46 @@ mod tests {
         let maturity = Date::from_calendar_date(2030, Month::December, 31).unwrap();
 
         // Create floating rate loans with explicit spreads
-        let loan1 = PoolAsset::floating_rate_loan(
-            "LOAN001",
-            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-            "SOFR-3M",
-            425.0, // SOFR + 425bps
-            maturity,
-            finstack_quant_core::dates::DayCount::Act360,
-        )
-        .with_rating(CreditRating::BB)
-        .with_industry("Technology")
-        .with_obligor_id("OBLIGOR001");
+        let loan1 = PoolAsset {
+            industry: Some("Technology".into()),
+            obligor_id: Some("OBLIGOR001".into()),
+            ..PoolAsset::floating_rate_loan(
+                "LOAN001",
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+                "SOFR-3M",
+                425.0, // SOFR + 425bps
+                maturity,
+                finstack_quant_core::dates::DayCount::Act360,
+            )
+            .with_rating(CreditRating::BB)
+        };
 
-        let loan2 = PoolAsset::floating_rate_loan(
-            "LOAN002",
-            Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
-            "SOFR-3M",
-            475.0, // SOFR + 475bps
-            maturity,
-            finstack_quant_core::dates::DayCount::Act360,
-        )
-        .with_rating(CreditRating::B)
-        .with_industry("Healthcare")
-        .with_obligor_id("OBLIGOR002");
+        let loan2 = PoolAsset {
+            industry: Some("Healthcare".into()),
+            obligor_id: Some("OBLIGOR002".into()),
+            ..PoolAsset::floating_rate_loan(
+                "LOAN002",
+                Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
+                "SOFR-3M",
+                475.0, // SOFR + 475bps
+                maturity,
+                finstack_quant_core::dates::DayCount::Act360,
+            )
+            .with_rating(CreditRating::B)
+        };
 
         // Create fixed rate bond (no separate spread)
-        let bond1 = PoolAsset::fixed_rate_bond(
-            "BOND001",
-            Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
-            0.09, // 9% fixed
-            maturity,
-            finstack_quant_core::dates::DayCount::Thirty360,
-        )
-        .with_rating(CreditRating::BB)
-        .with_industry("Energy");
+        let bond1 = PoolAsset {
+            industry: Some("Energy".into()),
+            ..PoolAsset::fixed_rate_bond(
+                "BOND001",
+                Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
+                0.09, // 9% fixed
+                maturity,
+                finstack_quant_core::dates::DayCount::Thirty360,
+            )
+            .with_rating(CreditRating::BB)
+        };
 
         // Build pool
         let mut pool = AssetPool::new("CLO_2024_1", DealType::Clo, Currency::USD);
@@ -173,7 +179,7 @@ mod tests {
     }
 
     #[test]
-    fn example_wal_from_cashflows() {
+    fn example_wal_from_principal_flows() {
         // Example: Calculating true WAL from a cashflow schedule
 
         let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
@@ -226,8 +232,10 @@ mod tests {
         let mut pool = AssetPool::new("CLO_2024_1A", DealType::Clo, Currency::USD);
 
         // Add diversified loan portfolio
-        pool.assets.push(
-            PoolAsset::floating_rate_loan(
+        pool.assets.push(PoolAsset {
+            industry: Some("Technology".into()),
+            obligor_id: Some("TECH_CORP_A".into()),
+            ..PoolAsset::floating_rate_loan(
                 "LOAN_TECH_001",
                 Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
                 "SOFR-3M",
@@ -236,12 +244,12 @@ mod tests {
                 finstack_quant_core::dates::DayCount::Act360,
             )
             .with_rating(CreditRating::BB)
-            .with_industry("Technology")
-            .with_obligor_id("TECH_CORP_A"),
-        );
+        });
 
-        pool.assets.push(
-            PoolAsset::floating_rate_loan(
+        pool.assets.push(PoolAsset {
+            industry: Some("Healthcare".into()),
+            obligor_id: Some("HEALTH_CORP_B".into()),
+            ..PoolAsset::floating_rate_loan(
                 "LOAN_HEALTH_001",
                 Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
                 "SOFR-3M",
@@ -250,12 +258,12 @@ mod tests {
                 finstack_quant_core::dates::DayCount::Act360,
             )
             .with_rating(CreditRating::B)
-            .with_industry("Healthcare")
-            .with_obligor_id("HEALTH_CORP_B"),
-        );
+        });
 
-        pool.assets.push(
-            PoolAsset::floating_rate_loan(
+        pool.assets.push(PoolAsset {
+            industry: Some("Consumer".into()),
+            obligor_id: Some("CONSUMER_CORP_C".into()),
+            ..PoolAsset::floating_rate_loan(
                 "LOAN_CONSUMER_001",
                 Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
                 "SOFR-3M",
@@ -264,9 +272,7 @@ mod tests {
                 finstack_quant_core::dates::DayCount::Act360,
             )
             .with_rating(CreditRating::B)
-            .with_industry("Consumer")
-            .with_obligor_id("CONSUMER_CORP_C"),
-        );
+        });
 
         // 3. Calculate pool metrics using market-standard methods
 

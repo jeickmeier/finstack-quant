@@ -434,8 +434,8 @@ pub(crate) fn prepare_deal_simulation(
     }
 
     // A custom waterfall must be structurally valid, reference only real
-    // (non-equity) tranches, and not conflict with deal-level `fees`. Deals
-    // arriving via JSON never pass through `with_waterfall`, so re-validate
+    // (non-equity) tranches, and not conflict with deal-level `fees`. The
+    // engine can be reached without `validate_invariants`, so re-validate
     // here rather than pricing a silently-broken structure.
     instrument.validate_custom_waterfall()?;
 
@@ -555,6 +555,28 @@ pub struct SimulationRun {
     pub tranches: FxHashMap<String, TrancheCashflows>,
     /// Reserve, draw-funding and reserve-interest accounting.
     pub diagnostics: SimulationDiagnostics,
+}
+
+impl SimulationRun {
+    /// The run of an exhausted pool: no tranche flows and zero accounting in
+    /// `currency`.
+    fn empty(currency: Currency) -> Self {
+        let zero = Money::from((0_i64, currency));
+        Self {
+            tranches: FxHashMap::default(),
+            diagnostics: SimulationDiagnostics {
+                periods: Vec::new(),
+                reserve_balance_path: Vec::new(),
+                reserve_interest_paid: Vec::new(),
+                draws_from_reserve: zero,
+                draws_from_principal: zero,
+                unfunded_draws: zero,
+                reserve_replenished: zero,
+                early_amortization_date: None,
+                tranche_draws: Vec::new(),
+            },
+        }
+    }
 }
 
 /// Execute the prepared period loop and return tranche results with the
@@ -745,74 +767,45 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
     })
 }
 
-/// Resolve, prepare and simulate a deal whose pool holds instrument
-/// collateral, driving period flows from the instruments' own schedules.
+/// Resolve, prepare and simulate a deal, returning tranche results with the
+/// deal-level diagnostics.
 ///
 /// # Arguments
 ///
-/// * `instrument` - Deal whose `pool.instruments` is populated.
-/// * `context` - Market context used to project every instrument schedule.
+/// * `instrument` - Deal to simulate; it is resolved for pricing first.
+/// * `context` - Market context used for rate resets and, for instrument
+///   collateral, to project every instrument schedule.
 /// * `as_of` - Valuation date.
-pub(crate) fn simulate_instrument_pool(
+/// * `source` - Pool flow source driving each period. `None` picks the
+///   deal's own: the instruments' schedules when `pool.instruments` is
+///   populated, the deterministic pool model otherwise.
+pub(crate) fn simulate_with_source(
     instrument: &StructuredCredit,
     context: &MarketContext,
     as_of: Date,
+    source: Option<&mut dyn PoolFlowSource>,
 ) -> Result<SimulationRun> {
+    let instrument_collateral = instrument.pool.instruments.is_some();
     let resolved = instrument.resolved_for_pricing()?;
     let instrument = &resolved;
-    let currency = instrument.pool.get_currency();
-    match prepare_deal_simulation(instrument, as_of)? {
-        Some(prepared) => {
+    // Exhausted pool: nothing to simulate, empty result.
+    let Some(prepared) = prepare_deal_simulation(instrument, as_of)? else {
+        return Ok(SimulationRun::empty(instrument.pool.get_currency()));
+    };
+    match source {
+        Some(source) => simulate_prepared(instrument, context, &prepared, source),
+        None if instrument_collateral => {
             let mut source = super::instrument_flows::InstrumentScheduleFlowSource::prepare(
                 instrument, context, &prepared,
             )?;
             simulate_prepared(instrument, context, &prepared, &mut source)
         }
-        None => Ok(SimulationRun {
-            tranches: FxHashMap::default(),
-            diagnostics: SimulationDiagnostics {
-                periods: Vec::new(),
-                reserve_balance_path: Vec::new(),
-                reserve_interest_paid: Vec::new(),
-                draws_from_reserve: Money::from((0_i64, currency)),
-                draws_from_principal: Money::from((0_i64, currency)),
-                unfunded_draws: Money::from((0_i64, currency)),
-                reserve_replenished: Money::from((0_i64, currency)),
-                early_amortization_date: None,
-                tranche_draws: Vec::new(),
-            },
-        }),
-    }
-}
-
-/// Resolve, prepare and simulate a deal, returning tranche results with the
-/// deal-level diagnostics.
-pub(crate) fn simulate_with_source<S: PoolFlowSource + ?Sized>(
-    instrument: &StructuredCredit,
-    context: &MarketContext,
-    as_of: Date,
-    source: &mut S,
-) -> Result<SimulationRun> {
-    let resolved = instrument.resolved_for_pricing()?;
-    let instrument = &resolved;
-    let currency = instrument.pool.get_currency();
-    match prepare_deal_simulation(instrument, as_of)? {
-        Some(prepared) => simulate_prepared(instrument, context, &prepared, source),
-        // Exhausted pool: nothing to simulate, empty result.
-        None => Ok(SimulationRun {
-            tranches: FxHashMap::default(),
-            diagnostics: SimulationDiagnostics {
-                periods: Vec::new(),
-                reserve_balance_path: Vec::new(),
-                reserve_interest_paid: Vec::new(),
-                draws_from_reserve: Money::from((0_i64, currency)),
-                draws_from_principal: Money::from((0_i64, currency)),
-                unfunded_draws: Money::from((0_i64, currency)),
-                reserve_replenished: Money::from((0_i64, currency)),
-                early_amortization_date: None,
-                tranche_draws: Vec::new(),
-            },
-        }),
+        None => simulate_prepared(
+            instrument,
+            context,
+            &prepared,
+            &mut DeterministicPoolFlowSource,
+        ),
     }
 }
 
@@ -849,38 +842,6 @@ fn drain_pending_recoveries_at_end(
         distribute_terminal_principal(state, amount, release_date)?;
     }
     Ok(final_date)
-}
-
-/// Aggregate tranche-level cashflows into one dated cashflow vector.
-pub(crate) fn aggregate_tranche_cashflows(
-    full_results: &FxHashMap<String, TrancheCashflows>,
-) -> Result<DatedFlows> {
-    // Aggregate all tranche cashflows into a single schedule
-    let estimated_dates = full_results
-        .values()
-        .next()
-        .map(|r| r.cashflows.len())
-        .unwrap_or(0);
-    let mut flow_map: FxHashMap<Date, Money> = {
-        let mut m = FxHashMap::default();
-        m.reserve(estimated_dates);
-        m
-    };
-
-    for result in full_results.values() {
-        for (date, amount) in &result.cashflows {
-            if let Some(existing) = flow_map.get_mut(date) {
-                *existing = existing.checked_add(*amount)?;
-            } else {
-                flow_map.insert(*date, *amount);
-            }
-        }
-    }
-
-    let mut all_flows: DatedFlows = flow_map.into_iter().collect();
-    all_flows.sort_by_key(|(d, _)| *d);
-
-    Ok(all_flows)
 }
 
 /// Calendar-month exposure: whole contractual months plus the actual fraction

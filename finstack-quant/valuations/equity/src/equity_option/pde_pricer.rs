@@ -3,9 +3,7 @@
 //! Solves the Black-Scholes PDE in log-spot coordinates on a sinh-concentrated
 //! grid. Supports both European and American exercise via the penalty method.
 
-use crate::equity_option::pricing::{
-    collect_inputs, has_future_discrete_dividends, resolve_lifecycle_value,
-};
+use crate::equity_option::pricing::{has_future_discrete_dividends, model_inputs, ModelInputs};
 use crate::equity_option::types::EquityOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -48,57 +46,34 @@ impl EquityOptionPdePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> std::result::Result<Money, PricingError> {
-        if let Some(value) = resolve_lifecycle_value(inst, market, as_of).map_err(|error| {
-            PricingError::model_failure_with_context(
-                error.to_string(),
-                PricingErrorContext::from_instrument(inst).model(ModelKey::PdeCrankNicolson1D),
-            )
+        let model = ModelKey::PdeCrankNicolson1D;
+        let inputs = match model_inputs(inst, market, as_of, model, || {
+            if matches!(inst.exercise_style, ExerciseStyle::Bermudan) {
+                return Err(PricingError::model_failure_with_context(
+                    "EquityOption PDE1D does not support Bermudan exercise; use a tree model",
+                    PricingErrorContext::from_instrument(inst).model(model),
+                ));
+            }
+            if matches!(inst.exercise_style, ExerciseStyle::American)
+                && has_future_discrete_dividends(inst, as_of)
+            {
+                return Err(PricingError::model_failure_with_context(
+                    "EquityOption PDE1D does not support American exercise with discrete \
+                     dividends; use the discrete-dividend tree model",
+                    PricingErrorContext::from_instrument(inst).model(model),
+                ));
+            }
+            Ok(())
         })? {
-            return Ok(value);
-        }
-        if matches!(inst.exercise_style, ExerciseStyle::Bermudan) {
-            return Err(PricingError::model_failure_with_context(
-                "EquityOption PDE1D does not support Bermudan exercise; use a tree model",
-                PricingErrorContext::from_instrument(inst).model(ModelKey::PdeCrankNicolson1D),
-            ));
-        }
-        if matches!(inst.exercise_style, ExerciseStyle::American)
-            && has_future_discrete_dividends(inst, as_of)
-        {
-            return Err(PricingError::model_failure_with_context(
-                "EquityOption PDE1D does not support American exercise with discrete \
-                 dividends; use the discrete-dividend tree model",
-                PricingErrorContext::from_instrument(inst).model(ModelKey::PdeCrankNicolson1D),
-            ));
-        }
-        let inputs = collect_inputs(inst, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(
-                e.to_string(),
-                PricingErrorContext::from_instrument(inst).model(ModelKey::PdeCrankNicolson1D),
-            )
-        })?;
+            ModelInputs::Settled(pv) => return Ok(pv),
+            ModelInputs::Live(inputs) => inputs,
+        };
         let spot = inputs.spot;
         let r = inputs.r;
         let q = inputs.q;
         let sigma = inputs.sigma;
         let t = inputs.t_vol;
         let ccy = inst.currency;
-
-        if t <= 0.0 {
-            let intrinsic = match inst.option_type {
-                OptionType::Call => (spot - inst.strike).max(0.0),
-                OptionType::Put => (inst.strike - spot).max(0.0),
-            };
-            return Money::new(intrinsic * inst.quantity, ccy).map_err(|error| {
-                finstack_quant_valuations_core::pricer::PricingError::from_core(
-                    error,
-                    finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                        inst,
-                    )
-                    .model(ModelKey::PdeCrankNicolson1D),
-                )
-            });
-        }
 
         let is_call = matches!(inst.option_type, OptionType::Call);
 

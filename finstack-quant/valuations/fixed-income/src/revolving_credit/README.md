@@ -30,7 +30,7 @@ Import path:
 | `McConfig`, `CreditSpreadProcessSpec`, `InterestRateProcessSpec` | Optional multi-factor dynamics: correlation matrix, credit-spread and short-rate processes. |
 | `RevolvingCreditPricer` | `price_with_paths(facility, market, as_of)` for full Monte Carlo path capture; `expected_cashflows(..)` for the path-averaged schedule of a stochastic facility. |
 | `EnhancedMonteCarloResult`, `PathResult` | MC statistics plus per-path PV, cashflows and factor trajectories. |
-| `PathAwareCashflowSchedule`, `ThreeFactorPathData` | Cashflow schedule carrying the simulated factor path. |
+| `cashflow_engine::{PathAwareCashflowSchedule, ThreeFactorPathData}` | Cashflow schedule carrying the simulated factor path. |
 | `INTERPOLATION_TOLERANCE`, `MIN_CIR_SPREAD`, `MAX_RECOVERY_RATE`, `MC_CLOCK_DAY_COUNT` | Module numerical constants; the last is the ACT/365F Monte Carlo clock. |
 
 Note that `pricer` and `types` are `pub(crate)` submodules — import the names
@@ -428,7 +428,7 @@ Registered for `InstrumentType::RevolvingCredit` in `metrics/mod.rs`:
   `CashFlowSchedule`, and `price_with_paths(market, as_of)` returning an
   `EnhancedMonteCarloResult` with the per-path PVs, draw option costs and
   factor trajectories plus `to_dataframe()`). Instances are accepted by
-  `price_instrument`, `instrument_cashflows_json` and
+  `price_instrument`, `instrument_cashflows` and
   `AssetPool.with_instruments`.
 - **WASM**: the JSON-first `valuations.instruments.RevolvingCredit` class
   (`fromJson`, `example`, `toJson`, `id`); price with

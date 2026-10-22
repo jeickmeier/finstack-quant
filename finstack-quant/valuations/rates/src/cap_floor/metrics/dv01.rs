@@ -34,11 +34,7 @@ impl MetricCalculator for Dv01Calculator {
                 return UnifiedDv01Calculator::new(Dv01CalculatorConfig::parallel_discount_only())
                     .calculate(context);
             }
-            let bump_bp = sens_config::from_context_or_default(
-                context.get_config(),
-                context.get_metric_pricing_overrides(),
-            )?
-            .rate_bump_bp;
+            let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
             let bumped_up = context
                 .bump_single_ois_rate_market_cached(&cap_floor.discount_curve_id, bump_bp)?;
             let pv_up = context.reprice_raw(bumped_up.as_ref(), context.as_of)?;
@@ -55,11 +51,7 @@ impl MetricCalculator for Dv01Calculator {
                 .calculate(context);
         }
 
-        let bump_bp = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?
-        .rate_bump_bp;
+        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
 
         let discount_id = &cap_floor.discount_curve_id;
         let forward_id = &cap_floor.forward_curve_id;

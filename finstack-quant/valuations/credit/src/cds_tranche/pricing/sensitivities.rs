@@ -1,6 +1,7 @@
-//! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
-//!
-use super::config::{
+//! Tranche measures on `CdsTranchePricer` — model upfront, par spread, spread
+//! DV01, expected loss, correlation delta, jump-to-default — and their helpers.
+
+use super::pricer::{
     CdsTranchePricer, CORR_BOUNDARY_WIDTH, MAX_CORRELATION, MIN_CORRELATION, NUMERICAL_TOLERANCE,
     PAR_SPREAD_TOLERANCE,
 };
@@ -57,7 +58,7 @@ impl CdsTranchePricer {
     /// equity-tranche LOSS `E[min(L, K) | Z]`; with `exposure = R` it is the
     /// conditional capped RECOVERED notional `E[min(G, cap) | Z]` used for
     /// senior-side recovery amortization (see
-    /// `calculate_equity_tranche_recovery`).
+    /// `calculate_equity_tranche_capped` with `PoolExposure::Recovery`).
     ///
     /// Uses the binomial distribution to sum over all possible numbers of defaults.
     pub(super) fn conditional_equity_tranche_capped(
@@ -67,28 +68,9 @@ impl CdsTranchePricer {
         conditional_default_prob: f64,
         exposure: f64,
     ) -> Result<f64> {
-        if !conditional_default_prob.is_finite() {
-            return Err(Error::Validation(
-                "conditional default probability must be finite".to_owned(),
-            ));
-        }
         let individual_notional = 1.0 / num_constituents as f64; // Normalized to 1.0 total
 
-        // Evaluate the whole conditional binomial PMF once (O(n)) instead of
-        // reconstructing a distribution per `k`. The PMF is written into a
-        // per-thread scratch buffer that is reused across quadrature-node
-        // evaluations, so this integrand allocates no `(N + 1)`-element vector
-        // on every call. The buffer is thread-local, so parallel tranche
-        // pricing remains correct and deterministic.
-        thread_local! {
-            static PMF_SCRATCH: std::cell::RefCell<Vec<f64>> =
-                const { std::cell::RefCell::new(Vec::new()) };
-        }
-
-        PMF_SCRATCH.with(|cell| {
-            let mut pmf = cell.borrow_mut();
-            binomial_pmf_all_into(&mut pmf, num_constituents, conditional_default_prob)?;
-
+        with_conditional_pmf(num_constituents, conditional_default_prob, |pmf| {
             let mut expected = 0.0;
 
             // Sum over all possible numbers of defaults
@@ -102,7 +84,7 @@ impl CdsTranchePricer {
                 expected += prob_k_defaults * capped;
             }
 
-            Ok(expected)
+            expected
         })
     }
 
@@ -117,21 +99,8 @@ impl CdsTranchePricer {
         loss_exposure: f64,
         recovery_exposure: f64,
     ) -> Result<(f64, f64)> {
-        if !conditional_default_prob.is_finite() {
-            return Err(Error::Validation(
-                "conditional default probability must be finite".to_owned(),
-            ));
-        }
         let individual_notional = 1.0 / num_constituents as f64;
-        thread_local! {
-            static PMF_SCRATCH: std::cell::RefCell<Vec<f64>> =
-                const { std::cell::RefCell::new(Vec::new()) };
-        }
-
-        PMF_SCRATCH.with(|cell| {
-            let mut pmf = cell.borrow_mut();
-            binomial_pmf_all_into(&mut pmf, num_constituents, conditional_default_prob)?;
-
+        with_conditional_pmf(num_constituents, conditional_default_prob, |pmf| {
             let mut loss = 0.0;
             let mut recovery = 0.0;
             for (k, &prob_k_defaults) in pmf.iter().enumerate() {
@@ -139,7 +108,7 @@ impl CdsTranchePricer {
                 loss += prob_k_defaults * (defaulted * loss_exposure).min(loss_cap);
                 recovery += prob_k_defaults * (defaulted * recovery_exposure).min(recovery_cap);
             }
-            Ok((loss, recovery))
+            (loss, recovery)
         })
     }
 
@@ -226,28 +195,6 @@ impl CdsTranchePricer {
         // an arbitrage-free pricing curve.
         BaseCorrelationCurve::builder("TEMP_BUMPED_CORR")
             .knots(bumped_points)
-            .build()
-    }
-
-    /// Create a bumped credit index with shifted hazard rates for CS01 calculation.
-    ///
-    /// Creates a new CreditIndexData with the index hazard curve shifted by delta_lambda.
-    pub(super) fn rebuild_credit_index(
-        &self,
-        original_index: &CreditIndexData,
-        recovery_rate: f64,
-        index_credit_curve: std::sync::Arc<
-            finstack_quant_core::market_data::term_structures::HazardCurve,
-        >,
-        base_correlation_curve: std::sync::Arc<
-            finstack_quant_core::market_data::term_structures::BaseCorrelationCurve,
-        >,
-    ) -> Result<CreditIndexData> {
-        original_index
-            .to_builder()
-            .recovery_rate(recovery_rate)
-            .index_credit_curve(index_credit_curve)
-            .base_correlation_curve(base_correlation_curve)
             .build()
     }
 
@@ -377,28 +324,13 @@ impl CdsTranchePricer {
         )
     }
 
-    /// Calculate the model upfront for the tranche.
-    ///
-    /// This is the net present value at the contractual running coupon,
-    /// representing the payment required to enter the position at that
-    /// coupon.
-    pub fn calculate_model_upfront(
-        &self,
-        tranche: &CdsTranche,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> Result<f64> {
-        let pv = self.price_tranche(tranche, market, as_of)?;
-        Ok(pv.amount())
-    }
-
     fn coupon_projection(
         &self,
         tranche: &CdsTranche,
         market: &MarketContext,
         as_of: Date,
     ) -> Result<(
-        Vec<super::config::ProjectedDiscountedRow>,
+        Vec<super::pricer::ProjectedDiscountedRow>,
         std::sync::Arc<finstack_quant_core::market_data::term_structures::DiscountCurve>,
     )> {
         tranche.validate()?;
@@ -538,19 +470,15 @@ impl CdsTranchePricer {
         let bumped_corr_curve_down =
             self.bump_base_correlation(original_index_arc.base_correlation_curve(), -bump_abs)?;
 
-        let bumped_index_up = self.rebuild_credit_index(
-            original_index_arc.as_ref(),
-            original_index_arc.recovery_rate(),
-            std::sync::Arc::clone(original_index_arc.index_credit_curve()),
-            std::sync::Arc::new(bumped_corr_curve_up),
-        )?;
+        let bumped_index_up = original_index_arc
+            .to_builder()
+            .base_correlation_curve(std::sync::Arc::new(bumped_corr_curve_up))
+            .build()?;
 
-        let bumped_index_down = self.rebuild_credit_index(
-            original_index_arc.as_ref(),
-            original_index_arc.recovery_rate(),
-            std::sync::Arc::clone(original_index_arc.index_credit_curve()),
-            std::sync::Arc::new(bumped_corr_curve_down),
-        )?;
+        let bumped_index_down = original_index_arc
+            .to_builder()
+            .base_correlation_curve(std::sync::Arc::new(bumped_corr_curve_down))
+            .build()?;
 
         let ctx_up = market
             .clone()
@@ -565,8 +493,12 @@ impl CdsTranchePricer {
             ))
             .insert_credit_index(&tranche.credit_index_id, bumped_index_down)?;
 
-        let pv_up = self.price_tranche(tranche, &ctx_up, as_of)?.amount();
-        let pv_down = self.price_tranche(tranche, &ctx_down, as_of)?.amount();
+        let pv_up = self
+            .price_validated_tranche(tranche, &ctx_up, as_of)?
+            .amount();
+        let pv_down = self
+            .price_validated_tranche(tranche, &ctx_down, as_of)?
+            .amount();
 
         // Central difference per unit ρ, rescaled to the per-1% (0.01 absolute
         // correlation) reporting convention shared with Recovery01.
@@ -641,6 +573,35 @@ impl CdsTranchePricer {
         }
         Ok(impacts.iter().sum::<f64>() / (impacts.len() as f64))
     }
+}
+
+/// Run `f` on the binomial PMF of defaults among `num_constituents` names with
+/// conditional default probability `conditional_default_prob`.
+///
+/// The whole PMF is evaluated once (O(n)) instead of reconstructing a
+/// distribution per `k`, into a per-thread scratch buffer reused across
+/// quadrature-node evaluations, so the integrand allocates no
+/// `(N + 1)`-element vector on every call. The buffer is thread-local, so
+/// parallel tranche pricing remains correct and deterministic.
+fn with_conditional_pmf<T>(
+    num_constituents: usize,
+    conditional_default_prob: f64,
+    f: impl FnOnce(&[f64]) -> T,
+) -> Result<T> {
+    if !conditional_default_prob.is_finite() {
+        return Err(Error::Validation(
+            "conditional default probability must be finite".to_owned(),
+        ));
+    }
+    thread_local! {
+        static PMF_SCRATCH: std::cell::RefCell<Vec<f64>> =
+            const { std::cell::RefCell::new(Vec::new()) };
+    }
+    PMF_SCRATCH.with(|cell| {
+        let mut pmf = cell.borrow_mut();
+        binomial_pmf_all_into(&mut pmf, num_constituents, conditional_default_prob)?;
+        Ok(f(&pmf))
+    })
 }
 
 #[cfg(test)]

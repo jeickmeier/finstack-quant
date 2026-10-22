@@ -373,7 +373,7 @@ def _kpis(result: Any, itype: str) -> list[KPI]:
         # generic: PV + first three present non-composite metrics
         cells: list[tuple[str, str, str]] = [("PV", fmt.money(result.price, result.currency, dp=0), "")]
         count = 0
-        for mid in result.metric_keys():
+        for mid in result.metrics:
             if "::" in mid:
                 continue
             cells.append(_metric_cell(mid, result.get_metric(mid), units))
@@ -393,7 +393,7 @@ def _analytics_section(result: Any, itype: str) -> Section:
     groups = _ANALYTICS_GROUPS.get(itype)
     if not groups:
         # generic: one column of every present non-composite metric
-        present = [(m, result.get_metric(m)) for m in result.metric_keys() if "::" not in m]
+        present = [(m, result.get_metric(m)) for m in result.metrics if "::" not in m]
         rows = [_metric_cell(m, v, units) for m, v in present]
         cols_html = "".join(tables.kv_table([(lbl, val, cls) for lbl, val, cls in rows[i::3]]) for i in range(3))
         return Section("Valuation & Analytics", f'<div class="statgrid">{cols_html}</div>')

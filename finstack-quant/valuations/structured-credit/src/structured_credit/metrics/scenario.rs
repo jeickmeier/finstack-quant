@@ -47,7 +47,7 @@ pub struct ScenarioCell {
     /// Clean settlement price as a percentage of the tranche's CURRENT
     /// balance (the factor-adjusted quote basis): the model dirty value at
     /// buyer settlement less accrued, the same figure as
-    /// `TrancheMetrics::price_pct`.
+    /// `TrancheMetrics::clean_price_pct`.
     pub price: f64,
     /// Weighted-average life in years.
     pub wal: f64,
@@ -86,7 +86,7 @@ pub struct ScenarioTable {
 ///
 /// Returns an error if the tranche is missing, a cell fails to reprice, or a
 /// cell field is non-finite.
-pub fn scenario_table(
+pub fn tranche_scenario_table(
     deal: &StructuredCredit,
     tranche_id: &str,
     market: &MarketContext,
@@ -96,18 +96,7 @@ pub fn scenario_table(
     deal.validate_for_pricing()?;
     let deal = deal.resolved_for_pricing()?;
     // Prices are per CURRENT face (the factor-adjusted quote basis).
-    let current_balance = deal
-        .tranches
-        .tranches
-        .iter()
-        .find(|t| t.id.as_str() == tranche_id)
-        .ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: format!("tranche:{tranche_id}"),
-            })
-        })?
-        .current_balance
-        .amount();
+    let current_balance = deal.tranches.require(tranche_id)?.current_balance.amount();
 
     // Cap grid size before allocating: each cell clones and reprices the deal.
     // Use checked mul so a huge product cannot wrap on wasm32 `usize`.
@@ -206,7 +195,7 @@ mod scenario_guard_tests {
             severities: vec![0.4; 100],
             recovery_lag: None,
         };
-        let err = scenario_table(&deal, "CLONOTES-A", &market, as_of, &grid)
+        let err = tranche_scenario_table(&deal, "CLONOTES-A", &market, as_of, &grid)
             .expect_err("a 1,000,000-cell grid must be rejected");
         let msg = err.to_string();
         assert!(

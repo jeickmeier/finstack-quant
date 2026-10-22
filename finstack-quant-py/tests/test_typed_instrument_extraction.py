@@ -47,7 +47,7 @@ from finstack_quant.valuations.instruments import (
     calculate_var,
     instrument_cashflows,
     price_instrument,
-    structured_credit_tranche_metrics,
+    tranche_metrics,
 )
 
 AS_OF = datetime.date(2024, 1, 15)
@@ -222,8 +222,8 @@ def test_structured_credit_metrics_typed_equal_envelope() -> None:
     assert tranche_ids
     for tranche_id in tranche_ids:
         kind, _ = _assert_same(
-            lambda tid=tranche_id: structured_credit_tranche_metrics(deal, tid, _market(), AS_OF),
-            lambda tid=tranche_id: structured_credit_tranche_metrics(envelope, tid, _market(), AS_OF),
+            lambda tid=tranche_id: tranche_metrics(deal, tid, _market(), AS_OF),
+            lambda tid=tranche_id: tranche_metrics(envelope, tid, _market(), AS_OF),
         )
         assert kind == "ok"
 

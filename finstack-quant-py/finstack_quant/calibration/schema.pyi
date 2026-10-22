@@ -16,7 +16,11 @@ def index() -> str:
     Returns
     -------
     str
-        Pretty-printed registry JSON containing the calibration artifacts.
+        Pretty-printed registry JSON containing the calibration artifacts:
+        an ``artifacts`` array whose rows carry ``path``, ``$id``, ``title``,
+        ``type_name`` (the Rust root type), ``summary``, ``bytes`` and
+        ``kind`` (``input`` for documents you author, ``output`` for
+        documents the library emits, ``component`` for shared definitions).
 
     Raises
     ------

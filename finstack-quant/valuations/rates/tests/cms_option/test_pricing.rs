@@ -130,15 +130,18 @@ fn test_convexity_adjustment_rate_dependency() {
     // level. The earlier dimensionally-wrong `0.5·σ²T·G(S)` formula returned
     // ~0.78 (7800 bp) for these inputs; a correct adjustment for a 20Y CMS,
     // 5Y to fixing, 20% vol is single-to-low-double-digit bp.
-    use finstack_quant_valuations_rates::cms_option::pricer::convexity_adjustment;
+    use finstack_quant_valuations_rates::cms_option::pricer::convexity_adjustment_with_frequency;
 
     let vol = 0.20;
     let time_to_fixing = 5.0;
     let swap_tenor = 20.0;
 
-    let adj_low_rate = convexity_adjustment(vol, time_to_fixing, swap_tenor, 0.01);
-    let adj_mid_rate = convexity_adjustment(vol, time_to_fixing, swap_tenor, 0.03);
-    let adj_high_rate = convexity_adjustment(vol, time_to_fixing, swap_tenor, 0.05);
+    let adj_low_rate =
+        convexity_adjustment_with_frequency(vol, time_to_fixing, swap_tenor, 0.01, 2.0, 0.0);
+    let adj_mid_rate =
+        convexity_adjustment_with_frequency(vol, time_to_fixing, swap_tenor, 0.03, 2.0, 0.0);
+    let adj_high_rate =
+        convexity_adjustment_with_frequency(vol, time_to_fixing, swap_tenor, 0.05, 2.0, 0.0);
 
     for adj in [adj_low_rate, adj_mid_rate, adj_high_rate] {
         assert!(
@@ -449,7 +452,7 @@ fn test_seasoned_cms_option_replication_uses_historical_fixing() {
     let market = standard_market(as_of);
 
     // Missing fixing series → hard error.
-    let err = CmsReplicationPricer::new()
+    let err = CmsReplicationPricer
         .price_dyn(&inst, &market, as_of)
         .expect_err("missing CMS fixing series must be a hard error");
     assert!(
@@ -460,7 +463,7 @@ fn test_seasoned_cms_option_replication_uses_historical_fixing() {
     // Recorded fixing → intrinsic on the observed rate, discounted from payment.
     let observed = 0.05;
     let market = with_cms_fixing(market, fixing, observed);
-    let pv = CmsReplicationPricer::new()
+    let pv = CmsReplicationPricer
         .price_dyn(&inst, &market, as_of)
         .expect("seasoned replication pricing")
         .value
@@ -565,7 +568,7 @@ fn replication_greeks_reprice_with_the_replication_pricer() {
     let market = skewed_vol_market(as_of, 0.20, 0.35);
     let inst = CmsOption::example().expect("example");
     let replication = |market: &MarketContext| {
-        CmsReplicationPricer::new()
+        CmsReplicationPricer
             .price_dyn(&inst, market, as_of)
             .expect("replication price")
             .value

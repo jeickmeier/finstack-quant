@@ -36,7 +36,7 @@ mod cases {
                 deal,
                 &market,
                 deal.closing_date,
-                &mut DeterministicPoolFlowSource,
+                Some(&mut DeterministicPoolFlowSource),
             )
             .expect("simulation")
         };
@@ -76,7 +76,7 @@ mod cases {
             &deal,
             &MarketContext::new(),
             deal.closing_date,
-            &mut DeterministicPoolFlowSource,
+            Some(&mut DeterministicPoolFlowSource),
         )
         .expect("bullet simulation");
         let principal: f64 = run
@@ -130,8 +130,10 @@ mod cases {
             .expect("equity"),
         ])
         .expect("structure");
-        deal.tranches.tranches[0].oc_trigger =
-            Some(CoverageTrigger::new(1.30, consequence).with_cure_level(1.40));
+        deal.tranches.tranches[0].oc_trigger = Some(CoverageTrigger {
+            cure_level: Some(1.40),
+            ..CoverageTrigger::new(1.30, consequence)
+        });
         deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         deal
@@ -432,7 +434,7 @@ mod cases {
             &deal,
             &market,
             deal.closing_date,
-            &mut DeterministicPoolFlowSource,
+            Some(&mut DeterministicPoolFlowSource),
         )
         .map(|run| run.tranches)
         .expect("baseline");
@@ -441,7 +443,7 @@ mod cases {
             &deal,
             &market,
             deal.closing_date,
-            &mut DeterministicPoolFlowSource,
+            Some(&mut DeterministicPoolFlowSource),
         )
         .map(|run| run.tranches)
         .expect("funded spread");
@@ -464,10 +466,10 @@ mod cases {
     #[test]
     fn production_waterfall_predefaulted_par_is_not_performing_collateral() {
         let mut deal = StructuredCredit::example().expect("example");
-        deal.pool.assets[0].default_with_recovery(
-            Money::new(70_000_000.0, Currency::USD).expect("recovery"),
-            deal.closing_date,
-        );
+        deal.pool.assets[0].defaulted = true;
+        deal.pool.assets[0].recovery_amount =
+            Some(Money::new(70_000_000.0, Currency::USD).expect("recovery"));
+        deal.pool.assets[0].default_date = Some(deal.closing_date);
         let state = SimulationState::new(
             &deal.pool,
             &deal.tranches,
@@ -731,7 +733,7 @@ mod cases {
         let fixing_date = start_date
             .add_business_days(-curve.reset_lag(), calendar)
             .expect("fixing date");
-        let reset_end = crate::structured_credit::utils::rate_helpers::try_tenor_to_period_end(
+        let reset_end = crate::structured_credit::pricing::simulation_engine::period_helpers::try_tenor_to_period_end(
             fixing_date,
             curve.tenor(),
             curve.day_count(),
@@ -975,50 +977,6 @@ mod cases {
         // Degenerate non-positive price falls back to 1:1 par recycling.
     }
 
-    fn empty_tranche_cashflows(id: &str, currency: Currency) -> TrancheCashflows {
-        TrancheCashflows {
-            tranche_id: id.to_string(),
-            cashflows: Vec::new(),
-            detailed_flows: Vec::new(),
-            accrual_periods: Vec::new(),
-            interest_flows: Vec::new(),
-            principal_flows: Vec::new(),
-            pik_flows: Vec::new(),
-            deferred_flows: Vec::new(),
-            writedown_flows: Vec::new(),
-            final_balance: Money::from((0_i64, currency)),
-            total_interest: Money::from((0_i64, currency)),
-            total_principal: Money::from((0_i64, currency)),
-            total_pik: Money::from((0_i64, currency)),
-            total_deferred: Money::from((0_i64, currency)),
-            total_writedown: Money::from((0_i64, currency)),
-        }
-    }
-
-    #[test]
-    fn aggregate_tranche_cashflows_errors_on_incompatible_same_date_amounts() {
-        let pay_date = Date::from_calendar_date(2026, Month::January, 15).expect("valid date");
-        let mut usd = empty_tranche_cashflows("AAA", Currency::USD);
-        usd.cashflows
-            .push((pay_date, Money::from((100_i64, Currency::USD))));
-
-        let mut eur = empty_tranche_cashflows("BBB", Currency::EUR);
-        eur.cashflows
-            .push((pay_date, Money::from((50_i64, Currency::EUR))));
-
-        let mut results = FxHashMap::default();
-        results.insert(usd.tranche_id.clone(), usd);
-        results.insert(eur.tranche_id.clone(), eur);
-
-        let err = aggregate_tranche_cashflows(&results)
-            .expect_err("currency mismatch should not be silently dropped");
-
-        assert!(matches!(
-            err,
-            finstack_quant_core::Error::CurrencyMismatch { .. }
-        ));
-    }
-
     // ── W-25: cleanup-call redemption must include accrued interest ──────
 
     fn cleanup_test_date() -> Date {
@@ -1058,18 +1016,19 @@ mod cases {
             maturity,
         )
         .expect("tranche");
-        let mut instrument = StructuredCredit::new_abs(
-            "ABS-CLEANUP",
-            pool,
-            TrancheStructure::new(vec![tranche]).expect("structure"),
-            cleanup_test_date(),
-            maturity,
-            "USD-OIS",
-        )
-        .expect("valid structured-credit dates")
-        .with_calendar_id("nyse")
-        .with_cleanup_call_decimal(0.10)
-        .expect("cleanup call");
+        let mut instrument = StructuredCredit {
+            cleanup_call_decimal: Some(0.10),
+            ..StructuredCredit::new_abs(
+                "ABS-CLEANUP",
+                pool,
+                TrancheStructure::new(vec![tranche]).expect("structure"),
+                cleanup_test_date(),
+                maturity,
+                "USD-OIS",
+            )
+            .expect("valid structured-credit dates")
+            .with_calendar_id("nyse")
+        };
         // 60% CPR: the pool factor crosses below 10% within ~4 years, well
         // before maturity, so a cleanup call genuinely fires mid-life.
         instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.60);
@@ -1091,7 +1050,7 @@ mod cases {
             &instrument,
             &market,
             cleanup_test_date(),
-            &mut DeterministicPoolFlowSource,
+            Some(&mut DeterministicPoolFlowSource),
         )
         .map(|run| run.tranches)
         .expect("simulation");
@@ -1229,7 +1188,7 @@ mod cases {
             &build_deal(true),
             &market,
             cc_test_date(),
-            &mut DeterministicPoolFlowSource,
+            Some(&mut DeterministicPoolFlowSource),
         )
         .map(|run| run.tranches)
         .expect("simulation with reinvestment");
@@ -1333,7 +1292,7 @@ mod cases {
             &instrument,
             &market,
             cc_test_date(),
-            &mut DeterministicPoolFlowSource,
+            Some(&mut DeterministicPoolFlowSource),
         )
         .map(|run| run.tranches)
         .expect("simulation");
@@ -1426,7 +1385,7 @@ mod cases {
             &instrument,
             &market,
             cc_test_date(),
-            &mut DeterministicPoolFlowSource,
+            Some(&mut DeterministicPoolFlowSource),
         )
         .map(|run| run.tranches)
         .expect("simulation");
@@ -2486,8 +2445,12 @@ mod cases {
     fn coverage_trigger_for_unknown_tranche_is_rejected() {
         use crate::structured_credit::types::CoverageTestSpec;
 
-        let err = oc_trigger_deal(vec![])
-            .with_coverage_triggers(vec![CoverageTestSpec::oc("NOT_A_TRANCHE", 1.2)])
+        use finstack_quant_valuations_core::instruments::Instrument;
+
+        let mut deal = oc_trigger_deal(vec![]);
+        deal.coverage_triggers = vec![CoverageTestSpec::oc("NOT_A_TRANCHE", 1.2)];
+        let err = deal
+            .validate_invariants()
             .expect_err("a trigger naming an unknown tranche must be rejected");
         let msg = err.to_string();
         assert!(
@@ -2642,18 +2605,19 @@ mod cases {
             maturity,
         )
         .expect("equity tranche");
-        let mut instrument = StructuredCredit::new_abs(
-            "ABS-BIG-RECOVERY-QUEUE",
-            pool,
-            TrancheStructure::new(vec![senior, equity]).expect("structure"),
-            start,
-            maturity,
-            "USD-OIS",
-        )
-        .expect("valid structured-credit dates")
-        .with_calendar_id("nyse")
-        .with_cleanup_call_decimal(0.10)
-        .expect("cleanup call");
+        let mut instrument = StructuredCredit {
+            cleanup_call_decimal: Some(0.10),
+            ..StructuredCredit::new_abs(
+                "ABS-BIG-RECOVERY-QUEUE",
+                pool,
+                TrancheStructure::new(vec![senior, equity]).expect("structure"),
+                start,
+                maturity,
+                "USD-OIS",
+            )
+            .expect("valid structured-credit dates")
+            .with_calendar_id("nyse")
+        };
         // No fees/coupons: principal funding is independently conserved as
         // performing par plus recoveries, less allocated net credit losses.
         instrument.fees = None;
@@ -2686,7 +2650,7 @@ mod cases {
             &instrument,
             &market,
             start,
-            &mut DeterministicPoolFlowSource,
+            Some(&mut DeterministicPoolFlowSource),
         )
         .map(|run| run.tranches)
         .expect("simulation");
@@ -2930,7 +2894,7 @@ mod cases {
                 &build_deal(lag),
                 &market,
                 closing,
-                &mut DeterministicPoolFlowSource,
+                Some(&mut DeterministicPoolFlowSource),
             )
             .map(|run| run.tranches)
             .expect("simulation")

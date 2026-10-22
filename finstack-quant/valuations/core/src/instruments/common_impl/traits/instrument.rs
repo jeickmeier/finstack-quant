@@ -470,7 +470,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// to attach to this instrument's [`ValuationResult`](crate::results::ValuationResult).
     ///
     /// The generic instrument pricer
-    /// ([`GenericInstrumentPricer`](crate::instruments::common_impl::pricing::GenericInstrumentPricer))
+    /// ([`GenericInstrumentPricer`](crate::instruments::pricing::GenericInstrumentPricer))
     /// calls this after computing PV and, when `Some`, attaches the returned
     /// details via [`ValuationResult::with_details`](crate::results::ValuationResult::with_details).
     /// FX-bearing instruments (`FxForward`, `FxOption`, `QuantoOption`) use

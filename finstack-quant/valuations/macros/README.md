@@ -64,12 +64,9 @@ hand-written curve builders in `finstack-quant-core`
 (`DiscountCurve::builder("USD-OIS")`), which take the one natural key as an
 argument.
 
-One deviation from
-[`.agents/rules/rust/code-standards.md`](../../../.agents/rules/rust/code-standards.md):
-that rule asks for `Type::builder(...)` as the *only* public entry point and
-says not to add a `Builder::new()` alias. The derive emits a public
-`TBuilder::new()` anyway, so `DepositBuilder::new()` is a second, equivalent
-way in. `DiscountCurveBuilder` has no such alias. Prefer `T::builder()`.
+`T::builder()` is the only entry point, as
+[`.agents/rules/rust/code-standards.md`](../../../.agents/rules/rust/code-standards.md)
+requires: the derive emits no `TBuilder::new()` alias.
 
 For an `Option<Inner>` field the derive generates two setters: `field(inner)`
 wraps the value in `Some`, and `field_opt(Option<Inner>)` assigns the option

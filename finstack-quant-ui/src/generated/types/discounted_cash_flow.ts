@@ -503,12 +503,6 @@ export interface D_05Fc0451Dee1E185F517 {
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
   /**
-   * Discount curve identifier, used for risk attribution only.
-   *
-   * Discounting always uses [`wacc`](Self::wacc) via `(1 + wacc)^{-t}`
-   * regardless of whether this curve is loaded (the
-   * previous behavior silently switched risky flows to risk-free curve
-   * discounting). WACC sensitivity is exposed separately as `dcf::wacc01`.
    * Mid-year discounting convention (default: `false` = end-of-period).
    *
    * When `true`, each flow is discounted at `t` minus half the average

@@ -1,14 +1,21 @@
 """
-Python bindings for the corresponding finstack-quant Rust API.
+Typed instruments, builders, and JSON pricing, metric and cashflow helpers.
 
-Every typed instrument ``from_json`` classmethod accepts either canonical bare
-``{"type": ..., "spec": ...}`` JSON or a versioned
-``{"schema": "finstack_quant.instrument/1", "instrument": ...}`` envelope.
-Inputs larger than 16 MiB raise ``ValueError`` before parsing.
+Mirrors ``finstack_quant_valuations::instruments``. Every typed instrument
+class and its builder live directly in this module, next to the JSON helpers
+(``price_instrument``, ``validate_instrument_json``, ``instrument_cashflows``).
+
+Every typed instrument ``from_json`` accepts only the versioned
+``{"schema": "finstack_quant.instrument/1", "instrument": ...}`` envelope
+whose ``instrument.type`` matches the class; bare ``{"type", "spec"}``
+payloads and cross-type coercion are rejected. Inputs larger than 16 MiB
+raise ``ValueError`` before parsing.
 
 Examples
 --------
->>> from finstack_quant.valuations.instruments import list_models, list_models_grouped
+>>> from finstack_quant.valuations.instruments import TermLoan, list_models_grouped
+>>> TermLoan.example().id
+'TERM-LOAN-USD-5Y'
 >>> models = list_models_grouped()["bond"]
 >>> all(model in models for model in ("discounting", "hazard_rate", "tree", "rates_credit"))
 True
@@ -121,11 +128,11 @@ __all__ = [
     "metric_metadata",
     "pretty_instrument_json",
     "price_instrument",
-    "structured_credit_tranche_breakeven_cdr",
-    "structured_credit_tranche_discount_margin",
-    "structured_credit_tranche_metrics",
-    "structured_credit_tranche_oas",
-    "structured_credit_tranche_scenario_table",
+    "tranche_breakeven_cdr",
+    "tranche_discount_margin",
+    "tranche_metrics",
+    "tranche_oas",
+    "tranche_scenario_table",
     "validate_instrument_json",
     "validate_typed_instrument_json",
 ]
@@ -829,7 +836,8 @@ class Bond:
         -------
         dict[str, object]
             Serde form of ``MarketDependencies`` (``curves`` grouped by role,
-            fixings, volatility surfaces, FX pairs).
+            ``credit_index_ids``, ``market_scalar_ids``,
+            ``volatility_dependencies``, ``fx_pairs``, ``series_ids``).
 
         Raises
         ------
@@ -3351,7 +3359,8 @@ class TermLoan:
         -------
         dict[str, object]
             Serde form of ``MarketDependencies`` (``curves`` grouped by role,
-            fixings, volatility surfaces, FX pairs).
+            ``credit_index_ids``, ``market_scalar_ids``,
+            ``volatility_dependencies``, ``fx_pairs``, ``series_ids``).
 
         Raises
         ------
@@ -5967,7 +5976,8 @@ class InterestRateSwap:
         -------
         dict[str, object]
             Serde form of ``MarketDependencies`` (``curves`` grouped by role,
-            fixings, volatility surfaces, FX pairs).
+            ``credit_index_ids``, ``market_scalar_ids``,
+            ``volatility_dependencies``, ``fx_pairs``, ``series_ids``).
 
         Raises
         ------
@@ -6757,7 +6767,8 @@ class Swaption:
         -------
         dict[str, object]
             Serde form of ``MarketDependencies`` (``curves`` grouped by role,
-            fixings, volatility surfaces, FX pairs).
+            ``credit_index_ids``, ``market_scalar_ids``,
+            ``volatility_dependencies``, ``fx_pairs``, ``series_ids``).
 
         Raises
         ------
@@ -7706,7 +7717,8 @@ class CapFloor:
         -------
         dict[str, object]
             Serde form of ``MarketDependencies`` (``curves`` grouped by role,
-            fixings, volatility surfaces, FX pairs).
+            ``credit_index_ids``, ``market_scalar_ids``,
+            ``volatility_dependencies``, ``fx_pairs``, ``series_ids``).
 
         Raises
         ------
@@ -9955,6 +9967,58 @@ class CdsOption:
         """
         ...
     @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def attributes(self) -> Attributes:
         """
         Instrument attributes (tags and metadata) used for scenario selection.
@@ -10025,21 +10089,6 @@ class CdsOption:
         """
         ...
     @property
-    def exercise_style(self) -> str:
-        """
-        Exercise style of the option.
-
-        Returns
-        -------
-        str
-            ``"european"``, ``"american"`` or ``"bermudan"``; only European prices.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-    @property
     def expiry(self) -> datetime.date:
         """
         Legal option expiry date.
@@ -10093,21 +10142,6 @@ class CdsOption:
         -------
         str
             ``"cash"`` or ``"physical"``.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-    @property
-    def premium_settlement_date(self) -> datetime.date | None:
-        """
-        Explicit option premium payment date.
-
-        Returns
-        -------
-        datetime.date | None
-            The date, or ``None`` for the convention settlement lag.
 
         Notes
         -----
@@ -10330,8 +10364,8 @@ class CdsOptionBuilder:
     Fluent builder for :class:`CdsOption`; wraps the Rust ``FinancialBuilder``
     output one setter for one setter.
 
-    Required: ``id``, ``strike``, ``option_type``, ``exercise_style``,
-    ``expiry``, ``underlying_maturity``, ``notional``, ``settlement``,
+    Required: ``id``, ``strike``, ``option_type``, ``expiry``,
+    ``underlying_maturity``, ``notional``, ``settlement``,
     ``recovery_rate``, ``discount_curve_id``, ``credit_curve_id``,
     ``vol_surface_id`` and ``underlying_is_index``. Builders are consumed by
     ``build()``; create a new builder per instrument.
@@ -10348,7 +10382,6 @@ class CdsOptionBuilder:
     ...     .id("CDSO-1")
     ...     .strike({"spread": "0.0125"})
     ...     .option_type("put")
-    ...     .exercise_style("european")
     ...     .expiry(datetime.date(2025, 6, 20))
     ...     .underlying_maturity(datetime.date(2030, 6, 20))
     ...     .notional(Money(5_000_000, Currency("USD")))
@@ -10422,26 +10455,6 @@ class CdsOptionBuilder:
         ------
         ValueError
             If ``value`` is not a recognized option type.
-        """
-        ...
-    def exercise_style(self, value: str) -> CdsOptionBuilder:
-        """
-        Set the exercise style.
-
-        Parameters
-        ----------
-        value : str
-            ``"european"``, ``"american"`` or ``"bermudan"``; pricing supports European only.
-
-        Returns
-        -------
-        CdsOptionBuilder
-            ``self``, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If ``value`` is not a recognized exercise style.
         """
         ...
     def expiry(self, value: datetime.date | str) -> CdsOptionBuilder:
@@ -10522,26 +10535,6 @@ class CdsOptionBuilder:
         ------
         ValueError
             If ``value`` is not a recognized settlement type.
-        """
-        ...
-    def premium_settlement_date(self, value: datetime.date | str) -> CdsOptionBuilder:
-        """
-        Set the option premium payment date.
-
-        Parameters
-        ----------
-        value : datetime.date | str
-            Premium payment date; when never set the CDS convention settlement lag applies.
-
-        Returns
-        -------
-        CdsOptionBuilder
-            ``self``, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If ``value`` is not a date.
         """
         ...
     def exercise_settlement_date(self, value: datetime.date | str) -> CdsOptionBuilder:
@@ -10822,6 +10815,75 @@ class CdsOptionBuilder:
         ------
         ValueError
             If ``value`` is not a decimal number.
+        """
+        ...
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> CdsOptionBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(
+        self, value: MetricPricingOverrides | dict[str, object] | str
+    ) -> CdsOptionBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> CdsOptionBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
         """
         ...
     def attributes(self, value: Attributes | dict[str, Any] | None) -> CdsOptionBuilder:
@@ -11894,9 +11956,7 @@ class CdsIndexBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()`` or a dict/JSON entry does not match the constituent shape.
-        TypeError
-            If ``value`` is neither a list nor a string.
+            If the builder was already consumed by ``build()``, ``value`` is neither a sequence nor a string, or a dict/JSON entry does not match the constituent shape.
         """
         ...
     def num_constituents(self, value: int) -> CdsIndexBuilder:
@@ -25372,8 +25432,10 @@ class StructuredCredit:
 
         The builder pre-seeds ``market_conditions``, ``deal_metadata`` and
         ``hedge_swaps`` with their Rust ``Default`` values (the Rust
-        builder fields have no default), which the corresponding ``*_json``
-        setters can override. Prefer :meth:`new_abs` / :meth:`new_clo` /
+        builder fields have no default), which the corresponding setters
+        (``market_conditions``, ``waterfall_rules``, ``fees``,
+        ``credit_model``, ``hedge_swaps`` ...) can override with typed
+        objects, dicts or JSON strings. Prefer :meth:`new_abs` / :meth:`new_clo` /
         :meth:`new_cmbs` / :meth:`new_rmbs` for registry-calibrated deal-type
         defaults; use this builder for full manual control.
 
@@ -27938,7 +28000,8 @@ class StructuredCreditBuilder:
         Raises
         ------
         ValueError
-            If a required field is missing or Rust validation fails.
+            If the builder was already consumed, a required field is missing,
+            or the completed deal fails pricing validation.
         """
         ...
 
@@ -28241,7 +28304,7 @@ def price_instrument(
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 1), 0.04))
     >>> from finstack_quant.valuations.instruments import price_instrument
     >>> result = price_instrument(loan, market, "2024-01-01", metrics=["all_in_rate"])
-    >>> (result.metric_keys(), round(result.get_metric("all_in_rate"), 4))
+    >>> (list(result.metrics), round(result.get_metric("all_in_rate"), 4))
     (['all_in_rate'], 0.06)
 
     """
@@ -33082,7 +33145,7 @@ class SimulationDiagnostics:
 class OasResult:
     """
     Result of an option-adjusted-spread calculation for a structured-credit
-    tranche (``structured_credit_tranche_oas``'s return value).
+    tranche (``tranche_oas``'s return value).
 
     Examples
     --------
@@ -33259,8 +33322,11 @@ class OasResult:
 
 class TrancheMetrics:
     """
-    Summary risk/pricing metrics for a structured-credit tranche
-    (``structured_credit_tranche_metrics``'s return value).
+    Per-tranche valuation, yield, spread and risk metrics
+    (``tranche_metrics``'s return value).
+
+    Prices are quoted per the tranche's current balance; an impaired note
+    reports zero prices and spreads and ``ytm`` ``None``.
 
     Examples
     --------
@@ -33270,15 +33336,18 @@ class TrancheMetrics:
     ...     "tranche_id": "A",
     ...     "currency": "USD",
     ...     "pv": 1000.0,
-    ...     "price_pct": 100.0,
+    ...     "clean_price_pct": 100.0,
+    ...     "dirty_price_pct": 100.0,
+    ...     "accrued": 0.0,
     ...     "factor": 1.0,
     ...     "wal": 3.0,
+    ...     "ytm": 0.05,
     ...     "z_spread_bp": 0.0,
     ...     "cs01": -1.0,
     ...     "spread_duration": 3.0,
     ...     "spread_convexity": 12.0,
-    ...     "modified_duration": 3.0,
-    ...     "convexity": 12.0,
+    ...     "effective_duration": 3.0,
+    ...     "effective_convexity": 12.0,
     ...     "target_price_pct": 100.0,
     ... })
     >>> metrics = TrancheMetrics.from_json(payload)
@@ -33314,15 +33383,18 @@ class TrancheMetrics:
         ...     "tranche_id": "A",
         ...     "currency": "USD",
         ...     "pv": 1000.0,
-        ...     "price_pct": 100.0,
+        ...     "clean_price_pct": 100.0,
+        ...     "dirty_price_pct": 100.0,
+        ...     "accrued": 0.0,
         ...     "factor": 1.0,
         ...     "wal": 3.0,
+        ...     "ytm": 0.05,
         ...     "z_spread_bp": 0.0,
         ...     "cs01": -1.0,
         ...     "spread_duration": 3.0,
         ...     "spread_convexity": 12.0,
-        ...     "modified_duration": 3.0,
-        ...     "convexity": 12.0,
+        ...     "effective_duration": 3.0,
+        ...     "effective_convexity": 12.0,
         ...     "target_price_pct": 100.0,
         ... }
         >>> metrics = TrancheMetrics.from_json(json.dumps(payload))
@@ -33367,13 +33439,13 @@ class TrancheMetrics:
     @property
     def currency(self) -> str:
         """
-        ISO-4217 code of the currency ``pv`` and ``cs01`` are denominated in.
-        Empty when decoded from a legacy payload that predates this field.
+        ISO-4217 code of the currency ``pv``, ``accrued`` and ``cs01`` are
+        denominated in.
 
         Returns
         -------
         str
-            The ISO-4217 currency code, or an empty string for legacy payloads.
+            The ISO-4217 currency code.
 
         Notes
         -----
@@ -33398,15 +33470,48 @@ class TrancheMetrics:
         ...
 
     @property
-    def price_pct(self) -> float:
+    def clean_price_pct(self) -> float:
         """
-        Model clean price, as a percentage of the tranche's current balance
-        (the factor-adjusted secondary-market quote basis).
+        Model clean settlement price, as a percentage of the tranche's current
+        balance (the factor-adjusted secondary-market quote basis).
 
         Returns
         -------
         float
-            The model price.
+            The model clean price.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def dirty_price_pct(self) -> float:
+        """
+        Model dirty settlement price (clean plus accrued), as a percentage of
+        the tranche's current balance.
+
+        Returns
+        -------
+        float
+            The model dirty price.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def accrued(self) -> float:
+        """
+        Accrued coupon at buyer settlement, in ``currency`` units.
+
+        Returns
+        -------
+        float
+            The accrued interest.
 
         Notes
         -----
@@ -33418,7 +33523,7 @@ class TrancheMetrics:
     def factor(self) -> float:
         """
         Pool factor of the note: current balance over original balance, so a
-        price on original face is ``price_pct * factor``.
+        price on original face is ``clean_price_pct * factor``.
 
         Returns
         -------
@@ -33441,6 +33546,24 @@ class TrancheMetrics:
         -------
         float
             The weighted-average life.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def ytm(self) -> float | None:
+        """
+        Decimal yield reproducing the ``target_price_pct`` dirty value,
+        compounded at the note's coupon frequency with time in the note's own
+        day count (a par note yields its coupon).
+
+        Returns
+        -------
+        float | None
+            ``None`` for an impaired note.
 
         Notes
         -----
@@ -33515,7 +33638,7 @@ class TrancheMetrics:
         ...
 
     @property
-    def modified_duration(self) -> float:
+    def effective_duration(self) -> float:
         """
         Effective (rate) duration of the tranche.
 
@@ -33534,7 +33657,7 @@ class TrancheMetrics:
         ...
 
     @property
-    def convexity(self) -> float:
+    def effective_convexity(self) -> float:
         """
         Effective convexity of the tranche.
 
@@ -33542,7 +33665,7 @@ class TrancheMetrics:
         -------
         float
             Years squared, from the same ±1 bp re-projection as
-            ``modified_duration``.
+            ``effective_duration``.
 
         Notes
         -----
@@ -33553,8 +33676,8 @@ class TrancheMetrics:
     @property
     def target_price_pct(self) -> float:
         """
-        Price the z-spread/CS01 were solved against, as a percentage of
-        current balance.
+        Price the yield, z-spread and CS01 were solved against, as a
+        percentage of current balance.
 
         Returns
         -------
@@ -33633,16 +33756,37 @@ class TrancheMetrics:
         """
         ...
 
+    @property
+    def metrics(self) -> dict[str, float]:
+        """
+        Requested registry metrics valued on this note.
+
+        Returns
+        -------
+        dict[str, float]
+            Keyed by metric id; empty when none were requested. Every reprice
+            values this tranche, so tranche sensitivities sum to the deal's.
+            Units follow each metric.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
     def to_dataframe(self) -> pd.DataFrame:
         """
         Export as a single-row pandas DataFrame.
 
-        Columns: ``tranche_id``, ``currency``, ``pv``, ``price_pct``, ``factor``, ``wal``,
+        Columns: ``tranche_id``, ``currency``, ``pv``, ``clean_price_pct``,
+        ``dirty_price_pct``, ``accrued``, ``factor``, ``wal``, ``ytm``,
         ``z_spread_bp``, ``cs01``, ``spread_duration``, ``spread_convexity``,
-        ``modified_duration``, ``convexity``, ``target_price_pct``, ``wal_to_call``,
-        ``z_spread_to_call_bp``, ``dm_to_call_bp``, ``dm_bp`` -- the same fields and
-        units as the properties of the same name (the ``*_to_call`` columns are
-        ``NaN`` without a call, ``dm_bp`` for fixed-rate tranches).
+        ``effective_duration``, ``effective_convexity``, ``target_price_pct``,
+        ``wal_to_call``, ``z_spread_to_call_bp``, ``dm_to_call_bp``, ``dm_bp`` --
+        the same fields and units as the properties of the same name (``ytm`` is
+        ``NaN`` for an impaired note, the ``*_to_call`` columns without a call,
+        ``dm_bp`` for fixed-rate tranches). Requested registry metrics stay in
+        :attr:`metrics`.
 
         Returns
         -------
@@ -33661,7 +33805,7 @@ class TrancheMetrics:
 class ScenarioTable:
     """
     Scenario/yield table for a single structured-credit tranche
-    (``structured_credit_tranche_scenario_table``'s return value).
+    (``tranche_scenario_table``'s return value).
 
     Examples
     --------
@@ -33785,7 +33929,7 @@ class ScenarioTable:
         """
         ...
 
-def structured_credit_tranche_discount_margin(
+def tranche_discount_margin(
     instrument: StructuredCredit | str,
     tranche_id: str,
     market: MarketContext | str,
@@ -33837,9 +33981,9 @@ def structured_credit_tranche_discount_margin(
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import structured_credit_tranche_discount_margin
+    >>> from finstack_quant.valuations.instruments import tranche_discount_margin
     >>> try:
-    ...     structured_credit_tranche_discount_margin("{}", "A", "{}", "2026-01-01", 100.0)
+    ...     tranche_discount_margin("{}", "A", "{}", "2026-01-01", 100.0)
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True
@@ -33847,7 +33991,7 @@ def structured_credit_tranche_discount_margin(
     """
     ...
 
-def structured_credit_tranche_breakeven_cdr(
+def tranche_breakeven_cdr(
     instrument: StructuredCredit | str,
     tranche_id: str,
     market: MarketContext | str,
@@ -33883,9 +34027,9 @@ def structured_credit_tranche_breakeven_cdr(
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import structured_credit_tranche_breakeven_cdr
+    >>> from finstack_quant.valuations.instruments import tranche_breakeven_cdr
     >>> try:
-    ...     structured_credit_tranche_breakeven_cdr("{}", "A", "{}", "2026-01-01")
+    ...     tranche_breakeven_cdr("{}", "A", "{}", "2026-01-01")
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True
@@ -33893,7 +34037,7 @@ def structured_credit_tranche_breakeven_cdr(
     """
     ...
 
-def structured_credit_tranche_oas(
+def tranche_oas(
     instrument: StructuredCredit | str,
     tranche_id: str,
     market: MarketContext | str,
@@ -33938,9 +34082,9 @@ def structured_credit_tranche_oas(
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import structured_credit_tranche_oas
+    >>> from finstack_quant.valuations.instruments import tranche_oas
     >>> try:
-    ...     structured_credit_tranche_oas("{}", "A", "{}", "2026-01-01", 100.0)
+    ...     tranche_oas("{}", "A", "{}", "2026-01-01", 100.0)
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True
@@ -33981,14 +34125,20 @@ def calculate_pool_stats(pool: AssetPool, as_of: datetime.date | str) -> PoolSta
     """
     ...
 
-def structured_credit_tranche_metrics(
+def tranche_metrics(
     instrument: StructuredCredit | str,
     tranche_id: str,
     market: MarketContext | str,
     as_of: datetime.date | str,
     market_price_pct: float | None = None,
+    metrics: list[str] | None = None,
 ) -> TrancheMetrics:
-    """Summary risk/pricing metrics for a tranche. Returns a ``TrancheMetrics``.
+    """Per-tranche valuation, yield, spread and risk metrics. Returns a ``TrancheMetrics``.
+
+    The one per-note analytics entry point: prices, accrued, yield, spreads
+    and durations come from the tranche's own to-maturity cashflows, and
+    ``metrics`` adds registry metrics valued on the note so tranche
+    sensitivities sum to the deal's.
 
     Parameters
     ----------
@@ -34006,6 +34156,10 @@ def structured_credit_tranche_metrics(
         Clean settlement price as a percentage of current balance. When omitted,
         the deal's market quote is used, or its model clean settlement price
         if no quote is supplied. PV remains measured at valuation.
+    metrics : list[str] or None, optional
+        Registry metric ids (for example ``"dv01"``, ``"default01"``) to value
+        on this note; returned in :attr:`TrancheMetrics.metrics`. Omitted or
+        empty computes none.
 
     Returns
     -------
@@ -34019,13 +34173,14 @@ def structured_credit_tranche_metrics(
         If ``tranche_id`` is not part of the deal.
     ValueError
         If the instrument JSON is malformed, the deal fails validation, the
-        tranche id is not part of the deal, or required market data is missing.
+        tranche id is not part of the deal, required market data is missing, or a
+        ``metrics`` id is unknown.
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import structured_credit_tranche_metrics
+    >>> from finstack_quant.valuations.instruments import tranche_metrics
     >>> try:
-    ...     structured_credit_tranche_metrics("{}", "A", "{}", "2026-01-01")
+    ...     tranche_metrics("{}", "A", "{}", "2026-01-01")
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True
@@ -34033,7 +34188,7 @@ def structured_credit_tranche_metrics(
     """
     ...
 
-def structured_credit_tranche_scenario_table(
+def tranche_scenario_table(
     instrument: StructuredCredit | str,
     tranche_id: str,
     market: MarketContext | str,
@@ -34074,9 +34229,9 @@ def structured_credit_tranche_scenario_table(
 
     Examples
     --------
-    >>> from finstack_quant.valuations.instruments import structured_credit_tranche_scenario_table
+    >>> from finstack_quant.valuations.instruments import tranche_scenario_table
     >>> try:
-    ...     structured_credit_tranche_scenario_table("{}", "A", "{}", "2026-01-01", "{}")
+    ...     tranche_scenario_table("{}", "A", "{}", "2026-01-01", "{}")
     ... except ValueError as exc:
     ...     print("schema" in str(exc))
     True

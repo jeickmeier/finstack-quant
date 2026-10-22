@@ -12,20 +12,20 @@ autobenches = false
 autotests = false
 
 [dependencies]
-finstack-quant-core = { path = "../core", version = "0.11.0", default-features = false }
-finstack-quant-cashflows = { path = "../cashflows", version = "0.11.0", default-features = false }
-finstack-quant-covenants = { path = "../covenants", version = "0.11.0", default-features = false }
-finstack-quant-margin = { path = "../margin", version = "0.11.0", default-features = false }
-finstack-quant-models = { path = "../models", version = "0.11.0", default-features = false }
-finstack-quant-valuations-core = { path = "core", version = "0.11.0", default-features = false }
-finstack-quant-valuations-fixed-income = { path = "fixed-income", version = "0.11.0", default-features = false }
-finstack-quant-valuations-structured-credit = { path = "structured-credit", version = "0.11.0", default-features = false }
-finstack-quant-valuations-rates = { path = "rates", version = "0.11.0", default-features = false }
-finstack-quant-valuations-equity = { path = "equity", version = "0.11.0", default-features = false }
-finstack-quant-valuations-credit = { path = "credit", version = "0.11.0", default-features = false }
-finstack-quant-valuations-exotics = { path = "exotics", version = "0.11.0", default-features = false }
-finstack-quant-valuations-fx = { path = "fx", version = "0.11.0", default-features = false }
-finstack-quant-valuations-macros = { path = "macros", version = "0.11.0" }
+finstack-quant-core = { path = "../core", version = "0.11.0-dev.202610210600", default-features = false }
+finstack-quant-cashflows = { path = "../cashflows", version = "0.11.0-dev.202610210600", default-features = false }
+finstack-quant-covenants = { path = "../covenants", version = "0.11.0-dev.202610210600", default-features = false }
+finstack-quant-margin = { path = "../margin", version = "0.11.0-dev.202610210600", default-features = false }
+finstack-quant-models = { path = "../models", version = "0.11.0-dev.202610210600", default-features = false }
+finstack-quant-valuations-core = { path = "core", version = "0.11.0-dev.202610210600", default-features = false }
+finstack-quant-valuations-fixed-income = { path = "fixed-income", version = "0.11.0-dev.202610210600", default-features = false }
+finstack-quant-valuations-structured-credit = { path = "structured-credit", version = "0.11.0-dev.202610210600", default-features = false }
+finstack-quant-valuations-rates = { path = "rates", version = "0.11.0-dev.202610210600", default-features = false }
+finstack-quant-valuations-equity = { path = "equity", version = "0.11.0-dev.202610210600", default-features = false }
+finstack-quant-valuations-credit = { path = "credit", version = "0.11.0-dev.202610210600", default-features = false }
+finstack-quant-valuations-exotics = { path = "exotics", version = "0.11.0-dev.202610210600", default-features = false }
+finstack-quant-valuations-fx = { path = "fx", version = "0.11.0-dev.202610210600", default-features = false }
+finstack-quant-valuations-macros = { path = "macros", version = "0.11.0-dev.202610210600" }
 indexmap = { workspace = true, features = ["serde"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -41,9 +41,9 @@ strum = { workspace = true, features = ["derive"] }
 rayon = "1.11"
 
 [dev-dependencies]
-finstack-quant-test-utils = { path = "../test-utils", version = "0.11.0" }
-finstack-quant-valuations-test-support = { path = "test-support", version = "0.11.0" }
-finstack-quant-calibration = { path = "../calibration", version = "0.11.0" }
+finstack-quant-test-utils = { path = "../test-utils", version = "0.11.0-dev.202610210600" }
+finstack-quant-valuations-test-support = { path = "test-support", version = "0.11.0-dev.202610210600" }
+finstack-quant-calibration = { path = "../calibration", version = "0.11.0-dev.202610210600" }
 time = { workspace = true, features = ["macros"] }
 proptest = "1.11.0"
 criterion = { workspace = true }

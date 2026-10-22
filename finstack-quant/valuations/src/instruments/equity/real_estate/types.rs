@@ -55,7 +55,7 @@ pub enum RealEstateValuationMethod {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields, try_from = "RealEstateAssetUnchecked")]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct RealEstateAsset {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -174,137 +174,7 @@ pub struct RealEstateAsset {
     pub attributes: Attributes,
 }
 
-/// Mirror of `RealEstateAsset` used by serde to apply `validate()` after
-/// deserialization. Not part of the public API.
-#[derive(Debug, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-struct RealEstateAssetUnchecked {
-    /// Unique instrument identifier.
-    id: InstrumentId,
-    /// Currency for valuation.
-    currency: Currency,
-    /// Valuation method (DCF or DirectCap).
-    valuation_method: RealEstateValuationMethod,
-    /// Optional property type classification (for reporting).
-    #[serde(default)]
-    property_type: Option<RealEstatePropertyType>,
-    /// Net operating income schedule (date, amount).
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
-    )]
-    noi_schedule: Vec<(Date, f64)>,
-    /// Capital expenditure schedule (date, amount). Values are treated as **positive outflows**.
-    ///
-    /// When present, cashflows are valued as `NOI - CapEx` (unlevered net cash flow).
-    #[serde(default)]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Option<Vec<(finstack_quant_core::wire::DateWire, f64)>>")
-    )]
-    capex_schedule: Option<Vec<(Date, f64)>>,
-    /// Discount rate for DCF (annualized).
-    #[serde(default)]
-    discount_rate: Option<f64>,
-    /// Capitalization rate for direct cap (annualized).
-    #[serde(default)]
-    cap_rate: Option<f64>,
-    /// Optional stabilized NOI override for direct cap.
-    #[serde(default)]
-    stabilized_noi: Option<f64>,
-    /// Optional terminal cap rate for DCF (uses last NOI).
-    #[serde(default)]
-    terminal_cap_rate: Option<f64>,
-    /// Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.
-    ///
-    /// Market convention for exit-cap terminal value is \(TV = NOI_{N+1} / cap\_rate\_exit\).
-    /// When not provided, defaults to 0 (uses last NOI as-is).
-    /// Validation range is \([-100\%, 20\%]\) to guard against configuration errors.
-    #[serde(default)]
-    terminal_growth_rate: Option<f64>,
-    /// Optional sale/exit date that truncates the DCF horizon.
-    ///
-    /// When set, DCF only values unlevered flows up to and including `sale_date`.
-    /// Terminal proceeds (if configured) are realized on `sale_date`.
-    #[serde(default)]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
-    )]
-    sale_date: Option<Date>,
-    /// Optional explicit gross sale price (terminal proceeds), before disposition costs.
-    ///
-    /// When set, this takes precedence over `terminal_cap_rate` for terminal proceeds.
-    #[serde(default)]
-    sale_price: Option<Money>,
-    /// Optional purchase price (useful for IRR / cap rate metrics).
-    #[serde(default)]
-    purchase_price: Option<Money>,
-    /// Acquisition (closing) cost line items in instrument currency, as
-    /// positive outflow magnitudes deducted at `as_of` in DCF valuation.
-    #[serde(default)]
-    acquisition_costs: Vec<Money>,
-    /// Optional disposition cost percentage applied to terminal value.
-    ///
-    /// A value of `0.02` represents 2% selling costs. Must be in \([0, 1)\).
-    #[serde(default)]
-    disposition_cost_decimal: Option<f64>,
-    /// Optional detailed disposition cost line items (positive outflows) deducted from terminal proceeds.
-    #[serde(default)]
-    disposition_costs: Vec<Money>,
-    /// Optional appraisal override value.
-    #[serde(default)]
-    appraisal_value: Option<Money>,
-    /// Day count convention for year fractions.
-    day_count: DayCount,
-    /// Instrument-owned pricing inputs.
-    #[serde(default)]
-    instrument_pricing_overrides: crate::instruments::pricing_overrides::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[serde(default)]
-    metric_pricing_overrides: crate::instruments::pricing_overrides::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[serde(default)]
-    scenario_pricing_overrides: crate::instruments::pricing_overrides::ScenarioPricingOverrides,
-    /// Attributes for scenario selection and tagging
-    #[serde(default)]
-    attributes: Attributes,
-}
-
-impl TryFrom<RealEstateAssetUnchecked> for RealEstateAsset {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(value: RealEstateAssetUnchecked) -> std::result::Result<Self, Self::Error> {
-        let inst = Self {
-            id: value.id,
-            currency: value.currency,
-            valuation_method: value.valuation_method,
-            property_type: value.property_type,
-            noi_schedule: value.noi_schedule,
-            capex_schedule: value.capex_schedule,
-            discount_rate: value.discount_rate,
-            cap_rate: value.cap_rate,
-            stabilized_noi: value.stabilized_noi,
-            terminal_cap_rate: value.terminal_cap_rate,
-            terminal_growth_rate: value.terminal_growth_rate,
-            sale_date: value.sale_date,
-            sale_price: value.sale_price,
-            purchase_price: value.purchase_price,
-            acquisition_costs: value.acquisition_costs,
-            disposition_cost_decimal: value.disposition_cost_decimal,
-            disposition_costs: value.disposition_costs,
-            appraisal_value: value.appraisal_value,
-            day_count: value.day_count,
-            instrument_pricing_overrides: value.instrument_pricing_overrides,
-            metric_pricing_overrides: value.metric_pricing_overrides,
-            scenario_pricing_overrides: value.scenario_pricing_overrides,
-            attributes: value.attributes,
-        };
-        inst.validate()?;
-        Ok(inst)
-    }
-}
+crate::validate_on_deserialize!(RealEstateAsset);
 
 impl RealEstateAsset {
     /// Validate structural invariants required by both DCF and DirectCap pricers.
@@ -522,58 +392,6 @@ impl RealEstateAsset {
             .attributes(Attributes::default())
             .build()
     }
-
-    pub(crate) fn acquisition_cost_total(&self) -> finstack_quant_core::Result<f64> {
-        pricer::acquisition_cost_total(self)
-    }
-
-    /// Compute net sale proceeds (undiscounted) realized at `horizon`, if configured.
-    ///
-    /// Precedence:
-    /// - If `sale_price` is set: use it as the gross proceeds.
-    /// - Else if `terminal_cap_rate` is set: use exit-cap convention `TV = NOI_{N+1} / cap_rate_exit`
-    ///   with NOI taken as the last schedule entry on/before `horizon`.
-    ///
-    /// Then apply:
-    /// - `disposition_cost_decimal` (pct of gross proceeds), and
-    /// - `disposition_costs` (dollar line items).
-    pub(crate) fn sale_proceeds_at(
-        &self,
-        as_of: Date,
-        horizon: Date,
-    ) -> finstack_quant_core::Result<Option<(Date, f64)>> {
-        pricer::sale_proceeds_at(self, as_of, horizon)
-    }
-
-    /// First future NOI amount on/after `as_of`.
-    pub(crate) fn first_noi(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
-        pricer::first_noi(self, as_of)
-    }
-
-    /// Unlevered net cash flows (NOI - CapEx) on/after `as_of`, truncated at
-    /// the valuation horizon (`sale_date` when set, else the last NOI date).
-    pub(crate) fn unlevered_flows(
-        &self,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<Vec<(Date, f64)>> {
-        pricer::unlevered_flows(self, as_of)
-    }
-
-    /// NOI cash flows on/after `as_of`.
-    pub(crate) fn noi_flows(&self, as_of: Date) -> finstack_quant_core::Result<Vec<(Date, f64)>> {
-        pricer::future_noi_flows(self, as_of)
-    }
-
-    /// Compute net sale proceeds at the terminal date (undiscounted), if configured.
-    ///
-    /// Uses the exit-cap convention `TV = NOI_{N+1} / cap_rate_exit`, optionally applying
-    /// `disposition_cost_decimal`.
-    pub(crate) fn terminal_sale_proceeds(
-        &self,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<Option<(Date, f64)>> {
-        pricer::terminal_sale_proceeds(self, as_of)
-    }
 }
 
 impl Instrument for RealEstateAsset {
@@ -607,13 +425,12 @@ impl finstack_quant_cashflows::CashflowScheduleSource for RealEstateAsset {
         _curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        let mut flows: Vec<(Date, Money)> = self
-            .unlevered_flows(as_of)?
+        let mut flows: Vec<(Date, Money)> = pricer::unlevered_flows(self, as_of)?
             .into_iter()
             .map(|(date, amount)| Money::new(amount, self.currency).map(|money| (date, money)))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
-        if let Some((date, amount)) = self.terminal_sale_proceeds(as_of)? {
+        if let Some((date, amount)) = pricer::terminal_sale_proceeds(self, as_of)? {
             flows.push((date, Money::new(amount, self.currency)?));
         }
         finstack_quant_cashflows::schedule_from_dated_flows(

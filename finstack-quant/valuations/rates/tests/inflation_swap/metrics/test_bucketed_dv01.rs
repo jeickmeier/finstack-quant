@@ -4,7 +4,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_rates::inflation_swap::InflationSwapBuilder;
+use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
 use finstack_quant_valuations_test_support::inflation::*;
 use rust_decimal::Decimal;
 use time::Month;
@@ -16,7 +16,7 @@ fn test_bucketed_dv01_computed() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-BDV01-1".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -63,7 +63,7 @@ fn test_bucketed_dv01_reasonable_magnitude() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-BDV01-MAG".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -121,7 +121,7 @@ fn test_bucketed_dv01_zero_for_matured() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-BDV01-MAT0".into())
         .notional(standard_notional())
         .start_date(Date::from_calendar_date(2015, Month::January, 1).unwrap())

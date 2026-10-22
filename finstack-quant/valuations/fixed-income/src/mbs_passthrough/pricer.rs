@@ -6,7 +6,7 @@
 use super::AgencyMbsPassthrough;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
-use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -89,7 +89,7 @@ pub fn generate_cashflows(
     if mbs.issue_date > period_start && as_of < mbs.issue_date {
         period_start = period_start
             .checked_add(Duration::days(32))
-            .and_then(|d| Date::from_calendar_date(d.year(), d.month(), 1).ok())
+            .and_then(|d| d.replace_day(1).ok())
             .unwrap_or(period_start);
     }
 
@@ -102,11 +102,11 @@ pub fn generate_cashflows(
             break;
         }
 
-        let period_end = end_of_month(period_start)?;
+        let period_end = period_start.end_of_month();
         let payment_date = mbs.payment_date_on(period_start, calendar)?;
 
         if payment_date < as_of {
-            period_start = next_month_start(period_start)?;
+            period_start = next_month_start(period_start);
             continue;
         }
 
@@ -114,14 +114,7 @@ pub fn generate_cashflows(
 
         // PSA/CDR seasoning ramps key off pool age (WALA), measured from the
         // issue date.
-        let seasoning = mbs.seasoning_months(period_end);
-        let raw_smm = mbs.prepayment_spec.smm(seasoning)?;
-        if !raw_smm.is_finite() || !(0.0..=1.0).contains(&raw_smm) {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "MBS prepayment model returned invalid SMM={raw_smm} at seasoning {seasoning} months; expected finite value in [0.0, 1.0]"
-            )));
-        }
-        let smm = raw_smm;
+        let smm = mbs.smm(period_end)?;
 
         // `wam_months` is the *remaining* WAM at the valuation date, so the level-pay
         // amortization horizon shrinks by one per projected period — not by
@@ -134,7 +127,7 @@ pub fn generate_cashflows(
         // For 30/360 this recovers exactly 1/12 each month, but Act/360 and
         // Act/365F vary by month length (28–31 days), so a fixed 1/12
         // mis-states accrued interest.
-        let accrual_period_end = next_month_start(period_start)?;
+        let accrual_period_end = next_month_start(period_start);
         let period_yf = mbs.day_count.year_fraction(
             period_start,
             accrual_period_end,
@@ -171,7 +164,7 @@ pub fn generate_cashflows(
         });
 
         balance = ending_balance;
-        period_start = next_month_start(period_start)?;
+        period_start = next_month_start(period_start);
 
         if period_end >= mbs.maturity {
             break;
@@ -321,19 +314,9 @@ fn schedule_from_projection(
     )
 }
 
-fn end_of_month(date: Date) -> Result<Date> {
-    let year = date.year();
-    let month = date.month();
-    let days_in_month = month.length(year);
-    Date::from_calendar_date(year, month, days_in_month)
-        .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))
-}
-
-fn next_month_start(date: Date) -> Result<Date> {
-    use time::Duration;
-    let end = end_of_month(date)?;
-    let next = end + Duration::days(1);
-    Ok(next)
+/// First day of the calendar month after `date`'s.
+fn next_month_start(date: Date) -> Date {
+    date.end_of_month() + time::Duration::days(1)
 }
 
 /// Interest purchased at settlement, from the calendar-month accrual boundary.
@@ -344,7 +327,8 @@ pub(crate) fn settlement_accrued_interest(
     if settlement < mbs.issue_date || settlement >= mbs.maturity {
         return Ok(0.0);
     }
-    let start = Date::from_calendar_date(settlement.year(), settlement.month(), 1)
+    let start = settlement
+        .replace_day(1)
         .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
     Ok(mbs.current_face.amount()
         * mbs.coupon
@@ -381,7 +365,8 @@ pub fn quote_basis_pool(
     mbs: &AgencyMbsPassthrough,
     settlement: Date,
 ) -> Result<AgencyMbsPassthrough> {
-    let accrual_start = Date::from_calendar_date(settlement.year(), settlement.month(), 1)
+    let accrual_start = settlement
+        .replace_day(1)
         .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
     if mbs
         .last_paid_accrual_end
@@ -396,39 +381,34 @@ pub fn quote_basis_pool(
     Ok(pool)
 }
 
-fn previous_month_start(date: Date) -> Result<Date> {
-    use time::Duration;
-    let current_start = Date::from_calendar_date(date.year(), date.month(), 1)
-        .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
-    let previous = current_start - Duration::days(1);
-    Date::from_calendar_date(previous.year(), previous.month(), 1)
-        .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))
-}
-
 /// First-of-month start of the earliest accrual period whose (delayed)
 /// payment has not yet settled at `as_of`.
 ///
 /// Shared with the Monte-Carlo OAS engine so both pricers project from the
 /// same accrual period, including a prior-month in-flight receivable.
 pub(crate) fn first_unpaid_accrual_start(mbs: &AgencyMbsPassthrough, as_of: Date) -> Result<Date> {
-    let issue_month = Date::from_calendar_date(mbs.issue_date.year(), mbs.issue_date.month(), 1)
+    let issue_month = mbs
+        .issue_date
+        .replace_day(1)
         .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
 
     if let Some(last_paid) = mbs.last_paid_accrual_end {
-        let paid_month = Date::from_calendar_date(last_paid.year(), last_paid.month(), 1)
+        let paid_month = last_paid
+            .replace_day(1)
             .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
-        return Ok(next_month_start(paid_month)?.max(issue_month));
+        return Ok(next_month_start(paid_month).max(issue_month));
     }
 
     let effective_start = as_of.max(mbs.issue_date);
-    let mut start = Date::from_calendar_date(effective_start.year(), effective_start.month(), 1)
+    let mut start = effective_start
+        .replace_day(1)
         .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
 
     while mbs.payment_date_for_accrual_period(start)? < as_of {
-        start = next_month_start(start)?;
+        start = next_month_start(start);
     }
     while start > issue_month {
-        let previous = previous_month_start(start)?;
+        let previous = start.add_months(-1)?;
         if mbs.payment_date_for_accrual_period(previous)? < as_of {
             break;
         }

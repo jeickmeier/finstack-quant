@@ -1,22 +1,267 @@
-//! Typed `StructuredCredit` class, its fluent builder, and `TrancheBuilder`.
+//! Typed `StructuredCredit` class, its fluent builder, `TrancheBuilder`, and
+//! the standalone tranche analytics.
 //!
 //! Pools, tranches, waterfalls and the simulation results cross the boundary
 //! as plain objects (the schema-generated TypeScript types).
+//!
+//! The tranche analytics mirror the Python `StructuredCredit` metric methods —
+//! discount margin, OAS, break-even CDR and the scenario table — as free
+//! functions that parse the canonical envelope and dispatch to the typed
+//! structured-credit domain API. The OAS, metrics, and scenario-table entry
+//! points return structured JavaScript objects with the same snake_case fields
+//! Python exposes through its `OasResult` / `TrancheMetrics` / `ScenarioTable`
+//! wrappers. The exported JS surface lives under `valuations.instruments`.
 
 use crate::api::core::dates::{JsDayCount, JsTenor};
 use crate::api::core::money::JsMoney;
-use crate::utils::input::js_string;
+use crate::api::valuations::pricing::parse_market;
+use crate::utils::input::{
+    from_js_json, js_f64, js_opt_f64, js_opt_string_seq, js_string, json_text, opt_json_text,
+};
+use crate::utils::wire::js_date;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, StructuredCredit, TrancheStructure,
+    self as sc, AssetPool, DealType, OasConfig, ScenarioGrid, StandardDealParams, StructuredCredit,
+    TrancheStructure,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
 
+fn parse_structured_credit(instrument_json: &str) -> Result<StructuredCredit, JsValue> {
+    finstack_quant_valuations::pricer::parse_typed_instrument_json(instrument_json)
+        .map_err(to_js_err)
+}
+
+/// Decode a JSON host argument into its typed Rust input.
+fn parse_json_arg<T: serde::de::DeserializeOwned>(json: &str, label: &str) -> Result<T, JsValue> {
+    serde_json::from_str(json).map_err(|e| {
+        to_js_err(finstack_quant_core::Error::Validation(format!(
+            "invalid {label} JSON: {e}"
+        )))
+    })
+}
+
+/// Z-spread-equivalent discount margin for a floating-rate tranche, returned in
+/// decimal units (`0.015` = 150 bp).
+///
+/// Contractual cashflows are projected without changing coupon projection,
+/// then a constant additive spread is applied to the discount curve. The result
+/// is zero at the model price, negative for a richer (higher)
+/// `marketPricePct`, and positive for a cheaper (lower) `marketPricePct`; it is
+/// not the contractual quoted margin.
+/// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
+/// @param tranche_id - Identifier of the floating-rate tranche whose contractual cashflows are spread-discounted.
+/// @param market_json - Canonical market-context JSON supplying the discount curve and any forward curves or historical fixings required for cashflow projection.
+/// @param as_of - ISO-8601 valuation date used for projection and discounting.
+/// @param market_price_pct - Clean settlement price as a percentage of the tranche's CURRENT balance (100.0 = par); accrued interest is added once at the deal's quote_settlement_date or the valuation date.
+/// @returns The z-spread-equivalent discount margin in decimal units.
+/// @throws Error - Thrown if JSON or the date is malformed, the deal is invalid, the tranche is missing or fixed-rate, market_price_pct is not finite and positive, required market data is unavailable, or the spread solve fails or exceeds ±5000 bp.
+#[wasm_bindgen(js_name = trancheDiscountMargin)]
+pub fn tranche_discount_margin(
+    instrument_json: JsValue,
+    tranche_id: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
+    market_price_pct: JsValue,
+) -> Result<f64, JsValue> {
+    let market_price_pct = js_f64(&market_price_pct, "marketPricePct")?;
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
+    let deal = parse_structured_credit(instrument_json)?;
+    let market = parse_market(&market_json)?;
+    let as_of = js_date(&as_of, "asOf")?;
+    sc::tranche_discount_margin(&deal, tranche_id, &market, as_of, market_price_pct)
+        .map_err(to_js_err)
+}
+
+/// Break-even constant default rate (CDR, decimal) for a tranche — the highest
+/// CDR at which the tranche takes no principal writedown.
+///
+/// # Errors
+///
+/// Throws a JavaScript exception if the instrument or market JSON is
+/// malformed; the instrument fails pricing validation or is not a
+/// structured-credit deal; `as_of` is invalid; the tranche or required market
+/// data is missing; or the break-even calculation fails.
+/// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
+/// @param tranche_id - Stable tranche identifier used to select the required domain object.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+#[wasm_bindgen(js_name = trancheBreakevenCdr)]
+pub fn tranche_breakeven_cdr(
+    instrument_json: JsValue,
+    tranche_id: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
+) -> Result<f64, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
+    let deal = parse_structured_credit(instrument_json)?;
+    let market = parse_market(&market_json)?;
+    let as_of = js_date(&as_of, "asOf")?;
+    sc::tranche_breakeven_cdr(&deal, tranche_id, &market, as_of).map_err(to_js_err)
+}
+
+/// Option-adjusted spread for a tranche; returns a typed `OasResult` object.
+///
+/// The result is a plain JavaScript object with snake_case fields (`oas`,
+/// `model_price`, `market_price`, `num_paths`, `price_std_error`) — the same
+/// shape Python exposes through its typed `OasResult` wrapper. Pass it to
+/// `JSON.stringify` if a wire string is needed.
+///
+/// `marketPricePct` is the clean settlement quote as a percentage of CURRENT balance.
+/// The deal's `quote_settlement_date` defaults to valuation. Accrued interest
+/// is added exactly once; payments on or before settlement belong to the seller.
+/// `configJson`, when present, is a JSON `OasConfig`; the default is used
+/// otherwise.
+///
+/// # Errors
+///
+/// Throws a JavaScript exception if the instrument, market, or optional
+/// configuration JSON is malformed; the instrument fails pricing validation;
+/// `as_of` is invalid; the tranche or discount curve is missing; the OAS solve
+/// fails or produces a non-finite result; or the result cannot be converted to
+/// a JavaScript value.
+/// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
+/// @param tranche_id - Stable tranche identifier used to select the required domain object.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param market_price_pct - Clean settlement quote as a percentage of CURRENT balance; accrued interest is added once.
+/// @param config_json - Optional OasConfig JSON; omit to use the default OAS solver configuration.
+#[wasm_bindgen(js_name = trancheOas)]
+pub fn tranche_oas(
+    instrument_json: JsValue,
+    tranche_id: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
+    market_price_pct: JsValue,
+    config_json: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let market_price_pct = js_f64(&market_price_pct, "marketPricePct")?;
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
+    let config_json = opt_json_text(config_json.as_ref(), "configJson")?;
+    let deal = parse_structured_credit(instrument_json)?;
+    let market = parse_market(&market_json)?;
+    let as_of = js_date(&as_of, "asOf")?;
+    let config: OasConfig = match config_json.as_deref() {
+        Some(json) => parse_json_arg(json, "OAS config")?,
+        None => OasConfig::default(),
+    };
+    let result = sc::tranche_oas(&deal, tranche_id, &market, as_of, market_price_pct, &config)
+        .map_err(to_js_err)?;
+    to_js_value(&result)
+}
+
+/// Scenario (CPR x CDR x severity) table for a tranche; returns a typed
+/// `ScenarioTable` object. `gridJson` is a JSON `ScenarioGrid` (`cprs`,
+/// `cdrs`, `severities`).
+///
+/// The result is a plain JavaScript object with snake_case fields
+/// (`tranche_id`, `cells`; each cell carries `cpr`, `cdr`, `severity`,
+/// `price`, `wal`, `writedown`) — the same shape Python exposes through its
+/// typed `ScenarioTable` wrapper. Pass it to `JSON.stringify` if a wire
+/// string is needed.
+///
+/// # Errors
+///
+/// Throws a JavaScript exception if the instrument, market, or scenario-grid
+/// JSON is malformed; the instrument fails pricing validation; `as_of` is
+/// invalid; the tranche or required market data is missing; a scenario fails
+/// or produces a non-finite result; or the table cannot be converted to a
+/// JavaScript value.
+/// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
+/// @param tranche_id - Stable tranche identifier used to select the required domain object.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param grid_json - ScenarioGrid JSON containing the CPR, CDR, and severity axes for the table.
+#[wasm_bindgen(js_name = trancheScenarioTable)]
+pub fn tranche_scenario_table(
+    instrument_json: JsValue,
+    tranche_id: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
+    grid_json: JsValue,
+) -> Result<JsValue, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
+    let grid_json: &str = &json_text(&grid_json, "gridJson")?;
+    let deal = parse_structured_credit(instrument_json)?;
+    let market = parse_market(&market_json)?;
+    let as_of = js_date(&as_of, "asOf")?;
+    let grid: ScenarioGrid = parse_json_arg(grid_json, "scenario grid")?;
+    let result =
+        sc::tranche_scenario_table(&deal, tranche_id, &market, as_of, &grid).map_err(to_js_err)?;
+    to_js_value(&result)
+}
+
+/// Per-tranche valuation, yield, spread and risk metrics computed from one
+/// tranche's own cashflows — the one per-note analytics entry point.
+///
+/// `marketPricePct` is a clean settlement quote (% of CURRENT balance). The
+/// deal's `quote_settlement_date` defaults to valuation; accrued interest is
+/// added once and seller-owned payments are excluded. When omitted the deal
+/// quote is used, or its model clean settlement price if no quote is supplied.
+/// `metrics` lists registry metric ids (`"dv01"`, `"default01"`, …) valued on
+/// this note and returned in `metrics`, so tranche sensitivities sum to the
+/// deal's. Returns a typed `TrancheMetrics` object — a plain JavaScript object
+/// with the same snake_case fields (`tranche_id`, `currency`, `pv`,
+/// `clean_price_pct`, `dirty_price_pct`, `accrued`, `factor`, `wal`, `ytm`,
+/// `z_spread_bp`, `cs01`, `spread_duration`, `spread_convexity`,
+/// `effective_duration`, `effective_convexity`, `target_price_pct`, `dm_bp`
+/// for floaters, `metrics`) Python exposes through its typed `TrancheMetrics`
+/// wrapper. Pass it to `JSON.stringify` if a wire string is needed.
+///
+/// # Errors
+///
+/// Throws a JavaScript exception if the instrument or market JSON is
+/// malformed; a metric id is unknown; the instrument fails pricing
+/// validation; `as_of` is invalid; the tranche or discount curve is missing;
+/// a metric fails or is non-finite; or the result cannot be converted to a
+/// JavaScript value.
+/// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
+/// @param tranche_id - Stable tranche identifier used to select the required domain object.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param market_price_pct - Optional clean settlement quote as a percentage of CURRENT balance; omit to use the deal quote, or its model clean price when no quote is supplied.
+/// @param metrics - Optional registry metric ids to value on this note; omit or pass an empty array for none.
+#[wasm_bindgen(js_name = trancheMetrics)]
+pub fn tranche_metrics(
+    instrument_json: JsValue,
+    tranche_id: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
+    market_price_pct: Option<JsValue>,
+    metrics: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let market_price_pct = js_opt_f64(market_price_pct.as_ref(), "marketPricePct")?;
+    let metric_ids = js_opt_string_seq(metrics.as_ref(), "metrics")?
+        .unwrap_or_default()
+        .iter()
+        .map(|id| finstack_quant_valuations::metrics::MetricId::parse_strict(id))
+        .collect::<finstack_quant_core::Result<Vec<_>>>()
+        .map_err(to_js_err)?;
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let tranche_id: &str = &js_string(&tranche_id, "trancheId")?;
+    let deal = parse_structured_credit(instrument_json)?;
+    let market = parse_market(&market_json)?;
+    let as_of = js_date(&as_of, "asOf")?;
+    let result = sc::tranche_metrics(
+        &deal,
+        tranche_id,
+        &market,
+        as_of,
+        market_price_pct,
+        &metric_ids,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&result)
+}
+
 /// A deal-type constructor `(id, pool, tranches, closingDate, maturity, discountCurveId, calendarId?)`.
 macro_rules! deal_constructor {
-    ($(#[$doc:meta])* $name:ident as $js_name:ident) => {
+    ($(#[$doc:meta])* $name:ident as $js_name:ident, $deal_type:ident) => {
         #[wasm_bindgen(js_class = StructuredCredit)]
         impl JsStructuredCredit {
             $(#[$doc])*
@@ -40,24 +285,24 @@ macro_rules! deal_constructor {
                 discount_curve_id: JsValue,
                 calendar_id: Option<JsValue>,
             ) -> Result<JsStructuredCredit, JsValue> {
-                let pool: AssetPool = super::arg::json(&pool, "pool")?;
-                let tranches: TrancheStructure = super::arg::json(&tranches, "tranches")?;
-                let mut inner = StructuredCredit::$name(
-                    js_string(&id, "id")?,
+                let pool: AssetPool = from_js_json(&pool, "pool")?;
+                let tranches: TrancheStructure = from_js_json(&tranches, "tranches")?;
+                let params = StandardDealParams {
+                    id: js_string(&id, "id")?.into(),
                     pool,
                     tranches,
-                    super::arg::date(&closing_date, "closingDate")?,
-                    super::arg::date(&maturity, "maturity")?,
-                    js_string(&discount_curve_id, "discountCurveId")?,
-                )
-                .map_err(to_js_err)?;
-                if let Some(calendar_id) =
-                    crate::utils::input::js_opt_string(calendar_id.as_ref(), "calendarId")?
-                {
-                    inner = inner.with_calendar_id(calendar_id);
-                }
-                inner.validate_for_pricing().map_err(to_js_err)?;
-                Ok(Self { inner })
+                    closing_date: js_date(&closing_date, "closingDate")?,
+                    maturity: js_date(&maturity, "maturity")?,
+                    discount_curve_id: js_string(&discount_curve_id, "discountCurveId")?.into(),
+                    calendar_id: crate::utils::input::js_opt_string(
+                        calendar_id.as_ref(),
+                        "calendarId",
+                    )?
+                    .map(Into::into),
+                };
+                StructuredCredit::new_standard(DealType::$deal_type, params)
+                    .map(|inner| Self { inner })
+                    .map_err(to_js_err)
             }
         }
     };
@@ -70,17 +315,11 @@ instrument_class!(
     finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit
 );
 
-instrument_builder_entry!(
+instrument_surface!(
     JsStructuredCredit,
     "StructuredCredit",
     JsStructuredCreditBuilder
 );
-
-instrument_to_dict!(JsStructuredCredit, "StructuredCredit");
-
-instrument_market_dependencies!(JsStructuredCredit, "StructuredCredit");
-
-instrument_pricing!(JsStructuredCredit, "StructuredCredit");
 
 factories!(JsStructuredCredit, "StructuredCredit", finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit, {
         /// Canonical example deal (mirrors Rust `StructuredCredit::example`): a USD 100,000,000 CLO with one 7% fixed-rate collateral bond and one 6% senior note, closing 2024-01-01, legal final 2034-01-01, discounted on `USD-OIS` with the `nyse` calendar.
@@ -192,15 +431,6 @@ getters!(JsStructuredCredit, "StructuredCredit", |i| {
         /// Custom priority of payments.
         /// @returns `null` when the deal-type template applies.
         waterfall as waterfall => json(i.waterfall),
-        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
-        /// @returns The overrides plain object; `{}` when none is set.
-        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
-        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
-        /// @returns The overrides plain object; unset fields are `null` or omitted.
-        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
-        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
-        /// @returns The overrides plain object; `{}` when none is set.
-        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
         /// Free-form attributes (tags and metadata).
         /// @returns The attribute bag.
         attributes as attributes => json(i.attributes),
@@ -232,6 +462,8 @@ getters!(JsStructuredCredit, "StructuredCredit", |i| {
         /// @returns `null` for non-card deals.
         card as card => json(i.credit_model.card),
 });
+
+common_getters!(JsStructuredCredit, "StructuredCredit", overrides);
 
 builder_class!(
     /// Fluent builder for `StructuredCredit`; one setter per Rust `FinancialBuilder` setter.
@@ -431,27 +663,18 @@ setters!(JsStructuredCreditBuilder, "StructuredCreditBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         deal_metadata as dealMetadata => json,
-        /// Set the instrument-owned pricing inputs.
-        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        instrument_pricing_overrides as instrumentPricingOverrides => json,
-        /// Set the metric-time pricing configuration stored on the instrument.
-        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        metric_pricing_overrides as metricPricingOverrides => json,
-        /// Set the scenario-only pricing adjustments.
-        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scenario_pricing_overrides as scenarioPricingOverrides => json,
         /// Set free-form attributes (tags and metadata) on the deal.
         /// @param value - Attribute bag; a plain object populates `meta` (an optional `"tags"` list populates `tags`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         attributes as attributes => json,
 });
+
+common_setters!(
+    JsStructuredCreditBuilder,
+    "StructuredCreditBuilder",
+    overrides
+);
 
 handle_setters!(JsStructuredCreditBuilder, "StructuredCreditBuilder", {
         /// Set the payment frequency for the structure.
@@ -554,19 +777,19 @@ handle_setters!(JsTrancheBuilder, "TrancheBuilder", {
 
 deal_constructor!(
     /// Create an asset-backed security deal (mirrors Rust `StructuredCredit::new_abs`).
-    new_abs as newAbs
+    new_abs as newAbs, Abs
 );
 deal_constructor!(
     /// Create a collateralized loan obligation (mirrors Rust `StructuredCredit::new_clo`).
-    new_clo as newClo
+    new_clo as newClo, Clo
 );
 deal_constructor!(
     /// Create a commercial mortgage-backed security deal (mirrors Rust `StructuredCredit::new_cmbs`).
-    new_cmbs as newCmbs
+    new_cmbs as newCmbs, Cmbs
 );
 deal_constructor!(
     /// Create a residential mortgage-backed security deal (mirrors Rust `StructuredCredit::new_rmbs`).
-    new_rmbs as newRmbs
+    new_rmbs as newRmbs, Rmbs
 );
 
 #[wasm_bindgen(js_class = StructuredCredit)]
@@ -637,8 +860,8 @@ impl JsStructuredCredit {
         as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
         let tranche_id = js_string(&tranche_id, "trancheId")?;
-        let market = super::market(&market_json)?;
-        let as_of = super::as_of(&as_of)?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
         to_js_value(
             &self
                 .inner
@@ -660,8 +883,8 @@ impl JsStructuredCredit {
         as_of: JsValue,
         purchase_price_pct: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let market = super::market(&market_json)?;
-        let as_of = super::as_of(&as_of)?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
         let purchase_price_pct =
             crate::utils::input::js_opt_f64(purchase_price_pct.as_ref(), "purchasePricePct")?;
         to_js_value(
@@ -693,8 +916,8 @@ impl JsStructuredCredit {
         num_paths: Option<JsValue>,
         antithetic: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let market = super::market(&market_json)?;
-        let as_of = super::as_of(&as_of)?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
         let num_paths = crate::utils::input::js_opt_uint(num_paths.as_ref(), "numPaths")?;
         let antithetic = crate::utils::input::js_opt_bool(antithetic.as_ref(), "antithetic")?;
         crate::utils::to_js_value(
@@ -718,8 +941,8 @@ impl JsStructuredCredit {
         market_json: JsValue,
         as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
-        let market = super::market(&market_json)?;
-        let as_of = super::as_of(&as_of)?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
         let run = finstack_quant_valuations::instruments::fixed_income::structured_credit::run_simulation_with_diagnostics(
             &self.inner,
             &market,
@@ -730,27 +953,17 @@ impl JsStructuredCredit {
     }
 }
 
-/// Fluent builder for a `Tranche`; one setter per Rust `TrancheBuilder` setter.
-///
-/// Every setter returns the builder, so calls chain; `build()` validates and
-/// consumes it. Create one with `valuations.instruments.trancheBuilder()`.
-#[wasm_bindgen(js_name = TrancheBuilder)]
-pub struct JsTrancheBuilder {
-    inner: super::Staged<
-        finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheBuilder,
-    >,
-}
-
-impl JsTrancheBuilder {
-    /// An empty builder.
-    pub(crate) fn new() -> Self {
-        Self {
-            inner: super::Staged::new(
-                finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheBuilder::new(),
-            ),
-        }
-    }
-}
+builder_class!(
+    @staged
+    /// Fluent builder for a `Tranche`; one setter per Rust `TrancheBuilder` setter.
+    ///
+    /// Every setter returns the builder, so calls chain; `build()` validates and
+    /// consumes it. Create one with `valuations.instruments.trancheBuilder()`.
+    JsTrancheBuilder,
+    "TrancheBuilder",
+    finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheBuilder,
+    finstack_quant_valuations::instruments::fixed_income::structured_credit::Tranche::builder()
+);
 
 #[wasm_bindgen(js_class = TrancheBuilder)]
 impl JsTrancheBuilder {
@@ -760,7 +973,7 @@ impl JsTrancheBuilder {
     /// @throws Error - Throws with kind `invalid_type` if `rate` is not a number, and kind `validation` if the builder was already consumed by `build()`.
     #[wasm_bindgen(js_name = couponFixed)]
     pub fn coupon_fixed(&self, rate: JsValue) -> Result<JsTrancheBuilder, JsValue> {
-        let rate = super::arg::num(&rate, "rate")?;
+        let rate = js_f64(&rate, "rate")?;
         let inner = self.inner.apply(|b| b.coupon(RateSpec::Fixed { rate }))?;
         Ok(Self { inner })
     }

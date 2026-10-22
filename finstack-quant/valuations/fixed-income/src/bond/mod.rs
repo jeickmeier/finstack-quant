@@ -113,7 +113,6 @@
 //! - bond metrics module for bond-specific risk metrics
 
 mod cashflow_spec;
-pub mod cashflows;
 pub(crate) mod metrics;
 /// Bond pricing engines including tree-based and analytical methods.
 pub mod pricing;

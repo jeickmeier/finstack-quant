@@ -31,11 +31,9 @@ impl MetricCalculator for DividendRiskCalculator {
             return Ok(0.0);
         }
 
-        let future = option
-            .discrete_dividends
-            .iter()
-            .filter(|(date, _)| *date > context.as_of && *date <= option.expiry)
-            .collect::<Vec<_>>();
+        let future =
+            super::super::pricing::inputs::future_discrete_dividends(option, context.as_of)
+                .collect::<Vec<_>>();
         if future.is_empty() {
             return dividend01_central_diff(option, option.div_yield_id.as_ref(), context);
         }

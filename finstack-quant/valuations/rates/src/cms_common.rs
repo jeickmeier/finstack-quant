@@ -1,4 +1,5 @@
-//! Reference-swap resolution shared by the CMS instruments.
+//! Reference-swap resolution and historical fixings shared by the CMS
+//! instruments.
 //!
 //! A CMS fixing observes the par rate of a reference swap. [`CmsOption`],
 //! [`CmsSwap`] and [`CmsSpreadOption`] all carry the same optional
@@ -16,6 +17,7 @@ use finstack_quant_core::dates::{
     calendar_by_id_strict, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::fixings::cms_fixing_series_id;
 use finstack_quant_core::types::{CurveId, IndexId};
 use finstack_quant_core::Result;
 
@@ -171,6 +173,39 @@ impl CmsReferenceSwap<'_> {
         let calendar_id = &convention.market_calendar_id;
         let calendar = calendar_by_id_strict(calendar_id)?;
         fixing_date.add_business_days(convention.market_settlement_days, calendar)
+    }
+
+    /// Effective date and forward par rate of the reference swap fixing on
+    /// `fixing_date`.
+    ///
+    /// The swap starts on [`Self::reference_swap_start`] (fixing date plus the
+    /// market settlement lag) and runs `tenor_months` months.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market supplying the discount and projection curves.
+    /// * `as_of` - Valuation date used for relative discount factors.
+    /// * `fixing_date` - CMS fixing (observation) date.
+    /// * `tenor_months` - Reference swap tenor in months, as returned by
+    ///   [`cms_tenor_months`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::reference_swap_start`] and
+    /// [`Self::forward_rate_and_annuity`], or a date error when the swap end
+    /// overflows.
+    pub fn forward_at_fixing(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        fixing_date: Date,
+        tenor_months: i32,
+    ) -> Result<(Date, f64)> {
+        let swap_start = self.reference_swap_start(fixing_date)?;
+        let swap_end = swap_start.add_months(tenor_months)?;
+        let (forward_rate, _annuity) =
+            self.forward_rate_and_annuity(market, as_of, swap_start, swap_end)?;
+        Ok((swap_start, forward_rate))
     }
 
     /// Forward par swap rate and market annuity of the reference swap
@@ -330,6 +365,83 @@ pub(crate) fn annuity_weight(rate: f64, tenor: f64, m: f64, delay: f64) -> (f64,
         weight * log_prime,
         weight * (log_prime.powi(2) + log_second),
     )
+}
+
+// Historical CMS (par swap rate) fixing lookups for seasoned CMS trades.
+//
+// Mirrors the cap/floor seasoned-fixing pattern: a coupon whose fixing date
+// lies before the valuation date must be valued off the recorded fixing, not
+// re-projected from the live curve (which produces phantom P&L every time
+// the curve moves). CMS fixings are par swap rates, so the series is keyed
+// by reference tenor as well as the projection curve — see
+// [`finstack_quant_core::market_data::fixings::cms_fixing_series_id`].
+
+/// Look up the recorded CMS (par swap) rate fixed on `fixing_date`.
+///
+/// # Errors
+///
+/// Returns a validation error when the fixing series
+/// `FIXING:CMS-{tenor}:{forward_curve_id}` is absent from the market context
+/// or has no observation on the exact fixing date. Seasoned CMS coupons must
+/// never silently fall back to live-curve projection.
+pub(crate) fn historical_cms_fixing(
+    curves: &MarketContext,
+    forward_curve_id: &CurveId,
+    cms_tenor_years: f64,
+    fixing_date: Date,
+) -> Result<f64> {
+    let fixings_id = cms_fixing_series_id(forward_curve_id.as_str(), cms_tenor_years);
+    let series = curves.get_series(&fixings_id).map_err(|_| {
+        finstack_quant_core::Error::Validation(format!(
+            "Seasoned CMS coupon requires historical fixing series '{}' for fixing date {}. \
+             Fixed-but-unpaid CMS coupons must be valued off observed swap-rate fixings, \
+             not the live forward curve.",
+            fixings_id, fixing_date
+        ))
+    })?;
+    series.value_on_exact(fixing_date).map_err(|e| {
+        finstack_quant_core::Error::Validation(format!(
+            "Missing CMS fixing in series '{}' on {}: {e}",
+            fixings_id, fixing_date
+        ))
+    })
+}
+
+#[cfg(test)]
+mod cms_fixings_tests {
+    use super::*;
+    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+    use time::macros::date;
+
+    #[test]
+    fn missing_series_is_a_hard_error() {
+        let ctx = MarketContext::new();
+        let err =
+            historical_cms_fixing(&ctx, &CurveId::new("USD-SOFR"), 10.0, date!(2025 - 01 - 02))
+                .expect_err("missing series must error");
+        let msg = err.to_string();
+        assert!(msg.contains("FIXING:CMS-10Y:USD-SOFR"), "{msg}");
+    }
+
+    #[test]
+    fn exact_date_lookup_returns_recorded_rate() {
+        let series = ScalarTimeSeries::new(
+            "FIXING:CMS-10Y:USD-SOFR",
+            vec![(date!(2025 - 01 - 02), 0.0412)],
+            None,
+        )
+        .expect("series");
+        let ctx = MarketContext::new().insert_series(series);
+        let rate =
+            historical_cms_fixing(&ctx, &CurveId::new("USD-SOFR"), 10.0, date!(2025 - 01 - 02))
+                .expect("fixing");
+        assert!((rate - 0.0412).abs() < 1e-12);
+
+        let err =
+            historical_cms_fixing(&ctx, &CurveId::new("USD-SOFR"), 10.0, date!(2025 - 01 - 03))
+                .expect_err("unobserved date must error");
+        assert!(err.to_string().contains("2025-01-03"));
+    }
 }
 
 #[cfg(test)]

@@ -26,8 +26,9 @@ destination. Product-family coverage and routing metadata live under
 `ListedFutureTerms` centralizes contracts, multiplier, settlement currency,
 entry and official marks, long/short direction, last-trading and settlement
 dates, and cash versus physical settlement. After trading ends, a final mark is
-mandatory. Physical contracts expose a signed `ListedDeliveryObligation`; bond
-conversion factors and accrued invoice interest remain in `BondFuture`.
+mandatory. Physical settlement records the deliverable asset and quantity per
+contract; bond conversion factors and accrued invoice interest remain in
+`BondFuture`.
 
 ## Lifecycle rules
 

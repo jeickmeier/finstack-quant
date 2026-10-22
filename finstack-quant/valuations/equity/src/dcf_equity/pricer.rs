@@ -51,6 +51,18 @@ pub(crate) fn pv_with_rf_bump(
     dcf: &DiscountedCashFlow,
     bump_at: &dyn Fn(f64) -> f64,
 ) -> finstack_quant_core::Result<f64> {
+    let (pv_explicit, pv_terminal) = pv_components_with_rf_bump(dcf, bump_at)?;
+    let equity_value = pv_explicit + pv_terminal - dcf.effective_net_debt();
+    dcf.apply_valuation_discounts(equity_value)
+}
+
+/// Enterprise-value components `(pv_explicit, pv_terminal)` at the WACC with
+/// its risk-free component bumped by `bump_at(t)` (absolute, decimal) at each
+/// tenor `t` in years; `bump_at = |_| 0.0` gives the unbumped components.
+pub(crate) fn pv_components_with_rf_bump(
+    dcf: &DiscountedCashFlow,
+    bump_at: &dyn Fn(f64) -> f64,
+) -> finstack_quant_core::Result<(f64, f64)> {
     // Terminal tenor: ExitMultiple discounts at the full horizon t_n (a
     // point-in-time sale price); Gordon/H-model keep the mid-year-adjusted
     // tenor (flow-stream proxies). See `terminal_discount_years`.
@@ -70,8 +82,7 @@ pub(crate) fn pv_with_rf_bump(
         })
         .sum();
 
-    let equity_value = pv_explicit + pv_terminal - dcf.effective_net_debt();
-    dcf.apply_valuation_discounts(equity_value)
+    Ok((pv_explicit, pv_terminal))
 }
 
 impl Pricer for DcfPricer {

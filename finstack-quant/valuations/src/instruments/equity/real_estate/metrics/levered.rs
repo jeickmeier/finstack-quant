@@ -1,10 +1,10 @@
 //! Metrics for [`LeveredRealEstateEquity`].
 
-use crate::instruments::equity::real_estate::LeveredRealEstateEquity;
+use crate::instruments::equity::real_estate::{levered_pricer, pricer, LeveredRealEstateEquity};
 use crate::instruments::Instrument;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::cashflow::xirr_with_daycount;
-use finstack_quant_core::Error as CoreError;
+use finstack_quant_core::Error;
 
 /// Levered equity IRR (XIRR-style) from the levered equity cashflow schedule.
 #[derive(Debug, Default)]
@@ -12,13 +12,9 @@ pub(super) struct LeveredIrr;
 
 impl MetricCalculator for LeveredIrr {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let inst = context
-            .instrument
-            .as_any()
-            .downcast_ref::<LeveredRealEstateEquity>()
-            .ok_or_else(|| CoreError::Validation("LeveredIrr: instrument type mismatch".into()))?;
+        let inst: &LeveredRealEstateEquity = context.instrument_as()?;
 
-        let flows = inst.equity_cashflows(&context.curves, context.as_of)?;
+        let flows = levered_pricer::equity_cashflows(inst, &context.curves, context.as_of)?;
         xirr_with_daycount(flows.as_slice(), inst.irr_day_count(), None)
     }
 }
@@ -29,30 +25,10 @@ pub(super) struct EquityMultiple;
 
 impl MetricCalculator for EquityMultiple {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let inst = context
-            .instrument
-            .as_any()
-            .downcast_ref::<LeveredRealEstateEquity>()
-            .ok_or_else(|| {
-                CoreError::Validation("EquityMultiple: instrument type mismatch".into())
-            })?;
+        let inst: &LeveredRealEstateEquity = context.instrument_as()?;
 
-        let flows = inst.equity_cashflows(&context.curves, context.as_of)?;
-        let mut inflows = 0.0;
-        let mut outflows = 0.0;
-        for (_d, a) in flows {
-            if a >= 0.0 {
-                inflows += a;
-            } else {
-                outflows += -a;
-            }
-        }
-        if outflows <= 0.0 {
-            return Err(CoreError::Validation(
-                "EquityMultiple: total outflows must be positive".into(),
-            ));
-        }
-        Ok(inflows / outflows)
+        let flows = levered_pricer::equity_cashflows(inst, &context.curves, context.as_of)?;
+        super::moic(flows.into_iter().map(|(_, a)| a), "EquityMultiple")
     }
 }
 
@@ -65,21 +41,16 @@ pub(super) struct LoanToValue;
 
 impl MetricCalculator for LoanToValue {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let inst = context
-            .instrument
-            .as_any()
-            .downcast_ref::<LeveredRealEstateEquity>()
-            .ok_or_else(|| CoreError::Validation("LoanToValue: type mismatch".into()))?;
+        let inst: &LeveredRealEstateEquity = context.instrument_as()?;
 
         let asset_pv = inst.asset.value(&context.curves, context.as_of)?;
         let denom = asset_pv.amount();
         if denom <= 0.0 {
-            return Err(CoreError::Validation(
+            return Err(Error::Validation(
                 "LoanToValue: asset PV must be positive".into(),
             ));
         }
-        let financing_pv =
-            super::super::levered_pricer::financing_pv(inst, &context.curves, context.as_of)?;
+        let financing_pv = levered_pricer::financing_pv(inst, &context.curves, context.as_of)?;
         Ok(financing_pv.abs() / denom)
     }
 }
@@ -110,23 +81,15 @@ fn min_dscr(
     interest_only: bool,
     metric_name: &str,
 ) -> finstack_quant_core::Result<f64> {
-    let inst = context
-        .instrument
-        .as_any()
-        .downcast_ref::<LeveredRealEstateEquity>()
-        .ok_or_else(|| CoreError::Validation(format!("{metric_name}: type mismatch")))?;
+    let inst: &LeveredRealEstateEquity = context.instrument_as()?;
 
     let as_of = context.as_of;
-    let exit = inst.resolve_exit_date(as_of)?;
+    let exit = pricer::horizon_date(&inst.asset, as_of)?;
 
-    let noi = inst.asset.noi_flows(as_of)?;
-    if noi.is_empty() {
-        return Err(CoreError::Validation(format!(
-            "{metric_name}: missing NOI flows"
-        )));
-    }
+    // Errors when no NOI falls on/after `as_of`, so the loop below runs.
+    let noi = pricer::future_noi_flows(&inst.asset, as_of)?;
 
-    let schedules = inst.financing_schedules_supported(&context.curves, as_of)?;
+    let schedules = levered_pricer::financing_schedules_supported(inst, &context.curves, as_of)?;
 
     let mut min_dscr = f64::INFINITY;
     let mut prev = as_of;
@@ -155,7 +118,7 @@ fn min_dscr(
     }
 
     if !min_dscr.is_finite() {
-        return Err(CoreError::Validation(format!(
+        return Err(Error::Validation(format!(
             "{metric_name}: could not compute (no qualifying debt service)"
         )));
     }
@@ -195,29 +158,17 @@ pub(super) struct LoanToValueAtOrigination;
 
 impl MetricCalculator for LoanToValueAtOrigination {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let inst = context
-            .instrument
-            .as_any()
-            .downcast_ref::<LeveredRealEstateEquity>()
-            .ok_or_else(|| {
-                CoreError::Validation("LoanToValueAtOrigination: type mismatch".into())
-            })?;
+        let inst: &LeveredRealEstateEquity = context.instrument_as()?;
 
-        let purchase = inst.asset.purchase_price.ok_or_else(|| {
-            CoreError::Validation("LoanToValueAtOrigination: purchase_price is required".into())
-        })?;
-        if purchase.currency() != inst.currency {
-            return Err(CoreError::Validation(
-                "LoanToValueAtOrigination: purchase_price currency mismatch".into(),
-            ));
-        }
-        if purchase.amount() <= 0.0 {
-            return Err(CoreError::Validation(
+        let purchase = pricer::required_purchase_price(&inst.asset)?;
+        if purchase <= 0.0 {
+            return Err(Error::Validation(
                 "LoanToValueAtOrigination: purchase_price must be positive".into(),
             ));
         }
 
-        let schedules = inst.financing_schedules_supported(&context.curves, context.as_of)?;
+        let schedules =
+            levered_pricer::financing_schedules_supported(inst, &context.curves, context.as_of)?;
         // Origination draw = lender outflows (negative Notional/RevolvingDraw)
         // on the first draw date on/after as_of, per financing instrument.
         // Matching only flows dated exactly at as_of would silently return 0
@@ -245,12 +196,12 @@ impl MetricCalculator for LoanToValueAtOrigination {
             }
         }
         if drawn <= 0.0 {
-            return Err(CoreError::Validation(
+            return Err(Error::Validation(
                 "LoanToValueAtOrigination: no financing draw found on/after as_of".into(),
             ));
         }
 
-        Ok(drawn / purchase.amount())
+        Ok(drawn / purchase)
     }
 }
 
@@ -260,11 +211,7 @@ pub(super) struct DebtPayoffAtExit;
 
 impl MetricCalculator for DebtPayoffAtExit {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let inst = context
-            .instrument
-            .as_any()
-            .downcast_ref::<LeveredRealEstateEquity>()
-            .ok_or_else(|| CoreError::Validation("DebtPayoffAtExit: type mismatch".into()))?;
+        let inst: &LeveredRealEstateEquity = context.instrument_as()?;
 
         let payoff = inst.financing_payoff_at_exit(&context.curves, context.as_of)?;
         Ok(payoff.amount())

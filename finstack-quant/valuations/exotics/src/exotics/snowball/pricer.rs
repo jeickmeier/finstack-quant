@@ -1,24 +1,23 @@
 //! Pricers for snowball and inverse-floater structured notes.
 
+use crate::exotics::hw1f_note::{exact_estimate, zero_estimate, Hw1fNote, Hw1fNotePricer};
 use crate::exotics::snowball::{Snowball, SnowballVariant};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff, StateKey};
 use finstack_quant_models::rates::clock::model_time;
-use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use finstack_quant_models::rates::hw1f::CouponEvent;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 use finstack_quant_models::rates::hw1f::Hw1fMcPricer;
 use finstack_quant_models::rates::hw1f::{
     initial_short_rate_from_curve, prepare_hw1f_params, Hw1fTermForward, PeriodForwardCoeffs,
 };
-use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
-    resolve_hw1f_params, Hw1fParamFamily,
-};
+use finstack_quant_valuations_core::instruments::pricing_overrides::ModelConfig;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
@@ -239,29 +238,22 @@ impl SnowballDiscountingPricer {
 
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
         let forward_curve = market.get_forward(inst.forward_curve_id.as_ref())?;
-        // The discounting pricer projects rates from the forward curve, so the
-        // term-forward coefficients (and the `r0` seasoned-fixing argument) are
-        // unused here; default HW params and `r0 = 0.0` suffice. Only the
-        // `accrual_fraction` / `discount_factor` fields are consumed below.
-        let term_forward = Hw1fTermForward::new(
-            HullWhiteCalibrationParams::default(),
-            discount_curve.as_ref(),
-            as_of,
+        finstack_quant_valuations_core::instruments::pricing::term_fixings::validate_term_curve_tenor(
+            forward_curve.as_ref(),
+            inst.index_tenor,
+            inst.id.as_str(),
         )?;
-        let events = coupon_events(inst, market, as_of, &term_forward, 0.0)?;
-        if events.is_empty() {
-            return Ok(Money::from((0_i64, inst.notional.currency())));
-        }
 
         let mut pv = 0.0;
         let mut prev_coupon = inst.initial_coupon;
-        let mut event_idx = 0usize;
         for period in inst.period_boundaries().windows(2) {
             let start = period[0];
             let end = period[1];
             if end <= as_of {
                 continue;
             }
+            let accrual_fraction = coupon_accrual_fraction(inst, start, end)?;
+            let discount_factor = discount_curve.as_ref().df_between_dates(as_of, end)?;
 
             let projection_start = start.max(as_of);
             let floating_rate = finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_on_date(
@@ -269,19 +261,13 @@ impl SnowballDiscountingPricer {
                 projection_start,
             )?;
             let coupon_rate = inst.compute_coupon(floating_rate, prev_coupon);
-            let event = &events[event_idx];
-            pv += coupon_rate
-                * event.accrual_fraction
-                * inst.notional.amount()
-                * event.discount_factor;
+            pv += coupon_rate * accrual_fraction * inst.notional.amount() * discount_factor;
             prev_coupon = coupon_rate;
-            event_idx += 1;
         }
 
-        let maturity = *inst.payment_dates.last().ok_or_else(|| {
-            finstack_quant_core::Error::Validation("Snowball requires payment dates".to_string())
-        })?;
-        let redemption_df = discount_curve.as_ref().df_between_dates(as_of, maturity)?;
+        let redemption_df = discount_curve
+            .as_ref()
+            .df_between_dates(as_of, final_coupon_date)?;
         pv += inst.notional.amount() * redemption_df;
         Money::new(pv, inst.notional.currency())
     }
@@ -338,72 +324,38 @@ impl Pricer for SnowballDiscountingPricer {
 }
 
 /// Hull-White 1F Monte Carlo pricer for path-dependent snowballs.
-#[derive(Debug, Clone)]
-pub struct SnowballHw1fMcPricer {
-    hw_params: Option<HullWhiteCalibrationParams>,
-    config: Hw1fMcConfig,
-}
+pub type SnowballHw1fMcPricer = Hw1fNotePricer<Snowball>;
 
-impl SnowballHw1fMcPricer {
-    /// Create a snowball pricer requiring explicit or pre-calibrated HW1F parameters.
-    pub fn new() -> Self {
-        Self {
-            hw_params: None,
-            config: Hw1fMcConfig::default(),
-        }
+impl Hw1fNote for Snowball {
+    const INSTRUMENT_TYPE: InstrumentType = InstrumentType::Snowball;
+    const LABEL: &'static str = "Snowball";
+
+    fn note_id(&self) -> &InstrumentId {
+        &self.id
     }
 
-    /// Create a snowball MC pricer with explicit HW1F parameters.
-    pub fn with_hw_params(hw_params: HullWhiteCalibrationParams) -> Self {
-        Self {
-            hw_params: Some(hw_params),
-            config: Hw1fMcConfig::default(),
-        }
+    fn hw1f_curve_id(&self) -> &str {
+        self.discount_curve_id.as_str()
     }
 
-    /// Set the Monte Carlo configuration (paths, seed, antithetic flag, time
-    /// steps) used by this pricer; instrument overrides still apply on top.
-    ///
-    /// # Arguments
-    ///
-    /// * `config` - Base Hull-White Monte Carlo configuration.
-    pub fn with_config(mut self, config: Hw1fMcConfig) -> Self {
-        self.config = config;
-        self
+    fn model_config(&self) -> &ModelConfig {
+        &self.instrument_pricing_overrides.model_config
     }
 
-    fn effective_hw_params(
+    fn error_curve_ids(&self) -> Vec<String> {
+        vec![
+            self.discount_curve_id.as_str().to_string(),
+            self.forward_curve_id.as_str().to_string(),
+        ]
+    }
+
+    fn hw1f_estimate(
         &self,
-        inst: &Snowball,
-        market: &MarketContext,
-    ) -> Result<HullWhiteCalibrationParams> {
-        resolve_hw1f_params(
-            Hw1fParamFamily::CapFloor,
-            inst.discount_curve_id.as_str(),
-            &inst.instrument_pricing_overrides.model_config,
-            self.hw_params,
-            &format!("Snowball {}", inst.id),
-            market,
-        )
-    }
-
-    fn effective_config(&self, inst: &Snowball) -> Hw1fMcConfig {
-        self.config.with_instrument_overrides(
-            &inst.id,
-            inst.instrument_pricing_overrides.model_config.mc_paths,
-            inst.instrument_pricing_overrides
-                .model_config
-                .mc_seed_scenario
-                .as_deref(),
-        )
-    }
-
-    fn price_estimate(
-        &self,
-        inst: &Snowball,
+        pricer: &SnowballHw1fMcPricer,
         market: &MarketContext,
         as_of: Date,
     ) -> Result<MoneyEstimate> {
+        let inst = self;
         inst.validate()?;
         ensure_not_callable(inst)?;
 
@@ -412,20 +364,7 @@ impl SnowballHw1fMcPricer {
             finstack_quant_core::Error::Validation("Snowball requires payment dates".to_string())
         })?;
         if as_of >= final_coupon_date {
-            let zero = Money::from((0_i64, inst.notional.currency()));
-            return Ok(MoneyEstimate {
-                mean: zero,
-                stderr: 0.0,
-                ci_95: (zero, zero),
-                num_paths: 0,
-                num_simulated_paths: 0,
-                std_dev: Some(0.0),
-                median: None,
-                percentile_25: None,
-                percentile_75: None,
-                min: Some(0.0),
-                max: Some(0.0),
-            });
+            return Ok(zero_estimate(inst.notional.currency()));
         }
         if as_of > first_coupon_date {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -435,7 +374,7 @@ impl SnowballHw1fMcPricer {
         }
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
         let _forward_curve = market.get_forward(inst.forward_curve_id.as_ref())?;
-        let hw_params = self.effective_hw_params(inst, market)?;
+        let hw_params = pricer.effective_hw_params(inst, market)?;
         // HW1F bond-reconstruction built from the discount curve; turns the
         // short rate sampled at each coupon's in-advance fixing date into that
         // coupon's term forward.
@@ -453,22 +392,9 @@ impl SnowballHw1fMcPricer {
             )));
         }
 
-        let events = coupon_events(inst, market, as_of, &term_forward, r0)?;
+        let events = coupon_events(inst, market, as_of, &term_forward)?;
         if events.is_empty() {
-            let zero = Money::from((0_i64, inst.notional.currency()));
-            return Ok(MoneyEstimate {
-                mean: zero,
-                stderr: 0.0,
-                ci_95: (zero, zero),
-                num_paths: 0,
-                num_simulated_paths: 0,
-                std_dev: Some(0.0),
-                median: None,
-                percentile_25: None,
-                percentile_75: None,
-                min: Some(0.0),
-                max: Some(0.0),
-            });
+            return Ok(zero_estimate(inst.notional.currency()));
         }
 
         let spec = SnowballCouponSpec {
@@ -479,7 +405,7 @@ impl SnowballHw1fMcPricer {
             coupon_floor: inst.coupon_floor,
             coupon_cap: inst.coupon_cap,
         };
-        let config = self.effective_config(inst);
+        let config = pricer.effective_config(inst);
 
         let event_times = event_times(inst, as_of)?;
         // No forward-starting coupon: every fixing is the deterministic
@@ -517,78 +443,6 @@ impl SnowballHw1fMcPricer {
         let payoff = SnowballPayoff::new(spec, inst.notional.amount(), events, true);
         mc.price(|| payoff.clone())
     }
-
-    pub(crate) fn price_internal(
-        &self,
-        inst: &Snowball,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> Result<Money> {
-        Ok(self.price_estimate(inst, market, as_of)?.mean)
-    }
-}
-
-impl Default for SnowballHw1fMcPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Pricer for SnowballHw1fMcPricer {
-    fn key(&self) -> PricerKey {
-        PricerKey::new(InstrumentType::Snowball, ModelKey::MonteCarloHullWhite1F)
-    }
-
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> std::result::Result<ValuationResult, PricingError> {
-        let snowball = finstack_quant_valuations_core::pricer::expect_inst::<Snowball>(
-            instrument,
-            InstrumentType::Snowball,
-        )?;
-        let estimate = self.price_estimate(snowball, market, as_of).map_err(|e| {
-            PricingError::from_core(
-                e,
-                PricingErrorContext::from_instrument(instrument)
-                    .model(ModelKey::MonteCarloHullWhite1F)
-                    .curve_ids([
-                        snowball.discount_curve_id.as_str().to_string(),
-                        snowball.forward_curve_id.as_str().to_string(),
-                    ]),
-            )
-        })?;
-
-        let mut result = ValuationResult::stamped(snowball.id.as_str(), as_of, estimate.mean);
-        finstack_quant_valuations_core::instruments::common_impl::helpers::attach_mc_diagnostics(
-            &mut result,
-            &estimate,
-        );
-        Ok(result)
-    }
-
-    fn price_raw_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> std::result::Result<f64, PricingError> {
-        let snowball = finstack_quant_valuations_core::pricer::expect_inst::<Snowball>(
-            instrument,
-            InstrumentType::Snowball,
-        )?;
-        self.price_internal(snowball, market, as_of)
-            .map(|m| m.amount())
-            .map_err(|e| {
-                PricingError::from_core(
-                    e,
-                    PricingErrorContext::from_instrument(instrument)
-                        .model(ModelKey::MonteCarloHullWhite1F),
-                )
-            })
-    }
 }
 
 fn ensure_not_callable(inst: &Snowball) -> Result<()> {
@@ -614,16 +468,13 @@ fn ensure_not_callable(inst: &Snowball) -> Result<()> {
 /// `[as_of, end]` window; `forward_coeffs` then degenerates to that flat rate
 /// (`needs_path_sample = false`).
 ///
-/// `term_forward` is the HW1F bond-reconstruction. The HW1F MC pricer reads the
-/// resulting coefficients; the path-independent discounting pricer ignores them
-/// (it projects rates from the forward curve directly) but still consumes the
-/// `accrual_fraction` / `discount_factor` fields.
+/// `term_forward` is the HW1F bond-reconstruction whose coefficients the HW1F
+/// MC pricer reads.
 fn coupon_events(
     inst: &Snowball,
     market: &MarketContext,
     as_of: Date,
     term_forward: &Hw1fTermForward<'_>,
-    _r0: f64,
 ) -> Result<Vec<CouponEvent>> {
     let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
     let forward_curve = market.get_forward(inst.forward_curve_id.as_ref())?;
@@ -640,15 +491,7 @@ fn coupon_events(
             continue;
         }
 
-        let accrual_fraction =
-            inst.day_count
-                .year_fraction(start, end, DayCountContext::default())?;
-        if !accrual_fraction.is_finite() || accrual_fraction <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Snowball {} has invalid accrual fraction {accrual_fraction} for {start} to {end}",
-                inst.id.as_str()
-            )));
-        }
+        let accrual_fraction = coupon_accrual_fraction(inst, start, end)?;
         let discount_factor = discount_curve.as_ref().df_between_dates(as_of, end)?;
 
         let (forward_coeffs, needs_path_sample) = if start > as_of {
@@ -689,6 +532,20 @@ fn coupon_events(
     Ok(events)
 }
 
+/// Positive, finite accrual fraction of the coupon period `[start, end]`.
+fn coupon_accrual_fraction(inst: &Snowball, start: Date, end: Date) -> Result<f64> {
+    let accrual_fraction = inst
+        .day_count
+        .year_fraction(start, end, DayCountContext::default())?;
+    if !accrual_fraction.is_finite() || accrual_fraction <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Snowball {} has invalid accrual fraction {accrual_fraction} for {start} to {end}",
+            inst.id.as_str()
+        )));
+    }
+    Ok(accrual_fraction)
+}
+
 /// In-advance fixing event times (years from `as_of`), one per forward-starting
 /// coupon — i.e. each coupon whose period *start* lies strictly after `as_of`.
 /// An already-seasoned first coupon contributes no path event.
@@ -723,19 +580,11 @@ fn deterministic_estimate(
     let mut payoff = SnowballPayoff::new(spec, notional.amount(), events.to_vec(), false);
     payoff.settle_seasoned_prefix();
     let pv = payoff.value(notional.currency())?;
-    Ok(MoneyEstimate {
-        mean: pv,
-        stderr: 0.0,
-        ci_95: (pv, pv),
-        num_paths: config.num_paths,
-        num_simulated_paths: config.simulated_path_count(),
-        std_dev: Some(0.0),
-        median: None,
-        percentile_25: None,
-        percentile_75: None,
-        min: Some(pv.amount()),
-        max: Some(pv.amount()),
-    })
+    Ok(exact_estimate(
+        pv,
+        config.num_paths,
+        config.simulated_path_count(),
+    ))
 }
 
 #[cfg(test)]
@@ -746,6 +595,7 @@ mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::types::{CurveId, InstrumentId};
+    use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
     use finstack_quant_valuations_core::instruments::BermudanCallProvision;
     use time::Month;
 

@@ -11,8 +11,8 @@ autobenches = false
 autotests = false
 
 [dependencies]
-finstack-quant-core = { path = "../core", version = "0.11.0", default-features = false }
-finstack-quant-cashflows = { path = "../cashflows", version = "0.11.0", default-features = false }
+finstack-quant-core = { path = "../core", version = "0.11.0-dev.202610210600", default-features = false }
+finstack-quant-cashflows = { path = "../cashflows", version = "0.11.0-dev.202610210600", default-features = false }
 smallvec = { version = "1.15", default-features = false, features = ["serde"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -39,7 +39,7 @@ json-schema = [
 
 [dev-dependencies]
 criterion = { workspace = true }
-finstack-quant-test-utils = { path = "../test-utils", version = "0.11.0" }
+finstack-quant-test-utils = { path = "../test-utils", version = "0.11.0-dev.202610210600" }
 jsonschema = { version = "0.28", default-features = false }
 proptest = "1.11.0"
 time = { workspace = true, features = ["macros"] }

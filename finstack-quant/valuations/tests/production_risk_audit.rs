@@ -53,10 +53,15 @@ fn fx01_follows_active_spot_and_forward_overrides() {
     forward.notional = Money::from((100_i64, Currency::EUR));
     forward.contract_rate = Some(1.0);
     forward.quoted_spot = Some(1.1);
-    let mut spot = FxSpot::new("SPOT", Currency::EUR, Currency::USD)
-        .with_quoted_spot(1.1)
-        .expect("spot")
-        .with_settlement_date(maturity);
+    let mut spot = FxSpot::builder()
+        .id("SPOT".into())
+        .base_currency(Currency::EUR)
+        .quote_currency(Currency::USD)
+        .notional(Money::from((1_i64, Currency::EUR)))
+        .quoted_spot(1.1)
+        .settlement_date(maturity)
+        .build()
+        .expect("valid FX spot");
     spot.notional = Money::from((100_i64, Currency::EUR));
     let ndf = Ndf::builder()
         .id("NDF".into())

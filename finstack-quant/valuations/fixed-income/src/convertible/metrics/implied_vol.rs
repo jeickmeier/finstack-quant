@@ -12,9 +12,7 @@
 //!
 //! Returned as a decimal fraction (e.g., 0.25 = 25% volatility).
 
-use std::cell::Cell;
-
-use crate::convertible::pricing::{calculate_accrued_interest, settlement_dirty_price};
+use crate::convertible::pricing::settlement_dirty_price;
 use crate::convertible::ConvertibleBond;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::{Error, Result};
@@ -26,21 +24,9 @@ impl MetricCalculator for ImpliedVolCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let bond: &ConvertibleBond = context.instrument_as()?;
         let as_of = context.as_of;
-        if as_of >= bond.maturity {
+        let Some(target_dirty) = super::quoted_dirty_target(bond, &context.curves, as_of)? else {
             return Ok(0.0);
-        }
-        let quoted_clean_price_pct = bond
-            .instrument_pricing_overrides
-            .market_quotes
-            .quoted_clean_price_pct
-            .ok_or_else(|| {
-                Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "instrument_pricing_overrides.market_quotes.quoted_clean_price_pct"
-                        .to_string(),
-                })
-            })?;
-        let accrued = calculate_accrued_interest(bond, &context.curves, as_of)?;
-        let target_dirty = quoted_clean_price_pct * bond.notional.amount() / 100.0 + accrued;
+        };
         if !target_dirty.is_finite() || target_dirty <= 0.0 {
             return Err(Error::Validation(
                 "convertible implied volatility requires a finite positive dirty-price target"
@@ -90,24 +76,11 @@ impl MetricCalculator for ImpliedVolCalculator {
                 "convertible clean-price quote is not bracketed on the selected lattice's admissible volatility interval [{lower}, {upper}]; dirty-price residuals per unit notional are {low_residual} and {high_residual}"
             )));
         }
-        let captured_err: Cell<Option<Error>> = Cell::new(None);
-        let objective = |volatility| match evaluate(volatility) {
-            Ok(residual) => residual,
-            Err(error) => {
-                let previous = captured_err.take();
-                captured_err.set(previous.or(Some(error)));
-                f64::NAN
-            }
-        };
-        let solved = BrentSolver::new()
+        let volatility = BrentSolver::new()
             .with_tolerance(1e-12)
             .with_max_iterations(100)
             .with_bracket_bounds(lower, upper)
-            .solve(objective, 0.25_f64.clamp(lower, upper));
-        if let Some(error) = captured_err.take() {
-            return Err(error);
-        }
-        let volatility = solved?;
+            .solve_fallible(&evaluate, 0.25_f64.clamp(lower, upper))?;
         let residual = evaluate(volatility)?;
         if residual.abs() > 1e-10 {
             return Err(Error::Validation(format!("convertible implied volatility failed repricing: dirty-price residual per unit notional {residual}")));

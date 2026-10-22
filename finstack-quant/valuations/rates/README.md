@@ -43,7 +43,8 @@ rather than repeating it.
 
 Two non-instrument files sit beside the leaves: `forward_swap_rate.rs` (forward
 swap rate, annuity and term-curve checks shared by the CMS leaves and
-`ir_future`) and `cms_fixings.rs` (historical CMS fixing lookup, crate-private).
+`ir_future`) and `cms_common.rs` (CMS reference-swap resolution and historical
+CMS fixing lookup, crate-private).
 The Hull-White 1-factor Monte Carlo and LSMC engines that the swaption,
 cap/floor, CMS, TARN, snowball, callable range accrual, MBS OAS and revolver
 pricers drive live in `finstack_quant_models::rates::hw1f`; the κ/σ resolution
@@ -54,9 +55,11 @@ from pricing overrides or calibrated market scalars is
 
 ## Public surface
 
-Import path: `finstack_quant_valuations_rates::<leaf>` (or `finstack_quant_valuations::instruments::rates::<leaf>` through the umbrella). All
-fifteen directories are `pub mod`. The headline types are also
-re-exported at the crate root and flat at `finstack_quant_valuations::instruments`:
+Import path: `finstack_quant_valuations_rates::<leaf>::<Type>` (or
+`finstack_quant_valuations::instruments::rates::<leaf>::<Type>` through the
+umbrella). All fifteen directories are `pub mod`; the crate root exports only the
+`RATES` family static. The headline types are also flat at
+`finstack_quant_valuations::instruments`:
 
 `InterestRateSwap`, `BasisSwap`, `XccySwap`, `CapFloor`, `RateOptionType`,
 `Swaption`, `BermudanSwaption`, `CmsSwap`, `CmsOption`, `CmsSpreadOption`,
@@ -69,12 +72,12 @@ actually reach for: the builders (`CapFloorBuilder`,
 `SwaptionBuilder`, `RepoBuilder`, `InflationSwapBuilder`,
 `YoYInflationSwapBuilder`, `InflationCapFloorBuilder`), `CapFloorVolType`,
 `OvernightCouponConvention`, `OvernightSpreadCompounding`,
-`swaption::{SABRParameters, BermudanSchedule, BermudanType,
-CashSettlementMethod, BermudanPricingMethod, BermudanSwaptionPricer,
-BermudanSwaptionTreeValuator, SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer}`,
-`xccy_swap::{NotionalExchange, ResettingSide,
-XccySwapLeg}`, `cms_swap::{FundingLeg, FundingLegSpec}`,
-`ir_future::FutureContractSpecs`, and `forward_swap_rate`.
+`swaption::{BermudanSchedule, BermudanType, CashSettlementMethod,
+BermudanSwaptionPricer, BermudanSwaptionTreeValuator,
+SimpleSwaptionBlackPricer, SimpleSwaptionNormalPricer}`, `xccy_swap::XccySwapLeg`,
+`cms_swap::{FundingLeg, FundingLegSpec}` and `ir_future::FutureContractSpecs`.
+`NotionalExchange` and `ResettingSide` are valuations-core types at
+`finstack_quant_valuations::instruments`.
 Reusable `HullWhiteParams` and Hull-White equations live at
 `finstack_quant_models::rates::hull_white`; the HW1F Monte Carlo and LSMC
 engines at `finstack_quant_models::rates::hw1f`.
@@ -88,10 +91,10 @@ Swaptions use the shared `ExerciseStyle`, `SettlementType` and
 `finstack_quant_valuations::instruments`.
 
 Inside a leaf, `metrics/`, `types.rs`/`types/`, `pricer.rs`/`pricing/` and the
-model-specific pricers (`hw_pricer.rs`, `lmm_pricer.rs`, `bermudan/`) are `pub(crate)` or private; supported
+model-specific pricers (`hw_pricer.rs`, `bermudan.rs`) are `pub(crate)` or private; supported
 items surface through each leaf's `pub use`. Genuinely public submodules are
-`cms_option::pricer` and `cms_option::replication_pricer`; `cms_common`,
-`cms_fixings`, `cms_swap::pricer` and `forward_swap_rate` are `pub(crate)`.
+`swaption::lmm_pricer`, `cms_option::pricer` and `cms_option::replication_pricer`; `cms_common`,
+`cms_swap::pricer` and `forward_swap_rate` are `pub(crate)`.
 
 ## Family conventions
 
@@ -108,7 +111,7 @@ items surface through each leaf's `pub use`. Genuinely public submodules are
   instrument-derived `t`.
 - **Leg pricing is shared.** `instruments::pricing::swap_legs` owns fixed-leg
   valuation and payment-delay handling. Floating coupons use the canonical
-  cashflow builder; `common_impl::pricing::overnight` supplies compounded-RFR
+  cashflow builder; `instruments::pricing::overnight` supplies compounded-RFR
   projection (lookback, observation shift, cutoff, fixings) for IRS, cap/floor
   and their risk paths. New swap-like legs reuse these kernels.
 - **Rates are `f64`, notionals are `Money`.** Spreads are basis points on the

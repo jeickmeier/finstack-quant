@@ -38,24 +38,23 @@
 //! The `FxSpot` instrument stores:
 //! ```
 //! use finstack_quant_core::currency::Currency;
+//! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::types::InstrumentId;
 //! use finstack_quant_valuations_fx::fx_spot::FxSpot;
 //!
 //! // CCY1 (base) is the currency being priced; CCY2 (quote) is the pricing currency.
-//! let mut eur_usd = FxSpot::new(InstrumentId::from("EURUSD"), Currency::EUR, Currency::USD);
-//! // How many units of `quote` per 1 unit of `base`
-//! eur_usd.quoted_spot = Some(1.10);
+//! let eur_usd = FxSpot::builder()
+//!     .id(InstrumentId::new("EURUSD"))
+//!     .base_currency(Currency::EUR)
+//!     .quote_currency(Currency::USD)
+//!     .notional(Money::from((1_000_000_i64, Currency::EUR)))
+//!     // How many units of `quote` per 1 unit of `base`
+//!     .quoted_spot(1.10)
+//!     .build()?;
+//! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
 //!
-//! Example:
-//! ```
-//! use finstack_quant_core::currency::Currency;
-//! use finstack_quant_core::types::InstrumentId;
-//! use finstack_quant_valuations_fx::fx_spot::FxSpot;
-//!
-//! let eur_usd = FxSpot::new(InstrumentId::from("EURUSD"), Currency::EUR, Currency::USD);
-//! // If quoted_spot = 1.10, this means: 1 EUR = 1.10 USD
-//! ```
+//! With `quoted_spot = Some(1.10)`, 1 EUR = 1.10 USD.
 
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
@@ -100,7 +99,7 @@ use finstack_quant_valuations_core::impl_instrument_base;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields, try_from = "FxSpotUnchecked")]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct FxSpot {
     /// Unique identifier for the FX pair
     pub id: InstrumentId,
@@ -178,122 +177,9 @@ pub struct FxSpot {
     pub attributes: Attributes,
 }
 
-#[derive(Debug, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-struct FxSpotUnchecked {
-    /// Unique identifier for the FX pair
-    id: InstrumentId,
-    /// Base currency (the currency being priced)
-    base_currency: Currency,
-    /// Quote currency (the currency used for pricing)
-    quote_currency: Currency,
-    /// Optional explicit settlement (value) date
-    #[serde(default)]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
-    )]
-    settlement_date: Option<Date>,
-    /// Optional T+N settlement lag in business days when `settlement_date` is not provided.
-    ///
-    /// `None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.
-    settlement_days: Option<u32>,
-    /// Optional quoted FX spot rate (quote per base); `None` reads the FxMatrix.
-    quoted_spot: Option<f64>,
-    /// Optional quote-currency discount curve for PV-ing the settlement
-    /// cashflow. When absent the settlement amount is reported undiscounted
-    /// (a 1–2 day effect for standard spot lags).
-    #[serde(default)]
-    domestic_discount_curve_id: Option<CurveId>,
-    /// Notional amount in base currency.
-    notional: Money,
-    /// Business day convention to apply when adjusting settlement (default: ModifiedFollowing)
-    ///
-    /// Note: Default changed from `Following` to `ModifiedFollowing` in v0.8.0 to align
-    /// with ISDA standard FX settlement conventions.
-    #[serde(default = "finstack_quant_valuations_core::serde_defaults::bdc_modified_following")]
-    business_day_convention: BusinessDayConvention,
-    /// Optional base currency calendar for joint calendar settlement adjustment.
-    ///
-    /// Per market convention, FX settlement uses the joint calendar of both currencies.
-    /// A date is a good business day only if it's valid in both calendars.
-    base_calendar_id: Option<String>,
-    /// Optional quote currency calendar for joint calendar settlement adjustment.
-    ///
-    /// Per market convention, FX settlement uses the joint calendar of both currencies.
-    /// A date is a good business day only if it's valid in both calendars.
-    quote_calendar_id: Option<String>,
-    /// Instrument-owned pricing inputs.
-    #[serde(default)]
-    instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[serde(default)]
-    metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[serde(default)]
-    scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
-    /// Attributes for scenario selection and tagging
-    attributes: Attributes,
-}
-
-impl TryFrom<FxSpotUnchecked> for FxSpot {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(value: FxSpotUnchecked) -> std::result::Result<Self, Self::Error> {
-        let spot = Self {
-            id: value.id,
-            base_currency: value.base_currency,
-            quote_currency: value.quote_currency,
-            settlement_date: value.settlement_date,
-            settlement_days: value.settlement_days,
-            quoted_spot: value.quoted_spot,
-            domestic_discount_curve_id: value.domestic_discount_curve_id,
-            notional: value.notional,
-            instrument_pricing_overrides: value.instrument_pricing_overrides,
-            metric_pricing_overrides: value.metric_pricing_overrides,
-            scenario_pricing_overrides: value.scenario_pricing_overrides,
-            business_day_convention: value.business_day_convention,
-            base_calendar_id: value.base_calendar_id.map(Into::into),
-            quote_calendar_id: value.quote_calendar_id.map(Into::into),
-            attributes: value.attributes,
-        };
-        spot.validate_economics()?;
-        Ok(spot)
-    }
-}
+finstack_quant_valuations_core::validate_on_deserialize!(FxSpot);
 
 impl FxSpot {
-    /// Create a new FX spot instrument.
-    ///
-    /// Default business day convention is `ModifiedFollowing` per ISDA standard.
-    pub fn new(
-        id: impl Into<InstrumentId>,
-        base_currency: Currency,
-        quote_currency: Currency,
-    ) -> Self {
-        Self {
-            id: id.into(),
-            base_currency,
-            quote_currency,
-            settlement_date: None,
-            settlement_days: None,
-            quoted_spot: None,
-            domestic_discount_curve_id: None,
-            notional: Money::from((1_i64, base_currency)),
-            instrument_pricing_overrides: Default::default(),
-            metric_pricing_overrides: Default::default(),
-            scenario_pricing_overrides: Default::default(),
-            business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            base_calendar_id: None,
-            quote_calendar_id: None,
-            attributes: Attributes::new(),
-        }
-    }
-
     /// Compute the effective settlement date for this FX spot.
     ///
     /// Returns the settlement date adjusted for business days according to the
@@ -350,126 +236,6 @@ impl FxSpot {
         }
     }
 
-    /// Set the explicit settlement (value) date.
-    ///
-    /// # Arguments
-    ///
-    /// * `date` - Contractual settlement date; business-day adjusted on the
-    ///   configured calendars and overrides `settlement_days`.
-    pub fn with_settlement_date(mut self, date: Date) -> Self {
-        self.settlement_date = Some(date);
-        self
-    }
-
-    /// Set the spot rate with validation.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the rate is negative or zero, as FX rates must be positive.
-    /// A zero rate would imply one currency is worthless, and negative rates are
-    /// economically meaningless for spot FX.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use finstack_quant_core::{currency::Currency, types::InstrumentId};
-    /// use finstack_quant_valuations_fx::fx_spot::FxSpot;
-    ///
-    /// let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-    ///     .with_quoted_spot(1.10)
-    ///     .expect("valid rate");
-    /// ```
-    pub fn with_quoted_spot(mut self, rate: f64) -> finstack_quant_core::Result<Self> {
-        if !rate.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "FX spot rate must be finite (got {}). NaN and Infinity are not valid rates.",
-                rate
-            )));
-        }
-        if rate < 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "FX spot rate cannot be negative (got {}). FX rates must be positive.",
-                rate
-            )));
-        }
-        if rate == 0.0 {
-            return Err(finstack_quant_core::Error::Validation(
-                "FX spot rate cannot be zero. A zero rate implies the base currency is worthless."
-                    .to_string(),
-            ));
-        }
-        self.quoted_spot = Some(rate);
-        Ok(self)
-    }
-
-    /// Set the notional amount with currency validation.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the notional currency doesn't match the base currency.
-    pub fn with_notional(mut self, notional: Money) -> finstack_quant_core::Result<Self> {
-        if notional.currency() != self.base_currency {
-            return Err(finstack_quant_core::Error::CurrencyMismatch {
-                expected: self.base_currency,
-                actual: notional.currency(),
-            });
-        }
-        self.notional = notional;
-        Ok(self)
-    }
-
-    /// Set the business day convention
-    pub fn with_business_day_convention(
-        mut self,
-        business_day_convention: BusinessDayConvention,
-    ) -> Self {
-        self.business_day_convention = business_day_convention;
-        self
-    }
-
-    /// Set the holiday calendar identifier used for settlement adjustment.
-    ///
-    /// Set the base currency calendar for joint calendar settlement adjustment.
-    ///
-    /// Per market convention, FX settlement uses the joint calendar of both currencies.
-    /// A date is a good business day only if it's valid in both calendars.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use finstack_quant_core::{currency::Currency, types::InstrumentId};
-    /// use finstack_quant_valuations_fx::fx_spot::FxSpot;
-    ///
-    /// let eur_usd = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-    ///     .with_base_calendar_id("TARGET")    // ECB TARGET calendar for EUR
-    ///     .with_quote_calendar_id("USNY");    // US New York calendar for USD
-    /// ```
-    pub fn with_base_calendar_id(mut self, id: impl Into<String>) -> Self {
-        self.base_calendar_id = Some(id.into().into());
-        self
-    }
-
-    /// Set the quote currency calendar for joint calendar settlement adjustment.
-    ///
-    /// Per market convention, FX settlement uses the joint calendar of both currencies.
-    /// A date is a good business day only if it's valid in both calendars.
-    pub fn with_quote_calendar_id(mut self, id: impl Into<String>) -> Self {
-        self.quote_calendar_id = Some(id.into().into());
-        self
-    }
-
-    /// Set the T+N settlement lag.
-    ///
-    /// # Arguments
-    ///
-    /// * `settlement_days` - Contractual business-day lag from the
-    ///   trade/valuation date; it overrides the pair-aware market default in
-    ///   either direction (for example `1` for a tom-next EUR/USD trade).
-    pub fn with_settlement_days(mut self, settlement_days: u32) -> Self {
-        self.settlement_days = Some(settlement_days);
-        self
-    }
-
     fn validate_economics(&self) -> finstack_quant_core::Result<()> {
         finstack_quant_core::validation::validate_distinct_currencies(
             self.base_currency,
@@ -482,8 +248,8 @@ impl FxSpot {
                 actual: self.notional.currency(),
             });
         }
-        // The builder and serde paths must enforce the same `quoted_spot`
-        // invariants as `with_quoted_spot`: finite and strictly positive.
+        // The builder and serde paths share the `quoted_spot` invariants:
+        // finite and strictly positive.
         if let Some(rate) = self.quoted_spot {
             if !rate.is_finite() {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -504,37 +270,14 @@ impl FxSpot {
     ///
     /// Useful for tests, demos, and documentation examples.
     pub fn example() -> Result<Self> {
-        Ok(
-            Self::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-                .with_notional(Money::from((1_000_000_i64, Currency::EUR)))?
-                .with_quoted_spot(1.10)?
-                .with_settlement_days(2),
-        )
-    }
-
-    /// Standard FX pair name (e.g., "EURUSD")
-    pub fn pair_name(&self) -> String {
-        format!("{}{}", self.base_currency, self.quote_currency)
-    }
-
-    /// Check if this is a same-region pair that typically settles T+1.
-    ///
-    /// Returns `true` for pairs like USD/CAD and USD/TRY that conventionally
-    /// settle in one business day rather than the standard T+2.
-    ///
-    /// # Market Convention Reference
-    ///
-    /// Per Bloomberg/Reuters FX settlement conventions:
-    /// - **USD/CAD**: North American same-day zone (T+1)
-    /// - **USD/TRY**: Turkish Lira settles T+1 per Istanbul market convention
-    ///
-    /// When `settlement_days` is unset, [`Self::effective_settlement_date`]
-    /// uses this list to choose T+1 versus T+2.
-    pub fn is_t1_pair(&self) -> bool {
-        finstack_quant_core::dates::fx::fx_standard_settlement_days(
-            self.base_currency,
-            self.quote_currency,
-        ) == 1
+        Self::builder()
+            .id(InstrumentId::new("EURUSD"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
+            .quoted_spot(1.10)
+            .settlement_days(2)
+            .build()
     }
 }
 
@@ -597,7 +340,6 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxSpot {
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
         Ok(Some(self.notional))
@@ -612,18 +354,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
         let settle_date = self.effective_settlement_date(as_of)?;
 
         if crate::shared::event_has_occurred(settle_date, as_of) {
-            return finstack_quant_cashflows::schedule_from_classified_flows(
-                Vec::new(),
-                finstack_quant_core::dates::DayCount::Act365F,
-                finstack_quant_cashflows::ScheduleBuildOpts {
-                    notional_hint: self.notional()?,
-                    meta: finstack_quant_cashflows::builder::CashFlowMeta {
-                        representation:
-                            finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual,
-                        ..Default::default()
-                    },
-                },
-            );
+            return crate::shared::settled_schedule(self.notional()?);
         }
 
         let flows = {
@@ -671,19 +402,25 @@ mod tests {
         Date::from_calendar_date(year, month, day).expect("valid test date")
     }
 
+    /// EUR/USD builder with a one-euro notional and no quoted spot.
+    fn eurusd() -> FxSpotBuilder {
+        FxSpot::builder()
+            .id(InstrumentId::new("EURUSD"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .notional(Money::from((1_i64, Currency::EUR)))
+    }
+
     #[test]
     fn test_fx_spot_creation() {
-        let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD);
+        let spot = eurusd().build().expect("valid FX spot");
         assert_eq!(spot.base_currency, Currency::EUR);
         assert_eq!(spot.quote_currency, Currency::USD);
-        assert_eq!(spot.pair_name(), "EURUSD");
     }
 
     #[test]
     fn test_fx_spot_with_explicit_rate() {
-        let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_quoted_spot(1.10)
-            .expect("valid rate");
+        let spot = eurusd().quoted_spot(1.10).build().expect("valid FX spot");
 
         let market = MarketContext::new();
         let as_of = date(2025, Month::January, 15);
@@ -698,7 +435,7 @@ mod tests {
 
     #[test]
     fn test_fx_spot_effective_settlement_date_default() {
-        let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD);
+        let spot = eurusd().build().expect("valid FX spot");
 
         // Wednesday -> should settle Friday (T+2 weekdays)
         let as_of = date(2025, Month::January, 15); // Wednesday
@@ -711,8 +448,10 @@ mod tests {
     #[test]
     fn test_fx_spot_effective_settlement_date_explicit() {
         let settle_date = date(2025, Month::January, 20);
-        let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_settlement_date(settle_date);
+        let spot = eurusd()
+            .settlement_date(settle_date)
+            .build()
+            .expect("valid FX spot");
 
         let as_of = date(2025, Month::January, 15);
         let settle = spot
@@ -723,8 +462,7 @@ mod tests {
 
     #[test]
     fn test_fx_spot_effective_settlement_date_custom_lag() {
-        let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_settlement_days(1);
+        let spot = eurusd().settlement_days(1).build().expect("valid FX spot");
 
         // A contractual T+1 (tom) lag is honored: Wednesday settles Thursday.
         let as_of = date(2025, Month::January, 15); // Wednesday
@@ -737,10 +475,11 @@ mod tests {
     #[test]
     fn test_fx_spot_returns_zero_when_settled() {
         let settle_date = date(2025, Month::January, 10);
-        let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_settlement_date(settle_date)
-            .with_quoted_spot(1.10)
-            .expect("valid rate");
+        let spot = eurusd()
+            .settlement_date(settle_date)
+            .quoted_spot(1.10)
+            .build()
+            .expect("valid FX spot");
 
         let market = MarketContext::new();
         let as_of = date(2025, Month::January, 15); // After settlement
@@ -751,20 +490,19 @@ mod tests {
 
     #[test]
     fn test_fx_spot_notional_currency_validation() {
-        let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD);
         let wrong_notional = Money::from((1000_i64, Currency::GBP));
 
-        let result = spot.with_notional(wrong_notional);
+        let result = eurusd().notional(wrong_notional).build();
         assert!(result.is_err(), "Should reject notional in wrong currency");
     }
 
     #[test]
     fn test_fx_spot_with_notional() {
-        let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_notional(Money::from((1_000_000_i64, Currency::EUR)))
-            .expect("valid notional")
-            .with_quoted_spot(1.10)
-            .expect("valid rate");
+        let spot = eurusd()
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
+            .quoted_spot(1.10)
+            .build()
+            .expect("valid FX spot");
 
         let market = MarketContext::new();
         let as_of = date(2025, Month::January, 15);
@@ -776,22 +514,20 @@ mod tests {
 
     #[test]
     fn test_fx_spot_rejects_negative_rate() {
-        let result = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_quoted_spot(-1.10);
+        let result = eurusd().quoted_spot(-1.10).build();
         assert!(result.is_err(), "Should reject negative rate");
 
         let err = result.unwrap_err();
         let err_msg = format!("{:?}", err);
         assert!(
-            err_msg.contains("negative") || err_msg.contains("spot_rate"),
-            "Error should mention negative rate"
+            err_msg.contains("must be positive"),
+            "Error should require a positive rate: {err_msg}"
         );
     }
 
     #[test]
     fn test_fx_spot_rejects_nan_rate() {
-        let result = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_quoted_spot(f64::NAN);
+        let result = eurusd().quoted_spot(f64::NAN).build();
         assert!(result.is_err(), "Should reject NaN rate");
 
         let err = result.unwrap_err();
@@ -805,22 +541,20 @@ mod tests {
 
     #[test]
     fn test_fx_spot_rejects_infinity_rate() {
-        let result = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_quoted_spot(f64::INFINITY);
+        let result = eurusd().quoted_spot(f64::INFINITY).build();
         assert!(result.is_err(), "Should reject Infinity rate");
     }
 
     #[test]
     fn test_fx_spot_rejects_zero_rate() {
-        let result = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_quoted_spot(0.0);
+        let result = eurusd().quoted_spot(0.0).build();
         assert!(result.is_err(), "Should reject zero rate");
 
         let err = result.unwrap_err();
         let err_msg = format!("{:?}", err);
         assert!(
-            err_msg.contains("zero") || err_msg.contains("spot_rate"),
-            "Error should mention zero rate"
+            err_msg.contains("must be positive"),
+            "Error should require a positive rate: {err_msg}"
         );
     }
 
@@ -842,33 +576,18 @@ mod tests {
 
     #[test]
     fn test_fx_spot_new_defaults_t1_pairs_to_one_day() {
-        let spot = FxSpot::new(InstrumentId::new("USDCAD"), Currency::USD, Currency::CAD);
+        let spot = FxSpot::builder()
+            .id(InstrumentId::new("USDCAD"))
+            .base_currency(Currency::USD)
+            .quote_currency(Currency::CAD)
+            .notional(Money::from((1_i64, Currency::USD)))
+            .build()
+            .expect("valid FX spot");
         let as_of = date(2025, Month::January, 15); // Wednesday
         let settle = spot
             .effective_settlement_date(as_of)
             .expect("should compute");
         assert_eq!(settle, date(2025, Month::January, 16)); // Thursday (T+1)
-    }
-
-    #[test]
-    fn test_fx_spot_is_t1_pair() {
-        let usd_cad = FxSpot::new(InstrumentId::new("USDCAD"), Currency::USD, Currency::CAD);
-        assert!(usd_cad.is_t1_pair(), "USD/CAD should be T+1 pair");
-
-        let cad_usd = FxSpot::new(InstrumentId::new("CADUSD"), Currency::CAD, Currency::USD);
-        assert!(cad_usd.is_t1_pair(), "CAD/USD should be T+1 pair");
-
-        let usd_try = FxSpot::new(InstrumentId::new("USDTRY"), Currency::USD, Currency::TRY);
-        assert!(usd_try.is_t1_pair(), "USD/TRY should be T+1 pair");
-
-        let try_usd = FxSpot::new(InstrumentId::new("TRYUSD"), Currency::TRY, Currency::USD);
-        assert!(try_usd.is_t1_pair(), "TRY/USD should be T+1 pair");
-
-        let usd_mxn = FxSpot::new(InstrumentId::new("USDMXN"), Currency::USD, Currency::MXN);
-        assert!(!usd_mxn.is_t1_pair(), "USD/MXN should NOT be T+1 pair");
-
-        let eur_usd = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD);
-        assert!(!eur_usd.is_t1_pair(), "EUR/USD should NOT be T+1 pair");
     }
 
     #[test]
@@ -899,8 +618,7 @@ mod tests {
     #[test]
     fn test_fx_spot_zero_settlement_lag() {
         // T+0 same-day settlement
-        let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_settlement_days(0);
+        let spot = eurusd().settlement_days(0).build().expect("valid FX spot");
 
         let as_of = date(2025, Month::January, 15);
         let settle = spot
@@ -963,10 +681,11 @@ mod tests {
             .expect("curve");
         let market = MarketContext::new().insert(curve);
 
-        let undiscounted = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_quoted_spot(1.10)
-            .expect("valid rate")
-            .with_settlement_date(settle);
+        let undiscounted = eurusd()
+            .quoted_spot(1.10)
+            .settlement_date(settle)
+            .build()
+            .expect("valid FX spot");
         let mut discounted = undiscounted.clone();
         discounted.domestic_discount_curve_id =
             Some(finstack_quant_core::types::CurveId::new("USD-OIS"));
@@ -996,9 +715,7 @@ mod tests {
     fn cashflow_schedule_marks_future_spot_settlement_as_contractual() {
         let as_of = date(2025, Month::January, 15);
         let market = MarketContext::new();
-        let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_quoted_spot(1.10)
-            .expect("valid rate");
+        let spot = eurusd().quoted_spot(1.10).build().expect("valid FX spot");
 
         let schedule = spot
             .cashflow_schedule(&market, as_of)
@@ -1016,14 +733,15 @@ mod tests {
         let settlement = date(2025, Month::January, 15);
         let as_of = date(2025, Month::January, 16);
         let market = MarketContext::new();
-        let spot = FxSpot::new(
-            InstrumentId::new("EURUSD-SETTLED"),
-            Currency::EUR,
-            Currency::USD,
-        )
-        .with_quoted_spot(1.10)
-        .expect("valid rate")
-        .with_settlement_date(settlement);
+        let spot = FxSpot::builder()
+            .id(InstrumentId::new("EURUSD-SETTLED"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .notional(Money::from((1_i64, Currency::EUR)))
+            .quoted_spot(1.10)
+            .settlement_date(settlement)
+            .build()
+            .expect("valid FX spot");
 
         let schedule = spot
             .cashflow_schedule(&market, as_of)

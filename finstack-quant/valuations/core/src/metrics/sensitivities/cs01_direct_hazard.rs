@@ -99,11 +99,7 @@ where
         else {
             return Ok(0.0);
         };
-        let bump_bp = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?
-        .credit_spread_bump_bp;
+        let bump_bp = sens_config::resolve(context)?.credit_spread_bump_bp;
         let hazard = context.curves.get_hazard(hazard_id.as_str())?;
         let hazard_bp = spread_equivalent_hazard_bump_bp(hazard.as_ref(), bump_bp);
         let cs01 = hazard_bump_sensitivity(context, &hazard, hazard_bp, |curve, bp| {
@@ -128,11 +124,7 @@ where
         else {
             return Ok(0.0);
         };
-        let bump_bp = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?
-        .credit_spread_bump_bp;
+        let bump_bp = sens_config::resolve(context)?.credit_spread_bump_bp;
         let hazard = context.curves.get_hazard(hazard_id.as_str())?;
         let hazard_bp = spread_equivalent_hazard_bump_bp(hazard.as_ref(), bump_bp);
         let tenors: Vec<f64> = hazard.knot_points().map(|(tenor, _)| tenor).collect();
@@ -143,7 +135,7 @@ where
             let cs01 = hazard_bump_sensitivity(context, &hazard, hazard_bp, |curve, bp| {
                 curve.with_tenor_hazard_rate_bumps_bp(&[(tenor, bp)])
             })? * (hazard_bp / bump_bp);
-            series.push((crate::metrics::format_bucket_label_cow(tenor), cs01));
+            series.push((crate::metrics::format_bucket_label(tenor), cs01));
             total += cs01;
         }
         context.store_bucketed_series(

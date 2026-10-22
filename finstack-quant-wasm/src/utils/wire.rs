@@ -126,6 +126,23 @@ pub fn js_date(value: &JsValue, label: &str) -> Result<Date, JsValue> {
     super::parse_iso_date(&js_string(value, label)?)
 }
 
+/// An optional ISO-8601 calendar date string: `undefined` and `null` are `None`.
+///
+/// # Arguments
+///
+/// * `value` - The JavaScript argument, if supplied.
+/// * `label` - The camelCase argument name, used in the error message.
+///
+/// # Errors
+///
+/// Throws as [`js_date`] does for a supplied value.
+pub fn js_opt_date(value: Option<&JsValue>, label: &str) -> Result<Option<Date>, JsValue> {
+    match value {
+        Some(value) if !value.is_undefined() && !value.is_null() => js_date(value, label).map(Some),
+        _ => Ok(None),
+    }
+}
+
 /// An exact decimal carried as a string (`"0.0425"`), as on the wire.
 ///
 /// The decimal is field `0` of the returned [`DecimalWire`].

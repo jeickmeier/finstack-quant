@@ -1,12 +1,12 @@
 //! Integration tests for fully custom payment waterfalls.
 //!
 //! A deal may replace the synthesized sequential template with an arbitrary
-//! [`Waterfall`] via `with_waterfall` (or the `waterfall` JSON field). These
+//! [`Waterfall`] via the `waterfall` field (in Rust or JSON). These
 //! tests pin the three contracts that make that safe:
 //! - attaching the template itself is an exact identity;
 //! - a genuinely different structure changes payment *timing* (config
 //!   sensitivity — the input must move the output);
-//! - malformed structures fail loudly at construction and at pricing time.
+//! - malformed structures fail loudly at validation and at pricing time.
 
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::currency::Currency;
@@ -16,6 +16,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::CoverageTestSpec;
 use finstack_quant_valuations_structured_credit::structured_credit::{
@@ -208,13 +209,13 @@ fn sequential_waterfall_with(sub_b_interest: Option<PaymentCalculation>) -> Wate
 #[test]
 fn attaching_the_template_waterfall_is_an_exact_identity() {
     let base = create_test_deal();
-    let custom = base
-        .clone()
-        .with_waterfall(
+    let custom = StructuredCredit {
+        waterfall: Some(
             base.create_waterfall()
                 .expect("valid create_waterfall fixture"),
-        )
-        .expect("template waterfall must validate");
+        ),
+        ..base.clone()
+    };
     let market = create_test_market();
 
     for tranche_id in ["SENIOR_A", "SUB_B", "EQUITY"] {
@@ -244,9 +245,10 @@ fn attaching_the_template_waterfall_is_an_exact_identity() {
 #[test]
 fn principal_tier_priority_does_not_transfer_subordinated_interest() {
     let template_deal = create_test_deal();
-    let custom_deal = create_test_deal()
-        .with_waterfall(by_class_waterfall())
-        .expect("by-class waterfall must validate");
+    let custom_deal = StructuredCredit {
+        waterfall: Some(by_class_waterfall()),
+        ..create_test_deal()
+    };
     let market = create_test_market();
     let template_b = (template_deal)
         .tranche_cashflows("SUB_B", &market, test_date())
@@ -265,23 +267,25 @@ fn principal_tier_priority_does_not_transfer_subordinated_interest() {
 #[test]
 fn capped_interest_defines_the_claim_and_never_defers() {
     let market = create_test_market();
-    let uncapped_deal = create_test_deal()
-        .with_waterfall(sequential_waterfall_with(Some(
+    let uncapped_deal = StructuredCredit {
+        waterfall: Some(sequential_waterfall_with(Some(
             PaymentCalculation::TrancheInterest {
                 tranche_id: "SUB_B".to_string(),
                 rounding: None,
             },
-        )))
-        .expect("uncapped custom waterfall");
-    let capped_deal = create_test_deal()
-        .with_waterfall(sequential_waterfall_with(Some(
+        ))),
+        ..create_test_deal()
+    };
+    let capped_deal = StructuredCredit {
+        waterfall: Some(sequential_waterfall_with(Some(
             PaymentCalculation::CappedTrancheInterest {
                 tranche_id: "SUB_B".to_string(),
                 cap_rate: 0.04,
                 rounding: None,
             },
-        )))
-        .expect("capped custom waterfall");
+        ))),
+        ..create_test_deal()
+    };
 
     let uncapped = (uncapped_deal)
         .tranche_cashflows("SUB_B", &market, test_date())
@@ -321,9 +325,10 @@ fn capped_interest_defines_the_claim_and_never_defers() {
 #[test]
 fn tranche_without_interest_recipient_owes_nothing() {
     let market = create_test_market();
-    let deal = create_test_deal()
-        .with_waterfall(sequential_waterfall_with(None))
-        .expect("interest-less custom waterfall");
+    let deal = StructuredCredit {
+        waterfall: Some(sequential_waterfall_with(None)),
+        ..create_test_deal()
+    };
 
     let flows = (deal)
         .tranche_cashflows("SUB_B", &market, test_date())
@@ -357,8 +362,12 @@ fn duplicate_interest_recipient_is_rejected() {
         .build()
         .expect("build");
 
-    let err = create_test_deal()
-        .with_waterfall(waterfall)
+    let deal = StructuredCredit {
+        waterfall: Some(waterfall),
+        ..create_test_deal()
+    };
+    let err = deal
+        .validate_invariants()
         .expect_err("two interest recipients for one tranche must be rejected");
     assert!(
         err.to_string().contains("exactly one recipient"),
@@ -488,8 +497,12 @@ fn custom_waterfall_rejects_unknown_tranche_reference() {
         .build()
         .expect("build");
 
-    let err = create_test_deal()
-        .with_waterfall(waterfall)
+    let deal = StructuredCredit {
+        waterfall: Some(waterfall),
+        ..create_test_deal()
+    };
+    let err = deal
+        .validate_invariants()
         .expect_err("unknown tranche reference must be rejected");
     assert!(
         err.to_string().contains("CLASS_X"),
@@ -507,8 +520,12 @@ fn custom_waterfall_rejects_equity_tranche_paid_by_id() {
         .build()
         .expect("build");
 
-    let err = create_test_deal()
-        .with_waterfall(waterfall)
+    let deal = StructuredCredit {
+        waterfall: Some(waterfall),
+        ..create_test_deal()
+    };
+    let err = deal
+        .validate_invariants()
         .expect_err("equity paid by tranche id must be rejected");
     assert!(
         err.to_string().contains("RecipientType::Equity"),
@@ -519,8 +536,12 @@ fn custom_waterfall_rejects_equity_tranche_paid_by_id() {
 #[test]
 fn custom_waterfall_conflicts_with_deal_level_fees() {
     let deal = create_test_deal().with_standard_fees();
+    let deal = StructuredCredit {
+        waterfall: Some(by_class_waterfall()),
+        ..deal
+    };
     let err = deal
-        .with_waterfall(by_class_waterfall())
+        .validate_invariants()
         .expect_err("deal-level fees must conflict with a custom waterfall");
     assert!(
         err.to_string().contains("fees"),
@@ -530,12 +551,13 @@ fn custom_waterfall_conflicts_with_deal_level_fees() {
 
 #[test]
 fn fees_attached_after_custom_waterfall_fail_at_pricing_time() {
-    // `with_waterfall` cannot see fees added later; the engine re-validates so
-    // the JSON path (which never calls `with_waterfall`) is equally protected.
-    let deal = create_test_deal()
-        .with_waterfall(by_class_waterfall())
-        .expect("valid custom waterfall")
-        .with_standard_fees();
+    // Fees added after the waterfall is attached are caught when the engine
+    // re-validates, so every construction path is equally protected.
+    let deal = StructuredCredit {
+        waterfall: Some(by_class_waterfall()),
+        ..create_test_deal()
+    }
+    .with_standard_fees();
     let market = create_test_market();
 
     let err = (deal)
@@ -552,12 +574,17 @@ fn duplicate_coverage_trigger_across_waterfall_and_deal_is_rejected() {
     let mut waterfall = by_class_waterfall();
     waterfall.insert_coverage_test(CoverageTestSpec::oc("SENIOR_A", 1.2));
 
-    let deal = create_test_deal()
-        .with_coverage_triggers(vec![CoverageTestSpec::oc("SENIOR_A", 1.25)])
-        .expect("deal-level trigger");
+    let deal = StructuredCredit {
+        coverage_triggers: vec![CoverageTestSpec::oc("SENIOR_A", 1.25)],
+        ..create_test_deal()
+    };
 
+    let deal = StructuredCredit {
+        waterfall: Some(waterfall),
+        ..deal
+    };
     let err = deal
-        .with_waterfall(waterfall)
+        .validate_invariants()
         .expect_err("duplicate test for one tranche and kind must be rejected");
     assert!(
         err.to_string().contains("duplicate"),
@@ -592,8 +619,12 @@ fn coverage_test_ahead_of_its_tranche_interest_is_rejected() {
         )
         .build()
         .expect("waterfall");
-    let err = create_test_deal()
-        .with_waterfall(waterfall)
+    let deal = StructuredCredit {
+        waterfall: Some(waterfall),
+        ..create_test_deal()
+    };
+    let err = deal
+        .validate_invariants()
         .expect_err("a test placed before its tranche's interest tier must be rejected");
     assert!(
         err.to_string().contains("sits before"),
@@ -605,9 +636,10 @@ fn coverage_test_ahead_of_its_tranche_interest_is_rejected() {
 
 #[test]
 fn custom_waterfall_survives_json_round_trip_and_prices_identically() {
-    let deal = create_test_deal()
-        .with_waterfall(by_class_waterfall())
-        .expect("valid custom waterfall");
+    let deal = StructuredCredit {
+        waterfall: Some(by_class_waterfall()),
+        ..create_test_deal()
+    };
     let market = create_test_market();
 
     let json = serde_json::to_string(&deal).expect("serialize");

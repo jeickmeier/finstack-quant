@@ -2,6 +2,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_fixed_income::bond::Bond;
@@ -15,7 +16,6 @@ use super::collateral::{InstrumentCollateral, ReserveInterestDestination};
 use super::enums::{AssetType, DealType};
 use super::npl::LiquidationSpec;
 use super::tranches::TrancheStructure;
-use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::types::CreditRating;
 
 /// Individual asset held in a structured-credit collateral pool.
@@ -373,18 +373,6 @@ impl PoolAsset {
         self
     }
 
-    /// Set industry classification
-    pub fn with_industry(mut self, industry: impl Into<String>) -> Self {
-        self.industry = Some(industry.into());
-        self
-    }
-
-    /// Set obligor identifier
-    pub fn with_obligor_id(mut self, obligor_id: impl Into<String>) -> Self {
-        self.obligor_id = Some(obligor_id.into());
-        self
-    }
-
     /// Get spread component in basis points
     ///
     /// Returns the explicit spread if available, otherwise derives from rate.
@@ -407,18 +395,6 @@ impl PoolAsset {
             self.maturity,
             finstack_quant_core::dates::DayCountContext::default(),
         )
-    }
-
-    /// Record a default and its outstanding recovery claim, payable after the deal recovery lag.
-    /// Repeating this operation replaces the current claim; it does not add another claim.
-    ///
-    /// # Arguments
-    /// * `recovery_amount` - Unreceived recovery cash in the asset currency, from zero to defaulted par.
-    /// * `default_date` - Economic default date used to schedule the recovery payment.
-    pub fn default_with_recovery(&mut self, recovery_amount: Money, default_date: Date) {
-        self.defaulted = true;
-        self.recovery_amount = Some(recovery_amount);
-        self.default_date = Some(default_date);
     }
 }
 
@@ -563,10 +539,9 @@ pub struct AssetPool {
     pub cumulative_prepayments: Money,
     /// Cumulative scheduled amortization (level-pay principal for amortizing assets).
     ///
-    /// Part of the original-balance denominator in
-    /// [`current_loss_percentage`](super::StructuredCredit::current_loss_percentage),
-    /// so it must be stated: omitting it understates the denominator and
-    /// overstates the reported loss rate.
+    /// Part of the reconstructed original balance
+    /// ([`AssetPool::original_balance_or_reconstructed`]) when no explicit
+    /// `original_balance` is supplied.
     pub cumulative_scheduled_amortization: Money,
 
     /// Original (cut-off) pool balance the deal's cumulative-loss triggers,
@@ -763,6 +738,41 @@ impl AssetPool {
             reserve_target: None,
             reserve_interest_destination: ReserveInterestDestination::Waterfall,
         }
+    }
+
+    /// Configure the pool's reserve account, returning the updated pool.
+    ///
+    /// Replaces all four reserve fields at once, so a field left out falls back
+    /// to its default rather than keeping a previous value.
+    ///
+    /// # Arguments
+    ///
+    /// * `reserve_account` - Opening reserve balance, in the pool currency.
+    /// * `reserve_account_rate` - Annual simple interest rate earned on the
+    ///   reserve, as a decimal (`0.03` = 3%), ACT/360 on the opening balance per
+    ///   legal period.
+    /// * `reserve_target` - Target balance that revolver repayments replenish
+    ///   toward before counting as principal collections; `None` disables
+    ///   replenishment from repayments.
+    /// * `reserve_interest_destination` - Where reserve interest is paid;
+    ///   `None` selects [`ReserveInterestDestination::default`] (the waterfall).
+    ///
+    /// # Returns
+    ///
+    /// The pool with the reserve fields set; every other field is unchanged.
+    #[must_use]
+    pub fn with_reserve(
+        mut self,
+        reserve_account: Money,
+        reserve_account_rate: f64,
+        reserve_target: Option<Money>,
+        reserve_interest_destination: Option<ReserveInterestDestination>,
+    ) -> Self {
+        self.reserve_account = reserve_account;
+        self.reserve_account_rate = reserve_account_rate;
+        self.reserve_target = reserve_target;
+        self.reserve_interest_destination = reserve_interest_destination.unwrap_or_default();
+        self
     }
 
     /// Add asset from existing bond

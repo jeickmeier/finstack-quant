@@ -99,6 +99,8 @@ pub mod asian_option;
 pub mod barrier_option;
 /// Callable range accrual module - Range accrual with Bermudan call.
 pub mod callable_range_accrual;
+/// Shared Hull-White 1F Monte Carlo pricer for the structured rate notes.
+mod hw1f_note;
 /// Lookback option module - Path-dependent lookback options.
 pub mod lookback_option;
 /// Range accrual module.
@@ -107,6 +109,3 @@ pub mod range_accrual;
 pub mod snowball;
 /// TARN (Target Redemption Note) module.
 pub mod tarn;
-
-mod family;
-pub use family::EXOTICS;

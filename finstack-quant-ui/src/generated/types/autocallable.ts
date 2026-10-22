@@ -346,7 +346,10 @@ export interface D_090A2E8Da3E1C2418317 {
    */
   cap_level: number;
   /**
-   * Coupon barriers corresponding to observation dates.
+   * Coupon barriers as ratios of initial spot.
+   *
+   * Coupon eligibility is independent of the autocall barrier. Each entry
+   * corresponds to the observation date at the same index.
    */
   coupon_barriers: number[];
   /**
@@ -417,7 +420,10 @@ export interface D_090A2E8Da3E1C2418317 {
   /**
    * Memory ("Phoenix") coupon feature.
    *
-   * Missed coupons accrue until a later coupon barrier is met.
+   * When enabled, a coupon whose coupon barrier is missed accrues until a
+   * later observation meets its coupon barrier. The current and all accrued
+   * coupons are then paid on that observation's payment date. Coupon
+   * eligibility remains independent of autocall eligibility.
    */
   memory_coupons?: boolean;
   metric_pricing_overrides?: MetricPricingOverrides;
@@ -440,11 +446,16 @@ export interface D_090A2E8Da3E1C2418317 {
    */
   past_fixings?: [Date1, number][];
   /**
-   * Explicit path model selection; required to acknowledge model risk.
+   * Explicit path model selection.
+   *
+   * `AtmTermGbm` is an ATM-term-structure approximation and does not model
+   * equity strike skew; callers must opt into that limitation.
    */
   path_model: "atm_term_gbm";
   /**
-   * Contractual payment dates corresponding to observation dates.
+   * Contractual payment dates for coupons and early redemption.
+   *
+   * Each entry corresponds to `observation_dates` at the same index.
    */
   payment_dates: Date1[];
   scenario_pricing_overrides?: ScenarioPricingOverrides;

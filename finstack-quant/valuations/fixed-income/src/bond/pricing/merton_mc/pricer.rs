@@ -1,0 +1,578 @@
+use super::calibration::{calibrate_parameter_to_market, MertonMcCalibrationOutput};
+use super::MertonMcResult;
+use crate::bond::pricing::time_basis::{
+    bond_cashflow_dfs_on_model_grid, bond_model_schedule, implied_flat_discount_rate_from_curve,
+    BondModelSchedule,
+};
+use crate::bond::Bond;
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::money::Money;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::MertonMcConfig;
+use finstack_quant_valuations_core::pricer::{
+    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
+};
+use finstack_quant_valuations_core::results::ValuationResult;
+use indexmap::IndexMap;
+
+// Pricer Registry Adapter
+
+/// Coupon grid and flat discount rate for Merton MC, on consistent time bases.
+struct MertonMcTimeBasis {
+    schedule: BondModelSchedule,
+    discount_rate: f64,
+}
+
+fn merton_mc_time_basis(
+    bond: &Bond,
+    disc: &DiscountCurve,
+    as_of: finstack_quant_core::dates::Date,
+    ctx: &PricingErrorContext,
+) -> std::result::Result<MertonMcTimeBasis, PricingError> {
+    let schedule = bond_model_schedule(bond, as_of)
+        .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
+    let discount_rate = implied_flat_discount_rate_from_curve(
+        disc,
+        as_of,
+        schedule.horizon,
+        schedule.maturity_years,
+    )
+    .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
+    Ok(MertonMcTimeBasis {
+        schedule,
+        discount_rate,
+    })
+}
+
+fn populate_cashflow_dfs_if_needed(
+    config: &mut MertonMcConfig,
+    disc: &DiscountCurve,
+    as_of: finstack_quant_core::dates::Date,
+    schedule: &BondModelSchedule,
+    ctx: &PricingErrorContext,
+) -> std::result::Result<(), PricingError> {
+    if config.cashflow_dfs.is_none() && schedule.maturity_years > 0.0 {
+        let dfs = bond_cashflow_dfs_on_model_grid(disc, as_of, schedule, config.steps_per_year)
+            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
+        config.cashflow_dfs = Some(dfs);
+    }
+    Ok(())
+}
+
+/// Merton structural Monte Carlo pricer for (PIK) bonds.
+///
+/// Registered under `PricerKey::new(InstrumentType::Bond, ModelKey::MertonMc)`;
+/// see the module-level docs for configuration details and metric outputs.
+pub(crate) struct SimpleBondMertonMcPricer;
+
+impl SimpleBondMertonMcPricer {
+    /// Validate, optionally calibrate, and run the Merton MC simulation.
+    ///
+    /// Returns the simulation result and, when the bond's Merton MC config
+    /// requests calibration, the calibration output whose Merton parameters
+    /// the simulation used.
+    fn run(
+        bond: &Bond,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        ctx: &PricingErrorContext,
+    ) -> std::result::Result<(MertonMcResult, Option<MertonMcCalibrationOutput>), PricingError>
+    {
+        bond.validate_merton_mc_embedded_rights()
+            .map_err(|error| PricingError::from_core(error, ctx.clone()))?;
+
+        let base_config = &bond
+            .instrument_pricing_overrides
+            .model_config
+            .merton_mc_config
+            .as_ref()
+            .ok_or_else(|| {
+                PricingError::invalid_input_with_context(
+                    "MertonMc pricer requires instrument_pricing_overrides.model_config.merton_mc_config",
+                    ctx.clone(),
+                )
+            })?
+            .0;
+
+        let disc = market
+            .get_discount(bond.discount_curve_id.as_str())
+            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
+
+        let MertonMcTimeBasis {
+            schedule,
+            discount_rate,
+        } = merton_mc_time_basis(bond, &disc, as_of, ctx)?;
+
+        // ---- Calibration pass (opt-in) ---------------------------------
+        let mut effective_config = base_config.clone();
+        let calibration = if let Some(ref cal_spec) = base_config.calibration {
+            let cal_output = calibrate_parameter_to_market(
+                bond,
+                market,
+                as_of,
+                discount_rate,
+                base_config,
+                cal_spec,
+            )
+            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
+            effective_config.merton = cal_output.calibrated_merton.clone();
+            effective_config.calibration = None;
+            Some(cal_output)
+        } else {
+            None
+        };
+
+        // Build term-structure discount factors from the curve for cashflow
+        // discounting. The flat `discount_rate` is still used for the Merton
+        // risk-neutral drift.
+        populate_cashflow_dfs_if_needed(&mut effective_config, &disc, as_of, &schedule, ctx)?;
+
+        // ---- Full pricing pass -----------------------------------------
+        let mc_result = bond
+            .price_merton_mc(&effective_config, discount_rate, as_of)
+            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
+        Ok((mc_result, calibration))
+    }
+
+    fn error_context(bond: &Bond) -> PricingErrorContext {
+        PricingErrorContext::new()
+            .instrument_id(bond.id())
+            .instrument_type(InstrumentType::Bond)
+            .model(ModelKey::MertonMc)
+            .curve_id(bond.discount_curve_id.as_str())
+    }
+}
+
+impl Pricer for SimpleBondMertonMcPricer {
+    fn key(&self) -> PricerKey {
+        PricerKey::new(InstrumentType::Bond, ModelKey::MertonMc)
+    }
+
+    fn price_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> std::result::Result<ValuationResult, PricingError> {
+        use finstack_quant_valuations_core::metrics::MetricId;
+
+        let bond = expect_inst::<Bond>(instrument, InstrumentType::Bond)?;
+        let ctx = Self::error_context(bond);
+        let (mc_result, calibration) = Self::run(bond, market, as_of, &ctx)?;
+
+        let mc_dirty_pct = mc_result.dirty_price_pct;
+        let pv_amount = mc_dirty_pct / 100.0 * bond.notional.amount();
+        let pv = Money::new(pv_amount, bond.notional.currency())
+            .map_err(|error| PricingError::from_core(error, ctx.clone()))?;
+
+        let mut measures = IndexMap::new();
+        measures.insert(MetricId::ExpectedLoss, mc_result.expected_loss);
+        measures.insert(
+            MetricId::custom("default_rate"),
+            mc_result.path_statistics.default_rate,
+        );
+        measures.insert(
+            MetricId::custom("avg_terminal_notional"),
+            mc_result.path_statistics.avg_terminal_notional,
+        );
+        measures.insert(
+            MetricId::custom("pik_fraction"),
+            mc_result.average_pik_fraction,
+        );
+        measures.insert(MetricId::custom("mc_stderr"), mc_result.standard_error);
+        measures.insert(
+            MetricId::custom("unexpected_loss"),
+            mc_result.unexpected_loss,
+        );
+        measures.insert(
+            MetricId::custom("expected_shortfall_95"),
+            mc_result.expected_shortfall_95,
+        );
+
+        if let Some(cal_output) = calibration {
+            measures.insert(
+                MetricId::custom("calibrated_debt_barrier"),
+                cal_output.calibrated_merton.debt_barrier(),
+            );
+            measures.insert(
+                MetricId::custom("calibrated_asset_vol"),
+                cal_output.calibrated_merton.asset_vol(),
+            );
+            measures.insert(
+                MetricId::custom("calibration_residual_pv"),
+                cal_output.residual_pv,
+            );
+            measures.insert(
+                MetricId::custom("calibration_iterations"),
+                cal_output.iterations as f64,
+            );
+            measures.insert(
+                MetricId::custom("calibration_target_pv"),
+                cal_output.target_pv,
+            );
+            measures.insert(
+                MetricId::custom("calibration_solved_parameter"),
+                cal_output.solved_parameter,
+            );
+        }
+
+        let result = ValuationResult::stamped(bond.id(), as_of, pv);
+        Ok(result.with_measures(measures))
+    }
+
+    fn price_raw_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> std::result::Result<f64, PricingError> {
+        let bond = expect_inst::<Bond>(instrument, InstrumentType::Bond)?;
+        let (mc_result, _) = Self::run(bond, market, as_of, &Self::error_context(bond))?;
+        Ok(mc_result.dirty_price_pct / 100.0 * bond.notional.amount())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bond::{CallPut, CallPutSchedule, ReturnFloorSpec};
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::StubKind;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::types::Rate;
+    use finstack_quant_models::credit::MertonModel;
+    use finstack_quant_valuations_core::instruments::PricingOptions;
+    use finstack_quant_valuations_core::pricer::PricingError;
+    use time::macros::date;
+
+    fn test_bond_and_config() -> (Bond, MertonMcConfig) {
+        let config = MertonMcConfig::new(
+            MertonModel::new(200.0, 0.20, 100.0, 0.03).expect("valid Merton model"),
+            0.40,
+        )
+        .expect("valid Merton MC config")
+        .steps_per_year(4);
+        let mut bond = Bond::fixed(
+            "MERTON_OPTION_GUARD",
+            Money::from((100_i64, Currency::USD)),
+            Rate::from_decimal(0.05).expect("valid rate fixture"),
+            date!(2024 - 01 - 15),
+            date!(2029 - 01 - 15),
+            StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("valid bond");
+        bond.instrument_pricing_overrides = bond
+            .instrument_pricing_overrides
+            .clone()
+            .with_merton_mc_config(config.clone())
+            .with_mc_paths(32)
+            .with_mc_antithetic(false);
+        (bond, config)
+    }
+
+    /// The Merton pricer seeds from `model_config.mc_seed_scenario` through
+    /// `derive_seed(instrument_id, label)` instead of a fixed registry seed.
+    /// Reference: the same estimator run with the former fixed seed (42) must
+    /// agree within four combined standard errors, and a different label must
+    /// select different random streams.
+    #[test]
+    fn merton_seed_comes_from_model_config_scenario() {
+        let (mut bond, config) = test_bond_and_config();
+        bond.instrument_pricing_overrides.model_config.mc_paths = Some(2_000);
+        let as_of = date!(2025 - 01 - 15);
+
+        let base = bond.price_merton_mc(&config, 0.03, as_of).expect("base");
+        let mut relabelled = bond.clone();
+        relabelled
+            .instrument_pricing_overrides
+            .model_config
+            .mc_seed_scenario = Some("alt".to_string());
+        let alt = relabelled
+            .price_merton_mc(&config, 0.03, as_of)
+            .expect("relabelled");
+        assert_ne!(
+            base.clean_price_pct.to_bits(),
+            alt.clean_price_pct.to_bits(),
+            "mc_seed_scenario must select the random streams"
+        );
+
+        let fixed_seed = bond
+            .price_merton_mc_with_run(
+                &config,
+                &super::super::MertonMcRun {
+                    num_paths: 2_000,
+                    seed: 42,
+                    antithetic: false,
+                },
+                0.03,
+                as_of,
+            )
+            .expect("fixed seed");
+        assert_eq!(base.num_paths, 2_000);
+        let tol = 4.0 * base.standard_error.hypot(fixed_seed.standard_error);
+        assert!(
+            (base.clean_price_pct - fixed_seed.clean_price_pct).abs() <= tol,
+            "derived-seed price {} vs fixed-seed price {} exceeds 4 standard errors {tol}",
+            base.clean_price_pct,
+            fixed_seed.clean_price_pct
+        );
+    }
+
+    fn test_market() -> MarketContext {
+        MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(date!(2025 - 01 - 15))
+                .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
+                .build()
+                .expect("valid discount curve"),
+        )
+    }
+
+    /// Merton config with default risk switched off: asset value far above a
+    /// tiny barrier and negligible volatility, so every path survives.
+    fn default_free_config() -> MertonMcConfig {
+        MertonMcConfig::new(
+            MertonModel::new(1.0e9, 1e-8, 1.0, 0.04).expect("valid Merton model"),
+            0.40,
+        )
+        .expect("valid Merton MC config")
+        .steps_per_year(12)
+    }
+
+    fn flat_act365_market(base: finstack_quant_core::dates::Date, rate: f64) -> MarketContext {
+        MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(base)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .knots([(0.0, 1.0), (30.0, (-rate * 30.0).exp())])
+                .build()
+                .expect("valid discount curve"),
+        )
+    }
+
+    /// W1.3: a seasoned bond at zero default risk must price at the
+    /// discounted DIRTY PV — the full next coupon is paid, not only the
+    /// fraction accruing after `as_of`.
+    ///
+    /// Hand calculation: 5% 30/360 semi-annual bond paying 2.5 per 100 on
+    /// Jan 14 / Jul 14 (all weekdays 2025–2028), maturity 2028-07-14,
+    /// valued 2025-04-14 (half-way through the Jan–Jul 2025 period) on a
+    /// flat 4% continuously compounded ACT/365F curve:
+    /// `PV = Σ 2.5·e^{-0.04·d_i/365} + 100·e^{-0.04·d_N/365}`.
+    #[test]
+    fn seasoned_bond_at_zero_default_risk_prices_at_dirty_pv() {
+        let as_of = date!(2025 - 04 - 14);
+        let r = 0.04;
+        let market = flat_act365_market(as_of, r);
+        let mut bond = Bond::fixed(
+            "MERTON_SEASONED",
+            Money::from((100_i64, Currency::USD)),
+            Rate::from_decimal(0.05).expect("valid rate"),
+            date!(2024 - 07 - 14),
+            date!(2028 - 07 - 14),
+            StubKind::None,
+            "USD-OIS",
+        )
+        .expect("valid bond");
+        bond.instrument_pricing_overrides = bond
+            .instrument_pricing_overrides
+            .clone()
+            .with_merton_mc_config(default_free_config())
+            .with_mc_paths(8)
+            .with_mc_antithetic(false);
+
+        let coupon_dates = [
+            date!(2025 - 07 - 14),
+            date!(2026 - 01 - 14),
+            date!(2026 - 07 - 14),
+            date!(2027 - 01 - 14),
+            date!(2027 - 07 - 14),
+            date!(2028 - 01 - 14),
+            date!(2028 - 07 - 14),
+        ];
+        let df = |d: finstack_quant_core::dates::Date| {
+            (-r * (d - as_of).whole_days() as f64 / 365.0).exp()
+        };
+        let dirty_pv: f64 = coupon_dates.iter().map(|&d| 2.5 * df(d)).sum::<f64>()
+            + 100.0 * df(date!(2028 - 07 - 14));
+        // Accrued at 2025-04-14 under 30/360: 90/180 of a 2.5 coupon.
+        let accrued = 1.25;
+
+        let pv = crate::FIXED_INCOME
+            .pricers()
+            .price_with_metrics(
+                &bond,
+                ModelKey::MertonMc,
+                &market,
+                as_of,
+                &[],
+                PricingOptions::default(),
+            )
+            .expect("Merton pricing of a seasoned bond")
+            .value
+            .amount();
+        assert!(
+            (pv - dirty_pv).abs() < 1e-6,
+            "Merton PV {pv} must equal hand dirty PV {dirty_pv}"
+        );
+        // The old engine paid only the post-as_of fraction of the next coupon.
+        assert!((pv - (dirty_pv - accrued * df(coupon_dates[0]))).abs() > 1.0);
+
+        let direct = bond
+            .price_merton_mc(&default_free_config(), r, as_of)
+            .expect("direct Merton pricing");
+        assert!(
+            (direct.dirty_price_pct - direct.clean_price_pct - accrued).abs() < 1e-9,
+            "dirty − clean must equal accrued: {} − {}",
+            direct.dirty_price_pct,
+            direct.clean_price_pct
+        );
+    }
+
+    /// W1.3: ACT/ACT (ICMA) bonds need the coupon frequency in the day-count
+    /// context; the Merton model clock used to pass the default context and
+    /// fail with `MissingFrequencyForActActIsma`.
+    #[test]
+    fn uk_gilt_merton_price_succeeds_and_matches_discount_pv_without_default_risk() {
+        let as_of = date!(2025 - 04 - 14);
+        let market = flat_act365_market(as_of, 0.04);
+        let mut gilt = Bond::with_convention(
+            "UKT_MERTON",
+            Money::from((100_i64, Currency::GBP)),
+            Rate::from_decimal(0.04).expect("valid rate"),
+            date!(2024 - 03 - 07),
+            date!(2030 - 03 - 07),
+            finstack_quant_valuations_core::instruments::BondConvention::UkGilt,
+            "USD-OIS",
+        )
+        .expect("valid gilt");
+        gilt.instrument_pricing_overrides = gilt
+            .instrument_pricing_overrides
+            .clone()
+            .with_merton_mc_config(default_free_config())
+            .with_mc_paths(8)
+            .with_mc_antithetic(false);
+
+        let merton = crate::FIXED_INCOME
+            .pricers()
+            .price_with_metrics(
+                &gilt,
+                ModelKey::MertonMc,
+                &market,
+                as_of,
+                &[],
+                PricingOptions::default(),
+            )
+            .expect("ICMA gilt must price under Merton MC")
+            .value
+            .amount();
+        let discount = crate::FIXED_INCOME
+            .pricers()
+            .price_with_metrics(
+                &gilt,
+                ModelKey::Discounting,
+                &market,
+                as_of,
+                &[],
+                PricingOptions::default(),
+            )
+            .expect("discount PV")
+            .value
+            .amount();
+        assert!(
+            (merton - discount).abs() < 1e-6,
+            "default-free Merton {merton} vs discount {discount}"
+        );
+    }
+
+    fn assert_option_guidance(message: &str) {
+        assert!(message.contains("does not support embedded call, put, or return-floor rights"));
+        assert!(message.contains("'tree'"));
+        assert!(message.contains("'rates_credit'"));
+    }
+
+    #[test]
+    fn public_and_registered_merton_paths_reject_embedded_rights() {
+        let as_of = date!(2025 - 01 - 15);
+        let market = test_market();
+        let (straight, config) = test_bond_and_config();
+
+        let direct = straight
+            .price_merton_mc(&config, 0.03, as_of)
+            .expect("straight Merton pricing remains supported");
+        assert!(direct.clean_price_pct.is_finite());
+        let registered_straight = crate::FIXED_INCOME
+            .pricers()
+            .price_with_metrics(
+                &straight,
+                ModelKey::MertonMc,
+                &market,
+                as_of,
+                &[],
+                PricingOptions::default(),
+            )
+            .expect("registered straight Merton pricing remains supported");
+        assert!(registered_straight.value.amount().is_finite());
+
+        let mut callable = straight.clone();
+        callable.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start: date!(2027 - 01 - 15),
+                end: date!(2027 - 01 - 15),
+                price_pct_of_par: 100.0,
+                make_whole: None,
+            }],
+            puts: Vec::new(),
+        });
+        let direct_error = callable
+            .price_merton_mc(&config, 0.03, as_of)
+            .expect_err("typed Merton pricing must reject callable bonds");
+        assert_option_guidance(&direct_error.to_string());
+
+        let money_error = crate::FIXED_INCOME
+            .pricers()
+            .price_with_metrics(
+                &callable,
+                ModelKey::MertonMc,
+                &market,
+                as_of,
+                &[],
+                PricingOptions::default(),
+            )
+            .expect_err("registered Merton pricing must reject callable bonds");
+        assert!(matches!(money_error, PricingError::InvalidInput { .. }));
+        assert_option_guidance(&money_error.to_string());
+
+        let mut puttable = straight.clone();
+        puttable.call_put = Some(CallPutSchedule {
+            calls: Vec::new(),
+            puts: vec![CallPut {
+                start: date!(2027 - 01 - 15),
+                end: date!(2027 - 01 - 15),
+                price_pct_of_par: 110.0,
+                make_whole: None,
+            }],
+        });
+        let put_error = puttable
+            .price_merton_mc(&config, 0.03, as_of)
+            .expect_err("typed Merton pricing must reject puttable bonds");
+        assert_option_guidance(&put_error.to_string());
+
+        let mut floored = straight;
+        floored.return_floor = Some(ReturnFloorSpec::moic(1.10));
+        let floor_error = floored
+            .price_merton_mc(&config, 0.03, as_of)
+            .expect_err("typed Merton pricing must reject return floors");
+        assert_option_guidance(&floor_error.to_string());
+
+        let raw_error = crate::FIXED_INCOME
+            .pricers()
+            .price_raw(&floored, ModelKey::MertonMc, &market, as_of)
+            .expect_err("registered raw Merton pricing must reject return floors");
+        assert!(matches!(raw_error, PricingError::InvalidInput { .. }));
+        assert_option_guidance(&raw_error.to_string());
+    }
+}

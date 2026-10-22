@@ -144,11 +144,11 @@ impl Instrument for ProbedInstrument {
                 "evaluation executor did not attach its request config".to_string(),
             )
         })?;
-        Ok(ValuationResult::stamped_with_config(
+        Ok(ValuationResult::stamped_with_meta(
             self.id(),
             as_of,
             Money::new(self.value, Currency::USD).expect("valid money fixture"),
-            config,
+            finstack_quant_core::config::results_meta(config),
         ))
     }
 }

@@ -25,7 +25,7 @@
 //! the fixed-income family (bond cashflow specs, loan terms, the revolving
 //! credit Monte Carlo engine, the agency pass-through pool model) and on the
 //! rates family (the deal-level interest-rate swap hedge), and share one
-//! registration unit, [`structured_credit::STRUCTURED_CREDIT`]:
+//! registration unit, [`STRUCTURED_CREDIT`]:
 //!
 //! - [`structured_credit`]: ABS, RMBS, CMBS and CLO deals as one instrument —
 //!   collateral pool, tranche capital structure, payment waterfall with
@@ -52,14 +52,15 @@
 //! assert_ne!(deal.id(), cmo.id());
 //! ```
 
-extern crate self as finstack_quant_valuations_structured_credit;
-
 /// Asset-backed facility module - warehouse lines against collateral pools.
 pub mod asset_backed_facility;
 /// CMO module - Collateralized Mortgage Obligations.
 pub mod cmo;
 /// Structured credit module - ABS, RMBS, CMBS, CLO.
 pub mod structured_credit;
+
+mod family;
+pub use family::STRUCTURED_CREDIT;
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

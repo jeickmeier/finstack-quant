@@ -227,56 +227,6 @@ fn test_tranche_thickness() {
     assert_eq!(thickness, 5.0);
 }
 
-#[test]
-fn test_tranche_is_first_loss() {
-    // Arrange
-    let equity = Tranche::new(
-        "EQUITY",
-        0.0,
-        10.0,
-        TrancheSeniority::Equity,
-        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        RateSpec::Fixed { rate: 0.15 },
-        maturity_date(),
-    )
-    .unwrap();
-
-    let mezz = Tranche::new(
-        "MEZZ",
-        10.0,
-        15.0,
-        TrancheSeniority::Mezzanine,
-        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
-        RateSpec::Fixed { rate: 0.08 },
-        maturity_date(),
-    )
-    .unwrap();
-
-    // Assert
-    assert!(equity.is_first_loss());
-    assert!(!mezz.is_first_loss());
-}
-
-#[test]
-fn test_tranche_is_impaired() {
-    // Arrange
-    let tranche = Tranche::new(
-        "MEZZ",
-        10.0,
-        15.0,
-        TrancheSeniority::Mezzanine,
-        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
-        RateSpec::Fixed { rate: 0.08 },
-        maturity_date(),
-    )
-    .unwrap();
-
-    // Act & Assert
-    assert!(!tranche.is_impaired(5.0)); // Loss below attachment
-    assert!(tranche.is_impaired(12.0)); // Loss in tranche
-    assert!(tranche.is_impaired(20.0)); // Loss above detachment
-}
-
 // Loss Allocation Tests
 
 #[test]
@@ -340,29 +290,6 @@ fn test_tranche_loss_allocation_full_loss() {
 
     // Assert: Full tranche wiped out
     assert_eq!(loss.amount(), 50_000_000.0);
-}
-
-#[test]
-fn test_tranche_current_balance_after_losses() {
-    // Arrange
-    let tranche = Tranche::new(
-        "MEZZ",
-        10.0,
-        15.0,
-        TrancheSeniority::Mezzanine,
-        Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"),
-        RateSpec::Fixed { rate: 0.08 },
-        maturity_date(),
-    )
-    .unwrap();
-
-    // Act: 12% loss
-    let balance = tranche
-        .current_balance_after_losses(12.0)
-        .expect("valid balance");
-
-    // Assert: Original $50M - $20M loss = $30M
-    assert_eq!(balance.amount(), 30_000_000.0);
 }
 
 // TrancheStructure Tests
@@ -482,23 +409,6 @@ fn test_tranche_structure_validates_reaches_100() {
 }
 
 #[test]
-fn test_tranche_structure_by_seniority() {
-    // Arrange
-    let equity = create_tranche("EQUITY", 0.0, 10.0, TrancheSeniority::Equity);
-    let mezz = create_tranche("MEZZ", 10.0, 15.0, TrancheSeniority::Mezzanine);
-    let senior = create_tranche("SENIOR", 15.0, 100.0, TrancheSeniority::Senior);
-
-    let structure = TrancheStructure::new(vec![equity, mezz, senior]).unwrap();
-
-    // Act
-    let senior_tranches = structure.by_seniority(TrancheSeniority::Senior);
-
-    // Assert
-    assert_eq!(senior_tranches.len(), 1);
-    assert_eq!(senior_tranches[0].id.as_str(), "SENIOR");
-}
-
-#[test]
 fn test_tranche_structure_senior_to() {
     // Arrange
     let equity = create_tranche("EQUITY", 0.0, 10.0, TrancheSeniority::Equity);
@@ -538,37 +448,15 @@ fn test_tranche_structure_senior_balance() {
     assert_eq!(senior_bal.amount(), 85_000_000.0);
 }
 
-#[test]
-fn test_tranche_structure_subordination_amount() {
-    // Arrange
-    let equity =
-        create_tranche_with_balance("EQUITY", 0.0, 10.0, TrancheSeniority::Equity, 10_000_000.0);
-    let mezz =
-        create_tranche_with_balance("MEZZ", 10.0, 15.0, TrancheSeniority::Mezzanine, 5_000_000.0);
-    let senior = create_tranche_with_balance(
-        "SENIOR",
-        15.0,
-        100.0,
-        TrancheSeniority::Senior,
-        85_000_000.0,
-    );
-
-    let structure = TrancheStructure::new(vec![equity, mezz, senior]).unwrap();
-
-    // Act
-    let sub_amount = structure.subordination_amount("SENIOR");
-
-    // Assert: Equity + Mezz = $15M
-    assert_eq!(sub_amount.amount(), 15_000_000.0);
-}
-
 // Coverage Trigger Tests
 
 #[test]
 fn test_coverage_trigger_creation() {
     // Arrange & Act
-    let trigger =
-        CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow).with_cure_level(1.25);
+    let trigger = CoverageTrigger {
+        cure_level: Some(1.25),
+        ..CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow)
+    };
 
     // Assert
     assert_eq!(trigger.trigger_level, 1.20);
@@ -589,8 +477,10 @@ fn test_coverage_trigger_is_breached() {
 #[test]
 fn test_coverage_trigger_is_cured() {
     // Arrange
-    let trigger =
-        CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow).with_cure_level(1.25);
+    let trigger = CoverageTrigger {
+        cure_level: Some(1.25),
+        ..CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow)
+    };
 
     // Act & Assert
     assert!(!trigger.is_cured(1.22)); // Above trigger but below cure

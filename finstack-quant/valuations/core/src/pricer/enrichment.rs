@@ -43,6 +43,9 @@ pub(super) fn enrich(
         mut base_result,
     } = request;
     let err_ctx = PricingErrorContext::from_instrument(instrument).model(model);
+    // The pricer's seed serves this request's metric evaluation only; the
+    // returned result does not carry it.
+    let pricer_seed = base_result.metric_seed.take();
 
     let leg_options = crate::instruments::PricingOptions {
         config: cfg.clone(),
@@ -88,6 +91,7 @@ pub(super) fn enrich(
                     pricer_registry,
                 ),
                 pricer_measures: base_result.measures.clone(),
+                pricer_seed: pricer_seed.clone(),
             },
         )
         .map_err(|error| PricingError::from_core(error, err_ctx.clone()))?;
@@ -122,6 +126,9 @@ pub(super) fn enrich(
                     Arc::clone(&pricer_registry),
                 ),
                 pricer_measures: base_result.measures.clone(),
+                // The seed belongs to the priced instrument, not to its
+                // metrics equivalent.
+                pricer_seed: None,
             },
         )
         .map_err(|error| PricingError::from_core(error, err_ctx.clone()))?
@@ -147,6 +154,7 @@ pub(super) fn enrich(
                     pricer_registry,
                 ),
                 pricer_measures: base_result.measures.clone(),
+                pricer_seed: pricer_seed.clone(),
             },
         )
         .map_err(|error| PricingError::from_core(error, err_ctx.clone()))?;

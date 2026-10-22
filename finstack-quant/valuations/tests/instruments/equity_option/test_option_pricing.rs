@@ -17,7 +17,7 @@ use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 #[allow(unused_imports)]
-use finstack_quant_valuations_test_support::test_helpers::tolerances;
+use finstack_quant_valuations_test_support::tolerances;
 use time::Month;
 
 fn create_test_call() -> EquityOption {

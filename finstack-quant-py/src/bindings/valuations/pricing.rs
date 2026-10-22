@@ -6,8 +6,11 @@
 
 use super::PyValuationResult;
 use crate::bindings::extract::{extract_instrument, extract_market};
-use crate::bindings::module_utils::{py_to_json_string, py_to_serde};
+use crate::bindings::module_utils::{
+    opt_spec_from_py, py_to_json_string, py_to_serde, spec_from_py,
+};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, serde_to_py};
+use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, display_to_py, value_error};
 use finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope;
 use finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides;
@@ -70,18 +73,6 @@ pub(crate) struct PyMetricPricingOverrides {
     pub(crate) inner: MetricPricingOverrides,
 }
 
-fn opt_serde_from_py<T: serde::de::DeserializeOwned + Send>(
-    py: Python<'_>,
-    obj: Option<&Bound<'_, PyAny>>,
-    label: &str,
-) -> PyResult<Option<T>> {
-    match obj {
-        None => Ok(None),
-        Some(value) if value.is_none() => Ok(None),
-        Some(value) => py_to_serde(py, value, label).map(Some),
-    }
-}
-
 #[pymethods]
 impl PyMetricPricingOverrides {
     #[new]
@@ -105,9 +96,9 @@ impl PyMetricPricingOverrides {
             _ => None,
         };
         let inner = MetricPricingOverrides {
-            bump_config: opt_serde_from_py(py, bump_config, "bump_config")?.unwrap_or_default(),
+            bump_config: opt_spec_from_py(py, bump_config, "bump_config")?.unwrap_or_default(),
             theta_period,
-            breakeven_config: opt_serde_from_py(py, breakeven_config, "breakeven_config")?,
+            breakeven_config: opt_spec_from_py(py, breakeven_config, "breakeven_config")?,
             bond_risk_basis: bond_risk_basis
                 .map(|name| {
                     serde_json::from_value(serde_json::Value::String(name.to_string())).map_err(
@@ -130,7 +121,7 @@ impl PyMetricPricingOverrides {
                     )
                 })
                 .transpose()?,
-            var_config: opt_serde_from_py(py, var_config, "var_config")?,
+            var_config: opt_spec_from_py(py, var_config, "var_config")?,
         };
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
@@ -140,14 +131,6 @@ impl PyMetricPricingOverrides {
     #[getter]
     fn bump_config<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.bump_config)
-    }
-
-    /// Theta / carry horizon as a ``Tenor``, or ``None`` for the one-day default.
-    #[getter]
-    fn theta_period(&self) -> Option<crate::bindings::core::dates::tenor::PyTenor> {
-        self.inner
-            .theta_period
-            .map(crate::bindings::core::dates::tenor::PyTenor::from_inner)
     }
 
     /// Breakeven configuration dict, or ``None``.
@@ -265,6 +248,12 @@ impl PyMetricPricingOverrides {
     }
 }
 
+crate::bindings::macros::py_getters!(PyMetricPricingOverrides |s| {
+    /// Theta / carry horizon as a ``Tenor``, or ``None`` for the one-day default.
+    theta_period -> Option<crate::bindings::core::dates::tenor::PyTenor> =
+        s.inner.theta_period.map(crate::bindings::core::dates::tenor::PyTenor::from_inner);
+});
+
 /// Historical market shifts for historical VaR / expected shortfall.
 ///
 /// Typed twin of the ``market_history`` JSON accepted by ``price_instrument``.
@@ -358,12 +347,6 @@ impl PyMarketHistory {
         crate::bindings::date_utils::date_to_py(py, self.inner.base_date)
     }
 
-    /// Historical window length in calendar days.
-    #[getter]
-    fn window_days(&self) -> u32 {
-        self.inner.window_days
-    }
-
     /// Scenarios as a list of dicts in chronological order.
     #[getter]
     fn scenarios<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -430,6 +413,11 @@ impl PyMarketHistory {
     }
 }
 
+crate::bindings::macros::py_getters!(PyMarketHistory |s| {
+    /// Historical window length in calendar days.
+    window_days -> u32 = s.inner.window_days;
+});
+
 /// Coerce ``MetricPricingOverrides | dict | str | None`` into the JSON the
 /// Rust pricing entry points accept.
 ///
@@ -476,203 +464,8 @@ pub(crate) fn metric_pricing_overrides_from_py(
     if let Ok(typed) = obj.cast::<PyMetricPricingOverrides>() {
         return Ok(typed.borrow().inner.clone());
     }
-    super::instruments::spec_from_py(py, obj, "metric_pricing_overrides")
+    spec_from_py(py, obj, "metric_pricing_overrides")
 }
-
-/// Bind the three Rust `*_pricing_overrides` fields of a typed instrument:
-/// serde-dict getters on the instrument and consuming setters on its
-/// `FinancialBuilder`.
-///
-/// Arguments: the Python instrument wrapper (`inner` is the Rust instrument),
-/// the Python builder wrapper (`inner: Option<RustBuilder>`), the builder's
-/// Python class name, and `fields` when the builder records set fields for
-/// `__repr__` in a `fields` vector (`no_fields` otherwise).
-macro_rules! pricing_override_methods {
-    (@record fields, $slf:ident, $name:literal) => {
-        $slf.fields.push(($name, "{...}".to_string()));
-    };
-    (@record no_fields, $slf:ident, $name:literal) => {};
-    ($instrument:ty, $builder:ty, $builder_name:literal, $record:ident) => {
-        #[pyo3::pymethods]
-        impl $instrument {
-            /// Instrument-owned pricing inputs in serde form.
-            ///
-            /// Returns
-            /// -------
-            /// dict[str, object]
-            ///     ``InstrumentPricingOverrides``: ``market_quotes`` (quoted
-            ///     clean price, yield, spreads, implied volatility, premium) and
-            ///     ``model_config`` (tree model and steps, Monte Carlo and
-            ///     Hull-White parameters). Empty sections are omitted; ``{}``
-            ///     when none is set.
-            #[getter]
-            fn instrument_pricing_overrides<'py>(
-                &self,
-                py: pyo3::Python<'py>,
-            ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::PyAny>> {
-                $crate::bindings::pandas_utils::serde_to_py(
-                    py,
-                    &self.inner.instrument_pricing_overrides,
-                )
-            }
-
-            /// Metric-time pricing configuration in serde form.
-            ///
-            /// Returns
-            /// -------
-            /// dict[str, object]
-            ///     ``MetricPricingOverrides`` (bump sizes, theta period, ...);
-            ///     unset fields are ``None`` or omitted. A
-            ///     ``metric_pricing_overrides`` argument to ``price`` is merged
-            ///     over it per call.
-            #[getter]
-            fn metric_pricing_overrides<'py>(
-                &self,
-                py: pyo3::Python<'py>,
-            ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::PyAny>> {
-                $crate::bindings::pandas_utils::serde_to_py(
-                    py,
-                    &self.inner.metric_pricing_overrides,
-                )
-            }
-
-            /// Scenario-only pricing adjustments in serde form.
-            ///
-            /// Returns
-            /// -------
-            /// dict[str, object]
-            ///     ``ScenarioPricingOverrides`` (``scenario_price_shock_decimal``,
-            ///     ``scenario_spread_shock_bp``); ``{}`` when none is set.
-            #[getter]
-            fn scenario_pricing_overrides<'py>(
-                &self,
-                py: pyo3::Python<'py>,
-            ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::PyAny>> {
-                $crate::bindings::pandas_utils::serde_to_py(
-                    py,
-                    &self.inner.scenario_pricing_overrides,
-                )
-            }
-        }
-
-        #[pyo3::pymethods]
-        impl $builder {
-            /// Set the instrument-owned pricing inputs.
-            ///
-            /// Parameters
-            /// ----------
-            /// value : dict[str, object] | str
-            ///     Rust ``InstrumentPricingOverrides`` in serde form (dict or
-            ///     JSON string): ``{"market_quotes": {...}, "model_config": {...}}``,
-            ///     e.g. ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
-            ///
-            /// Returns
-            /// -------
-            #[doc = concat!(" ", $builder_name)]
-            ///     ``self``, for chaining.
-            ///
-            /// Raises
-            /// ------
-            /// ValueError
-            ///     If the builder was already consumed by ``build()`` or
-            ///     ``value`` does not deserialize as ``InstrumentPricingOverrides``.
-            #[pyo3(text_signature = "($self, value)")]
-            fn instrument_pricing_overrides<'py>(
-                mut slf: pyo3::PyRefMut<'py, Self>,
-                py: pyo3::Python<'py>,
-                value: &pyo3::Bound<'py, pyo3::PyAny>,
-            ) -> pyo3::PyResult<pyo3::PyRefMut<'py, Self>> {
-                let overrides: finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides =
-                    $crate::bindings::valuations::instruments::spec_from_py(
-                        py,
-                        value,
-                        "instrument_pricing_overrides",
-                    )?;
-                let builder = $crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-                slf.inner = Some(builder.instrument_pricing_overrides(overrides));
-                $crate::bindings::valuations::pricing::pricing_override_methods!(
-                    @record $record, slf, "instrument_pricing_overrides"
-                );
-                Ok(slf)
-            }
-
-            /// Set the metric-time pricing configuration stored on the instrument.
-            ///
-            /// Parameters
-            /// ----------
-            /// value : MetricPricingOverrides | dict[str, object] | str
-            ///     Rust ``MetricPricingOverrides`` as the typed class, a dict or a
-            ///     JSON string.
-            ///
-            /// Returns
-            /// -------
-            #[doc = concat!(" ", $builder_name)]
-            ///     ``self``, for chaining.
-            ///
-            /// Raises
-            /// ------
-            /// ValueError
-            ///     If the builder was already consumed by ``build()`` or
-            ///     ``value`` does not deserialize as ``MetricPricingOverrides``.
-            #[pyo3(text_signature = "($self, value)")]
-            fn metric_pricing_overrides<'py>(
-                mut slf: pyo3::PyRefMut<'py, Self>,
-                py: pyo3::Python<'py>,
-                value: &pyo3::Bound<'py, pyo3::PyAny>,
-            ) -> pyo3::PyResult<pyo3::PyRefMut<'py, Self>> {
-                let overrides =
-                    $crate::bindings::valuations::pricing::metric_pricing_overrides_from_py(
-                        py, value,
-                    )?;
-                let builder = $crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-                slf.inner = Some(builder.metric_pricing_overrides(overrides));
-                $crate::bindings::valuations::pricing::pricing_override_methods!(
-                    @record $record, slf, "metric_pricing_overrides"
-                );
-                Ok(slf)
-            }
-
-            /// Set the scenario-only pricing adjustments.
-            ///
-            /// Parameters
-            /// ----------
-            /// value : dict[str, object] | str
-            ///     Rust ``ScenarioPricingOverrides`` in serde form (dict or JSON
-            ///     string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
-            ///
-            /// Returns
-            /// -------
-            #[doc = concat!(" ", $builder_name)]
-            ///     ``self``, for chaining.
-            ///
-            /// Raises
-            /// ------
-            /// ValueError
-            ///     If the builder was already consumed by ``build()`` or
-            ///     ``value`` does not deserialize as ``ScenarioPricingOverrides``.
-            #[pyo3(text_signature = "($self, value)")]
-            fn scenario_pricing_overrides<'py>(
-                mut slf: pyo3::PyRefMut<'py, Self>,
-                py: pyo3::Python<'py>,
-                value: &pyo3::Bound<'py, pyo3::PyAny>,
-            ) -> pyo3::PyResult<pyo3::PyRefMut<'py, Self>> {
-                let overrides: finstack_quant_valuations::instruments::pricing_overrides::ScenarioPricingOverrides =
-                    $crate::bindings::valuations::instruments::spec_from_py(
-                        py,
-                        value,
-                        "scenario_pricing_overrides",
-                    )?;
-                let builder = $crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
-                slf.inner = Some(builder.scenario_pricing_overrides(overrides));
-                $crate::bindings::valuations::pricing::pricing_override_methods!(
-                    @record $record, slf, "scenario_pricing_overrides"
-                );
-                Ok(slf)
-            }
-        }
-    };
-}
-pub(crate) use pricing_override_methods;
 
 /// Coerce ``dict | str | MarketHistory | None`` into the JSON the Rust
 /// pricing entry point accepts.
@@ -927,32 +720,7 @@ fn list_models_grouped() -> std::collections::BTreeMap<String, Vec<String>> {
     finstack_quant_valuations::pricer::list_models_grouped()
 }
 
-/// Return the maintained liquid listed-derivatives coverage catalog.
-///
-/// Parameters
-/// ----------
-/// exchange : str | None, optional
-///     Exact venue filter: ``"cme"``, ``"eurex"``, ``"montreal"``, or
-///     ``"sgx"``. ``None`` returns all venues.
-///
-/// Returns
-/// -------
-/// list[dict[str, object]]
-///     Product-family rows with the canonical instrument type, exercised
-///     features, source URL, and any residual modelling gap.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``exchange`` is not one of the accepted canonical venue names, or
-///     if the embedded listed-product sidecar is invalid.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.market import listed_product_catalog
-/// >>> rows = listed_product_catalog("cme")
-/// >>> all(row["exchange"] == "cme" for row in rows)
-/// True
+#[doc = pydoc!("finstack_quant.valuations.market", "listed_product_catalog")]
 #[pyfunction(signature = (exchange=None))]
 fn listed_product_catalog<'py>(
     py: Python<'py>,
@@ -965,33 +733,6 @@ fn listed_product_catalog<'py>(
     let rows = finstack_quant_valuations::market::listed::listed_product_catalog(exchange)
         .map_err(core_to_py)?;
     serde_to_py(py, &rows)
-}
-
-/// Parse the instrument (before the market) and run the Rust
-/// `instrument_cashflows` export for the typed cashflow envelope.
-fn cashflow_envelope(
-    py: Python<'_>,
-    instrument: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
-    as_of: &Bound<'_, PyAny>,
-    model: &str,
-) -> PyResult<InstrumentCashflowEnvelope> {
-    let instrument = extract_instrument(instrument)?;
-    let instrument = py
-        .detach(move || instrument.into_parsed(None))
-        .map_err(core_to_py)?;
-    let market = extract_market(py, market)?;
-    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
-    let model = model.to_owned();
-    py.detach(move || {
-        finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
-            &instrument,
-            &market,
-            &as_of,
-            &model,
-        )
-        .map_err(core_to_py)
-    })
 }
 
 /// Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
@@ -1064,8 +805,24 @@ fn instrument_cashflows(
     as_of: &Bound<'_, PyAny>,
     model: &str,
 ) -> PyResult<PyInstrumentCashflowEnvelope> {
-    cashflow_envelope(py, instrument, market, as_of, model)
-        .map(|inner| PyInstrumentCashflowEnvelope { inner })
+    // Parse the instrument before the market so instrument errors surface first.
+    let instrument = extract_instrument(instrument)?;
+    let instrument = py
+        .detach(move || instrument.into_parsed(None))
+        .map_err(core_to_py)?;
+    let market = extract_market(py, market)?;
+    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
+    let model = model.to_owned();
+    py.detach(move || {
+        finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
+            instrument.as_instrument(),
+            &market,
+            &as_of,
+            &model,
+        )
+        .map_err(core_to_py)
+    })
+    .map(|inner| PyInstrumentCashflowEnvelope { inner })
 }
 
 /// Cashflow export for one instrument: header fields plus per-flow rows.
@@ -1126,71 +883,16 @@ const CASHFLOW_ROW_COLUMNS: &[(&str, &str)] = &[
 
 #[pymethods]
 impl PyInstrumentCashflowEnvelope {
-    /// Instrument identifier.
-    #[getter]
-    fn instrument_id(&self) -> String {
-        self.inner.instrument_id.clone()
-    }
-
-    /// Reporting currency code of the row PVs and ``total_pv``.
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
-    }
-
-    /// Model key used: ``"discounting"`` or ``"hazard_rate"``.
-    #[getter]
-    fn model(&self) -> String {
-        self.inner.model.clone()
-    }
-
     /// Valuation date, as ``datetime.date``.
     #[getter]
     fn as_of<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::date_utils::date_to_py(py, self.inner.as_of)
     }
 
-    /// Discount curve identifier used for every row.
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    /// Hazard curve identifier (``None`` under ``"discounting"``).
-    #[getter]
-    fn credit_curve_id(&self) -> Option<String> {
-        self.inner.credit_curve_id.as_ref().map(ToString::to_string)
-    }
-
-    /// Recovery rate of the hazard curve as a decimal (``None`` under ``"discounting"``).
-    #[getter]
-    fn recovery_rate(&self) -> Option<f64> {
-        self.inner.recovery_rate
-    }
-
-    /// Scenario price shock applied to every row ``pv`` and ``total_pv``, as a
-    /// decimal (``-0.10`` multiplies by 0.90); ``None`` when unshocked.
-    #[getter]
-    fn scenario_price_shock_decimal(&self) -> Option<f64> {
-        self.inner.scenario_price_shock_decimal
-    }
-
     /// Per-flow rows as a list of dicts (the serde form of ``CashflowRow``).
     #[getter]
     fn flows<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.flows)
-    }
-
-    /// Sum of the row ``pv`` values in the envelope currency.
-    #[getter]
-    fn total_pv(&self) -> f64 {
-        self.inner.total_pv
-    }
-
-    /// ``True`` when ``total_pv`` agrees with the instrument's ``base_value``.
-    #[getter]
-    fn reconciles_with_base_value(&self) -> bool {
-        self.inner.reconciles_with_base_value
     }
 
     /// One row per cashflow as a pandas ``DataFrame``.
@@ -1280,6 +982,36 @@ impl PyInstrumentCashflowEnvelope {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyInstrumentCashflowEnvelope |s| {
+    /// Instrument identifier.
+    instrument_id -> String = s.inner.instrument_id.clone();
+
+    /// Reporting currency code of the row PVs and ``total_pv``.
+    currency -> String = s.inner.currency.to_string();
+
+    /// Model key used: ``"discounting"`` or ``"hazard_rate"``.
+    model -> String = s.inner.model.clone();
+
+    /// Discount curve identifier used for every row.
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    /// Hazard curve identifier (``None`` under ``"discounting"``).
+    credit_curve_id -> Option<String> = s.inner.credit_curve_id.as_ref().map(ToString::to_string);
+
+    /// Recovery rate of the hazard curve as a decimal (``None`` under ``"discounting"``).
+    recovery_rate -> Option<f64> = s.inner.recovery_rate;
+
+    /// Scenario price shock applied to every row ``pv`` and ``total_pv``, as a
+    /// decimal (``-0.10`` multiplies by 0.90); ``None`` when unshocked.
+    scenario_price_shock_decimal -> Option<f64> = s.inner.scenario_price_shock_decimal;
+
+    /// Sum of the row ``pv`` values in the envelope currency.
+    total_pv -> f64 = s.inner.total_pv;
+
+    /// ``True`` when ``total_pv`` agrees with the instrument's ``base_value``.
+    reconciles_with_base_value -> bool = s.inner.reconciles_with_base_value;
+});
 
 /// Register pricing functions on the valuations submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {

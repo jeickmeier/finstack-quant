@@ -68,7 +68,6 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
-use finstack_quant_valuations_core::instruments::EquityUnderlyingParams;
 use finstack_quant_valuations_core::instruments::SettlementType;
 use time::macros::date;
 
@@ -265,7 +264,6 @@ pub struct EquityOption {
     pub attributes: Attributes,
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 impl EquityOption {
     /// Create a vanilla equity option from a parameter bundle and explicit
     /// market-data identifiers.
@@ -438,41 +436,8 @@ impl EquityOption {
         )
     }
 
-    /// Create a new equity option using parameter structs
-    pub fn new(
-        id: impl Into<InstrumentId>,
-        option_params: &EquityOptionParams,
-        underlying_params: &EquityUnderlyingParams,
-        discount_curve_id: impl Into<CurveId>,
-        vol_surface_id: impl Into<CurveId>,
-    ) -> Self {
-        Self {
-            id: id.into(),
-            underlying_ticker: underlying_params.ticker.clone(),
-            strike: option_params.strike,
-            option_type: option_params.option_type,
-            exercise_style: option_params.exercise_style,
-            expiry: option_params.expiry,
-            quantity: option_params.quantity,
-            currency: option_params.currency,
-            day_count: finstack_quant_core::dates::DayCount::Act365F,
-            settlement: option_params.settlement,
-            exercise: None,
-            discount_curve_id: discount_curve_id.into(),
-            spot_id: underlying_params.spot_id.clone(),
-            vol_surface_id: vol_surface_id.into(),
-            div_yield_id: underlying_params.div_yield_id.clone(),
-            discrete_dividends: Vec::new(),
-            exercise_dates: None,
-            instrument_pricing_overrides: Default::default(),
-            metric_pricing_overrides: Default::default(),
-            scenario_pricing_overrides: Default::default(),
-            attributes: Attributes::new(),
-        }
-    }
-
     /// Calculate Greeks for this equity option
-    pub fn greeks(
+    pub(crate) fn greeks(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
@@ -623,76 +588,27 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for Equit
         request: &finstack_quant_valuations_core::instruments::OptionGreeksRequest,
     ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::OptionGreeks>
     {
+        use finstack_quant_valuations_core::instruments::OptionGreekKind;
         let mut greeks = finstack_quant_valuations_core::instruments::OptionGreeks::default();
         match request.greek {
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Delta => {
-                greeks.delta = self.option_delta(market, as_of, request.bumps)?
-            }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Gamma => {
-                greeks.gamma = self.option_gamma(market, as_of, request.bumps)?
-            }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Vega => {
-                greeks.vega = self.option_vega(market, as_of, request.bumps)?
-            }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Theta => {
-                greeks.theta = self.option_theta(market, as_of, request.bumps)?
-            }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Rho => {
-                greeks.rho_bp = self.option_rho_bp(market, as_of, request.bumps)?
-            }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Vanna => {
+            OptionGreekKind::Delta => greeks.delta = Some(self.greeks(market, as_of)?.delta),
+            OptionGreekKind::Gamma => greeks.gamma = Some(self.greeks(market, as_of)?.gamma),
+            OptionGreekKind::Vega => greeks.vega = Some(self.greeks(market, as_of)?.vega),
+            OptionGreekKind::Theta => greeks.theta = Some(self.greeks(market, as_of)?.theta),
+            OptionGreekKind::Rho => greeks.rho_bp = Some(self.greeks(market, as_of)?.rho),
+            OptionGreekKind::Vanna => {
                 greeks.vanna = self.option_vanna(market, as_of, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::Volga => {
+            OptionGreekKind::Volga => {
                 greeks.volga =
                     self.option_volga(market, as_of, request.require_base_pv()?, request.bumps)?
             }
-            finstack_quant_valuations_core::instruments::OptionGreekKind::ForeignRho => {}
+            OptionGreekKind::ForeignRho => {}
         }
         Ok(greeks)
     }
 }
 impl EquityOption {
-    fn option_delta(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(Some(self.greeks(market, as_of)?.delta))
-    }
-    fn option_gamma(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(Some(self.greeks(market, as_of)?.gamma))
-    }
-    fn option_vega(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(Some(self.greeks(market, as_of)?.vega))
-    }
-    fn option_theta(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(Some(self.greeks(market, as_of)?.theta))
-    }
-    fn option_rho_bp(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
-        _bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(Some(self.greeks(market, as_of)?.rho))
-    }
     fn option_vanna(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -850,20 +766,13 @@ impl finstack_quant_valuations_core::instruments::Instrument for EquityOption {
         &self,
     ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
     {
-        let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
-        deps.add_discount_curve(self.discount_curve_id.clone());
-        deps.add_market_scalar_id(self.spot_id.as_str());
-        deps.add_volatility_dependency(
-            finstack_quant_valuations_core::instruments::VolatilityDependency::new(
-                self.vol_surface_id.clone(),
-                Some(self.spot_id.clone()),
-                Some(self.strike),
-            ),
-        );
-        if let Some(dividend_yield) = &self.div_yield_id {
-            deps.add_market_scalar_id(dividend_yield.as_str());
-        }
-        Ok(deps)
+        Ok(crate::equity_vol_dependencies(
+            &self.discount_curve_id,
+            &self.spot_id,
+            &self.vol_surface_id,
+            Some(self.strike),
+            self.div_yield_id.as_ref(),
+        ))
     }
 
     fn base_value(

@@ -242,6 +242,11 @@ impl BumpSpec {
     }
 
     /// Create an additive bump specified in basis points (e.g., 100.0 = 100bp = 1%).
+    ///
+    /// # Arguments
+    ///
+    /// * `bump_bp` - Parallel shift in basis points applied to every point of
+    ///   the curve (`1.0` = 1bp = 0.0001 in decimal rate).
     pub fn parallel_bp(bump_bp: f64) -> Self {
         Self {
             mode: BumpMode::Additive,
@@ -365,6 +370,61 @@ impl BumpSpec {
                 target_bucket,
                 next_bucket: None,
             },
+        }
+    }
+
+    /// Create the triangular key-rate bump for one bucket of a bucket grid,
+    /// choosing the shape from which neighbours exist.
+    ///
+    /// | `prev_bucket` | `next_bucket` | Shape |
+    /// |---|---|---|
+    /// | `Some` | `Some` | [`Self::triangular_key_rate_bp`] (interior triangle) |
+    /// | `None` | `Some` | [`Self::triangular_key_rate_first_bp`] (flat left wing) |
+    /// | `Some` | `None` | [`Self::triangular_key_rate_last_bp`] (flat right wing) |
+    /// | `None` | `None` | [`Self::parallel_bp`] (sole bucket) |
+    ///
+    /// Bumping every bucket of a grid this way partitions unity, so the
+    /// bucketed sensitivities sum to the parallel one.
+    ///
+    /// # Arguments
+    ///
+    /// * `prev_bucket` - Adjacent lower bucket time in years, `None` for the
+    ///   first bucket of the grid.
+    /// * `target_bucket` - Bucket time in years receiving the full bump.
+    /// * `next_bucket` - Adjacent higher bucket time in years, `None` for the
+    ///   last bucket of the grid.
+    /// * `bump_bp` - Bump size in basis points (e.g., 1.0 = 1bp).
+    ///
+    /// # Example
+    /// ```rust
+    /// use finstack_quant_core::market_data::bumps::BumpSpec;
+    ///
+    /// let grid = [1.0, 2.0, 5.0];
+    /// let i = 0;
+    /// let spec = BumpSpec::triangular_key_rate_bucket_bp(
+    ///     grid[..i].last().copied(),
+    ///     grid[i],
+    ///     grid.get(i + 1).copied(),
+    ///     1.0,
+    /// );
+    /// assert_eq!(
+    ///     spec.bump_type,
+    ///     BumpSpec::triangular_key_rate_first_bp(1.0, 2.0, 1.0).bump_type
+    /// );
+    /// ```
+    pub fn triangular_key_rate_bucket_bp(
+        prev_bucket: Option<f64>,
+        target_bucket: f64,
+        next_bucket: Option<f64>,
+        bump_bp: f64,
+    ) -> Self {
+        match (prev_bucket, next_bucket) {
+            (Some(prev), Some(next)) => {
+                Self::triangular_key_rate_bp(prev, target_bucket, next, bump_bp)
+            }
+            (None, Some(next)) => Self::triangular_key_rate_first_bp(target_bucket, next, bump_bp),
+            (Some(prev), None) => Self::triangular_key_rate_last_bp(prev, target_bucket, bump_bp),
+            (None, None) => Self::parallel_bp(bump_bp),
         }
     }
 

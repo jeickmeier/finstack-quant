@@ -26,7 +26,7 @@ use finstack_quant_valuations_core::impl_instrument_base;
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields, try_from = "FxSwapUnchecked")]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct FxSwap {
     /// Unique instrument identifier
     pub id: InstrumentId,
@@ -94,90 +94,7 @@ pub struct FxSwap {
     pub attributes: Attributes,
 }
 
-#[derive(Debug, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-struct FxSwapUnchecked {
-    /// Unique instrument identifier.
-    id: InstrumentId,
-    /// Base currency (foreign).
-    base_currency: Currency,
-    /// Quote currency (domestic).
-    quote_currency: Currency,
-    /// Near leg settlement date (spot leg).
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    near_date: Date,
-    /// Far leg settlement date (forward leg).
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    far_date: Date,
-    /// Notional amount in base currency (exchanged on near, reversed on far).
-    notional: Money,
-    /// Domestic discount curve id (quote currency).
-    domestic_discount_curve_id: CurveId,
-    /// Foreign discount curve id (base currency).
-    foreign_discount_curve_id: CurveId,
-    /// Optional near leg FX rate (quote per base). If absent, use the market
-    /// outright forward from the valuation date to near settlement.
-    #[serde(default)]
-    near_rate: Option<f64>,
-    /// Optional far leg FX rate (quote per base). If absent, use the market
-    /// outright forward from the valuation date to far settlement.
-    #[serde(default)]
-    far_rate: Option<f64>,
-    /// Optional base currency calendar for spot/settlement adjustment metadata.
-    #[serde(default)]
-    base_calendar_id: Option<String>,
-    /// Optional quote currency calendar for spot/settlement adjustment metadata.
-    #[serde(default)]
-    quote_calendar_id: Option<String>,
-    /// Instrument-owned pricing inputs.
-    #[serde(default)]
-    instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[serde(default)]
-    metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[serde(default)]
-    scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
-    /// Attributes for scenario selection and tagging.
-    attributes: Attributes,
-}
-
-impl TryFrom<FxSwapUnchecked> for FxSwap {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(value: FxSwapUnchecked) -> std::result::Result<Self, Self::Error> {
-        let swap = Self {
-            id: value.id,
-            base_currency: value.base_currency,
-            quote_currency: value.quote_currency,
-            near_date: value.near_date,
-            far_date: value.far_date,
-            notional: value.notional,
-            domestic_discount_curve_id: value.domestic_discount_curve_id,
-            foreign_discount_curve_id: value.foreign_discount_curve_id,
-            near_rate: value.near_rate,
-            far_rate: value.far_rate,
-            base_calendar_id: value.base_calendar_id.map(Into::into),
-            quote_calendar_id: value.quote_calendar_id.map(Into::into),
-            instrument_pricing_overrides: value.instrument_pricing_overrides,
-            metric_pricing_overrides: value.metric_pricing_overrides,
-            scenario_pricing_overrides: value.scenario_pricing_overrides,
-            attributes: value.attributes,
-        };
-        swap.validate()?;
-        Ok(swap)
-    }
-}
+finstack_quant_valuations_core::validate_on_deserialize!(FxSwap);
 
 impl FxSwap {
     /// Validate FX swap economics at construction boundaries.
@@ -290,42 +207,6 @@ impl FxSwap {
             .build()
     }
 
-    /// Construct an FX swap from explicit broken near and far dates.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Instrument identifier.
-    /// * `base_currency` - Currency exchanged as the base leg.
-    /// * `quote_currency` - Currency exchanged as the quote leg.
-    /// * `near_date` - Explicit near-leg settlement date.
-    /// * `far_date` - Explicit far-leg settlement date.
-    /// * `notional` - Positive base-currency amount on both legs.
-    /// * `domestic_discount_curve_id` - Quote-currency discount curve.
-    /// * `foreign_discount_curve_id` - Base-currency discount curve.
-    #[allow(clippy::too_many_arguments)]
-    pub fn from_broken_dates(
-        id: impl Into<InstrumentId>,
-        base_currency: Currency,
-        quote_currency: Currency,
-        near_date: Date,
-        far_date: Date,
-        notional: Money,
-        domestic_discount_curve_id: impl Into<CurveId>,
-        foreign_discount_curve_id: impl Into<CurveId>,
-    ) -> finstack_quant_core::Result<Self> {
-        Self::builder()
-            .id(id.into())
-            .base_currency(base_currency)
-            .quote_currency(quote_currency)
-            .near_date(near_date)
-            .far_date(far_date)
-            .notional(notional)
-            .domestic_discount_curve_id(domestic_discount_curve_id.into())
-            .foreign_discount_curve_id(foreign_discount_curve_id.into())
-            .attributes(Attributes::new())
-            .build()
-    }
-
     // Builder entrypoint is provided via derive
 
     fn single_cashflow_schedule(
@@ -402,8 +283,6 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxSwap {
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         use super::pricing_helper::FxSwapPricingContext;
 
-        self.validate()?;
-
         // End-of-day policy: far-leg settlement remains live on its event date.
         if crate::shared::event_has_occurred(self.far_date, as_of) {
             return Ok(finstack_quant_core::money::Money::from((
@@ -436,18 +315,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
 
         self.validate()?;
         if crate::shared::event_has_occurred(self.far_date, as_of) {
-            return finstack_quant_cashflows::schedule_from_classified_flows(
-                Vec::new(),
-                finstack_quant_core::dates::DayCount::Act365F,
-                finstack_quant_cashflows::ScheduleBuildOpts {
-                    notional_hint: Some(Money::from((0_i64, self.base_currency))),
-                    meta: finstack_quant_cashflows::builder::CashFlowMeta {
-                        representation:
-                            finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual,
-                        ..Default::default()
-                    },
-                },
-            );
+            return crate::shared::settled_schedule(Some(Money::from((0_i64, self.base_currency))));
         }
 
         let ctx = FxSwapPricingContext::build(self, curves, as_of)?;

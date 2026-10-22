@@ -1,5 +1,5 @@
-//! Macros implementation used by the traits subsystem.
-//!
+//! `impl_instrument_base!` and the other exported macros that write the
+//! `Instrument` boilerplate for a family type.
 /// Implements the standard boilerplate methods for the [`Instrument`](super::Instrument) trait.
 ///
 /// Most instruments store their ID as `self.id` (an `InstrumentId`), attributes as
@@ -109,6 +109,55 @@ macro_rules! impl_focused_pricing_overrides {
             &mut self,
         ) -> Option<&mut $crate::instruments::pricing_overrides::ScenarioPricingOverrides> {
             Some(&mut self.scenario_pricing_overrides)
+        }
+    };
+}
+
+/// Serde impls for an instrument whose derives use `#[serde(remote = "Self")]`:
+/// deserialization runs [`Instrument::validate_invariants`](super::Instrument::validate_invariants),
+/// the same check `builder().build()` runs.
+///
+/// `remote = "Self"` turns the derived `Serialize`/`Deserialize` impls into
+/// inherent `serialize`/`deserialize` functions; this macro supplies the trait
+/// impls on top of them. Serialization is unchanged, and a payload that breaks
+/// an instrument invariant fails to deserialize with the validator's message.
+/// The JSON Schema still comes from the type's own `JsonSchema` derive.
+///
+/// # Arguments
+///
+/// * `$ty` - The instrument type; it must implement `Instrument` and carry
+///   `#[serde(remote = "Self")]` on its serde derives.
+///
+/// # Example
+///
+/// ```text
+/// #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+/// #[serde(deny_unknown_fields, remote = "Self")]
+/// pub struct MyInstrument { /* ... */ }
+///
+/// validate_on_deserialize!(MyInstrument);
+/// ```
+#[macro_export]
+macro_rules! validate_on_deserialize {
+    ($ty:ty) => {
+        impl ::serde::Serialize for $ty {
+            fn serialize<S: ::serde::Serializer>(
+                &self,
+                s: S,
+            ) -> ::core::result::Result<S::Ok, S::Error> {
+                <$ty>::serialize(self, s)
+            }
+        }
+
+        impl<'de> ::serde::Deserialize<'de> for $ty {
+            fn deserialize<D: ::serde::Deserializer<'de>>(
+                d: D,
+            ) -> ::core::result::Result<Self, D::Error> {
+                let value = <$ty>::deserialize(d)?;
+                $crate::instruments::Instrument::validate_invariants(&value)
+                    .map_err(::serde::de::Error::custom)?;
+                ::core::result::Result::Ok(value)
+            }
         }
     };
 }

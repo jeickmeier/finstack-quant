@@ -29,8 +29,7 @@ export default [
                 "2036-01-17",
                 "2036-07-17"
               ],
-              "lockout_end": null,
-              "notice_days": 0
+              "lockout_end": null
             },
             "id": "BERM-10NC2-USD",
             "notional": {
@@ -3775,12 +3774,12 @@ export default [
   {
     "path": "#/$defs/d_bb0c4c397737a24ff8ed",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/BermudanSchedule",
-    "description": "Bermudan exercise schedule specification.\n\nDefines the exercise dates and constraints for a Bermudan swaption.\nExercise dates are typically aligned with swap coupon dates."
+    "description": "Bermudan exercise schedule specification.\n\nDefines the exercise dates and constraints for a Bermudan swaption.\nExercise dates are typically aligned with swap coupon dates.\n\nEach exercise date is the notification (decision) date on which the holder\nelects to exercise, as in QuantLib's `BermudanExercise`; any contractual\nnotice period is already reflected in where the dates sit, so the schedule\ncarries no separate notice lag."
   },
   {
     "path": "#/$defs/d_bb0c4c397737a24ff8ed/properties/exercise_dates",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/BermudanSchedule/properties/exercise_dates",
-    "description": "Exercise dates (must be sorted, typically on swap coupon dates)"
+    "description": "Exercise notification (decision) dates, sorted; typically one notice\nperiod before the swap coupon dates they enter on."
   },
   {
     "path": "#/$defs/d_bb0c4c397737a24ff8ed/properties/exercise_dates/items",
@@ -3803,13 +3802,6 @@ export default [
   {
     "path": "#/$defs/d_bb0c4c397737a24ff8ed/properties/lockout_end/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/BermudanSchedule/properties/lockout_end/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_bb0c4c397737a24ff8ed/properties/notice_days",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json#/$defs/BermudanSchedule/properties/notice_days",
-    "description": "Notice period in business days before exercise",
-    "format": "uint32",
-    "minimum": 0
   },
   {
     "path": "#/$defs/d_bdf84b73c34f6ec51af5",

@@ -4,10 +4,9 @@
 //! registers them with the `MetricRegistry`. Calculators reuse the pricing
 //! engine helpers to ensure consistency between PV and greeks.
 
-mod charm;
-mod color;
 mod dividend_risk;
 pub(crate) mod selected_model;
+mod spot_greek_decay;
 
 use crate::equity_option::EquityOption;
 use finstack_quant_core::Result;
@@ -67,8 +66,8 @@ pub(crate) fn register_equity_option_metrics(
             (ImpliedVol, ImpliedVolCalculator),
             (Vanna, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::vanna()),
             (Volga, finstack_quant_valuations_core::metrics::sensitivities::option_greeks::OptionGreekCalculator::<crate::equity_option::EquityOption>::volga()),
-            (Charm, charm::CharmCalculator),
-            (Color, color::ColorCalculator),
+            (Charm, spot_greek_decay::CharmCalculator),
+            (Color, spot_greek_decay::ColorCalculator),
             (Speed, SpeedCalculator),
             // Custom metric: Dividend risk (dividend yield sensitivity per 1bp)
             (Dividend01, dividend_risk::DividendRiskCalculator),

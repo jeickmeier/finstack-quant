@@ -583,7 +583,7 @@ impl CapFloor {
                 .as_deref()
                 .or(self.calendar_id.as_deref());
             let fixing_calendar =
-                finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::resolve_overnight_fixing_calendar(
+                finstack_quant_valuations_core::instruments::pricing::overnight::resolve_overnight_fixing_calendar(
                     fixing_calendar_id,
                     self.notional.currency(),
                     &format!("CapFloor '{}'", self.id),
@@ -595,7 +595,7 @@ impl CapFloor {
                 .or(terms.fixing_calendar_id.as_deref());
             for period in &mut periods {
                 (period.accrual_start, period.accrual_end) =
-                    finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::adjust_overnight_accrual_boundaries(
+                    finstack_quant_valuations_core::instruments::pricing::overnight::adjust_overnight_accrual_boundaries(
                         period.accrual_start,
                         period.accrual_end,
                         self.business_day_convention,
@@ -638,55 +638,17 @@ impl CapFloor {
             .as_deref()
             .or(self.calendar_id.as_deref());
         let fixing_calendar =
-            finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::resolve_overnight_fixing_calendar(
+            finstack_quant_valuations_core::instruments::pricing::overnight::resolve_overnight_fixing_calendar(
                 fixing_calendar_id,
                 self.notional.currency(),
                 &format!("CapFloor '{}'", self.id),
             )?;
-        finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::final_overnight_fixing_date(
+        finstack_quant_valuations_core::instruments::pricing::overnight::final_overnight_fixing_date(
             period.accrual_start,
             period.accrual_end,
             &terms.compounding,
             fixing_calendar,
         )
-    }
-
-    /// Set the volatility type convention.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use finstack_quant_valuations_rates::cap_floor::{CapFloor, CapFloorVolType, RateOptionType};
-    /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_core::dates::{create_date, DayCount, Tenor};
-    /// use finstack_quant_core::money::Money;
-    /// use finstack_quant_core::types::{CurveId, InstrumentId};
-    /// use time::Month;
-    ///
-    /// # fn main() -> finstack_quant_core::Result<()> {
-    /// // Create a floor with normal volatility for EUR market (ACT/360 is the standard day count
-    /// // for EUR ESTR/EURIBOR caps and floors per ISDA conventions).
-    /// let floor = CapFloor::new(
-    ///     InstrumentId::new("EUR-FLOOR-001"),
-    ///     RateOptionType::Floor,
-    ///     Money::from((1_000_000_i64, Currency::EUR)),
-    ///     0.02,
-    ///     create_date(2026, Month::January, 1)?,
-    ///     create_date(2027, Month::January, 1)?,
-    ///     Some(Tenor::quarterly()),
-    ///     DayCount::Act360,
-    ///     CurveId::new("EUR-OIS"),
-    ///     CurveId::new("EUR-ESTR-3M"),
-    ///     CurveId::new("EUR-CAPFLOOR-VOL"),
-    /// )?
-    ///     .with_vol_type(CapFloorVolType::Normal);
-    /// # let _ = floor;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn with_vol_type(mut self, vol_type: CapFloorVolType) -> Self {
-        self.vol_type = vol_type;
-        self
     }
 
     pub(crate) fn resolved_payment_lag_days(&self) -> i32 {
@@ -1175,7 +1137,7 @@ mod tests {
         ctx = ctx.insert_surface(normal_vol_surface);
 
         // Build a floorlet with negative forward using normal vol surface.
-        let normal_floorlet = CapFloor::new(
+        let mut normal_floorlet = CapFloor::new(
             "NORM-FLOORLET",
             RateOptionType::Floor,
             notional,
@@ -1188,10 +1150,10 @@ mod tests {
             "USD-SOFR-3M",
             "TEST-VOL-NORMAL",
         )
-        .expect("valid strike")
-        .with_vol_type(CapFloorVolType::Normal);
+        .expect("valid strike");
+        normal_floorlet.vol_type = CapFloorVolType::Normal;
 
-        let black_floorlet = CapFloor::new(
+        let mut black_floorlet = CapFloor::new(
             "BLACK-FLOORLET",
             RateOptionType::Floor,
             notional,
@@ -1204,8 +1166,8 @@ mod tests {
             "USD-SOFR-3M",
             "TEST-VOL-NORMAL",
         )
-        .expect("valid strike")
-        .with_vol_type(CapFloorVolType::Lognormal);
+        .expect("valid strike");
+        black_floorlet.vol_type = CapFloorVolType::Lognormal;
 
         // This should succeed under normal model.
         let normal_pv = normal_floorlet

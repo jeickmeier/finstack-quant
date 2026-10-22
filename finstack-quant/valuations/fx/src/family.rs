@@ -66,7 +66,7 @@ fn register_metrics(registry: &mut MetricRegistry) -> Result<(), MetricRegistryE
     crate::fx_swap::metrics::register_fx_swap_metrics(registry)?;
     crate::fx_forward::metrics::register_fx_forward_metrics(registry)?;
     crate::fx_future::metrics::register_fx_future_metrics(registry)?;
-    crate::fx_future_option::metrics::register_fx_future_option_metrics(registry)?;
+    crate::fx_future_option::register_fx_future_option_metrics(registry)?;
     crate::ndf::metrics::register_ndf_metrics(registry)?;
     crate::fx_option::metrics::register_fx_option_metrics(registry)?;
     crate::fx_variance_swap::metrics::register_fx_variance_swap_metrics(registry)?;

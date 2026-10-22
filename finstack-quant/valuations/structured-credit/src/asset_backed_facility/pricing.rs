@@ -6,6 +6,7 @@ use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use rust_decimal::prelude::ToPrimitive;
 use serde::{Deserialize, Serialize};
@@ -335,7 +336,7 @@ impl AssetBackedFacility {
                 period.end.min(commitment_end),
                 DayCountContext::default(),
             )?;
-            let fee = undrawn * fee_bp / 10_000.0 * accrual;
+            let fee = undrawn * fee_bp / BASIS_POINTS_PER_UNIT * accrual;
             if fee > 0.0 {
                 fees.push((period.payment_date, Money::new(fee, currency)?));
             }
@@ -465,7 +466,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
 impl Instrument for AssetBackedFacility {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::AssetBackedFacility,
-        crate::structured_credit::STRUCTURED_CREDIT
+        crate::STRUCTURED_CREDIT
     );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {

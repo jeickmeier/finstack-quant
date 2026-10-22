@@ -42,6 +42,29 @@ impl RfComponentPriced for LeveredRealEstateEquity {
     }
 }
 
+/// Multiple on invested capital: total inflows over total outflows (absolute).
+///
+/// # Errors
+///
+/// Returns `Error::Validation` naming `metric` when there are no outflows.
+fn moic(flows: impl IntoIterator<Item = f64>, metric: &str) -> finstack_quant_core::Result<f64> {
+    let mut inflows = 0.0;
+    let mut outflows = 0.0;
+    for a in flows {
+        if a >= 0.0 {
+            inflows += a;
+        } else {
+            outflows += -a;
+        }
+    }
+    if outflows <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{metric}: total outflows must be positive"
+        )));
+    }
+    Ok(inflows / outflows)
+}
+
 /// Register real estate asset metrics with the registry.
 pub(crate) fn register_real_estate_metrics(
     registry: &mut MetricRegistry,

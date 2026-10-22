@@ -76,8 +76,8 @@ fn test_z_spread_reports_bond_compounding_spread() {
         "USD-OIS",
     )
     .expect("bond");
-    bond.cashflow_spec = finstack_quant_valuations_fixed_income::bond::CashflowSpec::fixed_rate(
-        finstack_quant_core::types::Rate::from_decimal(0.0).expect("valid rate fixture"),
+    bond.cashflow_spec = finstack_quant_valuations_fixed_income::bond::CashflowSpec::fixed(
+        0.0,
         finstack_quant_core::dates::Tenor::annual(),
         DayCount::Act365F,
     )
@@ -1053,12 +1053,8 @@ fn test_z_spread_roundtrip_coupon_exactly_on_settlement_date() {
     )
     .expect("bond should build");
     // Explicit annual day-count to make the on-date coupon unambiguous.
-    bond.cashflow_spec = CashflowSpec::fixed_rate(
-        finstack_quant_core::types::Rate::from_decimal(coupon_rate).expect("valid rate fixture"),
-        Tenor::annual(),
-        DayCount::Act365F,
-    )
-    .expect("finite test coupon");
+    bond.cashflow_spec = CashflowSpec::fixed(coupon_rate, Tenor::annual(), DayCount::Act365F)
+        .expect("finite test coupon");
     // No settlement lag: quote_date == as_of.
     bond.settlement_convention = None;
 
@@ -1152,12 +1148,8 @@ fn test_ytm_roundtrip_settlement_lag_two_days() {
         "USD-OIS",
     )
     .expect("bond should build");
-    bond.cashflow_spec = CashflowSpec::fixed_rate(
-        finstack_quant_core::types::Rate::from_decimal(coupon_rate).expect("valid rate fixture"),
-        Tenor::annual(),
-        DayCount::Act365F,
-    )
-    .expect("finite test coupon");
+    bond.cashflow_spec = CashflowSpec::fixed(coupon_rate, Tenor::annual(), DayCount::Act365F)
+        .expect("finite test coupon");
     // 2 settlement days so that quote_date = as_of + 2 weekdays = 2025-01-01.
     bond.settlement_convention = Some(BondSettlementConvention {
         settlement_days: 2,
@@ -1376,12 +1368,8 @@ fn test_z_spread_roundtrip_with_settlement_lag() {
         "USD-OIS",
     )
     .expect("bond should build");
-    bond.cashflow_spec = CashflowSpec::fixed_rate(
-        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-        Tenor::annual(),
-        DayCount::Act365F,
-    )
-    .expect("finite test coupon");
+    bond.cashflow_spec =
+        CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F).expect("finite test coupon");
     // 3-business-day settlement lag => quote_date strictly after as_of.
     bond.settlement_convention = Some(BondSettlementConvention {
         settlement_days: 3,

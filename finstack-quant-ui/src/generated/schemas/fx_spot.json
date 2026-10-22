@@ -1190,11 +1190,15 @@
           "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "description": "Optional base currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional base currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars."
         },
         "base_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
@@ -1214,7 +1218,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional quote-currency discount curve for PV-ing the settlement\ncashflow. When absent the settlement amount is reported undiscounted\n(a 1–2 day effect for standard spot lags)."
         },
         "id": {
@@ -1223,14 +1226,10 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "notional": {
@@ -1238,11 +1237,15 @@
           "description": "Notional amount in base currency."
         },
         "quote_calendar_id": {
-          "description": "Optional quote currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional quote currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars."
         },
         "quote_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
@@ -1258,7 +1261,6 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         },
         "settlement_date": {
@@ -1271,10 +1273,10 @@
             }
           ],
           "default": null,
-          "description": "Optional explicit settlement (value) date"
+          "description": "Optional explicit settlement (value) date. When set it is only\nbusiness-day adjusted and `settlement_days` is ignored."
         },
         "settlement_days": {
-          "description": "Optional T+N settlement lag in business days when `settlement_date` is not provided.\n\n`None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.",
+          "description": "Optional contractual T+N settlement lag in business days when\n`settlement_date` is not provided.\n\n`None` uses the pair-aware default from\n[`finstack_quant_core::dates::fx::fx_standard_settlement_days`]: T+1 for\nUSD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB, T+2 otherwise. An explicit value\noverrides that default.",
           "format": "uint32",
           "minimum": 0,
           "type": [

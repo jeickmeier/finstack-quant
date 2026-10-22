@@ -5,7 +5,7 @@
 //! [`InstrumentJson`](crate::instruments::json_loader::InstrumentJson) values of any
 //! family, which is the closed world by definition, so it registers with
 //! [`STANDARD`](crate::pricer::STANDARD) rather than with
-//! [`EXOTICS`](finstack_quant_valuations_exotics::exotics::EXOTICS).
+//! [`EXOTICS`](finstack_quant_valuations_exotics::EXOTICS).
 
 pub use finstack_quant_valuations_exotics::exotics::*;
 

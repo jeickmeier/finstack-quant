@@ -4,7 +4,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_rates::inflation_swap::InflationSwapBuilder;
+use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
 use finstack_quant_valuations_test_support::inflation::*;
 use rust_decimal::Decimal;
 use time::Month;
@@ -17,7 +17,7 @@ fn test_breakeven_equals_par_rate() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-BE-1".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -44,7 +44,8 @@ fn test_breakeven_equals_par_rate() {
     let par_rate = *result.measures.get("par_rate").unwrap();
 
     assert!(
-        (breakeven - par_rate).abs() < rate_tolerance(),
+        (breakeven - par_rate).abs()
+            < finstack_quant_valuations_test_support::tolerances::ANALYTICAL,
         "Breakeven should equal par rate: {} vs {}",
         breakeven,
         par_rate
@@ -58,7 +59,7 @@ fn test_breakeven_gives_zero_pv() {
 
     let ctx = standard_market(as_of, 0.02, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-BE-2".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -84,7 +85,7 @@ fn test_breakeven_gives_zero_pv() {
     let breakeven = *result.measures.get("breakeven").unwrap();
 
     // Create swap at breakeven
-    let be_swap = InflationSwapBuilder::new()
+    let be_swap = InflationSwap::builder()
         .id("ZCINF-BE-3".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -116,7 +117,7 @@ fn test_breakeven_increases_with_inflation() {
     let ctx_low = standard_market(as_of, 0.01, 0.04);
     let ctx_high = standard_market(as_of, 0.03, 0.04);
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-BE-INFL".into())
         .notional(standard_notional())
         .start_date(as_of)

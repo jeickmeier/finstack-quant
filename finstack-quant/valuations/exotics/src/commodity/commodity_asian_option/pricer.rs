@@ -19,6 +19,7 @@
 //!   European Average Options." `docs/REFERENCES.md#turnbull-wakeman-1991`
 
 use crate::commodity::commodity_asian_option::types::CommodityAsianOption;
+use crate::exotics::asian_option::types::{average_intrinsic, realized_average};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -51,12 +52,19 @@ pub(crate) fn compute_pv(
 
     let (hist_sum, hist_prod_log, hist_count) = inst.accumulated_state(as_of);
     let total_fixings = inst.fixing_dates.len();
-
-    if total_fixings == 0 {
-        return Err(finstack_quant_core::Error::Validation(
-            "CommodityAsianOption requires at least one fixing date".to_string(),
-        ));
-    }
+    // Intrinsic of the average of `count` realized fixings. The forward
+    // curve's spot stands in only for `count == 0`, which the expired branch
+    // can reach when the day count gives `t <= 0` before the last fixing.
+    let realized_intrinsic = |count: usize| -> finstack_quant_core::Result<f64> {
+        let average = match realized_average(inst.averaging_method, hist_sum, hist_prod_log, count)
+        {
+            Some(average) => average,
+            None => market
+                .get_price_curve(inst.forward_curve_id.as_str())?
+                .spot_price(),
+        };
+        Ok(average_intrinsic(inst.option_type, average, inst.strike))
+    };
 
     let future_count = inst
         .fixing_dates
@@ -65,14 +73,7 @@ pub(crate) fn compute_pv(
         .count();
     if future_count == 0 && t > 0.0 {
         let disc_curve = market.get_discount(inst.discount_curve_id.as_str())?;
-        let average = match inst.averaging_method {
-            AveragingMethod::Arithmetic => hist_sum / total_fixings as f64,
-            AveragingMethod::Geometric => (hist_prod_log / total_fixings as f64).exp(),
-        };
-        let payoff = match inst.option_type {
-            OptionType::Call => (average - inst.strike).max(0.0),
-            OptionType::Put => (inst.strike - average).max(0.0),
-        };
+        let payoff = realized_intrinsic(total_fixings)?;
         return Money::new(
             payoff * disc_curve.df_between_dates(as_of, inst.expiry)? * inst.quantity,
             inst.underlying.currency,
@@ -81,21 +82,7 @@ pub(crate) fn compute_pv(
 
     // Handle expired / fully observed options
     if t <= 0.0 {
-        let average = if hist_count > 0 {
-            match inst.averaging_method {
-                AveragingMethod::Arithmetic => hist_sum / hist_count as f64,
-                AveragingMethod::Geometric => (hist_prod_log / hist_count as f64).exp(),
-            }
-        } else {
-            // Fallback: use spot from forward curve
-            let price_curve = market.get_price_curve(inst.forward_curve_id.as_str())?;
-            price_curve.spot_price()
-        };
-
-        let intrinsic = match inst.option_type {
-            OptionType::Call => (average - inst.strike).max(0.0),
-            OptionType::Put => (inst.strike - average).max(0.0),
-        };
+        let intrinsic = realized_intrinsic(hist_count)?;
         return Money::new(intrinsic * inst.quantity, inst.underlying.currency);
     }
 
@@ -148,19 +135,6 @@ pub(crate) fn compute_pv(
              + {future_count} projected != {total_fixings} scheduled fixings",
             inst.id
         )));
-    }
-
-    // All fixings already observed but not yet settled
-    if future_count == 0 {
-        let average = match inst.averaging_method {
-            AveragingMethod::Arithmetic => hist_sum / total_fixings as f64,
-            AveragingMethod::Geometric => (hist_prod_log / total_fixings as f64).exp(),
-        };
-        let payoff = match inst.option_type {
-            OptionType::Call => (average - inst.strike).max(0.0),
-            OptionType::Put => (inst.strike - average).max(0.0),
-        };
-        return Money::new(payoff * df * inst.quantity, inst.underlying.currency);
     }
 
     // Compute price based on averaging method
@@ -390,19 +364,6 @@ fn price_arithmetic_tw_commodity(
 /// Commodity Asian option analytical pricer (Turnbull-Wakeman / Kemna-Vorst).
 pub struct CommodityAsianOptionAnalyticalPricer;
 
-impl CommodityAsianOptionAnalyticalPricer {
-    /// Create a new commodity Asian option pricer.
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for CommodityAsianOptionAnalyticalPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Pricer for CommodityAsianOptionAnalyticalPricer {
     fn key(&self) -> PricerKey {
         PricerKey::new(
@@ -434,7 +395,6 @@ mod tests {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
     use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
     use time::Month;
 
@@ -800,7 +760,7 @@ mod tests {
         let option = base_option(fixing_dates, settlement);
         let market = build_commodity_market(as_of, 80.0, 0.25, 0.05);
 
-        let pricer = CommodityAsianOptionAnalyticalPricer::new();
+        let pricer = CommodityAsianOptionAnalyticalPricer;
         let result = pricer
             .price_dyn(&option, &market, as_of)
             .expect("registry pricer should succeed");

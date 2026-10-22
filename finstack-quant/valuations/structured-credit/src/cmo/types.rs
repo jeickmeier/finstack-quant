@@ -4,9 +4,10 @@
 //! redistribute the cashflows from underlying MBS pools into tranches with
 //! different risk/return profiles.
 
-use super::tranches::pac_support::PacSchedule;
+use crate::cmo::PacSchedule;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, DealId, InstrumentId};
@@ -446,7 +447,7 @@ impl AgencyCmo {
                 )));
             }
         }
-        if self.reference_tranche().is_none() {
+        if self.reference_tranche().is_err() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{context} reference tranche '{}' is not present in the waterfall",
                 self.reference_tranche_id
@@ -608,8 +609,20 @@ impl AgencyCmo {
     }
 
     /// Get the reference tranche being valued.
-    pub fn reference_tranche(&self) -> Option<&CmoTranche> {
-        self.waterfall.get_tranche(&self.reference_tranche_id)
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::NotFound` (id `tranche:<reference_tranche_id>`)
+    /// when the waterfall has no tranche with `reference_tranche_id`.
+    pub fn reference_tranche(&self) -> finstack_quant_core::Result<&CmoTranche> {
+        self.waterfall
+            .get_tranche(&self.reference_tranche_id)
+            .ok_or_else(|| {
+                finstack_quant_core::InputError::NotFound {
+                    id: format!("tranche:{}", self.reference_tranche_id),
+                }
+                .into()
+            })
     }
 
     /// Validate that the deal's tranche coupon demand does not exceed the
@@ -650,8 +663,8 @@ impl AgencyCmo {
                     .cmo_collateral_defaults();
                 let wac = cmo.collateral_wac.unwrap_or(defaults.wac);
                 let pass_through = wac
-                    - defaults.servicing_fee_bp / 10_000.0
-                    - defaults.guarantee_fee_bp / 10_000.0;
+                    - defaults.servicing_fee_bp / BASIS_POINTS_PER_UNIT
+                    - defaults.guarantee_fee_bp / BASIS_POINTS_PER_UNIT;
                 (pass_through, cmo.waterfall.total_current_face()?.amount())
             }
         };
@@ -704,7 +717,10 @@ impl AgencyCmo {
 
 impl finstack_quant_cashflows::CashflowScheduleSource for AgencyCmo {
     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
-        Ok(self.reference_tranche().map(|tranche| tranche.current_face))
+        Ok(self
+            .reference_tranche()
+            .ok()
+            .map(|tranche| tranche.current_face))
     }
 
     fn raw_cashflow_schedule(
@@ -723,7 +739,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AgencyCmo {
 impl finstack_quant_valuations_core::instruments::Instrument for AgencyCmo {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::AgencyCmo,
-        crate::structured_credit::STRUCTURED_CREDIT
+        crate::STRUCTURED_CREDIT
     );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {

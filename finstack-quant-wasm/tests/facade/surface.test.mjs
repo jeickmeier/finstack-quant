@@ -30,6 +30,10 @@ function isClass(value) {
   return typeof value === 'function' && /^class\b/.test(Function.prototype.toString.call(value));
 }
 
+// wasm-bindgen emits a JavaScript `constructor(...)` only for a Rust
+// `#[wasm_bindgen(constructor)]`; every other class is built by its statics.
+const hasConstructor = (cls) => /^ {4}constructor\(/m.test(Function.prototype.toString.call(cls));
+
 function classSurface(cls) {
   const statics = Object.getOwnPropertyNames(cls)
     .filter((name) => !['length', 'name', 'prototype'].includes(name) && !skipMember(name))
@@ -41,7 +45,13 @@ function classSurface(cls) {
     const descriptor = Object.getOwnPropertyDescriptor(cls.prototype, name);
     (descriptor.get ? getters : methods).push(name);
   }
-  return { kind: 'class', statics, methods: methods.sort(), getters: getters.sort() };
+  return {
+    kind: 'class',
+    constructor: hasConstructor(cls),
+    statics,
+    methods: methods.sort(),
+    getters: getters.sort(),
+  };
 }
 
 function runtimeSurface() {
@@ -97,6 +107,26 @@ function declaredSurface() {
     return prototype ? checker.getTypeOfSymbolAtLocation(prototype, source) : null;
   };
 
+  // `new X(...)` is declared by a public `constructor` of a `declare class`
+  // (an implicit one when none is written) or by a `new (...)` signature of
+  // a constructor interface.
+  const declaresConstructor = (constructorType) => {
+    const symbol = constructorType.getSymbol();
+    if (symbol && symbol.flags & ts.SymbolFlags.Class) {
+      const constructors = (symbol.declarations ?? [])
+        .flatMap((decl) => decl.members ?? [])
+        .filter((member) => ts.isConstructorDeclaration(member));
+      const hidden = (member) =>
+        (member.modifiers ?? []).some(
+          (modifier) =>
+            modifier.kind === ts.SyntaxKind.PrivateKeyword ||
+            modifier.kind === ts.SyntaxKind.ProtectedKeyword
+        );
+      return constructors.length === 0 || constructors.some((member) => !hidden(member));
+    }
+    return constructorType.getConstructSignatures().length > 0;
+  };
+
   const visitClass = (path, constructorType, instance) => {
     const statics = checker
       .getPropertiesOfType(constructorType)
@@ -110,7 +140,13 @@ function declaredSurface() {
       if (skipMember(name) || name.startsWith('__@')) continue;
       (memberKind(member) === 'method' ? methods : getters).push(name);
     }
-    out[path] = { kind: 'class', statics, methods: methods.sort(), getters: getters.sort() };
+    out[path] = {
+      kind: 'class',
+      constructor: declaresConstructor(constructorType),
+      statics,
+      methods: methods.sort(),
+      getters: getters.sort(),
+    };
   };
 
   const visit = (path, type) => {

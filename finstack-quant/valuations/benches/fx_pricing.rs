@@ -75,7 +75,13 @@ fn bench_fx_spot_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("fx_spot_pv");
     let market = create_market();
     let as_of = base_date();
-    let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD);
+    let spot = FxSpot::builder()
+        .id(InstrumentId::new("EURUSD"))
+        .base_currency(Currency::EUR)
+        .quote_currency(Currency::USD)
+        .notional(Money::from((1_i64, Currency::EUR)))
+        .build()
+        .expect("valid FX spot");
 
     group.bench_function("eurusd", |b| {
         b.iter(|| spot.value(black_box(&market), black_box(as_of)));

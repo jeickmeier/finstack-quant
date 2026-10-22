@@ -630,7 +630,6 @@ impl InflationLinkedBond {
         nominal_bond_yield: f64,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        use crate::bond::pricing::quote_conversions::periods_per_year;
         use finstack_quant_core::math::Compounding;
         use std::num::NonZeroU32;
 
@@ -661,7 +660,7 @@ impl InflationLinkedBond {
             .unwrap_or(1.0)
             .max(1e-6); // guard against zero / expired bond
 
-        let n_f = periods_per_year(self.frequency).unwrap_or(1.0).max(1.0);
+        let n_f = self.frequency.payments_per_year().max(1.0);
         // ILB coupon frequencies are always an integer number of periods per
         // year (annual/semi-annual/quarterly/monthly); a non-integer here would
         // mean an unsupported tenor whose compounding cannot be expressed as

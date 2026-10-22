@@ -31,20 +31,7 @@ impl MetricCalculator for YtmCalculator {
         // Compute settlement date using loan calendar/business-day conventions.
         let settlement_date = loan.settlement_date(as_of)?;
 
-        // Signed cash-settlement flows from the cached (fixings-applied)
-        // schedule: coupons, fees, amortization, redemptions, and future
-        // funding legs (negative Notional). PIK capitalization is excluded.
-        let holder_flows: Vec<(finstack_quant_core::dates::Date, Money)> = schedule
-            .get_flows()
-            .iter()
-            .filter(|cf| cf.kind.is_cash_settlement())
-            .map(|cf| (cf.date, cf.amount))
-            .collect();
-
-        let mut flows: Vec<(finstack_quant_core::dates::Date, Money)> =
-            Vec::with_capacity(holder_flows.len() + 1);
-
-        // Add initial price leg at settlement_date (negative = outflow for purchase).
+        // Initial price leg at settlement (negative = outflow for purchase).
         // Quoted dirty prices and the carried model PV share the settlement origin.
         let target_price = target_price_from_quote_or_model(
             loan,
@@ -53,23 +40,13 @@ impl MetricCalculator for YtmCalculator {
             as_of,
             context.base_value,
         )?;
-        flows.push((
+        let price_leg = Money::new(-target_price.amount(), target_price.currency())?;
+
+        crate::loan_quotes::ytm_from_schedule(
+            &schedule,
             settlement_date,
-            Money::new(-target_price.amount(), target_price.currency())?,
-        ));
-
-        // Add signed canonical schedule flows after settlement_date
-        for (date, amount) in holder_flows {
-            if date > settlement_date {
-                flows.push((date, amount));
-            }
-        }
-
-        // Convert flows to (Date, f64) for XIRR
-        let flows_f64: Vec<(finstack_quant_core::dates::Date, f64)> =
-            flows.iter().map(|(d, m)| (*d, m.amount())).collect();
-
-        // Solve IRR using the loan's day-count convention
-        finstack_quant_core::cashflow::xirr_with_daycount(&flows_f64, loan.day_count, None)
+            price_leg.amount(),
+            loan.day_count,
+        )
     }
 }

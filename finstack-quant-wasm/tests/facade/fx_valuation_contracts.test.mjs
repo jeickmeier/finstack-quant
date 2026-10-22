@@ -66,7 +66,7 @@ test('typed FX Monte Carlo pricing preserves full-width seeds like generic prici
   assert.equal(typeof generic.details.data.seed, 'bigint');
   assert.ok(generic.details.data.seed > BigInt(Number.MAX_SAFE_INTEGER));
 
-  const typed = valuations.fx.FxBarrierOption.fromJson(instrumentJson);
+  const typed = valuations.instruments.FxBarrierOption.fromJson(instrumentJson);
   try {
     const result = typed.price(marketJson, asOf, model);
     assert.deepEqual(result.value, generic.value);
@@ -105,7 +105,7 @@ test('typed FX Greeks use volatility points, basis points, and daily theta', () 
     foreignRho: ((price(0.2, 0.04, 0.02 + h) - price(0.2, 0.04, 0.02 - h)) / (2 * h)) * 0.0001,
     theta: (price(0.2, 0.04, 0.02, '2024-01-03') - price(0.2, 0.04, 0.02, '2024-01-01')) / 2,
   };
-  const typed = valuations.fx.FxOption.fromJson(JSON.stringify(envelope));
+  const typed = valuations.instruments.FxOption.fromJson(JSON.stringify(envelope));
   try {
     const marketJson = JSON.stringify(market());
     for (const [metric, expectedValue] of Object.entries(expected)) {
@@ -167,7 +167,7 @@ test('typed quanto theta preserves configured period P&L and the capped horizon'
     assert.equal(generic.measures.theta_period_days, expectedDays);
     assert.ok(Math.abs(expected) > 1, 'carry probe must have material period P&L');
     assert.ok(Math.abs(generic.measures.theta - expected) < Math.abs(expected) * 1e-10);
-    const typed = valuations.fx.QuantoOption.fromJson(JSON.stringify(configured));
+    const typed = valuations.instruments.QuantoOption.fromJson(JSON.stringify(configured));
     try {
       assert.equal(typed.theta(JSON.stringify(quantoMarket(asOf)), asOf), generic.measures.theta);
       assert.equal(

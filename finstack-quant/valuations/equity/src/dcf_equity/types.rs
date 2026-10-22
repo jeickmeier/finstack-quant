@@ -11,7 +11,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_core::Error as CoreError;
+use finstack_quant_core::Error;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::MarketDependencies;
@@ -151,7 +151,7 @@ impl ValuationDiscounts {
         fn check(name: &str, val: Option<f64>) -> finstack_quant_core::Result<()> {
             if let Some(v) = val {
                 if !(0.0..=1.0).contains(&v) {
-                    return Err(CoreError::Validation(format!(
+                    return Err(Error::Validation(format!(
                         "{name} must be in [0.0, 1.0], got {v:.6}"
                     )));
                 }
@@ -233,7 +233,7 @@ pub struct DilutionSecurity {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields, try_from = "DiscountedCashFlowUnchecked")]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct DiscountedCashFlow {
     /// Unique identifier for the DCF.
     pub id: InstrumentId,
@@ -321,116 +321,7 @@ pub struct DiscountedCashFlow {
     pub attributes: Attributes,
 }
 
-/// Mirror of `DiscountedCashFlow` used by serde to apply `validate()` after
-/// deserialization. Not part of the public API.
-#[derive(Debug, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-struct DiscountedCashFlowUnchecked {
-    /// Unique identifier for the DCF.
-    id: InstrumentId,
-    /// Currency for all cashflows.
-    currency: Currency,
-    /// Explicit period free cash flows (date, amount pairs).
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
-    )]
-    flows: Vec<(Date, f64)>,
-    /// Weighted Average Cost of Capital (discount rate).
-    wacc: f64,
-    /// Terminal value specification.
-    terminal_value: TerminalValueSpec,
-    /// Valuation date (as-of date for the DCF).
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    valuation_date: Date,
-    /// Discount curve identifier, used for risk attribution only.
-    ///
-    /// Discounting always uses [`wacc`](Self::wacc) via `(1 + wacc)^{-t}`
-    /// regardless of whether this curve is loaded (the
-    /// previous behavior silently switched risky flows to risk-free curve
-    /// discounting). WACC sensitivity is exposed separately as `dcf::wacc01`.
-    /// Mid-year discounting convention (default: `false` = end-of-period).
-    ///
-    /// When `true`, each flow is discounted at `t` minus half the average
-    /// flow spacing instead of `t` (the classic `t - 0.5` for annual
-    /// grids; half a period for sub-annual grids), reflecting the
-    /// assumption that cash flows arrive mid-period. This is the standard
-    /// convention in IB/PE practice (Koller et al.). Exit-multiple
-    /// terminal values are not shifted (point-in-time sale at the horizon).
-    #[serde(default)]
-    mid_year_convention: bool,
-    /// Annualized terminal flow used by growth-perpetuity terminal values.
-    ///
-    /// Gordon Growth and H-Model capitalize an *annual* flow with annual
-    /// WACC and growth rates. When the explicit `flows` grid is sub-annual
-    /// (e.g. quarterly), the last flow is a period flow, not an annual one;
-    /// set this to the trailing-twelve-month aggregate of the final
-    /// explicit year so the terminal value is computed on a consistent
-    /// annual basis (Koller et al., Damodaran). When `None`, the last
-    /// explicit flow is used directly (correct for annual grids).
-    ///
-    /// Ignored by `ExitMultiple` terminal values.
-    #[serde(default)]
-    terminal_flow_override: Option<f64>,
-    /// Equity bridge from enterprise value to equity value (debt, cash,
-    /// preferred equity, minority interest, non-operating assets and other
-    /// adjustments), in instrument currency.
-    equity_bridge: EquityBridge,
-    /// Basic shares outstanding for per-share value calculation.
-    #[serde(default)]
-    shares_outstanding: Option<f64>,
-    /// Dilutive securities (options, warrants, RSUs, convertibles) for treasury stock method.
-    #[serde(default)]
-    dilution_securities: Vec<DilutionSecurity>,
-    /// Private company valuation discounts (DLOM, DLOC).
-    #[serde(default)]
-    valuation_discounts: Option<ValuationDiscounts>,
-    /// Instrument-owned pricing inputs.
-    #[serde(default)]
-    instrument_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[serde(default)]
-    metric_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[serde(default)]
-    scenario_pricing_overrides:
-        finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
-    /// Attributes for scenario selection and tagging
-    attributes: Attributes,
-}
-
-impl TryFrom<DiscountedCashFlowUnchecked> for DiscountedCashFlow {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(value: DiscountedCashFlowUnchecked) -> std::result::Result<Self, Self::Error> {
-        let inst = Self {
-            id: value.id,
-            currency: value.currency,
-            flows: value.flows,
-            wacc: value.wacc,
-            terminal_value: value.terminal_value,
-            valuation_date: value.valuation_date,
-            mid_year_convention: value.mid_year_convention,
-            terminal_flow_override: value.terminal_flow_override,
-            equity_bridge: value.equity_bridge,
-            shares_outstanding: value.shares_outstanding,
-            dilution_securities: value.dilution_securities,
-            valuation_discounts: value.valuation_discounts,
-            instrument_pricing_overrides: value.instrument_pricing_overrides,
-            metric_pricing_overrides: value.metric_pricing_overrides,
-            scenario_pricing_overrides: value.scenario_pricing_overrides,
-            attributes: value.attributes,
-        };
-        inst.validate()?;
-        Ok(inst)
-    }
-}
+finstack_quant_valuations_core::validate_on_deserialize!(DiscountedCashFlow);
 
 impl DiscountedCashFlow {
     /// Validate structural invariants required by the DCF pricer.
@@ -466,21 +357,21 @@ impl DiscountedCashFlow {
     /// `wacc` with the terminal-value variant.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         if !self.wacc.is_finite() {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "DCF '{}' wacc must be finite, got {}",
                 self.id.as_str(),
                 self.wacc
             )));
         }
         if self.wacc <= -1.0 {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "DCF '{}' wacc = {} would make (1 + wacc) <= 0; must be > -1.0",
                 self.id.as_str(),
                 self.wacc
             )));
         }
         if self.wacc <= -0.5 {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "DCF '{}' wacc = {} is at or below the sanity floor -0.5 (-50%); \
                  typical WACC is 0.05 - 0.20 (5% - 20%)",
                 self.id.as_str(),
@@ -488,7 +379,7 @@ impl DiscountedCashFlow {
             )));
         }
         if self.wacc >= 1.0 {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "DCF '{}' wacc = {} is at or above the sanity ceiling 1.0 (100%); \
                  typical WACC is 0.05 - 0.20 (5% - 20%). Did you mean {}?",
                 self.id.as_str(),
@@ -505,7 +396,7 @@ impl DiscountedCashFlow {
             ("non_operating_assets", bridge.non_operating_assets),
         ] {
             if !value.is_finite() {
-                return Err(CoreError::Validation(format!(
+                return Err(Error::Validation(format!(
                     "DCF '{}' equity_bridge.{} must be finite, got {}",
                     self.id.as_str(),
                     field,
@@ -515,7 +406,7 @@ impl DiscountedCashFlow {
         }
         for (name, value) in &bridge.other_adjustments {
             if !value.is_finite() {
-                return Err(CoreError::Validation(format!(
+                return Err(Error::Validation(format!(
                     "DCF '{}' equity_bridge.other_adjustments '{}' must be finite, got {}",
                     self.id.as_str(),
                     name,
@@ -525,7 +416,7 @@ impl DiscountedCashFlow {
         }
         for (i, (date, amount)) in self.flows.iter().enumerate() {
             if !amount.is_finite() {
-                return Err(CoreError::Validation(format!(
+                return Err(Error::Validation(format!(
                     "DCF '{}' flows[{}] amount on {} must be finite, got {}",
                     self.id.as_str(),
                     i,
@@ -536,7 +427,7 @@ impl DiscountedCashFlow {
         }
         for window in self.flows.windows(2) {
             if window[0].0 >= window[1].0 {
-                return Err(CoreError::Validation(format!(
+                return Err(Error::Validation(format!(
                     "DCF '{}' flow dates must be strictly increasing; got {} >= {}",
                     self.id.as_str(),
                     window[0].0,
@@ -546,7 +437,7 @@ impl DiscountedCashFlow {
         }
         for (i, (date, _)) in self.flows.iter().enumerate() {
             if *date <= self.valuation_date {
-                return Err(CoreError::Validation(format!(
+                return Err(Error::Validation(format!(
                     "DCF '{}' flows[{}] date {} must be strictly after valuation_date {}",
                     self.id.as_str(),
                     i,
@@ -557,7 +448,7 @@ impl DiscountedCashFlow {
         }
         if let Some(shares) = self.shares_outstanding {
             if !shares.is_finite() || shares <= 0.0 {
-                return Err(CoreError::Validation(format!(
+                return Err(Error::Validation(format!(
                     "DCF '{}' shares_outstanding must be finite and positive, got {}",
                     self.id.as_str(),
                     shares
@@ -566,7 +457,7 @@ impl DiscountedCashFlow {
         }
         for (i, sec) in self.dilution_securities.iter().enumerate() {
             if !sec.quantity.is_finite() || sec.quantity < 0.0 {
-                return Err(CoreError::Validation(format!(
+                return Err(Error::Validation(format!(
                     "DCF '{}' dilution_securities[{}] quantity must be finite and non-negative, got {}",
                     self.id.as_str(),
                     i,
@@ -574,7 +465,7 @@ impl DiscountedCashFlow {
                 )));
             }
             if !sec.exercise_price.is_finite() || sec.exercise_price < 0.0 {
-                return Err(CoreError::Validation(format!(
+                return Err(Error::Validation(format!(
                     "DCF '{}' dilution_securities[{}] exercise_price must be finite and non-negative, got {}",
                     self.id.as_str(),
                     i,
@@ -587,7 +478,7 @@ impl DiscountedCashFlow {
         }
         if let Some(tf) = self.terminal_flow_override {
             if !tf.is_finite() {
-                return Err(CoreError::Validation(format!(
+                return Err(Error::Validation(format!(
                     "DCF '{}' terminal_flow_override must be finite, got {}",
                     self.id.as_str(),
                     tf
@@ -602,7 +493,7 @@ impl DiscountedCashFlow {
         {
             if let Some(spacing) = self.average_flow_spacing_years() {
                 if spacing < SUB_ANNUAL_GRID_SPACING_THRESHOLD_YEARS {
-                    return Err(CoreError::Validation(format!(
+                    return Err(Error::Validation(format!(
                         "DCF '{}' has a sub-annual flow grid (average spacing {:.2}y) with a \
                          growth-perpetuity terminal value and no terminal_flow_override; the \
                          last period flow would be capitalized as an annual flow, understating \
@@ -628,7 +519,7 @@ impl DiscountedCashFlow {
         match &self.terminal_value {
             TerminalValueSpec::GordonGrowth { stable_growth_rate } => {
                 if !stable_growth_rate.is_finite() {
-                    return Err(CoreError::Validation(format!(
+                    return Err(Error::Validation(format!(
                         "DCF '{}' terminal_value.stable_growth_rate (gordon_growth) must be finite, got {}",
                         self.id.as_str(),
                         stable_growth_rate
@@ -640,7 +531,7 @@ impl DiscountedCashFlow {
                 multiple,
             } => {
                 if !terminal_metric.is_finite() || !multiple.is_finite() {
-                    return Err(CoreError::Validation(format!(
+                    return Err(Error::Validation(format!(
                         "DCF '{}' ExitMultiple terminal_metric ({}) and multiple ({}) must be finite",
                         self.id.as_str(),
                         terminal_metric,
@@ -648,7 +539,7 @@ impl DiscountedCashFlow {
                     )));
                 }
                 if terminal_metric * multiple < 0.0 {
-                    return Err(CoreError::Validation(format!(
+                    return Err(Error::Validation(format!(
                         "DCF '{}' ExitMultiple terminal_metric ({}) x multiple ({}) is negative; \
                          a negative terminal sale price is not meaningful — check the metric and \
                          multiple signs",
@@ -667,7 +558,7 @@ impl DiscountedCashFlow {
                     || !stable_growth_rate.is_finite()
                     || !half_life_years.is_finite()
                 {
-                    return Err(CoreError::Validation(format!(
+                    return Err(Error::Validation(format!(
                         "DCF '{}' H-Model parameters must be finite: high_growth_rate ({}), \
                          stable_growth_rate ({}), half_life_years ({})",
                         self.id.as_str(),
@@ -778,7 +669,7 @@ impl DiscountedCashFlow {
         match &self.terminal_value {
             TerminalValueSpec::GordonGrowth { stable_growth_rate } => {
                 let (_, last_fcf) = self.flows.last().ok_or_else(|| {
-                    CoreError::Validation(
+                    Error::Validation(
                         "DCF has no explicit flows; cannot compute terminal value".into(),
                     )
                 })?;
@@ -786,7 +677,7 @@ impl DiscountedCashFlow {
                 // Fail-closed: NaN parameters compare as None and must
                 // error rather than silently producing NaN values.
                 if wacc.partial_cmp(&g) != Some(std::cmp::Ordering::Greater) {
-                    return Err(CoreError::Validation(format!(
+                    return Err(Error::Validation(format!(
                         "Gordon Growth requires WACC ({:.6}) > stable_growth_rate ({:.6})",
                         wacc, g
                     )));
@@ -820,7 +711,7 @@ impl DiscountedCashFlow {
                 half_life_years,
             } => {
                 let (_, last_fcf) = self.flows.last().ok_or_else(|| {
-                    CoreError::Validation(
+                    Error::Validation(
                         "DCF has no explicit flows; cannot compute terminal value".into(),
                     )
                 })?;
@@ -831,7 +722,7 @@ impl DiscountedCashFlow {
                 // must error instead of silently passing.
                 use std::cmp::Ordering;
                 if wacc.partial_cmp(&g_s) != Some(Ordering::Greater) {
-                    return Err(CoreError::Validation(format!(
+                    return Err(Error::Validation(format!(
                         "H-Model requires WACC ({:.6}) > stable_growth_rate ({:.6})",
                         wacc, g_s
                     )));
@@ -840,13 +731,13 @@ impl DiscountedCashFlow {
                     g_h.partial_cmp(&g_s),
                     Some(Ordering::Greater | Ordering::Equal)
                 ) {
-                    return Err(CoreError::Validation(format!(
+                    return Err(Error::Validation(format!(
                         "H-Model requires high_growth_rate ({:.6}) >= stable_growth_rate ({:.6})",
                         g_h, g_s
                     )));
                 }
                 if h.partial_cmp(&0.0) != Some(Ordering::Greater) {
-                    return Err(CoreError::Validation(format!(
+                    return Err(Error::Validation(format!(
                         "H-Model requires half_life_years > 0, got {:.6}",
                         h
                     )));
@@ -897,9 +788,7 @@ impl DiscountedCashFlow {
     /// Returns `Err` if flows are empty.
     pub fn terminal_discount_years(&self) -> finstack_quant_core::Result<f64> {
         let (terminal_date, _) = self.flows.last().ok_or_else(|| {
-            CoreError::Validation(
-                "DCF has no explicit flows; cannot discount terminal value".into(),
-            )
+            Error::Validation("DCF has no explicit flows; cannot discount terminal value".into())
         })?;
         Ok(
             if matches!(self.terminal_value, TerminalValueSpec::ExitMultiple { .. }) {

@@ -41,14 +41,12 @@
 //! - private markets metrics module for private markets metrics
 
 pub(crate) mod metrics;
-/// Private markets fund pricer implementation
-pub(crate) mod pricer;
 mod types;
 mod waterfall;
 
 pub use types::PrivateMarketsFund;
 pub use waterfall::{
-    AllocationLedger, AllocationRow, CatchUpMode, ClawbackSettle, ClawbackSpec,
-    EquityWaterfallEngine, FundEvent, FundEventKind, PeFundWaterfallSpec, PeFundWaterfallTranche,
-    WaterfallSpecBuilder, WaterfallStyle,
+    AllocationLedger, AllocationRow, CatchUpMode, ClawbackSpec, EquityWaterfallEngine, FundEvent,
+    FundEventKind, PeFundWaterfallSpec, PeFundWaterfallTranche, WaterfallSpecBuilder,
+    WaterfallStyle,
 };

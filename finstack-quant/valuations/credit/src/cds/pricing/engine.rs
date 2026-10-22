@@ -1,6 +1,6 @@
-//! Configuration, integration, and metric helpers for CDS pricing.
-//!
-use super::config::CdsPricerConfig;
+//! `CdsPricer`: premium and protection legs, protection-leg integration over the
+//! ISDA Standard Model knot grid, NPV and the hazard-reprice cache.
+
 use super::helpers::{
     date_from_hazard_time, haz_t, isda_standard_model_boundaries, settlement_date, sp_cond_to,
     validate_recovery_consistency,
@@ -17,12 +17,15 @@ use finstack_quant_valuations_core::constants::credit;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
 use rust_decimal::prelude::ToPrimitive;
 
-/// CDS pricing engine. Stateless wrapper carrying configuration.
-#[derive(Debug)]
+/// CDS pricing engine.
+///
+/// Stateless: every valuation choice (par-spread denominator, step-in,
+/// accrual day count) comes from the instrument's
+/// [`CdsValuationConvention`](finstack_quant_valuations_core::market::conventions::CdsValuationConvention).
+/// Accrual-on-default is always included in the premium leg.
+#[derive(Debug, Default, Clone, Copy)]
 #[doc(hidden)]
-pub struct CdsPricer {
-    pub(super) config: CdsPricerConfig,
-}
+pub struct CdsPricer;
 
 #[derive(Clone, Copy)]
 pub(super) struct AodInputs<'a> {
@@ -53,12 +56,6 @@ pub(crate) struct CouponPeriod {
     pub(super) is_final: bool,
 }
 
-impl Default for CdsPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl CdsPricer {
     fn add_premium_period(
         &self,
@@ -74,30 +71,20 @@ impl CdsPricer {
         };
         let scheduled_coupon = inputs.cds.notional.amount() * inputs.spread * accrual;
         *total += scheduled_coupon * sp * df;
-        if self.config.include_accrual_on_default {
-            *total += inputs.spread.signum()
-                * inputs.cds.notional.amount()
-                * self.accrual_on_default_isda_standard_model_cond(AodInputs {
-                    spread: inputs.spread.abs(),
-                    ..inputs
-                })?;
-        }
+        *total += inputs.spread.signum()
+            * inputs.cds.notional.amount()
+            * self.accrual_on_default_isda_standard_model_cond(AodInputs {
+                spread: inputs.spread.abs(),
+                ..inputs
+            })?;
         Ok(())
     }
 
-    /// Create new pricer with default ISDA-compliant config.
+    /// Create the (stateless) CDS pricer.
     #[must_use]
     #[doc(hidden)]
     pub fn new() -> Self {
-        Self {
-            config: CdsPricerConfig::default(),
-        }
-    }
-
-    /// Create pricer with custom config.
-    #[must_use]
-    pub(crate) fn with_config(config: CdsPricerConfig) -> Self {
-        Self { config }
+        Self
     }
 
     /// Calculate PV of protection leg using ISDA Standard Model integration.
@@ -205,10 +192,9 @@ impl CdsPricer {
         // Compute survival at as_of for conditioning
         let sp_asof = surv.sp(t_asof);
 
-        let inputs = super::integration::ProtectionLegInputs {
+        let grid = IsdaGrid {
             t_start,
             t_end,
-            recovery,
             settlement_delay: cds.protection_leg.settlement_delay,
             calendar,
             sp_asof,
@@ -216,7 +202,7 @@ impl CdsPricer {
             disc,
             surv,
         };
-        let protection_pv = self.protection_leg_isda_standard_model_cond(&inputs)?;
+        let protection_pv = protection_leg_isda_standard_model_cond(&grid, recovery)?;
 
         Ok(protection_pv * cds.notional.amount())
     }
@@ -354,74 +340,38 @@ impl CdsPricer {
         // Linear scale from hazard-time position to instrument-day-count accrual.
         let tau_per_haz = tau_remaining / accrual_period_length_haz;
 
-        let boundaries = isda_standard_model_boundaries(
+        // Accrued fraction at interval start, expressed in instrument-DC units.
+        //
+        // QuantLib's `Actual360(true)` shifts discrete coupon accrual by
+        // one inclusive day. In the continuous default-accrual integral,
+        // that convention contributes half a day at the interval boundary.
+        // `IsdaCdsEngine` can also add its explicit `HalfDayBias`; when
+        // both QuantLib knobs are enabled the starting accrual is shifted
+        // by one full day.
+        let mut bias_days = 0.0;
+        if inp.cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360 {
+            if inp.cds.valuation_convention.act360_includes_last_day() {
+                bias_days += 0.5;
+            }
+            if inp.cds.valuation_convention.aod_half_day_bias() {
+                bias_days += 0.5;
+            }
+        }
+        let accrual_bias = bias_days / 360.0;
+
+        let grid = IsdaGrid {
             t_start,
             t_end,
-            inp.surv,
-            inp.disc,
-            self.config.protection_leg_substeps_per_year,
-        )?;
+            settlement_delay: inp.settlement_delay,
+            calendar: inp.calendar,
+            sp_asof,
+            as_of: inp.as_of,
+            disc: inp.disc,
+            surv: inp.surv,
+        };
         let mut accrual_pv = 0.0;
-
-        for window in boundaries.windows(2) {
-            let t1 = window[0];
-            let t2 = window[1];
-            let dt = t2 - t1;
-            if dt <= ZERO_TOLERANCE {
-                continue;
-            }
-
-            let sp1 = inp.surv.sp(t1) / sp_asof;
-            let sp2 = inp.surv.sp(t2) / sp_asof;
-            if !(sp1 > sp2 && sp1 > 0.0) {
-                continue;
-            }
-
-            // Piecewise-constant hazard rate over [t1, t2].
-            let hazard_rate = -(sp2 / sp1).ln() / dt;
-
-            // Relative DF anchored at as_of, via settled default date per knot.
-            let settle1 = settlement_date(
-                date_from_hazard_time(inp.surv, t1),
-                inp.settlement_delay,
-                inp.calendar,
-                self.config.business_days_per_year,
-            )?;
-            let settle2 = settlement_date(
-                date_from_hazard_time(inp.surv, t2),
-                inp.settlement_delay,
-                inp.calendar,
-                self.config.business_days_per_year,
-            )?;
-            let df1 = inp.disc.df_between_dates(inp.as_of, settle1)?;
-            let df2 = inp.disc.df_between_dates(inp.as_of, settle2)?;
-
-            // Piecewise-constant interest rate (may be negative if df2 > df1).
-            let interest_rate = if df1 > 0.0 && df2 > 0.0 {
-                -(df2 / df1).ln() / dt
-            } else {
-                0.0
-            };
-
-            // Accrued fraction at interval start, expressed in instrument-DC units.
-            //
-            // QuantLib's `Actual360(true)` shifts discrete coupon accrual by
-            // one inclusive day. In the continuous default-accrual integral,
-            // that convention contributes half a day at the interval boundary.
-            // `IsdaCdsEngine` can also add its explicit `HalfDayBias`; when
-            // both QuantLib knobs are enabled the starting accrual is shifted
-            // by one full day.
-            let mut bias_days = 0.0;
-            if inp.cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360 {
-                if inp.cds.valuation_convention.act360_includes_last_day() {
-                    bias_days += 0.5;
-                }
-                if inp.cds.valuation_convention.aod_half_day_bias() {
-                    bias_days += 0.5;
-                }
-            }
-            let accrual_bias = bias_days / 360.0;
-            let tau_at_t1 = (t1 - t_accrual_start) * tau_per_haz + accrual_bias;
+        grid.for_each_window(|w| {
+            let tau_at_t1 = (w.t1 - t_accrual_start) * tau_per_haz + accrual_bias;
 
             // Analytical integration for
             //   ∫ spread * (τ_at_t1 + (t - t1) * tau_per_haz) * λ * S(t1) * D(t1)
@@ -429,23 +379,23 @@ impl CdsPricer {
             // Let k = λ + r. Then
             //   I0 = (1 - e^{-kΔ})/k
             //   I1 = (1 - e^{-kΔ}(1 + kΔ))/k²
-            let k = hazard_rate + interest_rate;
+            let k = w.hazard_rate + w.interest_rate;
             let contribution = if k.abs() > ZERO_TOLERANCE {
-                let exp_term = (-k * dt).exp();
+                let exp_term = (-k * w.dt).exp();
                 let i0 = (1.0 - exp_term) / k;
-                let i1 = (1.0 - exp_term * (1.0 + k * dt)) / (k * k);
-                inp.spread * df1 * sp1 * hazard_rate * (tau_at_t1 * i0 + tau_per_haz * i1)
+                let i1 = (1.0 - exp_term * (1.0 + k * w.dt)) / (k * k);
+                inp.spread * w.df1 * w.sp1 * w.hazard_rate * (tau_at_t1 * i0 + tau_per_haz * i1)
             } else {
                 // Small-k fallback: midpoint approximation keeps AoD well-behaved
                 // for near-zero hazard or near-zero (r+λ).
-                let t_mid = (t1 + t2) * 0.5;
+                let t_mid = (w.t1 + w.t2) * 0.5;
                 let position =
                     ((t_mid - t_accrual_start) / accrual_period_length_haz).clamp(0.0, 1.0);
                 let accrued_tau = tau_remaining * position + accrual_bias;
-                inp.spread * accrued_tau * (sp1 - sp2) * df1
+                inp.spread * accrued_tau * (w.sp1 - w.sp2) * w.df1
             };
             accrual_pv += contribution;
-        }
+        })?;
         Ok(accrual_pv)
     }
 }
@@ -481,7 +431,7 @@ impl CdsHazardRepriceCache {
     ) -> Result<Self> {
         use rust_decimal::prelude::ToPrimitive;
 
-        let pricer = CdsPricer::with_config(CdsPricerConfig::from_cds(cds));
+        let pricer = CdsPricer::new();
         let disc = market.get_discount(&cds.premium_leg.discount_curve_id)?;
         let periods_raw = pricer.coupon_periods(cds, as_of)?;
         let mut periods = Vec::with_capacity(periods_raw.len());
@@ -593,9 +543,143 @@ pub(super) fn signed_npv(
     value
 }
 
+// Protection-leg and accrual-on-default integration over the ISDA Standard
+// Model knot grid.
+
+/// Per-integral constants of the ISDA Standard Model knot grid shared by the
+/// protection-leg and accrual-on-default integrators.
+#[derive(Clone, Copy)]
+pub(super) struct IsdaGrid<'a> {
+    /// Hazard-curve time (years) of the integration window start.
+    pub(super) t_start: f64,
+    /// Hazard-curve time (years) of the integration window end.
+    pub(super) t_end: f64,
+    /// Settlement delay in business days applied to the default date.
+    pub(super) settlement_delay: u16,
+    /// Optional business-day calendar for the settlement-date shift.
+    pub(super) calendar: Option<&'a dyn HolidayCalendar>,
+    /// Survival probability at `as_of` used to condition later hazard times.
+    pub(super) sp_asof: f64,
+    /// Pricing valuation date (discount factors are relative to it).
+    pub(super) as_of: Date,
+    /// Discount curve valuing the default-settlement cashflows.
+    pub(super) disc: &'a DiscountCurve,
+    /// Hazard / survival curve producing default densities.
+    pub(super) surv: &'a HazardCurve,
+}
+
+/// One grid window with piecewise-constant hazard and interest rates.
+#[derive(Clone, Copy)]
+pub(super) struct IsdaWindow {
+    /// Window start (hazard-curve years).
+    pub(super) t1: f64,
+    /// Window end (hazard-curve years).
+    pub(super) t2: f64,
+    /// Window length `t2 - t1`.
+    pub(super) dt: f64,
+    /// Conditional survival at `t1`.
+    pub(super) sp1: f64,
+    /// Conditional survival at `t2`.
+    pub(super) sp2: f64,
+    /// Piecewise-constant hazard rate `λ` over the window.
+    pub(super) hazard_rate: f64,
+    /// Relative discount factor from `as_of` to the settlement of a default at `t1`.
+    pub(super) df1: f64,
+    /// Piecewise-constant interest rate `r` over the window (may be negative).
+    pub(super) interest_rate: f64,
+}
+
+impl IsdaGrid<'_> {
+    /// Visit every window of the knot grid that carries default probability
+    /// (`sp1 > sp2` and `sp1 > 0`).
+    pub(super) fn for_each_window(&self, mut visit: impl FnMut(IsdaWindow)) -> Result<()> {
+        let boundaries =
+            isda_standard_model_boundaries(self.t_start, self.t_end, self.surv, self.disc)?;
+        for window in boundaries.windows(2) {
+            let t1 = window[0];
+            let t2 = window[1];
+            let dt = t2 - t1;
+            if dt <= ZERO_TOLERANCE {
+                continue;
+            }
+
+            let sp1 = self.surv.sp(t1) / self.sp_asof;
+            let sp2 = self.surv.sp(t2) / self.sp_asof;
+            if !(sp1 > sp2 && sp1 > 0.0) {
+                continue;
+            }
+
+            // Piecewise-constant hazard rate over [t1, t2].
+            let hazard_rate = -(sp2 / sp1).ln() / dt;
+
+            // Relative DF anchored at as_of, via settled default date per knot.
+            let settle1 = settlement_date(
+                date_from_hazard_time(self.surv, t1),
+                self.settlement_delay,
+                self.calendar,
+            )?;
+            let settle2 = settlement_date(
+                date_from_hazard_time(self.surv, t2),
+                self.settlement_delay,
+                self.calendar,
+            )?;
+            let df1 = self.disc.df_between_dates(self.as_of, settle1)?;
+            let df2 = self.disc.df_between_dates(self.as_of, settle2)?;
+
+            // Piecewise-constant interest rate (may be negative if df2 > df1).
+            let interest_rate = if df1 > 0.0 && df2 > 0.0 {
+                -(df2 / df1).ln() / dt
+            } else {
+                0.0
+            };
+
+            visit(IsdaWindow {
+                t1,
+                t2,
+                dt,
+                sp1,
+                sp2,
+                hazard_rate,
+                df1,
+                interest_rate,
+            });
+        }
+        Ok(())
+    }
+}
+
+/// ISDA Standard Model protection leg per unit notional, with conditional
+/// survival and relative discounting; `recovery` is the decimal recovery rate.
+fn protection_leg_isda_standard_model_cond(grid: &IsdaGrid<'_>, recovery: f64) -> Result<f64> {
+    if grid.t_start >= grid.t_end {
+        return Err(Error::Validation(format!(
+            "Protection leg start time ({}) must be before end time ({})",
+            grid.t_start, grid.t_end
+        )));
+    }
+    if grid.sp_asof <= credit::SURVIVAL_PROBABILITY_FLOOR {
+        return Ok(0.0);
+    }
+
+    let lgd = 1.0 - recovery;
+    let mut integral = 0.0;
+    grid.for_each_window(|w| {
+        // ISDA Standard Model analytical integration
+        let lambda_plus_r = w.hazard_rate + w.interest_rate;
+        if lambda_plus_r.abs() > ZERO_TOLERANCE {
+            let exp_term = (-lambda_plus_r * w.dt).exp();
+            integral += w.df1 * w.sp1 * (w.hazard_rate / lambda_plus_r) * (1.0 - exp_term);
+        } else {
+            integral += w.df1 * w.sp1 * w.hazard_rate * w.dt;
+        }
+    })?;
+
+    Ok(integral * lgd)
+}
+
 #[cfg(test)]
 mod cds_hazard_reprice_cache_tests {
-    use super::{CdsHazardRepriceCache, CdsPricer, CdsPricerConfig};
+    use super::{CdsHazardRepriceCache, CdsPricer};
     use crate::cds::CreditDefaultSwap;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
@@ -693,18 +777,12 @@ mod cds_hazard_reprice_cache_tests {
             }),
             "valuation date should fall inside a live coupon accrual period"
         );
-        assert!(
-            cache.pricer.config.include_accrual_on_default,
-            "CdsPricerConfig::from_cds should enable accrual-on-default"
-        );
-
         let discount = market.get_discount(&cds.premium_leg.discount_curve_id)?;
-        let without_aod = CdsPricer::with_config(CdsPricerConfig {
-            include_accrual_on_default: false,
-            ..CdsPricerConfig::from_cds(&cds)
-        })
-        .npv_full(&cds, discount.as_ref(), &hazard, as_of)?;
-        let with_aod = cds.value(&market, as_of)?.amount();
+        let pricer = CdsPricer::new();
+        let with_aod =
+            pricer.premium_leg_annuity(&cds, discount.as_ref(), &hazard, as_of, 1.0, true)?;
+        let without_aod =
+            pricer.premium_leg_annuity(&cds, discount.as_ref(), &hazard, as_of, 1.0, false)?;
         assert!(
             (with_aod - without_aod).abs() > 1.0e-8,
             "fixture should produce a non-zero accrual-on-default contribution"
@@ -731,7 +809,7 @@ mod cds_hazard_reprice_cache_tests {
 #[cfg(test)]
 mod cds_review_regression_tests {
     use super::{CdsHazardRepriceCache, CdsPricer};
-    use crate::cds::pricing::{AccrualDayCountPolicy, CdsPricerConfig};
+    use crate::cds::pricing::AccrualDayCountPolicy;
     use crate::cds::CreditDefaultSwap;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
@@ -824,7 +902,7 @@ mod cds_review_regression_tests {
             CdsValuationConvention::BloombergCdswClean,
         ] {
             let cds = contract(start, end, convention)?;
-            let pricer = CdsPricer::with_config(CdsPricerConfig::from_cds(&cds));
+            let pricer = CdsPricer::new();
             let expected_days =
                 (end - start).whole_days() + i64::from(convention.uses_clean_price());
             let expected_coupon = 10_000_000.0 * 0.01 * expected_days as f64 / 360.0;
@@ -893,7 +971,7 @@ mod cds_review_regression_tests {
             CdsValuationConvention::BloombergCdswCleanFullPremium,
         ] {
             let cds = contract(start, end, convention)?;
-            let pricer = CdsPricer::with_config(CdsPricerConfig::from_cds(&cds));
+            let pricer = CdsPricer::new();
             let accrual = ((end - start).whole_days() + i64::from(convention.uses_clean_price()))
                 as f64
                 / 360.0;
@@ -951,7 +1029,7 @@ mod cds_review_regression_tests {
                 CdsValuationConvention::BloombergCdswCleanFullPremium,
             ] {
                 let cds = contract(start, end, convention)?;
-                let pricer = CdsPricer::with_config(CdsPricerConfig::from_cds(&cds));
+                let pricer = CdsPricer::new();
                 let t = (end - as_of).whole_days() as f64 / 365.0;
                 let elapsed = (as_of - start).whole_days() as f64 / 360.0;
                 let coupon = ((end - start).whole_days() + 1) as f64 / 360.0;

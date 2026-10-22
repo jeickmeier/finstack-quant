@@ -17,8 +17,8 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec, ForecastSpec, NodeId};
 use finstack_quant_statements::types::FinancialStatementInstrument;
-use finstack_quant_valuations::instruments::fixed_income::term_loan::{TermLoan};
 use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
+use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use time::Month;
 
 /// Issue / as-of date shared by capital-structure fixtures.

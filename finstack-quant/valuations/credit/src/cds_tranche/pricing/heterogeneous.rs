@@ -1,11 +1,10 @@
 //! Heterogeneous capped loss by exact states for small pools and grid convolution.
-use super::config::{
-    CdsTranchePricer, PoolExposure, CDF_CLIP, GRID_STEP, HOMOGENEITY_TOLERANCE,
-    MAX_CONVOLUTION_WORK, MAX_GRID_POINTS, NUMERICAL_TOLERANCE,
+use super::pricer::{
+    CdsTranchePricer, PoolExposure, GRID_STEP, HOMOGENEITY_TOLERANCE, MAX_CONVOLUTION_WORK,
+    MAX_GRID_POINTS,
 };
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
-use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::{Error, Result};
 use std::cell::RefCell;
 
@@ -83,20 +82,7 @@ impl CdsTranchePricer {
             .map(|p| self.default_threshold_for_copula(*p))
             .collect();
         let conditional_p = |i: usize, factors: &[f64]| {
-            if self.copula_spec.is_gaussian() {
-                self.conditional_default_probability_enhanced(
-                    thresholds[i],
-                    correlation,
-                    factors[0],
-                )
-            } else {
-                self.conditional_default_prob_copula(
-                    self.copula(),
-                    thresholds[i],
-                    factors,
-                    correlation,
-                )
-            }
+            self.conditional_default_prob_copula(self.copula(), thresholds[i], factors, correlation)
         };
         let exposures: Vec<f64> = recoveries
             .iter()
@@ -196,89 +182,6 @@ impl CdsTranchePricer {
                 cap,
             ))
         })
-    }
-
-    /// Calculate conditional default probability given market factor Z.
-    ///
-    /// Standard implementation kept for compatibility and testing.
-    /// The enhanced version `conditional_default_probability_enhanced` is used
-    /// in production calculations for superior numerical stability.
-    ///
-    /// P(default | Z) = Φ((Φ⁻¹(PD) - √ρ * Z) / √(1-ρ))
-    #[cfg(test)]
-    pub(super) fn conditional_default_probability(
-        &self,
-        default_threshold: f64,
-        correlation: f64,
-        market_factor: f64,
-    ) -> f64 {
-        let sqrt_rho = correlation.sqrt();
-        let one_minus_rho: f64 = 1.0 - correlation;
-        let sqrt_one_minus_rho = one_minus_rho.sqrt();
-
-        let conditional_threshold =
-            (default_threshold - sqrt_rho * market_factor) / sqrt_one_minus_rho;
-        norm_cdf(conditional_threshold)
-    }
-
-    /// Enhanced conditional default probability with improved numerical stability.
-    ///
-    /// Provides superior handling of boundary cases and extreme correlation values
-    /// through sophisticated boundary transition functions and overflow protection.
-    ///
-    /// P(default | Z) = Φ((Φ⁻¹(PD) - √ρ * Z) / √(1-ρ))
-    pub(super) fn conditional_default_probability_enhanced(
-        &self,
-        default_threshold: f64,
-        correlation: f64,
-        market_factor: f64,
-    ) -> f64 {
-        // Apply smooth correlation boundaries to avoid numerical discontinuities
-        let correlation = self.smooth_correlation_boundary(correlation);
-
-        // Handle extreme correlation cases with special care
-        if correlation < NUMERICAL_TOLERANCE {
-            // Near-zero correlation: independent case
-            return norm_cdf(default_threshold);
-        }
-        if correlation > 1.0 - NUMERICAL_TOLERANCE {
-            // Perfect-correlation limit: the latent variable Aᵢ = √ρ·Z +
-            // √(1−ρ)·εᵢ → Z, so default (Aᵢ ≤ Φ⁻¹(PD)) becomes the deterministic
-            // step 1{Z ≤ Φ⁻¹(PD)}. The previous `Φ(Φ⁻¹(PD) − Z)` was the wrong
-            // limit (it dropped the 1/√(1−ρ) divisor).
-            //
-            // Reachability: `smooth_correlation_boundary` caps ρ at
-            // MAX_CORRELATION (0.99), so this branch is currently
-            // unreachable; the exact limit is kept for correctness should the cap
-            // ever be relaxed. The 0.99 cap is a deliberate numerical-stability
-            // choice and means the exact ρ = 1 comonotonic limit is not priced.
-            return if market_factor < default_threshold {
-                1.0
-            } else {
-                0.0
-            };
-        }
-
-        // Enhanced calculation with overflow protection
-        let sqrt_rho = correlation.sqrt();
-        let one_minus_rho = 1.0 - correlation;
-
-        // Protect against numerical issues when correlation approaches 1
-        let sqrt_one_minus_rho = if one_minus_rho < NUMERICAL_TOLERANCE {
-            NUMERICAL_TOLERANCE.sqrt() // Minimum practical value to avoid division by zero
-        } else {
-            let one_minus_rho: f64 = 1.0 - correlation;
-            one_minus_rho.sqrt()
-        };
-
-        // Calculate conditional threshold with overflow protection
-        let numerator = default_threshold - sqrt_rho * market_factor;
-        let conditional_threshold = numerator / sqrt_one_minus_rho;
-
-        // Clamp to reasonable range to prevent CDF overflow
-        let conditional_threshold = conditional_threshold.clamp(-CDF_CLIP, CDF_CLIP);
-
-        norm_cdf(conditional_threshold)
     }
 }
 

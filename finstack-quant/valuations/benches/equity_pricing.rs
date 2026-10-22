@@ -319,7 +319,6 @@ fn bench_vol_index_future_pv(c: &mut Criterion) {
                 )
                 .unwrap(),
             )
-            .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_index_curve_id(CurveId::new("VIX"))
             .attributes(Attributes::new())
             .build()

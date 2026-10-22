@@ -260,7 +260,12 @@ test('Rust types reject unknown keys and non-finite numbers in object inputs', (
     (error) => error.kind === 'validation' && /dayCont/.test(error.message)
   );
   assert.throws(
-    () => new valuations.fx.FxForward({ contract_rate: Number.NaN }),
+    () =>
+      valuations.instruments.FxForward.fromJson(
+        valuations.instruments.instrumentEnvelopeFromSpec('fx_forward', {
+          contract_rate: Number.NaN,
+        })
+      ),
     invalidType('spec')
   );
 });

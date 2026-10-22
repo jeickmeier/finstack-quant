@@ -29,7 +29,7 @@ every argument is a flat `f64`.
 Consumed by `valuations::instruments` — `equity/equity_option`,
 `equity/variance_swap`, `exotics/{asian,barrier,lookback}_option`,
 `fx/fx_barrier_option`, `fx/quanto_option`, and the shared
-`common_impl/pricing` helpers — by `models::pde` as a convergence anchor, and
+`instruments::pricing` helpers — by `models::pde` as a convergence anchor, and
 by the Python/WASM bindings via [`dispatch.rs`](dispatch.rs).
 
 ## Layout

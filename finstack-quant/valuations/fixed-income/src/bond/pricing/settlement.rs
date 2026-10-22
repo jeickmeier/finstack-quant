@@ -11,13 +11,15 @@
 //!   is set, otherwise `as_of`).
 //! - Accrued interest for market quotes is computed at the quote date.
 
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{adjust, Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
-use super::super::types::Bond;
-use super::super::CashflowSpec;
+use crate::bond::Bond;
 
 /// Compute the settlement date from a trade/valuation date.
 ///
@@ -35,43 +37,10 @@ pub(crate) fn settlement_date(bond: &Bond, as_of: Date) -> Result<Date> {
             "bond settlement_days {sd_u32} exceeds the supported range"
         ))
     })?;
-    let (calendar_id, business_day_convention) = match &bond.cashflow_spec {
-        CashflowSpec::Fixed(spec) => (
-            spec.schedule.calendar_id.as_str(),
-            spec.schedule.business_day_convention,
-        ),
-        CashflowSpec::Floating(spec) => (
-            spec.schedule.calendar_id.as_str(),
-            spec.schedule.business_day_convention,
-        ),
-        CashflowSpec::StepUp(spec) => (
-            spec.schedule.calendar_id.as_str(),
-            spec.schedule.business_day_convention,
-        ),
-        CashflowSpec::Amortizing { base, .. } => match &**base {
-            CashflowSpec::Fixed(spec) => (
-                spec.schedule.calendar_id.as_str(),
-                spec.schedule.business_day_convention,
-            ),
-            CashflowSpec::Floating(spec) => (
-                spec.schedule.calendar_id.as_str(),
-                spec.schedule.business_day_convention,
-            ),
-            CashflowSpec::StepUp(spec) => (
-                spec.schedule.calendar_id.as_str(),
-                spec.schedule.business_day_convention,
-            ),
-            CashflowSpec::Amortizing { .. } => {
-                return Err(finstack_quant_core::Error::Validation(
-                    "nested amortizing bond cashflow specifications are unsupported".to_string(),
-                ));
-            }
-        },
-    };
-
-    let cal = finstack_quant_core::dates::calendar_by_id_strict(calendar_id)?;
+    let schedule = bond.cashflow_spec.schedule();
+    let cal = finstack_quant_core::dates::calendar_by_id_strict(&schedule.calendar_id)?;
     let advanced = as_of.add_business_days(sd, cal)?;
-    let adjusted = adjust(advanced, business_day_convention, cal)?;
+    let adjusted = adjust(advanced, schedule.business_day_convention, cal)?;
     Ok(adjusted.max(bond.issue_date))
 }
 
@@ -249,6 +218,27 @@ pub(crate) fn quote_dirty_at_as_of(
     Ok(dirty_at_quote * carry.settlement_df + carry.detached_pv_as_of)
 }
 
+/// Replay principal claims on cash dates, retaining economic PIK/default dates.
+///
+/// Recovery exposure runs until actual cash repayment, so amortization,
+/// prepayment, notional and revolving rows drop their economic principal date.
+pub(crate) fn recovery_principal_path(schedule: &CashFlowSchedule) -> Result<Vec<(Date, Money)>> {
+    let mut cash_schedule = schedule.clone();
+    cash_schedule.update_flows(|flow| {
+        if matches!(
+            flow.kind,
+            CFKind::Amortization
+                | CFKind::PrePayment
+                | CFKind::Notional
+                | CFKind::RevolvingDraw
+                | CFKind::RevolvingRepayment
+        ) {
+            flow.principal_date = None;
+        }
+    });
+    cash_schedule.outstanding_by_date()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -268,7 +258,7 @@ mod tests {
             "USD-OIS",
         )
         .expect("bond");
-        bond.settlement_convention = Some(super::super::super::types::BondSettlementConvention {
+        bond.settlement_convention = Some(crate::bond::BondSettlementConvention {
             settlement_days: 2,
             ..Default::default()
         });
@@ -330,7 +320,7 @@ mod tests {
     #[test]
     fn settlement_rejects_unknown_calendar() {
         let mut bond = t2_bond();
-        if let CashflowSpec::Fixed(spec) = &mut bond.cashflow_spec {
+        if let crate::bond::CashflowSpec::Fixed(spec) = &mut bond.cashflow_spec {
             spec.schedule.calendar_id = "missing-calendar".into();
         }
         let err = settlement_date(&bond, date!(2025 - 01 - 02))
@@ -353,7 +343,7 @@ mod tests {
             "USD-OIS",
         )
         .expect("bond");
-        bond.settlement_convention = Some(super::super::super::types::BondSettlementConvention {
+        bond.settlement_convention = Some(crate::bond::BondSettlementConvention {
             settlement_days: 1,
             ex_coupon_days: 7,
             ex_coupon_calendar_id: None,

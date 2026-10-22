@@ -537,8 +537,7 @@ fn convert_money_to_reporting(
 
 /// Keep only dependencies of this instrument. FX conversion into the reporting
 /// currency is itself a dependency, even for a fixed local-currency cash claim.
-#[doc(hidden)]
-pub fn relevant_taylor_scenario(
+pub(crate) fn relevant_taylor_scenario(
     instrument: &dyn Instrument,
     currency: Currency,
     reporting_currency: Currency,
@@ -873,6 +872,7 @@ mod tests {
         id: String,
         price_id: String,
         currency: Currency,
+        discount_curves: Vec<CurveId>,
         attributes: Attributes,
     }
 
@@ -887,17 +887,27 @@ mod tests {
                 id: id.to_string(),
                 price_id: price_id.to_string(),
                 currency,
+                discount_curves: Vec::new(),
                 attributes: Attributes::new(),
             }
+        }
+
+        fn with_discount_curve(mut self, curve_id: &str) -> Self {
+            self.discount_curves.push(CurveId::from(curve_id));
+            self
         }
     }
 
     impl Instrument for CurrencyScalarInstrument {
-        /// Test mock: reads no market data.
+        /// Test mock: declares only the discount curves it was given.
         fn market_dependencies(
             &self,
         ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
-            Ok(crate::instruments::MarketDependencies::new())
+            let mut deps = crate::instruments::MarketDependencies::new();
+            for curve_id in &self.discount_curves {
+                deps.add_discount_curve(curve_id.clone());
+            }
+            Ok(deps)
         }
 
         fn id(&self) -> &str {
@@ -961,6 +971,42 @@ mod tests {
         );
         // Type-7 quantile at p = 0.01 over -50..49: h = 0.99 -> -49.01.
         assert!((result.var - (-49.01)).abs() < 1e-9);
+        Ok(())
+    }
+
+    /// The Taylor path differentiates only along the instrument's own
+    /// dependencies: a shift on a curve the instrument never reads is dropped.
+    #[test]
+    fn relevant_taylor_scenario_keeps_only_instrument_dependencies() -> Result<()> {
+        let as_of = sample_as_of();
+        let instrument = CurrencyScalarInstrument::new("USD", "USD-PX", Currency::USD)
+            .with_discount_curve("USD-OIS");
+        let scenario = MarketScenario::new(
+            as_of,
+            vec![
+                RiskFactorShift {
+                    factor: RiskFactorType::DiscountRate {
+                        curve_id: "USD-OIS".into(),
+                        tenor_years: 1.4,
+                    },
+                    shift: 0.0005,
+                },
+                RiskFactorShift {
+                    factor: RiskFactorType::DiscountRate {
+                        curve_id: "EUR-OIS".into(),
+                        tenor_years: 2.3,
+                    },
+                    shift: -0.0004,
+                },
+            ],
+        );
+        let relevant =
+            relevant_taylor_scenario(&instrument, Currency::USD, Currency::USD, &scenario)?;
+        assert_eq!(relevant.shifts.len(), 1);
+        assert!(matches!(
+            &relevant.shifts[0].factor,
+            RiskFactorType::DiscountRate { curve_id, .. } if curve_id == "USD-OIS"
+        ));
         Ok(())
     }
 

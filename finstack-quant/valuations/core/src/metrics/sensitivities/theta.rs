@@ -65,7 +65,7 @@
 //! - **Positive theta**: Instrument gains value over time (e.g., short options, carry trades)
 //! - **Zero theta**: No time-dependent value change (rare)
 
-use crate::metrics::period_cash::collect_cashflows_in_period_cached;
+use crate::metrics::period_cash::collect_period_cash_cached;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, Tenor};
 use finstack_quant_core::Result;
 
@@ -189,8 +189,9 @@ fn compute_theta_breakdown(context: &mut crate::metrics::MetricContext) -> Resul
         .amount();
 
     let start_date = context.as_of;
-    let carry =
-        collect_cashflows_in_period_cached(context, start_date, rolled_date, base_currency)?;
+    let carry = collect_period_cash_cached(context, start_date, rolled_date, base_currency)?
+        .total
+        .amount();
 
     let roll_down = rolled_pv - base_pv;
 

@@ -12,7 +12,7 @@ use finstack_quant_cashflows::builder::DefaultModelSpec;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_core::Result;
 use finstack_quant_models::credit::pool::prepayment::StochasticPrepaySpec;
-use finstack_quant_models::credit::pool::{CorrelationStructure, StochasticDefaultSpec};
+use finstack_quant_models::credit::pool::StochasticDefaultSpec;
 
 impl StructuredCredit {
     // Stochastic configuration helpers
@@ -24,46 +24,6 @@ impl StructuredCredit {
         self.credit_model.stochastic_prepay_spec.is_some()
             || self.credit_model.stochastic_default_spec.is_some()
             || self.credit_model.correlation_structure.is_some()
-    }
-
-    /// Enable stochastic prepayment modeling.
-    ///
-    /// # Arguments
-    /// * `spec` - Stochastic prepayment specification
-    ///
-    /// # Example
-    /// ```text
-    /// use finstack_quant_valuations_structured_credit::structured_credit::StructuredCredit;
-    /// use finstack_quant_models::credit::pool::prepayment::StochasticPrepaySpec;
-    ///
-    /// let mut clo = StructuredCredit::example().expect("example");
-    /// clo.with_stochastic_prepay(StochasticPrepaySpec::factor_correlated(
-    ///     finstack_quant_cashflows::builder::PrepaymentModelSpec::constant_cpr(0.15),
-    ///     0.35,
-    ///     0.25,
-    /// ));
-    /// ```
-    pub fn with_stochastic_prepay(&mut self, spec: StochasticPrepaySpec) -> &mut Self {
-        self.credit_model.stochastic_prepay_spec = Some(spec);
-        self
-    }
-
-    /// Enable stochastic default modeling.
-    ///
-    /// # Arguments
-    /// * `spec` - Stochastic default specification
-    pub fn with_stochastic_default(&mut self, spec: StochasticDefaultSpec) -> &mut Self {
-        self.credit_model.stochastic_default_spec = Some(spec);
-        self
-    }
-
-    /// Set correlation structure for stochastic modeling.
-    ///
-    /// # Arguments
-    /// * `structure` - Correlation structure specification
-    pub fn with_correlation(&mut self, structure: CorrelationStructure) -> &mut Self {
-        self.credit_model.correlation_structure = Some(structure);
-        self
     }
 
     /// Enable full stochastic modeling with default calibrations.

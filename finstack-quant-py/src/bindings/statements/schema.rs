@@ -123,7 +123,10 @@ fn statement_result_schema() -> PyResult<String> {
     schema_json(canonical::statement_result_schema().map_err(statements_to_py)?)
 }
 
-schema_registry_functions!(finstack_quant_statements::schema::ARTIFACTS);
+schema_registry_functions!(
+    finstack_quant_statements::schema::ARTIFACTS,
+    "finstack_quant.statements.schema"
+);
 
 /// Register the `finstack_quant.statements.schema` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

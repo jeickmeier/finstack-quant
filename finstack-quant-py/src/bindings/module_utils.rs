@@ -195,6 +195,36 @@ pub(crate) fn py_to_serde<'py, T: serde::de::DeserializeOwned + Send>(
         .map_err(|e| crate::errors::serde_json_to_py(e, &format!("invalid {label}")))
 }
 
+/// Coerce `dict | list | JSON str` Python input into a serde-backed Rust value.
+///
+/// A `str` is parsed as JSON text (`ValueError` "invalid {label} JSON: …" on
+/// malformed or mismatched JSON); any other object goes through [`py_to_serde`].
+/// The one spec coercer for binding inputs that have no typed Python twin.
+pub(crate) fn spec_from_py<T: serde::de::DeserializeOwned + Send>(
+    py: Python<'_>,
+    obj: &Bound<'_, PyAny>,
+    label: &str,
+) -> PyResult<T> {
+    if let Ok(json) = obj.extract::<&str>() {
+        return serde_json::from_str(json)
+            .map_err(|err| crate::errors::serde_json_to_py(err, &format!("invalid {label} JSON")));
+    }
+    py_to_serde(py, obj, label)
+}
+
+/// [`spec_from_py`] for an optional argument: an omitted argument or `None`
+/// yields `None`.
+pub(crate) fn opt_spec_from_py<T: serde::de::DeserializeOwned + Send>(
+    py: Python<'_>,
+    obj: Option<&Bound<'_, PyAny>>,
+    label: &str,
+) -> PyResult<Option<T>> {
+    match obj {
+        Some(value) if !value.is_none() => spec_from_py(py, value, label).map(Some),
+        _ => Ok(None),
+    }
+}
+
 /// Parse an ISO-4217 code into a [`Currency`], mapping failures to `ValueError`.
 pub(crate) fn parse_currency(code: &str) -> PyResult<finstack_quant_core::currency::Currency> {
     code.parse().map_err(crate::errors::core_to_py)

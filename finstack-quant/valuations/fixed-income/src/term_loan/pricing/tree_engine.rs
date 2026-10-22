@@ -47,7 +47,7 @@ use finstack_quant_core::Result;
 use finstack_quant_models::trees::short_rate_tree::{ShortRateTree, ShortRateTreeConfig};
 use finstack_quant_models::trees::tree_framework::{NodeState, TreeValuator};
 use finstack_quant_models::trees::two_factor_rates_credit::{NodeCoupon, RatesCreditTree};
-use finstack_quant_valuations_core::instruments::common_impl::pricing::rates_credit::{
+use finstack_quant_valuations_core::instruments::pricing::rates_credit::{
     build_rates_credit_targets, continuous_frp_weight,
 };
 use finstack_quant_valuations_core::instruments::pricing_overrides::resolve_rates_credit_config;
@@ -534,9 +534,8 @@ impl TermLoanValuator {
 
     /// Build node-coupon descriptors for stochastic future floating resets.
     fn stochastic_node_coupons(&self, market: &MarketContext) -> Result<Vec<NodeCoupon>> {
-        use finstack_quant_valuations_core::instruments::common_impl::pricing::floating_reset_descriptors::{
-            build_node_coupons, has_future_pik,
-            NodeCouponBuildInputs,
+        use finstack_quant_valuations_core::instruments::pricing::floating_reset_descriptors::{
+            build_node_coupons, has_future_pik, NodeCouponBuildInputs,
         };
 
         let RateSpec::Floating(ref float_spec) = self.loan.rate else {
@@ -737,16 +736,13 @@ impl TreeValuator for TermLoanValuator {
 }
 
 /// Tree-based pricer for callable term loans.
-#[derive(Debug, Clone, Default)]
+///
+/// A unit struct: per-loan settings come from the loan's
+/// `instrument_pricing_overrides.model_config`.
+#[derive(Debug, Clone)]
 pub struct TermLoanTreePricer;
 
 impl TermLoanTreePricer {
-    /// Create a tree pricer; per-loan settings come from the loan's
-    /// `instrument_pricing_overrides.model_config`.
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Tree steps: `model_config.tree_steps`, else [`DEFAULT_TREE_STEPS`].
     fn tree_steps(loan: &TermLoan) -> usize {
         loan.instrument_pricing_overrides

@@ -11,7 +11,6 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::risk::var_calculator::relevant_taylor_scenario;
 use finstack_quant_valuations::metrics::risk::var_calculator::{
     calculate_var, VarConfig, VarMethod,
 };
@@ -646,8 +645,5 @@ fn directional_taylor_keeps_nonstandard_tenor_and_unrelated_curves() -> Result<(
         None,
     )?;
     assert!((taylor.pnl_distribution[0] - full.pnl_distribution[0]).abs() < 1e-4);
-    let usd_only =
-        relevant_taylor_scenario(&usd, Currency::USD, Currency::USD, &history.scenarios[0])?;
-    assert_eq!(usd_only.shifts.len(), 1);
     Ok(())
 }

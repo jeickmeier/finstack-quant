@@ -11,6 +11,7 @@
 use super::*;
 use crate::structured_credit::types::{CallExercisePolicy, PutExercisePolicy};
 use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 
 /// One exercise window: the instrument may be redeemed at `price_pct` of par
 /// on any date in `[start, end]`.
@@ -130,7 +131,7 @@ impl ExerciseTerms {
                     return Ok(None);
                 };
                 let refinancing = self.market_rate(rate_view, pay_date, "refinancing-incentive")?;
-                if (coupon - refinancing) * 10_000.0 > *threshold_bp {
+                if (coupon - refinancing) * BASIS_POINTS_PER_UNIT > *threshold_bp {
                     Ok(Some(Redemption {
                         price_pct: window.price_pct,
                     }))
@@ -159,7 +160,7 @@ impl ExerciseTerms {
                 };
                 let reinvestment =
                     self.market_rate(rate_view, pay_date, "reinvestment-incentive")?;
-                if (reinvestment - coupon) * 10_000.0 > *threshold_bp {
+                if (reinvestment - coupon) * BASIS_POINTS_PER_UNIT > *threshold_bp {
                     Ok(Some(Redemption {
                         price_pct: window.price_pct,
                     }))

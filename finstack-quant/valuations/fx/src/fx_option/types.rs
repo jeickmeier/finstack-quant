@@ -45,7 +45,6 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::types::Attributes;
 use finstack_quant_models::types::OptionType;
-use finstack_quant_valuations_core::instruments::FxUnderlyingParams;
 // Pricing/greeks live in pricing engine; keep types minimal.
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -53,13 +52,6 @@ use finstack_quant_core::Result;
 
 use super::pricer;
 use finstack_quant_valuations_core::impl_instrument_base;
-
-fn default_fx_underlying(base_currency: Currency, quote_currency: Currency) -> FxUnderlyingParams {
-    // Fall back to currency-aware OIS curves instead of hardwiring USD legs.
-    let domestic = CurveId::new(format!("{}-OIS", quote_currency));
-    let foreign = CurveId::new(format!("{}-OIS", base_currency));
-    FxUnderlyingParams::new(base_currency, quote_currency, domestic, foreign)
-}
 
 /// Pair/venue FX delta quoting convention selected by the contract.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -221,7 +213,6 @@ pub struct FxOption {
     pub attributes: Attributes,
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 // FxOption uses both domestic and foreign curves for Garman-Kohlhagen pricing
 impl FxOption {
     /// Validate FX option currency invariants.
@@ -250,6 +241,12 @@ impl FxOption {
             return Err(finstack_quant_core::Error::Validation(
                 "FxOption delta convention venue must not be blank".to_string(),
             ));
+        }
+        if !self.strike.is_finite() || self.strike < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "FxOption strike must be finite and non-negative, got {}",
+                self.strike
+            )));
         }
         finstack_quant_core::validation::validate_money_finite(self.notional, "FxOption notional")?;
         finstack_quant_core::validation::validate_money_gt(
@@ -305,25 +302,18 @@ impl FxOption {
         option_type: OptionType,
         delta_convention: FxDeltaConvention,
     ) -> finstack_quant_core::Result<Self> {
-        let fx_underlying = if quote_currency == Currency::USD && base_currency == Currency::EUR {
-            FxUnderlyingParams::usd_eur()
-        } else if quote_currency == Currency::USD && base_currency == Currency::GBP {
-            FxUnderlyingParams::gbp_usd()
-        } else {
-            default_fx_underlying(base_currency, quote_currency)
-        };
         Self::builder()
             .id(id.into())
-            .base_currency(fx_underlying.base_currency)
-            .quote_currency(fx_underlying.quote_currency)
+            .base_currency(base_currency)
+            .quote_currency(quote_currency)
             .strike(strike)
             .option_type(option_type)
             .delta_convention(delta_convention)
             .expiry(expiry)
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .notional(notional)
-            .domestic_discount_curve_id(fx_underlying.domestic_discount_curve_id.to_owned())
-            .foreign_discount_curve_id(fx_underlying.foreign_discount_curve_id)
+            .domestic_discount_curve_id(CurveId::new(format!("{quote_currency}-OIS")))
+            .foreign_discount_curve_id(CurveId::new(format!("{base_currency}-OIS")))
             .vol_surface_id(vol_surface_id.into())
             .attributes(Attributes::new())
             .build()
@@ -475,23 +465,14 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxOption {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> Option<finstack_quant_valuations_core::results::ValuationDetails> {
-        // FX policy stamp: record whether the spot was a direct quote or
-        // triangulated through the FX matrix pivot. FxOption always
-        // resolves its spot via the matrix (`FxSpotSource::Matrix`), so
-        // there is no `fx_spot_id` short-circuit to consider.
-        use finstack_quant_core::money::fx::FxQuery;
-        let fx_triangulated = market
-            .fx()
-            .and_then(|fx| {
-                fx.rate(FxQuery::new(self.base_currency, self.quote_currency, as_of))
-                    .ok()
-            })
-            .map(|q| q.triangulated);
-        Some(
-            finstack_quant_valuations_core::results::ValuationDetails::Fx(
-                finstack_quant_valuations_core::results::FxValuationDetails { fx_triangulated },
-            ),
-        )
+        // FxOption always resolves its spot through the FX matrix.
+        Some(crate::shared::fx_valuation_details(
+            market,
+            self.base_currency,
+            self.quote_currency,
+            as_of,
+            false,
+        ))
     }
 
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
@@ -544,12 +525,18 @@ impl finstack_quant_valuations_core::instruments::OptionGreeksProvider for FxOpt
     }
 }
 impl FxOption {
-    fn option_vanna(
+    /// Central volatility scenarios for vanna and volga.
+    ///
+    /// The half-width is `requested_bump_abs` capped at half the resolved
+    /// volatility (the implied-volatility override, else the surface at
+    /// expiry and strike). Returns `None` once expired or when that
+    /// volatility is not positive, where both Greeks are reported as zero.
+    fn vol_scenarios(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
+        requested_bump_abs: f64,
+    ) -> finstack_quant_core::Result<Option<crate::shared::VolScenarios<Self>>> {
         let t = self
             .day_count
             .year_fraction(
@@ -559,7 +546,7 @@ impl FxOption {
             )?
             .max(0.0);
         if t <= 0.0 {
-            return Ok(Some(0.0));
+            return Ok(None);
         }
 
         let sigma = self
@@ -578,21 +565,35 @@ impl FxOption {
                 )
             })?;
         if sigma <= 0.0 {
-            return Ok(Some(0.0));
+            return Ok(None);
         }
-        let delta_sigma = bumps.vol_bump_decimal.min(sigma * 0.5);
-        let (up, curves_up) = finstack_quant_valuations_core::metrics::bump_active_volatility(
+        let delta_sigma = requested_bump_abs.min(sigma * 0.5);
+        let up = finstack_quant_valuations_core::metrics::bump_active_volatility(
             self,
             market,
             self.vol_surface_id.as_str(),
             delta_sigma,
         )?;
-        let (down, curves_dn) = finstack_quant_valuations_core::metrics::bump_active_volatility(
+        let down = finstack_quant_valuations_core::metrics::bump_active_volatility(
             self,
             market,
             self.vol_surface_id.as_str(),
             -delta_sigma,
         )?;
+        Ok(Some((delta_sigma, up, down)))
+    }
+
+    fn option_vanna(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        bumps: finstack_quant_valuations_core::instruments::GreekBumps,
+    ) -> finstack_quant_core::Result<Option<f64>> {
+        let Some((delta_sigma, (up, curves_up), (down, curves_dn))) =
+            self.vol_scenarios(market, as_of, bumps.vol_bump_decimal)?
+        else {
+            return Ok(Some(0.0));
+        };
 
         let delta_up = pricer::compute_greeks(&up, &curves_up, as_of)?.delta;
         let delta_dn = pricer::compute_greeks(&down, &curves_dn, as_of)?.delta;
@@ -612,49 +613,11 @@ impl FxOption {
         _base_pv: f64,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        let t = self
-            .day_count
-            .year_fraction(
-                as_of,
-                self.expiry,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )?
-            .max(0.0);
-        if t <= 0.0 {
+        let Some((delta_sigma, (up, curves_up), (down, curves_dn))) =
+            self.vol_scenarios(market, as_of, bumps.vol_bump_decimal)?
+        else {
             return Ok(Some(0.0));
-        }
-
-        let sigma = self
-            .instrument_pricing_overrides
-            .market_quotes
-            .implied_volatility
-            .map(Ok)
-            .unwrap_or_else(|| {
-                let surface = market.get_surface(self.vol_surface_id.as_str())?;
-                Ok::<_, finstack_quant_core::Error>(
-                    finstack_quant_models::volatility::get_surface_vol_clamped(
-                        &surface,
-                        t,
-                        self.strike,
-                    ),
-                )
-            })?;
-        if sigma <= 0.0 {
-            return Ok(Some(0.0));
-        }
-        let delta_sigma = bumps.vol_bump_decimal.min(sigma * 0.5);
-        let (up, curves_up) = finstack_quant_valuations_core::metrics::bump_active_volatility(
-            self,
-            market,
-            self.vol_surface_id.as_str(),
-            delta_sigma,
-        )?;
-        let (down, curves_dn) = finstack_quant_valuations_core::metrics::bump_active_volatility(
-            self,
-            market,
-            self.vol_surface_id.as_str(),
-            -delta_sigma,
-        )?;
+        };
 
         // Volga = d²V/dσ² scaled to "per 1% vol move" convention.
         // The raw second derivative d(vega)/dσ is divided by the bump and then

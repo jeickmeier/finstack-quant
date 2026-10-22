@@ -10,7 +10,7 @@ use finstack_quant_models::trees::short_rate_tree::{ShortRateTree, ShortRateTree
 use finstack_quant_valuations_core::instruments::pricing_overrides::{
     InstrumentPricingOverrides, ShortRateTreeModel,
 };
-use finstack_quant_valuations_fixed_income::bond::pricing::engine::tree::BondValuator;
+use finstack_quant_valuations_fixed_income::bond::pricing::tree::BondValuator;
 use finstack_quant_valuations_fixed_income::bond::{Bond, CallPut, CallPutSchedule};
 use time::macros::date;
 

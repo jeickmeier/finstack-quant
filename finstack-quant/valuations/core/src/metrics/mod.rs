@@ -55,40 +55,42 @@
 
 mod aggregation;
 mod buckets;
-mod core;
 mod cross_factor_pair;
+pub(crate) mod finite_difference;
+pub(crate) mod ids;
 pub(crate) mod period_cash;
+pub(crate) mod registration_macro;
+pub(crate) mod registry;
 pub mod risk;
 #[doc(hidden)]
 pub mod sensitivities;
+pub(crate) mod traits;
+pub(crate) mod universal;
 
 // Core surface (supported)
 pub use aggregation::is_additive_metric;
 pub use buckets::{
-    format_bucket_label, format_bucket_label_cow, format_key_rate_label, parse_key_rate_label,
-    STANDARD_BUCKETS_YEARS, STANDARD_BUCKET_LABELS,
+    format_bucket_label, format_key_rate_label, parse_key_rate_label, STANDARD_BUCKETS_YEARS,
+    STANDARD_BUCKET_LABELS,
 };
-pub use core::finite_difference::bump_surface_vol_absolute;
-#[doc(hidden)]
-pub use core::ids::closest_metric_names;
-pub use core::ids::{MetricGroup, MetricId, MetricUnit};
-pub use core::registry::{MetricRegistry, MetricRegistryError};
-pub use core::traits::{MetricCalculator, MetricContext};
-#[doc(hidden)]
-pub use core::universal::{register_universal_metrics, PricerPublishedMetric};
 pub use cross_factor_pair::CrossFactorPair;
-pub use period_cash::{collect_cashflows_in_period, collect_period_cash, PeriodCash};
-
-// Family-facing calculators and helpers.
-//
-// Instrument families register and compose these; they are not a supported
-// downstream API and stay out of the rendered documentation.
-//
-// These are used across `finstack-quant-valuations` (instrument metric registries, etc.) but are not
-// supported as a stable downstream API. Keep them `pub(crate)` so we can refactor module layout
-// without creating public breakage surface.
+pub use finite_difference::bump_surface_vol_absolute;
 #[doc(hidden)]
-pub use core::finite_difference::{
+pub use ids::closest_metric_names;
+pub use ids::{MetricGroup, MetricId, MetricUnit};
+pub use period_cash::{collect_period_cash, PeriodCash};
+pub use registry::{MetricRegistry, MetricRegistryError};
+pub use traits::{MetricCalculator, MetricContext, MetricSeed};
+#[doc(hidden)]
+pub use universal::{register_universal_metrics, PricerPublishedMetric};
+
+// Family-facing finite-difference helpers and calculators.
+//
+// Instrument families compose these; they are not a supported downstream API
+// and stay out of the rendered documentation. The remaining family-facing
+// calculators live at `metrics::sensitivities::<module>`.
+#[doc(hidden)]
+pub use finite_difference::{
     bump_active_volatility, bump_discount_curve_parallel, bump_scalar_price,
     central_diff_by_half_bump, central_diff_by_width, central_diff_scalar_relative,
     replace_scalar_value, scalar_numeric_value, scaled_central_diff_by_width, CORRELATION_BUMP,
@@ -105,9 +107,14 @@ pub use sensitivities::vega::KeyRateVega;
 
 // Error helper functions
 
-/// Create a NotFound error for missing metrics.
+/// Create a typed NotFound error for a missing metric.
 ///
 /// Use this when a metric dependency or required metric is not available.
+///
+/// # Arguments
+///
+/// * `metric` - Required metric identifier that was absent from a valuation
+///   result or dependency set; it is embedded in the returned `metric:` ID.
 ///
 /// # Examples
 ///
@@ -120,16 +127,10 @@ pub use sensitivities::vega::KeyRateVega;
 ///     results.get(&id).copied().ok_or_else(|| metric_not_found(id))
 /// }
 /// ```
-/// Create a typed NotFound error for a missing metric.
-///
-/// # Arguments
-///
-/// * `metric` - Required metric identifier that was absent from a valuation
-///   result or dependency set; it is embedded in the returned `metric:` ID.
 #[inline]
 pub fn metric_not_found(metric: MetricId) -> finstack_quant_core::Error {
     finstack_quant_core::InputError::NotFound {
-        id: format!("metric:{metric:?}"),
+        id: format!("metric:{metric}"),
     }
     .into()
 }

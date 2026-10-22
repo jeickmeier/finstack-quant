@@ -6,30 +6,32 @@
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "default": null,
-          "description": "Optional base currency calendar for spot/settlement adjustment metadata.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional base currency calendar for spot/settlement adjustment metadata."
         },
         "base_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Base currency (foreign)."
+          "description": "Base currency (foreign)"
         },
         "domestic_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Domestic discount curve id (quote currency)."
+          "description": "Domestic discount curve id (quote currency)"
         },
         "far_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Far leg settlement date (forward leg)."
+          "description": "Far leg settlement date (forward leg)"
         },
         "far_rate": {
-          "default": null,
           "description": "Optional far leg FX rate (quote per base). If absent, use the market\noutright forward from the valuation date to far settlement.",
           "format": "double",
           "type": [
@@ -39,30 +41,25 @@
         },
         "foreign_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Foreign discount curve id (base currency)."
+          "description": "Foreign discount curve id (base currency)"
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Unique instrument identifier."
+          "description": "Unique instrument identifier"
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "default": {},
           "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "default": {
-            "theta_period": null
-          },
           "description": "Metric-time pricing configuration."
         },
         "near_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Near leg settlement date (spot leg)."
+          "description": "Near leg settlement date (spot leg)"
         },
         "near_rate": {
-          "default": null,
           "description": "Optional near leg FX rate (quote per base). If absent, use the market\noutright forward from the valuation date to near settlement.",
           "format": "double",
           "type": [
@@ -72,23 +69,25 @@
         },
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Notional amount in base currency (exchanged on near, reversed on far)."
+          "description": "Notional amount in base currency (exchanged on near, reversed on far)"
         },
         "quote_calendar_id": {
-          "default": null,
-          "description": "Optional quote currency calendar for spot/settlement adjustment metadata.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional quote currency calendar for spot/settlement adjustment metadata."
         },
         "quote_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Quote currency (domestic)."
+          "description": "Quote currency (domestic)"
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "default": {},
           "description": "Scenario-only pricing adjustments."
         }
       },

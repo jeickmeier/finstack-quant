@@ -10,7 +10,7 @@
 //! leaves one 20-node Gaussian quadrature over the long rate.
 
 use crate::cms_spread_option::CmsSpreadOption;
-use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Tenor};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurfaceAxis;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -155,7 +155,7 @@ impl CmsSpreadOptionPricer {
         // rate is known, so there is no convexity adjustment and the payoff
         // collapses to intrinsic on the observed rates.
         if inst.expiry < as_of {
-            let observed = crate::cms_fixings::historical_cms_fixing(
+            let observed = crate::cms_common::historical_cms_fixing(
                 market,
                 &inst.forward_curve_id,
                 tenor_years,
@@ -170,21 +170,12 @@ impl CmsSpreadOptionPricer {
             });
         }
 
-        let tenor_months = tenor.months().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "CmsSpreadOption tenor {} must be month- or year-based",
-                tenor
-            ))
-        })?;
-        let reference_swap = inst.reference_swap();
-        let swap_start = reference_swap.reference_swap_start(inst.expiry)?;
-        let swap_end = swap_start.add_months(i32::try_from(tenor_months).map_err(|_| {
-            finstack_quant_core::Error::Validation("CMS tenor months exceed supported range".into())
-        })?)?;
+        let tenor_months = crate::cms_common::cms_tenor_months(tenor, "CmsSpreadOption tenor")?;
         // Project the CMS forward swap rate on the instrument's resolved swap
         // conventions (explicit fields override the required index identifier).
-        let (forward_rate, _) =
-            reference_swap.forward_rate_and_annuity(market, as_of, swap_start, swap_end)?;
+        let reference_swap = inst.reference_swap();
+        let (swap_start, forward_rate) =
+            reference_swap.forward_at_fixing(market, as_of, inst.expiry, tenor_months)?;
         if forward_rate <= 0.0 || !forward_rate.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "CmsSpreadOption forward CMS rate must be positive and finite, got {}",

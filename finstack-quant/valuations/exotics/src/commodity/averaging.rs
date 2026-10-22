@@ -8,8 +8,27 @@
 //! never observed by two adjacent periods; the final period sets
 //! `include_end = true` so the swap maturity date is observed exactly once.
 
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{calendar_by_id_strict, Date, DateExt};
 use finstack_quant_core::Result;
+
+/// Observation-date filter shared by the swap floating leg and the swaption
+/// forward swap rate: weekends are excluded, plus the holidays of `calendar_id`
+/// when one is configured.
+///
+/// # Arguments
+/// * `calendar_id` - Registered holiday calendar; `None` filters weekends only.
+///
+/// # Errors
+///
+/// Returns an error when `calendar_id` names an unregistered calendar.
+pub(crate) fn business_day_filter(calendar_id: Option<&str>) -> Result<impl Fn(Date) -> bool> {
+    let calendar = calendar_id.map(calendar_by_id_strict).transpose()?;
+    Ok(
+        move |date: Date| {
+            !date.is_weekend() && calendar.is_none_or(|cal| cal.is_business_day(date))
+        },
+    )
+}
 
 /// Build contractual commodity observation periods and separately adjusted payments.
 ///

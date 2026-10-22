@@ -17,19 +17,20 @@
 //! ```rust
 //! use finstack_quant_valuations_fixed_income::bond::CashflowSpec;
 //! use finstack_quant_core::dates::{Tenor, DayCount};
-//! use finstack_quant_core::types::Bps;
 //!
 //! // Fixed-rate bond: 5% annual coupon, semi-annual payments
 //! let fixed = CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360)
 //!     .expect("5% is a finite coupon");
 //!
-//! // Floating-rate note: SOFR + 200bps, quarterly payments
-//! let floating = CashflowSpec::floating_bp(
+//! // Floating-rate note: SOFR + 200bps, quarterly payments, registry reset lag
+//! let floating = CashflowSpec::floating(
 //!     "USD-SOFR-3M",
-//!     Bps::new(200),  // margin in basis points
+//!     200.0, // margin in basis points
 //!     Tenor::quarterly(),
 //!     DayCount::Act360,
-//! );
+//!     None,
+//! )
+//! .expect("200bps is a finite margin");
 //! ```
 //!
 //! # See Also
@@ -42,8 +43,8 @@ use finstack_quant_cashflows::builder::{
     CouponType, FixedCouponSpec, FloatingCouponSpec, FloatingRateSpec, StepUpCouponSpec,
 };
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
+use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::IndexId;
-use finstack_quant_core::types::{Bps, CurveId, Rate};
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 use finstack_quant_valuations_core::market::conventions::RateIndexConventions;
 use rust_decimal::Decimal;
@@ -80,6 +81,26 @@ pub enum CashflowSpec {
         /// Amortization schedule.
         schedule: AmortizationSpec,
     },
+}
+
+/// Coupon schedule shared by the convenience constructors: Following,
+/// short-front stub, no end-of-month roll, no payment lag, unadjusted accrual.
+fn default_schedule(
+    frequency: Tenor,
+    day_count: DayCount,
+    calendar_id: &str,
+) -> finstack_quant_cashflows::builder::ScheduleParams {
+    finstack_quant_cashflows::builder::ScheduleParams {
+        frequency,
+        day_count,
+        business_day_convention: BusinessDayConvention::Following,
+        calendar_id: calendar_id.into(),
+        stub: StubKind::ShortFront,
+        end_of_month: false,
+        payment_lag_days: 0,
+        adjust_accrual_dates: false,
+        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
+    }
 }
 
 impl CashflowSpec {
@@ -120,17 +141,7 @@ impl CashflowSpec {
                 fallback: Default::default(),
             },
             coupon_type: CouponType::Cash,
-            schedule: finstack_quant_cashflows::builder::ScheduleParams {
-                frequency,
-                day_count,
-                business_day_convention: BusinessDayConvention::Following,
-                calendar_id: calendar_id.into(),
-                stub: StubKind::ShortFront,
-                end_of_month: false,
-                payment_lag_days: 0,
-                adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
-            },
+            schedule: default_schedule(frequency, day_count, &calendar_id),
         })
     }
 
@@ -138,24 +149,7 @@ impl CashflowSpec {
         FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate,
-            schedule: finstack_quant_cashflows::builder::ScheduleParams {
-                frequency,
-
-                day_count,
-
-                business_day_convention: BusinessDayConvention::Following,
-
-                calendar_id: "weekends_only".into(),
-
-                stub: StubKind::ShortFront,
-
-                end_of_month: false,
-
-                payment_lag_days: 0,
-
-                adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
-            },
+            schedule: default_schedule(frequency, day_count, "weekends_only"),
         }
     }
 
@@ -188,15 +182,10 @@ impl CashflowSpec {
     /// ```rust
     /// use finstack_quant_valuations_fixed_income::bond::CashflowSpec;
     /// use finstack_quant_core::dates::{Tenor, DayCount};
-    /// use finstack_quant_core::types::Rate;
     ///
     /// // US Treasury-style: 4% coupon, semi-annual, 30/360
-    /// let spec = CashflowSpec::fixed_rate(
-    ///     Rate::from_percent(4.0).expect("valid rate fixture"),
-    ///     Tenor::semi_annual(),
-    ///     DayCount::Thirty360,
-    /// )
-    /// .expect("4% is a finite coupon");
+    /// let spec = CashflowSpec::fixed(0.04, Tenor::semi_annual(), DayCount::Thirty360)
+    ///     .expect("4% is a finite coupon");
     /// ```
     ///
     /// # See Also
@@ -212,21 +201,6 @@ impl CashflowSpec {
         Ok(Self::Fixed(Self::fixed_spec(rate, frequency, day_count)))
     }
 
-    /// Create a fixed-rate specification using a typed rate.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error if the rate is not finite or not representable
-    /// as a `Decimal`.
-    pub fn fixed_rate(
-        coupon: Rate,
-        frequency: Tenor,
-        day_count: DayCount,
-    ) -> finstack_quant_core::Result<Self> {
-        let rate = finstack_quant_core::decimal::f64_to_decimal(coupon.as_decimal())?;
-        Ok(Self::Fixed(Self::fixed_spec(rate, frequency, day_count)))
-    }
-
     /// Create a floating-rate specification with sensible defaults.
     ///
     /// # Arguments
@@ -235,13 +209,14 @@ impl CashflowSpec {
     /// * `spread_bp` - Spread over index in basis points (e.g., 200.0 for 200bps)
     /// * `frequency` - Payment frequency (e.g., `Tenor::quarterly()`)
     /// * `day_count` - Day count convention (e.g., `DayCount::Act360`)
+    /// * `reset_lag_days` - Business days before period start the rate fixes;
+    ///   `None` takes the rate-index registry default (for example T-0 for
+    ///   `AUD-BBSW-3M`), T-2 for unregistered indices
     ///
     /// # Defaults
     ///
     /// - `coupon_type`: Cash (100% cash payment)
     /// - `gearing`: 1.0
-    /// - `reset_lag_days`: Market default from the rate-index registry (for
-    ///   example T-0 for `AUD-BBSW-3M`); unregistered indices default to T-2.
     /// - `index_floor_bp`: None
     /// - `all_in_cap_bp`: None
     /// - `reset_frequency`: Same as payment frequency
@@ -257,8 +232,6 @@ impl CashflowSpec {
     /// - **LIBOR (historical)**: T-0 to T-2 depending on currency
     /// - **SONIA**: T-0 (same day)
     /// - **BBSW**: T-0 (same day)
-    ///
-    /// Use `floating_with_reset_lag()` to specify a non-default reset lag.
     ///
     /// # Returns
     ///
@@ -277,8 +250,19 @@ impl CashflowSpec {
     ///     200.0,  // 200 basis points
     ///     Tenor::quarterly(),
     ///     DayCount::Act360,
+    ///     None,
     /// )
     /// .expect("200bps is a finite margin");
+    ///
+    /// // SONIA-linked FRN with a T-0 (same-day) fixing
+    /// let sonia = CashflowSpec::floating(
+    ///     CurveId::new("GBP-SONIA"),
+    ///     150.0,
+    ///     Tenor::quarterly(),
+    ///     DayCount::Act365F,
+    ///     Some(0),
+    /// )
+    /// .expect("150bps is a finite margin");
     /// ```
     ///
     /// # Errors
@@ -288,7 +272,6 @@ impl CashflowSpec {
     ///
     /// # See Also
     ///
-    /// - `floating_with_reset_lag()` for custom reset lag
     /// - For full control (floors/caps/gearing), construct `FloatingCouponSpec` directly
     ///   and wrap in `CashflowSpec::Floating(...)`.
     pub fn floating(
@@ -296,6 +279,7 @@ impl CashflowSpec {
         spread_bp: f64,
         frequency: Tenor,
         day_count: DayCount,
+        reset_lag_days: Option<i32>,
     ) -> finstack_quant_core::Result<Self> {
         let spread_bp = finstack_quant_core::decimal::f64_to_decimal(spread_bp)?;
         Ok(Self::floating_spec(
@@ -303,104 +287,7 @@ impl CashflowSpec {
             spread_bp,
             frequency,
             day_count,
-            None,
-        ))
-    }
-
-    /// Create a floating-rate specification using a typed margin in basis points.
-    pub fn floating_bp(
-        forward_curve_id: impl Into<CurveId>,
-        spread_bp: Bps,
-        frequency: Tenor,
-        day_count: DayCount,
-    ) -> Self {
-        Self::floating_spec(
-            forward_curve_id.into(),
-            Decimal::from(spread_bp.as_bp()),
-            frequency,
-            day_count,
-            None,
-        )
-    }
-
-    /// Create a floating-rate specification with explicit reset lag.
-    ///
-    /// # Arguments
-    ///
-    /// * `forward_curve_id` - Forward curve identifier (e.g., "USD-SOFR-3M")
-    /// * `spread_bp` - Spread over index in basis points (e.g., 200.0 for 200bps)
-    /// * `frequency` - Payment frequency (e.g., `Tenor::quarterly()`)
-    /// * `day_count` - Day count convention (e.g., `DayCount::Act360`)
-    /// * `reset_lag_days` - Number of business days before period start for rate fixing
-    ///
-    /// # Market Conventions for Reset Lag
-    ///
-    /// | Index | Standard Reset Lag |
-    /// |-------|-------------------|
-    /// | SOFR | T-2 (2 days) |
-    /// | EURIBOR | T-2 (2 days) |
-    /// | SONIA | T-0 (same day) |
-    /// | TONA | T-2 (2 days) |
-    /// | BBSW | T-0 (same day) |
-    /// | LIBOR (historical) | T-0 to T-2 |
-    ///
-    /// # Returns
-    ///
-    /// A `CashflowSpec::Floating` variant with the specified parameters.
-    ///
-    /// # Input validation note
-    ///
-    /// This convenience constructor retains the historical zero-fallback behavior
-    /// for `spread_bp` after the debug-only finite-value assertion. Callers that
-    /// require strict conversion semantics should construct `FloatingCouponSpec`
-    /// directly with typed `Decimal` inputs.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_valuations_fixed_income::bond::CashflowSpec;
-    /// use finstack_quant_core::dates::{Tenor, DayCount};
-    /// use finstack_quant_core::types::CurveId;
-    ///
-    /// // SONIA-linked FRN with T-0 reset (same day fixing)
-    /// let sonia_frn = CashflowSpec::floating_with_reset_lag(
-    ///     CurveId::new("GBP-SONIA"),
-    ///     150.0,  // 150 basis points
-    ///     Tenor::quarterly(),
-    ///     DayCount::Act365F,
-    ///     0,  // T-0 reset for SONIA
-    /// )
-    /// .expect("150bps is a finite margin");
-    ///
-    /// // SOFR-linked FRN with standard T-2 reset
-    /// let sofr_frn = CashflowSpec::floating_with_reset_lag(
-    ///     CurveId::new("USD-SOFR-3M"),
-    ///     200.0,
-    ///     Tenor::quarterly(),
-    ///     DayCount::Act360,
-    ///     2,  // T-2 reset for SOFR
-    /// )
-    /// .expect("200bps is a finite margin");
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error if `spread_bp` is not finite or not
-    /// representable as a `Decimal`.
-    pub fn floating_with_reset_lag(
-        forward_curve_id: impl Into<CurveId>,
-        spread_bp: f64,
-        frequency: Tenor,
-        day_count: DayCount,
-        reset_lag_days: i32,
-    ) -> finstack_quant_core::Result<Self> {
-        let spread_bp = finstack_quant_core::decimal::f64_to_decimal(spread_bp)?;
-        Ok(Self::floating_spec(
-            forward_curve_id.into(),
-            spread_bp,
-            frequency,
-            day_count,
-            Some(reset_lag_days),
+            reset_lag_days,
         ))
     }
 
@@ -458,24 +345,7 @@ impl CashflowSpec {
             coupon_type: CouponType::Cash,
             initial_rate: initial,
             step_schedule,
-            schedule: finstack_quant_cashflows::builder::ScheduleParams {
-                frequency,
-
-                day_count,
-
-                business_day_convention: BusinessDayConvention::Following,
-
-                calendar_id: "weekends_only".into(),
-
-                stub: StubKind::ShortFront,
-
-                end_of_month: false,
-
-                payment_lag_days: 0,
-
-                adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
-            },
+            schedule: default_schedule(frequency, day_count, "weekends_only"),
         }))
     }
 
@@ -571,6 +441,19 @@ impl CashflowSpec {
         }
     }
 
+    /// Mutable schedule conventions of the coupon leg (the base leg for
+    /// amortizing specs).
+    pub(crate) fn schedule_mut(
+        &mut self,
+    ) -> &mut finstack_quant_cashflows::builder::ScheduleParams {
+        match self {
+            Self::Fixed(spec) => &mut spec.schedule,
+            Self::Floating(spec) => &mut spec.schedule,
+            Self::StepUp(spec) => &mut spec.schedule,
+            Self::Amortizing { base, .. } => base.schedule_mut(),
+        }
+    }
+
     /// Convert the coupon leg to pay entirely in cash.
     ///
     /// Sets `coupon_type` to [`CouponType::Cash`] on the fixed, floating or
@@ -589,16 +472,20 @@ impl CashflowSpec {
         }
     }
 
-    /// Floating-rate terms of the coupon leg, when it is floating (directly or
-    /// as the base of an amortizing spec).
-    pub(crate) fn floating_rate_spec(
-        &self,
-    ) -> Option<&finstack_quant_cashflows::builder::FloatingRateSpec> {
+    /// Floating coupon leg, when the coupon leg is floating (directly or as
+    /// the base of an amortizing spec).
+    pub(crate) fn floating_coupon_spec(&self) -> Option<&FloatingCouponSpec> {
         match self {
-            Self::Floating(spec) => Some(&spec.rate_spec),
-            Self::Amortizing { base, .. } => base.floating_rate_spec(),
+            Self::Floating(spec) => Some(spec),
+            Self::Amortizing { base, .. } => base.floating_coupon_spec(),
             Self::Fixed(_) | Self::StepUp(_) => None,
         }
+    }
+
+    /// Floating-rate terms of the coupon leg, when it is floating (directly or
+    /// as the base of an amortizing spec).
+    pub(crate) fn floating_rate_spec(&self) -> Option<&FloatingRateSpec> {
+        self.floating_coupon_spec().map(|spec| &spec.rate_spec)
     }
 
     /// Add this coupon leg (and any amortization) to a cashflow builder whose
@@ -684,31 +571,14 @@ impl CashflowSpec {
 impl Default for CashflowSpec {
     /// Default to semi-annual fixed bond with 30/360 day count (US convention).
     ///
-    /// Built directly (rather than via [`Self::fixed`]) because a zero coupon
-    /// is trivially finite and the variant must be infallible in `Default`.
+    /// Built through the infallible fixed-spec helper (rather than the
+    /// fallible [`Self::fixed`]) because a zero coupon is trivially finite.
     fn default() -> Self {
-        Self::Fixed(FixedCouponSpec {
-            coupon_type: CouponType::Cash,
-            rate: Decimal::ZERO,
-            schedule: finstack_quant_cashflows::builder::ScheduleParams {
-                frequency: Tenor::semi_annual(),
-
-                day_count: DayCount::Thirty360,
-
-                business_day_convention: BusinessDayConvention::Following,
-
-                calendar_id: "weekends_only".into(),
-
-                stub: StubKind::ShortFront,
-
-                end_of_month: false,
-
-                payment_lag_days: 0,
-
-                adjust_accrual_dates: false,
-                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
-            },
-        })
+        Self::Fixed(Self::fixed_spec(
+            Decimal::ZERO,
+            Tenor::semi_annual(),
+            DayCount::Thirty360,
+        ))
     }
 }
 
@@ -759,6 +629,7 @@ mod tests {
             0.0,
             Tenor::quarterly(),
             DayCount::Act365F,
+            None,
         )
         .expect("valid BBSW spec");
         let CashflowSpec::Floating(inferred) = inferred else {
@@ -767,12 +638,12 @@ mod tests {
         assert_eq!(inferred.rate_spec.reset_lag_days, 0);
         assert_eq!(inferred.schedule.calendar_id.as_str(), "auce");
 
-        let explicit = CashflowSpec::floating_with_reset_lag(
+        let explicit = CashflowSpec::floating(
             CurveId::new("AUD-BBSW-3M"),
             0.0,
             Tenor::quarterly(),
             DayCount::Act365F,
-            1,
+            Some(1),
         )
         .expect("explicit reset lag is valid");
         let CashflowSpec::Floating(explicit) = explicit else {
@@ -826,6 +697,7 @@ mod tests {
                 f64::NAN,
                 Tenor::quarterly(),
                 DayCount::Act360,
+                None
             )
             .is_err(),
             "NaN floating margin must be rejected"

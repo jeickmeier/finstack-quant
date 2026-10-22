@@ -21,15 +21,6 @@ pub enum SnowballVariant {
     InverseFloater,
 }
 
-impl std::fmt::Display for SnowballVariant {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SnowballVariant::Snowball => write!(f, "snowball"),
-            SnowballVariant::InverseFloater => write!(f, "inverse_floater"),
-        }
-    }
-}
-
 /// Snowball structured note.
 ///
 /// The coupon in each period depends on the previous period's coupon,
@@ -153,8 +144,6 @@ impl Snowball {
             "Snowball start_date followed by payment_dates",
         )?;
 
-        self.fixed_rate.as_f64();
-
         validation::require_with(self.gearing > 0.0 && self.gearing.is_finite(), || {
             format!(
                 "Snowball gearing ({}) must be positive and finite",
@@ -274,9 +263,7 @@ impl Snowball {
     /// Period `i` accrues over `[boundaries[i], boundaries[i + 1]]`, fixes in
     /// advance at `boundaries[i]` and pays at `boundaries[i + 1]`.
     pub(crate) fn period_boundaries(&self) -> Vec<Date> {
-        std::iter::once(self.start_date)
-            .chain(self.payment_dates.iter().copied())
-            .collect()
+        crate::exotics::hw1f_note::period_boundaries(self.start_date, &self.payment_dates)
     }
 
     /// Compute the coupon for a given period based on the variant.
@@ -312,7 +299,7 @@ impl Snowball {
 impl finstack_quant_valuations_core::instruments::Instrument for Snowball {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Snowball,
-        crate::exotics::EXOTICS
+        crate::EXOTICS
     );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {

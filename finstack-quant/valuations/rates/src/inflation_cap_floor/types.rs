@@ -38,8 +38,8 @@
 //! determine when those values are known. The selected volatility-expiry convention
 //! determines the ACT/365F clock on which annualized option volatility is quoted.
 
-use crate::cap_floor::pricing::payoff::CapletFloorletInputs;
 use crate::cap_floor::pricing::pricer::price_caplet_quote;
+use crate::cap_floor::pricing::CapletFloorletInputs;
 use crate::cap_floor::RateOptionType;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,

@@ -7,11 +7,12 @@ use crate::structured_credit::types::{
     Tranche, TrancheStructure,
 };
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
+use finstack_quant_core::Error;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
-use finstack_quant_core::{Error as CoreError, InputError};
 
 use serde::{Deserialize, Serialize};
 
@@ -52,20 +53,11 @@ fn borrowing_base_test(spec: &CoverageTestSpec, context: &TestContext) -> Result
         .rules
         .and_then(|rules| rules.borrowing_base.as_ref())
         .ok_or_else(|| {
-            CoreError::Validation(format!(
+            Error::Validation(format!(
                 "borrowing-base test {test_id} needs coverage_rules.borrowing_base"
             ))
         })?;
-    let tranche = context
-        .tranches
-        .tranches
-        .iter()
-        .find(|t| t.id.as_str() == tranche_id)
-        .ok_or_else(|| {
-            CoreError::from(InputError::NotFound {
-                id: format!("tranche:{}", tranche_id),
-            })
-        })?;
+    let tranche = context.tranches.require(tranche_id)?;
     let tranche_balance = context
         .tranche_balances
         .and_then(|b| b.get(tranche.id.as_str()))
@@ -127,16 +119,7 @@ fn oc_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult>
         spec.tranche_id.as_str(),
         spec.trigger_level,
     );
-    let tranche = context
-        .tranches
-        .tranches
-        .iter()
-        .find(|t| t.id.as_str() == tranche_id)
-        .ok_or_else(|| {
-            CoreError::from(InputError::NotFound {
-                id: format!("tranche:{}", tranche_id),
-            })
-        })?;
+    let tranche = context.tranches.require(tranche_id)?;
 
     // Coverage tests use live tranche balances when available.
     let tranche_balance = context
@@ -236,16 +219,7 @@ fn ic_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult>
         spec.tranche_id.as_str(),
         spec.trigger_level,
     );
-    let tranche = context
-        .tranches
-        .tranches
-        .iter()
-        .find(|t| t.id.as_str() == tranche_id)
-        .ok_or_else(|| {
-            CoreError::from(InputError::NotFound {
-                id: format!("tranche:{}", tranche_id),
-            })
-        })?;
+    let tranche = context.tranches.require(tranche_id)?;
 
     // Coverage tests use live tranche balances when available.
     let tranche_bal = context
@@ -449,7 +423,7 @@ fn rate_and_accrual(tranche: &Tranche, context: &TestContext<'_>) -> Result<(f64
             finstack_quant_cashflows::builder::RateSpec::Fixed { rate } => *rate,
             finstack_quant_cashflows::builder::RateSpec::Floating(spec) => {
                 use rust_decimal::prelude::ToPrimitive;
-                spec.spread_bp.to_f64().unwrap_or_default() / 10_000.0
+                spec.spread_bp.to_f64().unwrap_or_default() / BASIS_POINTS_PER_UNIT
             }
         }
     };
@@ -601,7 +575,7 @@ fn collateral_value(
 ) -> Result<Money> {
     if let Some(balances) = current_balances {
         if balances.len() != pool.assets.len() {
-            return Err(CoreError::Validation(format!(
+            return Err(Error::Validation(format!(
                 "current asset balance count {} does not match pool asset count {}",
                 balances.len(),
                 pool.assets.len()
@@ -611,7 +585,7 @@ fn collateral_value(
             .iter()
             .any(|balance| !balance.is_finite() || *balance < 0.0)
         {
-            return Err(CoreError::Validation(
+            return Err(Error::Validation(
                 "current asset balances must be finite and non-negative".to_string(),
             ));
         }
@@ -1083,8 +1057,8 @@ mod tests {
     /// `[]` for same-seniority notes and the OC denominator omits them.
     #[test]
     fn test_same_seniority_notes_get_distinct_priorities_and_oc_denominator() {
-        use finstack_quant_core::dates::Date as D;
-        let mat = D::from_calendar_date(2034, Month::January, 1).expect("date");
+        use finstack_quant_core::dates::Date;
+        let mat = Date::from_calendar_date(2034, Month::January, 1).expect("date");
         let cpn = || RateSpec::Fixed { rate: 0.05 };
         // Three Senior notes at distinct attachment points + an Equity note.
         // Capital stack (most senior first, lowest attachment): A-1 0-25,

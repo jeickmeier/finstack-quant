@@ -20,9 +20,7 @@ pub(crate) fn oas_decimal_from_quote_overrides(
         return Ok(Some(oas));
     }
 
-    let model = context
-        .pricing_model()
-        .unwrap_or_else(|| bond.default_pricing_model());
+    let model = crate::bond::metrics::active_model(context, bond);
     let pricing_dispatch = context.clone_pricer_dispatch();
     let Some(dirty_at_quote) =
         crate::bond::pricing::quote_conversions::settlement_dirty_from_quote_overrides(
@@ -35,13 +33,12 @@ pub(crate) fn oas_decimal_from_quote_overrides(
     else {
         return Ok(None);
     };
-    let config = crate::bond::pricing::engine::tree::bond_tree_settings(bond);
+    let config = crate::bond::pricing::tree::bond_tree_settings(bond);
     let quote_context = crate::bond::pricing::settlement::QuoteDateContext::new(
         bond,
         context.curves.as_ref(),
         context.as_of,
     )?;
-    let dirty_target_at_quote = dirty_at_quote;
     let mut trial_template = bond.clone();
     crate::bond::pricing::quote_conversions::clear_price_driving_overrides(&mut trial_template);
     // A precision target belongs to the final estimate. Enforcing it on every
@@ -66,7 +63,7 @@ pub(crate) fn oas_decimal_from_quote_overrides(
             .scenario_spread_shock_bp
             .is_none()
     {
-        use crate::bond::pricing::engine::tree::{bond_tree_config, TreePricer};
+        use crate::bond::pricing::tree::{bond_tree_config, TreePricer};
         match model {
             finstack_quant_valuations_core::pricer::ModelKey::Tree => Some(
                 TreePricer::with_config(bond_tree_config(bond, context.curves.as_ref())?),
@@ -98,18 +95,10 @@ pub(crate) fn oas_decimal_from_quote_overrides(
         } else {
             let mut trial = trial_template.clone();
             trial.instrument_pricing_overrides.market_quotes.quoted_oas = Some(oas_bp / 10_000.0);
-            if context.pricing_model().is_some() {
-                context.reprice_instrument_raw(
-                    &trial,
-                    context.curves.as_ref(),
-                    quote_context.quote_date,
-                )
-            } else {
-                trial.price_for_model_raw(model, context.curves.as_ref(), quote_context.quote_date)
-            }
+            crate::bond::metrics::reprice_selected(context, &trial, model, quote_context.quote_date)
         };
         match priced {
-            Ok(value) => value - dirty_target_at_quote,
+            Ok(value) => value - dirty_at_quote,
             Err(error) => {
                 let mut slot = pricing_error.borrow_mut();
                 if slot.is_none() {
@@ -142,19 +131,12 @@ pub(crate) fn oas_decimal_from_quote_overrides(
             .instrument_pricing_overrides
             .market_quotes
             .quoted_oas = Some(oas_decimal);
-        if context.pricing_model().is_some() {
-            context.reprice_instrument_raw(
-                &final_trial,
-                context.curves.as_ref(),
-                quote_context.quote_date,
-            )?;
-        } else {
-            final_trial.price_for_model_raw(
-                model,
-                context.curves.as_ref(),
-                quote_context.quote_date,
-            )?;
-        }
+        crate::bond::metrics::reprice_selected(
+            context,
+            &final_trial,
+            model,
+            quote_context.quote_date,
+        )?;
     }
 
     Ok(Some(oas_decimal))

@@ -24,7 +24,6 @@
 use crate::irs::InterestRateSwap;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
@@ -32,8 +31,6 @@ use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::PayReceive;
 
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
-use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::market_data::term_structures::ForwardCurve;
 
 impl InterestRateSwap {
     /// Returns true if this swap is configured as *single-curve* compounded RFR:
@@ -48,43 +45,6 @@ impl InterestRateSwap {
                 | FloatingLegCompounding::CompoundedWithObservationShift { .. }
                 | FloatingLegCompounding::CompoundedWithRateCutoff { .. }
         ) && self.float_leg.forward_curve_id == self.fixed_leg.discount_curve_id
-    }
-
-    /// Compute PV of an overnight-indexed (compounded-in-arrears) floating leg.
-    ///
-    /// This method implements market-standard compounded RFR accrual with support
-    /// for lookback and observation shift. It can be used for both single-curve
-    /// OIS (where `proj == disc`) and multi-curve compounded swaps.
-    ///
-    /// # Arguments
-    ///
-    /// * `disc` - Discount curve for discounting coupon payments
-    /// * `proj` - Projection curve (forward curve or discount curve for OIS)
-    /// * `as_of` - Valuation date
-    /// * `fixings` - Optional historical fixings for seasoned swaps
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error if:
-    /// - Historical fixings are required but missing for observation dates before `as_of`
-    /// - Calendar or date calculations fail
-    /// - Numerical stability thresholds are breached
-    pub(crate) fn pv_compounded_float_leg(
-        &self,
-        disc: &DiscountCurve,
-        proj: Option<&ForwardCurve>,
-        as_of: Date,
-        fixings: Option<&ScalarTimeSeries>,
-    ) -> Result<f64> {
-        let schedule = crate::irs::cashflow::projected_compounded_float_leg_schedule(
-            self, disc, proj, as_of, fixings,
-        )?;
-        let mut acc = NeumaierAccumulator::new();
-        for flow in schedule.get_flows() {
-            let df = disc.df_between_dates(as_of, flow.date)?;
-            acc.add(flow.amount.amount() * df);
-        }
-        Ok(acc.total())
     }
 
     /// Compute PV of fixed leg (helper for value calculation).
@@ -136,18 +96,18 @@ impl InterestRateSwap {
 
     /// Compute PV of floating leg (helper for value calculation).
     ///
-    /// Projects floating rate coupons using the forward curve, applies any
-    /// quoted spread, and discounts to present value. This method is used for
-    /// term-rate swaps (LIBOR-style, SOFR 3M) where the floating leg requires
-    /// forward rate projection.
+    /// Projects floating rate coupons, applies any quoted spread, and discounts
+    /// to present value. Term-rate legs (LIBOR-style, SOFR 3M) project from the
+    /// forward curve; compounded RFR legs compound daily overnight rates from the
+    /// forward curve (or, for single-curve OIS without one, the discount curve)
+    /// and read past observations from the fixings stored under the index id.
     ///
     /// # Arguments
     ///
-    /// * `disc` - Discount curve for discounting cashflows
-    /// * `fwd` - Forward curve for projecting floating rates
+    /// * `context` - Market data holding the fixed-leg discount curve, the
+    ///   floating-leg forward curve and any historical fixings (`FIXING:<index>`);
+    ///   fixings are required when `reset_date < as_of` for any period
     /// * `as_of` - Valuation date (only future cashflows are included)
-    /// * `fixings` - Optional historical fixings for seasoned swaps. Required when
-    ///   `reset_date < as_of` for any period; if missing, returns an error.
     ///
     /// # Returns
     ///
@@ -290,13 +250,12 @@ pub(crate) fn compute_pv_raw(
     })
 }
 
-/// Compute the floating-leg PV, dispatching on the leg's compounding.
+/// Compute the floating-leg PV.
 ///
-/// Simple (term-rate) legs use [`InterestRateSwap::pv_float_leg`]; compounded
-/// RFR legs use [`InterestRateSwap::pv_compounded_float_leg`] with the fixed-leg
-/// discount curve, the floating-leg forward curve (optional for single-curve
-/// OIS, where implied overnight forwards come from the discount curve) and any
-/// historical fixings stored under the forward curve id.
+/// Every supported compounding goes through [`InterestRateSwap::pv_float_leg`],
+/// which discounts the same signed schedule the cashflow surface emits
+/// (term-rate projection for `Simple`, daily compounded RFR projection with
+/// fixings for the compounded variants).
 ///
 /// # Arguments
 ///
@@ -313,28 +272,13 @@ pub(crate) fn compute_float_leg_pv(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
-    match irs.float_leg.compounding {
-        FloatingLegCompounding::Simple => irs.pv_float_leg(context, as_of),
-        FloatingLegCompounding::SimpleAverage => Err(super::simple_average_unsupported()),
-        FloatingLegCompounding::CompoundedInArrears { .. }
-        | FloatingLegCompounding::CompoundedWithObservationShift { .. }
-        | FloatingLegCompounding::CompoundedWithRateCutoff { .. } => {
-            let disc = context.get_discount(irs.fixed_leg.discount_curve_id.as_ref())?;
-            let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
-                context,
-                irs.float_leg.forward_curve_id.as_str(),
-            )
-            .ok();
-            let proj = if irs.is_single_curve_ois() {
-                context
-                    .get_forward(irs.float_leg.forward_curve_id.as_ref())
-                    .ok()
-            } else {
-                Some(context.get_forward(irs.float_leg.forward_curve_id.as_ref())?)
-            };
-            irs.pv_compounded_float_leg(disc.as_ref(), proj.as_deref(), as_of, fixings)
-        }
+    if matches!(
+        irs.float_leg.compounding,
+        FloatingLegCompounding::SimpleAverage
+    ) {
+        return Err(finstack_quant_valuations_core::instruments::common_impl::parameters::simple_average_unsupported());
     }
+    irs.pv_float_leg(context, as_of)
 }
 
 #[cfg(test)]
@@ -807,7 +751,7 @@ mod tests {
 
         let pv_fixed = swap.pv_fixed_leg(&disc, as_of).expect("fixed leg");
         let pv_float = swap
-            .pv_compounded_float_leg(&disc, None, as_of, None)
+            .pv_float_leg(&ctx, as_of)
             .expect("compounded float leg");
         let expected = pv_float - pv_fixed;
 
@@ -1012,7 +956,7 @@ mod tests {
             .build()
             .expect("discount curve");
 
-        let _ctx = MarketContext::new().insert(disc.clone());
+        let ctx = MarketContext::new().insert(disc.clone());
 
         // Create an OIS swap with NO lookback, NO observation shift, NO spread.
         // These are the conditions under which the identity is exact.
@@ -1057,9 +1001,7 @@ mod tests {
             .expect("swap");
 
         // Calculate floating leg PV using the pricer
-        let pv_float = swap
-            .pv_compounded_float_leg(&disc, None, as_of, None)
-            .expect("float leg PV");
+        let pv_float = swap.pv_float_leg(&ctx, as_of).expect("float leg PV");
 
         // Calculate analytical identity: N × (DF(start) - DF(end))
         // Note: This is the PV of receiving the floating leg payments

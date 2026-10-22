@@ -97,12 +97,12 @@ fn floating_credit_bond() -> Bond {
         "USD-OIS",
     )
     .unwrap();
-    bond.cashflow_spec = CashflowSpec::floating_with_reset_lag(
+    bond.cashflow_spec = CashflowSpec::floating(
         CurveId::from("USD-SOFR-3M"),
         200.0,
         Tenor::quarterly(),
         DayCount::Act360,
-        0,
+        Some(0),
     )
     .unwrap();
     bond.credit_curve_id = Some(CurveId::from("USD-HAZ"));
@@ -336,7 +336,7 @@ fn floating_credit_loan(coupon_type: CouponType) -> TermLoan {
 fn price_loan(loan: &TermLoan, sigma: Option<f64>) -> finstack_quant_core::Result<f64> {
     let mut loan = loan.clone();
     loan.instrument_pricing_overrides.model_config.hw1f_sigma = sigma;
-    TermLoanTreePricer::new()
+    TermLoanTreePricer
         .price_callable(&loan, &market(), as_of())
         .map(|m| m.amount())
 }
@@ -415,7 +415,7 @@ fn floating_loan_oas_solves_under_stochastic_rates() {
     let mut loan = floating_credit_loan(CouponType::Cash);
     loan.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.012);
     let market = market();
-    let pricer = TermLoanTreePricer::new();
+    let pricer = TermLoanTreePricer;
 
     let pv = pricer
         .price_callable(&loan, &market, as_of())

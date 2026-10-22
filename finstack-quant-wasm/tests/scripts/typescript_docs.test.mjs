@@ -192,35 +192,44 @@ export function fit(instrument_json: any, as_of: any): number;
   assert.equal(run('sync-facade-jsdoc.mjs', ...args, '--check').status, 0);
 });
 
-test('synchronizer documents `<Name>Instrument` interfaces from the raw class', (t) => {
+test('synchronizer reads macro-forwarded raw-string doc lines as plain text', (t) => {
   const paths = temporaryDeclarations(t, {
-    'facade.d.ts': `export interface FxOptionInstrument {
+    'facade.d.ts': `export interface FxOption {
   /**
    * Vega of the option.
-   * @returns Vega: change in value per 1.0 absolute move in implied volatility.
+   * @returns Stale return text.
    */
   vega(): number;
+  /**
+   * Strike of the option.
+   * @returns Stale return text.
+   */
+  readonly strike: number;
 }
 `,
     'raw.d.ts': `export class FxOption {
   /**
-   * Vega of the option.
-   * @returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility.
+   * r" Vega of the option.
+   * r"
+   * r" @returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility.
    */
   vega(): number;
+  /**
+   * r#" Strike of the option, e.g. \`"1.12"\`."#
+   * r#" @returns Strike, quote currency per unit of base (\`"quote/base"\`)."#
+   */
+  readonly strike: number;
 }
 `,
   });
-  const result = run(
-    'sync-facade-jsdoc.mjs',
-    `--facade=${paths['facade.d.ts']}`,
-    `--raw=${paths['raw.d.ts']}`,
-    '--write'
-  );
+  const args = [`--facade=${paths['facade.d.ts']}`, `--raw=${paths['raw.d.ts']}`];
+  const result = run('sync-facade-jsdoc.mjs', ...args, '--write');
   assert.equal(result.status, 0, result.stderr);
   const updated = readFileSync(paths['facade.d.ts'], 'utf8');
   assert.match(updated, /@returns Cash vega: PV change for a 1 vol-point/);
-  assert.doesNotMatch(updated, /per 1\.0 absolute move/);
+  assert.match(updated, /@returns Strike, quote currency per unit of base \(`"quote\/base"`\)\.\n/);
+  assert.doesNotMatch(updated, /r#?"|Stale/);
+  assert.equal(run('sync-facade-jsdoc.mjs', ...args, '--check').status, 0);
 });
 
 test('checker rejects placeholders, template units, internal names, repeats and orphan blocks', (t) => {

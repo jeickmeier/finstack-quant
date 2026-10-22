@@ -19,9 +19,7 @@
 //! - d2 = d1 - sigma*sqrt(T)
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{
-    calendar_by_id_strict, BusinessDayConvention, Date, DayCount, DayCountContext, Tenor,
-};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
@@ -244,7 +242,7 @@ impl CommoditySwaption {
 
     fn swap_periods(&self) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
         self.validate()?;
-        super::super::averaging::commodity_periods(
+        crate::commodity::averaging::commodity_periods(
             self.underlying_start_date,
             self.underlying_maturity,
             self.swap_frequency,
@@ -272,7 +270,7 @@ impl CommoditySwaption {
     /// where `F̄_i` is the business-day average of the forward curve over the
     /// half-open period `[T_{i-1}, T_i)` (the final period also observes the
     /// swap end date) — exactly the quantity the underlying
-    /// [`super::super::commodity_swap::CommoditySwap`] floating leg settles on
+    /// [`crate::commodity::commodity_swap::CommoditySwap`] floating leg settles on
     /// — and `DF_i = DF(as_of, payment_date_i)`.
     ///
     /// Sampling `F(payment_date_i)` instead of the period average moves the
@@ -317,21 +315,8 @@ impl CommoditySwaption {
         // Business-day filter consistent with the underlying swap's
         // averaging: weekends out, plus exchange holidays when a calendar
         // is configured.
-        let calendar = self
-            .calendar_id
-            .as_deref()
-            .map(calendar_by_id_strict)
-            .transpose()?;
-        let is_business_day = |date: Date| -> bool {
-            let wd = date.weekday();
-            if wd == time::Weekday::Saturday || wd == time::Weekday::Sunday {
-                return false;
-            }
-            if let Some(cal) = &calendar {
-                return cal.is_business_day(date);
-            }
-            true
-        };
+        let is_business_day =
+            crate::commodity::averaging::business_day_filter(self.calendar_id.as_deref())?;
         // The swap underlying a swaption is forward-starting (underlying_start_date ≥
         // expiry ≥ as_of), so every observation projects from the curve;
         // coverage failures propagate (W-11).
@@ -342,9 +327,9 @@ impl CommoditySwaption {
         let mut weight_total = 0.0;
         for period in &periods {
             let include_end = period.accrual_end == self.underlying_maturity;
-            let fwd = super::super::averaging::business_day_average_price(
+            let fwd = crate::commodity::averaging::business_day_average_price(
                 get_price,
-                is_business_day,
+                &is_business_day,
                 period.accrual_start,
                 period.accrual_end,
                 include_end,
@@ -488,7 +473,7 @@ impl CommoditySwaption {
 impl finstack_quant_valuations_core::instruments::Instrument for CommoditySwaption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CommoditySwaption,
-        crate::exotics::EXOTICS
+        crate::EXOTICS
     );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
@@ -536,15 +521,15 @@ impl finstack_quant_valuations_core::instruments::Instrument for CommoditySwapti
             );
         }
 
-        // Black-76 on forward swap rate
-        let unit_price = black76_swaption_price(
+        // Black-76 on the forward swap rate; the annuity carries the discounting.
+        let unit_price = finstack_quant_models::closed_form::black76_price(
             inputs.forward,
             self.fixed_price,
+            inputs.annuity,
             inputs.sigma,
             inputs.time,
-            inputs.annuity,
             self.option_type,
-        );
+        )?;
 
         Money::new(unit_price * self.quantity, self.underlying.currency)
     }
@@ -636,9 +621,6 @@ impl CommoditySwaption {
         as_of: Date,
         bumps: finstack_quant_valuations_core::instruments::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_core::market_data::bumps::{
-            BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
-        };
         use finstack_quant_valuations_core::instruments::Instrument;
 
         if as_of > self.expiry {
@@ -654,27 +636,18 @@ impl CommoditySwaption {
 
         let pv_base = self.value(market, as_of)?.amount();
 
-        let curve_id = CurveId::new(self.forward_curve_id.as_str());
-        let up = market.bump([MarketBump::Curve {
-            id: curve_id.clone(),
-            spec: BumpSpec {
-                bump_type: BumpType::Parallel,
-                mode: BumpMode::Additive,
-                units: BumpUnits::Percent,
-                value: bump_pct * 100.0,
-            },
-        }])?;
+        let up = crate::commodity::bump_price_curve_pct(
+            market,
+            self.forward_curve_id.as_str(),
+            bump_pct,
+        )?;
         let pv_up = self.value(&up, as_of)?.amount();
 
-        let down = market.bump([MarketBump::Curve {
-            id: curve_id,
-            spec: BumpSpec {
-                bump_type: BumpType::Parallel,
-                mode: BumpMode::Additive,
-                units: BumpUnits::Percent,
-                value: -bump_pct * 100.0,
-            },
-        }])?;
+        let down = crate::commodity::bump_price_curve_pct(
+            market,
+            self.forward_curve_id.as_str(),
+            -bump_pct,
+        )?;
         let pv_down = self.value(&down, as_of)?.amount();
 
         Ok(Some(
@@ -713,29 +686,6 @@ impl CommoditySwaption {
         let vega_abs = inputs.annuity * inputs.forward * norm_pdf(d1) * inputs.time.sqrt();
         Ok(Some(vega_abs * 0.01 * self.quantity))
     }
-}
-
-/// Black-76 swaption price.
-///
-/// C = annuity * [F * N(d1) - K * N(d2)]
-/// P = annuity * [K * N(-d2) - F * N(-d1)]
-///
-/// The discount factor is already embedded in the annuity factor.
-fn black76_swaption_price(
-    forward: f64,
-    strike: f64,
-    sigma: f64,
-    t: f64,
-    annuity: f64,
-    option_type: OptionType,
-) -> f64 {
-    let undiscounted = match option_type {
-        OptionType::Call => {
-            finstack_quant_models::closed_form::black_call(forward, strike, sigma, t)
-        }
-        OptionType::Put => finstack_quant_models::closed_form::black_put(forward, strike, sigma, t),
-    };
-    undiscounted * annuity
 }
 
 finstack_quant_valuations_core::impl_empty_cashflow_provider!(
@@ -1137,7 +1087,7 @@ mod tests {
             .amount();
 
         // Underlying pay-fixed swap with the same schedule parameters.
-        let swap = super::super::super::commodity_swap::CommoditySwap::builder()
+        let swap = crate::commodity::commodity_swap::CommoditySwap::builder()
             .id(InstrumentId::new("NG-SWAP-PAR"))
             .underlying(CommodityUnderlyingParams::new(
                 "Energy",

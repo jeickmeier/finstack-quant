@@ -269,6 +269,46 @@ pub struct LetterOfCreditSpec {
     pub leq: f64,
 }
 
+/// Commitment in force on `date`: the last of `steps` dated on or before it,
+/// else `opening`.
+pub(crate) fn commitment_in_force(steps: &[CommitmentStep], opening: Money, date: Date) -> Money {
+    steps
+        .iter()
+        .rev()
+        .find(|step| step.date <= date)
+        .map_or(opening, |step| step.amount)
+}
+
+/// Settlement date of a loan quote on `as_of`: `settlement_days` business
+/// days forward on `calendar_id`, or weekdays when no calendar is set.
+///
+/// # Errors
+///
+/// Returns an error when the settlement-day count exceeds the signed offset
+/// range, the shifted date exceeds the calendar, or `calendar_id` names an
+/// unknown calendar.
+pub(crate) fn settlement_date(
+    as_of: Date,
+    settlement_days: u32,
+    calendar_id: Option<&str>,
+) -> finstack_quant_core::Result<Date> {
+    use finstack_quant_core::dates::DateExt;
+
+    if settlement_days == 0 {
+        return Ok(as_of);
+    }
+    let settlement_days = i32::try_from(settlement_days).map_err(|_| {
+        finstack_quant_core::Error::Validation("settlement days exceed supported range".into())
+    })?;
+    match calendar_id {
+        Some(calendar_id) => {
+            let calendar = finstack_quant_core::dates::calendar_by_id_strict(calendar_id)?;
+            as_of.add_business_days(settlement_days, calendar)
+        }
+        None => as_of.add_weekdays(settlement_days),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

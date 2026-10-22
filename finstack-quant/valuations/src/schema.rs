@@ -18,8 +18,7 @@ use finstack_quant_core::schema::COMMON_SCHEMA_BASE;
 use finstack_quant_core::schema::JSON_SCHEMA_DIALECT;
 
 #[cfg(feature = "json-schema")]
-#[doc(hidden)]
-pub use finstack_quant_valuations_core::schema::package_valuations_schema;
+use finstack_quant_valuations_core::schema::package_valuations_schema;
 
 /// Parse embedded JSON schema at compile time, returning a Result.
 /// The JSON is embedded via `include_str!` so the content is always present,
@@ -165,15 +164,15 @@ fn external_schema_resources() -> finstack_quant_core::Result<Vec<(String, jsons
     Ok(resources)
 }
 
-/// Return canonical instrument discriminators from the tagged-JSON registry.
+/// Return every canonical instrument discriminator, in registry order.
 ///
-/// The registry is the source of truth for decoding and schema generation, so
-/// this accessor does not infer type names by parsing checked-in `$ref` paths.
-pub fn instrument_types() -> finstack_quant_core::Result<Vec<String>> {
-    Ok(crate::instruments::json_loader::registry_tags()
-        .iter()
-        .map(|tag| (*tag).to_string())
-        .collect())
+/// The tagged-JSON registry is the source of truth for decoding and schema
+/// generation, so this is the authoritative set of values accepted in an
+/// envelope's `instrument.type` field; it does not infer type names by
+/// parsing checked-in `$ref` paths.
+#[must_use]
+pub fn instrument_types() -> &'static [&'static str] {
+    crate::instruments::json_loader::INSTRUMENT_TYPES
 }
 
 /// Get the JSON Schema for a single instrument type.
@@ -216,7 +215,6 @@ fn unknown_instrument_type(instrument_type: &str) -> finstack_quant_core::Error 
 /// # Errors
 ///
 /// Returns `Error::Validation` if the embedded schema JSON is malformed.
-#[allow(dead_code)] // Public API, used in tests
 pub fn valuation_result_schema() -> finstack_quant_core::Result<&'static Value> {
     static SCHEMA: OnceLock<Result<Value, String>> = OnceLock::new();
     SCHEMA
@@ -290,7 +288,7 @@ pub fn validate_instrument_envelope_json(instance: &Value) -> finstack_quant_cor
         })?;
 
     if let Err(envelope_error) = envelope_result {
-        if instrument_types()?.iter().any(|ty| ty == instrument_type) {
+        if instrument_types().contains(&instrument_type) {
             validate_instrument_type_json(instrument_type, instance)?;
         }
         return Err(envelope_error);
@@ -726,7 +724,7 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
     use crate::instruments::credit_derivatives::cds_index::CdsIndexParams;
     use crate::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
     use crate::instruments::fixed_income::asset_backed_facility::FacilityProjection;
-    use crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcResult;
+    use crate::instruments::fixed_income::bond::pricing::merton_mc::MertonMcResult;
     use crate::instruments::fixed_income::convertible::ConvertibleGreeks;
     use crate::instruments::fixed_income::revolving_credit::pricing::unified::EnhancedMonteCarloResult;
     use crate::instruments::fixed_income::structured_credit::{
@@ -1447,14 +1445,13 @@ mod tests {
 
     #[test]
     fn test_instrument_types_lists_supported_tags() {
-        let types = instrument_types().expect("instrument types should parse");
-        let expected: Vec<String> = crate::instruments::json_loader::registry_tags()
-            .iter()
-            .map(|tag| (*tag).to_string())
-            .collect();
-        assert_eq!(types, expected);
-        assert!(types.iter().any(|ty| ty == "bond"));
-        assert!(types.iter().any(|ty| ty == "cms_swap"));
+        let types = instrument_types();
+        assert_eq!(
+            types.len(),
+            crate::instruments::json_loader::instrument_registry().len()
+        );
+        assert!(types.contains(&"bond"));
+        assert!(types.contains(&"cms_swap"));
     }
 
     #[test]
@@ -1469,8 +1466,7 @@ mod tests {
 
     #[test]
     fn test_all_envelope_types_have_dedicated_schemas() {
-        let types = instrument_types().expect("instrument types should parse");
-        for ty in &types {
+        for ty in instrument_types() {
             let schema = instrument_schema(ty)
                 .unwrap_or_else(|e| panic!("schema for '{ty}' should load: {e}"));
             let desc = schema["description"]

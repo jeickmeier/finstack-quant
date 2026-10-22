@@ -8,9 +8,7 @@ use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{
-    calendar_by_id_strict, BusinessDayConvention, Date, DateExt, Tenor,
-};
+use finstack_quant_core::dates::{calendar_by_id_strict, BusinessDayConvention, Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
@@ -304,11 +302,8 @@ impl CommoditySwap {
         periods: impl IntoIterator<Item = finstack_quant_cashflows::builder::SchedulePeriod>,
     ) -> Result<Vec<(finstack_quant_cashflows::builder::SchedulePeriod, f64)>> {
         let price_curve = market.get_price_curve(self.forward_curve_id.as_str())?;
-        let calendar = self
-            .calendar_id
-            .as_deref()
-            .map(|id| calendar_by_id_strict(id))
-            .transpose()?;
+        let is_business_day =
+            super::super::averaging::business_day_filter(self.calendar_id.as_deref())?;
         let fixings: std::collections::BTreeMap<Date, f64> =
             self.past_fixings.iter().copied().collect();
         let get_price = |date: Date| -> Result<f64> {
@@ -323,16 +318,13 @@ impl CommoditySwap {
                 price_curve.price_on_date(date)
             }
         };
-        let is_business_day = |date: Date| -> bool {
-            !date.is_weekend() && calendar.is_none_or(|cal| cal.is_business_day(date))
-        };
         let lag = time::Duration::days(i64::from(self.index_lag_days.unwrap_or(0)));
         periods
             .into_iter()
             .map(|period| {
                 let price = super::super::averaging::business_day_average_price(
                     get_price,
-                    is_business_day,
+                    &is_business_day,
                     period.accrual_start - lag,
                     period.accrual_end - lag,
                     period.accrual_end == self.maturity,
@@ -371,7 +363,7 @@ impl CommoditySwap {
 impl finstack_quant_valuations_core::instruments::Instrument for CommoditySwap {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CommoditySwap,
-        crate::exotics::EXOTICS
+        crate::EXOTICS
     );
 
     fn validate_invariants(&self) -> Result<()> {
@@ -432,10 +424,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommoditySwap {
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         let periods = self.periods()?;
         let mut flows = Vec::with_capacity(periods.len() * 2);
-        let fixed_sign = match self.side {
-            PayReceive::Pay => -1.0,
-            PayReceive::Receive => 1.0,
-        };
+        let fixed_sign = self.side.sign();
         for (period, floating_price) in self.projected_period_prices(market, as_of, periods)? {
             flows.push(self.classified_flow(
                 &period,

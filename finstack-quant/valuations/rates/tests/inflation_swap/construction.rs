@@ -6,7 +6,7 @@ use finstack_quant_core::market_data::scalars::InflationLag;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_valuations_core::instruments::PayReceive;
-use finstack_quant_valuations_rates::inflation_swap::InflationSwapBuilder;
+use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
 use finstack_quant_valuations_test_support::inflation::*;
 use rust_decimal::Decimal;
 use time::Month;
@@ -16,7 +16,7 @@ fn test_builder_creates_valid_swap() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-001".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -46,7 +46,7 @@ fn test_builder_with_lag_override() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-002".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -95,7 +95,7 @@ fn test_swap_with_different_day_counts() {
         DayCount::Thirty360,
         DayCount::ActActIsma,
     ] {
-        let swap = InflationSwapBuilder::new()
+        let swap = InflationSwap::builder()
             .id("ZCINF-DC".into())
             .notional(standard_notional())
             .start_date(as_of)
@@ -119,7 +119,7 @@ fn test_swap_with_different_notionals() {
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
     for notional_amt in &[1_000.0, 100_000.0, 1_000_000.0, 100_000_000.0] {
-        let swap = InflationSwapBuilder::new()
+        let swap = InflationSwap::builder()
             .id("ZCINF-NOT".into())
             .notional(Money::new(*notional_amt, Currency::USD).expect("valid money fixture"))
             .start_date(as_of)
@@ -143,7 +143,7 @@ fn test_swap_with_various_maturities() {
 
     for years in &[1, 2, 5, 10, 30] {
         let maturity = Date::from_calendar_date(2025 + years, Month::January, 1).unwrap();
-        let swap = InflationSwapBuilder::new()
+        let swap = InflationSwap::builder()
             .id("ZCINF-MAT".into())
             .notional(standard_notional())
             .start_date(as_of)
@@ -167,7 +167,7 @@ fn test_swap_with_negative_fixed_rate() {
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
     // Negative real rates are valid (e.g., during high inflation)
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-NEG".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -196,7 +196,7 @@ fn test_swap_with_attributes() {
         .with_tag("portfolio:hedge_fund_a")
         .with_tag("strategy:inflation_protection");
 
-    let swap = InflationSwapBuilder::new()
+    let swap = InflationSwap::builder()
         .id("ZCINF-ATTR".into())
         .notional(standard_notional())
         .start_date(as_of)
@@ -219,7 +219,7 @@ fn test_clone_and_equality() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
-    let swap1 = InflationSwapBuilder::new()
+    let swap1 = InflationSwap::builder()
         .id("ZCINF-CLONE".into())
         .notional(standard_notional())
         .start_date(as_of)

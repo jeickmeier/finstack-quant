@@ -29,7 +29,6 @@
 use crate::revolving_credit::cashflow_engine::CashflowEngine;
 use crate::revolving_credit::types::DrawRepaySpec;
 use crate::revolving_credit::RevolvingCredit;
-use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -43,29 +42,13 @@ impl ZSpreadCs01 for RevolvingCredit {
     ) -> finstack_quant_core::Result<ZSpreadCs01Inputs> {
         // Compounding frequency for the z-spread shift = coupon/fee payments per
         // year, mirroring the term-loan and bond z-spread convention.
-        let years = self.frequency.to_years();
-        let compounds_per_year = if years > 0.0 && years.is_finite() {
-            (1.0 / years).round().max(1.0)
-        } else {
-            1.0
-        };
+        let compounds_per_year = self.frequency.compounding_frequency();
 
         let flows = match &self.draw_repay_spec {
             DrawRepaySpec::Deterministic(_) => {
                 // Reuse the pricer's deterministic schedule (same fixings path)
                 // so PV_z(0) reproduces the no-credit-curve base PV.
-                let fixings = match &self.rate {
-                    RateSpec::Floating(spec) => {
-                        finstack_quant_core::market_data::fixings::get_fixing_series(
-                            curves,
-                            spec.forward_curve_id.as_ref(),
-                        )
-                        .ok()
-                    }
-                    RateSpec::Fixed { .. } => None,
-                };
-                let engine = CashflowEngine::new(self, Some(curves), as_of, fixings)?;
-                let schedule = engine.generate_deterministic()?;
+                let schedule = CashflowEngine::deterministic(self, curves, as_of)?;
 
                 // `price_single_path` discounts every scheduled flow on/after
                 // `as_of`; flows exactly on `as_of` carry t = 0 (zero spread

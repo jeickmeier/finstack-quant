@@ -15,7 +15,6 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
-use finstack_quant_valuations::instruments::exotics::basket::BasketCalculator;
 use finstack_quant_valuations::instruments::exotics::basket::{
     Basket, BasketAssetType, BasketConstituent, BasketPricingConfig, ConstituentReference,
 };
@@ -95,6 +94,18 @@ fn multi_currency_market_context() -> MarketContext {
         .insert_price("EUR_EQUITY", MarketScalar::Price(eur(100.0)))
         .insert_price("GBP_EQUITY", MarketScalar::Price(gbp(50.0)))
         .insert_price("USD_EQUITY", MarketScalar::Price(usd(200.0)))
+}
+
+/// Value one unit of `basket` (notional 1 in its reporting currency) through
+/// the production pricing path, so the result is the per-unit NAV.
+fn unit_value(
+    basket: &Basket,
+    context: &MarketContext,
+    as_of: Date,
+) -> finstack_quant_core::Result<Money> {
+    let mut unit = basket.clone();
+    unit.notional = Money::new(1.0, basket.reporting_currency)?;
+    unit.value(context, as_of)
 }
 
 /// Create a simple basket with market data constituents
@@ -268,31 +279,6 @@ fn test_constituent_count() {
     assert_eq!(count, 2);
 }
 
-#[test]
-fn test_get_constituent_by_id() {
-    // Arrange
-    let basket = simple_equity_basket();
-
-    // Act
-    let constituent = basket.get_constituent("AAPL");
-
-    // Assert
-    assert!(constituent.is_some());
-    assert_eq!(constituent.unwrap().id, "AAPL");
-}
-
-#[test]
-fn test_get_constituent_by_id_not_found() {
-    // Arrange
-    let basket = simple_equity_basket();
-
-    // Act
-    let constituent = basket.get_constituent("TSLA");
-
-    // Assert
-    assert!(constituent.is_none());
-}
-
 // Pricing Configuration Tests
 
 #[test]
@@ -320,7 +306,7 @@ fn test_custom_pricing_config() {
         .notional(usd(1_000_000.0))
         .discount_curve_id("USD-OIS".into())
         .expense_ratio(0.001)
-        .pricing_config(BasketPricingConfig::default())
+        .pricing_config(config)
         .constituents(vec![BasketConstituent {
             id: "TEST".to_string(),
             reference: ConstituentReference::MarketData {
@@ -332,8 +318,7 @@ fn test_custom_pricing_config() {
             ticker: None,
         }])
         .build()
-        .unwrap()
-        .with_pricing_config(config);
+        .unwrap();
 
     // Assert
     assert_eq!(basket.pricing_config.days_in_year, 360.0);
@@ -380,13 +365,10 @@ fn test_pricing_with_explicit_units() {
         .build()
         .unwrap();
     let context = equity_market_context();
-    let calc = basket.calculator();
     let as_of = date(2025, 1, 1);
 
     // Act
-    let basket_value = calc
-        .basket_value(&basket, &context, as_of, Some(100.0))
-        .unwrap();
+    let basket_value = unit_value(&basket, &context, as_of).unwrap();
 
     // Assert
     // AAPL: 10 units × $150 = $1,500
@@ -396,93 +378,7 @@ fn test_pricing_with_explicit_units() {
     assert_eq!(basket_value.currency(), Currency::USD);
 }
 
-#[test]
-fn test_nav_calculation_with_units() {
-    // Arrange
-    let basket = Basket::builder()
-        .id("NAV_BASKET".into())
-        .constituents(vec![BasketConstituent {
-            id: "AAPL".to_string(),
-            reference: ConstituentReference::MarketData {
-                price_id: "AAPL".into(),
-                asset_type: BasketAssetType::Equity,
-            },
-            weight: 0.0,
-            units: Some(100.0),
-            ticker: None,
-        }])
-        .expense_ratio(0.0)
-        .reporting_currency(Currency::USD)
-        .notional(usd(1_000_000.0))
-        .discount_curve_id("USD-OIS".into())
-        .instrument_pricing_overrides(Default::default())
-        .metric_pricing_overrides(Default::default())
-        .scenario_pricing_overrides(Default::default())
-        .attributes(Attributes::new())
-        .pricing_config(BasketPricingConfig::default())
-        .build()
-        .unwrap();
-    let context = equity_market_context();
-    let calc = basket.calculator();
-    let as_of = date(2025, 1, 1);
-    let shares_outstanding = 1000.0;
-
-    // Act
-    let nav = calc
-        .nav(&basket, &context, as_of, shares_outstanding)
-        .unwrap();
-
-    // Assert
-    // Total value: 100 units × $150 = $15,000
-    // NAV per share: $15,000 / 1000 shares = $15
-    assert_eq!(nav.amount(), 15.0);
-}
-
 // Weight-Based Pricing Tests
-
-#[test]
-fn test_pricing_with_weights_and_aum() {
-    // Arrange
-    let basket = simple_equity_basket();
-    let context = equity_market_context();
-    let calc = basket.calculator();
-    let as_of = date(2025, 1, 1);
-    let aum = usd(1_000_000.0);
-
-    // Act
-    let basket_value = calc
-        .basket_value_with_aum(&basket, &context, as_of, aum)
-        .unwrap();
-
-    // Assert
-    // Since all constituents are weight-based and expense_ratio is 0.001:
-    // Daily drag = 1,000,000 × (0.001 / 365.25) ≈ 2.738
-    // Value ≈ 1,000,000 - 2.738 ≈ 999,997.26
-    let expected_drag = 1_000_000.0 * (0.001 / 365.25);
-    assert!((basket_value.amount() - (1_000_000.0 - expected_drag)).abs() < 0.01);
-}
-
-#[test]
-fn test_nav_with_aum_calculation() {
-    // Arrange
-    let basket = simple_equity_basket();
-    let context = equity_market_context();
-    let calc = basket.calculator();
-    let as_of = date(2025, 1, 1);
-    let aum = usd(1_000_000.0);
-    let shares = 50_000.0;
-
-    // Act
-    let nav = calc
-        .nav_with_aum(&basket, &context, as_of, aum, shares)
-        .unwrap();
-
-    // Assert
-    // NAV = (AUM - expense drag) / shares
-    let expected_drag = 1_000_000.0 * (0.001 / 365.25);
-    let expected_nav = (1_000_000.0 - expected_drag) / shares;
-    assert!((nav.amount() - expected_nav).abs() < 0.001);
-}
 
 // Expense Ratio Tests
 
@@ -492,17 +388,15 @@ fn test_expense_ratio_zero_has_no_impact() {
     let mut basket = simple_equity_basket();
     basket.expense_ratio = 0.0;
     let context = equity_market_context();
-    let calc = basket.calculator();
     let as_of = date(2025, 1, 1);
-    let aum = usd(1_000_000.0);
 
     // Act
-    let basket_value = calc
-        .basket_value_with_aum(&basket, &context, as_of, aum)
-        .unwrap();
+    let basket_value = unit_value(&basket, &context, as_of).unwrap();
 
     // Assert
-    assert_eq!(basket_value.amount(), 1_000_000.0);
+    // Unit NAV before fees: 0.6 × $150 + 0.4 × $300 = $210; one day of fees is
+    // deducted as value × expense_ratio / days_in_year.
+    assert!((basket_value.amount() - 210.0).abs() < 1e-9);
 }
 
 #[test]
@@ -511,20 +405,15 @@ fn test_expense_ratio_reduces_basket_value() {
     let mut basket = simple_equity_basket();
     basket.expense_ratio = 0.365; // Large ratio for clear test signal
     let context = equity_market_context();
-    let calc = basket.calculator();
     let as_of = date(2025, 1, 1);
-    let aum = usd(1_000_000.0);
 
     // Act
-    let basket_value = calc
-        .basket_value_with_aum(&basket, &context, as_of, aum)
-        .unwrap();
+    let basket_value = unit_value(&basket, &context, as_of).unwrap();
 
     // Assert
-    // Daily expense = 1,000,000 × (0.365 / 365.25) = 1,000
-    // Value = 1,000,000 - 1,000 = 999,000
-    let expected_drag = 1_000_000.0 * (0.365 / 365.25);
-    assert!((basket_value.amount() - (1_000_000.0 - expected_drag)).abs() < 1.0);
+    // Unit NAV before fees: 0.6 × $150 + 0.4 × $300 = $210; one day of fees is
+    // deducted as value × expense_ratio / days_in_year.
+    assert!((basket_value.amount() - (210.0 - 210.0 * (0.365 / 365.25))).abs() < 1e-9);
 }
 
 #[test]
@@ -534,22 +423,19 @@ fn test_expense_ratio_with_custom_days_in_year() {
         days_in_year: 360.0,
         fx_policy: FxConversionPolicy::CashflowDate,
     };
-    let mut basket = simple_equity_basket().with_pricing_config(config);
+    let mut basket = simple_equity_basket();
+    basket.pricing_config = config;
     basket.expense_ratio = 0.36; // 0.1% daily with 360 day basis
     let context = equity_market_context();
-    let calc = basket.calculator();
     let as_of = date(2025, 1, 1);
-    let aum = usd(1_000_000.0);
 
     // Act
-    let basket_value = calc
-        .basket_value_with_aum(&basket, &context, as_of, aum)
-        .unwrap();
+    let basket_value = unit_value(&basket, &context, as_of).unwrap();
 
     // Assert
-    // Daily expense = 1,000,000 × (0.36 / 360) = 1,000
-    let expected_drag = 1_000_000.0 * (0.36 / 360.0);
-    assert!((basket_value.amount() - (1_000_000.0 - expected_drag)).abs() < 1.0);
+    // Unit NAV before fees: 0.6 × $150 + 0.4 × $300 = $210; one day of fees is
+    // deducted as value × expense_ratio / days_in_year.
+    assert!((basket_value.amount() - (210.0 - 210.0 * (0.36 / 360.0))).abs() < 1e-9);
 }
 
 // Multi-Currency and FX Conversion Tests
@@ -581,13 +467,10 @@ fn test_fx_conversion_eur_to_usd() {
         .build()
         .unwrap();
     let context = multi_currency_market_context();
-    let calc = basket.calculator();
     let as_of = date(2025, 1, 1);
 
     // Act
-    let basket_value = calc
-        .basket_value(&basket, &context, as_of, Some(100.0))
-        .unwrap();
+    let basket_value = unit_value(&basket, &context, as_of).unwrap();
 
     // Assert
     // EUR price: €100 × 10 units = €1,000
@@ -646,13 +529,10 @@ fn test_fx_conversion_multiple_currencies() {
         .build()
         .unwrap();
     let context = multi_currency_market_context();
-    let calc = basket.calculator();
     let as_of = date(2025, 1, 1);
 
     // Act
-    let basket_value = calc
-        .basket_value(&basket, &context, as_of, Some(100.0))
-        .unwrap();
+    let basket_value = unit_value(&basket, &context, as_of).unwrap();
 
     // Assert
     // EUR: €100 × 5 × 1.1 = $550
@@ -691,11 +571,10 @@ fn test_fx_conversion_error_without_fx_provider() {
     // Context without FX provider
     let context =
         minimal_market_context().insert_price("EUR_EQUITY", MarketScalar::Price(eur(100.0)));
-    let calc = basket.calculator();
     let as_of = date(2025, 1, 1);
 
     // Act
-    let result = calc.basket_value(&basket, &context, as_of, Some(100.0));
+    let result = unit_value(&basket, &context, as_of);
 
     // Assert
     assert!(
@@ -707,7 +586,7 @@ fn test_fx_conversion_error_without_fx_provider() {
 // Mixed Units and Weights Tests
 
 #[test]
-fn test_mixed_units_and_weights_with_aum() {
+fn test_mixed_units_and_weights() {
     // Arrange
     let basket = Basket::builder()
         .id("MIXED_BASKET".into())
@@ -745,20 +624,16 @@ fn test_mixed_units_and_weights_with_aum() {
         .build()
         .unwrap();
     let context = equity_market_context();
-    let calc = basket.calculator();
     let as_of = date(2025, 1, 1);
-    let aum = usd(10_000.0);
 
     // Act
-    let basket_value = calc
-        .basket_value_with_aum(&basket, &context, as_of, aum)
-        .unwrap();
+    let basket_value = unit_value(&basket, &context, as_of).unwrap();
 
     // Assert
     // AAPL: 10 × $150 = $1,500 (units-based)
-    // MSFT: 0.5 × $10,000 = $5,000 (weight of AUM)
-    // Total: $6,500
-    assert!((basket_value.amount() - 6500.0).abs() < 0.01);
+    // MSFT: 0.5 × $300 = $150 (weight of the constituent price)
+    // Total: $1,650
+    assert!((basket_value.amount() - 1650.0).abs() < 0.01);
 }
 
 // Instrument Reference Tests
@@ -802,11 +677,10 @@ fn test_constituent_reference_with_bond_instrument() {
         .build()
         .unwrap();
     let context = minimal_market_context();
-    let calc = basket.calculator();
     let as_of = base_date;
 
     // Act
-    let result = calc.basket_value(&basket, &context, as_of, Some(100.0));
+    let result = unit_value(&basket, &context, as_of);
 
     // Assert
     // Should successfully price using the bond's value() method
@@ -942,95 +816,14 @@ fn test_instrument_trait_value() {
 // Edge Cases and Error Handling Tests
 
 #[test]
-fn test_basket_value_with_zero_shares() {
-    // Arrange
-    let basket = Basket::builder()
-        .id("ZERO_SHARES_TEST".into())
-        .constituents(vec![BasketConstituent {
-            id: "AAPL".to_string(),
-            reference: ConstituentReference::MarketData {
-                price_id: "AAPL".into(),
-                asset_type: BasketAssetType::Equity,
-            },
-            weight: 0.0,
-            units: Some(10.0),
-            ticker: None,
-        }])
-        .expense_ratio(0.0)
-        .reporting_currency(Currency::USD)
-        .notional(usd(1_000_000.0))
-        .discount_curve_id("USD-OIS".into())
-        .instrument_pricing_overrides(Default::default())
-        .metric_pricing_overrides(Default::default())
-        .scenario_pricing_overrides(Default::default())
-        .attributes(Attributes::new())
-        .pricing_config(BasketPricingConfig::default())
-        .build()
-        .unwrap();
-    let context = equity_market_context();
-    let calc = basket.calculator();
-    let as_of = date(2025, 1, 1);
-
-    // Act - passing 0 shares with units-based constituent should error
-    let result = calc.nav(&basket, &context, as_of, 0.0);
-
-    // Assert
-    assert!(
-        result.is_err(),
-        "NAV calculation with zero shares and units should fail"
-    );
-}
-
-#[test]
-fn test_basket_value_with_negative_shares() {
-    // Arrange
-    let basket = Basket::builder()
-        .id("NEG_SHARES_TEST".into())
-        .constituents(vec![BasketConstituent {
-            id: "AAPL".to_string(),
-            reference: ConstituentReference::MarketData {
-                price_id: "AAPL".into(),
-                asset_type: BasketAssetType::Equity,
-            },
-            weight: 0.0,
-            units: Some(10.0),
-            ticker: None,
-        }])
-        .expense_ratio(0.0)
-        .reporting_currency(Currency::USD)
-        .notional(usd(1_000_000.0))
-        .discount_curve_id("USD-OIS".into())
-        .instrument_pricing_overrides(Default::default())
-        .metric_pricing_overrides(Default::default())
-        .scenario_pricing_overrides(Default::default())
-        .attributes(Attributes::new())
-        .pricing_config(BasketPricingConfig::default())
-        .build()
-        .unwrap();
-    let context = equity_market_context();
-    let calc = basket.calculator();
-    let as_of = date(2025, 1, 1);
-
-    // Act
-    let result = calc.nav(&basket, &context, as_of, -100.0);
-
-    // Assert
-    assert!(
-        result.is_err(),
-        "NAV calculation with negative shares and units should fail"
-    );
-}
-
-#[test]
 fn test_missing_price_data_error() {
     // Arrange
     let basket = simple_equity_basket();
     let context = minimal_market_context(); // No price data
-    let calc = basket.calculator();
     let as_of = date(2025, 1, 1);
 
     // Act
-    let result = calc.basket_value(&basket, &context, as_of, Some(100.0));
+    let result = unit_value(&basket, &context, as_of);
 
     // Assert
     assert!(
@@ -1040,41 +833,20 @@ fn test_missing_price_data_error() {
 }
 
 #[test]
-fn test_basket_value_weight_without_aum_or_shares_errors() {
-    // Arrange
-    let basket = simple_equity_basket();
-    let context = equity_market_context();
-    let calc = basket.calculator();
-    let as_of = date(2025, 1, 1);
-
-    // Act - weight-based basket needs shares or AUM
-    let result = calc.basket_value(&basket, &context, as_of, None);
-
-    // Assert
-    assert!(
-        result.is_err(),
-        "Weight-based basket without shares or AUM should error"
-    );
-}
-
-#[test]
 fn test_very_small_expense_ratio() {
     // Arrange
     let mut basket = simple_equity_basket();
     basket.expense_ratio = 0.000001; // 0.0001 bp
     let context = equity_market_context();
-    let calc = basket.calculator();
     let as_of = date(2025, 1, 1);
-    let aum = usd(1_000_000.0);
 
     // Act
-    let basket_value = calc
-        .basket_value_with_aum(&basket, &context, as_of, aum)
-        .unwrap();
+    let basket_value = unit_value(&basket, &context, as_of).unwrap();
 
     // Assert
-    // Very small expense should have minimal impact
-    assert!((basket_value.amount() - 1_000_000.0).abs() < 1.0);
+    // Unit NAV before fees: 0.6 × $150 + 0.4 × $300 = $210; one day of fees is
+    // deducted as value × expense_ratio / days_in_year.
+    assert!((basket_value.amount() - 210.0).abs() < 1e-3);
 }
 
 #[test]
@@ -1083,14 +855,10 @@ fn test_very_large_expense_ratio() {
     let mut basket = simple_equity_basket();
     basket.expense_ratio = 10.0; // 1000% - unrealistic but tests math
     let context = equity_market_context();
-    let calc = basket.calculator();
     let as_of = date(2025, 1, 1);
-    let aum = usd(1_000_000.0);
 
     // Act
-    let basket_value = calc
-        .basket_value_with_aum(&basket, &context, as_of, aum)
-        .unwrap();
+    let basket_value = unit_value(&basket, &context, as_of).unwrap();
 
     // Assert
     // Should handle large expense ratios without panic
@@ -1157,13 +925,10 @@ fn test_unitless_scalar_defaults_to_basket_currency() {
         .unwrap();
     let context =
         minimal_market_context().insert_price("UNITLESS_PRICE", MarketScalar::Unitless(50.0));
-    let calc = basket.calculator();
     let as_of = date(2025, 1, 1);
 
     // Act
-    let basket_value = calc
-        .basket_value(&basket, &context, as_of, Some(100.0))
-        .unwrap();
+    let basket_value = unit_value(&basket, &context, as_of).unwrap();
 
     // Assert
     // 10 units × 50 (unitless, interpreted as USD) = 500 USD
@@ -1382,7 +1147,7 @@ fn test_basket_envelope_roundtrip_with_instruments() {
         .unwrap();
 
     let envelope = InstrumentEnvelope {
-        schema: finstack_quant_valuations::instruments::json_loader::InstrumentSchema::CURRENT,
+        schema: finstack_quant_valuations::instruments::envelope::InstrumentSchema::CURRENT,
         instrument: InstrumentJson::Basket(basket.clone()),
     };
 
@@ -1403,27 +1168,6 @@ fn test_basket_envelope_roundtrip_with_instruments() {
 }
 
 // Calculator Reusability Tests
-
-#[test]
-fn test_calculator_can_be_reused() {
-    // Arrange
-    let basket1 = simple_equity_basket();
-    let basket2 = simple_equity_basket();
-    let context = equity_market_context();
-    let calc = BasketCalculator::new();
-    let as_of = date(2025, 1, 1);
-
-    // Act
-    let value1 = calc
-        .basket_value(&basket1, &context, as_of, Some(100.0))
-        .unwrap();
-    let value2 = calc
-        .basket_value(&basket2, &context, as_of, Some(100.0))
-        .unwrap();
-
-    // Assert
-    assert_eq!(value1.amount(), value2.amount());
-}
 
 // Integration Tests
 
@@ -1468,11 +1212,9 @@ fn test_full_pricing_workflow_units_based() {
         .unwrap();
     let context = equity_market_context();
     let as_of = date(2025, 1, 1);
-    let shares = 1000.0;
 
-    // Act - Calculate NAV
-    let calc = basket.calculator();
-    let nav = calc.nav(&basket, &context, as_of, shares).unwrap();
+    // Act - Calculate the unit NAV
+    let nav = unit_value(&basket, &context, as_of).unwrap();
 
     // Assert
     // AAPL: 50 × $150 = $7,500
@@ -1480,31 +1222,7 @@ fn test_full_pricing_workflow_units_based() {
     // Total: $16,500
     // Expense: $16,500 × (0.01 / 365.25) ≈ $0.45
     // After fees: $16,499.55
-    // NAV: $16,499.55 / 1000 = $16.50 (approximately)
-    assert!((nav.amount() - 16.5).abs() < 0.01);
-}
-
-#[test]
-fn test_full_pricing_workflow_weight_based() {
-    // Arrange
-    let basket = simple_equity_basket();
-    let context = equity_market_context();
-    let as_of = date(2025, 1, 1);
-    let aum = usd(5_000_000.0);
-    let shares = 100_000.0;
-
-    // Act
-    let calc = basket.calculator();
-    let nav = calc
-        .nav_with_aum(&basket, &context, as_of, aum, shares)
-        .unwrap();
-
-    // Assert
-    // AUM: $5,000,000
-    // Expense: $5,000,000 × (0.001 / 365.25) ≈ $13.69
-    // After fees: $4,999,986.31
-    // NAV: $4,999,986.31 / 100,000 ≈ $50.00
-    assert!((nav.amount() - 50.0).abs() < 0.01);
+    assert!((nav.amount() - (16_500.0 - 16_500.0 * (0.01 / 365.25))).abs() < 1e-9);
 }
 
 #[test]
@@ -1581,18 +1299,12 @@ fn test_real_world_etf_scenario() {
 
     // Act
     assert!(basket.validate().is_ok());
-    let aum = usd(10_000_000_000.0); // $10B AUM
-    let shares = 200_000_000.0; // 200M shares
-    let calc = basket.calculator();
-    let nav = calc
-        .nav_with_aum(&basket, &context, as_of, aum, shares)
-        .unwrap();
+    let nav = unit_value(&basket, &context, as_of).unwrap();
 
     // Assert
-    assert!(nav.amount() > 0.0);
+    // Unit NAV before fees: 0.25 × (150 + 300 + 2800) + 0.20 × 3200 + 0.05 × 1 = $1,452.55
     assert_eq!(nav.currency(), Currency::USD);
-    // NAV should be around $50 ($10B / 200M shares)
-    assert!((nav.amount() - 50.0).abs() < 1.0);
+    assert!((nav.amount() - (1452.55 - 1452.55 * (0.0009 / 365.25))).abs() < 1e-9);
 }
 
 #[test]

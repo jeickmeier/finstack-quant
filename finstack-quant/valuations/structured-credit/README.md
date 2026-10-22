@@ -42,10 +42,9 @@ assert!(!deal.id().is_empty());
 
 Import path: `finstack_quant_valuations_structured_credit::<module>` (or
 `finstack_quant_valuations::instruments::fixed_income::<module>` through the
-umbrella). `StructuredCredit`, `AgencyCmo`, `CmoTranche`, `CmoTrancheType`,
-`CmoWaterfall`, `AssetBackedFacility` and `STRUCTURED_CREDIT` are also
-re-exported at the crate root and flat at
-`finstack_quant_valuations::instruments`. The stochastic result DTOs
+umbrella); the crate root exports only the `STRUCTURED_CREDIT` family static.
+`StructuredCredit`, `AgencyCmo`, `CmoTranche`, `CmoTrancheType`, `CmoWaterfall`
+and `AssetBackedFacility` are also flat at `finstack_quant_valuations::instruments`. The stochastic result DTOs
 (`StochasticPricingResult`, `TranchePricingResult`,
 `StructuredCreditPricingMode`, `TrancheSeniority`) are defined in
 valuations-core `results::structured_credit` and re-exported from

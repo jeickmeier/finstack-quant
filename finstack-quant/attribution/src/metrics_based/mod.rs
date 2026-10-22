@@ -103,7 +103,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::collect_cashflows_in_period;
+use finstack_quant_valuations::metrics::collect_period_cash;
 use finstack_quant_valuations::results::ValuationResult;
 use std::sync::Arc;
 
@@ -248,16 +248,14 @@ pub fn attribute_pnl_metrics_based(
     // breach. Mirrors `apply_total_return_carry` on the reprice-based paths;
     // carry itself is NOT adjusted here because the metrics already carry the
     // cashflow component.
-    let realized_period_cash = Money::new(
-        collect_cashflows_in_period(
-            instrument.as_ref(),
-            market_t0,
-            as_of_t0,
-            as_of_t1,
-            val_t1.value.currency(),
-        )?,
+    let realized_period_cash = collect_period_cash(
+        instrument.as_ref(),
+        market_t0,
+        as_of_t0,
+        as_of_t1,
         val_t1.value.currency(),
-    )?;
+    )?
+    .total;
     attribution.total_pnl = attribution.total_pnl.checked_add(realized_period_cash)?;
 
     let inputs = MetricsContext::new(

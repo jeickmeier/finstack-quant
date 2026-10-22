@@ -5,9 +5,9 @@
 //! instrument; this entry point reprices a whole list under every scenario and
 //! takes the quantile of the summed P&L, so diversification is preserved.
 
-use super::instruments::spec_from_py;
 use super::pricing::PyMarketHistory;
 use crate::bindings::extract::{extract_instrument, extract_market, InstrumentArg};
+use crate::bindings::module_utils::{opt_spec_from_py, spec_from_py};
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_valuations::metrics::risk::var_calculator::{
@@ -24,15 +24,6 @@ fn extract_history(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<MarketHis
         return Ok(typed.borrow().inner.clone());
     }
     spec_from_py(py, obj, "MarketHistory")
-}
-
-/// Coerce ``dict | str | None`` into a `VarConfig`; ``None`` is Rust's default.
-fn extract_config(py: Python<'_>, obj: Option<&Bound<'_, PyAny>>) -> PyResult<VarConfig> {
-    match obj {
-        None => Ok(VarConfig::default()),
-        Some(obj) if obj.is_none() => Ok(VarConfig::default()),
-        Some(obj) => spec_from_py(py, obj, "VarConfig"),
-    }
 }
 
 /// Historical VaR and expected shortfall of a list of instruments.
@@ -125,7 +116,7 @@ fn calculate_var(
         .map(extract_instrument)
         .collect::<PyResult<Vec<InstrumentArg>>>()?;
     let history = extract_history(py, history)?;
-    let config = extract_config(py, config)?;
+    let config: VarConfig = opt_spec_from_py(py, config, "VarConfig")?.unwrap_or_default();
     let market = extract_market(py, market)?;
     let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let model = model.to_owned();
@@ -181,39 +172,6 @@ pub(crate) struct PyVarResult {
 
 #[pymethods]
 impl PyVarResult {
-    /// Value-at-Risk: the signed P&L at the ``1 - confidence_level`` quantile
-    /// (negative for a loss, ``0.0`` for an all-gain distribution), in the
-    /// portfolio or reporting currency.
-    #[getter]
-    fn var(&self) -> f64 {
-        self.inner.var
-    }
-
-    /// Expected shortfall: mean signed P&L over the worst
-    /// ``1 - confidence_level`` tail; same sign convention as ``var``.
-    #[getter]
-    fn expected_shortfall(&self) -> f64 {
-        self.inner.expected_shortfall
-    }
-
-    /// Portfolio P&L per scenario, sorted ascending (worst first).
-    #[getter]
-    fn pnl_distribution(&self) -> Vec<f64> {
-        self.inner.pnl_distribution.clone()
-    }
-
-    /// Number of scenarios in the distribution.
-    #[getter]
-    fn num_scenarios(&self) -> usize {
-        self.inner.num_scenarios
-    }
-
-    /// Confidence level used, as a decimal (``0.95`` = 95%).
-    #[getter]
-    fn confidence_level(&self) -> f64 {
-        self.inner.confidence_level
-    }
-
     /// The P&L distribution as a one-column pandas ``DataFrame``.
     ///
     /// Column ``pnl`` (``float64``), one row per scenario in the stored
@@ -288,6 +246,26 @@ impl PyVarResult {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyVarResult |s| {
+    /// Value-at-Risk: the signed P&L at the ``1 - confidence_level`` quantile
+    /// (negative for a loss, ``0.0`` for an all-gain distribution), in the
+    /// portfolio or reporting currency.
+    var -> f64 = s.inner.var;
+
+    /// Expected shortfall: mean signed P&L over the worst
+    /// ``1 - confidence_level`` tail; same sign convention as ``var``.
+    expected_shortfall -> f64 = s.inner.expected_shortfall;
+
+    /// Portfolio P&L per scenario, sorted ascending (worst first).
+    pnl_distribution -> Vec<f64> = s.inner.pnl_distribution.clone();
+
+    /// Number of scenarios in the distribution.
+    num_scenarios -> usize = s.inner.num_scenarios;
+
+    /// Confidence level used, as a decimal (``0.95`` = 95%).
+    confidence_level -> f64 = s.inner.confidence_level;
+});
 
 /// Register the VaR entry point and result type on the instruments submodule.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {

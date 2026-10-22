@@ -17,7 +17,7 @@ references:
 api:
 - finstack_quant.calibration.calibrate
 - finstack_quant.valuations.instruments.price_instrument
-- finstack_quant.valuations.instruments.structured_credit_tranche_metrics
+- finstack_quant.valuations.instruments.tranche_metrics
 - finstack_quant.core.market_data.BaseCorrelationCurve
 status: published
 ---
@@ -224,9 +224,9 @@ The formal CS01 match is exact in the displayed arithmetic. It deliberately cann
 
 {/* notebook-block notebook="02_pricing/instruments/credit_index_and_options.ipynb" cell="c4-exercise-hedge" role="exercise" */}
 ```python exec id=c4-exercise-hedge role=exercise
-from finstack_quant.valuations.instruments import structured_credit_tranche_metrics
+from finstack_quant.valuations.instruments import tranche_metrics
 holding=tracks.clo_bbb_holding()
-bbb=structured_credit_tranche_metrics(json.dumps(holding["deal"]),"BBB",market,AS_OF)
+bbb=tranche_metrics(json.dumps(holding["deal"]),"BBB",market,AS_OF)
 index_cs=price_instrument(json.dumps(inputs["ANALYST-CDX"]),market,AS_OF,model="hazard_rate",metrics=["cs01"])
 hedge_units=-bbb.cs01/index_cs.metrics["cs01"]
 print({"BBB_zspread_CS01":bbb.cs01,"index_quote_CS01_per_1m":index_cs.metrics["cs01"],
@@ -242,7 +242,7 @@ joint_market=tracks.build_market("credit")
 joint_market.insert(calibrate(joint_quotes).market.get_hazard("CDX-HAZ"))
 loss_deal=deepcopy(holding["deal"]);ls=loss_deal["instrument"]["spec"]
 ls["default_spec"]={"curve":"constant","cdr":.05};ls["recovery_spec"]={"rate":.25,"recovery_lag":6}
-stress_bbb=structured_credit_tranche_metrics(json.dumps(loss_deal),"BBB",joint_market,AS_OF)
+stress_bbb=tranche_metrics(json.dumps(loss_deal),"BBB",joint_market,AS_OF)
 stress_index=price_instrument(json.dumps(inputs["ANALYST-CDX"]),joint_market,AS_OF,model="hazard_rate")
 residual=stress_bbb.pv-bbb.pv+hedge_units*(stress_index.value.amount-index_cs.value.amount)
 print({"BBB_stress_pnl":stress_bbb.pv-bbb.pv,

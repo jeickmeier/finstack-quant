@@ -14,12 +14,12 @@
 //!
 //! - [`assertions`]: sign and finiteness assertions with named diagnostics.
 //! - [`builders`]: `TestMarketBuilder` for spot / vol / discount market contexts.
-//! - [`fixtures`]: standard dates, USD discount curves and notionals.
-//! - [`tolerances`]: canonical absolute and relative tolerance constants.
+//! - [`fixtures`]: a standard base date and USD discount curves.
+//! - [`tolerances`]: the tolerance tiers, strictest to loosest.
 //! - [`parity`]: `ParityConfig`, `compare_values` and the `assert_parity!`
 //!   macro for documented reference-value comparisons.
-//! - [`test_helpers`]: flat and sloped curve builders, standard markets,
-//!   money shorthands and Black-Scholes reference formulas.
+//! - [`test_helpers`]: standard dates, flat curve builders, swap and credit
+//!   markets and money shorthands.
 //! - [`date`], [`discount_forward_curves`], [`volatility`],
 //!   [`commodity_curves`]: one-line curve and surface constructors.
 //! - [`inflation`]: inflation curves, CPI index series and the standard
@@ -28,14 +28,14 @@
 //! # Example
 //!
 //! ```rust
-//! use finstack_quant_valuations_test_support::builders::test_market;
+//! use finstack_quant_valuations_test_support::builders::TestMarketBuilder;
 //! use finstack_quant_valuations_test_support::fixtures::base_date;
 //! use finstack_quant_valuations_test_support::tolerances;
 //!
 //! let as_of = base_date();
-//! let market = test_market(as_of).spot(100.0).vol(0.25).rate(0.05).build();
+//! let market = TestMarketBuilder::new(as_of).spot(100.0).vol(0.25).rate(0.05).build();
 //! assert!(market.get_discount("USD-OIS").is_ok());
-//! assert!(tolerances::TIGHT < tolerances::STANDARD);
+//! assert!(tolerances::TIGHT < tolerances::ANALYTICAL);
 //! ```
 
 pub mod assertions;

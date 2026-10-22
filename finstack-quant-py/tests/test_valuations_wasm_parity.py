@@ -143,10 +143,7 @@ def build_cases() -> dict[str, Any]:
         "price": swap_result.price,
         "dv01": swap.metric(rates_market, "2024-01-15", "dv01"),
         "result_json": _pinned_timestamp(swap_result.to_json()),
-        "price_decimal": swap_result.price_decimal(),
         "get_metric": swap_result.get_metric("dv01"),
-        "metric_keys": swap_result.metric_keys(),
-        "metric_count": swap_result.metric_count(),
         "metric_units": swap_result.metric_units(),
         "all_covenants_passed": swap_result.all_covenants_passed(),
         "failed_covenants": swap_result.failed_covenants(),
@@ -467,8 +464,9 @@ def test_python_matches_the_cross_host_golden() -> None:
 def test_valuation_result_methods_match_the_typed_wrapper() -> None:
     rates = json.loads(GOLDEN.read_text())["rates"]
     result = ValuationResult.from_json(rates["result_json"])
-    assert result.price_decimal() == rates["price_decimal"]
-    assert result.metric_keys() == rates["metric_keys"]
+    wire = json.loads(rates["result_json"])
+    assert str(result.value.amount_decimal) == wire["value"]["amount"]
+    assert list(result.metrics) == list(wire["measures"])
     assert result.get_metric("not_a_metric") is None
 
 

@@ -171,22 +171,22 @@ fn test_allocation_mode_sequential() {
 fn test_allocation_mode_pro_rata() {
     let tier = WaterfallTier::new("test", 1, PaymentType::Interest)
         .allocation_mode(AllocationMode::ProRata)
-        .add_recipient(
-            Recipient::new(
+        .add_recipient(Recipient {
+            weight: Some(0.60),
+            ..Recipient::new(
                 "r1",
                 RecipientType::Tranche("A".into()),
                 PaymentCalculation::ResidualCash,
             )
-            .with_weight(0.60),
-        )
-        .add_recipient(
-            Recipient::new(
+        })
+        .add_recipient(Recipient {
+            weight: Some(0.40),
+            ..Recipient::new(
                 "r2",
                 RecipientType::Tranche("B".into()),
                 PaymentCalculation::ResidualCash,
             )
-            .with_weight(0.40),
-        );
+        });
 
     assert_eq!(tier.allocation_mode, AllocationMode::ProRata);
     assert_eq!(tier.recipients[0].weight, Some(0.60));

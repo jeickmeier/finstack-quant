@@ -30,30 +30,10 @@ use finstack_quant_valuations_core::metrics::MetricContext;
 pub(super) fn cached_full_schedule(
     context: &mut MetricContext,
 ) -> finstack_quant_core::Result<Arc<CashFlowSchedule>> {
-    if context.internal_schedule.is_none() {
-        // Clone the instrument Arc so we can drop the context borrow before
-        // building the schedule, then re-borrow context to write the cache.
-        let inst = Arc::clone(&context.instrument);
-        let loan = inst.as_any().downcast_ref::<TermLoan>().ok_or_else(|| {
-            finstack_quant_core::InputError::NotFound {
-                id: format!(
-                    "instrument downcast: expected TermLoan, got {} (id={})",
-                    context.instrument.key(),
-                    context.instrument.id(),
-                ),
-            }
-        })?;
-        let schedule = crate::term_loan::pricing::TermLoanDiscountingPricer::pricing_schedule(
-            loan,
-            &context.curves,
-            context.as_of,
-        )?;
-        context.internal_schedule = Some(Arc::new(schedule));
-    }
-    let arc = context.internal_schedule.as_ref().ok_or_else(|| {
-        finstack_quant_core::Error::Validation("term loan schedule was not cached".to_string())
-    })?;
-    Ok(Arc::clone(arc))
+    crate::loan_quotes::cached_schedule(
+        context,
+        crate::term_loan::pricing::TermLoanDiscountingPricer::pricing_schedule,
+    )
 }
 
 /// Dirty purchase price implied by a clean price quote (% of outstanding).

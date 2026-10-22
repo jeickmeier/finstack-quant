@@ -53,9 +53,6 @@
 //! - [`crate::equity_option`] for cash-settled volatility-index options
 
 pub(crate) mod metrics;
-pub(crate) mod pricer;
 mod types;
 
 pub use types::VolatilityIndexFuture;
-
-// Builder provided by FinancialBuilder derive

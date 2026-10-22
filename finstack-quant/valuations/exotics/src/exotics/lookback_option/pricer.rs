@@ -13,7 +13,7 @@ use finstack_quant_valuations_core::pricer::{
 use finstack_quant_valuations_core::results::ValuationResult;
 
 // MC-specific imports
-use finstack_quant_models::monte_carlo::payoff::barrier::BarrierMonitoring as McBarrierMonitoring;
+use finstack_quant_models::monte_carlo::payoff::barrier::BarrierMonitoring;
 use finstack_quant_models::monte_carlo::payoff::lookback::{FloatingStrikeLookback, Lookback};
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
     PathDependentPricer, PathDependentPricerConfig,
@@ -34,7 +34,7 @@ impl LookbackOptionMcPricer {
     }
 
     /// Price a lookback option using Monte Carlo.
-    fn price_internal(
+    pub(crate) fn price_internal(
         &self,
         inst: &LookbackOption,
         curves: &MarketContext,
@@ -56,33 +56,15 @@ impl LookbackOptionMcPricer {
             return finstack_quant_core::money::Money::new(payoff * inst.quantity, inst.currency);
         }
 
+        let LookbackInputs {
+            spot,
+            r,
+            q,
+            sigma,
+            df: discount_factor,
+            ..
+        } = collect_lookback_inputs(inst, curves, as_of)?;
         let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
-        let discount_factor = disc_curve.df_between_dates(as_of, inst.expiry)?;
-        // Keep drift consistent with date-based discounting for MC simulation.
-        // A non-positive/non-finite df means a corrupted curve; error rather
-        // than silently pricing at a zero rate.
-        let r =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df(
-                discount_factor,
-                t,
-                "LookbackOption discount curve",
-            )?;
-
-        let spot = lookback_spot(inst, curves)?;
-
-        let q = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_optional_dividend_yield(
-            curves,
-            inst.div_yield_id.as_ref(),
-        )?;
-
-        let strike_val = inst.strike.unwrap_or(spot);
-        let sigma = finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &inst.instrument_pricing_overrides.market_quotes,
-            curves,
-            inst.vol_surface_id.as_str(),
-            t,
-            strike_val,
-        )?;
 
         let gbm_params = GbmParams::new(r, q, sigma)?;
         let process = GbmProcess::new(gbm_params);
@@ -102,7 +84,7 @@ impl LookbackOptionMcPricer {
                     ((t * base_cfg.steps_per_year).round() as usize).max(base_cfg.min_steps);
                 (
                     finstack_quant_core::math::time_grid::TimeGrid::uniform(t, num_steps)?,
-                    McBarrierMonitoring::Continuous { start_step: 0 },
+                    BarrierMonitoring::Continuous { start_step: 0 },
                 )
             }
             discrete @ finstack_quant_valuations_core::instruments::Monitoring::Discrete {
@@ -145,18 +127,15 @@ impl LookbackOptionMcPricer {
         let mut config = base_cfg;
         config.seed = seed;
         let pricer = PathDependentPricer::new(config);
+        // Seed the tracked extremum with the observed one if seasoned.
+        let initial_extremum = if tracks_max(inst) {
+            inst.observed_max.unwrap_or(f64::NEG_INFINITY)
+        } else {
+            inst.observed_min.unwrap_or(f64::INFINITY)
+        };
         let result = match inst.lookback_type {
             LookbackType::FloatingStrike => {
-                // Call pays S_T - S_min, put pays S_max - S_T; seed the
-                // observed extremum if seasoned.
-                let initial_extremum = match inst.option_type {
-                    finstack_quant_models::types::OptionType::Call => {
-                        inst.observed_min.unwrap_or(f64::INFINITY)
-                    }
-                    finstack_quant_models::types::OptionType::Put => {
-                        inst.observed_max.unwrap_or(f64::NEG_INFINITY)
-                    }
-                };
+                // Call pays S_T - S_min, put pays S_max - S_T.
                 let payoff = FloatingStrikeLookback::with_initial_extremum(
                     inst.option_type,
                     inst.quantity,
@@ -182,16 +161,7 @@ impl LookbackOptionMcPricer {
                 )?
             }
             LookbackType::FixedStrike => {
-                // Call pays max(S_max - K, 0), put pays max(K - S_min, 0);
-                // seed the observed extremum if seasoned.
-                let initial_extremum = match inst.option_type {
-                    finstack_quant_models::types::OptionType::Call => {
-                        inst.observed_max.unwrap_or(f64::NEG_INFINITY)
-                    }
-                    finstack_quant_models::types::OptionType::Put => {
-                        inst.observed_min.unwrap_or(f64::INFINITY)
-                    }
-                };
+                // Call pays max(S_max - K, 0), put pays max(K - S_min, 0).
                 let strike = inst.strike.as_ref().ok_or_else(|| {
                     finstack_quant_core::Error::Validation(
                         "FixedStrike lookback requires a strike".into(),
@@ -253,34 +223,30 @@ impl Pricer for LookbackOptionMcPricer {
     }
 }
 
-/// Present value using Monte Carlo.
-pub(crate) fn compute_pv(
-    inst: &LookbackOption,
-    curves: &MarketContext,
-    as_of: Date,
-) -> finstack_quant_core::Result<Money> {
-    let pricer = LookbackOptionMcPricer::new();
-    pricer.price_internal(inst, curves, as_of)
-}
-
 use finstack_quant_models::closed_form::{
     fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
     floating_strike_lookback_put,
 };
 
+/// Whether the payoff depends on the running maximum (fixed-strike call,
+/// floating-strike put) rather than the running minimum.
+fn tracks_max(inst: &LookbackOption) -> bool {
+    use finstack_quant_models::types::OptionType;
+    matches!(
+        (inst.lookback_type, inst.option_type),
+        (LookbackType::FixedStrike, OptionType::Call)
+            | (LookbackType::FloatingStrike, OptionType::Put)
+    )
+}
+
 fn require_observed_extremum(
     inst: &LookbackOption,
     as_of: Date,
 ) -> finstack_quant_core::Result<()> {
-    use finstack_quant_models::types::OptionType;
     use finstack_quant_valuations_core::instruments::Monitoring;
     let has_history = matches!(&inst.monitoring, Monitoring::Discrete { observation_dates }
         if observation_dates.iter().any(|date| *date < as_of));
-    let needs_max = matches!(
-        (inst.lookback_type, inst.option_type),
-        (LookbackType::FixedStrike, OptionType::Call)
-            | (LookbackType::FloatingStrike, OptionType::Put)
-    );
+    let needs_max = tracks_max(inst);
     if has_history
         && if needs_max {
             inst.observed_max.is_none()
@@ -379,12 +345,27 @@ fn expired_lookback_payoff(inst: &LookbackOption, spot: f64) -> finstack_quant_c
     Ok(payoff)
 }
 
-/// Helper to collect inputs for lookback option pricing.
+/// Market inputs shared by the Monte Carlo and analytical lookback pricers.
+struct LookbackInputs {
+    spot: f64,
+    /// Zero rate consistent with the dated discount factor `df`.
+    r: f64,
+    q: f64,
+    /// Volatility at the strike (spot for floating-strike lookbacks).
+    sigma: f64,
+    /// Instrument-day-count time to expiry.
+    t: f64,
+    /// Dated discount factor to expiry.
+    df: f64,
+}
+
+/// Collect the lookback pricing inputs in a fixed read order: discount curve,
+/// spot, dividend yield, volatility.
 fn collect_lookback_inputs(
     inst: &LookbackOption,
     curves: &MarketContext,
     as_of: Date,
-) -> finstack_quant_core::Result<(f64, f64, f64, f64, f64)> {
+) -> finstack_quant_core::Result<LookbackInputs> {
     let t = inst
         .day_count
         .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
@@ -415,24 +396,18 @@ fn collect_lookback_inputs(
             strike_val,
         )?;
 
-    Ok((spot, r, q, sigma, t))
+    Ok(LookbackInputs {
+        spot,
+        r,
+        q,
+        sigma,
+        t,
+        df,
+    })
 }
 
 /// Lookback option analytical pricer (continuous monitoring).
 pub(crate) struct LookbackOptionAnalyticalPricer;
-
-impl LookbackOptionAnalyticalPricer {
-    /// Create a new analytical lookback option pricer
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for LookbackOptionAnalyticalPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl Pricer for LookbackOptionAnalyticalPricer {
     fn key(&self) -> PricerKey {
@@ -475,7 +450,14 @@ impl Pricer for LookbackOptionAnalyticalPricer {
             ));
         }
 
-        let (spot, r, q, sigma, t) = collect_lookback_inputs(lookback, market, as_of)?;
+        let LookbackInputs {
+            spot,
+            r,
+            q,
+            sigma,
+            t,
+            ..
+        } = collect_lookback_inputs(lookback, market, as_of)?;
 
         if t <= 0.0 {
             let payoff = expired_lookback_payoff(lookback, spot)?;
@@ -491,36 +473,11 @@ impl Pricer for LookbackOptionAnalyticalPricer {
             ));
         }
 
-        // Determine current extremum based on option type
-        let spot_extremum = match lookback.lookback_type {
-            LookbackType::FixedStrike => match lookback.option_type {
-                finstack_quant_models::types::OptionType::Call => {
-                    // Fixed Strike Call: Payoff = max(S_max - K, 0)
-                    // Need max(observed_max, current_spot)
-                    let obs_max = lookback.observed_max.unwrap_or(spot);
-                    obs_max.max(spot)
-                }
-                finstack_quant_models::types::OptionType::Put => {
-                    // Fixed Strike Put: Payoff = max(K - S_min, 0)
-                    // Need min(observed_min, current_spot)
-                    let obs_min = lookback.observed_min.unwrap_or(spot);
-                    obs_min.min(spot)
-                }
-            },
-            LookbackType::FloatingStrike => match lookback.option_type {
-                finstack_quant_models::types::OptionType::Call => {
-                    // Floating Strike Call: Payoff = S_T - S_min
-                    // Need min(observed_min, current_spot)
-                    let obs_min = lookback.observed_min.unwrap_or(spot);
-                    obs_min.min(spot)
-                }
-                finstack_quant_models::types::OptionType::Put => {
-                    // Floating Strike Put: Payoff = S_max - S_T
-                    // Need max(observed_max, current_spot)
-                    let obs_max = lookback.observed_max.unwrap_or(spot);
-                    obs_max.max(spot)
-                }
-            },
+        // Running extremum to date, including the current spot.
+        let spot_extremum = if tracks_max(lookback) {
+            lookback.observed_max.unwrap_or(spot).max(spot)
+        } else {
+            lookback.observed_min.unwrap_or(spot).min(spot)
         };
 
         let price = match lookback.lookback_type {

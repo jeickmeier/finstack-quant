@@ -17,8 +17,8 @@ fn test_sabr_pricing_runs() {
         shift: None,
     };
 
-    let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, strike)
-        .with_sabr_params(sabr_params);
+    let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, strike);
+    swaption.sabr_params = Some(sabr_params);
 
     let market = create_flat_market(as_of, 0.05, 0.30); // Vol surface still needed for fallback
     let pv = swaption.value(&market, as_of).unwrap();
@@ -46,16 +46,16 @@ fn test_sabr_smile_effect() {
     let market = create_flat_market(as_of, 0.05, 0.25);
 
     // OTM put (low strike)
-    let otm_put = create_standard_receiver_swaption(expiry, swap_start, swap_end, 0.03)
-        .with_sabr_params(sabr_params.clone());
+    let mut otm_put = create_standard_receiver_swaption(expiry, swap_start, swap_end, 0.03);
+    otm_put.sabr_params = Some(sabr_params.clone());
 
     // ATM
-    let atm = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05)
-        .with_sabr_params(sabr_params.clone());
+    let mut atm = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
+    atm.sabr_params = Some(sabr_params.clone());
 
     // OTM call (high strike)
-    let otm_call = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.07)
-        .with_sabr_params(sabr_params);
+    let mut otm_call = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.07);
+    otm_call.sabr_params = Some(sabr_params);
 
     let pv_otm_put = otm_put.value(&market, as_of).unwrap().amount();
     let pv_atm = atm.value(&market, as_of).unwrap().amount();
@@ -92,10 +92,11 @@ fn test_sabr_beta_effect() {
         shift: None,
     };
 
-    let swaption_normal = create_standard_payer_swaption(expiry, swap_start, swap_end, strike)
-        .with_sabr_params(sabr_normal);
-    let swaption_lognormal = create_standard_payer_swaption(expiry, swap_start, swap_end, strike)
-        .with_sabr_params(sabr_lognormal);
+    let mut swaption_normal = create_standard_payer_swaption(expiry, swap_start, swap_end, strike);
+    swaption_normal.sabr_params = Some(sabr_normal);
+    let mut swaption_lognormal =
+        create_standard_payer_swaption(expiry, swap_start, swap_end, strike);
+    swaption_lognormal.sabr_params = Some(sabr_lognormal);
 
     let pv_normal = swaption_normal.value(&market, as_of).unwrap().amount();
     let pv_lognormal = swaption_lognormal.value(&market, as_of).unwrap().amount();

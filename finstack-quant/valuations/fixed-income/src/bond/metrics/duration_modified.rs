@@ -33,8 +33,7 @@ impl MetricCalculator for ModifiedDurationCalculator {
         let Ok(bond) = context.instrument_as::<Bond>() else {
             return Cow::Borrowed(self.dependencies());
         };
-        let has_options = bond.return_floor.is_some()
-            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        let has_options = bond.has_exercise_rights();
         if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
             Cow::Borrowed(&[])
         } else {
@@ -47,10 +46,11 @@ impl MetricCalculator for ModifiedDurationCalculator {
 
         // Callable/OAS model risk is opt-in. The default matches Bloomberg YAS
         // Workout risk: quoted-yield duration on maturity/workout cashflows.
-        let has_options = bond.return_floor.is_some()
-            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
+        let has_options = bond.has_exercise_rights();
         if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
-            return super::effective::effective_duration(bond, context, None);
+            return Ok(
+                super::effective::effective_duration_convexity(bond, context, None)?.duration,
+            );
         }
         let workout = if has_options {
             super::context_workout_path(context)?
@@ -59,36 +59,17 @@ impl MetricCalculator for ModifiedDurationCalculator {
         };
         let bond: &Bond = context.instrument_as()?;
 
-        let ytm = context
-            .computed
-            .get(&MetricId::Ytm)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:Ytm".to_string(),
-                })
-            })?;
+        let ytm = context.computed_metric(&MetricId::Ytm)?;
 
-        let d_mac = context
-            .computed
-            .get(&MetricId::DurationMac)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:DurationMac".to_string(),
-                })
-            })?;
+        let d_mac = context.computed_metric(&MetricId::DurationMac)?;
 
         let denominator_yield = if has_options {
-            workout.map_or(ytm, |(workout_yield, _, _)| workout_yield)
+            workout.map_or(ytm, |path| path.yield_rate)
         } else {
             ytm
         };
 
-        let m = crate::bond::pricing::quote_conversions::periods_per_year(
-            bond.cashflow_spec.frequency(),
-        )?
-        .max(1.0);
+        let m = bond.cashflow_spec.frequency().payments_per_year().max(1.0);
         let denom = 1.0 + denominator_yield / m;
         if denom.abs() < 1e-12 {
             return Err(finstack_quant_core::Error::Validation(

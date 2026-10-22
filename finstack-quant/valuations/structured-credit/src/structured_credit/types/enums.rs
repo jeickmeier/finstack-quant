@@ -29,6 +29,18 @@ pub enum DealType {
     Card,
 }
 
+impl DealType {
+    /// Day count of the deal's projected cashflow schedule: 30/360 for the
+    /// mortgage market (RMBS, CMBS), ACT/360 for CLO/CBO (the leveraged-loan
+    /// convention) and the ABS family.
+    pub(crate) fn schedule_day_count(self) -> finstack_quant_core::dates::DayCount {
+        match self {
+            DealType::Rmbs | DealType::Cmbs => finstack_quant_core::dates::DayCount::Thirty360,
+            _ => finstack_quant_core::dates::DayCount::Act360,
+        }
+    }
+}
+
 /// Displays the serde wire value (`clo`, `rmbs`, ...).
 impl core::fmt::Display for DealType {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

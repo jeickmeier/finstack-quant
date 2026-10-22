@@ -102,5 +102,3 @@ mod types;
 pub use types::{
     ConventionSwapParams, InterestRateSwap, InterestRateSwapBuilder, IrsLegConventions,
 };
-
-pub(crate) use finstack_quant_valuations_core::instruments::common_impl::parameters::simple_average_unsupported;

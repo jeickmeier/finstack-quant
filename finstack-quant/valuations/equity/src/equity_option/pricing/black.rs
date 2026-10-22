@@ -1,8 +1,8 @@
 //! Black–Scholes / tree pricing and cash greeks for equity options.
 
 use super::inputs::{
-    collect_inputs, early_exercise_market_params, escrowed_spot_drho, future_dividends,
-    resolve_lifecycle_value,
+    collect_inputs, early_exercise_market_params, escrowed_spot_drho, future_discrete_dividends,
+    future_dividends, resolve_lifecycle_value,
 };
 use crate::equity_option::types::EquityOption;
 use finstack_quant_core::dates::Date;
@@ -40,12 +40,7 @@ pub(crate) fn compute_pv(
             bs_price_unchecked(spot, inst.strike, r, q, sigma, t, inst.option_type)
         }
         ExerciseStyle::American => {
-            let steps = inst
-                .instrument_pricing_overrides
-                .model_config
-                .tree_steps
-                .unwrap_or(201);
-            let tree = BinomialTree::leisen_reimer(steps);
+            let tree = leisen_reimer_tree(inst);
             let (params, dividends) = early_exercise_market_params(inst, curves, as_of)?;
             if dividends.is_empty() {
                 tree.price_american(&params)?
@@ -54,35 +49,11 @@ pub(crate) fn compute_pv(
             }
         }
         ExerciseStyle::Bermudan => {
-            let schedule = inst.exercise_dates.as_ref().ok_or_else(|| {
-                finstack_quant_core::Error::Validation(
-                    "Bermudan equity option requires exercise_dates".to_string(),
-                )
-            })?;
-            let steps = inst
-                .instrument_pricing_overrides
-                .model_config
-                .tree_steps
-                .unwrap_or(201);
-            let tree = BinomialTree::leisen_reimer(steps);
+            let schedule = bermudan_schedule(inst)?;
+            let tree = leisen_reimer_tree(inst);
             let (params, dividends) = early_exercise_market_params(inst, curves, as_of)?;
-            let exercise_times: Vec<f64> = schedule
-                .iter()
-                .filter_map(|date| {
-                    let year_fraction = inst
-                        .day_count
-                        .year_fraction(as_of, *date, Default::default())
-                        .ok()?;
-                    (year_fraction > 0.0 && year_fraction <= params.time_to_expiry)
-                        .then_some(year_fraction)
-                })
-                .collect();
-            if exercise_times.is_empty() {
-                return Err(finstack_quant_core::Error::Validation(
-                    "Bermudan equity option has no exercise dates remaining after valuation date"
-                        .to_string(),
-                ));
-            }
+            let exercise_times =
+                bermudan_exercise_times(inst, schedule, as_of, params.time_to_expiry)?;
             if dividends.is_empty() {
                 tree.price_bermudan(&params, &exercise_times)?
             } else {
@@ -100,7 +71,7 @@ pub(crate) fn compute_pv(
 /// Cash greeks for an equity option (scaled by contract size; vega per 1% vol,
 /// rho per 1bp).
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct EquityOptionGreeks {
+pub(crate) struct EquityOptionGreeks {
     /// Delta: sensitivity to underlying price (scaled by contract size)
     pub delta: f64,
     /// Gamma: rate of change of delta with respect to underlying price
@@ -304,14 +275,12 @@ pub(crate) fn compute_greeks(
                     // time shrinks: dS*/dt = -sum(z_i * PV(D_i)). This reduces to
                     // -r * PV(D) for a flat curve, with no ex-date jump included.
                     let mut dividend_carry = 0.0;
-                    for &(ex_date, amount) in &inst.discrete_dividends {
-                        if ex_date > as_of && ex_date <= inst.expiry {
-                            let t_div = year_fraction(inst.day_count, as_of, ex_date)?;
-                            if t_div > 0.0 {
-                                let df = disc_curve.df_between_dates(as_of, ex_date)?;
-                                let zero_yield = -df.ln() / t_div;
-                                dividend_carry += zero_yield * amount * df;
-                            }
+                    for &(ex_date, amount) in future_discrete_dividends(inst, as_of) {
+                        let t_div = year_fraction(inst.day_count, as_of, ex_date)?;
+                        if t_div > 0.0 {
+                            let df = disc_curve.df_between_dates(as_of, ex_date)?;
+                            let zero_yield = -df.ln() / t_div;
+                            dividend_carry += zero_yield * amount * df;
                         }
                     }
                     let theta = greeks_unit.theta
@@ -331,22 +300,11 @@ pub(crate) fn compute_greeks(
             })
         }
         ExerciseStyle::American => {
-            let steps = inst
-                .instrument_pricing_overrides
-                .model_config
-                .tree_steps
-                .unwrap_or(201);
-            let tree = BinomialTree::leisen_reimer(steps);
+            let tree = leisen_reimer_tree(inst);
             let (params, dividends) = early_exercise_market_params(inst, curves, as_of)?;
             let price_fn = |market_params: &OptionMarketParams| -> Result<f64> {
                 let elapsed = params.time_to_expiry - market_params.time_to_expiry;
-                let dividends: Vec<_> = dividends
-                    .iter()
-                    .filter_map(|(time, amount)| {
-                        let remaining = time - elapsed;
-                        (remaining > 0.0).then_some((remaining, *amount))
-                    })
-                    .collect();
+                let dividends = remaining_dividends(&dividends, elapsed);
                 if dividends.is_empty() {
                     tree.price_american(market_params)
                 } else {
@@ -361,44 +319,14 @@ pub(crate) fn compute_greeks(
             )
         }
         ExerciseStyle::Bermudan => {
-            let schedule = inst.exercise_dates.as_ref().ok_or_else(|| {
-                finstack_quant_core::Error::Validation(
-                    "Bermudan equity option requires exercise_dates".to_string(),
-                )
-            })?;
-            let steps = inst
-                .instrument_pricing_overrides
-                .model_config
-                .tree_steps
-                .unwrap_or(201);
-            let tree = BinomialTree::leisen_reimer(steps);
+            let schedule = bermudan_schedule(inst)?;
+            let tree = leisen_reimer_tree(inst);
             let (params, dividends) = early_exercise_market_params(inst, curves, as_of)?;
-            let exercise_times: Vec<f64> = schedule
-                .iter()
-                .filter_map(|date| {
-                    let year_fraction = inst
-                        .day_count
-                        .year_fraction(as_of, *date, Default::default())
-                        .ok()?;
-                    (year_fraction > 0.0 && year_fraction <= params.time_to_expiry)
-                        .then_some(year_fraction)
-                })
-                .collect();
-            if exercise_times.is_empty() {
-                return Err(finstack_quant_core::Error::Validation(
-                    "Bermudan equity option has no exercise dates remaining after valuation date"
-                        .to_string(),
-                ));
-            }
+            let exercise_times =
+                bermudan_exercise_times(inst, schedule, as_of, params.time_to_expiry)?;
             let price_fn = |market_params: &OptionMarketParams| -> Result<f64> {
                 let elapsed = params.time_to_expiry - market_params.time_to_expiry;
-                let dividends: Vec<_> = dividends
-                    .iter()
-                    .filter_map(|(time, amount)| {
-                        let remaining = time - elapsed;
-                        (remaining > 0.0).then_some((remaining, *amount))
-                    })
-                    .collect();
+                let dividends = remaining_dividends(&dividends, elapsed);
                 let exercise_times: Vec<_> = exercise_times
                     .iter()
                     .filter_map(|time| {
@@ -424,6 +352,63 @@ pub(crate) fn compute_greeks(
             )
         }
     }
+}
+
+/// Leisen–Reimer tree with the instrument's `tree_steps` override (default 201).
+fn leisen_reimer_tree(inst: &EquityOption) -> BinomialTree {
+    let steps = inst
+        .instrument_pricing_overrides
+        .model_config
+        .tree_steps
+        .unwrap_or(201);
+    BinomialTree::leisen_reimer(steps)
+}
+
+/// Contractual Bermudan exercise dates.
+fn bermudan_schedule(inst: &EquityOption) -> Result<&[Date]> {
+    inst.exercise_dates.as_deref().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "Bermudan equity option requires exercise_dates".to_string(),
+        )
+    })
+}
+
+/// Model times of the exercise dates in `(0, time_to_expiry]`, on the
+/// instrument day count; errors when none remain.
+fn bermudan_exercise_times(
+    inst: &EquityOption,
+    schedule: &[Date],
+    as_of: Date,
+    time_to_expiry: f64,
+) -> Result<Vec<f64>> {
+    let exercise_times: Vec<f64> = schedule
+        .iter()
+        .filter_map(|date| {
+            let year_fraction = inst
+                .day_count
+                .year_fraction(as_of, *date, Default::default())
+                .ok()?;
+            (year_fraction > 0.0 && year_fraction <= time_to_expiry).then_some(year_fraction)
+        })
+        .collect();
+    if exercise_times.is_empty() {
+        return Err(finstack_quant_core::Error::Validation(
+            "Bermudan equity option has no exercise dates remaining after valuation date"
+                .to_string(),
+        ));
+    }
+    Ok(exercise_times)
+}
+
+/// Dividends still ahead after `elapsed` years of a theta time shift.
+fn remaining_dividends(dividends: &[(f64, f64)], elapsed: f64) -> Vec<(f64, f64)> {
+    dividends
+        .iter()
+        .filter_map(|(time, amount)| {
+            let remaining = time - elapsed;
+            (remaining > 0.0).then_some((remaining, *amount))
+        })
+        .collect()
 }
 
 fn tree_finite_difference_greeks(
@@ -502,26 +487,12 @@ fn tree_finite_difference_greeks(
     })
 }
 
-/// Registry pricer for Equity Option using Black-Scholes model
+/// Registry pricer for Equity Option using Black-Scholes model.
+///
+/// Registered under `ModelKey::Black76`, the library-wide key for lognormal
+/// option pricing: BSM is Black-76 applied to the forward
+/// `F = S × exp((r-q)T)`, so the same model key covers both.
 pub(crate) struct SimpleEquityOptionBlackPricer;
-
-impl SimpleEquityOptionBlackPricer {
-    /// Create new Black-Scholes pricer with default model.
-    ///
-    /// Uses `ModelKey::Black76` which is the library-wide convention for
-    /// lognormal option pricing. BSM and Black-76 are mathematically
-    /// equivalent (BSM is Black-76 applied to the forward
-    /// `F = S × exp((r-q)T)`), so the same model key covers both.
-    pub(crate) fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for SimpleEquityOptionBlackPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl finstack_quant_valuations_core::pricer::Pricer for SimpleEquityOptionBlackPricer {
     fn key(&self) -> finstack_quant_valuations_core::pricer::PricerKey {

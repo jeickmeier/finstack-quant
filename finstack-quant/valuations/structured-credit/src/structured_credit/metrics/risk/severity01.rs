@@ -22,15 +22,7 @@ pub(crate) struct Severity01Calculator;
 
 impl MetricCalculator for Severity01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let recovery01 = context
-            .computed
-            .get(&MetricId::Recovery01)
-            .copied()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "metric:recovery01".to_string(),
-                })
-            })?;
+        let recovery01 = context.computed_metric(&MetricId::Recovery01)?;
         Ok(-recovery01)
     }
 

@@ -568,26 +568,6 @@ impl ShiftingInterestSpec {
             triggers: Vec::new(),
         }
     }
-
-    /// Set how the schedule values are read.
-    ///
-    /// # Arguments
-    ///
-    /// * `mode` - [`ShiftMode`] applied to every step.
-    pub fn with_mode(mut self, mode: ShiftMode) -> Self {
-        self.mode = mode;
-        self
-    }
-
-    /// Set the performance tests gating the shift.
-    ///
-    /// # Arguments
-    ///
-    /// * `triggers` - Tests that must all pass for the schedule to apply.
-    pub fn with_triggers(mut self, triggers: Vec<StepDownTrigger>) -> Self {
-        self.triggers = triggers;
-        self
-    }
 }
 
 /// Early-amortization specification for revolving (master-trust) deals.

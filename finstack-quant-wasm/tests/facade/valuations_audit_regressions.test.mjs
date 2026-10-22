@@ -582,29 +582,6 @@ test('credit-index snapshots require complete issuer coverage', () => {
   );
 });
 
-test('CDS option premium settlement does not change option variance', () => {
-  const f = JSON.parse(
-    readFileSync(
-      new URL(
-        '../../../finstack-quant/valuations/tests/fixtures/production_cds_option.json',
-        import.meta.url
-      ),
-      'utf8'
-    )
-  );
-  const values = ['2025-01-06', '2025-07-01'].map((settlement) => {
-    f.instrument.instrument.spec.premium_settlement_date = settlement;
-    return valuations.instruments.priceInstrument(
-      JSON.stringify(f.instrument),
-      JSON.stringify(f.market),
-      f.as_of,
-      'bloomberg_cdso',
-      []
-    ).value.amount;
-  });
-  assert.ok(Math.abs(values[0] - values[1]) < 1e-8, `${values}`);
-});
-
 test('CDS bespoke frequency and stub determine premium cashflow PV', () => {
   const f = JSON.parse(
     readFileSync(

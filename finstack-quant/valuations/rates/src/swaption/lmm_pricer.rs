@@ -4,7 +4,7 @@
 //! so it can be dispatched via the pricing registry under
 //! `(BermudanSwaption, LmmMonteCarlo)`.
 
-use crate::swaption::bermudan::apply_exercise_today;
+use crate::swaption::bermudan::{apply_exercise_today, require_discount_curve, settled_result};
 use crate::swaption::pricing::lmm_bermudan::price_bermudan_lmm;
 use crate::swaption::BermudanSwaption;
 use crate::swaption::BermudanType;
@@ -12,7 +12,6 @@ use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::process::lmm::LmmParams;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::year_fraction;
@@ -127,9 +126,6 @@ impl BermudanSwaptionLmmPricer {
             || swaption.bermudan_type != BermudanType::CoTerminal
         {
             return Err(unsupported("requires physical co-terminal settlement"));
-        }
-        if swaption.exercise_schedule.notice_days != 0 {
-            return Err(unsupported("requires zero notice days"));
         }
         if !float.spread_bp.is_zero()
             || float.reset_lag_days != 0
@@ -322,33 +318,16 @@ impl Pricer for BermudanSwaptionLmmPricer {
             InstrumentType::BermudanSwaption,
         )?;
 
-        let disc = market
-            .get_discount(swaption.get_discount_curve_id().as_str())
-            .map_err(|e| {
-                PricingError::missing_market_data_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+        let disc = require_discount_curve(market, swaption.get_discount_curve_id().as_str())?;
 
         let ttm = swaption.time_to_maturity(as_of)?;
         if ttm <= 0.0 {
-            return Ok(ValuationResult::stamped(
-                swaption.id.as_str(),
-                as_of,
-                Money::from((0_i64, swaption.notional.currency())),
-            ));
+            return Ok(settled_result(swaption, as_of));
         }
 
-        let exercise_times = swaption
-            .exercise_schedule
-            .exercise_times(as_of, DayCount::Act365F)?;
+        let exercise_times = swaption.exercise_times(as_of)?;
         if exercise_times.is_empty() {
-            let mut result = ValuationResult::stamped(
-                swaption.id.as_str(),
-                as_of,
-                Money::from((0_i64, swaption.notional.currency())),
-            );
+            let mut result = settled_result(swaption, as_of);
             apply_exercise_today(swaption, market, as_of, &mut result)?;
             return Ok(result);
         }
@@ -410,6 +389,7 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, Date, Tenor};
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::money::Money;
     use finstack_quant_models::types::OptionType;
     use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     use rust_decimal::Decimal;
@@ -605,7 +585,9 @@ mod tests {
         // The day after the last exercise date: the right is still live on
         // the date itself.
         let as_of = option
-            .last_exercise()
+            .exercise_schedule
+            .exercise_dates
+            .last()
             .expect("exercise date")
             .next_day()
             .expect("next day");
@@ -651,7 +633,6 @@ mod tests {
             ("exercise", |s| {
                 s.exercise_schedule.exercise_dates[0] += time::Duration::days(1)
             }),
-            ("notice", |s| s.exercise_schedule.notice_days = 2),
             ("payment dates", |s| {
                 s.underlying_fixed_leg.business_day_convention = BusinessDayConvention::Following;
                 s.underlying_float_leg.business_day_convention = BusinessDayConvention::Following;

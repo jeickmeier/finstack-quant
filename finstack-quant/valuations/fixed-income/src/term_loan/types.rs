@@ -39,7 +39,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    calendar_by_id_strict, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
+    calendar_by_id_strict, BusinessDayConvention, Date, DayCount, StubKind, Tenor,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -688,7 +688,7 @@ impl TermLoan {
                     amount: Money::from((5_000_000_i64, Currency::USD)),
                 },
             ],
-            commitment_steps: vec![super::super::loan_terms::CommitmentStep {
+            commitment_steps: vec![crate::loan_terms::CommitmentStep {
                 date: date!(2024 - 10 - 15),
                 amount: Money::from((15_000_000_i64, Currency::USD)),
                 reduction_fee_bp: Decimal::ZERO,
@@ -800,19 +800,7 @@ impl TermLoan {
     /// Returns an error if the settlement-day count exceeds the signed offset range,
     /// the shifted date exceeds the calendar, or the calendar cannot be resolved.
     pub fn settlement_date(&self, as_of: Date) -> finstack_quant_core::Result<Date> {
-        if self.settlement_days == 0 {
-            return Ok(as_of);
-        }
-        let settlement_days = i32::try_from(self.settlement_days).map_err(|_| {
-            finstack_quant_core::Error::Validation("settlement days exceed supported range".into())
-        })?;
-
-        if let Some(calendar_id) = &self.calendar_id {
-            let calendar = calendar_by_id_strict(calendar_id)?;
-            return as_of.add_business_days(settlement_days, calendar);
-        }
-
-        as_of.add_weekdays(settlement_days)
+        crate::loan_terms::settlement_date(as_of, self.settlement_days, self.calendar_id.as_deref())
     }
 
     /// Accrual configuration for settlement accrued-interest calculations.
@@ -890,8 +878,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for TermLoan {
     ) -> finstack_quant_core::Result<Money> {
         match self.default_model() {
             finstack_quant_valuations_core::pricer::ModelKey::Tree => {
-                crate::term_loan::pricing::TermLoanTreePricer::new()
-                    .price_callable(self, curves, as_of)
+                crate::term_loan::pricing::TermLoanTreePricer.price_callable(self, curves, as_of)
             }
             finstack_quant_valuations_core::pricer::ModelKey::Discounting => {
                 crate::term_loan::pricing::TermLoanDiscountingPricer::price(self, curves, as_of)

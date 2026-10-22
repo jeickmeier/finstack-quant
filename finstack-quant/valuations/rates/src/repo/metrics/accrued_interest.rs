@@ -23,19 +23,11 @@ pub(crate) struct AccruedInterestCalculator;
 impl MetricCalculator for AccruedInterestCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let as_of = context.as_of;
-        let (
-            discount_curve_id,
-            day_count,
-            adj_start,
-            adj_maturity,
-            notional_amount,
-            effective_rate,
-        ) = {
+        let (day_count, adj_start, adj_maturity, notional_amount, effective_rate) = {
             let repo = context.instrument_as::<crate::repo::Repo>()?;
             // Use adjusted dates for consistency with PV and interest_amount()
             let (adj_start, adj_maturity) = repo.adjusted_dates()?;
             (
-                repo.discount_curve_id.to_owned(),
                 repo.day_count,
                 adj_start,
                 adj_maturity,
@@ -59,9 +51,6 @@ impl MetricCalculator for AccruedInterestCalculator {
             )?;
             notional_amount * effective_rate * accrual_fraction
         };
-
-        context.discount_curve_id = Some(discount_curve_id);
-        context.day_count = Some(day_count);
 
         Ok(accrued_amount)
     }

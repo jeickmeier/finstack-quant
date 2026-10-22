@@ -116,6 +116,8 @@ def test_public_functions_and_classes_name_a_module_that_exports_them() -> None:
         "import finstack_quant.schema",
         "from finstack_quant import schema",
         "from finstack_quant.models.credit import pd",
+        "import finstack_quant.valuations.instruments",
+        "from finstack_quant.valuations.market import ConventionRegistry",
         "import finstack_quant",
     ],
 )

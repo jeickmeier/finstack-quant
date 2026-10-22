@@ -3,7 +3,7 @@
 //! Provides parallel and key-rate vega calculators for instruments with volatility surfaces.
 
 use crate::instruments::Instrument;
-use crate::metrics::core::finite_difference::{
+use crate::metrics::finite_difference::{
     apply_parallel_surface_bumps_in_place, bumped_volatility_override, min_grid_vol,
     revert_scratch_bumps, volatility_override, VOL_POINTS_PER_ABSOLUTE_VOL,
 };
@@ -58,10 +58,7 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
-        let defaults = sens_config::from_context_or_default(
-            context.get_config(),
-            context.get_metric_pricing_overrides(),
-        )?;
+        let defaults = sens_config::resolve(context)?;
 
         let dependencies = instrument.market_dependencies()?;
         let vol_surface_ids = dependencies.present_vol_surface_ids(&context.curves);

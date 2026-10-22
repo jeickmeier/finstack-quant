@@ -8,8 +8,6 @@ pub(crate) mod dm;
 pub(crate) mod embedded_option_value;
 /// I-spread (interpolated spread) calculator
 pub(crate) mod i_spread;
-/// Moosmüller yield-to-maturity calculator
-pub(crate) mod moosmuller_ytm;
 /// Option-adjusted spread (OAS) calculator
 pub(crate) mod oas;
 /// Price calculators (clean and dirty)
@@ -32,13 +30,46 @@ pub(crate) use embedded_option_value::EmbeddedOptionValueCalculator;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
 pub(crate) use i_spread::ISpreadCalculator;
-pub(crate) use moosmuller_ytm::MoosmullerYtmCalculator;
 pub(crate) use oas::OasCalculator;
 pub(crate) use prices::{CleanPriceCalculator, DirtyPriceCalculator};
 pub(crate) use vega::BondVegaCalculator;
 pub(crate) use ytm::YtmCalculator;
 pub(crate) use ytw::YtwCalculator;
 pub use z_spread::ZSpreadCalculator;
+
+/// Dirty target value in currency at the quote/settlement date.
+///
+/// Uses the quoted clean price (percent of par) plus accrued at the quote
+/// date; without a quote, forward-values the model PV at `as_of` to the quote
+/// date, because the yield and spread kernels discount from the quote date and
+/// an un-carried PV target would bias the solved yield or spread by the
+/// settlement-period carry.
+///
+/// # Arguments
+///
+/// * `bond` - Bond whose quoted clean price and notional set the target.
+/// * `context` - Metric context supplying curves, `as_of` and the base model PV.
+/// * `quote_ctx` - Quote-date context (settlement date and accrued there).
+pub(crate) fn quote_date_dirty_target(
+    bond: &Bond,
+    context: &MetricContext,
+    quote_ctx: &QuoteDateContext,
+) -> finstack_quant_core::Result<f64> {
+    match bond
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct
+    {
+        Some(clean_px) => Ok(quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount())),
+        None => crate::bond::pricing::settlement::model_dirty_at_quote_date(
+            bond,
+            &context.curves,
+            context.as_of,
+            quote_ctx.quote_date,
+            context.base_value.amount(),
+        ),
+    }
+}
 
 /// Calculates the Japanese simple yield (単利), JSDA convention.
 ///

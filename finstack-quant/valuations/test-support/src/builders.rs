@@ -6,7 +6,6 @@
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 
 // Market Context Builders
@@ -18,12 +17,18 @@ pub struct TestMarketBuilder {
     vol: f64,
     rate: f64,
     div_yield: Option<f64>,
-    discount_curve_id: String,
-    vol_surface_id: String,
-    spot_id: String,
-    div_yield_id: Option<String>,
-    tenor_years: f64,
 }
+
+/// Discount curve id of every [`TestMarketBuilder`] market.
+const DISCOUNT_CURVE_ID: &str = "USD-OIS";
+/// Volatility surface id of every [`TestMarketBuilder`] market.
+const VOL_SURFACE_ID: &str = "SPOT_VOL";
+/// Spot price scalar id of every [`TestMarketBuilder`] market.
+const SPOT_ID: &str = "SPOT";
+/// Dividend yield scalar id, set only when a dividend yield is given.
+const DIV_YIELD_ID: &str = "SPOT_DIV";
+/// Far knot of the discount curve, in years.
+const TENOR_YEARS: f64 = 2.0;
 
 impl TestMarketBuilder {
     /// Create a new test market builder.
@@ -34,11 +39,6 @@ impl TestMarketBuilder {
             vol: 0.25,
             rate: 0.05,
             div_yield: None,
-            discount_curve_id: "USD-OIS".to_string(),
-            vol_surface_id: "SPOT_VOL".to_string(),
-            spot_id: "SPOT".to_string(),
-            div_yield_id: None,
-            tenor_years: 2.0,
         }
     }
 
@@ -63,66 +63,36 @@ impl TestMarketBuilder {
     /// Set the dividend yield.
     pub fn div_yield(mut self, div_yield: f64) -> Self {
         self.div_yield = Some(div_yield);
-        self.div_yield_id = Some(format!("{}_DIV", self.spot_id));
-        self
-    }
-
-    /// Set the discount curve ID.
-    pub fn discount_curve_id(mut self, id: &str) -> Self {
-        self.discount_curve_id = id.to_string();
-        self
-    }
-
-    /// Set the volatility surface ID.
-    pub fn vol_surface_id(mut self, id: &str) -> Self {
-        self.vol_surface_id = id.to_string();
-        self
-    }
-
-    /// Set the spot price scalar ID.
-    pub fn spot_id(mut self, id: &str) -> Self {
-        self.spot_id = id.to_string();
-        if self.div_yield.is_some() {
-            self.div_yield_id = Some(format!("{}_DIV", id));
-        }
-        self
-    }
-
-    /// Set the far tenor for the discount curve (default: 2.0 years).
-    pub fn tenor_years(mut self, years: f64) -> Self {
-        self.tenor_years = years;
         self
     }
 
     /// Build the market context.
     pub fn build(self) -> MarketContext {
-        let disc_curve = DiscountCurve::builder(self.discount_curve_id.as_str())
+        let disc_curve = DiscountCurve::builder(DISCOUNT_CURVE_ID)
             .base_date(self.as_of)
             .day_count(DayCount::Act365F)
             .knots([
                 (0.0_f64, 1.0_f64),
                 (1.0_f64, (-self.rate).exp()),
-                (self.tenor_years, (-self.rate * self.tenor_years).exp()),
+                (TENOR_YEARS, (-self.rate * TENOR_YEARS).exp()),
             ])
             .build()
             .expect("discount curve should build in tests");
 
-        let vol_surface = VolSurface::builder(self.vol_surface_id.as_str())
-            .expiries(&[0.5, 1.0, 2.0])
-            .strikes(&[80.0, 100.0, 120.0])
-            .row(&[self.vol, self.vol, self.vol])
-            .row(&[self.vol, self.vol, self.vol])
-            .row(&[self.vol, self.vol, self.vol])
-            .build()
-            .expect("vol surface should build in tests");
+        let vol_surface = crate::volatility::flat_vol_surface(
+            VOL_SURFACE_ID,
+            &[0.5, 1.0, 2.0],
+            &[80.0, 100.0, 120.0],
+            self.vol,
+        );
 
         let mut market = MarketContext::new()
             .insert(disc_curve)
             .insert_surface(vol_surface)
-            .insert_price(&self.spot_id, MarketScalar::Unitless(self.spot));
+            .insert_price(SPOT_ID, MarketScalar::Unitless(self.spot));
 
-        if let (Some(div), Some(div_id)) = (self.div_yield, &self.div_yield_id) {
-            market = market.insert_price(div_id, MarketScalar::Unitless(div));
+        if let Some(div) = self.div_yield {
+            market = market.insert_price(DIV_YIELD_ID, MarketScalar::Unitless(div));
         }
 
         market
@@ -146,37 +116,4 @@ pub fn simple_option_market(as_of: Date, spot: f64, vol: f64, rate: f64) -> Mark
         .vol(vol)
         .rate(rate)
         .build()
-}
-
-/// Create a test market with dividend yield.
-///
-/// # Arguments
-///
-/// * `as_of` - Valuation date; base date of the `USD-OIS` curve and `SPOT_VOL` surface.
-/// * `spot` - Spot price stored under the `SPOT` scalar, in the option's quote units.
-/// * `vol` - Flat annualised volatility, as a decimal, written across the surface.
-/// * `rate` - Continuously compounded flat discount rate, as a decimal.
-/// * `div_yield` - Continuous dividend yield, as a decimal, stored under the `SPOT_DIV` scalar.
-pub fn option_market_with_divs(
-    as_of: Date,
-    spot: f64,
-    vol: f64,
-    rate: f64,
-    div_yield: f64,
-) -> MarketContext {
-    TestMarketBuilder::new(as_of)
-        .spot(spot)
-        .vol(vol)
-        .rate(rate)
-        .div_yield(div_yield)
-        .build()
-}
-
-/// Create a test market context via builder.
-///
-/// # Arguments
-///
-/// * `as_of` - Valuation date every curve and surface the builder emits is based on.
-pub fn test_market(as_of: Date) -> TestMarketBuilder {
-    TestMarketBuilder::new(as_of)
 }

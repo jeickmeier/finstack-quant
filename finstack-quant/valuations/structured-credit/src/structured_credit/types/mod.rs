@@ -28,6 +28,7 @@ pub(crate) mod tranches;
 pub(crate) mod waterfall;
 
 mod constructors;
+pub use constructors::StandardDealParams;
 mod instrument;
 mod pricing_methods;
 mod resolved;
@@ -76,8 +77,8 @@ pub use waterfall::{
 };
 
 pub(crate) use results::DealAccruals;
-pub use results::{TrancheAccrualPeriod, TrancheCashflows, TrancheValuation};
-pub use tranche_view::StructuredCreditTranche;
+pub use results::{TrancheAccrualPeriod, TrancheCashflows};
+pub(crate) use tranche_view::StructuredCreditTranche;
 
 use finstack_quant_models::credit::pool::prepayment::StochasticPrepaySpec;
 use finstack_quant_models::credit::pool::{CorrelationStructure, StochasticDefaultSpec};
@@ -443,8 +444,8 @@ pub struct StructuredCredit {
     /// principal-only class). Equity is exempt: its interest/principal split
     /// is a reporting convention driven by the tranche's metadata coupon.
     ///
-    /// Constraints, enforced by [`Self::with_waterfall`] and re-checked at
-    /// pricing time so JSON-supplied deals get identical errors:
+    /// Constraints, enforced by `validate_invariants` and at pricing time so
+    /// every construction path gets identical errors:
     /// - every tranche referenced by a tier recipient or coverage trigger must
     ///   exist in `tranches`, and tranche-keyed recipients must not target an
     ///   equity tranche (the engine records equity flows under

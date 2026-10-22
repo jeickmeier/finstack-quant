@@ -377,12 +377,6 @@ impl InterestRateFuture {
             .build()
     }
 
-    /// Set contract specifications.
-    pub fn with_contract_specs(mut self, specs: FutureContractSpecs) -> Self {
-        self.contract_specs = specs;
-        self
-    }
-
     /// Get the rate implied by the entry price `terms.entry_price`.
     ///
     /// Interest rate futures quote as 100 minus the rate, i.e., a price of 97.50
@@ -430,7 +424,7 @@ impl InterestRateFuture {
         use finstack_quant_core::market_data::fixings::{
             get_fixing_series, require_fixing_value_exact,
         };
-        use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::{
+        use finstack_quant_valuations_core::instruments::pricing::overnight::{
             project_arithmetic_overnight_rate, project_overnight_coupon,
             resolve_overnight_fixing_calendar, OvernightArithmeticProjectionInput,
             OvernightCouponProjectionInput, OvernightProjectionCurve,
@@ -532,9 +526,19 @@ impl InterestRateFuture {
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
+        let projection = self.rate_projection(context, as_of)?;
+        self.convexity_adjustment_for(context, as_of, &projection)
+    }
+
+    /// Convexity adjustment for the already-computed rate `projection`.
+    fn convexity_adjustment_for(
+        &self,
+        context: &MarketContext,
+        as_of: Date,
+        projection: &RateFutureProjection,
+    ) -> finstack_quant_core::Result<f64> {
         use finstack_quant_core::dates::DayCountContext;
         let (_fixing_date, period_start, period_end) = self.resolve_dates()?;
-        let projection = self.rate_projection(context, as_of)?;
         if projection.parallel_forward_sensitivity == 0.0 {
             return Ok(0.0);
         }
@@ -573,7 +577,7 @@ impl InterestRateFuture {
         projected_rate: f64,
     ) -> finstack_quant_core::Result<f64> {
         use finstack_quant_models::rates::hull_white::{hw_b, HullWhiteParams};
-        use finstack_quant_valuations_core::instruments::common_impl::pricing::overnight::{
+        use finstack_quant_valuations_core::instruments::pricing::overnight::{
             project_overnight_coupon, resolve_overnight_fixing_calendar,
             OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
@@ -679,7 +683,7 @@ impl InterestRateFuture {
     ) -> finstack_quant_core::Result<f64> {
         self.validate()?;
         self.terms
-            .resolve_mark(self.id.as_str(), as_of, || self.fair_price(market, as_of))
+            .resolve_mark(self.id.as_str(), as_of, || self.model_price(market, as_of))
     }
 
     /// Model futures price `100 × (1 − R − CA)` in price points, where `R` is
@@ -696,9 +700,16 @@ impl InterestRateFuture {
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         self.validate()?;
+        self.model_price(market, as_of)
+    }
+
+    /// [`Self::fair_price`] for an already-validated contract.
+    fn model_price(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+        // The discount curve is a declared market dependency even though the
+        // daily-margined price does not discount.
         let _disc = market.get_discount(&self.discount_curve_id)?;
         let projection = self.rate_projection(market, as_of)?;
-        let effective_adjustment = self.convexity_adjustment(market, as_of)?;
+        let effective_adjustment = self.convexity_adjustment_for(market, as_of, &projection)?;
         Ok(100.0 * (1.0 - projection.rate - effective_adjustment))
     }
 
@@ -732,15 +743,7 @@ impl InterestRateFuture {
     pub fn npv_raw(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
         self.validate()?;
         self.terms
-            .npv_from_model_price(self.id.as_str(), as_of, || self.fair_price(market, as_of))
-    }
-
-    /// Derive contract tick value for the instrument accrual.
-    ///
-    /// Tick value is the quote-point multiplier times the tick size in price points.
-    pub fn derived_tick_value(&self) -> finstack_quant_core::Result<f64> {
-        self.validate()?;
-        Ok(self.terms.multiplier * self.contract_specs.tick_size)
+            .npv_from_model_price(self.id.as_str(), as_of, || self.model_price(market, as_of))
     }
 
     /// Calculate convexity adjusted rate using volatility surface.
@@ -954,7 +957,6 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InterestRateFuture {
     }
 }
 
-// Declare canonical market dependencies for the DV01 calculator.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1093,14 +1095,6 @@ mod tests {
                 );
             }
         }
-    }
-
-    #[test]
-    fn quoted_tick_reconciles_with_one_contract_pnl() {
-        let mut future = InterestRateFuture::example().expect("future");
-        future.terms.multiplier = 2500.0;
-        future.contract_specs.tick_size = 0.0025;
-        assert_eq!(future.derived_tick_value().expect("tick"), 6.25);
     }
 
     #[test]

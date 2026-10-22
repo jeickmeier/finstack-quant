@@ -1,52 +1,26 @@
-use super::{DealType, StructuredCredit, TrancheCashflows, TrancheValuation};
-use crate::structured_credit::metrics::{
-    calculate_tranche_cs01, calculate_tranche_duration, calculate_tranche_z_spread,
-};
+use super::{DealType, StructuredCredit, TrancheCashflows};
 use crate::structured_credit::pricing::stochastic::calibrations::{
     abs_auto_correlation_structure, clo_correlation_structure, cmbs_correlation_structure,
     rmbs_correlation_structure,
 };
+use crate::structured_credit::pricing::stochastic::pricer::ScenarioTreeConfig;
 use crate::structured_credit::pricing::stochastic::pricer::{
-    StochasticPricer, StochasticPricerConfig, StochasticPricingResult, StructuredCreditPricingMode,
+    StochasticPricer, StochasticPricerConfig,
 };
-use crate::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use finstack_quant_models::correlation::RecoverySpec as StochasticRecoverySpec;
+use finstack_quant_models::correlation::RecoverySpec;
 use finstack_quant_models::credit::pool::prepayment::StochasticPrepaySpec;
 use finstack_quant_models::credit::pool::{CorrelationStructure, StochasticDefaultSpec};
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations_core::results::structured_credit::{
+    StochasticPricingResult, StructuredCreditPricingMode,
+};
 
 impl StructuredCredit {
-    /// Calculate monthly prepayment probability at the supplied collateral age.
-    ///
-    /// # Arguments
-    ///
-    /// * `seasoning_months` - Collateral age in months, including age at closing.
-    pub fn calculate_smm(&self, seasoning_months: u32) -> finstack_quant_core::Result<f64> {
-        self.validated_credit_model()?
-            .prepayment_spec
-            .smm(seasoning_months)
-    }
-
-    /// Calculate monthly default probability at the supplied collateral age.
-    ///
-    /// # Arguments
-    ///
-    /// * `seasoning_months` - Collateral age in months, including age at closing.
-    pub fn calculate_default_rate(
-        &self,
-        seasoning_months: u32,
-    ) -> finstack_quant_core::Result<f64> {
-        self.validated_credit_model()?
-            .default_spec
-            .mdr(seasoning_months)
-    }
-
     /// Monte Carlo stochastic pricing with optional estimator-count and
     /// pairing overrides.
     ///
@@ -181,8 +155,8 @@ impl StructuredCredit {
             tree_config.num_periods = tree_steps.max(1);
         }
         let discount_curve = context.get_discount(self.discount_curve_id.as_str())?;
-        let mut config = StochasticPricerConfig::new(effective_as_of, discount_curve, tree_config)
-            .with_pricing_mode(pricing_mode);
+        let mut config =
+            StochasticPricerConfig::new(effective_as_of, discount_curve, tree_config, pricing_mode);
         if let Some(granularity) = self
             .instrument_pricing_overrides
             .model_config
@@ -257,10 +231,8 @@ impl StructuredCredit {
         tree_config.default_spec = default;
         tree_config.recovery_spec = match &self.credit_model.stochastic_recovery_spec {
             Some(spec) => spec.clone(),
-            None => {
-                StochasticRecoverySpec::constant(self.validated_credit_model()?.recovery_spec.rate)
-                    .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?
-            }
+            None => RecoverySpec::constant(self.validated_credit_model()?.recovery_spec.rate)
+                .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?,
         };
         // Explicit deal correlation overrides the copula spec's scalar.
         // The engine consumes only this scalar override; per-pair
@@ -442,7 +414,7 @@ impl StructuredCredit {
         self.value_tranche_cashflows(&cashflows, market, effective_as_of)
     }
 
-    fn value_tranche_cashflows(
+    pub(crate) fn value_tranche_cashflows(
         &self,
         cashflows: &TrancheCashflows,
         context: &MarketContext,
@@ -462,173 +434,6 @@ impl StructuredCredit {
         finstack_quant_valuations_core::instruments::common_impl::helpers::apply_scenario_value(
             self, pv,
         )
-    }
-
-    /// Value a note and calculate its mandatory price, yield, life and spread metrics.
-    ///
-    /// # Arguments
-    ///
-    /// * `tranche_id` - Exact note identifier within this deal's capital structure.
-    /// * `market` - Discount curves, forward curves and fixings used by projection.
-    /// * `as_of` - Valuation date of the current collateral and note balances.
-    /// * `metrics` - Additional registered metrics, computed for THIS note:
-    ///   every registry reprice (DV01, theta, the Default01 / Prepayment01 /
-    ///   Recovery01 / Severity01 bumps) values the tranche through
-    ///   [`super::StructuredCreditTranche`], so the senior and the equity carry
-    ///   their own sensitivities that sum to the deal's. Mandatory result
-    ///   fields are calculated even when this list is empty; calculation
-    ///   failures propagate.
-    ///
-    /// Prices and yields use buyer settlement entitlement and are quoted per
-    /// the tranche's CURRENT balance (the factor-adjusted secondary-market
-    /// basis; `factor` reports current over original face). PV remains at
-    /// valuation; spread results use an external clean/dirty quote when
-    /// supplied, otherwise the model's dirty settlement value. Z-spread is
-    /// returned in basis points.
-    pub fn value_tranche_with_metrics(
-        &self,
-        tranche_id: &str,
-        market: &MarketContext,
-        as_of: Date,
-        metrics: &[MetricId],
-    ) -> finstack_quant_core::Result<TrancheValuation> {
-        let lifecycle =
-            finstack_quant_valuations_core::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
-        let effective_as_of = lifecycle.effective_as_of(market, as_of);
-        let tranche = self
-            .tranches
-            .tranches
-            .iter()
-            .find(|t| t.id.as_str() == tranche_id)
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: format!("tranche:{tranche_id}"),
-                })
-            })?;
-        let cashflow_result = (self).tranche_cashflows(tranche_id, market, as_of)?;
-        let pv = self.value_tranche_cashflows(&cashflow_result, market, effective_as_of)?;
-        // Prices are per CURRENT face (the factor-adjusted quote basis).
-        let quote = super::super::metrics::quote::SettlementQuote::for_tranche(
-            self,
-            effective_as_of,
-            tranche.current_balance.amount(),
-            &cashflow_result,
-        )?;
-        let factor = if tranche.original_balance.amount() > 0.0 {
-            tranche.current_balance.amount() / tranche.original_balance.amount()
-        } else {
-            0.0
-        };
-        let disc = market.get_discount(&self.discount_curve_id)?;
-        let model_dirty = quote.model_dirty(&cashflow_result.cashflows, &disc)?;
-        // An impaired note — no current face or no positive settlement value
-        // (fully written down in the projection) — prices at zero and carries
-        // no yield or spread instead of failing the solves.
-        let impaired = tranche.current_balance.amount() <= 0.0 || model_dirty <= 0.0;
-        let target = if impaired {
-            0.0
-        } else {
-            let target = quote.external_target(self)?.unwrap_or(model_dirty);
-            quote.dirty_target(target)?
-        };
-
-        // The priced instrument is the NOTE: every registry reprice (DV01,
-        // theta, the *01 bumps) then values this tranche, not the deal.
-        let mut metric_context = MetricContext::new(
-            std::sync::Arc::new(super::StructuredCreditTranche::new(
-                self.clone(),
-                tranche_id,
-            )),
-            std::sync::Arc::new(market.clone()),
-            effective_as_of,
-            pv,
-            MetricContext::default_config(),
-        );
-        metric_context.cashflows = Some(cashflow_result.cashflows.clone());
-        metric_context.tagged_cashflows = Some(cashflow_result.detailed_flows.clone());
-        metric_context.set_ext(cashflow_result.clone());
-        metric_context.discount_curve_id = Some(self.discount_curve_id.to_owned());
-        metric_context.notional = Some(tranche.current_balance);
-        let mut requested = metrics.to_vec();
-        for required in [
-            MetricId::Accrued,
-            MetricId::CleanPrice,
-            MetricId::DirtyPrice,
-            MetricId::Ytm,
-            MetricId::WAL,
-        ] {
-            if !requested.contains(&required) {
-                requested.push(required);
-            }
-        }
-        if impaired {
-            // No yield on a worthless note: the solver has no target.
-            requested.retain(|id| *id != MetricId::Ytm);
-        }
-        let computed_metrics = self
-            .family()
-            .metrics()
-            .compute(&requested, &mut metric_context)?;
-        let accrued = Money::new(computed_metrics[&MetricId::Accrued], pv.currency())?;
-        let dirty_price = computed_metrics[&MetricId::DirtyPrice];
-        let clean_price = computed_metrics[&MetricId::CleanPrice];
-        let wal = computed_metrics[&MetricId::WAL];
-        let ytm = computed_metrics.get(&MetricId::Ytm).copied();
-        let modified_duration = match computed_metrics.get(&MetricId::DurationMod) {
-            Some(value) => *value,
-            None if impaired => 0.0,
-            None => calculate_tranche_duration(
-                &cashflow_result.cashflows,
-                &disc,
-                quote.settlement,
-                Money::new(model_dirty, pv.currency())?,
-                finstack_quant_valuations_core::metrics::sensitivities::config::resolve(
-                    &metric_context,
-                )?
-                .ytm_bump_bp
-                .unwrap_or(
-                    crate::structured_credit::metrics::risk::duration::DEFAULT_DURATION_YTM_BUMP_BP,
-                ),
-            )?,
-        };
-        let z_spread = match computed_metrics.get(&MetricId::ZSpread) {
-            Some(decimal) => decimal * 10_000.0,
-            None if impaired => 0.0,
-            None => calculate_tranche_z_spread(
-                &cashflow_result.cashflows,
-                &disc,
-                Money::new(target, pv.currency())?,
-                quote.settlement,
-            )?,
-        };
-        let cs01 = match computed_metrics.get(&MetricId::Cs01) {
-            Some(value) => *value,
-            None if impaired => 0.0,
-            None => calculate_tranche_cs01(
-                &cashflow_result.cashflows,
-                &disc,
-                z_spread * 1e-4,
-                quote.settlement,
-            )?,
-        };
-
-        let final_metrics: std::collections::BTreeMap<MetricId, f64> =
-            computed_metrics.into_iter().collect();
-
-        Ok(TrancheValuation {
-            tranche_id: tranche_id.to_string(),
-            pv,
-            clean_price,
-            dirty_price,
-            factor,
-            accrued,
-            wal,
-            modified_duration,
-            z_spread_bp: z_spread,
-            cs01,
-            ytm,
-            metrics: final_metrics,
-        })
     }
 }
 
@@ -654,17 +459,27 @@ mod production_structured_assumptions {
             panic!("deterministic default model");
         };
         assert!(
-            (prepay.smm(12).expect("SMM") - deal.calculate_smm(12).expect("resolved SMM")).abs()
-                < 1e-14
-        );
-        assert!(
-            (default.mdr(12).expect("MDR")
-                - deal.calculate_default_rate(12).expect("resolved MDR"))
+            (prepay.smm(12).expect("SMM")
+                - deal
+                    .credit_model
+                    .prepayment_spec
+                    .smm(12)
+                    .expect("resolved SMM"))
             .abs()
                 < 1e-14
         );
         assert!(
-            matches!(config.recovery_spec, StochasticRecoverySpec::Constant { rate } if (rate - 0.71).abs() < 1e-14)
+            (default.mdr(12).expect("MDR")
+                - deal
+                    .credit_model
+                    .default_spec
+                    .mdr(12)
+                    .expect("resolved MDR"))
+            .abs()
+                < 1e-14
+        );
+        assert!(
+            matches!(config.recovery_spec, RecoverySpec::Constant { rate } if (rate - 0.71).abs() < 1e-14)
         );
     }
 

@@ -149,12 +149,6 @@
 
 pub use finstack_quant_valuations_core::instruments::*;
 
-/// Per-flow cashflow export with DF / survival / PV columns.
-///
-/// See [`cashflow_export::instrument_cashflows`] for the primary entry
-/// point used by the Python and WASM bindings.
-pub mod cashflow_export;
-
 /// Commodity derivatives.
 pub mod commodity {
     pub use finstack_quant_valuations_exotics::commodity::*;

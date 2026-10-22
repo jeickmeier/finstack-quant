@@ -1,13 +1,15 @@
 //! wasm-bindgen-test suite for the typed `Bond` / `TermLoan` classes in
-//! `finstack_quant_wasm::api::valuations::fixed_income`.
+//! `finstack_quant_wasm::api::valuations::typed::fixed_income`.
 
 #![cfg(target_arch = "wasm32")]
 
 use finstack_quant_wasm::api::core::dates::{JsDayCount, JsTenor};
 use finstack_quant_wasm::api::core::money::JsMoney;
 use finstack_quant_wasm::api::core::types::{JsBps, JsRate};
-use finstack_quant_wasm::api::valuations::fixed_income::{JsBond, JsRevolvingCredit, JsTermLoan};
 use finstack_quant_wasm::api::valuations::pricing::price_instrument;
+use finstack_quant_wasm::api::valuations::typed::fixed_income::{
+    JsBond, JsRevolvingCredit, JsTermLoan,
+};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 

@@ -114,4 +114,13 @@ impl SettlementQuote {
         }
         (dirty_currency - self.accrued) / self.notional * 100.0
     }
+
+    /// Dirty price (% of current face); `0.0` for a note with no current
+    /// face.
+    pub(crate) fn dirty_price(&self, dirty_currency: f64) -> f64 {
+        if self.notional <= 0.0 {
+            return 0.0;
+        }
+        dirty_currency / self.notional * 100.0
+    }
 }

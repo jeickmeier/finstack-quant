@@ -3,8 +3,6 @@
 use crate::irs::InterestRateSwap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
-use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
@@ -350,11 +348,6 @@ impl BermudanSwaption {
         self.underlying_fixed_leg.frequency
     }
 
-    /// Floating-leg payment frequency.
-    pub fn get_float_frequency(&self) -> Tenor {
-        self.underlying_float_leg.frequency
-    }
-
     /// Fixed-leg accrual convention.
     pub fn get_fixed_day_count(&self) -> DayCount {
         self.underlying_fixed_leg.day_count
@@ -368,11 +361,6 @@ impl BermudanSwaption {
     /// Forward curve selected by the floating leg.
     pub fn get_forward_curve_id(&self) -> &CurveId {
         &self.underlying_float_leg.forward_curve_id
-    }
-
-    /// Schedule calendar selected by the fixed leg.
-    pub fn get_calendar_id(&self) -> Option<&str> {
-        self.underlying_fixed_leg.calendar_id.as_deref()
     }
 
     /// Set fixed leg frequency.
@@ -419,30 +407,6 @@ impl BermudanSwaption {
         self.exercise_schedule.effective_dates().first().copied()
     }
 
-    /// Get the last exercise date.
-    pub fn last_exercise(&self) -> Option<Date> {
-        self.exercise_schedule.effective_dates().last().copied()
-    }
-
-    /// Calculate ACT/365F model time to the first exercise.
-    ///
-    /// # Arguments
-    ///
-    /// * `as_of` - Valuation date; elapsed first exercises return zero.
-    pub fn time_to_first_exercise(&self, as_of: Date) -> Result<f64> {
-        match self.first_exercise() {
-            Some(first) => {
-                if as_of >= first {
-                    return Ok(0.0);
-                }
-                Ok(finstack_quant_models::rates::clock::model_time(
-                    as_of, first,
-                ))
-            }
-            None => Err(Error::Validation("No exercise dates".into())),
-        }
-    }
-
     /// Calculate the ACT/365F model horizon covering remaining contractual payments.
     ///
     /// # Arguments
@@ -469,24 +433,6 @@ impl BermudanSwaption {
     pub fn exercise_times(&self, as_of: Date) -> Result<Vec<f64>> {
         self.exercise_schedule
             .exercise_times(as_of, finstack_quant_core::dates::DayCount::Act365F)
-    }
-
-    /// Build the underlying swap payment schedule.
-    ///
-    /// Returns (payment_dates, accrual_fractions) for the fixed leg.
-    pub fn build_swap_schedule(&self) -> Result<(Vec<Date>, Vec<f64>)> {
-        let periods = self.fixed_schedule_periods()?;
-
-        if periods.is_empty() {
-            return Err(Error::Validation(
-                "Swap schedule has fewer than 2 dates".into(),
-            ));
-        }
-
-        let dates: Vec<Date> = periods.iter().map(|p| p.payment_date).collect();
-        let accruals: Vec<f64> = periods.iter().map(|p| p.accrual_year_fraction).collect();
-
-        Ok((dates, accruals))
     }
 
     /// Build the canonical fixed-leg periods used by Bermudan pricing paths.
@@ -522,68 +468,10 @@ impl BermudanSwaption {
         Ok(underlier)
     }
 
-    /// Convert payment dates to year fractions.
-    pub fn payment_times(&self, as_of: Date) -> Result<Vec<f64>> {
-        let (dates, _) = self.build_swap_schedule()?;
-        Ok(dates
-            .iter()
-            .map(|&d| finstack_quant_models::rates::clock::model_time(as_of, d))
-            .collect())
-    }
-
     pub(crate) fn strike_f64(&self) -> Result<f64> {
         self.get_strike().to_f64().ok_or_else(|| {
             Error::Validation("BermudanSwaption strike could not be converted to f64".into())
         })
-    }
-
-    /// Forward swap rate at a given exercise date (multi-curve).
-    ///
-    /// For co-terminal swaptions, the swap always matures at `swap_end`.
-    /// For non-co-terminal, each exercise date may have different remaining tenor.
-    ///
-    /// # Time Basis
-    ///
-    /// Uses curve-consistent time mapping:
-    /// - Discount factors use the discount curve's own base_date/day_count
-    /// - Forward rates use the forward curve's own base_date/day_count
-    pub fn forward_swap_rate(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-        exercise_date: Date,
-    ) -> Result<f64> {
-        let disc = market.get_discount(self.get_discount_curve_id().as_ref())?;
-        let annuity = self.remaining_annuity(disc.as_ref(), as_of, exercise_date)?;
-
-        if annuity.abs() < 1e-10 {
-            return Ok(0.0);
-        }
-
-        let underlier = self.underlying_irs_at(exercise_date)?;
-        let pv_float = crate::irs::pricer::compute_pv_raw(&underlier, market, as_of)?;
-        Ok(pv_float / (self.notional.amount() * annuity))
-    }
-
-    /// Calculate annuity for remaining swap payments after exercise date.
-    ///
-    /// # Time Basis
-    ///
-    /// Uses curve-consistent relative discount factors:
-    /// - DF from `as_of` to each payment date computed using the discount curve's
-    ///   own base_date and day_count.
-    /// - Accrual fractions use the instrument's day_count (correct for coupon calculation).
-    pub fn remaining_annuity(
-        &self,
-        disc: &dyn Discounting,
-        as_of: Date,
-        exercise_date: Date,
-    ) -> Result<f64> {
-        if exercise_date >= self.get_underlying_maturity() {
-            return Ok(0.0);
-        }
-        let periods = self.fixed_schedule_periods_at(exercise_date)?;
-        crate::irs::cashflow::fixed_leg_annuity(&periods, disc, as_of, exercise_date)
     }
 
     /// Convert to European swaption for the first exercise date.

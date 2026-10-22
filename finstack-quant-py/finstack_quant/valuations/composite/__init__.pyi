@@ -5,6 +5,9 @@ Specifications embed canonical instruments, resolve signed quantities only at
 initialization or explicit rebalance, and expose recursive primitive value,
 risk, concentration, execution, and dated total-return reports.
 
+``CompositeSpec.initialize`` covers both fixed and dynamic weighting; there
+is no separate ``initialize_fixed`` export.
+
 Examples
 --------
 >>> import datetime, json
@@ -195,7 +198,7 @@ class CompositeLegSpec:
         Returns
         -------
         dict[str, Any]
-            Same content as ``json.loads(self.instrument_json)``.
+            Canonical ``finstack_quant.instrument/1`` envelope of the embedded instrument.
 
         Raises
         ------
@@ -236,23 +239,6 @@ class CompositeLegSpec:
         >>> _leg_a = CompositeLegSpec("A", _equity("A", 100.0), 1.0)
         >>> _leg_a.instrument_dict()["instrument"]["type"]
         'equity'
-        """
-        ...
-
-    @property
-    def instrument_json(self) -> str:
-        """
-        Return the embedded instrument as a canonical v1 envelope.
-
-        Returns
-        -------
-        str
-            ``finstack_quant.instrument/1`` JSON for the embedded instrument.
-
-        Raises
-        ------
-        ValueError
-            If canonical JSON serialization fails.
         """
         ...
 
@@ -585,7 +571,7 @@ class RebalanceRule:
             Rebalance cadence as a ``Tenor`` or tenor string such as ``"1D"``,
             ``"1W"``, ``"1M"`` or ``"3M"``.
         calendar_id : str
-            Registered calendar identifier such as ``weekends``.
+            Registered calendar identifier such as ``weekends_only``.
         business_day_convention : str
             Canonical convention such as ``following`` or ``modified_following``.
         end : datetime.date | datetime.datetime | pandas.Timestamp | str | None
@@ -1192,8 +1178,7 @@ class CompositeInstrument:
         -------
         list[dict[str, Any]]
             One ``{"instrument_id", "instrument_type", "quantity_delta"}`` dict
-            per primitive with signed quantity deltas. ``execution_trades_json``
-            is the JSON twin.
+            per primitive with signed quantity deltas.
 
         Raises
         ------
@@ -1248,27 +1233,6 @@ class CompositeInstrument:
         """
         ...
 
-    def execution_trades_json(self, previous: CompositeInstrument | None = None) -> str:
-        """
-        JSON twin of :meth:`execution_trades`.
-
-        Parameters
-        ----------
-        previous : CompositeInstrument | None
-            Prior resolved state, or ``None`` for establishment trades.
-
-        Returns
-        -------
-        str
-            JSON array of primitive identifiers, types, and signed quantity deltas.
-
-        Raises
-        ------
-        ValueError
-            If either state is invalid or primitive definitions conflict.
-        """
-        ...
-
     def execution_trades_dataframe(self, previous: CompositeInstrument | None = None) -> pd.DataFrame:
         """
         :meth:`execution_trades` as a pandas ``DataFrame``.
@@ -1316,7 +1280,7 @@ class CompositeRebalanceResult:
     ...     RebalanceRule.manual(),
     ... )
     >>> _result = _spec.initialize(MarketContext(), datetime.date(2025, 1, 1))
-    >>> (_result.instrument.id, len(json.loads(_result.trades_json)))
+    >>> (_result.instrument.id, len(_result.trades))
     ('LOAN-SPREAD', 2)
     """
 
@@ -1383,23 +1347,6 @@ class CompositeRebalanceResult:
         Notes
         -----
         This accessor does not raise; it clones the stored result instrument.
-        """
-        ...
-
-    @property
-    def trades_json(self) -> str:
-        """
-        Return net primitive quantity deltas as a JSON array.
-
-        Returns
-        -------
-        str
-            Primitive IDs, type tags, and signed quantity deltas.
-
-        Raises
-        ------
-        ValueError
-            If canonical JSON serialization fails.
         """
         ...
 
@@ -1541,7 +1488,7 @@ class CompositeExposureReport:
     @property
     def path_count(self) -> int:
         """
-        Return the number of recursive primitive paths.
+        Return the number of recursive primitive paths before overlap netting.
 
         Returns
         -------
@@ -1826,9 +1773,34 @@ class CompositeHistoryResult:
         """
         ...
 
+    def row(self, index: int) -> dict[str, Any]:
+        """
+        Return one zero-based dated history row as a ``dict``.
+
+        Parameters
+        ----------
+        index : int
+            Zero-based row index in chronological order.
+
+        Returns
+        -------
+        dict[str, Any]
+            The selected row in its canonical serde shape (what
+            ``json.loads(self.row_json(index))`` returns): value, cashflows,
+            P&L, return, exposures and rebalance trades.
+
+        Raises
+        ------
+        IndexError
+            If ``index`` is outside the result bounds.
+        ValueError
+            If the selected row cannot be converted.
+        """
+        ...
+
     def row_json(self, index: int) -> str:
         """
-        Serialize one zero-based dated history row.
+        Serialize one zero-based dated history row; JSON twin of :meth:`row`.
 
         Parameters
         ----------
@@ -1873,6 +1845,10 @@ def history_from_spec(
 ) -> CompositeHistoryResult:
     """
     Initialize at the first observation and calculate chronological rows.
+
+    Warmup observations feed dynamic weighting only. The first output row
+    has ``return_index = 100`` and zero P&L. Scheduled rebalances are
+    close-effective.
 
     Parameters
     ----------
@@ -1945,6 +1921,9 @@ def history(
 ) -> CompositeHistoryResult:
     """
     Calculate chronological rows from an already-resolved initial state.
+
+    Period return is ``pnl / capital``. The initial effective date must be
+    on or before the first observation.
 
     Parameters
     ----------

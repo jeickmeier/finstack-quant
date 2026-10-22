@@ -12,11 +12,9 @@
 //! - CS01 (parallel par-spread rebootstrap)
 //! - Correlation01 (per 1% correlation change)
 //! - Recovery01 (per 1% recovery change)
-//! - TailDependence (copula tail dependence coefficient)
 
 mod cs01;
 mod recovery01;
-mod tail_dependence;
 
 use crate::cds_tranche::CdsTranche;
 use finstack_quant_core::Result;
@@ -28,43 +26,25 @@ use finstack_quant_valuations_core::metrics::MetricRegistry;
 pub(crate) fn register_cds_tranche_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
-    use finstack_quant_valuations_core::metrics::MetricId;
     use finstack_quant_valuations_core::pricer::InstrumentType;
-    use std::sync::Arc;
 
-    for (id, calculator) in [
-        (
-            MetricId::custom("model_upfront"),
-            Arc::new(ModelUpfrontCalculator)
-                as Arc<dyn finstack_quant_valuations_core::metrics::MetricCalculator>,
-        ),
-        (MetricId::SpreadDv01, Arc::new(SpreadDv01Calculator)),
-        (MetricId::Correlation01, Arc::new(Correlation01Calculator)),
-        (
-            MetricId::Recovery01,
-            Arc::new(recovery01::Recovery01Calculator),
-        ),
-        (
-            MetricId::custom("tail_dependence"),
-            Arc::new(tail_dependence::TailDependenceCalculator),
-        ),
-    ] {
-        registry.register_metric(id, calculator, &[InstrumentType::CdsTranche])?;
-    }
-
-    // Standard metrics using macro
     finstack_quant_valuations_core::register_metrics! {
         registry: registry,
         instrument: InstrumentType::CdsTranche,
         metrics: [
+            (SpreadDv01, SpreadDv01Calculator),
+            (Correlation01, Correlation01Calculator),
+            (Recovery01, recovery01::Recovery01Calculator),
             (Cs01, cs01::CdsTrancheCs01Calculator),
             (BucketedCs01, cs01::CdsTrancheBucketedCs01Calculator),
             (ParSpread, ParSpreadCalculator),
             (ExpectedLoss, ExpectedLossCalculator),
             (JumpToDefault, JumpToDefaultCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
-            // Theta is now registered universally in crate::CREDIT.metrics()
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+        ],
+        custom: [
+            ("model_upfront", ModelUpfrontCalculator),
         ]
     }
     Ok(())
@@ -115,27 +95,14 @@ impl MetricCalculator for JumpToDefaultCalculator {
 /// Model-upfront calculator for CDS Tranche
 ///
 /// Computes the model upfront (net present value at the contractual running
-/// coupon) using the Gaussian Copula pricing engine if the required credit
-/// index data are available. Distinct from the contractual `upfront` field.
+/// coupon) using the Gaussian Copula pricing engine; a missing credit index
+/// is a `NotFound` error. Distinct from the contractual `upfront` field.
 pub(crate) struct ModelUpfrontCalculator;
 
 impl MetricCalculator for ModelUpfrontCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let tranche: &CdsTranche = context.instrument_as()?;
-        if context
-            .curves
-            .as_ref()
-            .get_credit_index(&tranche.credit_index_id)
-            .is_ok()
-        {
-            tranche.model_upfront(&context.curves, context.as_of)
-        } else {
-            Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::NotFound {
-                    id: format!("credit_index:{}", tranche.credit_index_id),
-                },
-            ))
-        }
+        tranche.model_upfront(&context.curves, context.as_of)
     }
 }
 

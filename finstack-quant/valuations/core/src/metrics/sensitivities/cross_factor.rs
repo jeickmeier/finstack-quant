@@ -6,7 +6,7 @@
 //! a four-corner central mixed difference.
 
 use crate::instruments::FxPair;
-use crate::metrics::core::finite_difference::{
+use crate::metrics::finite_difference::{
     bump_scalar_price, central_mixed, min_grid_vol, volatility_override,
 };
 use crate::metrics::sensitivities::config as sens_config;
@@ -331,10 +331,7 @@ pub fn make_rates_bumper(context: &MetricContext) -> Result<Option<Box<dyn Facto
         return Ok(None);
     }
 
-    let defaults = sens_config::from_context_or_default(
-        context.get_config(),
-        context.get_metric_pricing_overrides(),
-    )?;
+    let defaults = sens_config::resolve(context)?;
     Ok(Some(Box::new(ParallelCurveBumper {
         curve_ids,
         bump_bp: defaults.rate_bump_bp,
@@ -348,10 +345,7 @@ pub fn make_credit_bumper(context: &MetricContext) -> Result<Option<Box<dyn Fact
         return Ok(None);
     }
 
-    let defaults = sens_config::from_context_or_default(
-        context.get_config(),
-        context.get_metric_pricing_overrides(),
-    )?;
+    let defaults = sens_config::resolve(context)?;
     for id in &deps.curves.credit_curves {
         super::cs01::require_hazard_replay(
             context.curves.get_hazard(id.as_str())?.as_ref(),
@@ -390,10 +384,7 @@ pub fn make_vol_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorB
         return Ok(None);
     }
 
-    let defaults = sens_config::from_context_or_default(
-        context.get_config(),
-        context.get_metric_pricing_overrides(),
-    )?;
+    let defaults = sens_config::resolve(context)?;
     let mut minimum = override_volatility.unwrap_or(f64::INFINITY);
     for id in &vol_surface_ids {
         let surface = context.curves.get_surface(id.as_str())?;
@@ -433,10 +424,7 @@ pub fn make_spot_bumper(context: &MetricContext) -> Result<Option<Box<dyn Factor
         return Ok(None);
     };
 
-    let defaults = sens_config::from_context_or_default(
-        context.get_config(),
-        context.get_metric_pricing_overrides(),
-    )?;
+    let defaults = sens_config::resolve(context)?;
     Ok(Some(Box::new(SpotBumper {
         price_id: price_id.clone(),
         bump_pct: defaults.spot_bump_decimal,
@@ -450,10 +438,7 @@ pub fn make_fx_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBu
         return Ok(None);
     }
 
-    let defaults = sens_config::from_context_or_default(
-        context.get_config(),
-        context.get_metric_pricing_overrides(),
-    )?;
+    let defaults = sens_config::resolve(context)?;
     Ok(Some(Box::new(FxBumper {
         pairs: deps.fx_pairs,
         bump_pct: defaults.spot_bump_decimal,

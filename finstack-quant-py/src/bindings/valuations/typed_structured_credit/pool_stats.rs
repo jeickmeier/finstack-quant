@@ -31,7 +31,7 @@ pub struct PyPoolStats {
     pub(crate) inner: PoolStats,
 }
 
-sc_wire_methods!(PyPoolStats, PoolStats, "PoolStats");
+crate::bindings::macros::wire_methods!(PyPoolStats, PoolStats, "PoolStats", to_dict);
 
 /// Column order of [`PyPoolStats::to_dataframe`] (the serde field order).
 const POOL_STATS_COLUMNS: &[&str] = &[
@@ -47,59 +47,6 @@ const POOL_STATS_COLUMNS: &[&str] = &[
 
 #[pymethods]
 impl PyPoolStats {
-    /// Weighted-average coupon of the performing fixed-rate collateral, as
-    /// an annual decimal (``0.07`` = 7%).
-    #[getter]
-    fn wac(&self) -> f64 {
-        self.inner.wac
-    }
-
-    /// Weighted-average spread, in basis points, of the performing
-    /// collateral that carries an explicit spread.
-    #[getter]
-    fn weighted_avg_spread_bp(&self) -> f64 {
-        self.inner.weighted_avg_spread_bp
-    }
-
-    /// Balance-weighted average remaining maturity in years from the
-    /// statistics date.
-    #[getter]
-    fn weighted_avg_maturity(&self) -> f64 {
-        self.inner.weighted_avg_maturity
-    }
-
-    /// Moody's diversity score of the pool.
-    #[getter]
-    fn diversity_score(&self) -> f64 {
-        self.inner.diversity_score
-    }
-
-    /// Number of distinct obligors.
-    #[getter]
-    fn num_obligors(&self) -> usize {
-        self.inner.num_obligors
-    }
-
-    /// Number of distinct industries.
-    #[getter]
-    fn num_industries(&self) -> usize {
-        self.inner.num_industries
-    }
-
-    /// Defaulted balance in percent points of the current total pool
-    /// balance (``10.0`` = 10%).
-    #[getter]
-    fn defaulted_balance_pct(&self) -> f64 {
-        self.inner.defaulted_balance_pct
-    }
-
-    /// Undrawn commitment across performing revolving and delayed-draw
-    /// collateral, in pool-currency units.
-    #[getter]
-    fn undrawn_commitment(&self) -> f64 {
-        self.inner.undrawn_commitment
-    }
-
     /// The statistics as a one-row pandas ``DataFrame``.
     ///
     /// Columns: ``wac``, ``weighted_avg_spread_bp``,
@@ -135,6 +82,37 @@ impl PyPoolStats {
         )
     }
 }
+
+crate::bindings::macros::py_getters!(PyPoolStats |s| {
+    /// Weighted-average coupon of the performing fixed-rate collateral, as
+    /// an annual decimal (``0.07`` = 7%).
+    wac -> f64 = s.inner.wac;
+
+    /// Weighted-average spread, in basis points, of the performing
+    /// collateral that carries an explicit spread.
+    weighted_avg_spread_bp -> f64 = s.inner.weighted_avg_spread_bp;
+
+    /// Balance-weighted average remaining maturity in years from the
+    /// statistics date.
+    weighted_avg_maturity -> f64 = s.inner.weighted_avg_maturity;
+
+    /// Moody's diversity score of the pool.
+    diversity_score -> f64 = s.inner.diversity_score;
+
+    /// Number of distinct obligors.
+    num_obligors -> usize = s.inner.num_obligors;
+
+    /// Number of distinct industries.
+    num_industries -> usize = s.inner.num_industries;
+
+    /// Defaulted balance in percent points of the current total pool
+    /// balance (``10.0`` = 10%).
+    defaulted_balance_pct -> f64 = s.inner.defaulted_balance_pct;
+
+    /// Undrawn commitment across performing revolving and delayed-draw
+    /// collateral, in pool-currency units.
+    undrawn_commitment -> f64 = s.inner.undrawn_commitment;
+});
 
 /// Collateral-pool statistics at a date (mirrors Rust ``calculate_pool_stats``).
 ///

@@ -14,7 +14,10 @@ Examples
 'CreditFactorModel'
 "#;
 
-schema_registry_functions!(finstack_quant_factor::schema::ARTIFACTS);
+schema_registry_functions!(
+    finstack_quant_factor::schema::ARTIFACTS,
+    "finstack_quant.models.factor.schema"
+);
 
 /// Register the `finstack_quant.models.factor.schema` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

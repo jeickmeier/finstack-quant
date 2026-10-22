@@ -119,15 +119,6 @@ pub(crate) fn covered_interest_parity_forward(
     Ok(collect_fx_forward_inputs(request)?.forward_rate())
 }
 
-/// Source for the FX spot used by an option-style FX pricer.
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum FxSpotSource<'a> {
-    /// Resolve spot from the market FX matrix.
-    Matrix,
-    /// Resolve spot from an explicit market scalar when present, otherwise use the FX matrix.
-    ScalarId(Option<&'a PriceId>),
-}
-
 /// Shared request for FX option-style market inputs.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct FxOptionInputRequest<'a> {
@@ -153,8 +144,8 @@ pub(crate) struct FxOptionInputRequest<'a> {
     pub(crate) strike: f64,
     /// Instrument-owned pricing inputs.
     pub(crate) instrument_pricing_overrides: &'a InstrumentPricingOverrides,
-    /// Spot source.
-    pub(crate) spot_source: FxSpotSource<'a>,
+    /// Explicit spot scalar; `None` reads the FX matrix.
+    pub(crate) spot_id: Option<&'a PriceId>,
     /// Context label for rate-conversion errors.
     pub(crate) rate_context: &'a str,
 }
@@ -170,6 +161,8 @@ pub(crate) struct FxOptionInputsNoVol {
     pub(crate) r_foreign: f64,
     /// Time to expiry on the vol basis.
     pub(crate) t: f64,
+    /// Date-based domestic discount factor from `as_of` to expiry (`1.0` once expired).
+    pub(crate) df_domestic: f64,
 }
 
 /// Shared FX option inputs including volatility.
@@ -185,50 +178,72 @@ pub(crate) struct FxOptionInputs {
     pub(crate) sigma: f64,
     /// Time to expiry on the vol basis.
     pub(crate) t: f64,
+    /// Date-based domestic discount factor from `as_of` to expiry (`1.0` once expired).
+    pub(crate) df_domestic: f64,
 }
 
+/// Quote-per-base FX spot from the `spot_id` scalar when given, else the FX matrix.
+///
+/// A missing `spot_id` scalar is an error; it never falls back to the matrix.
 pub(crate) fn resolve_fx_spot(
-    request: FxOptionInputRequest<'_>,
+    market: &MarketContext,
+    as_of: Date,
+    base_currency: Currency,
+    quote_currency: Currency,
+    spot_id: Option<&PriceId>,
+    context: &str,
 ) -> finstack_quant_core::Result<f64> {
-    if let FxSpotSource::ScalarId(Some(spot_id)) = request.spot_source {
-        let spot_scalar = request.market.get_price(spot_id)?;
-        let spot = finstack_quant_valuations_core::metrics::scalar_numeric_value(spot_scalar);
-        if !spot.is_finite() || spot <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "{} spot must be finite and > 0, got {}",
-                request.rate_context, spot
-            )));
+    let spot = match spot_id {
+        Some(spot_id) => finstack_quant_valuations_core::metrics::scalar_numeric_value(
+            market.get_price(spot_id)?,
+        ),
+        None => {
+            market
+                .fx_required()?
+                .rate(FxQuery::new(base_currency, quote_currency, as_of))?
+                .rate
         }
-        return Ok(spot);
-    }
-
-    let fx_matrix = request.market.fx_required()?;
-    let spot = fx_matrix
-        .rate(FxQuery::new(
-            request.base_currency,
-            request.quote_currency,
-            request.as_of,
-        ))?
-        .rate;
+    };
     if !spot.is_finite() || spot <= 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "{} spot must be finite and > 0, got {}",
-            request.rate_context, spot
+            "{context} spot must be finite and > 0, got {spot}"
         )));
     }
     Ok(spot)
 }
 
+impl FxOptionInputRequest<'_> {
+    /// Spot read from the request's source.
+    pub(crate) fn spot(&self) -> finstack_quant_core::Result<f64> {
+        resolve_fx_spot(
+            self.market,
+            self.as_of,
+            self.base_currency,
+            self.quote_currency,
+            self.spot_id,
+            self.rate_context,
+        )
+    }
+}
+
 pub(crate) fn collect_fx_option_inputs_no_vol(
     request: FxOptionInputRequest<'_>,
 ) -> finstack_quant_core::Result<FxOptionInputsNoVol> {
-    let spot = resolve_fx_spot(request)?;
+    let spot = request.spot()?;
+    collect_fx_option_inputs_no_vol_at_spot(request, spot)
+}
+
+fn collect_fx_option_inputs_no_vol_at_spot(
+    request: FxOptionInputRequest<'_>,
+    spot: f64,
+) -> finstack_quant_core::Result<FxOptionInputsNoVol> {
     if request.as_of >= request.expiry {
         return Ok(FxOptionInputsNoVol {
             spot,
             r_domestic: 0.0,
             r_foreign: 0.0,
             t: 0.0,
+            df_domestic: 1.0,
         });
     }
 
@@ -263,13 +278,23 @@ pub(crate) fn collect_fx_option_inputs_no_vol(
         r_domestic,
         r_foreign,
         t,
+        df_domestic: df_d,
     })
 }
 
 pub(crate) fn collect_fx_option_inputs(
     request: FxOptionInputRequest<'_>,
 ) -> finstack_quant_core::Result<FxOptionInputs> {
-    let no_vol = collect_fx_option_inputs_no_vol(request)?;
+    let spot = request.spot()?;
+    collect_fx_option_inputs_at_spot(request, spot)
+}
+
+/// [`collect_fx_option_inputs`] with the spot already resolved by the caller.
+pub(crate) fn collect_fx_option_inputs_at_spot(
+    request: FxOptionInputRequest<'_>,
+    spot: f64,
+) -> finstack_quant_core::Result<FxOptionInputs> {
+    let no_vol = collect_fx_option_inputs_no_vol_at_spot(request, spot)?;
     if request.as_of >= request.expiry {
         return Ok(FxOptionInputs {
             spot: no_vol.spot,
@@ -277,6 +302,7 @@ pub(crate) fn collect_fx_option_inputs(
             r_foreign: 0.0,
             sigma: 0.0,
             t: 0.0,
+            df_domestic: 1.0,
         });
     }
 
@@ -295,11 +321,163 @@ pub(crate) fn collect_fx_option_inputs(
         r_foreign: no_vol.r_foreign,
         sigma,
         t: no_vol.t,
+        df_domestic: no_vol.df_domestic,
     })
+}
+
+/// `true` once `expiry` is reached on the instrument's `day_count` basis, where
+/// option Greeks are reported as zero.
+pub(crate) fn greeks_expired(
+    day_count: DayCount,
+    as_of: Date,
+    expiry: Date,
+) -> finstack_quant_core::Result<bool> {
+    Ok(day_count.year_fraction(as_of, expiry, DayCountContext::default())? <= 0.0)
+}
+
+/// One-sided PV change per basis point of a parallel bump of `curve_id`.
+pub(crate) fn discount_rho_bp<I>(
+    instrument: &I,
+    market: &MarketContext,
+    as_of: Date,
+    curve_id: &CurveId,
+    bump_bp: f64,
+) -> finstack_quant_core::Result<f64>
+where
+    I: finstack_quant_valuations_core::instruments::Instrument,
+{
+    let base_pv = instrument.value(market, as_of)?.amount();
+    let bumped = finstack_quant_valuations_core::metrics::bump_discount_curve_parallel(
+        market, curve_id, bump_bp,
+    )?;
+    let pv_bumped = instrument.value(&bumped, as_of)?.amount();
+    Ok((pv_bumped - base_pv) / bump_bp)
+}
+
+/// Market with the FX matrix `base/quote` rate bumped relatively by `bump_pct`.
+///
+/// Uses the matrix's own relative bump, which keeps its `FxConfig` (pivot,
+/// triangulation) and pinned quotes and never mutates the shared provider.
+pub(crate) fn fx_matrix_bumped_market(
+    market: &MarketContext,
+    base_currency: Currency,
+    quote_currency: Currency,
+    as_of: Date,
+    bump_pct: f64,
+) -> finstack_quant_core::Result<MarketContext> {
+    Ok(market
+        .clone()
+        .insert_fx(market.fx_required()?.with_bumped_rate(
+            base_currency,
+            quote_currency,
+            bump_pct,
+            as_of,
+        )?))
+}
+
+/// Central spot delta `(PV(S·(1+h)) − PV(S·(1−h))) / (2·S·h)`.
+///
+/// `bumped_market(h)` returns the market with the instrument's spot source
+/// bumped relatively by `h`.
+pub(crate) fn spot_delta<I, F>(
+    instrument: &I,
+    as_of: Date,
+    spot: f64,
+    bump_pct: f64,
+    bumped_market: F,
+) -> finstack_quant_core::Result<f64>
+where
+    I: finstack_quant_valuations_core::instruments::Instrument,
+    F: Fn(f64) -> finstack_quant_core::Result<MarketContext>,
+{
+    let up = bumped_market(bump_pct)?;
+    let down = bumped_market(-bump_pct)?;
+    let pv_up = instrument.value(&up, as_of)?.amount();
+    let pv_dn = instrument.value(&down, as_of)?.amount();
+    finstack_quant_valuations_core::metrics::central_diff_by_width(
+        pv_up,
+        pv_dn,
+        2.0 * spot * bump_pct,
+    )
+}
+
+/// Central spot gamma `(PV(S·(1+h)) − 2·PV(S) + PV(S·(1−h))) / (S·h)²`.
+///
+/// Returns `0.0` when the bump width `S·h` is not positive. `bumped_market(h)`
+/// returns the market with the instrument's spot source bumped relatively by `h`.
+pub(crate) fn spot_gamma<I, F>(
+    instrument: &I,
+    as_of: Date,
+    base_pv: f64,
+    spot: f64,
+    bump_pct: f64,
+    bumped_market: F,
+) -> finstack_quant_core::Result<f64>
+where
+    I: finstack_quant_valuations_core::instruments::Instrument,
+    F: Fn(f64) -> finstack_quant_core::Result<MarketContext>,
+{
+    let bump_size = spot * bump_pct;
+    if bump_size <= 0.0 {
+        return Ok(0.0);
+    }
+    let up = bumped_market(bump_pct)?;
+    let pv_up = instrument.value(&up, as_of)?.amount();
+    let down = bumped_market(-bump_pct)?;
+    let pv_dn = instrument.value(&down, as_of)?.amount();
+    Ok((pv_up - 2.0 * base_pv + pv_dn) / (bump_size * bump_size))
+}
+
+/// Quote-per-base FX policy stamp: whether the matrix triangulated the pair.
+///
+/// `spot_overridden` marks a spot taken from outside the matrix (a quoted
+/// spot or an explicit spot scalar), where triangulation does not apply.
+pub(crate) fn fx_valuation_details(
+    market: &MarketContext,
+    base_currency: Currency,
+    quote_currency: Currency,
+    as_of: Date,
+    spot_overridden: bool,
+) -> finstack_quant_valuations_core::results::ValuationDetails {
+    let fx_triangulated = if spot_overridden {
+        None
+    } else {
+        market
+            .fx()
+            .and_then(|fx| {
+                fx.rate(FxQuery::new(base_currency, quote_currency, as_of))
+                    .ok()
+            })
+            .map(|q| q.triangulated)
+    };
+    finstack_quant_valuations_core::results::ValuationDetails::Fx(
+        finstack_quant_valuations_core::results::FxValuationDetails { fx_triangulated },
+    )
+}
+
+/// Empty schedule of a contract whose cashflows have all settled.
+pub(crate) fn settled_schedule(
+    notional_hint: Option<finstack_quant_core::money::Money>,
+) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
+    finstack_quant_cashflows::schedule_from_classified_flows(
+        Vec::new(),
+        DayCount::Act365F,
+        finstack_quant_cashflows::ScheduleBuildOpts {
+            notional_hint,
+            meta: finstack_quant_cashflows::builder::CashFlowMeta {
+                representation:
+                    finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual,
+                ..Default::default()
+            },
+        },
+    )
 }
 
 /// One volatility scenario: the instrument and market to reprice.
 pub(crate) type VolScenario<I> = (I, MarketContext);
+
+/// Applied half-width with the up and down volatility scenarios.
+pub(crate) type VolScenarios<I> = (f64, VolScenario<I>, VolScenario<I>);
 
 /// Central volatility bump on the source pricing reads.
 ///
@@ -319,7 +497,7 @@ pub(crate) fn active_vol_scenarios<I>(
     market: &MarketContext,
     surface_id: &str,
     requested_bump_abs: f64,
-) -> finstack_quant_core::Result<(f64, VolScenario<I>, VolScenario<I>)>
+) -> finstack_quant_core::Result<VolScenarios<I>>
 where
     I: finstack_quant_valuations_core::instruments::Instrument + Clone,
 {
@@ -400,7 +578,7 @@ mod tests {
             vol_surface_id: "EURUSD-VOL",
             strike: 1.1,
             instrument_pricing_overrides: &InstrumentPricingOverrides::default(),
-            spot_source: FxSpotSource::Matrix,
+            spot_id: None,
             rate_context: "test",
         })
         .expect("inputs should resolve");
@@ -441,7 +619,7 @@ mod tests {
             vol_surface_id: "EURUSD-VOL",
             strike: 1.1,
             instrument_pricing_overrides: &InstrumentPricingOverrides::default(),
-            spot_source: FxSpotSource::ScalarId(Some(&spot_id)),
+            spot_id: Some(&spot_id),
             rate_context: "test",
         })
         .expect("inputs should resolve");

@@ -12,30 +12,18 @@ instrument_class!(
     finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption
 );
 
-instrument_builder_entry!(JsCdsOption, "CdsOption", JsCdsOptionBuilder);
-
-instrument_to_dict!(JsCdsOption, "CdsOption");
-
-instrument_market_dependencies!(JsCdsOption, "CdsOption");
-
-instrument_pricing!(JsCdsOption, "CdsOption");
+instrument_surface!(JsCdsOption, "CdsOption", JsCdsOptionBuilder);
 
 getters!(JsCdsOption, "CdsOption", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key of the Bloomberg CDSO quadrature pricer.
         default_model as defaultModel => text(Instrument::default_model(i)),
-        /// Instrument attributes (tags and metadata) used for scenario selection.
-        /// @returns The attribute bag; empty when none were set.
-        attributes as attributes => json(i.attributes),
         /// Option strike in its serde form.
         /// @returns `{ spread: "<decimal rate>" }` or `{ clean_price_pct: "<price points>" }`.
         strike as strike => json(i.strike),
         /// Option type.
         /// @returns `"call"` (right to buy protection) or `"put"` (right to sell protection).
         option_type as optionType => json(i.option_type),
-        /// Exercise style; only European prices.
-        /// @returns `"european"`, `"american"` or `"bermudan"`.
-        exercise_style as exerciseStyle => json(i.exercise_style),
         /// Legal option expiry date.
         /// @returns ISO-8601 expiry date.
         expiry as expiry => date(i.expiry),
@@ -48,9 +36,6 @@ getters!(JsCdsOption, "CdsOption", |i| {
         /// Settlement type of the exercise proceeds.
         /// @returns `"cash"` or `"physical"`.
         settlement as settlement => json(i.settlement),
-        /// Explicit option premium payment date.
-        /// @returns The date, or `null` for the convention settlement lag.
-        premium_settlement_date as premiumSettlementDate => opt_date(i.premium_settlement_date),
         /// Explicit exercise proceeds payment date.
         /// @returns The date, or `null` for legal expiry.
         exercise_settlement_date as exerciseSettlementDate => opt_date(i.exercise_settlement_date),
@@ -95,6 +80,8 @@ getters!(JsCdsOption, "CdsOption", |i| {
         coupon_bp as couponBp => json(i.coupon_bp.and_then(|d| rust_decimal::prelude::ToPrimitive::to_f64(&d))),
 });
 
+common_getters!(JsCdsOption, "CdsOption");
+
 factories!(JsCdsOption, "CdsOption", finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption, {
         /// Canonical 100bp-strike call on a 5-year USD 10,000,000 corporate CDS (mirrors Rust `CdsOption::example`): expiry 2025-06-20, CDS maturity 2030-06-20, cash settlement, 40% recovery, curves `USD-OIS` / `CORP-HAZARD`, vol surface `CDSOPT-VOL`.
         /// @returns The example option.
@@ -133,11 +120,6 @@ setters!(JsCdsOptionBuilder, "CdsOptionBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         option_type as optionType => en,
-        /// Set the exercise style.
-        /// @param value - `"european"`, `"american"` or `"bermudan"`; pricing supports European only.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        exercise_style as exerciseStyle => en,
         /// Set the option expiry date.
         /// @param value - Legal expiry as an ISO-8601 string; must precede the underlying maturity.
         /// @returns The builder, for chaining.
@@ -153,11 +135,6 @@ setters!(JsCdsOptionBuilder, "CdsOptionBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         settlement as settlement => en,
-        /// Set the option premium payment date.
-        /// @param value - Premium payment date as an ISO-8601 string; when never set the CDS convention settlement lag applies.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        premium_settlement_date as premiumSettlementDate => date,
         /// Set the exercise proceeds payment date.
         /// @param value - On or after expiry and before CDS maturity, as an ISO-8601 string; when never set legal expiry is used.
         /// @returns The builder, for chaining.
@@ -228,12 +205,9 @@ setters!(JsCdsOptionBuilder, "CdsOptionBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         coupon_bp as couponBp => dec,
-        /// Set instrument attributes (tags and metadata).
-        /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => json,
 });
+
+common_setters!(JsCdsOptionBuilder, "CdsOptionBuilder");
 
 handle_setters!(JsCdsOptionBuilder, "CdsOptionBuilder", {
         /// Set the option notional.

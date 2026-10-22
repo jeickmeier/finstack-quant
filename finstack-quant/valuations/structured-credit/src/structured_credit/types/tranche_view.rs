@@ -14,7 +14,7 @@
 //! yield, WAL, pool metrics) see the deal while every reprice sees the
 //! tranche.
 
-use super::{DealType, StructuredCredit};
+use super::StructuredCredit;
 use finstack_quant_cashflows::{schedule_from_classified_flows, ScheduleBuildOpts};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -25,14 +25,14 @@ use finstack_quant_valuations_core::instruments::Instrument;
 
 /// A deal plus the identifier of the note the metrics are computed for.
 ///
-/// Built by [`StructuredCredit::value_tranche_with_metrics`]; direct callers
-/// can place it in a `MetricContext` to obtain per-tranche registry metrics.
+/// Built by [`tranche_metrics`](crate::structured_credit::tranche_metrics)
+/// for its registry `metrics` pass.
 #[derive(Clone, Debug)]
-pub struct StructuredCreditTranche {
+pub(crate) struct StructuredCreditTranche {
     /// The deal that owns the note.
-    pub deal: StructuredCredit,
+    pub(crate) deal: StructuredCredit,
     /// Identifier of the priced note.
-    pub tranche_id: String,
+    pub(crate) tranche_id: String,
 }
 
 impl StructuredCreditTranche {
@@ -42,7 +42,7 @@ impl StructuredCreditTranche {
     ///
     /// * `deal` - The structured-credit deal the note belongs to.
     /// * `tranche_id` - Exact identifier of one of `deal.tranches`.
-    pub fn new(deal: StructuredCredit, tranche_id: impl Into<String>) -> Self {
+    pub(crate) fn new(deal: StructuredCredit, tranche_id: impl Into<String>) -> Self {
         Self {
             deal,
             tranche_id: tranche_id.into(),
@@ -70,13 +70,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCreditTranch
         let flows = (self.deal)
             .tranche_cashflows(&self.tranche_id, context, as_of)?
             .detailed_flows;
-        let day_count = match self.deal.deal_type {
-            DealType::Rmbs | DealType::Cmbs => finstack_quant_core::dates::DayCount::Thirty360,
-            _ => finstack_quant_core::dates::DayCount::Act360,
-        };
         schedule_from_classified_flows(
             flows,
-            day_count,
+            self.deal.deal_type.schedule_day_count(),
             ScheduleBuildOpts {
                 notional_hint: finstack_quant_cashflows::CashflowScheduleSource::notional(self)?,
                 meta: finstack_quant_cashflows::builder::CashFlowMeta {
@@ -99,7 +95,7 @@ impl Instrument for StructuredCreditTranche {
     }
 
     fn family(&self) -> &'static finstack_quant_valuations_core::pricer::Family {
-        &crate::structured_credit::STRUCTURED_CREDIT
+        &crate::STRUCTURED_CREDIT
     }
 
     /// The deal, not the view: the deal's metric calculators downcast the

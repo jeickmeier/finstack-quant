@@ -126,8 +126,6 @@ impl Tarn {
             "TARN start_date followed by payment_dates",
         )?;
 
-        self.fixed_rate.as_f64();
-
         validation::require_with(
             self.target_coupon >= 0.0 && self.target_coupon.is_finite(),
             || {
@@ -156,9 +154,7 @@ impl Tarn {
     /// Period `i` accrues over `[boundaries[i], boundaries[i + 1]]`, fixes in
     /// advance at `boundaries[i]` and pays at `boundaries[i + 1]`.
     pub(crate) fn period_boundaries(&self) -> Vec<Date> {
-        std::iter::once(self.start_date)
-            .chain(self.payment_dates.iter().copied())
-            .collect()
+        crate::exotics::hw1f_note::period_boundaries(self.start_date, &self.payment_dates)
     }
 
     /// Create a canonical example TARN for testing.
@@ -202,7 +198,7 @@ impl Tarn {
 impl finstack_quant_valuations_core::instruments::Instrument for Tarn {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::Tarn,
-        crate::exotics::EXOTICS
+        crate::EXOTICS
     );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {

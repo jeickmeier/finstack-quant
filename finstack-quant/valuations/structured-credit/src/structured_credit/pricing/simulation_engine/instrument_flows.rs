@@ -28,6 +28,7 @@ use finstack_quant_cashflows::builder::{CashFlowSchedule, FloatingRateParams};
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_models::monte_carlo::process::cir::CirProcess;
 use finstack_quant_valuations_fixed_income::bond::CashflowSpec;
 use finstack_quant_valuations_fixed_income::revolving_credit::pricing::path_generator::build_credit_spread_params;
@@ -1168,16 +1169,10 @@ fn build_schedule(
         ),
         CollateralInstrument::Revolver(_) => (Vec::new(), Vec::new()),
     };
-    let fixed_coupon = match held {
-        CollateralInstrument::Bond(bond) => fixed_coupon_of(&bond.cashflow_spec)?,
-        CollateralInstrument::TermLoan(loan) => match &loan.rate {
-            RateSpec::Fixed { rate } => Some(*rate),
-            RateSpec::Floating(_) => None,
-        },
-        CollateralInstrument::Revolver(facility) => match &facility.rate {
-            RateSpec::Fixed { rate } => Some(*rate),
-            RateSpec::Floating(_) => None,
-        },
+    let fixed_coupon = match (held, held.loan_rate()) {
+        (CollateralInstrument::Bond(bond), _) => fixed_coupon_of(&bond.cashflow_spec)?,
+        (_, Some(RateSpec::Fixed { rate })) => Some(*rate),
+        (_, _) => None,
     };
     let call_policy = collateral.call_policy_for(&id);
     let put_policy = collateral.put_policy_for(&id);
@@ -1217,43 +1212,19 @@ fn build_schedule(
         worst_period,
     };
 
-    let (default_source, recovery_rate) = match held {
-        CollateralInstrument::Bond(bond) => (
-            bond.credit_curve_id
-                .as_ref()
-                .map_or(PeriodDefaultSource::DealModel, |c| {
-                    PeriodDefaultSource::HazardCurve(c.to_string())
-                }),
-            None,
-        ),
-        CollateralInstrument::TermLoan(loan) => (
-            loan.credit_curve_id
-                .as_ref()
-                .map_or(PeriodDefaultSource::DealModel, |c| {
-                    PeriodDefaultSource::HazardCurve(c.to_string())
-                }),
-            None,
-        ),
-        CollateralInstrument::Revolver(facility) => (
-            facility
-                .credit_curve_id
-                .as_ref()
-                .map_or(PeriodDefaultSource::DealModel, |c| {
-                    PeriodDefaultSource::HazardCurve(c.to_string())
-                }),
-            Some(facility.recovery_rate),
-        ),
+    let default_source = held
+        .credit_curve_id()
+        .map_or(PeriodDefaultSource::DealModel, |c| {
+            PeriodDefaultSource::HazardCurve(c.to_string())
+        });
+    let recovery_rate = match held {
+        CollateralInstrument::Revolver(facility) => Some(facility.recovery_rate),
+        CollateralInstrument::Bond(_) | CollateralInstrument::TermLoan(_) => None,
     };
-    let floating_params = match held {
-        CollateralInstrument::Bond(bond) => floating_params_of(&bond.cashflow_spec)?,
-        CollateralInstrument::TermLoan(loan) => match &loan.rate {
-            RateSpec::Floating(spec) => Some(FloatingRateParams::try_from(spec)?),
-            RateSpec::Fixed { .. } => None,
-        },
-        CollateralInstrument::Revolver(facility) => match &facility.rate {
-            RateSpec::Floating(spec) => Some(FloatingRateParams::try_from(spec)?),
-            RateSpec::Fixed { .. } => None,
-        },
+    let floating_params = match (held, held.loan_rate()) {
+        (CollateralInstrument::Bond(bond), _) => floating_params_of(&bond.cashflow_spec)?,
+        (_, Some(RateSpec::Floating(spec))) => Some(FloatingRateParams::try_from(spec)?),
+        (_, _) => None,
     };
     let revolver = match held {
         CollateralInstrument::Revolver(facility) => Some(RevolverTerms {
@@ -1280,7 +1251,7 @@ fn build_schedule(
             margins: (0..period_dates.len())
                 .map(|k| {
                     let start = if k == 0 { as_of } else { period_dates[k - 1] };
-                    let delta = facility.margin_delta_bp_at(start) / 10_000.0;
+                    let delta = facility.margin_delta_bp_at(start) / BASIS_POINTS_PER_UNIT;
                     match &facility.rate {
                         RateSpec::Fixed { rate } => MarginTerms::FixedRate(*rate + delta),
                         RateSpec::Floating(_) => MarginTerms::Spread,

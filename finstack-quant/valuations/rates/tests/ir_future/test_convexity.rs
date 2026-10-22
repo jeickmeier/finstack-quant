@@ -61,7 +61,9 @@ fn test_explicit_convexity_adjustment() {
         convexity_adjustment: Some(0.0005), // 5 bp adjustment
     };
 
-    let future = create_standard_future(start, end).with_contract_specs(specs_with_ca);
+    let mut future = create_standard_future(start, end);
+
+    future.contract_specs = specs_with_ca;
 
     let pv = future.value(&market, as_of).unwrap();
     assert!(pv.amount().is_finite());
@@ -77,7 +79,8 @@ fn test_convexity_impact() {
         convexity_adjustment: Some(0.0),
         ..FutureContractSpecs::default()
     };
-    let with_zero_ca = create_standard_future(start, end).with_contract_specs(specs_zero_ca);
+    let mut with_zero_ca = create_standard_future(start, end);
+    with_zero_ca.contract_specs = specs_zero_ca;
     let pv_zero_ca = with_zero_ca.value(&market, as_of).unwrap().amount();
 
     // Case 2: Explicit Positive Adjustment
@@ -85,7 +88,8 @@ fn test_convexity_impact() {
         convexity_adjustment: Some(0.0050), // 50bps
         ..FutureContractSpecs::default()
     };
-    let with_pos_ca = create_standard_future(start, end).with_contract_specs(specs_pos_ca);
+    let mut with_pos_ca = create_standard_future(start, end);
+    with_pos_ca.contract_specs = specs_pos_ca;
     let pv_pos_ca = with_pos_ca.value(&market, as_of).unwrap().amount();
 
     // PV should be lower with positive convexity adjustment (Long Future: PV ~ Rate_implied - (Rate_fwd + Conv))
@@ -110,8 +114,11 @@ fn test_convexity_adjustment_sign() {
         ..FutureContractSpecs::default()
     };
 
-    let fut_pos = create_standard_future(start, end).with_contract_specs(positive_ca);
-    let fut_neg = create_standard_future(start, end).with_contract_specs(negative_ca);
+    let mut fut_pos = create_standard_future(start, end);
+
+    fut_pos.contract_specs = positive_ca;
+    let mut fut_neg = create_standard_future(start, end);
+    fut_neg.contract_specs = negative_ca;
 
     let pv_pos = fut_pos.value(&market, as_of).unwrap().amount();
     let pv_neg = fut_neg.value(&market, as_of).unwrap().amount();
@@ -133,7 +140,9 @@ fn test_large_convexity_adjustment() {
         ..FutureContractSpecs::default()
     };
 
-    let future = create_standard_future(start, end).with_contract_specs(large_ca);
+    let mut future = create_standard_future(start, end);
+
+    future.contract_specs = large_ca;
 
     let pv = future.value(&market, as_of).unwrap();
 

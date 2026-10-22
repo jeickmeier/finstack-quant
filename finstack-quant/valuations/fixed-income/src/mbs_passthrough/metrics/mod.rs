@@ -23,9 +23,8 @@ pub(crate) mod mc_oas;
 /// `β = ln(2) / 0.01 ≈ 69.3`.
 ///
 /// Both the effective duration/convexity engine ([`duration`]) and the
-/// Monte-Carlo OAS engine ([`mc_oas`], via [`McOasConfig`]'s default
-/// `prepay_rate_sensitivity`) use this constant so the two engines price the
-/// prepayment option consistently; the MC config field remains overridable.
+/// Monte-Carlo OAS engine ([`mc_oas`]) use this constant so the two engines
+/// price the prepayment option consistently.
 pub(crate) const PREPAY_RATE_SENSITIVITY: f64 = std::f64::consts::LN_2 / 0.01;
 
 pub(crate) use mc_oas::{calculate_mc_oas, McOasConfig};
@@ -77,29 +76,9 @@ impl MetricCalculator for EffectiveConvexityCalculator {
 /// `instrument_pricing_overrides.model_config.hw1f_mean_reversion` and
 /// `hw1f_sigma`, supplied together; without them the engine uses κ = 5% and
 /// σ = 1%. These are user inputs: the metric does not calibrate them to
-/// swaptions.
+/// swaptions. `model_config.mc_paths` sets the path count (default 512) and
+/// `model_config.mc_seed(&id)` the seed.
 pub(crate) struct OasCalculator;
-
-/// Resolve the MC-OAS configuration from the pool's model overrides.
-fn mc_oas_config(mbs: &AgencyMbsPassthrough) -> finstack_quant_core::Result<McOasConfig> {
-    let model = &mbs.instrument_pricing_overrides.model_config;
-    if model.hw1f_sigma_schedule.is_some() {
-        return Err(finstack_quant_core::Error::Validation(
-            "MBS MC-OAS takes a scalar hw1f_sigma; hw1f_sigma_schedule is not supported".into(),
-        ));
-    }
-    match (model.hw1f_mean_reversion, model.hw1f_sigma) {
-        (None, None) => Ok(McOasConfig::default()),
-        (Some(hw1f_mean_reversion), Some(hw1f_sigma)) => Ok(McOasConfig {
-            hw1f_mean_reversion,
-            hw1f_sigma,
-            ..McOasConfig::default()
-        }),
-        _ => Err(finstack_quant_core::Error::Validation(
-            "MBS MC-OAS requires hw1f_mean_reversion and hw1f_sigma together".into(),
-        )),
-    }
-}
 
 impl MetricCalculator for OasCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
@@ -120,7 +99,7 @@ impl MetricCalculator for OasCalculator {
             market_price,
             context.curves.as_ref(),
             context.as_of,
-            &mc_oas_config(mbs)?,
+            &McOasConfig::resolve(mbs)?,
         )
     }
 }
@@ -220,8 +199,16 @@ mod tests {
                 0.0,
             )
             .expect("static z-spread");
-        let mc_oas =
-            calculate_mc_oas(&mbs, quote, &market, as_of, &McOasConfig::default()).expect("mc oas");
+        let config = McOasConfig {
+            num_paths: 512,
+            hw1f_mean_reversion: 0.05,
+            hw1f_sigma: 0.01,
+            seed: mbs
+                .instrument_pricing_overrides
+                .model_config
+                .mc_seed(&mbs.id),
+        };
+        let mc_oas = calculate_mc_oas(&mbs, quote, &market, as_of, &config).expect("mc oas");
 
         // The registered metric.
         let ctx = MetricContext::new(
@@ -288,9 +275,13 @@ mod tests {
             &market,
             as_of,
             &McOasConfig {
+                num_paths: 512,
                 hw1f_mean_reversion: 0.10,
                 hw1f_sigma: 0.015,
-                ..McOasConfig::default()
+                seed: mbs
+                    .instrument_pricing_overrides
+                    .model_config
+                    .mc_seed(&mbs.id),
             },
         )
         .expect("direct");
@@ -302,5 +293,27 @@ mod tests {
 
         mbs.instrument_pricing_overrides.model_config.hw1f_sigma = None;
         assert!(metric(&mbs).is_err(), "partial κ/σ pair must be rejected");
+    }
+
+    /// `mc_paths` and the seed scenario label reach the MC-OAS engine.
+    #[test]
+    fn mc_oas_config_reads_paths_and_seed_from_model_config() {
+        let mut mbs = AgencyMbsPassthrough::example().expect("mbs");
+        let base = McOasConfig::resolve(&mbs).expect("base");
+        assert_eq!(base.num_paths, 512);
+        assert_eq!(
+            base.seed,
+            finstack_quant_models::monte_carlo::seed::derive_seed(&mbs.id, "base")
+        );
+        mbs.instrument_pricing_overrides.model_config.mc_paths = Some(64);
+        mbs.instrument_pricing_overrides
+            .model_config
+            .mc_seed_scenario = Some("stress".into());
+        let configured = McOasConfig::resolve(&mbs).expect("configured");
+        assert_eq!(configured.num_paths, 64);
+        assert_eq!(
+            configured.seed,
+            finstack_quant_models::monte_carlo::seed::derive_seed(&mbs.id, "stress")
+        );
     }
 }

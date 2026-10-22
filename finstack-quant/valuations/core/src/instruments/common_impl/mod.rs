@@ -27,15 +27,11 @@ pub mod example_constants {
 
 // Shared utilities and helper functions
 pub mod helpers;
-pub mod listed;
+// Listed future / future-option terms (public at `instruments::*`)
+pub(crate) mod listed;
 pub mod margin;
 // Shared volatility override/surface resolution.
 pub mod vol_resolution;
 
 // Common parameter types shared across instruments
 pub mod parameters;
-
-// Common pricing patterns and infrastructure
-pub mod pricing;
-
-// Enriched per-flow cashflow export with DF/SP/PV columns.

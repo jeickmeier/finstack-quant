@@ -14,22 +14,9 @@ pub(crate) struct SimpleInflationCapFloorPricer {
 }
 
 impl SimpleInflationCapFloorPricer {
-    /// Create a new pricer with default Black-76 model.
-    pub(crate) fn new() -> Self {
-        Self {
-            model: ModelKey::Black76,
-        }
-    }
-
-    /// Create a pricer with specified model key.
+    /// Create a pricer registered under `model` (`Black76` or `Normal`).
     pub(crate) fn with_model(model: ModelKey) -> Self {
         Self { model }
-    }
-}
-
-impl Default for SimpleInflationCapFloorPricer {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

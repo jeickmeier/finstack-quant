@@ -4,28 +4,13 @@
 //! filtering and outstanding principal at the horizon date for redemption.
 
 use crate::term_loan::TermLoan;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::DateExt;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
 use super::irr_helpers::{
     cached_full_schedule, maturity_exercise_date, solve_irr_to_date,
     target_price_from_quote_or_model,
 };
-
-/// Compute a date N years ahead of `as_of`, with leap-year fallback.
-///
-/// For Feb 29 valuations in non-leap target years, falls back to Feb 28.
-/// Returns an error if the target date cannot be constructed at all.
-fn years_ahead(as_of: Date, years: i32) -> finstack_quant_core::Result<Date> {
-    match Date::from_calendar_date(as_of.year() + years, as_of.month(), as_of.day()) {
-        Ok(d) => Ok(d),
-        Err(_) => {
-            // Feb 29 → Feb 28 fallback for leap year → non-leap year transitions
-            Date::from_calendar_date(as_of.year() + years, as_of.month(), 28)
-                .map_err(|_| finstack_quant_core::InputError::InvalidDateRange.into())
-        }
-    }
-}
 
 macro_rules! define_ytn {
     ($name:ident, $years:expr) => {
@@ -51,7 +36,8 @@ macro_rules! define_ytn {
                     (maturity_exercise_date(loan, &schedule), target_price)
                 };
 
-                let target = years_ahead(as_of, $years)?;
+                // Feb 29 clamps to Feb 28 in a non-leap target year.
+                let target = as_of.add_months(12 * $years)?;
                 let exercise_date = if target < maturity { target } else { maturity };
                 if exercise_date <= as_of {
                     return Err(finstack_quant_core::InputError::InvalidDateRange.into());

@@ -864,7 +864,7 @@ mod tests {
         vol: f64,
     ) -> CdsOption {
         let params = CdsOptionParams::new(
-            super::super::strike::CdsOptionStrike::Spread(bp_to_decimal(strike_bp)),
+            crate::cds_option::strike::CdsOptionStrike::Spread(bp_to_decimal(strike_bp)),
             as_of.add_months(12).expect("valid date shift"),
             as_of.add_months(60).expect("valid date shift"),
             Money::from((10_000_000_i64, Currency::USD)),
@@ -976,23 +976,6 @@ mod tests {
             (stressed_limit - 16.0).abs() < 1e-12,
             "extreme vol-time inputs should still use the legacy 4σ√t guard, got {stressed_limit}"
         );
-    }
-
-    #[test]
-    fn index_fep_is_independent_of_premium_payment_date() {
-        let as_of = date!(2025 - 01 - 02);
-        let mut option = option(as_of, OptionType::Call, 100.0, 0.30);
-        option.underlying_is_index = true;
-        option.knockout = false;
-        let market = market(as_of);
-        let expected = context_for(&option, &market, as_of, 0.3).front_end_protection;
-        for settlement in [date!(2025 - 01 - 09), date!(2025 - 07 - 01)] {
-            option.premium_settlement_date = Some(settlement);
-            assert_eq!(
-                context_for(&option, &market, as_of, 0.3).front_end_protection,
-                expected
-            );
-        }
     }
 
     #[test]
@@ -1409,7 +1392,7 @@ mod tests {
         use finstack_quant_valuations_core::instruments::Instrument;
 
         let params = CdsOptionParams::new(
-            super::super::strike::CdsOptionStrike::CleanPricePct(
+            crate::cds_option::strike::CdsOptionStrike::CleanPricePct(
                 Decimal::try_from(strike_price_pct).expect("valid clean-price strike"),
             ),
             as_of.add_months(12).expect("valid date shift"),
@@ -1718,11 +1701,10 @@ mod tests {
         }
 
         #[test]
-        fn valuation_clock_ignores_fixed_premium_and_exercise_settlement_dates() {
+        fn valuation_clock_ignores_exercise_settlement_date() {
             let initial = date!(2025 - 01 - 01);
             let later = date!(2025 - 07 - 01);
             let mut option = option(initial, OptionType::Call, 100.0, 0.3);
-            option.premium_settlement_date = Some(date!(2025 - 01 - 06));
             option.exercise_settlement_date = Some(option.expiry + time::Duration::days(5));
             let expected = (option.expiry - later).whole_days() as f64 / 365.0;
             assert!(
@@ -1738,7 +1720,6 @@ mod tests {
             let mut option = option(initial, OptionType::Call, 100.0, 0.3);
             option.underlying_is_index = true;
             option.knockout = false;
-            option.premium_settlement_date = Some(date!(2025 - 01 - 06));
             let curves = market(initial);
             let ctx = context_for(&option, &curves, later, 0.3);
             let t = (option.expiry - later).whole_days() as f64 / 365.0;
@@ -1755,7 +1736,7 @@ mod tests {
             payer.underlying_is_index = true;
             payer.knockout = false;
             payer.strike =
-                super::super::super::strike::CdsOptionStrike::CleanPricePct(Decimal::from(100));
+                crate::cds_option::strike::CdsOptionStrike::CleanPricePct(Decimal::from(100));
             payer.strike_index_factor = Some(1.0);
             let mut receiver = payer.clone();
             receiver.option_type = OptionType::Put;

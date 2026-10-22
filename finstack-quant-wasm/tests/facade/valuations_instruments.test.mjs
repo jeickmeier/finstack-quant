@@ -470,7 +470,6 @@ test('CdsOption is a typed class matching the Python wrapper', () => {
     .id('CDXO-1')
     .strike({ clean_price_pct: '107.0' })
     .optionType('put')
-    .exerciseStyle('european')
     .expiry('2025-06-20')
     .underlyingMaturity('2030-06-20')
     .notional(new core.Money(25_000_000, new core.Currency('USD')))

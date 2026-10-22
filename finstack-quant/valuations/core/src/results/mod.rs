@@ -23,7 +23,7 @@
 //!
 //! # Metadata Tracking
 //!
-//! [`finstack_quant_core::config::ResultsMeta`] captures important context for audit and reproducibility:
+//! [`ResultsMeta`](finstack_quant_core::config::ResultsMeta) captures important context for audit and reproducibility:
 //! - **Timestamp**: When the valuation was computed
 //! - **Rounding context**: Numeric precision policy applied
 //! - **FX policy**: Currency conversion method (if applicable)
@@ -37,7 +37,7 @@
 //! # See Also
 //!
 //! - [`crate::results::ValuationResult`] for the main result type
-//! - [`finstack_quant_core::config::ResultsMeta`] for execution metadata
+//! - [`ResultsMeta`](finstack_quant_core::config::ResultsMeta) for execution metadata
 //! - [`crate::metrics`] for available metric calculators
 //!
 //! # References

@@ -159,7 +159,7 @@ fn test_discount_curve_id_accessor_returns_correct_value() {
     let swap = sample_swap(PayReceive::Receive);
 
     // Act
-    let discount_curve_id = swap.get_discount_curve_id();
+    let discount_curve_id = &swap.discount_curve_id;
 
     // Assert
     assert_eq!(discount_curve_id.as_str(), DISC_ID);

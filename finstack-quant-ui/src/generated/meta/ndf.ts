@@ -1059,15 +1059,24 @@ export default [
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/attributes",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/attributes",
-    "description": "Attributes for scenario selection and tagging.",
+    "description": "Attributes for scenario selection and tagging",
     "ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/base_calendar_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/base_calendar_id",
-    "default": null,
     "description": "Optional base currency calendar."
+  },
+  {
+    "path": "#/$defs/d_6737e7813812de86cf9b/properties/base_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/base_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6737e7813812de86cf9b/properties/base_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/base_calendar_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/base_currency",
@@ -1079,8 +1088,7 @@ export default [
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/contract_rate",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/contract_rate",
-    "default": null,
-    "description": "Contract forward rate. Interpretation depends on `quote_convention`.\n`None` values the NDF at-market.",
+    "description": "Contract forward rate. Interpretation depends on `quote_convention`:\n- BasePerSettlement: base per settlement (e.g., 7.25 CNY per USD)\n- SettlementPerBase: settlement per base (e.g., 0.138 USD per CNY)\n\n`None` values the NDF at-market: the contract rate equals the market\nforward, so the settlement amount and PV are zero.",
     "format": "double"
   },
   {
@@ -1100,8 +1108,7 @@ export default [
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/fixing_source",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/fixing_source",
-    "default": null,
-    "description": "Official fixing source/benchmark enum for type-safe specification."
+    "description": "Official fixing source/benchmark enum for type-safe specification.\n\nUse this field for validated fixing sources.\nSee [`NdfFixingSource`] for supported benchmarks and their typical currencies."
   },
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/fixing_source/anyOf/0",
@@ -1116,8 +1123,7 @@ export default [
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/foreign_discount_curve_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/foreign_discount_curve_id",
-    "default": null,
-    "description": "Optional foreign (base) currency discount curve ID."
+    "description": "Optional foreign (base) currency discount curve ID.\nRequired for pre-fixing forward estimation unless `quoted_forward`\nis supplied."
   },
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/foreign_discount_curve_id/anyOf/0",
@@ -1139,7 +1145,6 @@ export default [
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/instrument_pricing_overrides",
-    "default": {},
     "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
@@ -1154,9 +1159,6 @@ export default [
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/metric_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/metric_pricing_overrides",
-    "default": {
-      "theta_period": null
-    },
     "description": "Metric-time pricing configuration.",
     "ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
@@ -1171,8 +1173,7 @@ export default [
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/observed_fixing",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/observed_fixing",
-    "default": null,
-    "description": "Observed fixing rate. Interpretation depends on `quote_convention`.",
+    "description": "Observed fixing rate. Interpretation depends on `quote_convention`.\nIf Some, NDF is post-fixing.",
     "format": "double"
   },
   {
@@ -1185,21 +1186,18 @@ export default [
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/quoted_forward",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/quoted_forward",
-    "default": null,
-    "description": "Explicit pre-fixing forward rate in `quote_convention` units.",
+    "description": "Explicit pre-fixing forward rate in `quote_convention` units.\n\nUse this for NDF market quotes or basis-adjusted forwards when a base\ncurrency discount curve is unavailable.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/quoted_spot",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/quoted_spot",
-    "default": null,
-    "description": "Optional spot rate override for forward rate calculation.",
+    "description": "Optional spot rate override for forward rate calculation.\nInterpretation depends on `quote_convention`.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/scenario_pricing_overrides",
-    "default": {},
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
@@ -1207,8 +1205,17 @@ export default [
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/settlement_calendar_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/settlement_calendar_id",
-    "default": null,
     "description": "Optional settlement currency calendar."
+  },
+  {
+    "path": "#/$defs/d_6737e7813812de86cf9b/properties/settlement_calendar_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/settlement_calendar_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6737e7813812de86cf9b/properties/settlement_calendar_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json#/$defs/Ndf/properties/settlement_calendar_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_6737e7813812de86cf9b/properties/settlement_currency",

@@ -469,8 +469,6 @@ export interface DE582C9C5939A01A9515F {
  * Represents a spot equity position that can be priced using market data.
  * The price can come from direct market quotes or be computed from
  * underlying fundamentals.
- *
- * See unit tests and `examples/` for usage.
  */
 export interface DA39Cc24B914A22260377 {
   attributes: Attributes;

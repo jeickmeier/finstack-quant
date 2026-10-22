@@ -247,49 +247,25 @@ impl CommodityAsianOption {
 
     /// Validate the realized-fixing history against the fixing schedule.
     ///
-    /// Errors  when:
-    /// - `past_fixings` contains duplicate dates (each would be
-    ///   double-counted by [`accumulated_state`](Self::accumulated_state)), or
-    /// - any scheduled `fixing_date <= as_of` has no past fixing — a
-    ///   missing past fixing silently deflates `hist_sum` and inflates the
-    ///   seasoned effective strike.
+    /// Runs the structural checks of `validate_invariants` (duplicate,
+    /// unscheduled or non-finite past fixings; non-positive geometric
+    /// fixings) and additionally errors when a scheduled `fixing_date <= as_of`
+    /// has no past fixing — a missing past fixing silently deflates `hist_sum`
+    /// and inflates the seasoned effective strike.
     ///
     /// # Arguments
     ///
-    /// * `as_of` - Valuation or observation date that anchors discounting and schedule logic
+    /// * `as_of` - Valuation date; every scheduled fixing on or before it must
+    ///   have a realized value in `past_fixings`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for an invalid structure or a missing past
+    /// fixing.
     pub fn validate_past_fixings(&self, as_of: Date) -> finstack_quant_core::Result<()> {
         self.validate_structure()?;
-        let mut seen: std::collections::BTreeSet<Date> = std::collections::BTreeSet::new();
-        for (d, value) in &self.past_fixings {
-            if !seen.insert(*d) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CommodityAsianOption '{}' has duplicate past fixing for date {d}",
-                    self.id
-                )));
-            }
-            if !self.fixing_dates.contains(d) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CommodityAsianOption '{}' has a past fixing for {d}, which is \
-                     not a scheduled fixing date (date mismatch)",
-                    self.id
-                )));
-            }
-            if !value.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CommodityAsianOption '{}' past fixing for {d} must be finite, got {value}",
-                    self.id
-                )));
-            }
-            if matches!(self.averaging_method, AveragingMethod::Geometric) && *value <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CommodityAsianOption '{}' geometric-average fixing for {d} must be positive, got {value}",
-                    self.id
-                )));
-            }
-        }
-
         for fixing_date in &self.fixing_dates {
-            if *fixing_date <= as_of && !seen.contains(fixing_date) {
+            if *fixing_date <= as_of && !self.past_fixings.iter().any(|(d, _)| d == fixing_date) {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "CommodityAsianOption '{}' is missing a past fixing for past \
                      fixing date {fixing_date} (as_of {as_of}); every fixing date on or \
@@ -298,38 +274,24 @@ impl CommodityAsianOption {
                 )));
             }
         }
-
         Ok(())
     }
 
     /// Get the accumulated state (sum, log_sum, count) from realized fixings.
     ///
     /// Only considers fixings that match dates in `fixing_dates` and are on or
-    /// before `as_of`.
-    ///
-    /// Call [`Self::validate_past_fixings`] first. Geometric averaging
-    /// requires strictly positive values, so this function never needs to
-    /// encode an invalid observation as a sentinel.
+    /// before `as_of`. Non-positive values (allowed for arithmetic averages)
+    /// enter the sum and count but not the log-sum.
     ///
     /// # Arguments
     ///
-    /// * `as_of` - Valuation or observation date that anchors discounting and schedule logic
+    /// * `as_of` - Valuation date; only fixings dated on or before it count.
     pub fn accumulated_state(&self, as_of: Date) -> (f64, f64, usize) {
-        let mut sum = 0.0;
-        let mut product_log = 0.0;
-        let mut count = 0;
-
-        for (d, v) in &self.past_fixings {
-            if *d <= as_of && self.fixing_dates.contains(d) {
-                sum += v;
-                if *v > 0.0 {
-                    product_log += v.ln();
-                }
-                count += 1;
-            }
-        }
-
-        (sum, product_log, count)
+        crate::exotics::asian_option::types::accumulated_state(
+            &self.past_fixings,
+            &self.fixing_dates,
+            as_of,
+        )
     }
 
     /// Compute the average forward price for remaining (future) fixing dates.
@@ -359,7 +321,7 @@ impl CommodityAsianOption {
 impl finstack_quant_valuations_core::instruments::Instrument for CommodityAsianOption {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::CommodityAsianOption,
-        crate::exotics::EXOTICS
+        crate::EXOTICS
     );
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {

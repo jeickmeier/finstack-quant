@@ -3,19 +3,13 @@
 //! This module provides specialized pricing engines for Bermudan swaptions
 //! using tree-based and Monte Carlo methods.
 //!
-//! # Available Engines
+//! # Engines
 //!
-//! - `tree_valuator` - Hull-White tree-based pricing (industry standard)
-//!
-//! # Example
-//!
-//! ```text
-//! use finstack_quant_valuations_rates::swaption::BermudanSwaption;
-//! use finstack_quant_valuations_rates::swaption::pricing::BermudanSwaptionTreeValuator;
-//!
-//! let swaption = BermudanSwaption::example().expect("example");
-//! // Use with HullWhiteTree for backward induction pricing
-//! ```
+//! - `tree_valuator`: Hull-White tree backward induction
+//!   (`BermudanSwaptionTreeValuator`, re-exported at `swaption::`)
+//! - `monte_carlo_lsmc`: Hull-White Longstaff-Schwartz Monte Carlo
+//! - `lmm_bermudan`: LIBOR market model Bermudan pricing
+//! - `swap_rate_utils`: the Hull-White zero-coupon bond price they share
 
 pub mod lmm_bermudan;
 pub mod monte_carlo_lsmc;

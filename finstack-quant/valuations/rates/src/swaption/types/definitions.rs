@@ -78,11 +78,17 @@ impl std::str::FromStr for CashSettlementMethod {
 ///
 /// Defines the exercise dates and constraints for a Bermudan swaption.
 /// Exercise dates are typically aligned with swap coupon dates.
+///
+/// Each exercise date is the notification (decision) date on which the holder
+/// elects to exercise, as in QuantLib's `BermudanExercise`; any contractual
+/// notice period is already reflected in where the dates sit, so the schedule
+/// carries no separate notice lag.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct BermudanSchedule {
-    /// Exercise dates (must be sorted, typically on swap coupon dates)
+    /// Exercise notification (decision) dates, sorted; typically one notice
+    /// period before the swap coupon dates they enter on.
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
@@ -95,8 +101,6 @@ pub struct BermudanSchedule {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub lockout_end: Option<Date>,
-    /// Notice period in business days before exercise
-    pub notice_days: u32,
 }
 
 impl BermudanSchedule {
@@ -109,20 +113,7 @@ impl BermudanSchedule {
         Self {
             exercise_dates,
             lockout_end: None,
-            notice_days: 0,
         }
-    }
-
-    /// Create schedule with lockout period.
-    pub fn with_lockout(mut self, lockout_end: Date) -> Self {
-        self.lockout_end = Some(lockout_end);
-        self
-    }
-
-    /// Create schedule with notice period.
-    pub fn with_notice_days(mut self, days: u32) -> Self {
-        self.notice_days = days;
-        self
     }
 
     /// Generate co-terminal exercise dates from swap schedule.
@@ -191,11 +182,6 @@ impl BermudanSchedule {
             .filter(|&&d| d > as_of)
             .map(|&d| day_count.year_fraction(as_of, d, ctx))
             .collect()
-    }
-
-    /// Number of exercise opportunities.
-    pub fn num_exercises(&self) -> usize {
-        self.effective_dates().len()
     }
 }
 

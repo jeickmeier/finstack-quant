@@ -83,9 +83,7 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
     ) -> Result<Self> {
         if swaption.get_forward_curve_id() != swaption.get_discount_curve_id() {
             return Err(finstack_quant_core::Error::Validation(
-                "Bermudan tree pricing is currently single-curve only. \
-                 Set forward_curve_id equal to discount_curve_id or use a multi-curve-capable engine."
-                    .into(),
+                crate::swaption::bermudan::single_curve_only_message("Bermudan tree"),
             ));
         }
 

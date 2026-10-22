@@ -19,6 +19,7 @@
 
 use crate::structured_credit::StructuredCredit;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
+use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
@@ -130,7 +131,7 @@ impl MetricCalculator for Prepayment01Calculator {
         // per UNIT of CPR; multiply by 1bp (0.0001) so the metric matches its
         // documented `$ per 1bp` convention used by model-parameter attribution.
         let prepayment01 = if achieved_bump > 0.0 {
-            (pv_up - pv_down) / achieved_bump * 0.0001
+            (pv_up - pv_down) / achieved_bump * ONE_BASIS_POINT
         } else {
             0.0
         };

@@ -34,7 +34,7 @@
 
 use crate::cms_common::annuity_weight;
 use crate::cms_option::types::CmsOption;
-use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
@@ -50,11 +50,6 @@ use finstack_quant_valuations_core::results::ValuationResult;
 pub struct CmsOptionPricer;
 
 impl CmsOptionPricer {
-    /// Create a new CMS option pricer.
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Internal pricing logic
     ///
     /// # Time Basis
@@ -75,7 +70,6 @@ impl CmsOptionPricer {
         as_of: Date,
         convexity_scale: f64,
     ) -> Result<Money> {
-        inst.validate()?;
         let mut total_pv = 0.0;
         let strike = inst.strike_f64()?;
         let discount_curve = curves.get_discount(inst.discount_curve_id.as_ref())?;
@@ -98,7 +92,7 @@ impl CmsOptionPricer {
             // cap/floor pricer) — never on a rate re-projected from the live
             // curve, which books phantom P&L.
             if fixing_date < as_of {
-                let observed = crate::cms_fixings::historical_cms_fixing(
+                let observed = crate::cms_common::historical_cms_fixing(
                     curves,
                     &inst.forward_curve_id,
                     inst.cms_tenor.to_years(),
@@ -117,14 +111,10 @@ impl CmsOptionPricer {
 
             // 1. Calculate Forward Swap Rate
             let reference_swap = inst.reference_swap();
-            let swap_start = reference_swap.reference_swap_start(fixing_date)?;
             let swap_tenor_months =
                 crate::cms_common::cms_tenor_months(inst.cms_tenor, "CmsOption cms_tenor")?;
-            let swap_end = swap_start.add_months(swap_tenor_months)?;
-
-            // Calculate annuity and forward rate
-            let (forward_swap_rate, _) =
-                reference_swap.forward_rate_and_annuity(curves, as_of, swap_start, swap_end)?;
+            let (swap_start, forward_swap_rate) =
+                reference_swap.forward_at_fixing(curves, as_of, fixing_date, swap_tenor_months)?;
 
             if forward_swap_rate <= 0.0 || strike <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation("Black CMS option requires positive forward and strike; no normal-volatility conversion is inferred".to_owned()));
@@ -219,15 +209,6 @@ impl CmsOptionPricer {
 
         Money::new(total_pv * inst.notional.amount(), inst.notional.currency())
     }
-
-    fn price_internal(
-        &self,
-        inst: &CmsOption,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<Money> {
-        self.price_internal_with_convexity(inst, curves, as_of, 1.0)
-    }
 }
 
 impl crate::cms_common::CmsConvexityPricing for CmsOption {
@@ -237,13 +218,7 @@ impl crate::cms_common::CmsConvexityPricing for CmsOption {
         as_of: Date,
         convexity_scale: f64,
     ) -> Result<Money> {
-        CmsOptionPricer::new().price_internal_with_convexity(self, market, as_of, convexity_scale)
-    }
-}
-
-impl Default for CmsOptionPricer {
-    fn default() -> Self {
-        Self::new()
+        CmsOptionPricer.price_internal_with_convexity(self, market, as_of, convexity_scale)
     }
 }
 
@@ -263,84 +238,36 @@ impl Pricer for CmsOptionPricer {
             InstrumentType::CmsOption,
         )?;
 
-        let pv = self.price_internal(cms, market, as_of)?;
+        let pv = self.price_internal_with_convexity(cms, market, as_of, 1.0)?;
 
         Ok(ValuationResult::stamped(cms.id(), as_of, pv))
     }
 }
 
-/// Present value using Convexity Adjusted Black.
-pub(crate) fn compute_pv(inst: &CmsOption, curves: &MarketContext, as_of: Date) -> Result<Money> {
-    let pricer = CmsOptionPricer::new();
-    pricer.price_internal(inst, curves, as_of)
-}
-
-/// Compute convexity adjustment for CMS rate using Hagan (2003) methodology.
+/// First-order CMS convexity adjustment (Hagan 2003) using the actual
+/// reference-swap fixed payment frequency and payment delay.
 ///
-/// The convexity adjustment accounts for the measure change from the annuity
-/// measure (where the forward swap rate is a martingale) to the payment measure
-/// (where the CMS rate is a martingale).
-///
-/// # Formula
-///
-/// The CMS-adjusted forward is `E^{T_pay}[S] = F + CA`. To first order in the
-/// swap-rate variance, the Hagan (2003) standard-model adjustment is:
+/// The adjustment accounts for the measure change from the annuity measure
+/// (where the forward swap rate is a martingale) to the payment measure (where
+/// the CMS rate is a martingale). The CMS-adjusted forward is
+/// `E^{T_pay}[S] = F + CA`; to first order in the swap-rate variance:
 ///
 /// ```text
 /// CA ≈ (g'(F) / g(F)) · Var^A[S] ≈ (g'(F) / g(F)) · F² · σ² · T
 /// ```
 ///
-/// where `g(k) = (1+k/m)^(-m*delay) / A_par(k)` is the Radon-Nikodym derivative between the
-/// payment measure and the annuity measure. The zero-delay convenience function
-/// assumes payment at reference-swap start. For actual coupon dates use
-/// [`convexity_adjustment_with_frequency`], including the payment-bond sensitivity
-/// `-m*delay/(m+F)` as well as `-A_par'(F)/A_par(F)`.
-///
-/// The earlier `0.5·σ²T·G(S)` form with `G(S) = swap_tenor/(1+S·tenor)²` was
-/// dimensionally wrong: `G(S)` carries units of *years*, so the result was not
-/// a rate and was oversized by one-to-two orders of magnitude.
-///
-/// This convenience function assumes semiannual fixed coupons (`m = 2`)
-/// and payment at reference-swap start. It does not infer a market convention.
-/// Callers needing the resolved frequency and actual payment delay should use
-/// [`convexity_adjustment_with_frequency`]. For higher-order effects use
-/// the static-replication pricer (`replication_pricer`,
-/// `ModelKey::StaticReplication`), which captures convexity to all orders.
-///
-/// # Arguments
-///
-/// * `volatility` - Swap rate volatility (annualized, decimal form e.g. 0.20 for 20%)
-/// * `time_to_fixing` - Time to fixing date in years
-/// * `swap_tenor` - Tenor of the underlying CMS swap in years (e.g., 10.0 for 10Y)
-/// * `forward_rate` - Current forward swap rate (decimal form e.g. 0.03 for 3%)
-///
-/// # Returns
-///
-/// Convexity adjustment to add to the forward swap rate (decimal form).
+/// where `g(k) = (1+k/m)^(-m*delay) / A_par(k)` is the Radon-Nikodym derivative
+/// between the payment measure and the annuity measure, so the adjustment
+/// carries the payment-bond sensitivity `-m*delay/(m+F)` as well as
+/// `-A_par'(F)/A_par(F)`. For higher-order effects use the static-replication
+/// pricer (`replication_pricer`, `ModelKey::StaticReplication`), which captures
+/// convexity to all orders.
 ///
 /// # References
 ///
 /// - Hagan, P. S. (2003). "Convexity Conundrums: Pricing CMS Swaps, Caps, and Floors."
 ///   Wilmott Magazine, March, 38-44. `docs/REFERENCES.md#hagan-2003-cms-convexity`
 /// - Andersen, L. B., & Piterbarg, V. V. (2010). *Interest Rate Modeling*, Vol. 3, §16.2. `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
-pub fn convexity_adjustment(
-    volatility: f64,
-    time_to_fixing: f64,
-    swap_tenor: f64,
-    forward_rate: f64,
-) -> f64 {
-    convexity_adjustment_with_frequency(
-        volatility,
-        time_to_fixing,
-        swap_tenor,
-        forward_rate,
-        2.0,
-        0.0,
-    )
-}
-
-/// First-order CMS convexity adjustment using the actual reference-swap fixed
-/// payment frequency.
 ///
 /// # Arguments
 ///

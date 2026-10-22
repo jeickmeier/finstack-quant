@@ -26,7 +26,10 @@ fn create_context(fx: FxSpot, as_of: Date) -> MetricContext {
 
 #[test]
 fn test_base_amount_default_notional() {
-    let fx = sample_eurusd().with_quoted_spot(1.20).expect("test rate");
+    let fx = FxSpot {
+        quoted_spot: Some(1.20),
+        ..sample_eurusd()
+    };
     let mut ctx = create_context(fx, test_date());
 
     let amount = calculate_metric(&mut ctx, MetricId::BaseAmount).unwrap();
@@ -55,11 +58,11 @@ fn test_base_amount_various_currencies() {
     );
 
     // GBP base
-    let gbp_fx = sample_gbpusd()
-        .with_notional(Money::new(2_500_000.0, Currency::GBP).expect("valid money fixture"))
-        .unwrap()
-        .with_quoted_spot(1.40)
-        .expect("test rate");
+    let gbp_fx = FxSpot {
+        notional: Money::new(2_500_000.0, Currency::GBP).expect("valid money fixture"),
+        quoted_spot: Some(1.40),
+        ..sample_gbpusd()
+    };
     let mut gbp_ctx = create_context(gbp_fx, test_date());
     approx_eq(
         calculate_metric(&mut gbp_ctx, MetricId::BaseAmount).unwrap(),
@@ -71,11 +74,11 @@ fn test_base_amount_various_currencies() {
 
 #[test]
 fn test_base_amount_zero_notional() {
-    let fx = sample_eurusd()
-        .with_notional(Money::new(0.0, Currency::EUR).expect("valid money fixture"))
-        .unwrap()
-        .with_quoted_spot(1.20)
-        .expect("test rate");
+    let fx = FxSpot {
+        notional: Money::new(0.0, Currency::EUR).expect("valid money fixture"),
+        quoted_spot: Some(1.20),
+        ..sample_eurusd()
+    };
     let mut ctx = create_context(fx, test_date());
 
     let amount = calculate_metric(&mut ctx, MetricId::BaseAmount).unwrap();

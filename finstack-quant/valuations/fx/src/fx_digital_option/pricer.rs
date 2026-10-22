@@ -1,7 +1,7 @@
 //! FX digital option pricer implementation.
 
 use crate::fx_digital_option::types::{DigitalPayoutType, FxDigitalOption};
-use crate::shared::{collect_fx_option_inputs, FxOptionInputRequest, FxSpotSource};
+use crate::shared::{collect_fx_option_inputs, FxOptionInputRequest, FxOptionInputs};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -9,20 +9,55 @@ use finstack_quant_core::Result;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::d1_d2;
 
-/// FX digital option calculator.
-#[derive(Debug, Clone, Default)]
-pub(crate) struct FxDigitalOptionCalculator;
-
 pub(crate) fn compute_pv(
     inst: &FxDigitalOption,
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
-    inst.validate()?;
     if as_of > inst.expiry {
         return Ok(Money::from((0_i64, inst.quote_currency)));
     }
-    FxDigitalOptionCalculator.npv(inst, curves, as_of)
+    let FxOptionInputs {
+        spot,
+        r_domestic: r_d,
+        r_foreign: r_f,
+        sigma,
+        t,
+        ..
+    } = collect_fx_option_inputs(input_request(inst, curves, as_of))?;
+
+    if t <= 0.0 {
+        let itm = match inst.option_type {
+            OptionType::Call => spot > inst.strike,
+            OptionType::Put => spot < inst.strike,
+        };
+        return if itm {
+            match inst.payout_type {
+                DigitalPayoutType::CashOrNothing => Ok(inst.payout_amount),
+                DigitalPayoutType::AssetOrNothing => Ok(Money::new(
+                    spot * inst.notional.amount(),
+                    inst.quote_currency,
+                )?),
+            }
+        } else {
+            Ok(Money::from((0_i64, inst.quote_currency)))
+        };
+    }
+
+    let price = price_digital(
+        spot,
+        inst.strike,
+        r_d,
+        r_f,
+        sigma,
+        t,
+        inst.option_type,
+        inst.payout_type,
+        inst.payout_amount.amount(),
+        inst.notional.amount(),
+    );
+
+    Money::new(price, inst.quote_currency)
 }
 
 pub(crate) fn compute_greeks(
@@ -33,107 +68,53 @@ pub(crate) fn compute_greeks(
     if as_of > inst.expiry {
         return Ok(FxDigitalOptionGreeks::default());
     }
-    FxDigitalOptionCalculator.compute_greeks(inst, curves, as_of)
+    let FxOptionInputs {
+        spot,
+        r_domestic: r_d,
+        r_foreign: r_f,
+        sigma,
+        t,
+        ..
+    } = collect_fx_option_inputs(input_request(inst, curves, as_of))?;
+
+    if t <= 0.0 {
+        return Ok(FxDigitalOptionGreeks::default());
+    }
+
+    greeks_digital(
+        spot,
+        inst.strike,
+        r_d,
+        r_f,
+        sigma,
+        t,
+        inst.option_type,
+        inst.payout_type,
+        inst.payout_amount.amount(),
+        inst.notional.amount(),
+        inst.metric_pricing_overrides.theta_days_per_year(),
+    )
 }
 
-impl FxDigitalOptionCalculator {
-    pub(crate) fn npv(
-        &self,
-        inst: &FxDigitalOption,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<Money> {
-        let (spot, r_d, r_f, sigma, t) = self.collect_inputs(inst, curves, as_of)?;
-
-        if t <= 0.0 {
-            let itm = match inst.option_type {
-                OptionType::Call => spot > inst.strike,
-                OptionType::Put => spot < inst.strike,
-            };
-            return if itm {
-                match inst.payout_type {
-                    DigitalPayoutType::CashOrNothing => Ok(inst.payout_amount),
-                    DigitalPayoutType::AssetOrNothing => Ok(Money::new(
-                        spot * inst.notional.amount(),
-                        inst.quote_currency,
-                    )?),
-                }
-            } else {
-                Ok(Money::from((0_i64, inst.quote_currency)))
-            };
-        }
-
-        let price = price_digital(
-            spot,
-            inst.strike,
-            r_d,
-            r_f,
-            sigma,
-            t,
-            inst.option_type,
-            inst.payout_type,
-            inst.payout_amount.amount(),
-            inst.notional.amount(),
-        );
-
-        Money::new(price, inst.quote_currency)
-    }
-
-    pub(crate) fn compute_greeks(
-        &self,
-        inst: &FxDigitalOption,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<FxDigitalOptionGreeks> {
-        let (spot, r_d, r_f, sigma, t) = self.collect_inputs(inst, curves, as_of)?;
-
-        if t <= 0.0 {
-            return Ok(FxDigitalOptionGreeks::default());
-        }
-
-        greeks_digital(
-            spot,
-            inst.strike,
-            r_d,
-            r_f,
-            sigma,
-            t,
-            inst.option_type,
-            inst.payout_type,
-            inst.payout_amount.amount(),
-            inst.notional.amount(),
-            inst.metric_pricing_overrides.theta_days_per_year(),
-        )
-    }
-
-    pub(crate) fn collect_inputs(
-        &self,
-        inst: &FxDigitalOption,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<(f64, f64, f64, f64, f64)> {
-        let inputs = collect_fx_option_inputs(FxOptionInputRequest {
-            market: curves,
-            as_of,
-            base_currency: inst.base_currency,
-            quote_currency: inst.quote_currency,
-            expiry: inst.expiry,
-            day_count: inst.day_count,
-            domestic_discount_curve_id: &inst.domestic_discount_curve_id,
-            foreign_discount_curve_id: &inst.foreign_discount_curve_id,
-            vol_surface_id: inst.vol_surface_id.as_str(),
-            strike: inst.strike,
-            instrument_pricing_overrides: &inst.instrument_pricing_overrides,
-            spot_source: FxSpotSource::Matrix,
-            rate_context: "FxDigitalOption",
-        })?;
-        Ok((
-            inputs.spot,
-            inputs.r_domestic,
-            inputs.r_foreign,
-            inputs.sigma,
-            inputs.t,
-        ))
+fn input_request<'a>(
+    inst: &'a FxDigitalOption,
+    curves: &'a MarketContext,
+    as_of: Date,
+) -> FxOptionInputRequest<'a> {
+    FxOptionInputRequest {
+        market: curves,
+        as_of,
+        base_currency: inst.base_currency,
+        quote_currency: inst.quote_currency,
+        expiry: inst.expiry,
+        day_count: inst.day_count,
+        domestic_discount_curve_id: &inst.domestic_discount_curve_id,
+        foreign_discount_curve_id: &inst.foreign_discount_curve_id,
+        vol_surface_id: inst.vol_surface_id.as_str(),
+        strike: inst.strike,
+        instrument_pricing_overrides: &inst.instrument_pricing_overrides,
+        spot_id: None,
+        rate_context: "FxDigitalOption",
     }
 }
 
@@ -689,9 +670,13 @@ mod tests {
             .instrument_pricing_overrides
             .market_quotes
             .implied_volatility = Some(0.0);
-        let (spot, r_d, r_f, _, t) = FxDigitalOptionCalculator
-            .collect_inputs(&option, &market, as_of)
-            .expect("inputs");
+        let FxOptionInputs {
+            spot,
+            r_domestic: r_d,
+            r_foreign: r_f,
+            t,
+            ..
+        } = collect_fx_option_inputs(input_request(&option, &market, as_of)).expect("inputs");
         option.strike = spot * ((r_d - r_f) * t).exp();
         for payout_type in [
             DigitalPayoutType::CashOrNothing,

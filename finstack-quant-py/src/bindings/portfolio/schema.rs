@@ -11,7 +11,10 @@ use pyo3::types::{PyList, PyModule};
 /// Docstring for the `finstack_quant.portfolio.schema` Python namespace.
 const MODULE_DOC: &str = "Compiled-in JSON Schemas for the portfolio wire format.\n\nThe content-addressed materialization bundle you author and the optimizer\nresult the engine emits.\n\nUse `index()` to see what this crate publishes, `get(selector)` to fetch one\nschema, and `validate(selector, payload)` to check a payload and get back the\nJSON Pointer of anything that failed.\n\nExamples\n--------\n>>> import json\n>>> from finstack_quant.portfolio import schema\n>>> json.loads(schema.get(\"portfolio_materialization.schema.json\"))[\"$schema\"]\n'https://json-schema.org/draft/2020-12/schema'\n";
 
-schema_registry_functions!(finstack_quant_portfolio::schema::ARTIFACTS);
+schema_registry_functions!(
+    finstack_quant_portfolio::schema::ARTIFACTS,
+    "finstack_quant.portfolio.schema"
+);
 
 /// Register the `finstack_quant.portfolio.schema` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

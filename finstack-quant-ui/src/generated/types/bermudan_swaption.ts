@@ -456,17 +456,14 @@ export interface Attributes {
  */
 export interface DBb0C4C397737A24Ff8Ed {
   /**
-   * Exercise dates (must be sorted, typically on swap coupon dates)
+   * Exercise notification (decision) dates, sorted; typically one notice
+   * period before the swap coupon dates they enter on.
    */
   exercise_dates: Date[];
   /**
    * Lockout period end (no exercise before this date)
    */
   lockout_end?: Date | null;
-  /**
-   * Notice period in business days before exercise
-   */
-  notice_days: number;
 }
 /**
  * Instrument-owned pricing inputs.

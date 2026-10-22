@@ -54,7 +54,7 @@
 //! The family lives in `finstack-quant-valuations-fixed-income` and is
 //! re-exported here unchanged; the structured-credit tier
 //! (`structured_credit`, `cmo`, `asset_backed_facility`, registering
-//! with `structured_credit::STRUCTURED_CREDIT`) lives in
+//! with `finstack_quant_valuations_structured_credit::STRUCTURED_CREDIT`) lives in
 //! `finstack-quant-valuations-structured-credit` and is re-exported under the
 //! same paths.
 

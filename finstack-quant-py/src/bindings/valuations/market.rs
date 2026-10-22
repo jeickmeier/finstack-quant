@@ -12,6 +12,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
 use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::pydoc::pydoc;
 use crate::bindings::valuations::convert::{enum_to_py_string, opt_repr};
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_valuations::market::conventions::ids::{
@@ -35,22 +36,13 @@ pub(crate) const EXPORTS: &[&str] = &[
 ];
 
 /// Shared `to_json` / `from_json` / `__reduce__` / `to_dict` plumbing for the
-/// serde-backed convention records.
+/// serde-backed convention records; `$name` is the Python class name keying
+/// the per-class stub docstrings.
 macro_rules! convention_record_methods {
-    ($py:ty, $rust:ty) => {
+    ($py:ty, $rust:ty, $name:literal) => {
         #[pymethods]
         impl $py {
-            /// Deserialize from the JSON produced by ``to_json``.
-            ///
-            /// Parameters
-            /// ----------
-            /// json : str
-            ///     Strict JSON object with exactly the fields ``to_json`` writes.
-            ///
-            /// Raises
-            /// ------
-            /// ValueError
-            ///     If the JSON is malformed or has the wrong shape.
+            #[doc = pydoc!("finstack_quant.valuations.market", concat!($name, ".from_json"))]
             #[staticmethod]
             #[pyo3(text_signature = "(json)")]
             fn from_json(json: &str) -> PyResult<Self> {
@@ -58,13 +50,13 @@ macro_rules! convention_record_methods {
                 Ok(Self { inner })
             }
 
-            /// Serialize to the canonical JSON wire form.
+            #[doc = pydoc!("finstack_quant.valuations.market", concat!($name, ".to_json"))]
             #[pyo3(text_signature = "($self)")]
             fn to_json(&self) -> PyResult<String> {
                 serde_json::to_string(&self.inner).map_err(display_to_py)
             }
 
-            /// Return every field as a plain ``dict`` (canonical serde shape).
+            #[doc = pydoc!("finstack_quant.valuations.market", concat!($name, ".to_dict"))]
             #[pyo3(text_signature = "($self)")]
             fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
                 serde_to_py(py, &self.inner)
@@ -79,17 +71,7 @@ macro_rules! convention_record_methods {
     };
 }
 
-/// Market conventions for one floating-rate index (SOFR, EURIBOR-3M, ...).
-///
-/// Returned by ``ConventionRegistry.require_rate_index``. Fields are read-only;
-/// build swaps from them with ``InterestRateSwap.from_conventions``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.market import ConventionRegistry
-/// >>> conv = ConventionRegistry().require_rate_index("USD-SOFR")
-/// >>> conv.currency
-/// 'USD'
+#[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions")]
 #[pyclass(
     module = "finstack_quant.valuations.market",
     name = "RateIndexConventions",
@@ -102,53 +84,15 @@ pub struct PyRateIndexConventions {
     pub(crate) inner: RateIndexConventions,
 }
 
-convention_record_methods!(PyRateIndexConventions, RateIndexConventions);
+convention_record_methods!(
+    PyRateIndexConventions,
+    RateIndexConventions,
+    "RateIndexConventions"
+);
 
 #[pymethods]
 impl PyRateIndexConventions {
-    /// ISO-4217 currency code of the index.
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
-    }
-
-    /// Index family: ``"overnight_rfr"``, ``"term_ibor"`` or the serde name of the variant.
-    #[getter]
-    fn kind(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.kind)
-    }
-
-    /// Index tenor (``"3M"``) or ``None`` for overnight indices.
-    #[getter]
-    fn tenor(&self) -> PyResult<Option<String>> {
-        self.inner.tenor.as_ref().map(enum_to_py_string).transpose()
-    }
-
-    /// Accrual day count of the floating leg (serde name, e.g. ``"act_360"``).
-    #[getter]
-    fn day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.day_count)
-    }
-
-    /// Default floating-leg payment frequency (``"3M"``, ``"1Y"`` ...).
-    #[getter]
-    fn default_payment_frequency(&self) -> String {
-        self.inner.default_payment_frequency.to_string()
-    }
-
-    /// Default payment lag in business days after period end.
-    #[getter]
-    fn default_payment_lag_days(&self) -> i32 {
-        self.inner.default_payment_lag_days
-    }
-
-    /// Default fixing (reset) lag in business days before accrual start.
-    #[getter]
-    fn default_reset_lag_days(&self) -> i32 {
-        self.inner.default_reset_lag_days
-    }
-
-    /// OIS compounding style for overnight indices, or ``None``.
+    #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions.ois_compounding")]
     #[getter]
     fn ois_compounding(&self) -> PyResult<Option<String>> {
         self.inner
@@ -156,36 +100,6 @@ impl PyRateIndexConventions {
             .as_ref()
             .map(enum_to_py_string)
             .transpose()
-    }
-
-    /// Calendar identifier used for fixings and payments.
-    #[getter]
-    fn market_calendar_id(&self) -> String {
-        self.inner.market_calendar_id.clone()
-    }
-
-    /// Spot settlement lag in business days (T+n).
-    #[getter]
-    fn market_settlement_days(&self) -> i32 {
-        self.inner.market_settlement_days
-    }
-
-    /// Business-day convention for date rolls (serde name).
-    #[getter]
-    fn market_business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.market_business_day_convention)
-    }
-
-    /// Default fixed-leg day count for a standard swap on this index.
-    #[getter]
-    fn default_fixed_leg_day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.default_fixed_leg_day_count)
-    }
-
-    /// Default fixed-leg payment frequency for a standard swap on this index.
-    #[getter]
-    fn default_fixed_leg_frequency(&self) -> String {
-        self.inner.default_fixed_leg_frequency.to_string()
     }
 
     /// Return ``repr(self)``.
@@ -208,16 +122,47 @@ impl PyRateIndexConventions {
     }
 }
 
-/// Schedule conventions for one CDS family (``isda_na``, ``isda_eu``, ...).
-///
-/// Returned by ``ConventionRegistry.resolve_cds``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.market import ConventionRegistry
-/// >>> spec = ConventionRegistry().resolve_cds("USD", "isda_na")
-/// >>> spec.family
-/// 'isda_na'
+crate::bindings::macros::py_getters!(PyRateIndexConventions |s| {
+    #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions.currency")]
+    currency -> String = s.inner.currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions.kind")]
+    kind -> PyResult<String> = enum_to_py_string(&s.inner.kind);
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions.tenor")]
+    tenor -> PyResult<Option<String>> = s.inner.tenor.as_ref().map(enum_to_py_string).transpose();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions.day_count")]
+    day_count -> PyResult<String> = enum_to_py_string(&s.inner.day_count);
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions.default_payment_frequency")]
+    default_payment_frequency -> String = s.inner.default_payment_frequency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions.default_payment_lag_days")]
+    default_payment_lag_days -> i32 = s.inner.default_payment_lag_days;
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions.default_reset_lag_days")]
+    default_reset_lag_days -> i32 = s.inner.default_reset_lag_days;
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions.market_calendar_id")]
+    market_calendar_id -> String = s.inner.market_calendar_id.clone();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions.market_settlement_days")]
+    market_settlement_days -> i32 = s.inner.market_settlement_days;
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions.market_business_day_convention")]
+    market_business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.market_business_day_convention);
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions.default_fixed_leg_day_count")]
+    default_fixed_leg_day_count -> PyResult<String> =
+        enum_to_py_string(&s.inner.default_fixed_leg_day_count);
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "RateIndexConventions.default_fixed_leg_frequency")]
+    default_fixed_leg_frequency -> String = s.inner.default_fixed_leg_frequency.to_string();
+});
+
+#[doc = pydoc!("finstack_quant.valuations.market", "CdsConventionSpec")]
 #[pyclass(
     module = "finstack_quant.valuations.market",
     name = "CdsConventionSpec",
@@ -230,52 +175,10 @@ pub struct PyCdsConventionSpec {
     pub(crate) inner: CdsConventionSpec,
 }
 
-convention_record_methods!(PyCdsConventionSpec, CdsConventionSpec);
+convention_record_methods!(PyCdsConventionSpec, CdsConventionSpec, "CdsConventionSpec");
 
 #[pymethods]
 impl PyCdsConventionSpec {
-    /// Convention family (``"isda_na"``, ``"isda_eu"``, ``"isda_as"``, ``"custom"``).
-    #[getter]
-    fn family(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.family)
-    }
-
-    /// Calendar identifier for premium-leg date rolls.
-    #[getter]
-    fn calendar_id(&self) -> String {
-        self.inner.calendar_id.clone()
-    }
-
-    /// Premium-leg accrual day count (serde name).
-    #[getter]
-    fn day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.day_count)
-    }
-
-    /// Business-day convention for premium dates (serde name).
-    #[getter]
-    fn business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    /// Stub rule for the first premium period (serde name).
-    #[getter]
-    fn stub(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.stub)
-    }
-
-    /// Settlement lag in business days (T+n; SNAC is T+1 for the step-in date).
-    #[getter]
-    fn settlement_days(&self) -> u16 {
-        self.inner.settlement_days
-    }
-
-    /// Premium payment frequency (``"3M"`` for standard IMM-roll CDS).
-    #[getter]
-    fn frequency(&self) -> String {
-        self.inner.frequency.to_string()
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -289,16 +192,31 @@ impl PyCdsConventionSpec {
     }
 }
 
-/// Market conventions for a swaption family (settlement, fixed-leg schedule, index).
-///
-/// Returned by ``ConventionRegistry.require_swaption``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.market import ConventionRegistry
-/// >>> conv = ConventionRegistry().require_swaption("USD")
-/// >>> isinstance(conv.float_leg_index, str)
-/// True
+crate::bindings::macros::py_getters!(PyCdsConventionSpec |s| {
+    #[doc = pydoc!("finstack_quant.valuations.market", "CdsConventionSpec.family")]
+    family -> PyResult<String> = enum_to_py_string(&s.inner.family);
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "CdsConventionSpec.calendar_id")]
+    calendar_id -> String = s.inner.calendar_id.clone();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "CdsConventionSpec.day_count")]
+    day_count -> PyResult<String> = enum_to_py_string(&s.inner.day_count);
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "CdsConventionSpec.business_day_convention")]
+    business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.business_day_convention);
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "CdsConventionSpec.stub")]
+    stub -> PyResult<String> = enum_to_py_string(&s.inner.stub);
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "CdsConventionSpec.settlement_days")]
+    settlement_days -> u16 = s.inner.settlement_days;
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "CdsConventionSpec.frequency")]
+    frequency -> String = s.inner.frequency.to_string();
+});
+
+#[doc = pydoc!("finstack_quant.valuations.market", "SwaptionConventions")]
 #[pyclass(
     module = "finstack_quant.valuations.market",
     name = "SwaptionConventions",
@@ -311,46 +229,14 @@ pub struct PySwaptionConventions {
     pub(crate) inner: SwaptionConventions,
 }
 
-convention_record_methods!(PySwaptionConventions, SwaptionConventions);
+convention_record_methods!(
+    PySwaptionConventions,
+    SwaptionConventions,
+    "SwaptionConventions"
+);
 
 #[pymethods]
 impl PySwaptionConventions {
-    /// Calendar identifier for expiry and settlement rolls.
-    #[getter]
-    fn calendar_id(&self) -> String {
-        self.inner.calendar_id.clone()
-    }
-
-    /// Settlement lag in business days from expiry to swap start.
-    #[getter]
-    fn settlement_days(&self) -> i32 {
-        self.inner.settlement_days
-    }
-
-    /// Business-day convention for schedule rolls (serde name).
-    #[getter]
-    fn business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    /// Fixed-leg payment frequency of the underlying swap.
-    #[getter]
-    fn fixed_leg_frequency(&self) -> String {
-        self.inner.fixed_leg_frequency.to_string()
-    }
-
-    /// Fixed-leg day count of the underlying swap (serde name).
-    #[getter]
-    fn fixed_leg_day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.fixed_leg_day_count)
-    }
-
-    /// Floating-leg index identifier of the underlying swap.
-    #[getter]
-    fn float_leg_index(&self) -> String {
-        self.inner.float_leg_index.clone()
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -363,16 +249,28 @@ impl PySwaptionConventions {
     }
 }
 
-/// Market conventions for a zero-coupon inflation swap family.
-///
-/// Returned by ``ConventionRegistry.require_inflation_swap``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.market import ConventionRegistry
-/// >>> registry = ConventionRegistry()
-/// >>> isinstance(registry, ConventionRegistry)
-/// True
+crate::bindings::macros::py_getters!(PySwaptionConventions |s| {
+    #[doc = pydoc!("finstack_quant.valuations.market", "SwaptionConventions.calendar_id")]
+    calendar_id -> String = s.inner.calendar_id.clone();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "SwaptionConventions.settlement_days")]
+    settlement_days -> i32 = s.inner.settlement_days;
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "SwaptionConventions.business_day_convention")]
+    business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.business_day_convention);
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "SwaptionConventions.fixed_leg_frequency")]
+    fixed_leg_frequency -> String = s.inner.fixed_leg_frequency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "SwaptionConventions.fixed_leg_day_count")]
+    fixed_leg_day_count -> PyResult<String> = enum_to_py_string(&s.inner.fixed_leg_day_count);
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "SwaptionConventions.float_leg_index")]
+    float_leg_index -> String = s.inner.float_leg_index.clone();
+});
+
+#[doc = pydoc!("finstack_quant.valuations.market", "InflationSwapConventions")]
 #[pyclass(
     module = "finstack_quant.valuations.market",
     name = "InflationSwapConventions",
@@ -385,46 +283,14 @@ pub struct PyInflationSwapConventions {
     pub(crate) inner: InflationSwapConventions,
 }
 
-convention_record_methods!(PyInflationSwapConventions, InflationSwapConventions);
+convention_record_methods!(
+    PyInflationSwapConventions,
+    InflationSwapConventions,
+    "InflationSwapConventions"
+);
 
 #[pymethods]
 impl PyInflationSwapConventions {
-    /// Monthly reference-index rule: ``linear`` daily weights or ``step`` monthly values.
-    #[getter]
-    fn interpolation(&self) -> String {
-        self.inner.interpolation.to_string()
-    }
-
-    /// Calendar identifier for schedule rolls.
-    #[getter]
-    fn calendar_id(&self) -> String {
-        self.inner.calendar_id.clone()
-    }
-
-    /// Settlement lag in business days.
-    #[getter]
-    fn settlement_days(&self) -> i32 {
-        self.inner.settlement_days
-    }
-
-    /// Business-day convention for schedule rolls (serde name).
-    #[getter]
-    fn business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    /// Accrual day count (serde name).
-    #[getter]
-    fn day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.day_count)
-    }
-
-    /// Index observation lag (``"3M"`` for the standard 3-month lag).
-    #[getter]
-    fn inflation_lag(&self) -> String {
-        self.inner.inflation_lag.to_string()
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -437,16 +303,28 @@ impl PyInflationSwapConventions {
     }
 }
 
-/// Market conventions for a cross-currency basis swap pair.
-///
-/// Returned by ``ConventionRegistry.require_xccy``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.market import ConventionRegistry
-/// >>> registry = ConventionRegistry()
-/// >>> isinstance(registry, ConventionRegistry)
-/// True
+crate::bindings::macros::py_getters!(PyInflationSwapConventions |s| {
+    #[doc = pydoc!("finstack_quant.valuations.market", "InflationSwapConventions.interpolation")]
+    interpolation -> String = s.inner.interpolation.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "InflationSwapConventions.calendar_id")]
+    calendar_id -> String = s.inner.calendar_id.clone();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "InflationSwapConventions.settlement_days")]
+    settlement_days -> i32 = s.inner.settlement_days;
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "InflationSwapConventions.business_day_convention")]
+    business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.business_day_convention);
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "InflationSwapConventions.day_count")]
+    day_count -> PyResult<String> = enum_to_py_string(&s.inner.day_count);
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "InflationSwapConventions.inflation_lag")]
+    inflation_lag -> String = s.inner.inflation_lag.to_string();
+});
+
+#[doc = pydoc!("finstack_quant.valuations.market", "XccyConventions")]
 #[pyclass(
     module = "finstack_quant.valuations.market",
     name = "XccyConventions",
@@ -459,76 +337,10 @@ pub struct PyXccyConventions {
     pub(crate) inner: XccyConventions,
 }
 
-convention_record_methods!(PyXccyConventions, XccyConventions);
+convention_record_methods!(PyXccyConventions, XccyConventions, "XccyConventions");
 
 #[pymethods]
 impl PyXccyConventions {
-    /// ISO-4217 code of the base (first) currency.
-    #[getter]
-    fn base_currency(&self) -> String {
-        self.inner.base_currency.to_string()
-    }
-
-    /// ISO-4217 code of the quote (second) currency.
-    #[getter]
-    fn quote_currency(&self) -> String {
-        self.inner.quote_currency.to_string()
-    }
-
-    /// Floating index identifier of the base-currency leg.
-    #[getter]
-    fn base_index_id(&self) -> String {
-        self.inner.base_index_id.to_string()
-    }
-
-    /// Floating index identifier of the quote-currency leg.
-    #[getter]
-    fn quote_index_id(&self) -> String {
-        self.inner.quote_index_id.to_string()
-    }
-
-    /// T+N spot settlement lag in business days.
-    #[getter]
-    fn settlement_days(&self) -> u32 {
-        self.inner.settlement_days
-    }
-
-    /// Payment frequency of both legs.
-    #[getter]
-    fn payment_frequency(&self) -> String {
-        self.inner.payment_frequency.to_string()
-    }
-
-    /// Accrual day count (serde name).
-    #[getter]
-    fn day_count(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.day_count)
-    }
-
-    /// Business-day convention for schedule rolls (serde name).
-    #[getter]
-    fn business_day_convention(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.business_day_convention)
-    }
-
-    /// Calendar identifier of the base-currency leg.
-    #[getter]
-    fn base_calendar_id(&self) -> String {
-        self.inner.base_calendar_id.clone()
-    }
-
-    /// Calendar identifier of the quote-currency leg.
-    #[getter]
-    fn quote_calendar_id(&self) -> String {
-        self.inner.quote_calendar_id.clone()
-    }
-
-    /// Notional-exchange style (serde name of ``NotionalExchange``).
-    #[getter]
-    fn notional_exchange(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.notional_exchange)
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -542,16 +354,43 @@ impl PyXccyConventions {
     }
 }
 
-/// Contract conventions for a listed interest-rate future.
-///
-/// Returned by ``ConventionRegistry.require_ir_future``.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.market import ConventionRegistry
-/// >>> registry = ConventionRegistry()
-/// >>> isinstance(registry, ConventionRegistry)
-/// True
+crate::bindings::macros::py_getters!(PyXccyConventions |s| {
+    #[doc = pydoc!("finstack_quant.valuations.market", "XccyConventions.base_currency")]
+    base_currency -> String = s.inner.base_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "XccyConventions.quote_currency")]
+    quote_currency -> String = s.inner.quote_currency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "XccyConventions.base_index_id")]
+    base_index_id -> String = s.inner.base_index_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "XccyConventions.quote_index_id")]
+    quote_index_id -> String = s.inner.quote_index_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "XccyConventions.settlement_days")]
+    settlement_days -> u32 = s.inner.settlement_days;
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "XccyConventions.payment_frequency")]
+    payment_frequency -> String = s.inner.payment_frequency.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "XccyConventions.day_count")]
+    day_count -> PyResult<String> = enum_to_py_string(&s.inner.day_count);
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "XccyConventions.business_day_convention")]
+    business_day_convention -> PyResult<String> =
+        enum_to_py_string(&s.inner.business_day_convention);
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "XccyConventions.base_calendar_id")]
+    base_calendar_id -> String = s.inner.base_calendar_id.clone();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "XccyConventions.quote_calendar_id")]
+    quote_calendar_id -> String = s.inner.quote_calendar_id.clone();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "XccyConventions.notional_exchange")]
+    notional_exchange -> PyResult<String> = enum_to_py_string(&s.inner.notional_exchange);
+});
+
+#[doc = pydoc!("finstack_quant.valuations.market", "IrFutureConventions")]
 #[pyclass(
     module = "finstack_quant.valuations.market",
     name = "IrFutureConventions",
@@ -564,72 +403,14 @@ pub struct PyIrFutureConventions {
     pub(crate) inner: IrFutureConventions,
 }
 
-convention_record_methods!(PyIrFutureConventions, IrFutureConventions);
+convention_record_methods!(
+    PyIrFutureConventions,
+    IrFutureConventions,
+    "IrFutureConventions"
+);
 
 #[pymethods]
 impl PyIrFutureConventions {
-    /// Underlying floating index identifier.
-    #[getter]
-    fn index_id(&self) -> String {
-        self.inner.index_id.to_string()
-    }
-
-    /// Reference-rate compounding over the reference period: ``"simple"``,
-    /// ``"simple_average"``, or the JSON text of a compounded variant such as
-    /// ``{"compounded_in_arrears":{"lookback_days":0}}``.
-    #[getter]
-    fn compounding(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.compounding)
-    }
-
-    /// Reference-period placement relative to expiry (serde name).
-    #[getter]
-    fn reference_period(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.reference_period)
-    }
-
-    /// Exchange calendar identifier.
-    #[getter]
-    fn calendar_id(&self) -> String {
-        self.inner.calendar_id.clone()
-    }
-
-    /// Settlement lag in business days.
-    #[getter]
-    fn settlement_days(&self) -> i32 {
-        self.inner.settlement_days
-    }
-
-    /// Number of listed delivery months.
-    #[getter]
-    fn delivery_months(&self) -> u8 {
-        self.inner.delivery_months
-    }
-
-    /// Contract face value in the contract currency.
-    #[getter]
-    fn face_value(&self) -> f64 {
-        self.inner.face_value
-    }
-
-    /// Minimum price increment in price points.
-    #[getter]
-    fn tick_size(&self) -> f64 {
-        self.inner.tick_size
-    }
-
-    /// Currency value of one tick.
-    #[getter]
-    fn tick_value(&self) -> f64 {
-        self.inner.tick_value
-    }
-
-    /// Fixed convexity adjustment in decimal rate, or ``None``.
-    #[getter]
-    fn convexity_adjustment(&self) -> Option<f64> {
-        self.inner.convexity_adjustment
-    }
-
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
@@ -643,26 +424,39 @@ impl PyIrFutureConventions {
     }
 }
 
-/// Process-global registry of embedded market conventions.
-///
-/// Mirrors Rust ``ConventionRegistry::try_global()``: the tables (rate
-/// indices, CDS families, swaptions, inflation swaps, IR futures, cross-currency
-/// pairs) are loaded once from the crate's embedded JSON and shared. Lookups
-/// are read-only.
-///
-/// Raises
-/// ------
-/// RuntimeError
-///     If the embedded convention tables fail to load (a packaging error).
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.valuations.market import ConventionRegistry
-/// >>> registry = ConventionRegistry()
-/// >>> registry.require_rate_index("USD-SOFR").currency
-/// 'USD'
-/// >>> registry.primary_cds_family("USD")
-/// 'isda_na'
+crate::bindings::macros::py_getters!(PyIrFutureConventions |s| {
+    #[doc = pydoc!("finstack_quant.valuations.market", "IrFutureConventions.index_id")]
+    index_id -> String = s.inner.index_id.to_string();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "IrFutureConventions.compounding")]
+    compounding -> PyResult<String> = enum_to_py_string(&s.inner.compounding);
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "IrFutureConventions.reference_period")]
+    reference_period -> PyResult<String> = enum_to_py_string(&s.inner.reference_period);
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "IrFutureConventions.calendar_id")]
+    calendar_id -> String = s.inner.calendar_id.clone();
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "IrFutureConventions.settlement_days")]
+    settlement_days -> i32 = s.inner.settlement_days;
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "IrFutureConventions.delivery_months")]
+    delivery_months -> u8 = s.inner.delivery_months;
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "IrFutureConventions.face_value")]
+    face_value -> f64 = s.inner.face_value;
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "IrFutureConventions.tick_size")]
+    tick_size -> f64 = s.inner.tick_size;
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "IrFutureConventions.tick_value")]
+    tick_value -> f64 = s.inner.tick_value;
+
+    #[doc = pydoc!("finstack_quant.valuations.market", "IrFutureConventions.convexity_adjustment")]
+    convexity_adjustment -> Option<f64> = s.inner.convexity_adjustment;
+});
+
+#[doc = pydoc!("finstack_quant.valuations.market", "ConventionRegistry")]
 #[pyclass(
     module = "finstack_quant.valuations.market",
     name = "ConventionRegistry",
@@ -681,12 +475,6 @@ fn global_registry() -> PyResult<&'static ConventionRegistry> {
 
 #[pymethods]
 impl PyConventionRegistry {
-    /// Open the process-global convention registry.
-    ///
-    /// Raises
-    /// ------
-    /// RuntimeError
-    ///     If the embedded convention tables fail to load.
     #[new]
     #[pyo3(text_signature = "()")]
     fn new() -> PyResult<Self> {
@@ -694,23 +482,7 @@ impl PyConventionRegistry {
         Ok(Self)
     }
 
-    /// Look up the conventions of a floating-rate index.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Index identifier as used on curves and legs, e.g. ``"USD-SOFR"``,
-    ///     ``"EUR-EURIBOR-3M"``.
-    ///
-    /// Returns
-    /// -------
-    /// RateIndexConventions
-    ///     Day count, frequencies, lags, calendar and settlement conventions.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If ``id`` is not in the embedded rate-index table.
+    #[doc = pydoc!("finstack_quant.valuations.market", "ConventionRegistry.require_rate_index")]
     #[pyo3(text_signature = "($self, id)")]
     fn require_rate_index(&self, id: &str) -> PyResult<PyRateIndexConventions> {
         let registry = global_registry()?;
@@ -721,29 +493,7 @@ impl PyConventionRegistry {
         Ok(PyRateIndexConventions { inner })
     }
 
-    /// Resolve the CDS schedule conventions for a currency and doc clause.
-    ///
-    /// Parameters
-    /// ----------
-    /// currency : str
-    ///     ISO-4217 code of the contract currency (``"USD"``, ``"EUR"``).
-    /// doc_clause : str
-    ///     ISDA doc clause or family name: ``"cr14"``, ``"mr14"``, ``"mm14"``,
-    ///     ``"xr14"``, ``"isda_na"``, ``"isda_eu"``, ``"isda_as"``,
-    ///     ``"isda_au"``, ``"isda_nz"``. The 2014 clauses map to the currency's
-    ///     primary family (``"isda_na"`` is the SNAC / post-Big-Bang standard).
-    ///
-    /// Returns
-    /// -------
-    /// CdsConventionSpec
-    ///     Calendar, day count, roll, stub, settlement and frequency conventions.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``currency`` or ``doc_clause`` is not recognised.
-    /// KeyError
-    ///     If no convention exists for the resolved family.
+    #[doc = pydoc!("finstack_quant.valuations.market", "ConventionRegistry.resolve_cds")]
     #[pyo3(text_signature = "($self, currency, doc_clause)")]
     fn resolve_cds(&self, currency: &str, doc_clause: &str) -> PyResult<PyCdsConventionSpec> {
         let registry = global_registry()?;
@@ -761,22 +511,7 @@ impl PyConventionRegistry {
         Ok(PyCdsConventionSpec { inner })
     }
 
-    /// Return the primary CDS convention family for a currency.
-    ///
-    /// Parameters
-    /// ----------
-    /// currency : str
-    ///     ISO-4217 code (``"USD"`` → ``"isda_na"``, ``"EUR"`` → ``"isda_eu"``).
-    ///
-    /// Returns
-    /// -------
-    /// str | None
-    ///     Family serde name, or ``None`` when the currency has no primary family.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``currency`` is not a valid ISO-4217 code.
+    #[doc = pydoc!("finstack_quant.valuations.market", "ConventionRegistry.primary_cds_family")]
     #[pyo3(text_signature = "($self, currency)")]
     fn primary_cds_family(&self, currency: &str) -> PyResult<Option<String>> {
         let registry = global_registry()?;
@@ -787,23 +522,7 @@ impl PyConventionRegistry {
             .transpose()
     }
 
-    /// Look up swaption conventions.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Swaption convention identifier (typically the underlying index id,
-    ///     e.g. ``"USD"`` or ``"EUR"``).
-    ///
-    /// Returns
-    /// -------
-    /// SwaptionConventions
-    ///     Settlement, roll and fixed-leg conventions of the underlying swap.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If ``id`` is not in the embedded swaption table.
+    #[doc = pydoc!("finstack_quant.valuations.market", "ConventionRegistry.require_swaption")]
     #[pyo3(text_signature = "($self, id)")]
     fn require_swaption(&self, id: &str) -> PyResult<PySwaptionConventions> {
         let registry = global_registry()?;
@@ -814,22 +533,7 @@ impl PyConventionRegistry {
         Ok(PySwaptionConventions { inner })
     }
 
-    /// Look up zero-coupon inflation-swap conventions.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Inflation-swap convention identifier (e.g. ``"USD-CPI"``, ``"EUR-HICP"``, ``"UK-RPI"``).
-    ///
-    /// Returns
-    /// -------
-    /// InflationSwapConventions
-    ///     Calendar, settlement, day count and observation-lag conventions.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If ``id`` is not in the embedded inflation-swap table.
+    #[doc = pydoc!("finstack_quant.valuations.market", "ConventionRegistry.require_inflation_swap")]
     #[pyo3(text_signature = "($self, id)")]
     fn require_inflation_swap(&self, id: &str) -> PyResult<PyInflationSwapConventions> {
         let registry = global_registry()?;
@@ -840,22 +544,7 @@ impl PyConventionRegistry {
         Ok(PyInflationSwapConventions { inner })
     }
 
-    /// Look up listed interest-rate-future contract conventions.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Contract identifier (e.g. ``"CME:SR3"`` for CME 3M SOFR futures).
-    ///
-    /// Returns
-    /// -------
-    /// IrFutureConventions
-    ///     Index, averaging, reference period, tick and settlement conventions.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If ``id`` is not in the embedded IR-future table.
+    #[doc = pydoc!("finstack_quant.valuations.market", "ConventionRegistry.require_ir_future")]
     #[pyo3(text_signature = "($self, id)")]
     fn require_ir_future(&self, id: &str) -> PyResult<PyIrFutureConventions> {
         let registry = global_registry()?;
@@ -866,22 +555,7 @@ impl PyConventionRegistry {
         Ok(PyIrFutureConventions { inner })
     }
 
-    /// Look up cross-currency basis-swap conventions.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Pair identifier (e.g. ``"EUR/USD-XCCY"``).
-    ///
-    /// Returns
-    /// -------
-    /// XccyConventions
-    ///     Leg indices, calendars, lags, frequency and notional-exchange style.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If ``id`` is not in the embedded cross-currency table.
+    #[doc = pydoc!("finstack_quant.valuations.market", "ConventionRegistry.require_xccy")]
     #[pyo3(text_signature = "($self, id)")]
     fn require_xccy(&self, id: &str) -> PyResult<PyXccyConventions> {
         let registry = global_registry()?;

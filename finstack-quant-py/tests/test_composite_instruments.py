@@ -73,7 +73,7 @@ def test_typed_composite_prices_and_decomposes() -> None:
     resolved = resolved_result.instrument
 
     assert resolved.state.resolved_legs == {"A": 1.0, "B": -1.0}
-    assert [trade["quantity_delta"] for trade in json.loads(resolved_result.trades_json)] == [
+    assert [trade["quantity_delta"] for trade in resolved_result.trades] == [
         1.0,
         -1.0,
     ]

@@ -179,7 +179,7 @@ fn oas_and_eov_round_trip_at_quoted_oas() {
     let as_of = date!(2025 - 01 - 01);
     let mut loan = term_loan(None, true);
     let market = market();
-    let pricer = TermLoanTreePricer::new();
+    let pricer = TermLoanTreePricer;
     let oas_bp = pricer
         .calculate_oas(&loan, &market, as_of, 95.0)
         .expect("OAS from discounted quote");

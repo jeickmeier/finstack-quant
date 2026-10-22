@@ -21,7 +21,7 @@
 //!   `StepRemaining`)
 //! - [`LoanCallSchedule`]: Borrower prepayment options
 //! - [`OidPolicy`]: Original issue discount handling
-//! - [`OidEirSpec`]: Effective interest rate amortization settings
+//! - [`OidEirSpec`](crate::loan_terms::OidEirSpec): Effective interest rate amortization settings
 //!
 //! LSTA par-trade marks use T+7:
 //!
@@ -246,12 +246,7 @@ impl DdtlSpec {
     ///
     /// * `date` - Date the limit is wanted for; a step dated on it applies.
     pub(crate) fn limit_in_force_at(&self, date: Date) -> Money {
-        self.commitment_steps
-            .iter()
-            .filter(|step| step.date <= date)
-            .map(|step| step.amount)
-            .next_back()
-            .unwrap_or(self.commitment)
+        crate::loan_terms::commitment_in_force(&self.commitment_steps, self.commitment, date)
     }
 }
 

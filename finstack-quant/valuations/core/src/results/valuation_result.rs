@@ -238,8 +238,8 @@ pub struct MonteCarloValuationDetails {
 ///     meta: Default::default(),
 /// };
 ///
-/// let result = ValuationResult::stamped("LOAN-001", as_of, pv)
-///     .with_covenant("dscr_test", covenant);
+/// let mut result = ValuationResult::stamped("LOAN-001", as_of, pv);
+/// result.covenants = Some([("dscr_test".to_string(), covenant)].into_iter().collect());
 ///
 /// assert!(result.all_covenants_passed());
 /// assert_eq!(result.failed_covenants().len(), 0);
@@ -346,6 +346,11 @@ pub struct ValuationResult {
     /// Stamped by the pricer registry. Absent on results constructed directly.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provenance: Option<super::ValuationProvenance>,
+
+    /// Pricer state handed to metric evaluation of the same request; never
+    /// serialized. See [`MetricSeed`](crate::metrics::MetricSeed).
+    #[serde(skip)]
+    pub(crate) metric_seed: Option<std::sync::Arc<dyn crate::metrics::MetricSeed>>,
 }
 
 impl ValuationResult {
@@ -391,21 +396,6 @@ impl ValuationResult {
         // policy should construct core `ResultsMeta` and use
         // `stamped_with_meta` to avoid creating a fresh config here.
         let meta = results_meta(&FinstackConfig::default());
-        Self::stamped_with_meta(instrument_id, as_of, value, meta)
-    }
-
-    /// Create a valuation result using a provided configuration.
-    ///
-    /// This helper ensures the metadata stamp matches the exact `FinstackConfig`
-    /// used during pricing, avoiding mismatches between execution policy and
-    /// reported metadata.
-    pub fn stamped_with_config(
-        instrument_id: &str,
-        as_of: Date,
-        value: Money,
-        cfg: &FinstackConfig,
-    ) -> Self {
-        let meta = results_meta(cfg);
         Self::stamped_with_meta(instrument_id, as_of, value, meta)
     }
 
@@ -466,7 +456,32 @@ impl ValuationResult {
             covenants: None,
             explanation: None,
             provenance: None,
+            metric_seed: None,
         }
+    }
+
+    /// Hand state computed while pricing to the metric evaluation of this
+    /// request.
+    ///
+    /// The registry installs the seed into the metric context before the
+    /// instrument seeds it, so metrics reuse the pricer's work. The seed is not
+    /// serialized and does not change any reported value.
+    ///
+    /// # Arguments
+    ///
+    /// * `seed` - State produced by the pricer for this instrument, market and
+    ///   valuation date.
+    ///
+    /// # Returns
+    ///
+    /// `Self` for method chaining
+    #[must_use]
+    pub fn with_metric_seed(
+        mut self,
+        seed: std::sync::Arc<dyn crate::metrics::MetricSeed>,
+    ) -> Self {
+        self.metric_seed = Some(seed);
+        self
     }
 
     /// Attach an explanation trace for debugging and auditability.
@@ -627,119 +642,6 @@ impl ValuationResult {
             .collect()
     }
 
-    /// Attach multiple covenant reports to the result.
-    ///
-    /// Replaces any existing covenant reports with the provided map.
-    /// Used for structured products with multiple compliance tests.
-    ///
-    /// # Arguments
-    ///
-    /// * `covenants` - Map of covenant identifier to compliance report
-    ///
-    /// # Returns
-    ///
-    /// `Self` for method chaining
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_valuations_core::results::ValuationResult;
-    /// use finstack_quant_covenants::CovenantReport;
-    /// use indexmap::IndexMap;
-    /// # use finstack_quant_core::currency::Currency;
-    /// # use finstack_quant_core::money::Money;
-    /// # use finstack_quant_core::dates::create_date;
-    /// # use time::Month;
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let as_of = create_date(2025, Month::January, 15)?;
-    /// # let pv = Money::from((1_000_000_i64, Currency::USD));
-    /// let mut covenants = IndexMap::new();
-    /// covenants.insert("dscr".to_string(), CovenantReport {
-    ///     covenant_type: "dscr".to_string(),
-    ///     covenant_id: None,
-    ///     passed: true,
-    ///     actual_value: Some(1.5),
-    ///     threshold: Some(1.25),
-    ///     details: Some("DSCR test passed".to_string()),
-    ///     headroom: Some(0.25),
-    ///     meta: Default::default(),
-    /// });
-    ///
-    /// let result = ValuationResult::stamped("LOAN-001", as_of, pv)
-    ///     .with_covenants(covenants);
-    ///
-    /// assert!(result.all_covenants_passed());
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn with_covenants(mut self, covenants: IndexMap<String, CovenantReport>) -> Self {
-        self.covenants = Some(covenants);
-        self
-    }
-
-    /// Add a single covenant report to the result.
-    ///
-    /// Preserves existing covenant reports and adds a new one.
-    /// Convenient for incrementally building covenant results.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` - Covenant identifier (e.g., "dscr_test", "ltv_check")
-    /// * `report` - Covenant compliance report
-    ///
-    /// # Returns
-    ///
-    /// `Self` for method chaining
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_valuations_core::results::ValuationResult;
-    /// use finstack_quant_covenants::CovenantReport;
-    /// # use finstack_quant_core::currency::Currency;
-    /// # use finstack_quant_core::money::Money;
-    /// # use finstack_quant_core::dates::create_date;
-    /// # use time::Month;
-    ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let as_of = create_date(2025, Month::January, 15)?;
-    /// # let pv = Money::from((1_000_000_i64, Currency::USD));
-    /// let result = ValuationResult::stamped("LOAN-001", as_of, pv)
-    ///     .with_covenant("dscr", CovenantReport {
-    ///         covenant_type: "dscr".to_string(),
-    ///         covenant_id: None,
-    ///         passed: true,
-    ///         actual_value: Some(1.5),
-    ///         threshold: Some(1.25),
-    ///         details: None,
-    ///         headroom: Some(0.25),
-    ///         meta: Default::default(),
-    ///     })
-    ///     .with_covenant("ltv", CovenantReport {
-    ///         covenant_type: "ltv".to_string(),
-    ///         covenant_id: None,
-    ///         passed: true,
-    ///         actual_value: Some(0.70),
-    ///         threshold: Some(0.80),
-    ///         details: None,
-    ///         headroom: Some(0.10),
-    ///         meta: Default::default(),
-    ///     });
-    ///
-    /// assert_eq!(result.covenants.as_ref().expect("should succeed").len(), 2);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn with_covenant(mut self, key: &str, report: CovenantReport) -> Self {
-        let mut covenants = self.covenants.unwrap_or_default();
-        covenants.insert(key.to_string(), report);
-        self.covenants = Some(covenants);
-        self
-    }
-
-    // Note: FX policy stamping is handled at the core `ResultsMeta` level.
-
     /// Check if all covenants passed their compliance tests.
     ///
     /// Returns `true` if there are no covenants or if all covenants passed.
@@ -762,17 +664,18 @@ impl ValuationResult {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let as_of = create_date(2025, Month::January, 15)?;
     /// # let pv = Money::from((1_000_000_i64, Currency::USD));
-    /// let result = ValuationResult::stamped("LOAN-001", as_of, pv)
-    ///     .with_covenant("dscr", CovenantReport {
-    ///         covenant_type: "dscr".to_string(),
-    ///         covenant_id: None,
-    ///         passed: true,
-    ///         actual_value: Some(1.5),
-    ///         threshold: Some(1.25),
-    ///         details: None,
-    ///         headroom: Some(0.25),
-    ///         meta: Default::default(),
-    ///     });
+    /// let mut result = ValuationResult::stamped("LOAN-001", as_of, pv);
+    /// let dscr = CovenantReport {
+    ///     covenant_type: "dscr".to_string(),
+    ///     covenant_id: None,
+    ///     passed: true,
+    ///     actual_value: Some(1.5),
+    ///     threshold: Some(1.25),
+    ///     details: None,
+    ///     headroom: Some(0.25),
+    ///     meta: Default::default(),
+    /// };
+    /// result.covenants = Some([("dscr".to_string(), dscr)].into_iter().collect());
     ///
     /// assert!(result.all_covenants_passed());
     /// # Ok(())
@@ -807,17 +710,18 @@ impl ValuationResult {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let as_of = create_date(2025, Month::January, 15)?;
     /// # let pv = Money::from((1_000_000_i64, Currency::USD));
-    /// let result = ValuationResult::stamped("LOAN-001", as_of, pv)
-    ///     .with_covenant("dscr", CovenantReport {
-    ///         covenant_type: "dscr".to_string(),
-    ///         covenant_id: None,
-    ///         passed: false,
-    ///         actual_value: Some(1.1),
-    ///         threshold: Some(1.25),
-    ///         details: Some("DSCR below threshold".to_string()),
-    ///         headroom: Some(-0.15),
-    ///         meta: Default::default(),
-    ///     });
+    /// let mut result = ValuationResult::stamped("LOAN-001", as_of, pv);
+    /// let dscr = CovenantReport {
+    ///     covenant_type: "dscr".to_string(),
+    ///     covenant_id: None,
+    ///     passed: false,
+    ///     actual_value: Some(1.1),
+    ///     threshold: Some(1.25),
+    ///     details: Some("DSCR below threshold".to_string()),
+    ///     headroom: Some(-0.15),
+    ///     meta: Default::default(),
+    /// };
+    /// result.covenants = Some([("dscr".to_string(), dscr)].into_iter().collect());
     ///
     /// let failed = result.failed_covenants();
     /// assert_eq!(failed.len(), 1);
@@ -837,11 +741,6 @@ impl ValuationResult {
             .unwrap_or_default()
     }
 }
-
-// Note: a previous revision exposed `impl Index<MetricId>` / `impl Index<&MetricId>`
-// on `ValuationResult`, which silently panicked on missing keys. Callers must now
-// use `metric(id)` / `metric_str(id)` (option-returning), or index the backing `measures` map directly when a
-// missing key truly is a programming error at the call site.
 
 #[cfg(test)]
 mod tests {
@@ -982,11 +881,11 @@ mod tests {
     }
 
     #[test]
-    fn stamped_with_config_round_trips_metadata_fields() {
+    fn stamped_with_meta_round_trips_config_metadata_fields() {
         let as_of = date!(2025 - 01 - 15);
         let pv = Money::from((1_i64, Currency::USD));
         let cfg = FinstackConfig::default();
-        let stamped = ValuationResult::stamped_with_config("CFG-1", as_of, pv, &cfg);
+        let stamped = ValuationResult::stamped_with_meta("CFG-1", as_of, pv, results_meta(&cfg));
         assert_eq!(stamped.instrument_id, "CFG-1");
         assert_eq!(
             stamped.meta.numeric_mode,
@@ -1013,9 +912,8 @@ mod tests {
             },
         );
         let trace = ExplanationTrace::new("unit");
-        let original = ValuationResult::stamped("TR", as_of, pv)
-            .with_covenants(covenants)
-            .with_explanation(trace);
+        let mut original = ValuationResult::stamped("TR", as_of, pv).with_explanation(trace);
+        original.covenants = Some(covenants);
         let json = serde_json::to_string(&original);
         assert!(json.is_ok(), "valuation result should serialize");
         if let Ok(json) = json {

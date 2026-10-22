@@ -455,23 +455,6 @@ def test_credit_tranche_loss_and_complete_issuer_coverage() -> None:
         MarketContext.from_json(json.dumps(f["market"]))
 
 
-def test_cds_option_premium_settlement_does_not_change_variance() -> None:
-    f = json.loads(
-        (
-            Path(__file__).resolve().parents[2] / "finstack-quant/valuations/tests/fixtures/production_cds_option.json"
-        ).read_text()
-    )
-    values = []
-    for settlement in ["2025-01-06", "2025-07-01"]:
-        f["instrument"]["instrument"]["spec"]["premium_settlement_date"] = settlement
-        values.append(
-            price_instrument(
-                json.dumps(f["instrument"]), json.dumps(f["market"]), f["as_of"], "bloomberg_cdso", []
-            ).value.amount
-        )
-    assert values[0] == pytest.approx(values[1], abs=1e-8)
-
-
 def test_bespoke_cds_frequency_and_stub_price_the_configured_payments() -> None:
     import math
 

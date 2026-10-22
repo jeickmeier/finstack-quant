@@ -11,16 +11,15 @@ use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations::instruments::equity::equity_option::{
     EquityOptionMarketData, EquityOptionParams,
 };
-use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 
 use super::convert::{
-    attributes_from_py, bool_repr, builder_repr, date_repr, day_count_from_py, enum_to_py_string,
-    float_repr,
+    attributes_from_py, bool_repr, date_repr, day_count_from_py, enum_to_py_string, float_repr,
 };
-use super::instruments::{enum_from_str, serialize_typed_instrument_json};
+use super::instruments::enum_from_str;
 use super::typed_fx::typed_option_greeks;
-use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
-use crate::bindings::valuations::convert::take_builder;
+use super::typed_macros::{
+    builder_set, instrument_envelope_methods, instrument_greek_methods, instrument_pricing_methods,
+};
 
 type EquityOptionBuilderInner =
     finstack_quant_valuations::instruments::equity::equity_option::EquityOptionBuilder;
@@ -56,24 +55,13 @@ pub struct PyEquityOption {
     pub(crate) inner: finstack_quant_valuations::instruments::equity::equity_option::EquityOption,
 }
 
-impl PyEquityOption {
-    /// Serialize as the canonical instrument envelope accepted by the JSON loader.
-    pub(crate) fn envelope_json(&self) -> PyResult<String> {
-        serialize_typed_instrument_json(
-            InstrumentJson::EquityOption(self.inner.clone()),
-            "EquityOption",
-        )
-    }
-}
-
 instrument_envelope_methods!(
-    PyEquityOption,
+    PyEquityOption("EquityOption"),
     EquityOption,
-    "equity_option",
-    PyEquityOptionBuilder,
-    finstack_quant_valuations::instruments::equity::equity_option::EquityOption::builder()
+    builder = PyEquityOptionBuilder("EquityOptionBuilder", fields),
+    seed = finstack_quant_valuations::instruments::equity::equity_option::EquityOption::builder(),
 );
-instrument_pricing_methods!(PyEquityOption);
+instrument_pricing_methods!(PyEquityOption, "EquityOption");
 
 #[pymethods]
 impl PyEquityOption {
@@ -177,8 +165,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
             enum_from_str(option_type, "option_type")?,
             quantity,
             crate::bindings::core::currency::extract_currency(currency)?,
-        )
-        .with_settlement(finstack_quant_valuations::instruments::SettlementType::Cash);
+        );
         let inner =
             finstack_quant_valuations::instruments::equity::equity_option::EquityOption::european_with_market_data(
                 id,
@@ -233,156 +220,6 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
             .map_err(core_to_py)
     }
 
-    /// Spot delta of the option.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Delta produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce delta.
-    #[pyo3(signature = (market, as_of, model="default"))]
-    fn delta(
-        &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-        model: &str,
-    ) -> PyResult<f64> {
-        crate::bindings::valuations::instruments::metric_typed(
-            py,
-            Box::new(self.inner.clone()),
-            market,
-            as_of,
-            "delta",
-            model,
-        )
-    }
-
-    /// Gamma of the option.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Gamma produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce gamma.
-    #[pyo3(signature = (market, as_of, model="default"))]
-    fn gamma(
-        &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-        model: &str,
-    ) -> PyResult<f64> {
-        crate::bindings::valuations::instruments::metric_typed(
-            py,
-            Box::new(self.inner.clone()),
-            market,
-            as_of,
-            "gamma",
-            model,
-        )
-    }
-
-    /// Vega of the option (per 1% vol).
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Vega produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce vega.
-    #[pyo3(signature = (market, as_of, model="default"))]
-    fn vega(
-        &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-        model: &str,
-    ) -> PyResult<f64> {
-        crate::bindings::valuations::instruments::metric_typed(
-            py,
-            Box::new(self.inner.clone()),
-            market,
-            as_of,
-            "vega",
-            model,
-        )
-    }
-
-    /// Theta of the option (per day on ``metric_pricing_overrides.theta_day_basis``, calendar days by default).
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Theta produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce theta.
-    #[pyo3(signature = (market, as_of, model="default"))]
-    fn theta(
-        &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-        model: &str,
-    ) -> PyResult<f64> {
-        crate::bindings::valuations::instruments::metric_typed(
-            py,
-            Box::new(self.inner.clone()),
-            market,
-            as_of,
-            "theta",
-            model,
-        )
-    }
-
-    /// Rho of the option.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Rho produced by the selected model.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an input is invalid, required market data is missing, pricing
-    ///     fails, or the model does not produce rho.
-    #[pyo3(signature = (market, as_of, model="default"))]
-    fn rho(
-        &self,
-        py: Python<'_>,
-        market: &Bound<'_, PyAny>,
-        as_of: &Bound<'_, PyAny>,
-        model: &str,
-    ) -> PyResult<f64> {
-        crate::bindings::valuations::instruments::metric_typed(
-            py,
-            Box::new(self.inner.clone()),
-            market,
-            as_of,
-            "rho",
-            model,
-        )
-    }
-
     /// Compute the standard option Greek set as a dict.
     ///
     /// Mirrors ``FxOption.greeks`` and the WASM ``greeks`` method: Greeks the
@@ -410,58 +247,10 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         typed_option_greeks(py, Box::new(self.inner.clone()), market, as_of, model)
     }
 
-    /// Underlying equity ticker.
-    #[getter]
-    fn underlying_ticker(&self) -> String {
-        self.inner.underlying_ticker.clone()
-    }
-
-    /// Strike price.
-    #[getter]
-    fn strike(&self) -> f64 {
-        self.inner.strike
-    }
-
-    /// ``"call"`` or ``"put"``.
-    #[getter]
-    fn option_type(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.option_type)
-    }
-
-    /// ``"european"``, ``"american"`` or ``"bermudan"``.
-    #[getter]
-    fn exercise_style(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.exercise_style)
-    }
-
     /// Expiry date.
     #[getter]
     fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.expiry)
-    }
-
-    /// Number of underlying units; PV and Greeks scale linearly with it.
-    #[getter]
-    fn quantity(&self) -> f64 {
-        self.inner.quantity
-    }
-
-    /// Currency of the strike, premium and present value (ISO-4217 code).
-    #[getter]
-    fn currency(&self) -> String {
-        self.inner.currency.to_string()
-    }
-
-    /// Accrual day-count convention.
-    #[getter]
-    fn day_count(&self) -> crate::bindings::core::dates::daycount::PyDayCount {
-        crate::bindings::core::dates::daycount::PyDayCount::from_inner(self.inner.day_count)
-    }
-
-    /// ``"physical"`` or ``"cash"`` settlement.
-    #[getter]
-    fn settlement(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.settlement)
     }
 
     /// Observed exercise state as ``{"date", "spot", "settlement_date", "exercised"}``, or ``None``.
@@ -476,30 +265,6 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         out.set_item("settlement_date", date_to_py(py, exercise.settlement_date)?)?;
         out.set_item("exercised", exercise.exercised)?;
         Ok(Some(out))
-    }
-
-    /// Discount curve identifier.
-    #[getter]
-    fn discount_curve_id(&self) -> String {
-        self.inner.discount_curve_id.to_string()
-    }
-
-    /// Equity spot price identifier.
-    #[getter]
-    fn spot_id(&self) -> String {
-        self.inner.spot_id.to_string()
-    }
-
-    /// Volatility surface identifier.
-    #[getter]
-    fn vol_surface_id(&self) -> String {
-        self.inner.vol_surface_id.to_string()
-    }
-
-    /// Continuous dividend yield identifier, or ``None``.
-    #[getter]
-    fn div_yield_id(&self) -> Option<String> {
-        self.inner.div_yield_id.as_ref().map(|id| id.to_string())
     }
 
     /// Discrete dividends as ``(ex_date, amount)`` pairs.
@@ -538,6 +303,47 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
     }
 }
 
+crate::bindings::macros::py_getters!(PyEquityOption |s| {
+    /// Underlying equity ticker.
+    underlying_ticker -> String = s.inner.underlying_ticker.clone();
+
+    /// Strike price.
+    strike -> f64 = s.inner.strike;
+
+    /// ``"call"`` or ``"put"``.
+    option_type -> PyResult<String> = enum_to_py_string(&s.inner.option_type);
+
+    /// ``"european"``, ``"american"`` or ``"bermudan"``.
+    exercise_style -> PyResult<String> = enum_to_py_string(&s.inner.exercise_style);
+
+    /// Number of underlying units; PV and Greeks scale linearly with it.
+    quantity -> f64 = s.inner.quantity;
+
+    /// Currency of the strike, premium and present value (ISO-4217 code).
+    currency -> String = s.inner.currency.to_string();
+
+    /// Accrual day-count convention.
+    day_count -> crate::bindings::core::dates::daycount::PyDayCount =
+        crate::bindings::core::dates::daycount::PyDayCount::from_inner(s.inner.day_count);
+
+    /// ``"physical"`` or ``"cash"`` settlement.
+    settlement -> PyResult<String> = enum_to_py_string(&s.inner.settlement);
+
+    /// Discount curve identifier.
+    discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    /// Equity spot price identifier.
+    spot_id -> String = s.inner.spot_id.to_string();
+
+    /// Volatility surface identifier.
+    vol_surface_id -> String = s.inner.vol_surface_id.to_string();
+
+    /// Continuous dividend yield identifier, or ``None``.
+    div_yield_id -> Option<String> = s.inner.div_yield_id.as_ref().map(|id| id.to_string());
+});
+
+instrument_greek_methods!(PyEquityOption("EquityOption") { delta, gamma, vega, theta, rho });
+
 /// Fluent builder for ``EquityOption``; wraps the Rust
 /// ``FinancialBuilder``-generated builder (consuming setters).
 ///
@@ -551,13 +357,6 @@ pub struct PyEquityOptionBuilder {
     inner: Option<EquityOptionBuilderInner>,
     fields: Vec<(&'static str, String)>,
 }
-
-crate::bindings::valuations::pricing::pricing_override_methods!(
-    PyEquityOption,
-    PyEquityOptionBuilder,
-    "EquityOptionBuilder",
-    fields
-);
 
 #[pymethods]
 impl PyEquityOptionBuilder {
@@ -1055,34 +854,6 @@ impl PyEquityOptionBuilder {
         let shown = value.repr()?.to_string();
         builder_set!(slf, attributes, shown, |b: EquityOptionBuilderInner| b
             .attributes(attrs))
-    }
-
-    /// Build the validated equity option.
-    ///
-    /// Validation is the Rust ``EquityOption::builder().build()`` invariants
-    /// only; there is no additional binding-side check.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOption
-    ///     The validated equity option.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the builder was already consumed, a required field is missing,
-    ///     or the completed option fails validation (non-positive strike,
-    ///     zero quantity, unsorted dividends, inconsistent exercise state).
-    #[pyo3(text_signature = "($self)")]
-    fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyEquityOption> {
-        let b = take_builder(&mut slf.inner)?;
-        let inner = b.build().map_err(core_to_py)?;
-        Ok(PyEquityOption { inner })
-    }
-
-    /// Return ``repr(self)`` listing the fields set so far.
-    fn __repr__(&self) -> String {
-        builder_repr("EquityOptionBuilder", &self.fields)
     }
 }
 

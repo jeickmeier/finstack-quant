@@ -50,14 +50,6 @@ impl RealEstateFinancing {
             Self::Repo(instrument) => instrument,
         }
     }
-
-    pub(crate) fn cashflow_schedule(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        self.as_instrument().cashflow_schedule(market, as_of)
-    }
 }
 
 /// Levered real estate equity = unlevered asset + financing.
@@ -149,27 +141,6 @@ impl LeveredRealEstateEquity {
             .build()
     }
 
-    pub(crate) fn resolve_exit_date(&self, as_of: Date) -> finstack_quant_core::Result<Date> {
-        levered_pricer::resolve_exit_date(self, as_of)
-    }
-
-    pub(crate) fn financing_schedules_supported(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<Vec<finstack_quant_cashflows::builder::CashFlowSchedule>> {
-        levered_pricer::financing_schedules_supported(self, market, as_of)
-    }
-
-    /// Build a dated equity cashflow schedule for internal levered return metrics.
-    pub(crate) fn equity_cashflows(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<Vec<(Date, f64)>> {
-        levered_pricer::equity_cashflows(self, market, as_of)
-    }
-
     /// Convenience: compute financing payoff amount at exit (absolute amount).
     pub fn financing_payoff_at_exit(
         &self,
@@ -222,8 +193,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for LeveredRealEstateEquit
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        let flows = self
-            .equity_cashflows(market, as_of)?
+        let flows = levered_pricer::equity_cashflows(self, market, as_of)?
             .into_iter()
             .map(|(date, amount)| Money::new(amount, self.currency).map(|money| (date, money)))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;

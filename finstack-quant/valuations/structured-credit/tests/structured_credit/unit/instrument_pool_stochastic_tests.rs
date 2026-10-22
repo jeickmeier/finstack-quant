@@ -17,7 +17,7 @@ use finstack_quant_valuations_fixed_income::revolving_credit::{
     StochasticUtilizationSpec, UtilizationProcess,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_tranche_oas, CallExercisePolicy, InstrumentCollateral, OasConfig, StructuredCredit,
+    tranche_oas, CallExercisePolicy, InstrumentCollateral, OasConfig, StructuredCredit,
 };
 use time::macros::date;
 
@@ -218,7 +218,8 @@ fn spread_sensitivity_raises_draws_and_losses_on_stress_paths() {
             senior: 45_900_000.0,
             equity: 5_100_000.0,
         });
-        deal.with_stochastic_default(StochasticDefaultSpec::gaussian_copula(0.02, 0.3));
+        deal.credit_model.stochastic_default_spec =
+            Some(StochasticDefaultSpec::gaussian_copula(0.02, 0.3));
         deal
     };
     let market = market_with_curves(CLOSING).insert(widening_hazard_curve());
@@ -273,7 +274,8 @@ fn same_seed_is_bit_identical_across_thread_counts() {
         senior: 45_900_000.0,
         equity: 5_100_000.0,
     });
-    deal.with_stochastic_default(StochasticDefaultSpec::gaussian_copula(0.02, 0.3));
+    deal.credit_model.stochastic_default_spec =
+        Some(StochasticDefaultSpec::gaussian_copula(0.02, 0.3));
     let market = market_with_curves(CLOSING)
         .insert(HazardCurve::flat(HAZARD_ID, CLOSING, 0.05, 0.4).expect("hazard curve"));
 
@@ -321,7 +323,7 @@ fn oas_solves_on_instrument_collateral() {
         .amount();
     let price_pct = senior / 11_700_000.0 * 100.0;
 
-    let deterministic = calculate_tranche_oas(
+    let deterministic = tranche_oas(
         &deal,
         "A",
         &market,
@@ -341,7 +343,7 @@ fn oas_solves_on_instrument_collateral() {
         deterministic.oas
     );
 
-    let stochastic = calculate_tranche_oas(
+    let stochastic = tranche_oas(
         &deal,
         "A",
         &market,

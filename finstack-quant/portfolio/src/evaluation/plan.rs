@@ -616,11 +616,11 @@ mod tests {
             let config = options.config.ok_or_else(|| {
                 finstack_quant_core::Error::Validation("missing config".to_string())
             })?;
-            Ok(ValuationResult::stamped_with_config(
+            Ok(ValuationResult::stamped_with_meta(
                 self.id(),
                 as_of,
                 Money::from((100_i64, Currency::USD)),
-                config.as_ref(),
+                finstack_quant_core::config::results_meta(config.as_ref()),
             ))
         }
     }

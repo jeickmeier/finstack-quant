@@ -52,10 +52,10 @@ fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
     registry.register(crate::swaption::lmm_pricer::BermudanSwaptionLmmPricer::default())?;
 
     // CMS products.
-    registry.register(crate::cms_option::pricer::CmsOptionPricer::new())?;
-    registry.register(crate::cms_option::replication_pricer::CmsReplicationPricer::new())?;
-    registry.register(crate::cms_swap::pricer::CmsSwapPricer::new())?;
-    registry.register(crate::cms_swap::pricer::CmsSwapReplicationPricer::new())?;
+    registry.register(crate::cms_option::pricer::CmsOptionPricer)?;
+    registry.register(crate::cms_option::replication_pricer::CmsReplicationPricer)?;
+    registry.register(crate::cms_swap::pricer::CmsSwapPricer)?;
+    registry.register(crate::cms_swap::pricer::CmsSwapReplicationPricer)?;
     registry.register(crate::cms_spread_option::CmsSpreadOptionPricer::new())?;
 
     // Inflation.
@@ -69,8 +69,11 @@ fn register_pricers(registry: &mut PricerRegistry) -> Result<(), PricingError> {
         InstrumentType::YoYInflationSwap,
         crate::inflation_swap::YoYInflationSwap
     );
-    registry
-        .register(crate::inflation_cap_floor::pricer::SimpleInflationCapFloorPricer::default())?;
+    registry.register(
+        crate::inflation_cap_floor::pricer::SimpleInflationCapFloorPricer::with_model(
+            ModelKey::Black76,
+        ),
+    )?;
     registry.register(
         crate::inflation_cap_floor::pricer::SimpleInflationCapFloorPricer::with_model(
             ModelKey::Normal,

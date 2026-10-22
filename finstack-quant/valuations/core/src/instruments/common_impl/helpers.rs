@@ -32,6 +32,8 @@ pub fn scalar_price_amount(
     }
 }
 
+/// Publish a Monte Carlo estimate's standard error, 95% confidence bounds and
+/// path counts as `mc_*` custom measures on `result`.
 pub fn attach_mc_diagnostics(
     result: &mut crate::results::ValuationResult,
     estimate: &finstack_quant_models::monte_carlo::results::MoneyEstimate,
@@ -461,12 +463,8 @@ pub fn merged_path_config(
     Ok(c)
 }
 
-/// Extract a unitless market scalar with a fallback default.
-///
 /// Read a required unitless market scalar, erroring when it is missing or typed.
 ///
-/// Production model-parameter resolvers should prefer this over the lenient
-/// fallback form so missing or mistyped model scalars are surfaced.
 /// The `model` argument is purely diagnostic and appears in the error
 /// message (e.g. `"Heston"`, `"rough Bergomi"`).
 pub fn get_unitless_scalar_strict(
@@ -481,10 +479,27 @@ pub fn get_unitless_scalar_strict(
         ))),
         Err(_) => Err(finstack_quant_core::Error::from(
             finstack_quant_core::InputError::NotFound {
-                id: format!("{key} (required by {model} strict from_market resolver)"),
+                id: format!("{key} (required by {model})"),
             },
         )),
     }
+}
+
+/// Pricing options, dispatch and pricer-published measures handed from the
+/// registry to [`compute_metrics_dyn`].
+#[derive(Default)]
+pub struct MetricBuildOptions {
+    /// Config, market history and recalibration provider for the metric context.
+    pub pricing: PricingOptions,
+    /// Pricer dispatch metric calculators use when they reprice bumped markets.
+    pub pricing_dispatch: PricingDispatch,
+    /// Measures the model pricer already published for this valuation, taken
+    /// verbatim from its `ValuationResult`. Standard identifiers among them
+    /// seed the metric context; see [`compute_metrics_dyn`].
+    pub pricer_measures: IndexMap<MetricId, f64>,
+    /// State the model pricer attached to its `ValuationResult`; installed into
+    /// the metric context before the instrument seeds it.
+    pub pricer_seed: Option<Arc<dyn crate::metrics::MetricSeed>>,
 }
 
 /// Compute requested metric measures for an already-priced instrument.
@@ -494,24 +509,20 @@ pub fn get_unitless_scalar_strict(
 /// returns deterministic measures, preventing metric attachment from replacing
 /// model details or metadata.
 ///
-/// This function uses trait objects to avoid generic monomorphization across
-/// compilation units, which can cause coverage metadata mismatches.
-///
 /// # Arguments
 ///
-/// * `instrument` - The instrument to price (wrapped in Arc for efficiency)
-/// * `curves` - Market data context (wrapped in Arc for efficiency)
-/// * `as_of` - Valuation date
-/// * `base_value` - Final scenario-adjusted base value (NPV)
-/// * `metrics` - List of metrics to compute. Every entry is forwarded to the
-///   metric registry unfiltered, so each one either lands in the returned map
-///   or aborts the call with an error; requested metrics are never silently
-///   dropped. Callers that legitimately tolerate partial support across
-///   heterogeneous instruments (composites) must narrow this list themselves.
-/// * `cfg` - Optional FinstackConfig for user-tunable metric defaults (e.g., bump sizes).
-///   When `None`, uses global defaults.
-/// * `market_history` - Optional market history for Historical VaR / Expected Shortfall metrics.
-///   When `None`, these metrics will not be available.
+/// * `instrument` - The priced instrument, shared with the metric context.
+/// * `curves` - Market data context the base value was priced against.
+/// * `as_of` - Valuation date.
+/// * `base_value` - Final scenario-adjusted base value (NPV).
+/// * `metrics` - Metrics to compute. Every entry is forwarded to the metric
+///   registry unfiltered, so each one either lands in the returned map or
+///   aborts the call with an error; requested metrics are never silently
+///   dropped. Callers that tolerate partial support across heterogeneous
+///   instruments (composites) must narrow this list themselves.
+/// * `options` - Pricing options (config, market history for historical
+///   VaR/ES, recalibration provider), the pricer dispatch used for bumped
+///   reprices, and the measures the model pricer already published.
 ///
 /// # Errors
 ///
@@ -519,32 +530,6 @@ pub fn get_unitless_scalar_strict(
 /// registered, `Error::MetricNotApplicable` when it is registered but has no
 /// calculator for this instrument type, and `Error::MetricCalculationFailed`
 /// when a calculator runs and fails (for example on a missing market input).
-///
-/// # Performance
-///
-/// Accepts Arc-wrapped arguments to avoid cloning on every call. Callers should
-/// clone the instrument and market context once into Arc at the call boundary.
-///
-/// # Thread Safety
-///
-/// The `curves` parameter is wrapped in `Arc` for efficiency, not thread synchronization.
-/// Callers must ensure the market context is not mutated concurrently. For multi-threaded
-/// pricing with market data updates, create a new `MarketContext` snapshot for each
-/// pricing batch.
-///
-/// The `instrument` parameter is also `Arc`-wrapped. Instruments are generally immutable
-/// after construction, so this is safe for concurrent reads.
-/// Crate-private bundle at the registry → metric boundary.
-#[derive(Default)]
-pub struct MetricBuildOptions {
-    pub pricing: PricingOptions,
-    pub pricing_dispatch: PricingDispatch,
-    /// Measures the model pricer already published for this valuation, taken
-    /// verbatim from its `ValuationResult`. Standard identifiers among them
-    /// seed the metric context; see [`compute_metrics_dyn`].
-    pub pricer_measures: IndexMap<MetricId, f64>,
-}
-
 pub fn compute_metrics_dyn(
     instrument: Arc<dyn crate::instruments::Instrument>,
     curves: Arc<MarketContext>,
@@ -557,6 +542,7 @@ pub fn compute_metrics_dyn(
         pricing,
         pricing_dispatch,
         pricer_measures,
+        pricer_seed,
     } = options;
     let finstack_config = pricing.config.unwrap_or_else(MetricContext::default_config);
     let mut context = MetricContext::new(
@@ -579,6 +565,9 @@ pub fn compute_metrics_dyn(
 
     // Allow instruments to pre-seed the metric context with cached data (e.g., pre-computed
     // cashflows) to avoid redundant computation during metric calculation.
+    if let Some(seed) = pricer_seed {
+        seed.seed(&mut context);
+    }
     let market_ref: Arc<MarketContext> = Arc::clone(&context.curves);
     instrument.seed_metric_context(&mut context, market_ref.as_ref(), as_of);
 
@@ -683,11 +672,13 @@ pub fn build_with_metrics_dyn(
         .unwrap_or_else(MetricContext::default_config);
     let instrument_id = instrument.id().to_string();
     let measures = compute_metrics_dyn(instrument, curves, as_of, base_value, metrics, options)?;
-    let mut result = crate::results::ValuationResult::stamped_with_config(
+    // Stamp the exact `FinstackConfig` used during pricing so execution policy
+    // and reported metadata cannot disagree.
+    let mut result = crate::results::ValuationResult::stamped_with_meta(
         &instrument_id,
         as_of,
         base_value,
-        cfg.as_ref(),
+        finstack_quant_core::config::results_meta(cfg.as_ref()),
     );
     result.measures = measures;
     Ok(result)
@@ -1199,7 +1190,6 @@ pub fn apply_inflation_lag(date: Date, lag: InflationLag) -> finstack_quant_core
         InflationLag::None => Ok(date),
         InflationLag::Months(m) => date.add_months(-i32::from(m)),
         InflationLag::Days(d) => date.add_days(-i64::from(d)),
-        #[allow(unreachable_patterns)]
         _ => Err(finstack_quant_core::Error::Validation(
             "unsupported inflation lag convention".into(),
         )),
@@ -1247,7 +1237,7 @@ pub fn resolve_inflation_lag(
 ///
 /// The index is cloned with the instrument's effective lag so a contract-level
 /// lag override is honored without mutating shared market data.
-pub fn realized_inflation_index_value(
+fn realized_inflation_index_value(
     index: &InflationIndex,
     unlagged_date: Date,
     effective_date: Date,
@@ -1302,22 +1292,31 @@ pub struct InflationReferenceValue {
     pub publication_date: Option<Date>,
 }
 
-/// Resolve a contractual reference CPI, applying month lag and daily weight once.
+/// Resolve a contractual reference CPI, applying month lag and daily weight
+/// once, together with the availability of every interpolation anchor.
+///
 /// Explicit monthly publication dates control availability independently of the
 /// observation lag. Without one, past reference anchors remain strictly required
-/// history; a stale feed cannot silently extend the forecast window.
-pub fn reference_inflation_value(
-    market: &MarketContext,
-    index_id: &str,
-    date: Date,
-    as_of: Date,
-    lag: InflationLag,
-    interpolation: SeriesInterpolation,
-) -> finstack_quant_core::Result<f64> {
-    Ok(resolve_reference_inflation(market, index_id, date, as_of, lag, interpolation)?.value)
-}
-
-/// Resolve reference CPI and the availability of every interpolation anchor.
+/// history; a stale feed cannot silently extend the forecast window. Known
+/// anchors read the inflation index history; unknown anchors are projected from
+/// the inflation curve with the same id.
+///
+/// # Arguments
+///
+/// * `market` - Market context holding the inflation index history and, for
+///   anchors not yet published by `as_of`, the inflation curve named `index_id`.
+/// * `index_id` - Identifier shared by the inflation index and inflation curve.
+/// * `date` - Contractual reference date before the observation lag is applied.
+/// * `as_of` - Valuation date deciding which anchors are published fixings.
+/// * `lag` - Observation lag: month lags keep the contractual month's daily
+///   weight, day lags shift the reference date itself.
+/// * `interpolation` - `Step` uses the first-of-month anchor only; `Linear`
+///   interpolates daily between consecutive monthly anchors.
+///
+/// # Errors
+///
+/// Returns an error when a required historical fixing or projection curve is
+/// missing, or when the lag moves the date out of range.
 pub fn resolve_reference_inflation(
     market: &MarketContext,
     index_id: &str,
@@ -1559,7 +1558,7 @@ mod realized_inflation_index_tests {
             .with_publication_dates(index.get_publication_dates())
             .expect("release dates");
         let stale_market = market.clone().insert_inflation_index(stale);
-        assert!(reference_inflation_value(
+        assert!(resolve_reference_inflation(
             &stale_market,
             "US-CPI",
             date!(2026 - 04 - 01),
@@ -1572,7 +1571,7 @@ mod realized_inflation_index_tests {
         let no_metadata = InflationIndex::new("US-CPI", vec![(december, 305.0)], Currency::USD)
             .expect("history with no publication policy");
         let no_metadata_market = market.insert_inflation_index(no_metadata);
-        assert!(reference_inflation_value(
+        assert!(resolve_reference_inflation(
             &no_metadata_market,
             "US-CPI",
             date!(2026 - 04 - 01),

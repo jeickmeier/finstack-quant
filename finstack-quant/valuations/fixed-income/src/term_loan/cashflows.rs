@@ -603,7 +603,7 @@ fn cumulative_drawn_at(ddtl: &super::spec::DdtlSpec, draw_stop: Option<Date>, da
     total
 }
 
-pub(crate) use crate::loan_quotes::OidEirSchedule;
+use crate::loan_quotes::OidEirSchedule;
 
 /// Build an effective interest rate (EIR) amortization schedule from cashflows.
 pub(crate) fn build_oid_eir_schedule(

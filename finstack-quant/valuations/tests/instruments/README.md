@@ -76,7 +76,8 @@ Import fixtures and tolerances from the dev-only crate
 [`finstack-quant-valuations-test-support`](../../test-support/README.md).
 
 ```rust
-use finstack_quant_valuations_test_support::test_helpers::{dates, flat_discount_curve, tolerances};
+use finstack_quant_valuations_test_support::test_helpers::{dates, flat_discount_curve};
+use finstack_quant_valuations_test_support::tolerances;
 
 #[test]
 fn bond_prices_near_par_at_coupon_rate() {

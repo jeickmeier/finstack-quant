@@ -43,17 +43,6 @@ impl TbaTerm {
     }
 }
 
-/// Displays the serde wire value (`fifteen_year`, `twenty_year`, `thirty_year`).
-impl std::fmt::Display for TbaTerm {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TbaTerm::FifteenYear => write!(f, "fifteen_year"),
-            TbaTerm::TwentyYear => write!(f, "twenty_year"),
-            TbaTerm::ThirtyYear => write!(f, "thirty_year"),
-        }
-    }
-}
-
 /// TBA (To-Be-Announced) forward trade.
 ///
 /// Represents a forward contract to buy or sell agency MBS at a specified
@@ -298,71 +287,52 @@ impl AgencyTba {
         if let Some(date) = self.settlement_date {
             return Ok(date);
         }
-        let month = time::Month::try_from(self.settlement_month)
-            .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
-        let class = self.effective_settlement_class();
-        finstack_quant_core::dates::sifma_settlement_date(month, self.settlement_year, class)
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "No published SIFMA settlement date for {:02}/{} and class {:?}",
-                    self.settlement_month, self.settlement_year, class
-                ))
-            })
+        sifma_settlement(
+            self.settlement_year,
+            self.settlement_month,
+            self.effective_settlement_class(),
+        )
     }
 
     /// Effective settlement class (explicit or inferred from agency + term).
     pub fn effective_settlement_class(&self) -> SifmaSettlementClass {
-        self.settlement_class.unwrap_or_else(|| {
-            SifmaSettlementClass::from_agency_term(self.agency.as_str(), self.term.years())
-        })
+        settlement_class(self.settlement_class, self.agency, self.term)
     }
+}
 
-    /// Get TBA identifier string (e.g., "FN30 4.0 Mar24").
-    pub fn tba_identifier(&self) -> String {
-        let agency_str = match self.agency {
-            AgencyProgram::Fnma => "FN",
-            AgencyProgram::Fhlmc => "FH",
-            AgencyProgram::GnmaII | AgencyProgram::GnmaI => "GN",
-        };
-        let term_str = match self.term {
-            TbaTerm::FifteenYear => "15",
-            TbaTerm::TwentyYear => "20",
-            TbaTerm::ThirtyYear => "30",
-        };
-        let month_str = match self.settlement_month {
-            1 => "Jan",
-            2 => "Feb",
-            3 => "Mar",
-            4 => "Apr",
-            5 => "May",
-            6 => "Jun",
-            7 => "Jul",
-            8 => "Aug",
-            9 => "Sep",
-            10 => "Oct",
-            11 => "Nov",
-            12 => "Dec",
-            _ => "???",
-        };
-        let year_str = (self.settlement_year % 100) as u8;
+/// Settlement class `explicit` when set, else inferred from `agency` and
+/// `term`.
+pub(crate) fn settlement_class(
+    explicit: Option<SifmaSettlementClass>,
+    agency: AgencyProgram,
+    term: TbaTerm,
+) -> SifmaSettlementClass {
+    explicit
+        .unwrap_or_else(|| SifmaSettlementClass::from_agency_term(agency.as_str(), term.years()))
+}
 
-        format!(
-            "{}{} {:.1} {}{:02}",
-            agency_str,
-            term_str,
-            self.coupon * 100.0,
-            month_str,
-            year_str
-        )
-    }
-
-    /// Calculate trade value (notional × price).
-    pub fn trade_value(&self) -> finstack_quant_core::Result<Money> {
-        Money::new(
-            self.notional.amount() * self.trade_price / 100.0,
-            self.notional.currency(),
-        )
-    }
+/// Published SIFMA settlement date of `class` for the `year`/`month` TBA
+/// settlement month.
+///
+/// # Errors
+///
+/// Returns a validation error for an invalid month or when SIFMA has no
+/// published date for that month and class.
+pub(crate) fn sifma_settlement(
+    year: i32,
+    month: u8,
+    class: SifmaSettlementClass,
+) -> finstack_quant_core::Result<Date> {
+    let calendar_month = time::Month::try_from(month)
+        .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
+    finstack_quant_core::dates::sifma_settlement_date(calendar_month, year, class).ok_or_else(
+        || {
+            finstack_quant_core::Error::Validation(format!(
+                "No published SIFMA settlement date for {:02}/{} and class {:?}",
+                month, year, class
+            ))
+        },
+    )
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for AgencyTba {
@@ -449,17 +419,6 @@ mod tests {
     use time::Month;
 
     #[test]
-    fn term_display_matches_serde_wire_value() {
-        for t in [
-            TbaTerm::FifteenYear,
-            TbaTerm::TwentyYear,
-            TbaTerm::ThirtyYear,
-        ] {
-            assert_eq!(serde_json::to_value(t).expect("ser"), t.to_string());
-        }
-    }
-
-    #[test]
     // schema-rejection-test: prepayment_model (now prepayment_spec)
     fn rejects_retired_prepayment_model_key() {
         let tba = AgencyTba::example().expect("example");
@@ -535,31 +494,19 @@ mod tests {
     }
 
     #[test]
-    fn agency_conventions_drive_tba_class_and_identifier() {
+    fn agency_conventions_drive_tba_settlement_class() {
         let cases = [
-            (AgencyProgram::Fnma, "FN30", SifmaSettlementClass::A),
-            (AgencyProgram::Fhlmc, "FH30", SifmaSettlementClass::A),
-            (AgencyProgram::GnmaI, "GN30", SifmaSettlementClass::C),
-            (AgencyProgram::GnmaII, "GN30", SifmaSettlementClass::C),
+            (AgencyProgram::Fnma, SifmaSettlementClass::A),
+            (AgencyProgram::Fhlmc, SifmaSettlementClass::A),
+            (AgencyProgram::GnmaI, SifmaSettlementClass::C),
+            (AgencyProgram::GnmaII, SifmaSettlementClass::C),
         ];
 
-        for (agency, identifier_prefix, settlement_class) in cases {
+        for (agency, settlement_class) in cases {
             let mut tba = AgencyTba::example().expect("AgencyTba example is valid");
             tba.agency = agency;
-            let identifier = tba.tba_identifier();
-
-            assert!(identifier.starts_with(identifier_prefix));
-            assert!(identifier.contains("4.0"));
             assert_eq!(tba.effective_settlement_class(), settlement_class);
         }
-    }
-
-    #[test]
-    fn test_trade_value() {
-        let tba = AgencyTba::example().expect("AgencyTba example is valid");
-        let value = tba.trade_value().expect("valid trade_value fixture");
-        // 10M at 98.5 = 9.85M
-        assert!((value.amount() - 9_850_000.0).abs() < 1.0);
     }
 
     #[test]

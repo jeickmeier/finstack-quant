@@ -50,9 +50,11 @@ convention in `mbs_passthrough` and all four move.
 
 ## Public surface
 
-Import path: `finstack_quant_valuations_fixed_income::<leaf>` (or `finstack_quant_valuations::instruments::fixed_income::<leaf>` through the umbrella).
-Every leaf directory is `pub mod`. The headline types are additionally
-re-exported at the crate root and flat at `finstack_quant_valuations::instruments`:
+Import path: `finstack_quant_valuations_fixed_income::<leaf>::<Type>` (or
+`finstack_quant_valuations::instruments::fixed_income::<leaf>::<Type>` through the
+umbrella). Every leaf directory is `pub mod`; the crate root exports only the
+`FIXED_INCOME` family static. The headline types are also flat at
+`finstack_quant_valuations::instruments`:
 
 `Bond`, `BondSettlementConvention`, `BondFuture`, `BondFutureBuilder`,
 `BondFutureSpecs`, `DeliverableBond`, `AgencyCmo`, `CmoTranche`,
@@ -69,8 +71,8 @@ conversion and greeks types, and everything the four README'd leaves export.
 Inside a leaf, `metrics/`, `pricer.rs`/`pricing/` and `types.rs`/`types/` are
 `pub(crate)` or private; their supported items surface through the leaf's
 `pub use` list. The exceptions — genuinely public submodules — are
-`cmo::tranches` (the PAC schedule only), `cmo::waterfall`, `dollar_roll::carry`,
-`bond::cashflow_spec`, `bond::cashflows`, `bond::pricing`,
+`cmo::waterfall`, `dollar_roll::carry`,
+`bond::cashflow_spec`, `bond::pricing`,
 `revolving_credit::cashflow_engine`, `structured_credit::waterfall`,
 `term_loan::spec` and `term_loan::overrides`.
 

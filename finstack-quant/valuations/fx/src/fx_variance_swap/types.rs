@@ -11,9 +11,8 @@ use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_core::Result;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::Instrument as InstrumentTrait;
-
-pub(crate) use finstack_quant_valuations_core::instruments::PayReceive;
+use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::PayReceive;
 
 fn default_observation_business_day_convention() -> BusinessDayConvention {
     BusinessDayConvention::Following
@@ -350,23 +349,6 @@ impl FxVarianceSwap {
         pricer::realized_fraction_by_observations(self, as_of)
     }
 
-    /// Calendar-time fraction elapsed under the instrument day count.
-    /// This descriptive measure is not a variance-pricing weight: the
-    /// contract normalizes squared returns by its scheduled sample count.
-    ///
-    /// # Arguments
-    ///
-    /// * `as_of` - Date at which to measure elapsed time, clamped to the
-    ///   observation window.
-    pub fn time_elapsed_fraction(&self, as_of: Date) -> Result<f64> {
-        pricer::time_elapsed_fraction(self, as_of)
-    }
-
-    /// Get historical prices aligned to observation dates when available.
-    pub fn get_historical_prices(&self, market: &MarketContext, as_of: Date) -> Result<Vec<f64>> {
-        pricer::get_historical_prices(self, market, as_of)
-    }
-
     /// Calculate partial realized variance for the elapsed period.
     pub fn partial_realized_variance(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         pricer::partial_realized_variance(self, market, as_of)
@@ -388,7 +370,7 @@ impl FxVarianceSwap {
     }
 }
 
-impl InstrumentTrait for FxVarianceSwap {
+impl Instrument for FxVarianceSwap {
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::FxVarianceSwap,
         crate::FX

@@ -1,11 +1,10 @@
 //! The pricer registry over built-in instruments: parity with the trait
 //! path, result-envelope preservation and custom registries.
 
-use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::market_data::context::MarketContext as Market;
 use finstack_quant_valuations::instruments::Instrument as Priceable;
 use finstack_quant_valuations::pricer::{
-    stamp_results_meta, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
 };
 use finstack_quant_valuations::results::ValuationDetails;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -202,10 +201,14 @@ impl Pricer for RichBondPricer {
                 fx_triangulated: Some(true),
             },
         ))
-        .with_covenant("rich-result", covenant)
         .with_explanation(finstack_quant_core::explain::ExplanationTrace::new(
             "rich-pricer",
         ));
+        result.covenants = Some(
+            [("rich-result".to_string(), covenant)]
+                .into_iter()
+                .collect(),
+        );
         result.meta.fx_policy_applied = Some("pricer-fx-policy".to_string());
         result.meta.timestamp = Some(time::OffsetDateTime::UNIX_EPOCH);
         result.meta.version = Some("model-version".to_string());
@@ -672,17 +675,50 @@ fn fx_policy_pricer_stamp_takes_precedence_over_curve_stamp() {
     let disc = flat_discount_curve_with_fx_policy("USD-TREASURY", as_of, "curve::xccy_basis");
     let market = MarketContext::new().insert(disc);
 
-    let pricer = FixedBondPricer {
-        amount: 1_000.0,
-        model: ModelKey::Discounting,
-    };
-    let mut result = pricer
-        .price_dyn(&bond, &market, as_of)
-        .expect("synthetic pricer should price");
-    result.meta.fx_policy_applied = Some("pricer::explicit_policy".to_string());
-    result.meta.parallel = true;
+    /// Stamps its own FX policy and parallel flag, as a model pricer may.
+    struct PolicyStampingPricer;
 
-    stamp_results_meta(&FinstackConfig::default(), &bond, &market, &mut result);
+    impl Pricer for PolicyStampingPricer {
+        fn key(&self) -> PricerKey {
+            PricerKey::new(InstrumentType::Bond, ModelKey::Tree)
+        }
+
+        fn price_dyn(
+            &self,
+            instrument: &dyn Priceable,
+            _market: &Market,
+            as_of: Date,
+        ) -> std::result::Result<finstack_quant_valuations::results::ValuationResult, PricingError>
+        {
+            let mut result = finstack_quant_valuations::results::ValuationResult::stamped(
+                instrument.id(),
+                as_of,
+                finstack_quant_core::money::Money::new(
+                    1_000.0,
+                    finstack_quant_core::currency::Currency::USD,
+                )
+                .expect("valid money fixture"),
+            );
+            result.meta.fx_policy_applied = Some("pricer::explicit_policy".to_string());
+            result.meta.parallel = true;
+            Ok(result)
+        }
+    }
+
+    let mut registry = PricerRegistry::new();
+    registry
+        .register(PolicyStampingPricer)
+        .expect("unique test pricer registration");
+    let result = registry
+        .price_with_metrics(
+            &bond,
+            ModelKey::Tree,
+            &market,
+            as_of,
+            &[],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("registry pricing should succeed");
 
     assert_eq!(
         result.meta.fx_policy_applied.as_deref(),

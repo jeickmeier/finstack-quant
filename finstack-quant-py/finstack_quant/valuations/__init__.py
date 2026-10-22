@@ -22,15 +22,14 @@ True
 """
 
 from finstack_quant.finstack_quant import valuations as _valuations
-from finstack_quant.valuations import (
-    composite as composite,
-    instruments as instruments,
-    market as market,
-)
 
 ValuationResult = _valuations.ValuationResult
-# `schema` is a compiled submodule with no pure-Python shim package; the extension
-# registers it as `finstack_quant.valuations.schema`.
+# The submodules are compiled modules with no pure-Python shim; the extension
+# registers each under its public path (`finstack_quant.valuations.instruments`
+# and so on), and the stubs beside them carry the types and docstrings.
+composite = _valuations.composite
+instruments = _valuations.instruments
+market = _valuations.market
 schema = _valuations.schema
 
 

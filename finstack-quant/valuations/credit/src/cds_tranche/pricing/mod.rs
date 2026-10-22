@@ -56,16 +56,14 @@
 //!
 //! * Base correlation model can have small arbitrage inconsistencies at curve knots
 
-mod config;
 mod engine;
 mod expected_loss;
 mod heterogeneous;
 mod integration;
-mod registry;
+mod pricer;
 mod sensitivities;
 
 #[cfg(test)]
 mod tests;
 
-pub use config::CdsTranchePricer;
-pub(crate) use registry::SimpleCdsTrancheHazardPricer;
+pub use pricer::CdsTranchePricer;

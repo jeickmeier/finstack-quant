@@ -1,8 +1,7 @@
 //! Par spread calculator for fixed income index TRS.
 
 use crate::fi_trs::FiIndexTotalReturnSwap;
-use finstack_quant_core::{Error, Result};
-use finstack_quant_valuations_core::instruments::pricing::swap_legs::ANNUITY_EPSILON;
+use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::TrsEngine;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 
@@ -34,46 +33,18 @@ impl MetricCalculator for ParSpreadCalculator {
                  model, not a full fixed-income index mark-to-market model"
             );
         });
-        let annuity = context
-            .computed
-            .get(&MetricId::FinancingAnnuity)
-            .copied()
-            .ok_or_else(|| finstack_quant_core::InputError::NotFound {
-                id: "metric:financing_annuity".into(),
-            })?;
+        let annuity = context.computed_metric(&MetricId::FinancingAnnuity)?;
         let trs: &FiIndexTotalReturnSwap = context.instrument_as()?;
         let curves = context.curves.as_ref();
-        let as_of = context.as_of;
-
-        if annuity.abs() < ANNUITY_EPSILON {
-            return Err(Error::Validation(format!(
-                "FI TRS par spread: financing annuity {annuity:.3e} below \
-                 ANNUITY_EPSILON ({ANNUITY_EPSILON:.0e}). Division would amplify rounding \
-                 noise into the par spread."
-            )));
-        }
-
-        let tr_pv = trs.pv_total_return_leg(curves, as_of)?;
-
-        let float_pv = TrsEngine::pv_financing_float_only(
+        let tr_pv = trs.pv_total_return_leg(curves, context.as_of)?;
+        TrsEngine::par_spread_bp(
+            tr_pv,
             &trs.financing_leg,
             &trs.schedule,
             trs.notional,
             curves,
-            as_of,
-        )?;
-
-        // s_par = (PV(TR) - PV(float)) / Annuity, converted to basis points
-        let par_spread = (tr_pv.amount() - float_pv) / annuity * 10000.0;
-
-        if par_spread.is_nan() || par_spread.is_infinite() {
-            return Err(Error::Validation(format!(
-                "Par spread calculation produced invalid value: {}. \
-                 Check that financing annuity is non-zero.",
-                par_spread
-            )));
-        }
-
-        Ok(par_spread)
+            context.as_of,
+            annuity,
+        )
     }
 }

@@ -10,6 +10,8 @@
 //! convergence rate. It requires a bracketing interval `[a, b]` where `f(a)` and
 //! `f(b)` have opposite signs; [`BrentSolver::solve`] searches for one around an
 //! initial guess and [`BrentSolver::solve_in_bracket`] takes one directly.
+//! [`BrentSolver::solve_fallible`] runs the same search for an objective that
+//! returns `Result<f64>` and aborts with the objective's first error.
 //!
 //! # Examples
 //!
@@ -186,7 +188,7 @@ impl BrentSolver {
     /// overflow and to constrain the search to a reasonable domain.
     fn find_bracket<Func>(&self, f: &mut Func, initial_guess: f64) -> Result<[(f64, f64); 2]>
     where
-        Func: FnMut(f64) -> f64,
+        Func: FnMut(f64) -> Result<f64>,
     {
         use crate::InputError;
 
@@ -223,8 +225,12 @@ impl BrentSolver {
         }
         let mut a = (initial_guess - initial_size).max(self.bracket_min);
         let mut b = (initial_guess + initial_size).min(self.bracket_max);
-        let mut fa = f(a);
-        let mut fb = if a.to_bits() == b.to_bits() { fa } else { f(b) };
+        let mut fa = f(a)?;
+        let mut fb = if a.to_bits() == b.to_bits() {
+            fa
+        } else {
+            f(b)?
+        };
         let mut expansion_iterations = 0;
 
         // Expand bracket until we find a sign change
@@ -260,11 +266,11 @@ impl BrentSolver {
             let next_b = (b + width * self.bracket_expansion).min(self.bracket_max);
             if next_a < a {
                 a = next_a;
-                fa = f(a);
+                fa = f(a)?;
             }
             if next_b > b {
                 b = next_b;
-                fb = f(b);
+                fb = f(b)?;
             }
 
             // Stop if we've hit the bounds
@@ -339,6 +345,77 @@ impl BrentSolver {
     where
         Func: FnMut(f64) -> f64,
     {
+        self.solve_fallible(|x| Ok(f(x)), initial_guess)
+    }
+
+    /// Solve `f(x) = 0` for an objective that can fail, searching for a
+    /// bracket around `initial_guess`.
+    ///
+    /// Runs exactly the bracket search and Brent iteration of
+    /// [`solve`](Self::solve), evaluating the objective at the same points in
+    /// the same order. The first `Err` returned by `f` aborts the solve and is
+    /// returned unchanged; `f` is not evaluated again afterwards. Use it when
+    /// the objective reprices through a fallible pricer, so the pricer's
+    /// error reaches the caller instead of a sentinel residual steering the
+    /// bracket or a generic non-finite report hiding the cause. For an
+    /// objective that never fails the root is bit-identical to
+    /// [`solve`](Self::solve).
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - Fallible objective whose root is sought; `Ok(y)` is the residual
+    ///   at `x` in the objective's own units (a non-finite `y` is still a
+    ///   solver failure), `Err` is a failure to evaluate it at `x`
+    /// * `initial_guess` - Centre of the bracket-expansion search, clamped to
+    ///   [`bracket_min`](Self::bracket_min)..=[`bracket_max`](Self::bracket_max)
+    ///
+    /// # Returns
+    ///
+    /// A value `x` accepted on a small residual *or* a sufficiently narrow
+    /// bracket, exactly as for [`solve`](Self::solve).
+    ///
+    /// # Errors
+    ///
+    /// - The first error returned by `f`, unchanged.
+    /// - [`InputError::SolverConvergenceFailed`](crate::error::InputError::SolverConvergenceFailed)
+    ///   under the same conditions as [`solve`](Self::solve): no sign change
+    ///   within the bracket bounds, a non-finite residual, or the iteration
+    ///   cap reached.
+    /// - [`Error::Validation`](crate::Error::Validation) for a non-finite
+    ///   `initial_guess` or invalid bracket settings, before `f` is evaluated.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use finstack_quant_core::math::solver::BrentSolver;
+    /// use finstack_quant_core::{Error, Result};
+    ///
+    /// // A repricing objective defined only for positive inputs.
+    /// let price = |x: f64| -> Result<f64> {
+    ///     if x <= 0.0 {
+    ///         return Err(Error::Validation(format!("x must be positive, got {x}")));
+    ///     }
+    ///     Ok(x.ln())
+    /// };
+    ///
+    /// // Bounded to the pricer's domain, the solve finds ln(x) = 1.
+    /// let root = BrentSolver::new()
+    ///     .bracket_bounds(0.5, 10.0)
+    ///     .solve_fallible(|x| Ok(price(x)? - 1.0), 2.0)?;
+    /// assert!((root - std::f64::consts::E).abs() < 1e-10);
+    ///
+    /// // With the default unbounded search the bracket expansion probes
+    /// // x <= 0: the pricer's error is returned as-is, not a solver failure.
+    /// let err = BrentSolver::new()
+    ///     .solve_fallible(|x| Ok(price(x)? - 1.0), 2.0)
+    ///     .unwrap_err();
+    /// assert!(matches!(err, Error::Validation(_)));
+    /// # Ok::<(), Error>(())
+    /// ```
+    pub fn solve_fallible<Func>(&self, mut f: Func, initial_guess: f64) -> Result<f64>
+    where
+        Func: FnMut(f64) -> Result<f64>,
+    {
         let bracket = self.find_bracket(&mut f, initial_guess)?;
         self.brent_method(f, bracket)
     }
@@ -374,7 +451,7 @@ impl BrentSolver {
         } else {
             f(hi)
         };
-        self.brent_method(f, [(lo, flo), (hi, fhi)])
+        self.brent_method(|x| Ok(f(x)), [(lo, flo), (hi, fhi)])
     }
 
     /// Core Brent's method implementation.
@@ -382,7 +459,7 @@ impl BrentSolver {
     /// Requirements: `f(lo)` and `f(hi)` must have opposite signs.
     fn brent_method<Func>(&self, mut f: Func, bracket: [(f64, f64); 2]) -> Result<f64>
     where
-        Func: FnMut(f64) -> f64,
+        Func: FnMut(f64) -> Result<f64>,
     {
         use crate::InputError;
 
@@ -512,7 +589,7 @@ impl BrentSolver {
             } else {
                 b += tol1.copysign(xm);
             }
-            fb = f(b);
+            fb = f(b)?;
             if !fb.is_finite() {
                 return Err(InputError::SolverConvergenceFailed {
                     iterations: iteration + 1,
@@ -622,6 +699,79 @@ mod tests {
             err.to_string().contains("same sign"),
             "unexpected error: {err}"
         );
+    }
+
+    #[test]
+    fn test_brent_solve_fallible_matches_solve_bit_for_bit() {
+        let objectives: [fn(f64) -> f64; 4] = [
+            |x| x * x * x - x - 1.0,
+            |x| x - 100.0,
+            |x| (-x).exp() - 0.25,
+            |x| x.powi(3) - 2.0 * x - 5.0,
+        ];
+        let solvers = [
+            BrentSolver::new(),
+            BrentSolver::new().with_initial_bracket_size(Some(5.0)),
+            BrentSolver::new().with_tolerance(1e-8).with_max_iterations(50),
+            BrentSolver::new().with_bracket_bounds(0.0, 1e3),
+        ];
+        for solver in &solvers {
+            for f in objectives {
+                for guess in [0.0, 1.0, 95.0] {
+                    let plain = solver.solve(f, guess);
+                    let fallible = solver.solve_fallible(|x| Ok(f(x)), guess);
+                    match (plain, fallible) {
+                        (Ok(a), Ok(b)) => assert_eq!(a.to_bits(), b.to_bits()),
+                        (Err(a), Err(b)) => assert_eq!(a.to_string(), b.to_string()),
+                        (a, b) => panic!("solve {a:?} vs solve_fallible {b:?}"),
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_brent_solve_fallible_returns_first_objective_error() {
+        // Fails in the bracket search: the probe below 0.5 errors.
+        let evaluations = std::cell::Cell::new(0);
+        let err = BrentSolver::new()
+            .solve_fallible(
+                |x| {
+                    evaluations.set(evaluations.get() + 1);
+                    if x < 0.5 {
+                        Err(crate::Error::Validation(format!("bad input {x}")))
+                    } else {
+                        Ok(x - 10.0)
+                    }
+                },
+                0.5,
+            )
+            .expect_err("objective error must abort the solve");
+        assert!(
+            matches!(&err, crate::Error::Validation(msg) if msg.starts_with("bad input")),
+            "unexpected error: {err}"
+        );
+        assert_eq!(evaluations.get(), 1, "no evaluation after the first error");
+
+        // Fails inside the Brent iteration: only the endpoints of the
+        // bracket [0, 2] evaluate.
+        let err = BrentSolver::new()
+            .with_bracket_bounds(0.0, 2.0)
+            .with_initial_bracket_size(Some(1.0))
+            .solve_fallible(
+                |x| {
+                    if x == 0.0 {
+                        Ok(-1.0)
+                    } else if x == 2.0 {
+                        Ok(1.0)
+                    } else {
+                        Err(crate::Error::Validation("interior".into()))
+                    }
+                },
+                1.0,
+            )
+            .expect_err("interior error must abort the solve");
+        assert!(matches!(&err, crate::Error::Validation(msg) if msg == "interior"));
     }
 
     // ===== Phase 1 Robustness Tests =====

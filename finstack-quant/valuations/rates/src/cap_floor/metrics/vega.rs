@@ -70,14 +70,20 @@ impl MetricCalculator for HwSigmaVegaCalculator {
     }
 }
 
+/// Caplet vega per 1% (absolute) vol, non-negative for long options.
+///
+/// At `sigma <= 0` the true vega is zero away from the money and only finite
+/// exactly at-the-money; the closed forms report zero vega for a degenerate
+/// (extrapolated) zero vol rather than the `n(0)` value an ATM-equivalent `d`
+/// would give, which would overstate vega for ITM/OTM strikes.
 fn caplet_vega(c: CapletInputs) -> f64 {
-    use crate::cap_floor::pricing::{black, normal};
+    use finstack_quant_models::closed_form::{bachelier_vega, black_vega};
     use finstack_quant_models::volatility::VolatilityConvention;
     match c.convention {
         VolatilityConvention::Normal => {
-            normal::vega_per_pct(c.strike, c.forward, c.sigma, c.time_to_fixing)
+            bachelier_vega(c.forward, c.strike, c.sigma, c.time_to_fixing) / 100.0
         }
-        _ => black::vega_per_pct(c.strike, c.forward, c.sigma, c.time_to_fixing),
+        _ => black_vega(c.forward, c.strike, c.sigma, c.time_to_fixing) / 100.0,
     }
 }
 

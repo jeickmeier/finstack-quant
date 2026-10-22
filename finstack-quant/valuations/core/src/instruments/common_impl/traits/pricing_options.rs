@@ -1,5 +1,5 @@
-//! Pricing options implementation used by the traits subsystem.
-//!
+//! [`PricingOptions`]: per-call config, registries and market history passed
+//! to `Instrument::price_with_metrics`.
 // Pricing Options
 
 use crate::metrics::risk::MarketHistory;

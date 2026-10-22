@@ -5,8 +5,8 @@
 //! pricing overrides, parse the as-of date and model key, and dispatch through
 //! the caller-selected registry or the shared standard registry.
 
-use super::{parse_model_key, shared_standard_registry, ModelKey};
-use crate::instruments::json_loader::{instrument_load_error, MAX_JSON_BYTES};
+use super::{parse_model_key, ModelKey, STANDARD};
+use crate::instruments::envelope::{instrument_load_error, MAX_JSON_BYTES};
 use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use crate::instruments::pricing_overrides::MetricPricingOverrides;
 use crate::instruments::Instrument;
@@ -16,8 +16,6 @@ use finstack_quant_core::contract::{parse_json_value, LoadLimits};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Error;
 use serde_json::Value;
-#[cfg(test)]
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -558,7 +556,7 @@ pub fn price_instrument(
     let registry = pricing_options
         .registry
         .as_ref()
-        .map_or_else(shared_standard_registry, Arc::clone);
+        .map_or_else(|| STANDARD.shared_pricers(), Arc::clone);
     let metric_registry = pricing_options.metric_registry.clone();
     let metric_registry = metric_registry
         .as_deref()
@@ -800,21 +798,19 @@ fn decode_pricing_envelope(
 }
 
 #[cfg(test)]
-fn instrument_json_for_pricing<'a>(
-    instrument_json: &'a str,
-    metric_pricing_overrides: Option<&str>,
-) -> finstack_quant_core::Result<Cow<'a, str>> {
-    serde_json::to_string(&pricing_document(
-        instrument_json,
-        metric_pricing_overrides,
-    )?)
-    .map(Cow::Owned)
-    .map_err(|e| Error::Validation(e.to_string()))
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
+
+    fn instrument_json_for_pricing(
+        instrument_json: &str,
+        metric_pricing_overrides: Option<&str>,
+    ) -> finstack_quant_core::Result<String> {
+        serde_json::to_string(&pricing_document(
+            instrument_json,
+            metric_pricing_overrides,
+        )?)
+        .map_err(|e| Error::Validation(e.to_string()))
+    }
     use crate::instruments::commodity::commodity_spot_option::CommoditySpotOption;
     use crate::instruments::credit_derivatives::cds_option::CdsOption;
     use crate::instruments::equity::equity_option::EquityOption;
@@ -1032,7 +1028,10 @@ mod tests {
             .expect("canonical fx spot");
         assert_eq!(envelope.instrument.type_tag(), "fx_spot");
         let parsed = serde_json::to_value(&envelope).expect("json");
-        assert_eq!(parsed["schema"], InstrumentEnvelope::CURRENT_SCHEMA);
+        assert_eq!(
+            parsed["schema"],
+            crate::instruments::envelope::InstrumentSchema::CURRENT.as_str()
+        );
         assert_eq!(parsed["instrument"]["type"], "fx_spot");
         assert_eq!(parsed["instrument"]["spec"]["id"], "EURUSD-SPOT");
     }
@@ -1123,7 +1122,7 @@ mod tests {
             ),
         )
         .expect("merge");
-        let parsed: Value = serde_json::from_str(merged.as_ref()).expect("json");
+        let parsed: Value = serde_json::from_str(&merged).expect("json");
         assert_eq!(
             parsed["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"],
             serde_json::json!({"count": 1, "unit": "days"})
@@ -1180,7 +1179,7 @@ mod tests {
         )
         .expect("merge");
         let envelope: crate::instruments::json_loader::InstrumentEnvelope =
-            serde_json::from_str(merged.as_ref()).expect("merged composite must still parse");
+            serde_json::from_str(&merged).expect("merged composite must still parse");
         let InstrumentJson::Composite(parsed) = envelope.instrument else {
             panic!("expected composite");
         };
@@ -1227,12 +1226,12 @@ mod tests {
     #[test]
     fn validate_instrument_json_rejects_credit_and_convertible_invariants() {
         let mut cds_option = CdsOption::example().expect("CDS option");
-        cds_option.exercise_style = finstack_quant_models::types::ExerciseStyle::American;
+        cds_option.exercise_settlement_date = Some(cds_option.expiry - time::Duration::days(1));
         let json = envelope_json(InstrumentJson::CdsOption(cds_option));
         assert!(validate_instrument_json(&json, None)
-            .expect_err("unsupported exercise style must fail")
+            .expect_err("exercise settlement before expiry must fail")
             .to_string()
-            .contains("European"));
+            .contains("on or after legal expiry"));
 
         let mut convertible = ConvertibleBond::example().expect("convertible");
         convertible.conversion.ratio = None;
@@ -1335,7 +1334,10 @@ mod tests {
 
         let canonical = validate_instrument_json(&json, None).expect("valid envelope");
         let value: Value = serde_json::from_str(&canonical).expect("canonical json");
-        assert_eq!(value["schema"], InstrumentEnvelope::CURRENT_SCHEMA);
+        assert_eq!(
+            value["schema"],
+            crate::instruments::envelope::InstrumentSchema::CURRENT.as_str()
+        );
         assert_eq!(value["instrument"]["type"], "bond");
     }
 

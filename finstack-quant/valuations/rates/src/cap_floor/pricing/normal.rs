@@ -3,12 +3,10 @@
 //! This pricing path is used when cap/floor volatility is quoted in normal terms
 //! (absolute rate units), which is common in low/negative-rate environments.
 
-use super::payoff::CapletFloorletInputs;
+use super::CapletFloorletInputs;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::closed_form::bachelier_price_with_annuity;
-use finstack_quant_models::closed_form::{
-    bachelier_delta_call, bachelier_delta_put, bachelier_gamma, bachelier_vega,
-};
+use finstack_quant_models::closed_form::{bachelier_delta_call, bachelier_delta_put};
 use finstack_quant_models::types::OptionType;
 
 /// Price a caplet/floorlet using Bachelier's normal model.
@@ -108,26 +106,4 @@ pub(crate) fn delta(is_cap: bool, strike: f64, forward: f64, sigma: f64, t_fix: 
     } else {
         bachelier_delta_put(forward, strike, sigma, t_fix)
     }
-}
-
-/// Bachelier forward gamma (per unit forward).
-///
-/// Returns the second derivative of option price with respect to forward rate.
-/// Gamma is always non-negative for long options.
-///
-/// Gamma = n(d) / (σ√T)
-pub(crate) fn gamma(strike: f64, forward: f64, sigma: f64, t_fix: f64) -> f64 {
-    bachelier_gamma(forward, strike, sigma, t_fix)
-}
-
-/// Bachelier vega per 1% normal vol.
-///
-/// Returns the sensitivity of option price to a 1% (absolute) change in normal volatility.
-/// Vega is always non-negative for long options.
-///
-/// Vega = √T · n(d) / 100
-pub(crate) fn vega_per_pct(strike: f64, forward: f64, sigma: f64, t_fix: f64) -> f64 {
-    // A degenerate (extrapolated) zero/negative vol reports zero vega rather
-    // than the `n(0)` value an ATM-equivalent `d` would give.
-    bachelier_vega(forward, strike, sigma, t_fix) / 100.0
 }

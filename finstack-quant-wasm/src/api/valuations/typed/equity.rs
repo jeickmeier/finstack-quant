@@ -2,8 +2,10 @@
 
 use crate::api::core::currency::JsCurrency;
 use crate::api::core::dates::JsDayCount;
-use crate::utils::input::js_string;
-use crate::utils::{to_js_err, to_js_value};
+use crate::api::valuations::pricing::parse_market;
+use crate::utils::input::{from_js_json, js_bool, js_f64, js_string};
+use crate::utils::to_js_err;
+use crate::utils::wire::{js_date, js_wire};
 use finstack_quant_valuations::instruments::Instrument;
 use wasm_bindgen::prelude::*;
 
@@ -14,30 +16,12 @@ instrument_class!(
     finstack_quant_valuations::instruments::equity::equity_option::EquityOption
 );
 
-instrument_builder_entry!(JsEquityOption, "EquityOption", JsEquityOptionBuilder);
-
-instrument_to_dict!(JsEquityOption, "EquityOption");
-
-instrument_market_dependencies!(JsEquityOption, "EquityOption");
-
-instrument_pricing!(JsEquityOption, "EquityOption");
+instrument_surface!(JsEquityOption, "EquityOption", JsEquityOptionBuilder);
 
 getters!(JsEquityOption, "EquityOption", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"hazard_rate"` or `"black76"`.
         default_model as defaultModel => text(Instrument::default_model(i)),
-        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
-        /// @returns The overrides plain object; `{}` when none is set.
-        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
-        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
-        /// @returns The overrides plain object; unset fields are `null` or omitted.
-        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
-        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
-        /// @returns The overrides plain object; `{}` when none is set.
-        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
-        /// Instrument attributes (tags and metadata) used for scenario selection.
-        /// @returns The attribute bag; empty when none were set.
-        attributes as attributes => json(i.attributes),
         /// Identifier of the underlying equity referenced by the option.
         /// @returns Ticker string exactly as supplied at construction; it is the key used to look up the spot price and volatility surface in the market context, so it must match the market-data identifier.
         underlying_ticker as underlyingTicker => json(i.underlying_ticker),
@@ -87,6 +71,8 @@ getters!(JsEquityOption, "EquityOption", |i| {
         /// @returns The dates, or `null`.
         exercise_dates as exerciseDates => opt_dates(i.exercise_dates),
 });
+
+common_getters!(JsEquityOption, "EquityOption");
 
 factories!(JsEquityOption, "EquityOption", finstack_quant_valuations::instruments::equity::equity_option::EquityOption, {
         /// Canonical SPX 4500 European call expiring 2024-06-21 (mirrors Rust `EquityOption::example`): 100 units in USD, curve `USD-OIS`, spot `EQUITY-SPOT`, surface `EQUITY-VOL`, dividend yield `EQUITY-DIVYIELD`.
@@ -216,27 +202,9 @@ setters!(JsEquityOptionBuilder, "EquityOptionBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         exercise_dates as exerciseDates => dates,
-        /// Set the instrument-owned pricing inputs.
-        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        instrument_pricing_overrides as instrumentPricingOverrides => json,
-        /// Set the metric-time pricing configuration stored on the instrument.
-        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        metric_pricing_overrides as metricPricingOverrides => json,
-        /// Set the scenario-only pricing adjustments.
-        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        scenario_pricing_overrides as scenarioPricingOverrides => json,
-        /// Set instrument attributes (tags and metadata).
-        /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        attributes as attributes => json,
 });
+
+common_setters!(JsEquityOptionBuilder, "EquityOptionBuilder");
 
 handle_setters!(JsEquityOptionBuilder, "EquityOptionBuilder", {
         /// Set the model day count for volatility, dividend carry and exercise times.
@@ -275,11 +243,11 @@ impl JsEquityOption {
         finstack_quant_valuations::instruments::equity::equity_option::EquityOption::european(
             js_string(&id, "id")?,
             js_string(&ticker, "ticker")?,
-            super::arg::num(&strike, "strike")?,
-            super::arg::date(&expiry, "expiry")?,
-            super::arg::num(&quantity, "quantity")?,
+            js_f64(&strike, "strike")?,
+            js_date(&expiry, "expiry")?,
+            js_f64(&quantity, "quantity")?,
             currency.inner,
-            super::arg::en(&option_type, "optionType")?,
+            js_wire(&option_type, "optionType")?,
         )
         .map(|inner| Self { inner })
         .map_err(to_js_err)
@@ -300,9 +268,9 @@ impl JsEquityOption {
         as_of: JsValue,
         target_price: JsValue,
     ) -> Result<f64, JsValue> {
-        let market = super::market(&market_json)?;
-        let as_of = super::as_of(&as_of)?;
-        let target_price = super::arg::num(&target_price, "targetPrice")?;
+        let market = parse_market(&market_json)?;
+        let as_of = js_date(&as_of, "asOf")?;
+        let target_price = js_f64(&target_price, "targetPrice")?;
         self.inner
             .implied_vol(&market, as_of, target_price)
             .map_err(to_js_err)
@@ -320,22 +288,15 @@ impl JsEquityOption {
         as_of: JsValue,
         model: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
-            Box::new(self.inner.clone()),
-            None,
-        )
-        .map_err(to_js_err)?;
-        let market = super::market(&market_json)?;
+        let market_json = crate::utils::input::json_text(&market_json, "marketJson")?;
         let as_of = js_string(&as_of, "asOf")?;
         let model = crate::utils::input::js_opt_string(model.as_ref(), "model")?;
-        let pairs = crate::api::valuations::pricing::standard_option_greeks_with_context(
-            &instrument,
-            &market,
+        super::option_greeks(
+            Box::new(self.inner.clone()),
+            &market_json,
             &as_of,
-            model.as_deref().unwrap_or("default"),
-        )?;
-        let ordered: indexmap::IndexMap<&'static str, f64> = pairs.into_iter().collect();
-        to_js_value(&ordered)
+            model.as_deref(),
+        )
     }
 }
 
@@ -359,10 +320,10 @@ impl JsEquityOptionBuilder {
         exercised: JsValue,
     ) -> Result<JsEquityOptionBuilder, JsValue> {
         let exercise = finstack_quant_valuations::instruments::equity::equity_option::EquityOptionExercise::new(
-            super::arg::date(&date, "date")?,
-            super::arg::num(&spot, "spot")?,
-            super::arg::date(&settlement_date, "settlementDate")?,
-            super::arg::flag(&exercised, "exercised")?,
+            js_date(&date, "date")?,
+            js_f64(&spot, "spot")?,
+            js_date(&settlement_date, "settlementDate")?,
+            js_bool(&exercised, "exercised")?,
         );
         let inner = self.inner.apply(|b| b.exercise(exercise))?;
         Ok(Self { inner })
@@ -374,7 +335,7 @@ impl JsEquityOptionBuilder {
     /// @throws Error - Throws with kind `invalid_type` if `value` is not an array of `[string, number]` pairs, and kind `validation` if a date is malformed or the builder was already consumed by `build()`.
     #[wasm_bindgen(js_name = discreteDividends)]
     pub fn discrete_dividends(&self, value: JsValue) -> Result<JsEquityOptionBuilder, JsValue> {
-        let rows: Vec<(String, f64)> = super::arg::json(&value, "value")?;
+        let rows: Vec<(String, f64)> = from_js_json(&value, "value")?;
         let dividends = rows
             .into_iter()
             .map(|(date, amount)| Ok((crate::utils::parse_iso_date(&date)?, amount)))

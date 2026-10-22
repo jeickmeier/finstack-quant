@@ -1,53 +1,40 @@
-//! Shared utilities for swap rate calculation from Hull-White model.
-//!
-//! Provides reusable functions for computing forward swap rates and bond prices
-//! from Hull-White short rate simulations. Used by both swaption and CMS pricing.
+//! Hull-White zero-coupon bond price from a simulated short rate, used by the
+//! Bermudan swaption Monte Carlo pricer.
 
 use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
 use finstack_quant_models::rates::hull_white::{hw_b, hw_ln_a};
 
-/// Hull-White bond price calculation utilities.
+/// Hull-White zero-coupon bond price `P(t, T)` from the short rate `r(t)`.
 ///
-/// Computes P(t, T) = A(t, T) * exp(-B(t, T) * r(t))
+/// Uses the curve-calibrated affine reconstruction
+/// `P(t,T) = A(t,T) · exp(−B(t,T) · r(t))` with `B` from
+/// [`hw_b`] and `ln A` from [`hw_ln_a`] (Brigo & Mercurio 2006,
+/// §3.3.1, eqs. 3.39–3.40), evaluated at the process volatility
+/// `σ(t)`.
 ///
-/// where:
-/// - B(t, T) = (1 - exp(-κ(T-t))) / κ
-/// - A(t, T) depends on model parameters
-pub struct HullWhiteBondPrice;
-
-impl HullWhiteBondPrice {
-    /// Compute bond price P(t, T) from short rate r(t).
-    ///
-    /// Uses the curve-calibrated affine reconstruction
-    /// `P(t,T) = A(t,T) · exp(−B(t,T) · r(t))` with `B` from
-    /// [`hw_b`] and `ln A` from [`hw_ln_a`] (Brigo & Mercurio 2006,
-    /// §3.3.1, eqs. 3.39–3.40), evaluated at the process volatility
-    /// `σ(t)`.
-    ///
-    /// # Arguments
-    ///
-    /// * `params` - Hull-White parameters (κ and σ(t) are used)
-    /// * `r_t` - Current short rate
-    /// * `t` - Current time
-    /// * `maturity_time` - Maturity time (T)
-    /// * `discount_curve_fn` - Market discount factors `P_mkt(0, ·)`
-    pub fn bond_price(
-        params: &HullWhite1FParams,
-        r_t: f64,
-        t: f64,
-        maturity_time: f64,
-        discount_curve_fn: impl Fn(f64) -> f64,
-    ) -> f64 {
-        let b = hw_b(params.kappa, t, maturity_time);
-        let ln_a = hw_ln_a(
-            params.kappa,
-            params.sigma_at_time(t),
-            t,
-            maturity_time,
-            &discount_curve_fn,
-        );
-        (ln_a - b * r_t).exp()
-    }
+/// # Arguments
+///
+/// * `params` - Hull-White parameters (κ and σ(t) are used)
+/// * `r_t` - Current short rate
+/// * `t` - Current time
+/// * `maturity_time` - Maturity time (T)
+/// * `discount_curve_fn` - Market discount factors `P_mkt(0, ·)`
+pub fn hw_bond_price(
+    params: &HullWhite1FParams,
+    r_t: f64,
+    t: f64,
+    maturity_time: f64,
+    discount_curve_fn: impl Fn(f64) -> f64,
+) -> f64 {
+    let b = hw_b(params.kappa, t, maturity_time);
+    let ln_a = hw_ln_a(
+        params.kappa,
+        params.sigma_at_time(t),
+        t,
+        maturity_time,
+        &discount_curve_fn,
+    );
+    (ln_a - b * r_t).exp()
 }
 
 #[cfg(test)]
@@ -138,7 +125,7 @@ mod tests {
         let mut old_max_err = 0.0_f64;
         for &(t, big_t) in &[(0.5, 2.0), (1.0, 3.0), (2.5, 5.0), (4.0, 7.0)] {
             let r_t = f0(t);
-            let recon = HullWhiteBondPrice::bond_price(&params, r_t, t, big_t, discount_fn);
+            let recon = hw_bond_price(&params, r_t, t, big_t, discount_fn);
 
             let B = hw_b(kappa, t, big_t);
             let var = sigma * sigma / (4.0 * kappa) * (1.0 - (-2.0 * kappa * t).exp()) * B * B;
@@ -170,7 +157,7 @@ mod tests {
         // f(0,0) = 0.025.
         let r0 = 0.025;
         for &big_t in &[0.25, 1.0, 5.0, 10.0] {
-            let recon = HullWhiteBondPrice::bond_price(&params, r0, 0.0, big_t, discount_fn);
+            let recon = hw_bond_price(&params, r0, 0.0, big_t, discount_fn);
             let market = discount_fn(big_t);
             assert!(
                 (recon - market).abs() < 1e-6,

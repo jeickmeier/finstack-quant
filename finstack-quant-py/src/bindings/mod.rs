@@ -24,6 +24,7 @@ pub(crate) mod module_utils;
 pub(crate) mod pandas_utils;
 pub(crate) mod pickle_support;
 pub mod portfolio;
+pub(crate) mod pydoc;
 pub(crate) mod repr_support;
 pub mod scenarios;
 pub mod schema;
