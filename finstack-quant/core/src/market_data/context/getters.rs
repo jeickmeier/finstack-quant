@@ -39,6 +39,13 @@ impl MarketContext {
         map.get(id).ok_or_else(|| Self::not_found_error(id))
     }
 
+    /// Borrow stored curve data without choosing a financial interpretation.
+    pub(in crate::market_data) fn get_curve(&self, id: &str) -> Result<&CurveStorage> {
+        self.curves
+            .get(id)
+            .ok_or_else(|| self.missing_curve_error(id))
+    }
+
     /// Helper method to extract curve with type checking and error handling
     fn get_curve_with_type_check<T, F>(
         &self,
@@ -49,17 +56,15 @@ impl MarketContext {
     where
         F: FnOnce(&CurveStorage) -> Option<T>,
     {
-        match self.curves.get(id) {
-            Some(storage) => extractor(storage).ok_or_else(|| {
-                crate::InputError::WrongCurveType {
-                    id: id.to_string(),
-                    expected: expected_type.to_string(),
-                    actual: storage.curve_type().to_string(),
-                }
-                .into()
-            }),
-            None => Err(self.missing_curve_error(id)),
-        }
+        let storage = self.get_curve(id)?;
+        extractor(storage).ok_or_else(|| {
+            crate::InputError::WrongCurveType {
+                id: id.to_string(),
+                expected: expected_type.to_string(),
+                actual: storage.curve_type().to_string(),
+            }
+            .into()
+        })
     }
 
     /// Get a discount curve by identifier.
