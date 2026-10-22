@@ -1,5 +1,6 @@
 //! Spec-type bindings for `finstack_quant_cashflows::builder`.
 
+use crate::bindings::cashflows::aggregation::extract_dated_flows;
 use crate::bindings::macros::wire_methods;
 use finstack_quant_cashflows::builder::{
     AmortizationSpec, CouponType, DefaultModelSpec, FeeAccrualBasis, FeeBase, FeeSpec,
@@ -61,14 +62,6 @@ pub(crate) fn date_decimal_pairs(
     items
         .iter()
         .map(|(d, v)| Ok((py_to_date(d)?, decimal_from_any(v)?)))
-        .collect()
-}
-
-/// Extract a list of `(date, Money)` pairs.
-fn date_money_pairs(items: Vec<(Bound<'_, PyAny>, PyMoney)>) -> PyResult<Vec<(Date, Money)>> {
-    items
-        .iter()
-        .map(|(d, m)| Ok((py_to_date(d)?, m.inner)))
         .collect()
 }
 
@@ -1335,7 +1328,7 @@ impl PyAmortizationSpec {
     fn step_remaining(schedule: Vec<(Bound<'_, PyAny>, PyMoney)>) -> PyResult<Self> {
         Ok(Self {
             inner: AmortizationSpec::StepRemaining {
-                schedule: date_money_pairs(schedule)?,
+                schedule: extract_dated_flows(schedule)?,
             },
         })
     }
@@ -1400,7 +1393,7 @@ impl PyAmortizationSpec {
     fn custom_principal(items: Vec<(Bound<'_, PyAny>, PyMoney)>) -> PyResult<Self> {
         Ok(Self {
             inner: AmortizationSpec::CustomPrincipal {
-                items: date_money_pairs(items)?,
+                items: extract_dated_flows(items)?,
             },
         })
     }
