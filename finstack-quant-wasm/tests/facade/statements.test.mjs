@@ -241,3 +241,72 @@ test('statements residual scale warning accepts the applied ratio and rejects ob
     evaluator.free();
   }
 });
+
+test('statements correlated paths retain sampled shocks when peer values round flat', () => {
+  function run(method, rho, tiny) {
+    const model = JSON.parse(MODEL_JSON);
+    model.id = 'direct-shocks';
+    model.periods = [1, 2, 3, 4].map((quarter) => ({
+      id: `2025Q${quarter}`,
+      start: `2025-${String(quarter * 3 - 2).padStart(2, '0')}-01`,
+      end: quarter === 4 ? '2026-01-01' : `2025-${String(quarter * 3 + 1).padStart(2, '0')}-01`,
+      is_actual: quarter === 1,
+    }));
+    const params = {
+      std_dev: tiny ? 1e-20 : 0.1,
+      seed: 42,
+      ...(method === 'mean_reverting'
+        ? { long_run_mean: tiny ? 1e16 : 100, reversion_speed: 0.1 }
+        : { mean: 0 }),
+    };
+    model.nodes = {
+      peer: {
+        node_id: 'peer',
+        node_type: 'value',
+        values: { '2025Q1': tiny ? 1e16 : 100 },
+        forecast: { method, params },
+      },
+    };
+    for (const [node, peer, correlation, seed] of [
+      ['follower', 'peer', rho, 19],
+      ['child', 'follower', 0.6, 23],
+    ]) {
+      model.nodes[node] = {
+        node_id: node,
+        node_type: 'mixed',
+        formula_text: `${peer} * 0 + 100`,
+        values: { '2025Q1': 100 },
+        forecast: {
+          method: 'normal',
+          params: { mean: 0, std_dev: 1, seed, correlation_with: peer, correlation },
+        },
+      };
+    }
+    const evaluator = new statements.Evaluator();
+    try {
+      return evaluator.evaluateMonteCarlo(
+        JSON.stringify(model),
+        JSON.stringify({ n_paths: 16, seed: 7, percentiles: [0.5], include_path_data: true })
+      );
+    } finally {
+      evaluator.free();
+    }
+  }
+  function paths(result, metric) {
+    const columns = result.path_data.columns;
+    return columns[3].data.values.filter((_, i) => columns[2].data.values[i] === metric);
+  }
+  for (const method of ['normal', 'log_normal', 'mean_reverting']) {
+    for (const rho of [-1, 0, 0.6, 1]) {
+      const baseline = run(method, rho, false);
+      const rounded = run(method, rho, true);
+      assert.ok(paths(rounded, 'peer').every((value) => value === 1e16));
+      for (const metric of ['follower', 'child'])
+        assert.deepEqual(
+          paths(rounded, metric),
+          paths(baseline, metric),
+          `${method}, rho=${rho}, ${metric}`
+        );
+    }
+  }
+});

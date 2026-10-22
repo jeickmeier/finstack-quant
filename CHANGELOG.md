@@ -31,6 +31,10 @@
 
 #### Changed
 
+- Gaussian Monte Carlo forecasts retain their sampled shocks directly, preserving correlation when small increments round away at large levels. Zero-volatility nodes remain ineligible as stochastic correlation peers.
+
+- Capital-structure residual scaling warnings use `ResidualScaleMismatch { applied_ratio }` (`residual_scale_mismatch` in JSON), replacing the inaccurate `ScaleClamped` warning and its obsolete fields. Cashflow scaling is unchanged.
+
 - Capital-structure runtime state, dated principal claims, and waterfall execution are crate-private. The evaluator owns their lifecycle; the unused cumulative-principal accumulator and redundant waterfall period argument are removed.
 
 - `PikToggleSpec.target_instrument_ids` is a required list across Rust, Python, and JSON. Missing and null target lists are rejected; validation requires at least one borrowing-debt target.

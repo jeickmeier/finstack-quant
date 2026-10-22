@@ -211,3 +211,139 @@ fn integer_valued_float_seeds_work_and_out_of_range_seeds_fail() {
     invalid.params.insert("seed".into(), json!(u64::MAX as f64));
     assert!(invalid.validate().is_err());
 }
+
+fn shock_chain_model(method: ForecastMethod, tiny: bool, rho: f64) -> FinancialModelSpec {
+    let sigma = if tiny { 1e-20 } else { 0.1 };
+    let peer = match method {
+        ForecastMethod::Normal => ForecastSpec::normal(0.0, sigma, 42),
+        ForecastMethod::LogNormal => ForecastSpec::log_normal(0.0, sigma, 42),
+        _ => ForecastSpec::mean_reverting(if tiny { 1e16 } else { 100.0 }, 0.1, sigma, 42),
+    };
+    let mut follower = ForecastSpec::normal(0.0, 1.0, 19);
+    follower
+        .params
+        .insert("correlation_with".into(), json!("peer"));
+    follower.params.insert("correlation".into(), json!(rho));
+    let mut child = ForecastSpec::normal(0.0, 1.0, 23);
+    child
+        .params
+        .insert("correlation_with".into(), json!("follower"));
+    child.params.insert("correlation".into(), json!(0.6));
+    let mut builder = ModelBuilder::new("direct-shocks");
+    builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+    builder.value(
+        "peer",
+        &[(quarter(1), if tiny { 1e16.into() } else { 100.0.into() })],
+    );
+    builder.forecast("peer", peer);
+    let mut mixed = builder.mixed("follower");
+    mixed.values(&[(quarter(1), 100.0.into())]);
+    mixed.formula("peer * 0 + 100").unwrap();
+    mixed.forecast(follower);
+    builder = mixed.build().unwrap();
+    let mut mixed = builder.mixed("child");
+    mixed.values(&[(quarter(1), 100.0.into())]);
+    mixed.formula("follower * 0 + 100").unwrap();
+    mixed.forecast(child);
+    builder = mixed.build().unwrap();
+    builder.build().unwrap()
+}
+
+fn metric_paths(
+    results: &finstack_quant_statements::evaluator::MonteCarloResults,
+    metric: &str,
+) -> Vec<f64> {
+    use finstack_quant_core::table::TableColumnData;
+    let columns = &results.path_data.as_ref().unwrap().columns;
+    let (TableColumnData::String(metrics), TableColumnData::Float64(values)) =
+        (&columns[2].data, &columns[3].data)
+    else {
+        panic!("path table shape")
+    };
+    metrics
+        .iter()
+        .zip(values)
+        .filter_map(|(name, value)| (name == metric).then_some(*value))
+        .collect()
+}
+
+#[test]
+fn rounded_peer_levels_preserve_correlated_paths_and_chains() {
+    let config = MonteCarloConfig::new(32, 7).with_path_data(true);
+    for method in [
+        ForecastMethod::Normal,
+        ForecastMethod::LogNormal,
+        ForecastMethod::MeanReverting,
+    ] {
+        for rho in [-1.0, 0.0, 0.6, 1.0] {
+            let baseline = Evaluator::new()
+                .evaluate_monte_carlo(&shock_chain_model(method, false, rho), &config)
+                .unwrap();
+            let rounded = Evaluator::new()
+                .evaluate_monte_carlo(&shock_chain_model(method, true, rho), &config)
+                .unwrap();
+            assert!(metric_paths(&rounded, "peer").iter().all(|v| *v == 1e16));
+            for metric in ["follower", "child"] {
+                assert_eq!(
+                    metric_paths(&rounded, metric),
+                    metric_paths(&baseline, metric),
+                    "{method:?}, rho={rho}, {metric}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn clipping_and_explicit_overrides_preserve_latent_correlated_paths() {
+    let baseline = shock_chain_model(ForecastMethod::Normal, true, 0.6);
+    let config = MonteCarloConfig::new(32, 7).with_path_data(true);
+    let expected = Evaluator::new()
+        .evaluate_monte_carlo(&baseline, &config)
+        .unwrap();
+    for override_explicit in [false, true] {
+        let mut model = baseline.clone();
+        let peer = model.nodes.get_mut("peer").unwrap();
+        if override_explicit {
+            peer.values
+                .as_mut()
+                .unwrap()
+                .insert(quarter(3), 200.0.into());
+        } else {
+            let params = &mut peer.forecast.as_mut().unwrap().params;
+            params.insert("min".into(), json!(100.0));
+            params.insert("max".into(), json!(100.0));
+        }
+        let actual = Evaluator::new()
+            .evaluate_monte_carlo(&model, &config)
+            .unwrap();
+        for metric in ["follower", "child"] {
+            assert_eq!(
+                metric_paths(&actual, metric),
+                metric_paths(&expected, metric)
+            );
+        }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn direct_shocks_have_identical_serial_and_parallel_wire_results() {
+    let model = shock_chain_model(ForecastMethod::LogNormal, true, 0.6);
+    let config = MonteCarloConfig::new(64, 7).with_path_data(true);
+    let run = |threads| {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .build()
+            .unwrap()
+            .install(|| {
+                serde_json::to_value(
+                    Evaluator::new()
+                        .evaluate_monte_carlo(&model, &config)
+                        .unwrap(),
+                )
+                .unwrap()
+            })
+    };
+    assert_eq!(run(1), run(4));
+}

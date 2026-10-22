@@ -14,16 +14,18 @@
 //! use finstack_quant_core::dates::PeriodId;
 //!
 //! # fn main() -> Result<()> {
-//! let model = ModelBuilder::new("goal_seek_test")
-//!     .periods("2025Q1..Q4", None)?
-//!     .value("revenue", &[
+//! let model = {
+//!     let mut model_builder = ModelBuilder::new("goal_seek_test");
+//!     model_builder.periods("2025Q1..Q4", None)?;
+//!     model_builder.value("revenue", &[
 //!         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
-//!     ])
-//!     .forecast("revenue", ForecastSpec::growth(0.05))
-//!     .compute("interest_expense", "10000.0")?
-//!     .compute("ebitda", "revenue * 0.3")?
-//!     .compute("interest_coverage", "ebitda / interest_expense")?
-//!     .build()?;
+//!     ]);
+//!     model_builder.forecast("revenue", ForecastSpec::growth(0.05));
+//!     model_builder.compute("interest_expense", "10000.0")?;
+//!     model_builder.compute("ebitda", "revenue * 0.3")?;
+//!     model_builder.compute("interest_coverage", "ebitda / interest_expense")?;
+//!     model_builder.build()?
+//! };
 //!
 //! // Solve for Q4 revenue that achieves 2.0x interest coverage
 //! let target_period = PeriodId::quarter(2025, 4).expect("valid period fixture");
