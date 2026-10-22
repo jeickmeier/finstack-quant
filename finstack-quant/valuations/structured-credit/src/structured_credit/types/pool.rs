@@ -851,11 +851,11 @@ impl AssetPool {
                     day_count: line.day_count,
                     smm_override: line
                         .cpr
-                        .map(finstack_quant_cashflows::builder::cpr_to_smm)
+                        .map(finstack_quant_cashflows::builder::annual_to_monthly)
                         .transpose()?,
                     mdr_override: line
                         .cdr
-                        .map(finstack_quant_cashflows::builder::cdr_to_mdr)
+                        .map(finstack_quant_cashflows::builder::annual_to_monthly)
                         .transpose()?,
                     recovery_rate: line.recovery_rate,
                     commitment: None,

@@ -7,7 +7,6 @@ use finstack_quant_core::dates::{
     adjust, BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, HolidayCalendar,
     StubKind, Tenor,
 };
-use finstack_quant_core::InputError;
 
 use super::date_generation::{
     build_schedule_period, effective_frequency, effective_stub, generate_periods_with_adjustment,
@@ -426,10 +425,7 @@ pub fn build_single_period(
         cal,
         params.adjust_accrual_dates,
     )?;
-    let mut enriched = enrich_periods(vec![period], &params)?.into_iter();
-    enriched
-        .next()
-        .ok_or_else(|| InputError::TooFewPoints.into())
+    enrich_period(period, &params, cal)
 }
 
 /// Build canonical schedule periods with consistent market conventions.

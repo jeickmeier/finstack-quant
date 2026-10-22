@@ -392,7 +392,7 @@ def _prepayment_models() -> Any:
     models = [
         PrepaymentModelSpec.constant_cpr(0.06),
         PrepaymentModelSpec.psa(1.5),
-        PrepaymentModelSpec.psa_100(),
+        PrepaymentModelSpec.psa(1.0),
         PrepaymentModelSpec.cmbs_with_lockout(60, 0.1),
         PrepaymentModelSpec.abs(0.015),
         PrepaymentModelSpec.vector([0.02, 0.05, 0.08]),
@@ -497,3 +497,22 @@ def test_period_aggregation_get_amount_is_the_rust_lookup() -> None:
     assert aggregation.get_amount("2025Q1", "EUR") is None
     assert aggregation.get_amount("2025Q2", "USD") is None
     assert not hasattr(aggregation, "get")
+
+
+def test_period_lookup_preserves_exact_labels_and_empty_buckets() -> None:
+    from finstack_quant.cashflows.aggregation import PeriodAggregation
+
+    aggregation = PeriodAggregation.from_json('{"2025Q1":{"USD":{"amount":"100.25","currency":"USD"}},"2025Q2":{}}')
+    first = aggregation.get_period("2025Q1")
+    assert first["USD"].amount == 100.25
+    first["USD"] = usd(1)
+    assert aggregation.get_amount("2025Q1", "USD").amount == 100.25
+    assert aggregation.get_period("2025Q2") == {}
+    assert aggregation["2025Q2"] == {}
+    assert "2025Q2" in aggregation
+    assert len(aggregation) == 2
+    for missing in ["2025Q3", "2025q1", " 2025Q1", "nope", ""]:
+        assert aggregation.get_period(missing) is None
+        assert missing not in aggregation
+        with pytest.raises(KeyError):
+            _ = aggregation[missing]

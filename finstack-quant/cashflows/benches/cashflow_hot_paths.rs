@@ -33,7 +33,6 @@ use finstack_quant_cashflows::builder::merge_cashflow_schedules;
 use finstack_quant_cashflows::builder::{
     CashFlowMeta, CashFlowSchedule, CouponType, FixedCouponSpec, Notional,
 };
-use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_cashflows::{
     build_cashflow_schedule_json, dated_flows_json, validate_cashflow_schedule_json,
 };
@@ -150,7 +149,7 @@ fn make_quarterly_periods(base: Date, n_quarters: u32) -> Vec<Period> {
 }
 
 /// Dated flows spanning `years` years with quarterly payments.
-fn make_dated_flows(n: usize, base: Date) -> DatedFlows {
+fn make_dated_flows(n: usize, base: Date) -> Vec<(Date, Money)> {
     (0..n)
         .map(|i| {
             let days = (i as i64) * 90 + 90;

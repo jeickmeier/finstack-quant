@@ -2,10 +2,10 @@
 
 use super::pricing::{accrued_at, prices::quote_notional};
 use crate::structured_credit::{StructuredCredit, TrancheCashflows};
-use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::metrics::MetricContext;
 
@@ -97,7 +97,11 @@ impl SettlementQuote {
         }
     }
 
-    pub(crate) fn model_dirty(&self, flows: &DatedFlows, curve: &DiscountCurve) -> Result<f64> {
+    pub(crate) fn model_dirty(
+        &self,
+        flows: &[(Date, Money)],
+        curve: &DiscountCurve,
+    ) -> Result<f64> {
         flows
             .iter()
             .filter(|(date, _)| *date > self.settlement)

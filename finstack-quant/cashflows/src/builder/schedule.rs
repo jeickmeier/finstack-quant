@@ -45,7 +45,7 @@ fn kind_rank(kind: CFKind) -> u8 {
     }
 }
 
-/// Sort flows deterministically using schedule ordering semantics.
+/// Compare flows using schedule ordering semantics.
 ///
 /// Multi-key ordering, applied in priority order:
 ///
@@ -53,12 +53,14 @@ fn kind_rank(kind: CFKind) -> u8 {
 /// 2. **Kind rank** — see [`kind_rank`]. Coupons sort before fees, fees before
 ///    amortization, amortization before prepayment, etc.
 /// 3. **Currency** — lexicographic on the ISO code.
-/// 4. **Amount** — `f64::total_cmp`, so signed values sort consistently and
-///    NaN handling is well-defined.
-/// 5. **Reset date** — `Option<Date>` ordering, with `None` first.
+/// 4. **Amount** — exact Decimal value, without conversion to floating point.
+/// 5. **Reset and principal dates** — `Option<Date>` ordering, with `None` first.
 /// 6. **Accrual factor** — `f64::total_cmp`.
 /// 7. **Rate** — `Option<f64>` ordering, with `None` first, then `total_cmp`.
 /// 8. **Accrual metadata** — period, day-count rank, then projected index rate.
+/// 9. **Principal delta** — currency, then exact Decimal value.
+/// 10. **Representation ties** — actual kind, day-count variant, and Decimal
+///     encodings distinguish rows whose preceding comparison keys are equal.
 ///
 /// This is the canonical order downstream consumers
 /// (`outstanding_by_date`, `pv_by_period`, accrual, dataframe export, etc.)
@@ -69,16 +71,12 @@ fn kind_rank(kind: CFKind) -> u8 {
 /// A stable sort is used deliberately: `merge_cashflow_schedules` concatenates
 /// already-sorted schedules, and the stable sort's run detection handles those
 /// pre-sorted runs in near-linear time (an unstable sort re-partitions them).
-fn sort_flows(flows: &mut [CashFlow]) {
-    flows.sort_by(compare_flows);
-}
-
 fn compare_flows(a: &CashFlow, b: &CashFlow) -> std::cmp::Ordering {
     a.date
         .cmp(&b.date)
         .then_with(|| kind_rank(a.kind).cmp(&kind_rank(b.kind)))
         .then_with(|| a.amount.currency().cmp(&b.amount.currency()))
-        .then_with(|| a.amount.amount().total_cmp(&b.amount.amount()))
+        .then_with(|| a.amount.amount_decimal().cmp(&b.amount.amount_decimal()))
         .then_with(|| a.reset_date.cmp(&b.reset_date))
         .then_with(|| a.principal_date.cmp(&b.principal_date))
         .then_with(|| a.accrual_factor.total_cmp(&b.accrual_factor))
@@ -94,12 +92,34 @@ fn compare_flows(a: &CashFlow, b: &CashFlow) -> std::cmp::Ordering {
                     (Some(x), Some(y)) => x
                         .currency()
                         .cmp(&y.currency())
-                        .then_with(|| x.amount().total_cmp(&y.amount())),
+                        .then_with(|| x.amount_decimal().cmp(&y.amount_decimal())),
                     (None, Some(_)) => std::cmp::Ordering::Less,
                     (Some(_), None) => std::cmp::Ordering::Greater,
                     _ => std::cmp::Ordering::Equal,
                 }
             })
+        })
+        // Retain the existing economic precedence before resolving representation ties.
+        .then_with(|| (a.kind as usize).cmp(&(b.kind as usize)))
+        .then_with(|| {
+            a.accrual
+                .as_ref()
+                .map(|value| value.day_count as usize)
+                .cmp(&b.accrual.as_ref().map(|value| value.day_count as usize))
+        })
+        .then_with(|| {
+            a.amount
+                .amount_decimal()
+                .serialize()
+                .cmp(&b.amount.amount_decimal().serialize())
+        })
+        .then_with(|| {
+            a.principal_delta
+                .map(|value| value.amount_decimal().serialize())
+                .cmp(
+                    &b.principal_delta
+                        .map(|value| value.amount_decimal().serialize()),
+                )
         })
 }
 
@@ -312,7 +332,7 @@ where
     D: serde::Deserializer<'de>,
 {
     let mut flows = <Vec<CashFlow> as serde::Deserialize>::deserialize(deserializer)?;
-    sort_flows(&mut flows);
+    flows.sort_by(compare_flows);
     Ok(flows)
 }
 
@@ -331,7 +351,7 @@ impl CashFlowSchedule {
     /// * `day_count` - Day-count convention converting date pairs into year fractions
     /// * `meta` - Schedule-level calendars, facility limit, issue/maturity
     ///   dates, and representation tag stamped on the result
-    pub fn from_parts(
+    pub(crate) fn from_flows_unchecked(
         flows: Vec<CashFlow>,
         notional: Notional,
         day_count: DayCount,
@@ -343,7 +363,7 @@ impl CashFlowSchedule {
             day_count,
             meta,
         };
-        sort_flows(&mut schedule.flows);
+        schedule.flows.sort_by(compare_flows);
         schedule
     }
 
@@ -352,9 +372,9 @@ impl CashFlowSchedule {
     ///
     /// Each row must pass [`CashFlow::validate`] (finite amounts, a finite
     /// non-negative `accrual_factor`, a reset date not after the payment date,
-    /// consistent accrual metadata); the rows are then sorted exactly as
-    /// [`Self::from_parts`] does. Cross-flow economic invariants (principal
-    /// reconciliation, metadata dates) are not checked here; call
+    /// consistent accrual metadata and principal-delta currency); the rows are
+    /// then sorted into canonical schedule order. Cross-flow economic invariants
+    /// (principal reconciliation, metadata dates) are not checked here; call
     /// [`Self::validate`] for those.
     ///
     /// # Arguments
@@ -368,8 +388,8 @@ impl CashFlowSchedule {
     ///
     /// # Errors
     ///
-    /// Returns the first row's validation error (`Error::Validation` or
-    /// `Error::Input`) when any row is invalid.
+    /// Returns the first row's validation error (`Error::Validation`,
+    /// `Error::Input`, or `Error::CurrencyMismatch`) when any row is invalid.
     ///
     /// # Examples
     ///
@@ -411,7 +431,7 @@ impl CashFlowSchedule {
         for flow in &flows {
             flow.validate()?;
         }
-        Ok(Self::from_parts(flows, notional, day_count, meta))
+        Ok(Self::from_flows_unchecked(flows, notional, day_count, meta))
     }
 
     /// Return the canonical ordered cashflows.
@@ -458,7 +478,7 @@ impl CashFlowSchedule {
         for flow in &mut self.flows {
             update(flow);
         }
-        sort_flows(&mut self.flows);
+        self.flows.sort_by(compare_flows);
     }
 
     /// Fallible variant of [`Self::update_flows`].
@@ -479,7 +499,7 @@ impl CashFlowSchedule {
         for flow in &mut self.flows {
             update(flow)?;
         }
-        sort_flows(&mut self.flows);
+        self.flows.sort_by(compare_flows);
         Ok(())
     }
 
@@ -491,7 +511,7 @@ impl CashFlowSchedule {
     /// Add one cashflow and restore canonical ordering.
     pub fn push_flow(&mut self, flow: CashFlow) {
         self.flows.push(flow);
-        sort_flows(&mut self.flows);
+        self.flows.sort_by(compare_flows);
     }
 
     /// Start a cashflow builder.
@@ -572,7 +592,7 @@ impl CashFlowSchedule {
                 *delta = delta.checked_mul_f64(scale)?;
             }
         }
-        sort_flows(&mut self.flows);
+        self.flows.sort_by(compare_flows);
         Ok(self)
     }
 
@@ -739,7 +759,7 @@ impl CashFlowSchedule {
         // An inception recipe cannot be reapplied to the rebased opening balance.
         self.notional.amort = super::AmortizationSpec::None;
         self.flows.retain(|cf| cf.date >= as_of);
-        sort_flows(&mut self.flows);
+        self.flows.sort_by(compare_flows);
         Ok(self)
     }
 
@@ -764,12 +784,12 @@ impl CashFlowSchedule {
     ///     CashFlow::new(date, None, Money::from((50_000_i64, Currency::USD)), CFKind::Fixed, 0.5, Some(0.05)),
     ///     CashFlow::new(date, None, Money::from((100_000_i64, Currency::USD)), CFKind::Amortization, 0.0, None),
     /// ];
-    /// let schedule = CashFlowSchedule::from_parts(
+    /// let schedule = CashFlowSchedule::from_flows(
     ///     flows,
     ///     Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
     ///     DayCount::Act365F,
     ///     CashFlowMeta::default(),
-    /// );
+    /// ).expect("valid cashflow rows");
     ///
     /// let coupons: Vec<_> = schedule.coupons().collect();
     /// assert_eq!(coupons.len(), 1);
@@ -846,7 +866,7 @@ impl CashFlowSchedule {
     /// Returns error if:
     /// - `meta.issue_date` is unset
     /// - Currency mismatch between flows and notional
-    pub fn outstanding_by_date(&self) -> finstack_quant_core::Result<crate::DatedFlows> {
+    pub fn outstanding_by_date(&self) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
         let issue = self.meta.issue_date.ok_or_else(|| {
             finstack_quant_core::Error::Validation(
                 "outstanding_by_date: schedule.meta.issue_date is required to identify the initial funding flow"
@@ -875,7 +895,7 @@ impl CashFlowSchedule {
     ///
     /// # Returns
     ///
-    /// Validated [`crate::DatedFlows`] in schedule order.
+    /// Validated `Vec<(Date, Money)>` in schedule order.
     ///
     /// # Errors
     ///
@@ -900,12 +920,12 @@ impl CashFlowSchedule {
     /// assert_eq!(schedule.dated_flows()?[0].1.currency(), Currency::USD);
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
-    pub fn dated_flows(&self) -> finstack_quant_core::Result<crate::DatedFlows> {
+    pub fn dated_flows(&self) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
         self.validate_native_cash()?;
         Ok(self.settlement_rows())
     }
 
-    pub(crate) fn settlement_rows(&self) -> crate::DatedFlows {
+    pub(crate) fn settlement_rows(&self) -> Vec<(Date, Money)> {
         self.flows
             .iter()
             .filter(|flow| flow.kind.is_cash_settlement())
@@ -1107,7 +1127,7 @@ where
     calendar_ids.dedup();
     crate::fixings::normalize_projected_fixings(&mut projected_fixings);
 
-    CashFlowSchedule::from_parts(
+    CashFlowSchedule::from_flows_unchecked(
         flows,
         notional,
         day_count,
@@ -1361,8 +1381,149 @@ mod tests {
         )
     }
 
+    fn assert_every_row_order_is_canonical(rows: Vec<CashFlow>) {
+        fn canonical_json(rows: &[CashFlow]) -> String {
+            let schedule = CashFlowSchedule::from_flows(
+                rows.to_vec(),
+                Notional::par(1_000.0, Currency::USD).expect("notional"),
+                DayCount::Act360,
+                CashFlowMeta::default(),
+            )
+            .expect("valid rows");
+            serde_json::to_string(schedule.get_flows()).expect("serializable rows")
+        }
+        fn visit(rows: &mut [CashFlow], index: usize, expected: &str) {
+            if index == rows.len() {
+                assert_eq!(canonical_json(rows), expected);
+                return;
+            }
+            for next in index..rows.len() {
+                rows.swap(index, next);
+                visit(rows, index + 1, expected);
+                rows.swap(index, next);
+            }
+        }
+        let expected = canonical_json(&rows);
+        visit(&mut rows.clone(), 0, &expected);
+        let schedules: Vec<_> = rows
+            .into_iter()
+            .map(|row| {
+                CashFlowSchedule::from_flows(
+                    vec![row],
+                    Notional::par(1_000.0, Currency::USD).expect("notional"),
+                    DayCount::Act360,
+                    CashFlowMeta::default(),
+                )
+                .expect("valid row")
+            })
+            .collect();
+        for order in [schedules.clone(), schedules.into_iter().rev().collect()] {
+            let merged = merge_cashflow_schedules(
+                order,
+                Notional::par(1_000.0, Currency::USD).expect("notional"),
+                DayCount::Act360,
+            );
+            assert_eq!(
+                serde_json::to_string(merged.get_flows()).expect("serializable merge"),
+                expected
+            );
+        }
+    }
+
     #[test]
-    fn from_flows_validates_every_row_and_from_parts_does_not() {
+    fn canonical_order_distinguishes_kinds_with_shared_economic_ranks() {
+        let date = Date::from_calendar_date(2025, Month::June, 15).expect("date");
+        for (first, second) in [
+            (CFKind::Fixed, CFKind::FloatReset),
+            (CFKind::Fee, CFKind::CommitmentFee),
+            (CFKind::Recovery, CFKind::AccruedOnDefault),
+            (CFKind::Notional, CFKind::RevolvingDraw),
+            (CFKind::InitialMarginPost, CFKind::MarginInterest),
+        ] {
+            assert_eq!(kind_rank(first), kind_rank(second));
+            assert_every_row_order_is_canonical(vec![
+                flow(date, 1.0, first),
+                flow(date, 1.0, second),
+            ]);
+        }
+    }
+
+    #[test]
+    fn canonical_order_preserves_exact_decimal_values_and_representation() {
+        let date = Date::from_calendar_date(2025, Month::June, 15).expect("date");
+        let money = |value| Money::from_decimal_str(value, Currency::USD).expect("exact money");
+        let low = money("1.000000000000000001");
+        let high = money("1.000000000000000002");
+        assert_eq!(low.amount(), high.amount(), "fixture must collide as f64");
+        let with_amount = |amount| CashFlow {
+            amount,
+            ..flow(date, 1.0, CFKind::Fixed)
+        };
+        assert_eq!(
+            compare_flows(&with_amount(low), &with_amount(high)),
+            std::cmp::Ordering::Less
+        );
+        assert_every_row_order_is_canonical(vec![
+            with_amount(high),
+            with_amount(low),
+            with_amount(money("1.0")),
+            with_amount(money("1.00")),
+        ]);
+        let with_delta = |value| flow(date, 1.0, CFKind::Notional).with_principal_delta(value);
+        assert_eq!(
+            compare_flows(&with_delta(low), &with_delta(high)),
+            std::cmp::Ordering::Less
+        );
+        assert_every_row_order_is_canonical(vec![
+            with_delta(high),
+            with_delta(low),
+            with_delta(money("1.0")),
+            with_delta(money("1.00")),
+        ]);
+    }
+
+    #[test]
+    fn canonical_order_distinguishes_all_day_count_metadata() {
+        let start = Date::from_calendar_date(2025, Month::March, 15).expect("start");
+        let end = Date::from_calendar_date(2025, Month::June, 15).expect("end");
+        let conventions = [
+            DayCount::OneOne,
+            DayCount::Act360,
+            DayCount::Act365F,
+            DayCount::Act365L,
+            DayCount::Thirty360,
+            DayCount::ThirtyE360,
+            DayCount::ThirtyE360Isda,
+            DayCount::Thirty360It,
+            DayCount::Nl365,
+            DayCount::ActAct,
+            DayCount::ActActIsma,
+            DayCount::ActActAfb,
+            DayCount::Bus252,
+        ];
+        let with_day_count = |day_count| {
+            flow(end, 1.0, CFKind::Fixed).with_accrual(CashFlowAccrual {
+                start,
+                end,
+                day_count,
+                projected_index_rate: None,
+                calendar_id: Some("weekends_only".into()),
+                coupon_period: Some((start, end)),
+                end_is_termination_date: false,
+            })
+        };
+        for (index, first) in conventions.iter().enumerate() {
+            for second in &conventions[index + 1..] {
+                assert_every_row_order_is_canonical(vec![
+                    with_day_count(*first),
+                    with_day_count(*second),
+                ]);
+            }
+        }
+    }
+
+    #[test]
+    fn from_flows_validates_every_row_and_from_flows_unchecked_does_not() {
         let date = Date::from_calendar_date(2025, Month::June, 15).expect("date");
         let negative_accrual = CashFlow {
             accrual_factor: -1.0,
@@ -1373,7 +1534,9 @@ mod tests {
             ..flow(date, 10.0, CFKind::Fixed)
         };
         let notional = Notional::par(1_000.0, Currency::USD).expect("notional");
-        for bad in [negative_accrual, late_reset] {
+        let mismatched_currency = flow(date, -98.0, CFKind::Notional)
+            .with_principal_delta(Money::from((100_i64, Currency::EUR)));
+        for bad in [negative_accrual, late_reset, mismatched_currency] {
             assert!(CashFlowSchedule::from_flows(
                 vec![flow(date, 1.0, CFKind::Fixed), bad.clone()],
                 notional.clone(),
@@ -1381,7 +1544,7 @@ mod tests {
                 CashFlowMeta::default(),
             )
             .is_err());
-            let raw = CashFlowSchedule::from_parts(
+            let raw = CashFlowSchedule::from_flows_unchecked(
                 vec![bad],
                 notional.clone(),
                 DayCount::Act360,
@@ -1404,7 +1567,7 @@ mod tests {
         let issue = Date::from_calendar_date(2025, Month::January, 1).expect("issue");
         let pik = issue.add_months(3).expect("valid date shift");
         let maturity = issue.add_months(6).expect("valid date shift");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(issue, -98.0, CFKind::Notional)
                     .with_principal_delta(Money::from((100_i64, Currency::USD))),
@@ -1451,7 +1614,7 @@ mod tests {
             coupon_period: None,
             end_is_termination_date: true,
         });
-        let raw = CashFlowSchedule::from_parts(
+        let raw = CashFlowSchedule::from_flows_unchecked(
             vec![pik, flow(maturity, 106.0, CFKind::Notional)],
             Notional::par(100.0, Currency::USD).expect("notional"),
             DayCount::Thirty360,
@@ -1547,7 +1710,7 @@ mod tests {
     #[test]
     fn scale_amounts_restores_canonical_order_under_sign_flip() {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(date, 100.0, CFKind::Amortization),
                 flow(date, 200.0, CFKind::Amortization),
@@ -1573,9 +1736,9 @@ mod tests {
     }
 
     #[test]
-    fn from_parts_sorts_by_date_then_kind_rank() {
+    fn from_flows_unchecked_sorts_by_date_then_kind_rank() {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(date, 10.0, CFKind::Recovery),
                 flow(date, 12.0, CFKind::Amortization),
@@ -1597,7 +1760,7 @@ mod tests {
     fn validate_rejects_over_amortization() {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
 
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![flow(date, 150.0, CFKind::Amortization)],
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
@@ -1613,7 +1776,7 @@ mod tests {
     #[test]
     fn serde_is_structural_and_requires_explicit_economic_validation() {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-        let unvalidated = CashFlowSchedule::from_parts(
+        let unvalidated = CashFlowSchedule::from_flows_unchecked(
             vec![flow(date, 150.0, CFKind::Amortization)],
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
@@ -1634,7 +1797,7 @@ mod tests {
     fn merge_cashflow_schedules_merges_meta_and_resorts() {
         let d1 = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let d2 = Date::from_calendar_date(2025, Month::February, 15).expect("valid date");
-        let left = CashFlowSchedule::from_parts(
+        let left = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(d2, 4.0, CFKind::Recovery).with_accrual(CashFlowAccrual {
                     coupon_period: None,
@@ -1657,7 +1820,7 @@ mod tests {
                 maturity: None,
             },
         );
-        let right = CashFlowSchedule::from_parts(
+        let right = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(d1, 10.0, CFKind::Amortization).with_accrual(CashFlowAccrual {
                     coupon_period: None,
@@ -1717,13 +1880,13 @@ mod tests {
     #[test]
     fn merge_cashflow_schedules_preserves_mixed_currency_rows() {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-        let usd = CashFlowSchedule::from_parts(
+        let usd = CashFlowSchedule::from_flows_unchecked(
             vec![flow(date, 100.0, CFKind::Notional)],
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta::default(),
         );
-        let eur = CashFlowSchedule::from_parts(
+        let eur = CashFlowSchedule::from_flows_unchecked(
             vec![CashFlow::new(
                 date,
                 None,
@@ -1757,13 +1920,13 @@ mod tests {
     #[test]
     fn merge_cashflow_schedules_marks_mixed_projection_as_projected() {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-        let contractual = CashFlowSchedule::from_parts(
+        let contractual = CashFlowSchedule::from_flows_unchecked(
             vec![flow(date, 100.0, CFKind::Fixed)],
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta::default(),
         );
-        let projected = CashFlowSchedule::from_parts(
+        let projected = CashFlowSchedule::from_flows_unchecked(
             vec![flow(date, 1.0, CFKind::FloatReset)],
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
@@ -1789,7 +1952,7 @@ mod tests {
     fn validation_counts_delayed_funding_before_amortization() {
         let issue = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let repayment = Date::from_calendar_date(2025, Month::July, 15).expect("valid date");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(issue, -100.0, CFKind::Notional),
                 flow(repayment, 30.0, CFKind::Amortization),
@@ -1810,7 +1973,7 @@ mod tests {
     #[test]
     fn retired_accrual_sidecars_are_rejected() {
         let end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![flow(end, 12.5, CFKind::Fixed)],
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
@@ -1832,7 +1995,7 @@ mod tests {
     fn deserialization_routes_unsorted_flows_through_canonical_constructor() {
         let early = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let late = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(early, 1.0, CFKind::Fixed),
                 flow(late, 2.0, CFKind::Fixed),
@@ -1861,7 +2024,7 @@ mod tests {
             day_count: DayCount::Act360,
             projected_index_rate: Some(0.031),
         };
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(d2, 12.5, CFKind::Fixed).with_accrual(accrual.clone()),
                 flow(d1, 100.0, CFKind::Notional),
@@ -1883,7 +2046,7 @@ mod tests {
         let d1 = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
         let d2 = Date::from_calendar_date(2027, Month::January, 1).expect("valid date");
 
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(d1, 500_000.0, CFKind::Amortization),
                 flow(d2, 500_000.0, CFKind::Amortization),
@@ -1998,7 +2161,7 @@ mod tests {
             let mut row = flow(date, amount, CFKind::Fixed);
             row.principal_delta =
                 delta.map(|value| Money::new(value, Currency::USD).expect("money"));
-            let schedule = CashFlowSchedule::from_parts(
+            let schedule = CashFlowSchedule::from_flows_unchecked(
                 vec![row],
                 Notional::par(0.0, Currency::USD).expect("notional"),
                 DayCount::Act365F,
@@ -2011,7 +2174,7 @@ mod tests {
     fn shifted_principal_schedule(payment: Date, economic: Date) -> CashFlowSchedule {
         let issue = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
-        CashFlowSchedule::from_parts(
+        CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(issue, -100.0, CFKind::Notional),
                 flow(payment, 50.0, CFKind::Amortization).with_principal_date(economic),
@@ -2147,7 +2310,7 @@ mod tests {
     fn wal_counts_revolving_repayments() {
         let issue = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![flow(maturity, 100.0, CFKind::RevolvingRepayment)],
             Notional::par(100.0, Currency::USD).expect("notional"),
             DayCount::Thirty360,
@@ -2166,7 +2329,7 @@ mod tests {
         let usd = flow(date, 100.0, CFKind::Fixed);
         let mut eur = usd.clone();
         eur.amount = Money::from((100_i64, Currency::EUR));
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![usd, eur],
             Notional::par(100.0, Currency::USD).expect("notional"),
             DayCount::Act365F,

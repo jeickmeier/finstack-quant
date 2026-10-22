@@ -14,9 +14,7 @@
 //! - PSA (Public Securities Association). "Standard Prepayment Model", 1985.
 //! - Moody's Investors Service. "WARF®: Measuring Portfolio Credit Risk in CLOs."
 
-use finstack_quant_cashflows::builder::{
-    clamped_cdr_to_mdr, clamped_cpr_to_smm, mdr_to_cdr, psa_cpr,
-};
+use finstack_quant_cashflows::builder::{annual_to_monthly_clamped, monthly_to_annual, psa_cpr};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
@@ -111,7 +109,7 @@ fn test_psa_golden_smm_conversion() {
     // 6% CPR → SMM = 1 - 0.94^(1/12) = 0.51430...%
     let cpr: f64 = 0.06;
     let expected_smm = 1.0 - (1.0 - cpr).powf(1.0 / 12.0);
-    let actual_smm = clamped_cpr_to_smm(cpr);
+    let actual_smm = annual_to_monthly_clamped(cpr);
 
     assert!(
         (actual_smm - expected_smm).abs() < RATE_TOLERANCE,
@@ -145,7 +143,7 @@ fn test_cdr_mdr_golden_conversion() {
 
     for (cdr, label) in test_cases {
         let expected_mdr = 1.0 - (1.0 - cdr).powf(1.0 / 12.0);
-        let actual_mdr = clamped_cdr_to_mdr(cdr);
+        let actual_mdr = annual_to_monthly_clamped(cdr);
 
         assert!(
             (actual_mdr - expected_mdr).abs() < RATE_TOLERANCE,
@@ -156,7 +154,7 @@ fn test_cdr_mdr_golden_conversion() {
         );
 
         // Verify roundtrip
-        let cdr_back = mdr_to_cdr(actual_mdr).expect("valid MDR");
+        let cdr_back = monthly_to_annual(actual_mdr).expect("valid MDR");
         assert!(
             (cdr_back - cdr).abs() < RATE_TOLERANCE,
             "{}: roundtrip failed: {} -> {} -> {}",
@@ -174,7 +172,7 @@ fn test_cdr_mdr_golden_2_percent() {
     // Reference: Moody's CLO methodology
 
     let cdr = 0.02;
-    let mdr = clamped_cdr_to_mdr(cdr);
+    let mdr = annual_to_monthly_clamped(cdr);
 
     // Expected: 1 - 0.98^(1/12) = 0.0016833...
     let expected = 1.0 - 0.98_f64.powf(1.0 / 12.0);

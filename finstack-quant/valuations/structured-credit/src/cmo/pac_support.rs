@@ -6,7 +6,7 @@
 //! the PAC.
 
 use crate::cmo::types::PacCollar;
-use finstack_quant_cashflows::builder::{clamped_cpr_to_smm, psa_cpr};
+use finstack_quant_cashflows::builder::{annual_to_monthly_clamped, psa_cpr};
 use finstack_quant_valuations_fixed_income::mbs_passthrough::pricer::pool_month_step;
 
 /// Dated contractual PAC principal target, in the tranche currency's major units.
@@ -217,7 +217,7 @@ fn project_principal_stream(
 /// keeping PAC/Support projection consistent with the rest of the workspace.
 #[inline]
 fn psa_to_smm(speed_multiplier: f64, month: u32) -> f64 {
-    clamped_cpr_to_smm(psa_cpr(speed_multiplier, month))
+    annual_to_monthly_clamped(psa_cpr(speed_multiplier, month))
 }
 
 #[cfg(test)]
@@ -393,7 +393,7 @@ mod tests {
         // helper across a PSA grid, including high-speed clamping behavior.
         for &psa in &[0.0, 0.5, 1.0, 2.0, 3.0, 18.0] {
             for &month in &[1u32, 15, 30, 60, 360] {
-                let canonical = clamped_cpr_to_smm(psa_cpr(psa, month));
+                let canonical = annual_to_monthly_clamped(psa_cpr(psa, month));
                 let got = psa_to_smm(psa, month);
                 assert!(
                     (got - canonical).abs() < 1e-12,

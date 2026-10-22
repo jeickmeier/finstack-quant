@@ -3615,7 +3615,7 @@ export interface StochasticPricingResult {
    * @minItems 2
    * @maxItems 2
    */
-  pv_confidence_interval: [unknown, unknown];
+  pv_confidence_interval: [number, number];
   /**
    * Sample standard error of the mean PV estimate, in the NPV currency.
    *

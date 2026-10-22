@@ -125,9 +125,9 @@ pub(super) struct SimulationState<'a> {
     /// Cumulative revolver repayments diverted to replenish the reserve.
     pub(super) reserve_replenished: Money,
     /// End-of-period reserve balances.
-    pub(super) reserve_balance_path: DatedFlows,
+    pub(super) reserve_balance_path: Vec<(Date, Money)>,
     /// Reserve interest earned per period, before routing.
-    pub(super) reserve_interest_paid: DatedFlows,
+    pub(super) reserve_interest_paid: Vec<(Date, Money)>,
 }
 
 /// One coverage test as the waterfall executor evaluated it in a period.
@@ -213,13 +213,13 @@ pub struct SimulationDiagnostics {
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
     )]
-    pub reserve_balance_path: DatedFlows,
+    pub reserve_balance_path: Vec<(Date, Money)>,
     /// Reserve interest earned each period, before routing to its destination.
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
     )]
-    pub reserve_interest_paid: DatedFlows,
+    pub reserve_interest_paid: Vec<(Date, Money)>,
     /// Collateral draws funded from the reserve account over the simulation.
     pub draws_from_reserve: Money,
     /// Collateral draws funded from principal collections over the simulation.

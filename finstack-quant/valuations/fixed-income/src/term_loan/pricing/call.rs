@@ -4,10 +4,10 @@ use crate::bond::pricing::tree::BondValuator;
 use crate::term_loan::{LoanCall, LoanCallType, TermLoan};
 use finstack_quant_cashflows::accrual::AccrualIndex;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
 /// Exercise-date claims on one loan schedule. The outstanding path and both
@@ -15,7 +15,7 @@ use finstack_quant_core::Result;
 /// exercise date does not rebuild them.
 pub(crate) struct ExerciseClaims<'a> {
     schedule: &'a CashFlowSchedule,
-    outstanding: DatedFlows,
+    outstanding: Vec<(Date, Money)>,
     cash: AccrualIndex,
     total: AccrualIndex,
 }

@@ -14,7 +14,7 @@ use finstack_quant_core::{
 use time::macros::date;
 
 fn schedule(values: &[Option<f64>]) -> CashFlowSchedule {
-    CashFlowSchedule::from_parts(
+    CashFlowSchedule::from_flows(
         vec![],
         Notional::par(1.0, Currency::USD).unwrap(),
         DayCount::Act360,
@@ -30,6 +30,7 @@ fn schedule(values: &[Option<f64>]) -> CashFlowSchedule {
             ..Default::default()
         },
     )
+    .expect("valid cashflow rows")
 }
 
 #[test]

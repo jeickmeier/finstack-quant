@@ -391,11 +391,10 @@
       "accruedInterestAmount",
       "aggregateByPeriod",
       "aggregateCashflowsChecked",
+      "annualToMonthly",
       "buildCashflowSchedule",
       "buildCashflowScheduleJson",
       "calendarYearLadder",
-      "cdrToMdr",
-      "cprToSmm",
       "datedFlows",
       "datedFlowsJson",
       "defaultModelSpecCumulativeDefaultFraction",
@@ -413,11 +412,12 @@
       "floatingRateSpecSonia",
       "floatingRateSpecValidate",
       "materializeFixings",
-      "mdrToCdr",
       "mergeCashflowSchedules",
+      "monthlyToAnnual",
       "notionalPar",
       "notionalValidate",
-      "prepaymentModelSpecPsa100",
+      "periodAggregationGetAmount",
+      "periodAggregationGetPeriod",
       "prepaymentModelSpecSmm",
       "prepaymentModelSpecValidate",
       "recoveryModelSpecRecoveryRate",
@@ -436,7 +436,6 @@
       "scheduleParamsUsdTreasury",
       "scheduleParamsValidate",
       "schema",
-      "smmToCpr",
       "validateCashflowScheduleJson"
     ]
   },
@@ -508,6 +507,9 @@
   "cashflows.aggregateCashflowsChecked": {
     "kind": "function"
   },
+  "cashflows.annualToMonthly": {
+    "kind": "function"
+  },
   "cashflows.buildCashflowSchedule": {
     "kind": "function"
   },
@@ -515,12 +517,6 @@
     "kind": "function"
   },
   "cashflows.calendarYearLadder": {
-    "kind": "function"
-  },
-  "cashflows.cdrToMdr": {
-    "kind": "function"
-  },
-  "cashflows.cprToSmm": {
     "kind": "function"
   },
   "cashflows.datedFlows": {
@@ -574,10 +570,10 @@
   "cashflows.materializeFixings": {
     "kind": "function"
   },
-  "cashflows.mdrToCdr": {
+  "cashflows.mergeCashflowSchedules": {
     "kind": "function"
   },
-  "cashflows.mergeCashflowSchedules": {
+  "cashflows.monthlyToAnnual": {
     "kind": "function"
   },
   "cashflows.notionalPar": {
@@ -586,7 +582,10 @@
   "cashflows.notionalValidate": {
     "kind": "function"
   },
-  "cashflows.prepaymentModelSpecPsa100": {
+  "cashflows.periodAggregationGetAmount": {
+    "kind": "function"
+  },
+  "cashflows.periodAggregationGetPeriod": {
     "kind": "function"
   },
   "cashflows.prepaymentModelSpecSmm": {
@@ -638,9 +637,6 @@
     "kind": "function"
   },
   "cashflows.scheduleParamsValidate": {
-    "kind": "function"
-  },
-  "cashflows.smmToCpr": {
     "kind": "function"
   },
   "cashflows.validateCashflowScheduleJson": {

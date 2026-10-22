@@ -151,7 +151,7 @@ for kind in ["clo","abs","cmbs","rmbs"]:
         "recovery":s["recovery_spec"]["rate"],
         "recovery_lag_months":s["recovery_spec"]["recovery_lag"]})
 print(pd.DataFrame(preset_rows))
-print(pd.DataFrame([{"months":age,"PSA100_SMM":PrepaymentModelSpec.psa_100().smm(age),
+print(pd.DataFrame([{"months":age,"PSA100_SMM":PrepaymentModelSpec.psa(1.0).smm(age),
     "PSA200_SMM":PrepaymentModelSpec.psa(2).smm(age),
     "CMBS60_lockout_SMM":PrepaymentModelSpec.cmbs_with_lockout(60,.10).smm(age)} for age in [1,12,30,59,60,72]]))
 ```

@@ -385,7 +385,7 @@ export type MarketMapping =
          * by the factor so that the factor move preserves the intended overall
          * shock size while localizing it along the tenor axis.
          */
-        tenor_weights: [unknown, unknown][];
+        tenor_weights: [number, number][];
         [k: string]: unknown;
       };
     }
@@ -406,7 +406,7 @@ export type MarketMapping =
          * @minItems 2
          * @maxItems 2
          */
-        pair: [unknown, unknown];
+        pair: [Currency, Currency];
         [k: string]: unknown;
       };
     }
@@ -423,132 +423,6 @@ export type MarketMapping =
         [k: string]: unknown;
       };
     };
-/**
- * Declarative matcher configuration that can be serialized and rebuilt.
- */
-export type MatchingConfig =
-  | {
-      mapping_table: MappingRule[];
-    }
-  | {
-      cascade: MatchingConfig[];
-    }
-  | {
-      hierarchical: HierarchicalConfig;
-    }
-  | {
-      credit_hierarchical: CreditHierarchicalConfig;
-    };
-/**
- * Classification of a curve dependency's role.
- */
-export type CurveType = "discount" | "forward" | "hazard" | "inflation" | "base_correlation";
-/**
- * Classification used by dependency filters and declarative matching config.
- */
-export type DependencyType = "discount" | "forward" | "credit" | "spot" | "vol" | "fx" | "series";
-/**
- * Resolved regression mode stored in the calibrated artifact.
- *
- * A `BucketOnly` issuer's betas are all 1.0 and carry no fit statistics.
- */
-export type IssuerBetaMode = "issuer_beta" | "bucket_only";
-/**
- * Risk measure used when aggregating factor exposures.
- */
-export type RiskMeasure =
-  | "variance"
-  | "volatility"
-  | {
-      var: {
-        /**
-         * Confidence level in the open interval `(0.5, 1)`.
-         */
-        confidence: number;
-        [k: string]: unknown;
-      };
-    }
-  | {
-      expected_shortfall: {
-        /**
-         * Confidence level in the open interval `(0.5, 1)`.
-         */
-        confidence: number;
-        [k: string]: unknown;
-      };
-    };
-/**
- * Policy for handling dependencies that do not match any factor.
- *
- * Serializes in `snake_case`, matching the crate-wide wire convention and
- * this type's own `Display` representation.
- */
-export type UnmatchedPolicy = "strict" | "warn";
-/**
- * Sole supported credit-factor-model contract marker.
- */
-export type CreditFactorModelSchema = "finstack_quant.credit_factor_model/1";
-/**
- * Volatility model for a single factor.
- *
- * The `Sample` variant stores a single variance estimate; `Ewma` additionally
- * persists the smoothing parameter used at calibration time.
- */
-export type FactorVolModel =
-  | {
-      sample: {
-        /**
-         * Annualized variance estimate for this factor.
-         */
-        variance: number;
-      };
-    }
-  | {
-      ewma: {
-        /**
-         * Smoothing parameter λ ∈ (0, 1) used at calibration time.
-         */
-        lambda: number;
-        /**
-         * Annualized one-step-ahead variance forecast.
-         */
-        variance: number;
-      };
-    };
-/**
- * Volatility model for an issuer's idiosyncratic adder.
- *
- * Mirrors [`FactorVolModel`] in structure; kept separate so per-issuer and
- * per-factor models can diverge independently in later PRs.
- */
-export type IdiosyncraticVolModel =
-  | {
-      sample: {
-        /**
-         * Annualized variance of the issuer's idiosyncratic adder.
-         */
-        variance: number;
-        [k: string]: unknown;
-      };
-    }
-  | {
-      ewma: {
-        /**
-         * Smoothing parameter λ ∈ (0, 1) used at calibration time.
-         */
-        lambda: number;
-        /**
-         * Annualized one-step-ahead variance forecast for the idiosyncratic
-         * adder.
-         */
-        variance: number;
-        [k: string]: unknown;
-      };
-    };
-/**
- * Which credit metric drives the toggle decision.
- */
-export type CreditStateVariable = "hazard_rate" | "distance_to_default" | "leverage";
 /**
  * ISO 4217 currency enumeration
  */
@@ -712,6 +586,132 @@ export type Currency =
   | "ZAR"
   | "ZMW"
   | "ZWL";
+/**
+ * Declarative matcher configuration that can be serialized and rebuilt.
+ */
+export type MatchingConfig =
+  | {
+      mapping_table: MappingRule[];
+    }
+  | {
+      cascade: MatchingConfig[];
+    }
+  | {
+      hierarchical: HierarchicalConfig;
+    }
+  | {
+      credit_hierarchical: CreditHierarchicalConfig;
+    };
+/**
+ * Classification of a curve dependency's role.
+ */
+export type CurveType = "discount" | "forward" | "hazard" | "inflation" | "base_correlation";
+/**
+ * Classification used by dependency filters and declarative matching config.
+ */
+export type DependencyType = "discount" | "forward" | "credit" | "spot" | "vol" | "fx" | "series";
+/**
+ * Resolved regression mode stored in the calibrated artifact.
+ *
+ * A `BucketOnly` issuer's betas are all 1.0 and carry no fit statistics.
+ */
+export type IssuerBetaMode = "issuer_beta" | "bucket_only";
+/**
+ * Risk measure used when aggregating factor exposures.
+ */
+export type RiskMeasure =
+  | "variance"
+  | "volatility"
+  | {
+      var: {
+        /**
+         * Confidence level in the open interval `(0.5, 1)`.
+         */
+        confidence: number;
+        [k: string]: unknown;
+      };
+    }
+  | {
+      expected_shortfall: {
+        /**
+         * Confidence level in the open interval `(0.5, 1)`.
+         */
+        confidence: number;
+        [k: string]: unknown;
+      };
+    };
+/**
+ * Policy for handling dependencies that do not match any factor.
+ *
+ * Serializes in `snake_case`, matching the crate-wide wire convention and
+ * this type's own `Display` representation.
+ */
+export type UnmatchedPolicy = "strict" | "warn";
+/**
+ * Sole supported credit-factor-model contract marker.
+ */
+export type CreditFactorModelSchema = "finstack_quant.credit_factor_model/1";
+/**
+ * Volatility model for a single factor.
+ *
+ * The `Sample` variant stores a single variance estimate; `Ewma` additionally
+ * persists the smoothing parameter used at calibration time.
+ */
+export type FactorVolModel =
+  | {
+      sample: {
+        /**
+         * Annualized variance estimate for this factor.
+         */
+        variance: number;
+      };
+    }
+  | {
+      ewma: {
+        /**
+         * Smoothing parameter λ ∈ (0, 1) used at calibration time.
+         */
+        lambda: number;
+        /**
+         * Annualized one-step-ahead variance forecast.
+         */
+        variance: number;
+      };
+    };
+/**
+ * Volatility model for an issuer's idiosyncratic adder.
+ *
+ * Mirrors [`FactorVolModel`] in structure; kept separate so per-issuer and
+ * per-factor models can diverge independently in later PRs.
+ */
+export type IdiosyncraticVolModel =
+  | {
+      sample: {
+        /**
+         * Annualized variance of the issuer's idiosyncratic adder.
+         */
+        variance: number;
+        [k: string]: unknown;
+      };
+    }
+  | {
+      ewma: {
+        /**
+         * Smoothing parameter λ ∈ (0, 1) used at calibration time.
+         */
+        lambda: number;
+        /**
+         * Annualized one-step-ahead variance forecast for the idiosyncratic
+         * adder.
+         */
+        variance: number;
+        [k: string]: unknown;
+      };
+    };
+/**
+ * Which credit metric drives the toggle decision.
+ */
+export type CreditStateVariable = "hazard_rate" | "distance_to_default" | "leverage";
 /**
  * Exact decimal encoded only as a JSON string.
  */
@@ -1139,7 +1139,7 @@ export type ProcessSpec =
        * order. A cash dividend is a non-negative amount in spot units and
        * a proportional dividend a non-negative decimal fraction of spot.
        */
-      dividends: [unknown, unknown][];
+      dividends: [number, Dividend][];
       /**
        * Diffusion parameters between dividend dates. Set `q` to zero when
        * every dividend is listed explicitly.
@@ -2110,7 +2110,7 @@ export interface AttributeFilter {
   /**
    * Metadata key/value pairs that must all match exactly.
    */
-  meta?: [unknown, unknown][];
+  meta?: [string, string][];
   /**
    * Tags that must all be present on the instrument.
    */
@@ -3262,21 +3262,21 @@ export interface DieboldLi {
    * @minItems 3
    * @maxItems 3
    */
-  mu?: [unknown, unknown, unknown] | null;
+  mu?: [number[], number, null] | null;
   /**
    * VAR(1) coefficient matrix Phi.
    *
    * @minItems 3
    * @maxItems 3
    */
-  phi?: [unknown, unknown, unknown] | null;
+  phi?: [number[], number, number] | null;
   /**
    * VAR(1) residual covariance Q.
    *
    * @minItems 3
    * @maxItems 3
    */
-  q_cov?: [unknown, unknown, unknown] | null;
+  q_cov?: [number[], number, number] | null;
   /**
    * Tenor grid from the input panel.
    */
@@ -3298,7 +3298,7 @@ export interface FactorTimeSeries {
    * @minItems 3
    * @maxItems 3
    */
-  factors: [unknown, unknown, unknown];
+  factors: [number[], number, number];
   /**
    * R-squared per tenor (length N).
    */
@@ -3313,7 +3313,7 @@ export interface FactorTimeSeries {
    * @minItems 3
    * @maxItems 3
    */
-  residuals: [unknown, unknown, unknown];
+  residuals: [number[], number, number];
   [k: string]: unknown;
 }
 /**
@@ -3387,7 +3387,7 @@ export interface Estimate {
    * @minItems 2
    * @maxItems 2
    */
-  ci_95: [unknown, unknown];
+  ci_95: [number, number];
   /**
    * Optional maximum of captured discounted path values.
    */
@@ -3610,7 +3610,7 @@ export interface GeneratorMatrix {
    * @minItems 3
    * @maxItems 3
    */
-  data: [unknown, unknown, unknown];
+  data: [number[], number, number];
   regularization_l1?: number;
   round_trip_error?: number;
   scale: RatingScale;
@@ -4084,7 +4084,7 @@ export interface MoneyEstimate {
    * @minItems 2
    * @maxItems 2
    */
-  ci_95: [unknown, unknown];
+  ci_95: [Money, Money];
   /**
    * Optional maximum of captured discounted path values.
    */
@@ -4398,7 +4398,7 @@ export interface PathPoint {
    * Amounts follow the sign convention `positive = inflow`,
    * `negative = outflow`.
    */
-  cashflows?: [unknown, unknown, unknown][];
+  cashflows?: [number, number, CashflowType][];
   /**
    * Optional payoff snapshot at this point.
    *
@@ -5058,7 +5058,7 @@ export interface RatingPath {
   /**
    * Transition events as (time, state_index) pairs, starting with (0.0, s₀).
    */
-  transitions: [unknown, unknown][];
+  transitions: [number, number][];
   [k: string]: unknown;
 }
 /**
@@ -5402,7 +5402,7 @@ export interface SeniorityCalibration {
   /**
    * Per-seniority Beta recovery parameters.
    */
-  classes: [unknown, unknown][];
+  classes: [SeniorityClass, BetaRecovery][];
   /**
    * Source label (e.g., "Moody's 1982-2023").
    */
@@ -5657,7 +5657,7 @@ export interface TransitionMatrix {
    * @minItems 3
    * @maxItems 3
    */
-  data: [unknown, unknown, unknown];
+  data: [number[], number, number];
   horizon: number;
   scale: RatingScale;
 }
@@ -5794,7 +5794,7 @@ export interface YieldPanel {
    * @minItems 3
    * @maxItems 3
    */
-  yields: [unknown, unknown, unknown];
+  yields: [number[], number, number];
   [k: string]: unknown;
 }
 /**
@@ -5815,21 +5815,21 @@ export interface YieldPca {
    * @minItems 3
    * @maxItems 3
    */
-  loadings: [unknown, unknown, unknown];
+  loadings: [number[], number, number];
   /**
    * Mean yield change vector (length N), subtracted before PCA.
    *
    * @minItems 3
    * @maxItems 3
    */
-  mean_change: [unknown, unknown, unknown];
+  mean_change: [number[], number, null];
   /**
    * Scores matrix: (T-1) dates x K components.
    *
    * @minItems 3
    * @maxItems 3
    */
-  scores: [unknown, unknown, unknown];
+  scores: [number[], number, number];
   /**
    * Tenor grid (length N).
    */

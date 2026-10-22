@@ -579,7 +579,7 @@ export type PikSchedule =
       uniform: PikMode;
     }
   | {
-      stepped: [unknown, unknown][];
+      stepped: [number, PikMode][];
     };
 /**
  * Per-coupon PIK behavior for the MC engine.
@@ -863,7 +863,7 @@ export type AmortizationSpec =
         /**
          * Ordered list of `(date, remaining_principal_after_date)`.
          */
-        schedule: [unknown, unknown][];
+        schedule: [DateWire, Money][];
       };
     }
   | {
@@ -903,7 +903,7 @@ export type AmortizationSpec =
         /**
          * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
          */
-        items: [unknown, unknown][];
+        items: [DateWire, Money][];
       };
     };
 /**
@@ -2246,7 +2246,7 @@ export type MarketMapping =
          * by the factor so that the factor move preserves the intended overall
          * shock size while localizing it along the tenor axis.
          */
-        tenor_weights: [unknown, unknown][];
+        tenor_weights: [number, number][];
         [k: string]: unknown;
       };
     }
@@ -2267,7 +2267,7 @@ export type MarketMapping =
          * @minItems 2
          * @maxItems 2
          */
-        pair: [unknown, unknown];
+        pair: [Currency, Currency];
         [k: string]: unknown;
       };
     }
@@ -3451,7 +3451,7 @@ export type CommodityFutureFixing =
       /**
        * Official prices already fixed, keyed by observation date.
        */
-      past_fixings?: [unknown, unknown][];
+      past_fixings?: [DateWire, number][];
       type: "arithmetic_average";
     };
 /**
@@ -3939,7 +3939,7 @@ export type ReserveTarget =
        * @minItems 2
        * @maxItems 2
        */
-      max: [unknown, unknown];
+      max: [ReserveTarget, ReserveTarget];
     };
 /**
  * How a shifting-interest schedule value is read.
@@ -4186,7 +4186,7 @@ export type ExprNode =
        * @minItems 2
        * @maxItems 2
        */
-      call: [unknown, unknown];
+      call: [Function, Expr[]];
     }
   | {
       bin_op: {
@@ -4232,6 +4232,59 @@ export type ExprNode =
         then_expr: Expr;
       };
     };
+/**
+ * Built-in function identifiers.
+ */
+export type Function =
+  | "lag"
+  | "lead"
+  | "diff"
+  | "pct_change"
+  | "cum_sum"
+  | "cum_prod"
+  | "cum_min"
+  | "cum_max"
+  | "rolling_mean"
+  | "rolling_sum"
+  | "ewm_mean"
+  | "std"
+  | "var"
+  | "median"
+  | "rolling_std"
+  | "rolling_var"
+  | "rolling_median"
+  | "shift"
+  | "rank"
+  | "quantile"
+  | "rolling_min"
+  | "rolling_max"
+  | "rolling_count"
+  | "ewm_std"
+  | "ewm_var"
+  | "sum"
+  | "mean"
+  | "annualize"
+  | "annualize_rate"
+  | "ttm"
+  | "ytd"
+  | "qtd"
+  | "fiscal_ytd"
+  | "coalesce"
+  | "min"
+  | "max"
+  | "abs"
+  | "sign"
+  | "growth_rate"
+  | "pow"
+  | "round"
+  | "floor"
+  | "ceil"
+  | "ln"
+  | "exp"
+  | "log10"
+  | "sqrt"
+  | "clamp"
+  | "is_missing";
 /**
  * Binary operators for expressions.
  */
@@ -4284,7 +4337,7 @@ export type CurveState =
       /**
        * Time/value pairs used to construct the curve
        */
-      knot_points: [unknown, unknown][];
+      knot_points: [number, number][];
       /**
        * Minimum forward rate floor (if set)
        */
@@ -4331,7 +4384,7 @@ export type CurveState =
       /**
        * Time/value pairs used to construct the curve
        */
-      knot_points: [unknown, unknown][];
+      knot_points: [number, number][];
       /**
        * Optional contractual reset/end-date boundaries.
        *
@@ -4388,7 +4441,7 @@ export type CurveState =
       /**
        * Time/value pairs used to construct the curve
        */
-      knot_points: [unknown, unknown][];
+      knot_points: [number, number][];
       /**
        * Hazard-rate cap the curve was built with, when it differs from the
        * default of 10; absent for curves built with the default.
@@ -4401,7 +4454,7 @@ export type CurveState =
       /**
        * Par spread points for reporting
        */
-      par_points: [unknown, unknown][];
+      par_points: [number, number][];
       /**
        * Recovery rate
        */
@@ -4444,7 +4497,7 @@ export type CurveState =
       /**
        * Time/value pairs used to construct the curve
        */
-      knot_points: [unknown, unknown][];
+      knot_points: [number, number][];
       /**
        * Source interpolation and accumulated time origin for a rolled curve.
        */
@@ -4481,7 +4534,7 @@ export type CurveState =
       /**
        * Time/value pairs used to construct the curve
        */
-      knot_points: [unknown, unknown][];
+      knot_points: [number, number][];
       /**
        * Source interpolation and accumulated time origin for a rolled curve.
        */
@@ -4520,7 +4573,7 @@ export type CurveState =
       /**
        * Time/value pairs used to construct the curve.
        */
-      knot_points: [unknown, unknown][];
+      knot_points: [number, number][];
       /**
        * Source interpolation and accumulated time origin for a rolled curve.
        */
@@ -4995,59 +5048,6 @@ export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor
  * amount per one such unit.
  */
 export type MoveUnit = "basis_point" | "vol_point" | "percent" | "price_unit";
-/**
- * Built-in function identifiers.
- */
-export type Function =
-  | "lag"
-  | "lead"
-  | "diff"
-  | "pct_change"
-  | "cum_sum"
-  | "cum_prod"
-  | "cum_min"
-  | "cum_max"
-  | "rolling_mean"
-  | "rolling_sum"
-  | "ewm_mean"
-  | "std"
-  | "var"
-  | "median"
-  | "rolling_std"
-  | "rolling_var"
-  | "rolling_median"
-  | "shift"
-  | "rank"
-  | "quantile"
-  | "rolling_min"
-  | "rolling_max"
-  | "rolling_count"
-  | "ewm_std"
-  | "ewm_var"
-  | "sum"
-  | "mean"
-  | "annualize"
-  | "annualize_rate"
-  | "ttm"
-  | "ytd"
-  | "qtd"
-  | "fiscal_ytd"
-  | "coalesce"
-  | "min"
-  | "max"
-  | "abs"
-  | "sign"
-  | "growth_rate"
-  | "pow"
-  | "round"
-  | "floor"
-  | "ceil"
-  | "ln"
-  | "exp"
-  | "log10"
-  | "sqrt"
-  | "clamp"
-  | "is_missing";
 
 /**
  * Advance rate applied to one collateral class.
@@ -5757,7 +5757,7 @@ export interface MertonMcConfig {
    * these factors instead of the flat `discount_rate`. The flat rate is
    * still used for the Merton risk-neutral drift.
    */
-  cashflow_dfs?: [unknown, unknown][] | null;
+  cashflow_dfs?: [number, number][] | null;
   /**
    * Optional dynamic (notional-dependent) recovery rate model.
    *
@@ -5813,7 +5813,7 @@ export interface MertonMcCalibrationSpec {
    * @minItems 2
    * @maxItems 2
    */
-  bracket?: [unknown, unknown] | null;
+  bracket?: [number, number] | null;
   /**
    * Number of independent MC estimators used during calibration iterations (low paths).
    */
@@ -6498,7 +6498,7 @@ export interface AsianOption {
    * provide the historical fixings here. Only fixings that match dates in
    * `fixing_dates` and are on or before the valuation date are considered.
    */
-  past_fixings?: [unknown, unknown][];
+  past_fixings?: [DateWire, number][];
   /**
    * Number of underlying units the option is written on; PV and Greeks scale linearly with it.
    */
@@ -7809,7 +7809,7 @@ export interface StepUpCouponSpec {
    * applied here. The rate is set at accrual start (per market
    * convention for step-up bonds).
    */
-  step_schedule: [unknown, unknown][];
+  step_schedule: [DateWire, DecimalWire][];
   /**
    * Stub-handling rule used when the start/end dates do not fit an exact
    * whole number of periods.
@@ -7916,7 +7916,7 @@ export interface CashFlowAccrual {
    * @minItems 2
    * @maxItems 2
    */
-  coupon_period?: [unknown, unknown] | null;
+  coupon_period?: [DateWire, DateWire] | null;
   /**
    * Day-count convention used for the accrual factor.
    */
@@ -9356,7 +9356,7 @@ export interface AttributeFilter {
   /**
    * Metadata key/value pairs that must all match exactly.
    */
-  meta?: [unknown, unknown][];
+  meta?: [string, string][];
   /**
    * Tags that must all be present on the instrument.
    */
@@ -12379,7 +12379,7 @@ export interface CapFloor {
    * @minItems 2
    * @maxItems 2
    */
-  premium?: [unknown, unknown] | null;
+  premium?: [DateWire, Money] | null;
   /**
    * Option type
    */
@@ -13088,7 +13088,7 @@ export interface CreditDefaultSwap {
    * @minItems 2
    * @maxItems 2
    */
-  upfront?: [unknown, unknown] | null;
+  upfront?: [DateWire, Money] | null;
   /**
    * Valuation presentation convention.
    *
@@ -13261,7 +13261,7 @@ export interface CdsIndex {
    * @minItems 2
    * @maxItems 2
    */
-  upfront?: [unknown, unknown] | null;
+  upfront?: [DateWire, Money] | null;
   /**
    * Version number within series
    */
@@ -13412,7 +13412,7 @@ export interface CdsTranche {
    * @minItems 2
    * @maxItems 2
    */
-  upfront?: [unknown, unknown] | null;
+  upfront?: [DateWire, Money] | null;
 }
 /**
  * Credit option instrument (option on CDS spread or clean index price)
@@ -13600,7 +13600,7 @@ export interface Equity {
   /**
    * Optional discrete cash dividends `(ex_date, amount)` for single-name forwards.
    */
-  discrete_dividends?: [unknown, unknown][];
+  discrete_dividends?: [DateWire, number][];
   /**
    * Market-scalar id of the unitless continuous dividend yield (decimal,
    * 0.02 = 2%). `None` means a zero dividend yield.
@@ -13684,7 +13684,7 @@ export interface EquityOption {
    * - Haug, Haug, Lewis (2003). "Back to Basics: a new approach to the
    *   discrete dividend problem"
    */
-  discrete_dividends?: [unknown, unknown][];
+  discrete_dividends?: [DateWire, number][];
   /**
    * Optional continuous dividend yield identifier.
    *
@@ -15612,7 +15612,7 @@ export interface CommodityAsianOption {
   /**
    * Already observed fixings for seasoned options (ex-date, price pairs).
    */
-  past_fixings?: [unknown, unknown][];
+  past_fixings?: [DateWire, number][];
   /**
    * Contract quantity in commodity units.
    */
@@ -15896,7 +15896,7 @@ export interface CommoditySwap {
    * substitution of today's spot . Observations on or
    * after the valuation date project from the price curve.
    */
-  past_fixings?: [unknown, unknown][];
+  past_fixings?: [DateWire, number][];
   /**
    * Notional quantity per period.
    */
@@ -16303,7 +16303,7 @@ export interface EquityFuture {
   /**
    * Optional discrete dividends `(ex_date, amount)` in index points.
    */
-  discrete_dividends?: [unknown, unknown][];
+  discrete_dividends?: [DateWire, number][];
   /**
    * Optional continuous dividend-yield scalar in decimal annual units.
    */
@@ -16578,7 +16578,7 @@ export interface Autocallable {
    * missed memory coupons, discrete knock-in monitoring) and only the
    * remaining future observation dates are simulated.
    */
-  past_fixings?: [unknown, unknown][];
+  past_fixings?: [DateWire, number][];
   /**
    * Explicit path model selection.
    *
@@ -16688,7 +16688,7 @@ export interface CliquetOption {
    * returns are computed deterministically from these fixings (with local
    * cap/floor applied) and only the remaining future periods are simulated.
    */
-  past_fixings?: [unknown, unknown][];
+  past_fixings?: [DateWire, number][];
   /**
    * Explicit path model selection.
    *
@@ -17249,7 +17249,7 @@ export interface EquityTotalReturnSwap {
    * When non-empty, pricing uses explicit period dividend pass-through and does
    * not add continuous-yield dividend return to avoid double counting.
    */
-  discrete_dividends?: [unknown, unknown][];
+  discrete_dividends?: [DateWire, number][];
   /**
    * Settlement timing for explicit manufactured dividends.
    *
@@ -17318,7 +17318,7 @@ export interface EquityTotalReturnSwap {
    * may use live spot. Pricing errors when any other required fixing is
    * unavailable.
    */
-  past_fixings?: [unknown, unknown][];
+  past_fixings?: [DateWire, number][];
   /**
    * Scenario-only pricing adjustments.
    */
@@ -17846,7 +17846,7 @@ export interface RealEstateAsset {
    *
    * When present, cashflows are valued as `NOI - CapEx` (unlevered net cash flow).
    */
-  capex_schedule?: [unknown, unknown][] | null;
+  capex_schedule?: [DateWire, number][] | null;
   /**
    * Currency for valuation.
    */
@@ -17890,7 +17890,7 @@ export interface RealEstateAsset {
    * would understate those values by 12x/4x. Flows dated exactly on the
    * valuation `as_of` are included in PV undiscounted (t = 0).
    */
-  noi_schedule: [unknown, unknown][];
+  noi_schedule: [DateWire, number][];
   /**
    * Optional property type classification (for reporting).
    */
@@ -17990,7 +17990,7 @@ export interface DiscountedCashFlow {
   /**
    * Explicit period free cash flows (date, amount pairs).
    */
-  flows: [unknown, unknown][];
+  flows: [DateWire, number][];
   /**
    * Unique identifier for the DCF.
    */
@@ -18102,7 +18102,7 @@ export interface EquityBridge {
    * Named adjustments (e.g., unfunded pension, contingent liabilities).
    * Positive values increase equity; negative values decrease it.
    */
-  other_adjustments?: [unknown, unknown][];
+  other_adjustments?: [string, number][];
   /**
    * Preferred stock at liquidation preference.
    */
@@ -19712,7 +19712,7 @@ export interface DiscountCurveTransform {
   /**
    * Original, untransformed interpolation pillars.
    */
-  source_points: [unknown, unknown][];
+  source_points: [number, number][];
 }
 /**
  * A flat function representation: repeated shocks merge on a breakpoint union
@@ -19758,7 +19758,7 @@ export interface ForwardCurveTransform {
   /**
    * Original interpolation pillars, independent of current curve samples.
    */
-  source_points: [unknown, unknown][];
+  source_points: [number, number][];
 }
 /**
  * Exact valuation-layer inputs required to replay a hazard-curve calibration.
@@ -19821,7 +19821,7 @@ export interface InterpRollState {
   /**
    * Source pillars `(time, value)` in the source curve's own coordinates.
    */
-  source_points: [unknown, unknown][];
+  source_points: [number, number][];
 }
 /**
  * Dividend schedule for an equity or ETF underlying.
@@ -19887,24 +19887,24 @@ export interface FxMatrixState {
    * Required: a snapshot that omits it would silently re-derive those
    * dates from the provider instead of restoring the pinned fixings.
    */
-  pinned_quotes: [unknown, unknown, unknown, unknown, unknown][];
+  pinned_quotes: [Currency, Currency, string, FxConversionPolicy, number][];
   /**
    * Captured date/policy-scoped provider quotes. These override captured
    * pair-global provider quotes for their scope while remaining below
    * explicit matrix quotes in either direction. Required even when empty.
    */
-  provider_pinned_quotes: [unknown, unknown, unknown, unknown, unknown][];
+  provider_pinned_quotes: [Currency, Currency, string, FxConversionPolicy, number][];
   /**
    * Captured provider quotes, below explicit global and date/policy-pinned
    * quotes in lookup priority. Market-context restoration uses these to
    * rebuild a quote-only provider; arbitrary live provider behavior is not
    * serialized. Required even when the provider has no snapshot quotes.
    */
-  provider_quotes: [unknown, unknown, unknown][];
+  provider_quotes: [Currency, Currency, number][];
   /**
    * Pair-global quotes as source, target, rate tuples.
    */
-  quotes: [unknown, unknown, unknown][];
+  quotes: [Currency, Currency, number][];
 }
 /**
  * Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour.
@@ -20080,7 +20080,7 @@ export interface InflationIndex {
   /**
    * Observations as (date, value) pairs
    */
-  observations: [unknown, unknown][];
+  observations: [DateWire, number][];
   /**
    * Explicit monthly observation availability; no release dates are inferred.
    */
@@ -20145,7 +20145,7 @@ export interface ScalarTimeSeries {
   /**
    * Observations as (date, value) pairs
    */
-  observations: [unknown, unknown][];
+  observations: [DateWire, number][];
 }
 /**
  * Volatility surface defined on expiry × strike grid.

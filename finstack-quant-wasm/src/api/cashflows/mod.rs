@@ -88,58 +88,30 @@ pub fn dated_flows_json(schedule_json: JsValue) -> Result<String, JsValue> {
     finstack_quant_cashflows::dated_flows_json(schedule_json).map_err(to_js_err)
 }
 
-/// Convert an annual CPR (constant prepayment rate) to a monthly SMM.
+/// Convert annual conditional prepayment or default mortality to monthly mortality.
 ///
-/// Uses the standard relationship `SMM = 1 - (1 - CPR)^(1/12)` (Fabozzi's
-/// MBS handbook).
+/// Uses `monthly = 1 - (1 - annual)^(1/12)` with twelve monthly periods.
 ///
-/// @param cpr - Annualized CPR as a decimal in `[0, 1]` (0.06 means 6%).
-/// @returns Monthly SMM as a decimal.
-/// @throws If `cpr` is negative, non-finite, or above 1.0.
-#[wasm_bindgen(js_name = cprToSmm)]
-pub fn cpr_to_smm(cpr: JsValue) -> Result<f64, JsValue> {
-    let cpr = js_f64(&cpr, "cpr")?;
-    finstack_quant_cashflows::builder::cpr_to_smm(cpr).map_err(to_js_err)
+/// @param annual - Finite annual mortality as a decimal in `[0, 1]` (CPR or CDR); no calendar day-count adjustment applies.
+/// @returns Monthly mortality as a decimal; zero and one map to themselves.
+/// @throws If `annual` is not a number (kind `invalid_type`), is non-finite, or lies outside `[0, 1]` (kind `validation`).
+#[wasm_bindgen(js_name = annualToMonthly)]
+pub fn annual_to_monthly(annual: JsValue) -> Result<f64, JsValue> {
+    let annual = js_f64(&annual, "annual")?;
+    finstack_quant_cashflows::builder::annual_to_monthly(annual).map_err(to_js_err)
 }
 
-/// Convert a monthly SMM (single monthly mortality) to an annual CPR.
+/// Convert monthly conditional prepayment or default mortality to annual mortality.
 ///
-/// Uses `CPR = 1 - (1 - SMM)^12`.
+/// Uses `annual = 1 - (1 - monthly)^12` with twelve monthly periods.
 ///
-/// @param smm - Monthly SMM as a decimal in `[0, 1]`.
-/// @returns Annualized CPR as a decimal.
-/// @throws If `smm` is negative, non-finite, or above 1.0.
-#[wasm_bindgen(js_name = smmToCpr)]
-pub fn smm_to_cpr(smm: JsValue) -> Result<f64, JsValue> {
-    let smm = js_f64(&smm, "smm")?;
-    finstack_quant_cashflows::builder::smm_to_cpr(smm).map_err(to_js_err)
-}
-
-/// Convert an annual CDR (constant default rate) to a monthly MDR.
-///
-/// Default and prepayment mortality rates share the same annual-to-monthly
-/// conversion kernel: `MDR = 1 - (1 - CDR)^(1/12)`.
-///
-/// @param cdr - Constant annual default rate as a decimal in `[0, 1]`.
-/// @returns Monthly MDR as a decimal.
-/// @throws If `cdr` is negative, non-finite, or above 1.0.
-#[wasm_bindgen(js_name = cdrToMdr)]
-pub fn cdr_to_mdr(cdr: JsValue) -> Result<f64, JsValue> {
-    let cdr = js_f64(&cdr, "cdr")?;
-    finstack_quant_cashflows::builder::cdr_to_mdr(cdr).map_err(to_js_err)
-}
-
-/// Convert a monthly MDR (monthly default rate) to an annual CDR.
-///
-/// Uses `CDR = 1 - (1 - MDR)^12`.
-///
-/// @param mdr - Monthly default rate as a decimal in `[0, 1]`.
-/// @returns Annualized CDR as a decimal.
-/// @throws If `mdr` is negative, non-finite, or above 1.0.
-#[wasm_bindgen(js_name = mdrToCdr)]
-pub fn mdr_to_cdr(mdr: JsValue) -> Result<f64, JsValue> {
-    let mdr = js_f64(&mdr, "mdr")?;
-    finstack_quant_cashflows::builder::mdr_to_cdr(mdr).map_err(to_js_err)
+/// @param monthly - Finite monthly mortality as a decimal in `[0, 1]` (SMM or MDR); no calendar day-count adjustment applies.
+/// @returns Annual mortality as a decimal; zero and one map to themselves.
+/// @throws If `monthly` is not a number (kind `invalid_type`), is non-finite, or lies outside `[0, 1]` (kind `validation`).
+#[wasm_bindgen(js_name = monthlyToAnnual)]
+pub fn monthly_to_annual(monthly: JsValue) -> Result<f64, JsValue> {
+    let monthly = js_f64(&monthly, "monthly")?;
+    finstack_quant_cashflows::builder::monthly_to_annual(monthly).map_err(to_js_err)
 }
 
 /// Convert an ABS speed to the single-month mortality for a seasoning month.

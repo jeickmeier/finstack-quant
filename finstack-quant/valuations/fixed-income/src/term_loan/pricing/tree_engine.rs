@@ -1059,13 +1059,14 @@ mod tests {
             call_friction_cents,
             time_steps: vec![0.0, 1.0],
             origin: date!(2025 - 01 - 01),
-            schedule: finstack_quant_cashflows::builder::CashFlowSchedule::from_parts(
+            schedule: finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
                 Vec::new(),
                 finstack_quant_cashflows::builder::Notional::par(outstanding, Currency::USD)
                     .expect("notional"),
                 finstack_quant_core::dates::DayCount::Act360,
                 Default::default(),
-            ),
+            )
+            .expect("valid cashflow rows"),
         }
     }
 

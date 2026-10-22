@@ -4,60 +4,38 @@
 //! These conversions apply to both prepayment rates (CPR/SMM) and
 //! default rates (CDR/MDR), as they use identical mathematical formulas.
 
-/// Convert annual CPR (constant prepayment rate) to monthly SMM (single monthly mortality).
+/// Convert an annual conditional prepayment or default rate to its monthly rate.
 ///
-/// Uses the standard relationship (per Fabozzi's MBS handbook):
-/// `SMM = 1 - (1 - CPR)^(1/12)`.
+/// Uses `monthly = 1 - (1 - annual)^(1/12)` for both CPR/SMM and CDR/MDR.
 ///
 /// # Arguments
 ///
-/// * `cpr` - Annualized CPR or CDR as a decimal, for example `0.06` for 6%.
+/// * `annual` - Finite annual conditional mortality as a decimal in `[0, 1]`;
+///   `0.06` represents 6% CPR or CDR. No calendar day-count adjustment is applied.
 ///
 /// # Returns
 ///
-/// Monthly SMM or MDR as a decimal.
-///
-/// # Edge Cases
-///
-/// - CPR = 0: Returns 0.0 (no prepayment)
-/// - CPR = 100%: Returns 100% SMM.
+/// Monthly conditional mortality as a decimal. Zero and one map to themselves.
 ///
 /// # Errors
 ///
-/// Returns `Error::Validation("cpr must be a decimal in [0,1]; got …")` if
-/// CPR is negative, non-finite, or above 100%.
+/// Returns `Error::Validation` if `annual` is non-finite or outside `[0, 1]`.
 ///
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_cashflows::builder::cpr_to_smm;
-///
-/// // Convert 6% CPR to SMM
-/// let cpr = 0.06;
-/// let smm = cpr_to_smm(cpr).unwrap();
-/// assert!((smm - 0.005143).abs() < 0.0001); // Approximately 0.5143% monthly
-///
-/// // Edge case: 100% CPR maps to 100% SMM
-/// let smm_100 = cpr_to_smm(1.0).unwrap();
-/// assert_eq!(smm_100, 1.0);
-///
-/// // Negative CPR is rejected
-/// assert!(cpr_to_smm(-0.05).is_err());
+/// use finstack_quant_cashflows::builder::annual_to_monthly;
+/// assert!((annual_to_monthly(0.06)? - 0.0051430128).abs() < 1e-10);
+/// assert_eq!(annual_to_monthly(1.0)?, 1.0);
+/// assert!(annual_to_monthly(-0.05).is_err());
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
-pub fn cpr_to_smm(cpr: f64) -> finstack_quant_core::Result<f64> {
-    annual_to_monthly("cpr", cpr)
-}
-
-/// Checked annual-to-monthly mortality kernel shared by
-/// [`cpr_to_smm`] and [`cdr_to_mdr`]; `name` labels the rate in errors.
-fn annual_to_monthly(name: &str, annual: f64) -> finstack_quant_core::Result<f64> {
-    check_unit_interval(name, annual)?;
+pub fn annual_to_monthly(annual: f64) -> finstack_quant_core::Result<f64> {
+    check_unit_interval("annual", annual)?;
     if annual == 0.0 {
         return Ok(0.0);
     }
-    // `expm1` retains precision for small mortality rates. This matters for
-    // finite-difference risk measures, where rounding in two nearby PVs can be
-    // amplified by the final subtraction.
+    // Retain precision for small mortality rates and finite-difference risks.
     Ok(-((1.0 - annual).ln() / 12.0).exp_m1())
 }
 
@@ -112,49 +90,37 @@ pub fn psa_cpr(speed_multiplier: f64, seasoning_months: u32) -> f64 {
     base * speed_multiplier
 }
 
-/// Convert monthly SMM to annual CPR.
+/// Convert a monthly conditional prepayment or default rate to its annual rate.
 ///
-/// # Formula
-///
-/// `annual = 1 - (1 - monthly)^12`
+/// Uses `annual = 1 - (1 - monthly)^12` for both SMM/CPR and MDR/CDR.
 ///
 /// # Arguments
 ///
-/// * `smm` - Monthly SMM or MDR as a decimal in `[0, 1]`.
+/// * `monthly` - Finite monthly conditional mortality as a decimal in `[0, 1]`;
+///   `0.01` represents 1% SMM or MDR. Annualization uses twelve monthly periods.
 ///
 /// # Returns
 ///
-/// Annualized CPR or CDR as a decimal.
+/// Annual conditional mortality as a decimal. Zero and one map to themselves.
 ///
 /// # Errors
 ///
-/// Returns `Error::Validation("smm must be a decimal in [0,1]; got …")` for
-/// negative, non-finite, or above-`1.0` inputs.
+/// Returns `Error::Validation` if `monthly` is non-finite or outside `[0, 1]`.
 ///
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_cashflows::builder::{cpr_to_smm, smm_to_cpr};
-///
-/// // Roundtrip conversion
-/// let cpr = 0.06;
-/// let smm = cpr_to_smm(cpr).unwrap();
-/// let cpr_back = smm_to_cpr(smm).unwrap();
-/// assert!((cpr - cpr_back).abs() < 1e-10);
+/// use finstack_quant_cashflows::builder::{annual_to_monthly, monthly_to_annual};
+/// let monthly = annual_to_monthly(0.06)?;
+/// assert!((monthly_to_annual(monthly)? - 0.06).abs() < 1e-14);
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
-pub fn smm_to_cpr(smm: f64) -> finstack_quant_core::Result<f64> {
-    monthly_to_annual("smm", smm)
-}
-
-/// Checked monthly-to-annual mortality kernel shared by
-/// [`smm_to_cpr`] and [`mdr_to_cdr`]; `name` labels the rate in errors.
-fn monthly_to_annual(name: &str, monthly: f64) -> finstack_quant_core::Result<f64> {
-    check_unit_interval(name, monthly)?;
+pub fn monthly_to_annual(monthly: f64) -> finstack_quant_core::Result<f64> {
+    check_unit_interval("monthly", monthly)?;
     if monthly == 0.0 {
         return Ok(0.0);
     }
-    // `1 - (1 - m)^12` through `expm1`/`ln_1p`, which keeps precision for
-    // small mortality rates exactly like the annual-to-monthly direction.
+    // Keep precision for small mortality rates with expm1/ln_1p.
     Ok(-(12.0 * (-monthly).ln_1p()).exp_m1())
 }
 
@@ -167,50 +133,6 @@ fn check_unit_interval(name: &str, value: f64) -> finstack_quant_core::Result<()
         )));
     }
     Ok(())
-}
-
-/// Convert annual CDR (constant default rate) to monthly MDR.
-///
-/// Default and prepayment mortality rates use the same annual-to-monthly
-/// conversion. This named entry point keeps domain terminology explicit while
-/// delegating to the single checked kernel.
-///
-/// Computes `MDR = 1 - (1 - CDR)^(1/12)`, with rates represented as decimal
-/// probabilities (`0.06` means 6% annually).
-///
-/// # Arguments
-///
-/// * `cdr` - Constant annual default rate as a finite decimal probability in
-///   `[0, 1]`, where `0.06` represents 6% per year.
-///
-/// # Errors
-///
-/// Returns `Error::Validation("cdr must be a decimal in [0,1]; got …")` if
-/// `cdr` is non-finite or outside `[0, 1]`.
-pub fn cdr_to_mdr(cdr: f64) -> finstack_quant_core::Result<f64> {
-    annual_to_monthly("cdr", cdr)
-}
-
-/// Convert monthly MDR to annual CDR.
-///
-/// Default and prepayment mortality rates use the same monthly-to-annual
-/// conversion. This named entry point keeps domain terminology explicit while
-/// delegating to the single checked kernel.
-///
-/// Computes `CDR = 1 - (1 - MDR)^12`, with rates represented as decimal
-/// probabilities (`0.01` means 1% monthly).
-///
-/// # Arguments
-///
-/// * `mdr` - Monthly default rate as a finite decimal probability in `[0, 1]`,
-///   where `0.01` represents 1% for one month.
-///
-/// # Errors
-///
-/// Returns `Error::Validation("mdr must be a decimal in [0,1]; got …")` if
-/// `mdr` is non-finite or outside `[0, 1]`.
-pub fn mdr_to_cdr(mdr: f64) -> finstack_quant_core::Result<f64> {
-    monthly_to_annual("mdr", mdr)
 }
 
 /// Convert an ABS speed to the single-month mortality for a seasoning month.
@@ -287,10 +209,10 @@ mod tests {
     #[test]
     fn rate_errors_name_the_rate_the_caller_passed() {
         for (result, name) in [
-            (cdr_to_mdr(1.2), "cdr"),
-            (mdr_to_cdr(-0.1), "mdr"),
-            (cpr_to_smm(1.2), "cpr"),
-            (smm_to_cpr(f64::NAN), "smm"),
+            (annual_to_monthly(1.2), "annual"),
+            (monthly_to_annual(-0.1), "monthly"),
+            (annual_to_monthly(f64::INFINITY), "annual"),
+            (monthly_to_annual(f64::NAN), "monthly"),
         ] {
             let message = result.expect_err("out-of-range rate").to_string();
             assert!(
@@ -301,41 +223,35 @@ mod tests {
     }
 
     #[test]
-    fn default_rate_names_share_the_checked_kernel() {
-        let annual = 0.02;
-        let monthly = cdr_to_mdr(annual).expect("valid CDR");
-        assert_eq!(monthly, cpr_to_smm(annual).expect("valid annual rate"));
-        assert_eq!(
-            mdr_to_cdr(monthly).expect("valid MDR"),
-            smm_to_cpr(monthly).expect("valid monthly rate")
-        );
-    }
-
-    #[test]
     fn annual_to_monthly_uses_stable_kernel() {
         let annual = 0.02;
         let expected = -((1.0_f64 - annual).ln() / 12.0).exp_m1();
-        assert_eq!(cpr_to_smm(annual).expect("valid annual rate"), expected);
+        assert_eq!(
+            annual_to_monthly(annual).expect("valid annual rate"),
+            expected
+        );
     }
 
     #[test]
     fn conversion_boundaries_and_invalid_inputs() {
         let conversions = [
             (
-                "CPR to SMM",
-                cpr_to_smm as fn(f64) -> finstack_quant_core::Result<f64>,
+                "annual to monthly",
+                annual_to_monthly as fn(f64) -> finstack_quant_core::Result<f64>,
             ),
             (
-                "SMM to CPR",
-                smm_to_cpr as fn(f64) -> finstack_quant_core::Result<f64>,
+                "monthly to annual",
+                monthly_to_annual as fn(f64) -> finstack_quant_core::Result<f64>,
             ),
         ];
 
         for (name, convert) in conversions {
-            for (input, expected) in [(0.0, 0.0), (1.0, 1.0)] {
+            for (input, expected) in [(-0.0, 0.0_f64), (0.0, 0.0), (1.0, 1.0)] {
                 assert_eq!(
-                    convert(input).expect("boundary rate should succeed"),
-                    expected,
+                    convert(input)
+                        .expect("boundary rate should succeed")
+                        .to_bits(),
+                    expected.to_bits(),
                     "{name} returned the wrong boundary value"
                 );
             }
@@ -350,34 +266,23 @@ mod tests {
     }
 }
 
-fn convert_clamped(rate: f64, convert: fn(f64) -> finstack_quant_core::Result<f64>) -> f64 {
-    convert(rate.clamp(0.0, 1.0)).unwrap_or(f64::NAN)
-}
-
-/// Annual CPR to monthly SMM with the input clamped into `[0, 1]`.
+/// Convert annual conditional mortality to monthly mortality after clamping.
 ///
-/// Projection loops feed shocked or interpolated rates that may stray just
-/// outside the unit interval; clamping keeps them on the valid branch instead
-/// of failing the whole simulation.
+/// Projection loops can use this for shocked or interpolated CPR/CDR values.
 ///
 /// # Arguments
 ///
-/// * `cpr` - Annual conditional prepayment rate as a decimal; clamped into `[0, 1]`.
+/// * `annual` - Annual conditional prepayment or default rate as a decimal.
+///   Values below zero (including negative infinity) clamp to zero; values above
+///   one (including positive infinity) clamp to one. NaN remains NaN.
+///
+/// # Returns
+///
+/// Monthly mortality in `[0, 1]`, or NaN when the input is NaN.
 #[inline]
 #[must_use]
-pub fn clamped_cpr_to_smm(cpr: f64) -> f64 {
-    convert_clamped(cpr, cpr_to_smm)
-}
-
-/// Annual CDR to monthly MDR with the input clamped into `[0, 1]`.
-///
-/// # Arguments
-///
-/// * `cdr` - Annual conditional default rate as a decimal; clamped into `[0, 1]`.
-#[inline]
-#[must_use]
-pub fn clamped_cdr_to_mdr(cdr: f64) -> f64 {
-    convert_clamped(cdr, cdr_to_mdr)
+pub fn annual_to_monthly_clamped(annual: f64) -> f64 {
+    annual_to_monthly(annual.clamp(0.0, 1.0)).unwrap_or(f64::NAN)
 }
 
 #[cfg(test)]
@@ -386,9 +291,16 @@ mod clamped_tests {
 
     #[test]
     fn clamped_conversions_stay_on_the_unit_branch() {
-        assert_eq!(clamped_cpr_to_smm(0.0), 0.0);
-        assert!((clamped_cpr_to_smm(1.5) - 1.0).abs() < 1e-12);
-        assert!(clamped_cpr_to_smm(-0.2) == 0.0);
-        assert!((clamped_cdr_to_mdr(0.02) - cdr_to_mdr(0.02).expect("valid CDR")).abs() < 1e-15);
+        assert_eq!(annual_to_monthly_clamped(0.0), 0.0);
+        assert_eq!(annual_to_monthly_clamped(-0.0).to_bits(), 0.0_f64.to_bits());
+        assert_eq!(annual_to_monthly_clamped(f64::NEG_INFINITY), 0.0);
+        assert_eq!(annual_to_monthly_clamped(f64::INFINITY), 1.0);
+        assert!(annual_to_monthly_clamped(f64::NAN).is_nan());
+        assert!((annual_to_monthly_clamped(1.5) - 1.0).abs() < 1e-12);
+        assert!(annual_to_monthly_clamped(-0.2) == 0.0);
+        assert!(
+            (annual_to_monthly_clamped(0.02) - annual_to_monthly(0.02).expect("valid CDR")).abs()
+                < 1e-15
+        );
     }
 }

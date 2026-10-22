@@ -32,8 +32,8 @@ The flow types themselves (`CashFlow`, `CFKind`, `CashFlowAccrual`) live in
 Crate-root exports also include `CashflowScheduleSource`, `CashflowProvider`,
 `ScheduleBuildOpts`, the `schedule_from_*` adapters, the serde JSON surface
 (`CashflowScheduleBuildSpec`, `build_cashflow_schedule_json`,
-`validate_cashflow_schedule_json`, `dated_flows_json`), and the type aliases
-`DatedFlow = (Date, Money)` and `DatedFlows = Vec<DatedFlow>`.
+`validate_cashflow_schedule_json`, `dated_flows_json`). Dated amounts use
+`(Date, Money)` tuples, collected as `Vec<(Date, Money)>` for schedules.
 
 ## Building a schedule
 
@@ -161,8 +161,7 @@ Discount curves use their own date basis for relative discounting.
 - `CFKind::is_cash_settlement` is the guard for "is this dated cash": `Pik` is a
   capitalization event and `DefaultedNotional` is a write-down, so both return
   `false` and are excluded from `dated_flows_json`.
-- Prepayment/default rate conversions (`cpr_to_smm`, `smm_to_cpr`,
-  `cdr_to_mdr`, `mdr_to_cdr`) live in the private `builder::credit_rates`
+- Prepayment/default rate conversions (`annual_to_monthly`, `monthly_to_annual`) live in the private `builder::credit_rates`
   module and are re-exported from `builder`. They validate their inputs and
   return `Result`.
 - Errors are `finstack_quant_core::Error`; this crate defines no error type of

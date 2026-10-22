@@ -1604,12 +1604,12 @@ export interface CreditContextMetrics {
   /**
    * Cash DSCR by period: `CFADS / (interest_cash + principal)`.
    */
-  dscr: [unknown, unknown][];
+  dscr: [PeriodId, number][];
   /**
    * Fee-inclusive cash DSCR by period:
    * `CFADS / (interest_cash + principal + fees)`.
    */
-  dscr_incl_fees: [unknown, unknown][];
+  dscr_incl_fees: [PeriodId, number][];
   /**
    * Minimum fee-inclusive cash DSCR across all periods.
    */
@@ -1621,7 +1621,7 @@ export interface CreditContextMetrics {
   /**
    * Total DSCR by period: `CFADS / (interest_total + principal)`.
    */
-  dscr_total: [unknown, unknown][];
+  dscr_total: [PeriodId, number][];
   /**
    * Minimum total DSCR across all periods.
    */
@@ -1630,7 +1630,7 @@ export interface CreditContextMetrics {
    * Interest coverage by period:
    * `interest_coverage_node_value / interest_expense_total`.
    */
-  interest_coverage: [unknown, unknown][];
+  interest_coverage: [PeriodId, number][];
   /**
    * Minimum interest coverage across all periods.
    */
@@ -1644,7 +1644,7 @@ export interface CreditContextMetrics {
    * supplies a varying value path; a missing period omits LTV for that
    * period only.
    */
-  ltv: [unknown, unknown][];
+  ltv: [PeriodId, number][];
   /**
    * Periods requested but excluded from one or more coverage series.
    *
@@ -1791,7 +1791,7 @@ export interface EquityBridge {
    * Named adjustments (e.g., unfunded pension, contingent liabilities).
    * Positive values increase equity; negative values decrease it.
    */
-  other_adjustments?: [unknown, unknown][];
+  other_adjustments?: [string, number][];
   /**
    * Preferred stock at liquidation preference.
    */
@@ -1996,7 +1996,7 @@ export interface CreditMapping {
    * @minItems 2
    * @maxItems 2
    */
-  leverage_warn?: [unknown, unknown] | null;
+  leverage_warn?: [number, number] | null;
 }
 /**
  * Optional configuration for DCF valuation beyond the core WACC/terminal parameters.
@@ -2560,7 +2560,7 @@ export interface EffectiveTaxRateCheck {
    * @minItems 2
    * @maxItems 2
    */
-  expected_range: [unknown, unknown];
+  expected_range: [number, number];
   /**
    * Pretax income node.
    */
@@ -2709,7 +2709,7 @@ export interface Exposure {
    * bucket. Knot times must be strictly increasing, finite, and
    * non-negative; EAD values must be finite and non-negative.
    */
-  ead_schedule?: [unknown, unknown][] | null;
+  ead_schedule?: [number, number][] | null;
   /**
    * Effective interest rate (annualized, decimal). Used as the IFRS 9
    * discount rate. Example: 0.05 = 5%.
@@ -2976,7 +2976,7 @@ export interface InterestExpenseReconciliation {
   /**
    * Debt-balance / rate pairs: `(balance_node, optional_rate_node)`.
    */
-  debt_balance_nodes: [unknown, unknown][];
+  debt_balance_nodes: [Id, Id | null][];
   /**
    * Interest expense node (income statement).
    */
@@ -3057,7 +3057,7 @@ export interface ThreeStatementMapping {
    * Debt-balance / optional-rate pairs used to test the implied interest
    * rate against `interest_expense_node`.
    */
-  debt_balance_nodes?: [unknown, unknown][];
+  debt_balance_nodes?: [Id, Id | null][];
   /**
    * Depreciation / amortization expense node (income statement).
    */
@@ -3365,14 +3365,14 @@ export interface LeverageRangeCheck {
    * @minItems 2
    * @maxItems 2
    */
-  error_range: [unknown, unknown];
+  error_range: [number, number];
   /**
    * `(min, max)` range that triggers a warning when exceeded.
    *
    * @minItems 2
    * @maxItems 2
    */
-  warn_range: [unknown, unknown];
+  warn_range: [number, number];
   [k: string]: unknown;
 }
 /**
@@ -3632,7 +3632,7 @@ export interface RatingPdMap {
  * rejected.
  */
 export interface RawPdCurve {
-  knots: [unknown, unknown][];
+  knots: [number, number][];
   rating: string;
 }
 /**
@@ -3905,7 +3905,7 @@ export interface ScorecardMetric {
      * @minItems 2
      * @maxItems 2
      */
-    [k: string]: [unknown, unknown];
+    [k: string]: [number, number];
   };
   /**
    * Weight in overall score (0.0 to 1.0)
@@ -4102,7 +4102,7 @@ export interface WeightedEclResult {
   /**
    * Per-scenario breakdown: (scenario_id, weight, result).
    */
-  scenario_breakdown: [unknown, unknown, unknown][];
+  scenario_breakdown: [string, number, EclResult][];
   /**
    * Assigned IFRS 9 stage.
    */

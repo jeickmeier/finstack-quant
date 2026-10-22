@@ -228,7 +228,7 @@ export type CurveState =
       /**
        * Time/value pairs used to construct the curve
        */
-      knot_points: [unknown, unknown][];
+      knot_points: [number, number][];
       /**
        * Minimum forward rate floor (if set)
        */
@@ -275,7 +275,7 @@ export type CurveState =
       /**
        * Time/value pairs used to construct the curve
        */
-      knot_points: [unknown, unknown][];
+      knot_points: [number, number][];
       /**
        * Optional contractual reset/end-date boundaries.
        *
@@ -332,7 +332,7 @@ export type CurveState =
       /**
        * Time/value pairs used to construct the curve
        */
-      knot_points: [unknown, unknown][];
+      knot_points: [number, number][];
       /**
        * Hazard-rate cap the curve was built with, when it differs from the
        * default of 10; absent for curves built with the default.
@@ -345,7 +345,7 @@ export type CurveState =
       /**
        * Par spread points for reporting
        */
-      par_points: [unknown, unknown][];
+      par_points: [number, number][];
       /**
        * Recovery rate
        */
@@ -388,7 +388,7 @@ export type CurveState =
       /**
        * Time/value pairs used to construct the curve
        */
-      knot_points: [unknown, unknown][];
+      knot_points: [number, number][];
       /**
        * Source interpolation and accumulated time origin for a rolled curve.
        */
@@ -425,7 +425,7 @@ export type CurveState =
       /**
        * Time/value pairs used to construct the curve
        */
-      knot_points: [unknown, unknown][];
+      knot_points: [number, number][];
       /**
        * Source interpolation and accumulated time origin for a rolled curve.
        */
@@ -464,7 +464,7 @@ export type CurveState =
       /**
        * Time/value pairs used to construct the curve.
        */
-      knot_points: [unknown, unknown][];
+      knot_points: [number, number][];
       /**
        * Source interpolation and accumulated time origin for a rolled curve.
        */
@@ -1303,7 +1303,7 @@ export interface DiscountCurveTransform {
   /**
    * Original, untransformed interpolation pillars.
    */
-  source_points: [unknown, unknown][];
+  source_points: [number, number][];
 }
 /**
  * A flat function representation: repeated shocks merge on a breakpoint union
@@ -1335,7 +1335,7 @@ export interface ForwardCurveTransform {
   /**
    * Original interpolation pillars, independent of current curve samples.
    */
-  source_points: [unknown, unknown][];
+  source_points: [number, number][];
 }
 /**
  * Exact valuation-layer inputs required to replay a hazard-curve calibration.
@@ -1398,7 +1398,7 @@ export interface InterpRollState {
   /**
    * Source pillars `(time, value)` in the source curve's own coordinates.
    */
-  source_points: [unknown, unknown][];
+  source_points: [number, number][];
 }
 /**
  * A dated dividend event.
@@ -1549,24 +1549,24 @@ export interface FxMatrixState {
    * Required: a snapshot that omits it would silently re-derive those
    * dates from the provider instead of restoring the pinned fixings.
    */
-  pinned_quotes: [unknown, unknown, unknown, unknown, unknown][];
+  pinned_quotes: [Currency, Currency, string, FxConversionPolicy, number][];
   /**
    * Captured date/policy-scoped provider quotes. These override captured
    * pair-global provider quotes for their scope while remaining below
    * explicit matrix quotes in either direction. Required even when empty.
    */
-  provider_pinned_quotes: [unknown, unknown, unknown, unknown, unknown][];
+  provider_pinned_quotes: [Currency, Currency, string, FxConversionPolicy, number][];
   /**
    * Captured provider quotes, below explicit global and date/policy-pinned
    * quotes in lookup priority. Market-context restoration uses these to
    * rebuild a quote-only provider; arbitrary live provider behavior is not
    * serialized. Required even when the provider has no snapshot quotes.
    */
-  provider_quotes: [unknown, unknown, unknown][];
+  provider_quotes: [Currency, Currency, number][];
   /**
    * Pair-global quotes as source, target, rate tuples.
    */
-  quotes: [unknown, unknown, unknown][];
+  quotes: [Currency, Currency, number][];
 }
 /**
  * A single node in the market data hierarchy tree.
@@ -1661,7 +1661,7 @@ export interface InflationIndex {
   /**
    * Observations as (date, value) pairs
    */
-  observations: [unknown, unknown][];
+  observations: [DateWire, number][];
   /**
    * Explicit monthly observation availability; no release dates are inferred.
    */
@@ -1802,7 +1802,7 @@ export interface ScalarTimeSeries {
   /**
    * Observations as (date, value) pairs
    */
-  observations: [unknown, unknown][];
+  observations: [DateWire, number][];
 }
 /**
  * Volatility surface defined on expiry × strike grid.

@@ -215,13 +215,13 @@ pub struct DatedFlowJson {
     pub amount: Money,
 }
 
-impl From<crate::DatedFlow> for DatedFlowJson {
-    fn from((date, amount): crate::DatedFlow) -> Self {
+impl From<(Date, Money)> for DatedFlowJson {
+    fn from((date, amount): (Date, Money)) -> Self {
         Self { date, amount }
     }
 }
 
-impl From<DatedFlowJson> for crate::DatedFlow {
+impl From<DatedFlowJson> for (Date, Money) {
     fn from(flow: DatedFlowJson) -> Self {
         (flow.date, flow.amount)
     }

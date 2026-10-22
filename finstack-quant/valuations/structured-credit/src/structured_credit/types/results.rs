@@ -3,7 +3,6 @@
 //! This module provides result types for individual tranche valuation within
 //! structured credit instruments (CLO, ABS, RMBS, CMBS).
 
-use finstack_quant_cashflows::DatedFlows;
 use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::money::Money;
@@ -74,7 +73,7 @@ pub struct TrancheCashflows {
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
     )]
-    pub cashflows: DatedFlows,
+    pub cashflows: Vec<(Date, Money)>,
     /// Detailed cashflows with proper classification using CFKind.
     pub detailed_flows: Vec<CashFlow>,
     /// Contractual coupon periods with balances before projected principal events.
@@ -84,19 +83,19 @@ pub struct TrancheCashflows {
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
     )]
-    pub interest_flows: DatedFlows,
+    pub interest_flows: Vec<(Date, Money)>,
     /// Principal cashflows (component of total).
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
     )]
-    pub principal_flows: DatedFlows,
+    pub principal_flows: Vec<(Date, Money)>,
     /// PIK capitalization flows.
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
     )]
-    pub pik_flows: DatedFlows,
+    pub pik_flows: Vec<(Date, Money)>,
     /// Interest DEFERRED to future periods on a non-PIK tranche.
     ///
     /// Non-PIK shortfalls used to be recorded in `pik_flows`. PIK means
@@ -110,13 +109,13 @@ pub struct TrancheCashflows {
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
     )]
-    pub deferred_flows: DatedFlows,
+    pub deferred_flows: Vec<(Date, Money)>,
     /// Write-down flows (loss allocation reducing tranche balance).
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
     )]
-    pub writedown_flows: DatedFlows,
+    pub writedown_flows: Vec<(Date, Money)>,
     /// Final tranche balance after all payments.
     pub final_balance: Money,
     /// Total interest received.

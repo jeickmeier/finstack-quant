@@ -1201,31 +1201,31 @@ export interface FrtbScenarioCharges {
  */
 export interface FrtbSensitivities {
   base_currency: Currency;
-  commodity_curvature: [unknown, unknown, unknown, unknown][];
-  commodity_delta: [unknown, unknown, unknown, unknown, unknown][];
-  commodity_vega: [unknown, unknown, unknown, unknown][];
-  csr_nonsec_curvature: [unknown, unknown, unknown, unknown][];
-  csr_nonsec_delta: [unknown, unknown, unknown, unknown, unknown][];
-  csr_nonsec_vega: [unknown, unknown, unknown, unknown][];
-  csr_sec_ctp_curvature: [unknown, unknown, unknown, unknown][];
-  csr_sec_ctp_delta: [unknown, unknown, unknown, unknown, unknown][];
-  csr_sec_ctp_vega: [unknown, unknown, unknown, unknown][];
-  csr_sec_nonctp_curvature: [unknown, unknown, unknown, unknown][];
-  csr_sec_nonctp_delta: [unknown, unknown, unknown, unknown, unknown][];
-  csr_sec_nonctp_vega: [unknown, unknown, unknown, unknown][];
+  commodity_curvature: [string, number, number, number][];
+  commodity_delta: [string, number, string, string, number][];
+  commodity_vega: [string, number, string, number][];
+  csr_nonsec_curvature: [string, number, number, number][];
+  csr_nonsec_delta: [string, number, string, string, number][];
+  csr_nonsec_vega: [string, number, string, number][];
+  csr_sec_ctp_curvature: [string, number, number, number][];
+  csr_sec_ctp_delta: [string, number, string, string, number][];
+  csr_sec_ctp_vega: [string, number, string, number][];
+  csr_sec_nonctp_curvature: [string, number, number, number][];
+  csr_sec_nonctp_delta: [string, number, string, string, number][];
+  csr_sec_nonctp_vega: [string, number, string, number][];
   drc_positions: DrcPosition[];
-  equity_curvature: [unknown, unknown, unknown, unknown][];
-  equity_delta: [unknown, unknown, unknown][];
-  equity_repo_delta: [unknown, unknown, unknown][];
-  equity_vega: [unknown, unknown, unknown, unknown][];
-  fx_curvature: [unknown, unknown, unknown, unknown][];
-  fx_delta: [unknown, unknown, unknown][];
-  fx_vega: [unknown, unknown, unknown, unknown][];
-  girr_curvature: [unknown, unknown, unknown][];
-  girr_delta: [unknown, unknown, unknown][];
-  girr_inflation_delta: [unknown, unknown][];
-  girr_vega: [unknown, unknown, unknown, unknown][];
-  girr_xccy_basis_delta: [unknown, unknown][];
+  equity_curvature: [string, number, number, number][];
+  equity_delta: [string, number, number][];
+  equity_repo_delta: [string, number, number][];
+  equity_vega: [string, number, string, number][];
+  fx_curvature: [Currency, Currency, number, number][];
+  fx_delta: [Currency, Currency, number][];
+  fx_vega: [Currency, Currency, string, number][];
+  girr_curvature: [Currency, number, number][];
+  girr_delta: [Currency, string, number][];
+  girr_inflation_delta: [Currency, number][];
+  girr_vega: [Currency, string, string, number][];
+  girr_xccy_basis_delta: [Currency, number][];
   rrao_exotic_notionals: RraoPosition[];
 }
 /**
@@ -1806,7 +1806,7 @@ export interface MvaResult {
   /**
    * Echo of the IM profile used: `(time, IM(t))` pairs.
    */
-  im_profile: [unknown, unknown][];
+  im_profile: [number, number][];
   /**
    * MVA (positive = lifetime funding cost of posting IM).
    */
@@ -2022,27 +2022,27 @@ export interface SimmSensitivitiesJson {
   /**
    * Commodity delta buckets as `(bucket, amount)`.
    */
-  commodity_delta?: [unknown, unknown][];
+  commodity_delta?: [string, number][];
   /**
    * Commodity vega buckets as `(bucket, amount)`.
    */
-  commodity_vega?: [unknown, unknown][];
+  commodity_vega?: [string, number][];
   /**
    * Credit non-qualifying delta buckets as `(name, tenor, amount)`.
    */
-  credit_non_qualifying_delta?: [unknown, unknown, unknown][];
+  credit_non_qualifying_delta?: [string, string, number][];
   /**
    * Credit non-qualifying vega buckets as `(name, tenor, amount)`.
    */
-  credit_non_qualifying_vega?: [unknown, unknown, unknown][];
+  credit_non_qualifying_vega?: [string, string, number][];
   /**
    * Credit qualifying deltas as `(sector, name, tenor, amount)`.
    */
-  credit_qualifying_delta?: [unknown, unknown, unknown, unknown][];
+  credit_qualifying_delta?: [SimmCreditSector, string, string, number][];
   /**
    * Credit qualifying vegas as `(sector, name, tenor, amount)`.
    */
-  credit_qualifying_vega?: [unknown, unknown, unknown, unknown][];
+  credit_qualifying_vega?: [SimmCreditSector, string, string, number][];
   /**
    * Expiry-resolved volatility-weighted vega inputs before curvature scaling.
    */
@@ -2050,27 +2050,27 @@ export interface SimmSensitivitiesJson {
   /**
    * Equity delta buckets as `(underlier, amount)`.
    */
-  equity_delta?: [unknown, unknown][];
+  equity_delta?: [string, number][];
   /**
    * Equity vega buckets as `(underlier, amount)`.
    */
-  equity_vega?: [unknown, unknown][];
+  equity_vega?: [string, number][];
   /**
    * FX delta buckets as `(currency, amount)`.
    */
-  fx_delta?: [unknown, unknown][];
+  fx_delta?: [Currency, number][];
   /**
    * FX vega buckets as `(ccy1, ccy2, amount)`.
    */
-  fx_vega?: [unknown, unknown, unknown][];
+  fx_vega?: [Currency, Currency, number][];
   /**
    * Interest-rate delta buckets as `(currency, tenor, amount)`.
    */
-  ir_delta?: [unknown, unknown, unknown][];
+  ir_delta?: [Currency, string, number][];
   /**
    * Interest-rate vega buckets as `(currency, tenor, amount)`.
    */
-  ir_vega?: [unknown, unknown, unknown][];
+  ir_vega?: [Currency, string, number][];
 }
 /**
  * Variation margin calculation result.
@@ -2197,21 +2197,21 @@ export interface XvaResult {
    * - BCBS 279 (2014). "The standardised approach for measuring
    *   counterparty credit risk exposures." `docs/REFERENCES.md#bcbs-279-saccr`
    */
-  effective_epe_profile: [unknown, unknown][];
+  effective_epe_profile: [number, number][];
   /**
    * Expected Negative Exposure profile: `(time, ENE(t))`.
    *
    * ENE(t) = E[max(-V(t), 0)] — the average negative mark-to-market
    * at each time point (own-default exposure).
    */
-  ene_profile: [unknown, unknown][];
+  ene_profile: [number, number][];
   /**
    * Expected Positive Exposure profile: `(time, EPE(t))`.
    *
    * EPE(t) = E[max(V(t), 0)] — the average positive mark-to-market
    * at each time point.
    */
-  epe_profile: [unknown, unknown][];
+  epe_profile: [number, number][];
   /**
    * FVA (Funding Valuation Adjustment): net funding cost/benefit.
    *

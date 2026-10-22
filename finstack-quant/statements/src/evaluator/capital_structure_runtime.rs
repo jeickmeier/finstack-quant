@@ -476,7 +476,7 @@ mod opening_tests {
         let coupon_date = period_start;
 
         let instrument = ScheduleInstrument {
-            schedule: CashFlowSchedule::from_parts(
+            schedule: CashFlowSchedule::from_flows(
                 vec![
                     CashFlow::new(
                         issue,
@@ -509,7 +509,8 @@ mod opening_tests {
                     issue_date: Some(issue),
                     ..CashFlowMeta::default()
                 },
-            ),
+            )
+            .expect("valid cashflow rows"),
         };
 
         let market_ctx = MarketContext::new();
@@ -540,7 +541,7 @@ mod opening_tests {
             ),
         ] {
             let instrument = ScheduleInstrument {
-                schedule: CashFlowSchedule::from_parts(
+                schedule: CashFlowSchedule::from_flows(
                     vec![CashFlow::new(
                         maturity,
                         None,
@@ -555,7 +556,8 @@ mod opening_tests {
                         issue_date: Some(issue),
                         ..Default::default()
                     },
-                ),
+                )
+                .expect("valid cashflow rows"),
             };
             let opening = resolve_opening_balance(
                 &instrument,
@@ -572,7 +574,7 @@ mod opening_tests {
     fn first_period_opening_without_funding_does_not_apply_boundary_amortization() {
         let period_start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let instrument = ScheduleInstrument {
-            schedule: CashFlowSchedule::from_parts(
+            schedule: CashFlowSchedule::from_flows(
                 vec![CashFlow::new(
                     period_start,
                     None,
@@ -589,7 +591,8 @@ mod opening_tests {
                     ),
                     ..Default::default()
                 },
-            ),
+            )
+            .expect("valid cashflow rows"),
         };
         let opening = resolve_opening_balance(
             &instrument,

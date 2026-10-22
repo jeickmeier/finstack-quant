@@ -27,7 +27,7 @@
 //!
 //! # Conventions
 //!
-//! Amounts retain their [`Money`] currency, and checked aggregation does not
+//! Amounts retain their [`Money`](finstack_quant_core::money::Money) currency, and checked aggregation does not
 //! perform FX conversion. Coupon rates are decimals (`0.05` means 5%); fields
 //! ending in `_bp` are basis points. Schedule dates follow the day-count,
 //! calendar, business-day, stub, roll, and payment-lag rules in
@@ -100,14 +100,6 @@ pub use traits::{
     schedule_from_classified_flows, schedule_from_dated_flows, CashflowProvider,
     CashflowScheduleSource, ScheduleBuildOpts,
 };
-
-use finstack_quant_core::{dates::Date, money::Money};
-
-/// Single dated amount in a specific currency.
-pub type DatedFlow = (Date, Money);
-
-/// Currency-preserving schedule as a list of dated amounts.
-pub type DatedFlows = Vec<DatedFlow>;
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

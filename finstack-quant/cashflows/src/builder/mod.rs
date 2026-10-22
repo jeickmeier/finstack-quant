@@ -56,8 +56,8 @@ pub(crate) mod schedule;
 mod specs;
 
 pub use credit_rates::{
-    abs_to_smm, cdr_to_mdr, clamped_cdr_to_mdr, clamped_cpr_to_smm, cpr_to_smm, mdr_to_cdr,
-    psa_cpr, smm_to_cpr, PSA_RAMP_MONTHS, PSA_TERMINAL_CPR, SDA_PEAK_CDR,
+    abs_to_smm, annual_to_monthly, annual_to_monthly_clamped, monthly_to_annual, psa_cpr,
+    PSA_RAMP_MONTHS, PSA_TERMINAL_CPR, SDA_PEAK_CDR,
 };
 pub use floating_replay::{
     CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod,
@@ -73,7 +73,7 @@ pub use periods::{
     SchedulePeriod,
 };
 pub use rate_helpers::{
-    apply_bp_bounds, calculate_floating_rate, observed_term_fixing, project_floating_rate,
+    apply_bp_bounds, calculate_floating_rate, observed_index_fixing, project_floating_rate,
     project_index_rate, project_overnight_rate, FloatingRateParams,
 };
 pub use schedule::{

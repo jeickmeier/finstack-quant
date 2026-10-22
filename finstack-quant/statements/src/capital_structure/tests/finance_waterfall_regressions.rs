@@ -578,7 +578,7 @@ fn advance_principal_cannot_be_repaid_again_before_its_economic_date() {
 fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
     for (initial_cash, sweep_first) in [(100, false), (75, true)] {
         let (mut state, mut flows) = loans(&["loan"], 100);
-        let schedule = CashFlowSchedule::from_parts(
+        let schedule = CashFlowSchedule::from_flows(
             vec![
                 CashFlow::new(
                     date!(2025 - 04 - 04),
@@ -605,7 +605,8 @@ fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
                 issue_date: Some(date!(2025 - 01 - 01)),
                 ..Default::default()
             },
-        );
+        )
+        .expect("valid cashflow rows");
         state.residual_schedules.insert("loan".into(), schedule);
         let first_period = dated_period(date!(2025 - 03 - 31), date!(2025 - 04 - 01));
         let loan = flows.get_mut("loan").expect("loan");

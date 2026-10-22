@@ -325,9 +325,9 @@ const cases = {
     return {
       by_period: aggregation,
       get_amount: [
-        aggregation['2026Q1']?.['EUR'] ?? null,
-        aggregation['2025Q1']?.['EUR'] ?? null,
-        aggregation['nope']?.['USD'] ?? null,
+        cashflows.periodAggregationGetAmount(aggregation, '2026Q1', 'EUR'),
+        cashflows.periodAggregationGetAmount(aggregation, '2025Q1', 'EUR'),
+        cashflows.periodAggregationGetAmount(aggregation, 'nope', 'USD'),
       ],
       checked: cashflows.aggregateCashflowsChecked(flows.slice(0, 2), 'USD'),
       ladder: cashflows.calendarYearLadder(
@@ -435,7 +435,7 @@ const cases = {
     const models = [
       { curve: 'constant', cpr: 0.06 },
       { curve: 'psa', speed_multiplier: 1.5 },
-      cashflows.prepaymentModelSpecPsa100(),
+      { curve: 'psa', speed_multiplier: 1.0 },
       { curve: 'cmbs_lockout', lockout_months: 60, post_lockout_cpr: 0.1 },
       { curve: 'abs', speed: 0.015 },
       { curve: 'vector', monthly_cpr: [0.02, 0.05, 0.08] },
@@ -620,6 +620,16 @@ test('spec functions validate through Rust and reject wrong host types', () => {
       }),
     kind('validation', /reset_lag_days must be non-negative/)
   );
+  for (const [fields, message] of [
+    [{ index_floor_bp: '100', index_cap_bp: '50' }, /index_floor_bp/],
+    [{ all_in_floor_bp: '100', all_in_cap_bp: '50' }, /all_in_floor_bp/],
+  ]) {
+    assert.throws(
+      () =>
+        cashflows.floatingRateSpecValidate({ ...cashflows.floatingRateSpecSofr('0'), ...fields }),
+      kind('validation', message)
+    );
+  }
   assert.equal(cashflows.notionalValidate(cashflows.notionalPar(100, 'USD')), undefined);
   assert.throws(
     () =>
@@ -638,7 +648,7 @@ test('spec functions validate through Rust and reject wrong host types', () => {
     kind('validation', /must be a decimal in \[0,1\]; got -0\.1/)
   );
   assert.equal(
-    cashflows.prepaymentModelSpecValidate(cashflows.prepaymentModelSpecPsa100()),
+    cashflows.prepaymentModelSpecValidate({ curve: 'psa', speed_multiplier: 1.0 }),
     undefined
   );
   assert.throws(

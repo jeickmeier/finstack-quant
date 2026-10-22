@@ -11,6 +11,7 @@ use crate::traits::ScheduleBuildOpts;
 #[cfg(feature = "jsonschema-validate")]
 use finstack_quant_core::Error;
 use finstack_quant_core::Result;
+use finstack_quant_core::{dates::Date, money::Money};
 use serde_json::Value;
 
 /// Typed cashflow definitions eligible for assertion-checked externalization.
@@ -233,7 +234,7 @@ fn cashflow_schedule_examples() -> finstack_quant_core::Result<Vec<serde_json::V
 /// Canonical `PeriodAggregation`: [`example_build_spec`]'s flows by calendar quarter.
 fn period_aggregation_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
     let schedule = example_build_spec()?.build(None)?;
-    let flows: Vec<crate::DatedFlow> = schedule
+    let flows: Vec<(Date, Money)> = schedule
         .flows
         .iter()
         .map(|flow| (flow.date, flow.amount))

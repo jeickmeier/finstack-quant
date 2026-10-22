@@ -648,7 +648,7 @@ fn outstanding_by_date_dedup_and_values() {
 #[test]
 fn outstanding_by_date_includes_prepayment() {
     let prepay_date = Date::from_calendar_date(2025, Month::March, 15).unwrap();
-    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_parts(
+    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
         vec![CashFlow::new(
             prepay_date,
             None,
@@ -664,7 +664,8 @@ fn outstanding_by_date_includes_prepayment() {
             issue_date: Some(prepay_date),
             ..Default::default()
         },
-    );
+    )
+    .expect("valid cashflow rows");
 
     let outstanding = schedule.outstanding_by_date().unwrap();
     assert_eq!(outstanding.len(), 1, "expected one dated balance snapshot");
@@ -679,7 +680,7 @@ fn outstanding_by_date_includes_prepayment() {
 fn outstanding_by_date_includes_defaulted_notional() {
     let default_date = Date::from_calendar_date(2025, Month::March, 15).unwrap();
     let recovery_date = Date::from_calendar_date(2025, Month::September, 15).unwrap();
-    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_parts(
+    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
         vec![
             CashFlow::new(
                 default_date,
@@ -705,7 +706,8 @@ fn outstanding_by_date_includes_defaulted_notional() {
             issue_date: Some(default_date),
             ..Default::default()
         },
-    );
+    )
+    .expect("valid cashflow rows");
 
     let outstanding = schedule.outstanding_by_date().unwrap();
     assert_eq!(outstanding.len(), 2, "expected default and recovery dates");
@@ -753,7 +755,7 @@ fn builder_created_schedule_sets_issue_date_for_outstanding_by_date() {
 #[test]
 fn outstanding_by_date_requires_issue_date() {
     let prepay_date = Date::from_calendar_date(2025, Month::March, 15).unwrap();
-    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_parts(
+    let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
         vec![CashFlow::new(
             prepay_date,
             None,
@@ -766,7 +768,8 @@ fn outstanding_by_date_requires_issue_date() {
             .expect("valid notional fixture"),
         DayCount::Act365F,
         finstack_quant_cashflows::builder::CashFlowMeta::default(),
-    );
+    )
+    .expect("valid cashflow rows");
 
     let err = schedule
         .outstanding_by_date()
@@ -1276,12 +1279,13 @@ fn test_weighted_average_life_two_amort() {
         ),
     ];
 
-    let schedule = CashFlowSchedule::from_parts(
+    let schedule = CashFlowSchedule::from_flows(
         flows,
         Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
-    );
+    )
+    .expect("valid cashflow rows");
 
     let wal = schedule.wal(as_of).expect("WAL should succeed");
     // With Act/365F, ~365 days = ~1.0y, ~730 days = ~2.0y
@@ -1312,12 +1316,13 @@ fn test_weighted_average_life_bullet() {
         None,
     )];
 
-    let schedule = CashFlowSchedule::from_parts(
+    let schedule = CashFlowSchedule::from_flows(
         flows,
         Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
-    );
+    )
+    .expect("valid cashflow rows");
 
     let wal = schedule.wal(as_of).expect("WAL should succeed");
     // 5 years with Act/365F (1826 or 1827 days depending on leap years)
@@ -1336,12 +1341,13 @@ fn test_weighted_average_life_empty() {
 
     let as_of = Date::from_calendar_date(2025, Month::January, 15).unwrap();
 
-    let schedule = CashFlowSchedule::from_parts(
+    let schedule = CashFlowSchedule::from_flows(
         vec![],
         Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
-    );
+    )
+    .expect("valid cashflow rows");
 
     let wal = schedule.wal(as_of).expect("WAL should succeed");
     assert!(wal == 0.0, "WAL with no flows should be 0.0, got {}", wal);
@@ -1389,12 +1395,13 @@ fn test_weighted_average_life_ignores_coupons() {
         ),
     ];
 
-    let schedule = CashFlowSchedule::from_parts(
+    let schedule = CashFlowSchedule::from_flows(
         flows,
         Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
-    );
+    )
+    .expect("valid cashflow rows");
 
     let wal = schedule.wal(as_of).expect("WAL should succeed");
     // Should be ~1.0 year (only the notional at maturity counts)

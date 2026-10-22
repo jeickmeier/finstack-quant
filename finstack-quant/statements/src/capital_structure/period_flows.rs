@@ -560,7 +560,7 @@ mod tests {
     }
 
     fn test_schedule(flows: Vec<CashFlow>, notional: f64, issue_date: Date) -> CashFlowSchedule {
-        CashFlowSchedule::from_parts(
+        CashFlowSchedule::from_flows(
             flows,
             Notional::par(notional, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
@@ -569,6 +569,7 @@ mod tests {
                 ..CashFlowMeta::default()
             },
         )
+        .expect("valid cashflow rows")
     }
 
     #[test]

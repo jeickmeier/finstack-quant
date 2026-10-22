@@ -4,7 +4,7 @@ use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Teno
 
 /// Serde default for optional stub fields: `ShortFront` (`StubKind::default()` is `None`).
 pub(crate) fn stub_short_front() -> StubKind {
-    StubKind::ShortFront
+    ScheduleParams::DEFAULT_STUB
 }
 
 /// Roll-date rule applied when generating schedule anchors.
@@ -67,7 +67,7 @@ impl RollRule {
     /// Used by serde to keep the default rule off the wire so existing
     /// payloads are unchanged.
     #[must_use]
-    pub fn is_none(&self) -> bool {
+    fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
 }
@@ -144,6 +144,12 @@ pub struct ScheduleParams {
 const WK: &str = finstack_quant_core::dates::WEEKENDS_ONLY_ID;
 
 impl ScheduleParams {
+    /// Default stub rule for coupon and periodic-fee schedules when omitted.
+    ///
+    /// This is short-front, independently of the general-purpose
+    /// `StubKind::default()` value (`None`).
+    pub const DEFAULT_STUB: StubKind = StubKind::ShortFront;
+
     fn preset(
         frequency: Tenor,
         day_count: DayCount,
@@ -155,7 +161,7 @@ impl ScheduleParams {
             day_count,
             business_day_convention,
             calendar_id: calendar_id.into(),
-            stub: StubKind::ShortFront,
+            stub: Self::DEFAULT_STUB,
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
