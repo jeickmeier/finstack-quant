@@ -230,3 +230,33 @@ def test_failed_mixed_formula_preserves_configuration_and_parent() -> None:
     assert model["nodes"]["mixed"]["formula_text"] == "base * 0.5"
     assert model["meta"]["marker"] == "retained"
     assert "base" in model["nodes"]
+
+
+def test_accounting_overflow_is_an_error_without_invalid_numbers() -> None:
+    builder = s.ModelBuilder("overflow")
+    builder.periods("2025Q1..Q2", None)
+    for name, bad, good in [("a1", 1e308, 40.0), ("a2", 1e308, 60.0), ("l", 1e308, 70.0), ("e", 1e308, 30.0)]:
+        builder.value_scalar(name, {"2025Q1": bad, "2025Q2": good})
+    model = builder.build()
+    suite = s.CheckSuiteSpec(
+        "overflow",
+        builtin_checks=[
+            {
+                "type": "balance_sheet_articulation",
+                "assets_nodes": ["a1", "a2"],
+                "liabilities_nodes": ["l"],
+                "equity_nodes": ["e"],
+            }
+        ],
+        config=s.CheckConfig(materiality_threshold=1e300),
+    )
+    report = json.loads(run_checks(model, suite).to_json())
+    assert report["summary"]["failed"] == 1
+    result = report["results"][0]
+    assert not result["passed"]
+    assert len(result["comparisons"]) == 1
+    assert result["comparisons"][0]["period"] == "2025Q2"
+    finding = result["findings"][0]
+    assert finding["severity"] == "error"
+    assert finding.get("comparison") is None
+    assert finding.get("materiality") is None

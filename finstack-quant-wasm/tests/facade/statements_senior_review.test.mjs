@@ -289,3 +289,32 @@ test('failed mixed formula preserves values, forecast, name and parent', () => {
     parent.free();
   }
 });
+
+test('accounting overflow fails without publishing invalid numbers', () => {
+  const input = model({
+    a1: values('a1', [1e308, 40, 40]),
+    a2: values('a2', [1e308, 60, 60]),
+    l: values('l', [1e308, 70, 70]),
+    e: values('e', [1e308, 30, 30]),
+  });
+  const suite = {
+    name: 'overflow',
+    config: { materiality_threshold: 1e300 },
+    builtin_checks: [
+      {
+        type: 'balance_sheet_articulation',
+        assets_nodes: ['a1', 'a2'],
+        liabilities_nodes: ['l'],
+        equity_nodes: ['e'],
+      },
+    ],
+  };
+  const report = statements_analytics.runChecks(input, suite);
+  assert.equal(report.summary.failed, 1);
+  const result = report.results[0];
+  assert.equal(result.passed, false);
+  assert.equal(result.comparisons.length, 2);
+  assert.equal(result.findings[0].severity, 'error');
+  assert.equal(result.findings[0].comparison ?? null, null);
+  assert.equal(result.findings[0].materiality ?? null, null);
+});

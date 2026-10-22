@@ -173,6 +173,21 @@ impl Check for CashReconciliation {
             let diff = cash_curr - expected_cash;
             let reference = cash_prev.abs().max(1.0);
             let tolerance = effective_tolerance(&context.config, self.tolerance, reference);
+            let relative = (diff / reference).abs() * 100.0;
+            if ![expected_cash, diff, tolerance, relative]
+                .iter()
+                .all(|v| v.is_finite())
+            {
+                findings.push(crate::checks::helpers::arithmetic_failure(
+                    self.id(),
+                    *curr_pid,
+                    vec![
+                        self.cash_balance_node.clone(),
+                        self.total_cash_flow_node.clone(),
+                    ],
+                ));
+                continue;
+            }
             let comparison = CheckComparison {
                 identity: "cash_roll_forward".to_string(),
                 period: Some(*curr_pid),
@@ -183,8 +198,6 @@ impl Check for CashReconciliation {
             comparisons.push(comparison.clone());
 
             if diff.abs() > tolerance {
-                let relative = (diff / reference).abs() * 100.0;
-
                 findings.push(CheckFinding {
                     check_id: self.id().to_string(),
                     severity: Severity::Error,
@@ -261,6 +274,29 @@ impl Check for CashReconciliation {
                     let reference = total_cf.abs().max(1.0);
                     let component_tolerance =
                         effective_tolerance(&context.config, self.tolerance, reference);
+                    let relative = (component_diff / reference).abs() * 100.0;
+                    if ![
+                        cfo_val + cfi_val,
+                        component_sum,
+                        component_diff,
+                        component_tolerance,
+                        relative,
+                    ]
+                    .iter()
+                    .all(|v| v.is_finite())
+                    {
+                        findings.push(crate::checks::helpers::arithmetic_failure(
+                            self.id(),
+                            *curr_pid,
+                            vec![
+                                self.total_cash_flow_node.clone(),
+                                cfo_node.clone(),
+                                cfi_node.clone(),
+                                cff_node.clone(),
+                            ],
+                        ));
+                        continue;
+                    }
                     let comparison = CheckComparison {
                         identity: "cash_flow_components".to_string(),
                         period: Some(*curr_pid),
@@ -271,8 +307,6 @@ impl Check for CashReconciliation {
                     comparisons.push(comparison.clone());
 
                     if component_diff.abs() > component_tolerance {
-                        let relative = (component_diff / reference).abs() * 100.0;
-
                         findings.push(CheckFinding {
                             check_id: self.id().to_string(),
                             severity: Severity::Error,
