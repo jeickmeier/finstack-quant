@@ -1,8 +1,8 @@
 //! Builders for cross-currency swap instruments from market quotes.
 
 use crate::build::BuildCtx;
-use crate::quotes::ids::Pillar;
-use crate::quotes::xccy::XccyQuote;
+use crate::quotes::Pillar;
+use crate::quotes::XccyQuote;
 use finstack_quant_core::dates::fx::fx_spot_date;
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::dates::{adjust, resolve_joint_calendar};

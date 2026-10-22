@@ -6,9 +6,9 @@ use crate::api::schema::{
 };
 use crate::build::cds::build_cds_instrument;
 use crate::build::BuildCtx;
-use crate::quotes::cds::CdsQuote;
-use crate::quotes::ids::{Pillar, QuoteId};
+use crate::quotes::CdsQuote;
 use crate::quotes::MarketQuote;
+use crate::quotes::{Pillar, QuoteId};
 use crate::recalibration::bump_hazard_spreads;
 use crate::{CalibrationConfig, CalibrationMethod, ResidualWeightingScheme};
 use finstack_quant_core::currency::Currency;

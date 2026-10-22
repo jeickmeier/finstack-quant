@@ -31,7 +31,7 @@ use crate::api::prior_market::PriorMarketObject;
 use crate::api::schema::{CalibrationEnvelope, StepParams, CALIBRATION_CONTRACT};
 use crate::quotes::MarketQuote;
 #[cfg(test)]
-use crate::quotes::{cds::CdsQuote, rates::RateQuote};
+use crate::quotes::{CdsQuote, RateQuote};
 #[cfg(test)]
 use finstack_quant_core::contract::ContractError;
 use finstack_quant_core::contract::{
@@ -631,7 +631,7 @@ mod tests {
         CalibrationPlan, CalibrationResultEnvelope, CalibrationSchema, CalibrationStep,
         DiscountCurveParams, StepParams,
     };
-    use crate::quotes::ids::{Pillar, QuoteId};
+    use crate::quotes::{Pillar, QuoteId};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::types::IndexId;
@@ -1292,7 +1292,7 @@ mod canonical_validation_tests {
 
     #[test]
     fn unresolved_quote_id_is_flagged() {
-        use crate::quotes::ids::QuoteId;
+        use crate::quotes::QuoteId;
         let mut quote_sets = FxHashMap::default();
         quote_sets.insert("usd".to_string(), vec![QuoteId::new("MISSING")]);
         let envelope = CalibrationEnvelope {

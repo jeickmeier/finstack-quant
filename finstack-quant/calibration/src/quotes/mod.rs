@@ -13,8 +13,8 @@
 //! # Quick Example
 //!
 //! ```rust
-//! use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-//! use finstack_quant_calibration::quotes::rates::RateQuote;
+//! use finstack_quant_calibration::quotes::{Pillar, QuoteId};
+//! use finstack_quant_calibration::quotes::RateQuote;
 //! use finstack_quant_core::types::IndexId;
 //!
 //! # fn example() -> finstack_quant_core::Result<()> {
@@ -34,25 +34,33 @@
 //! # See Also
 //!
 //! - [`crate::quotes::MarketQuote`] for the unified quote enum
-//! - [`crate::quotes::ids::QuoteId`] for quote identifiers
-//! - [`crate::quotes::ids::Pillar`] for maturity pillars
+//! - [`crate::quotes::QuoteId`] for quote identifiers
+//! - [`crate::quotes::Pillar`] for maturity pillars
 
 /// Credit quotes (CDS).
-pub mod cds;
+mod cds;
 /// CDS tranche quotes.
-pub mod cds_tranche;
+mod cds_tranche;
 /// Stable identifiers (QuoteId, Pillar).
-pub mod ids;
+mod ids;
 /// Inflation quotes.
-pub mod inflation;
+mod inflation;
 /// Unified MarketQuote enum.
 mod market_quote;
 /// Interest rate quotes (Deposit, FRA, Futures, Swap).
-pub mod rates;
+mod rates;
 /// Volatility quotes.
-pub mod vol;
+mod vol;
 /// Cross-currency swap quotes.
-pub mod xccy;
+mod xccy;
+
+pub use cds::CdsQuote;
+pub use cds_tranche::CdsTrancheQuote;
+pub use ids::{Pillar, QuoteId};
+pub use inflation::InflationQuote;
+pub use rates::RateQuote;
+pub use vol::VolQuote;
+pub use xccy::XccyQuote;
 
 pub(crate) use market_quote::ExtractQuotes;
 pub use market_quote::MarketQuote;

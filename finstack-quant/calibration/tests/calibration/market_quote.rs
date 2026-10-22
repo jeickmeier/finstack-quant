@@ -2,9 +2,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-use finstack_quant_calibration::quotes::rates::RateQuote;
 use finstack_quant_calibration::quotes::MarketQuote;
+use finstack_quant_calibration::quotes::RateQuote;
+use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 use finstack_quant_core::types::IndexId;
 
 #[test]

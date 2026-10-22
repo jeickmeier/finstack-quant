@@ -10,8 +10,8 @@ use finstack_quant_valuations_rates::fra::ForwardRateAgreement;
 use finstack_quant_valuations_rates::irs::InterestRateSwap;
 use rust_decimal::Decimal;
 
-use crate::quotes::ids::Pillar;
-use crate::quotes::rates::RateQuote;
+use crate::quotes::Pillar;
+use crate::quotes::RateQuote;
 
 fn usd_build_ctx(as_of: Date) -> BuildCtx {
     let mut curve_ids = finstack_quant_core::FxHashMap::default();

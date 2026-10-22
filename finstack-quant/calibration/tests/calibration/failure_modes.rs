@@ -7,11 +7,11 @@ use finstack_quant_calibration::api::schema::{
     ForwardCurveParams, HazardCurveParams, InflationCurveParams, StepParams,
     SurfaceExtrapolationPolicy, SwaptionVolConvention, SwaptionVolParams, VolSurfaceParams,
 };
-use finstack_quant_calibration::quotes::cds::CdsQuote;
-use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
-use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
-use finstack_quant_calibration::quotes::inflation::InflationQuote;
+use finstack_quant_calibration::quotes::CdsQuote;
+use finstack_quant_calibration::quotes::CdsTrancheQuote;
+use finstack_quant_calibration::quotes::InflationQuote;
 use finstack_quant_calibration::quotes::MarketQuote;
+use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;

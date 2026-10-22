@@ -20,13 +20,13 @@ use crate::errors::core_to_py;
 use finstack_quant_calibration::api::market_datum::{
     DividendScheduleDatum, FxSpotDatum, MarketDatum, PriceDatum,
 };
-use finstack_quant_calibration::quotes::cds::CdsQuote;
-use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
-use finstack_quant_calibration::quotes::ids::Pillar;
-use finstack_quant_calibration::quotes::inflation::InflationQuote;
-use finstack_quant_calibration::quotes::rates::RateQuote;
-use finstack_quant_calibration::quotes::vol::VolQuote;
-use finstack_quant_calibration::quotes::xccy::XccyQuote;
+use finstack_quant_calibration::quotes::CdsQuote;
+use finstack_quant_calibration::quotes::CdsTrancheQuote;
+use finstack_quant_calibration::quotes::InflationQuote;
+use finstack_quant_calibration::quotes::Pillar;
+use finstack_quant_calibration::quotes::RateQuote;
+use finstack_quant_calibration::quotes::VolQuote;
+use finstack_quant_calibration::quotes::XccyQuote;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use pyo3::prelude::*;
 use pyo3::IntoPyObjectExt;

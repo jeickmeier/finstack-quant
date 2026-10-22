@@ -5,7 +5,7 @@ use crate::build::context::BuildCtx;
 use crate::build::prepared::PreparedQuote;
 use crate::config::{CalibrationConfig, CalibrationMethod, HazardCurveSolveConfig};
 use crate::constants::WEIGHT_MIN_FLOOR;
-use crate::quotes::cds::CdsQuote;
+use crate::quotes::CdsQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
 use crate::solver::bootstrap;
 use crate::solver::global;
@@ -335,7 +335,7 @@ impl HazardCurveTarget {
         context: &MarketContext,
         global_config: &CalibrationConfig,
     ) -> Result<(HazardCurve, CalibrationReport)> {
-        let cds_quotes: Vec<crate::quotes::cds::CdsQuote> = quotes.extract_quotes();
+        let cds_quotes: Vec<crate::quotes::CdsQuote> = quotes.extract_quotes();
 
         if cds_quotes.is_empty() {
             return Err(finstack_quant_core::Error::Input(
@@ -421,11 +421,11 @@ impl HazardCurveTarget {
             });
 
             let risk_quote = match original_quote {
-                crate::quotes::cds::CdsQuote::CdsParSpread { spread_bp, .. } => {
+                crate::quotes::CdsQuote::CdsParSpread { spread_bp, .. } => {
                     par_points.push((prepared.pillar_time, *spread_bp));
                     original_quote.clone()
                 }
-                crate::quotes::cds::CdsQuote::CdsUpfront { id, pillar, .. } => {
+                crate::quotes::CdsQuote::CdsUpfront { id, pillar, .. } => {
                     let cds = prepared
                         .instrument
                         .as_any()
@@ -501,15 +501,15 @@ impl HazardCurveTarget {
         // or sentinel (NaN).
         let curve_recovery = self.params.recovery_rate;
         let quote_spread_bp = match pq.quote.as_ref() {
-            crate::quotes::cds::CdsQuote::CdsParSpread { spread_bp, .. } => *spread_bp,
-            crate::quotes::cds::CdsQuote::CdsUpfront { coupon_bp, .. } => *coupon_bp,
+            crate::quotes::CdsQuote::CdsParSpread { spread_bp, .. } => *spread_bp,
+            crate::quotes::CdsQuote::CdsUpfront { coupon_bp, .. } => *coupon_bp,
         };
         let recovery = if curve_recovery.is_finite() {
             curve_recovery
         } else {
             match pq.quote.as_ref() {
-                crate::quotes::cds::CdsQuote::CdsParSpread { recovery_rate, .. }
-                | crate::quotes::cds::CdsQuote::CdsUpfront { recovery_rate, .. } => *recovery_rate,
+                crate::quotes::CdsQuote::CdsParSpread { recovery_rate, .. }
+                | crate::quotes::CdsQuote::CdsUpfront { recovery_rate, .. } => *recovery_rate,
             }
         };
 

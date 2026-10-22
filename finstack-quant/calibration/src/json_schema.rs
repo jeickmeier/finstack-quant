@@ -87,7 +87,7 @@ fn hull_white_piecewise_sigma_config_examples() -> finstack_quant_core::Result<V
 
 /// A 5Y North American single-name par spread.
 fn cds_quote_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    example_from_json::<crate::quotes::cds::CdsQuote>(serde_json::json!({
+    example_from_json::<crate::quotes::CdsQuote>(serde_json::json!({
         "type": "cds_par_spread",
         "id": "ACME-CDS-5Y",
         "entity": "ACME",
@@ -100,7 +100,7 @@ fn cds_quote_examples() -> finstack_quant_core::Result<Vec<Value>> {
 
 /// The 3-7% mezzanine tranche of a CDX IG series.
 fn cds_tranche_quote_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    example_from_json::<crate::quotes::cds_tranche::CdsTrancheQuote>(serde_json::json!({
+    example_from_json::<crate::quotes::CdsTrancheQuote>(serde_json::json!({
         "id": "CDX-IG-42-3-7-5Y",
         "index": "CDX.NA.IG",
         "series": 42,
@@ -115,7 +115,7 @@ fn cds_tranche_quote_examples() -> finstack_quant_core::Result<Vec<Value>> {
 
 /// A 5Y zero-coupon US CPI swap.
 fn inflation_quote_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    example_from_json::<crate::quotes::inflation::InflationQuote>(serde_json::json!({
+    example_from_json::<crate::quotes::InflationQuote>(serde_json::json!({
         "inflation_swap": {
             "id": "USD-CPI-ZC-5Y",
             "maturity": "2030-01-15",
@@ -126,11 +126,11 @@ fn inflation_quote_examples() -> finstack_quant_core::Result<Vec<Value>> {
     }))
 }
 
-fn rate_quote_example() -> finstack_quant_core::Result<crate::quotes::rates::RateQuote> {
-    Ok(crate::quotes::rates::RateQuote::Deposit {
-        id: crate::quotes::ids::QuoteId::new("USD-SOFR-DEP-1M"),
+fn rate_quote_example() -> finstack_quant_core::Result<crate::quotes::RateQuote> {
+    Ok(crate::quotes::RateQuote::Deposit {
+        id: crate::quotes::QuoteId::new("USD-SOFR-DEP-1M"),
         index: finstack_quant_core::types::IndexId::new("USD-SOFR"),
-        pillar: crate::quotes::ids::Pillar::Tenor("1M".parse()?),
+        pillar: crate::quotes::Pillar::Tenor("1M".parse()?),
         rate: 0.0525,
     })
 }
@@ -142,7 +142,7 @@ fn rate_quote_examples() -> finstack_quant_core::Result<Vec<Value>> {
 
 /// A one-year at-the-money equity call volatility.
 fn vol_quote_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    example_from_json::<crate::quotes::vol::VolQuote>(serde_json::json!({
+    example_from_json::<crate::quotes::VolQuote>(serde_json::json!({
         "option_vol": {
             "id": "SPX-1Y-5000-C",
             "underlying": "SPX",
@@ -156,7 +156,7 @@ fn vol_quote_examples() -> finstack_quant_core::Result<Vec<Value>> {
 
 /// A 5Y EUR/USD cross-currency basis swap.
 fn xccy_quote_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    example_from_json::<crate::quotes::xccy::XccyQuote>(serde_json::json!({
+    example_from_json::<crate::quotes::XccyQuote>(serde_json::json!({
         "id": "EURUSD-XCCY-5Y",
         "convention": "EUR/USD-XCCY",
         "far_pillar": {"tenor": {"count": 5, "unit": "years"}},
@@ -259,42 +259,42 @@ fn build_artifacts() -> Vec<SchemaArtifact> {
             "Settings of the piecewise-constant Hull-White sigma bootstrap to cap/floor quotes.",
         )
         .with_examples(hull_white_piecewise_sigma_config_examples),
-        component::<crate::quotes::cds::CdsQuote>(
+        component::<crate::quotes::CdsQuote>(
             "schemas/market/1/cds_quote.schema.json",
             "https://finstack_quant.dev/schemas/market/1/cds_quote.schema.json",
             "CDS Quote",
             "Single-name CDS par-spread or upfront quote.",
         )
         .with_examples(cds_quote_examples),
-        component::<crate::quotes::cds_tranche::CdsTrancheQuote>(
+        component::<crate::quotes::CdsTrancheQuote>(
             "schemas/market/1/cds_tranche_quote.schema.json",
             "https://finstack_quant.dev/schemas/market/1/cds_tranche_quote.schema.json",
             "CDS Tranche Quote",
             "Index tranche upfront quote.",
         )
         .with_examples(cds_tranche_quote_examples),
-        component::<crate::quotes::inflation::InflationQuote>(
+        component::<crate::quotes::InflationQuote>(
             "schemas/market/1/inflation_quote.schema.json",
             "https://finstack_quant.dev/schemas/market/1/inflation_quote.schema.json",
             "Inflation Quote",
             "Zero-coupon or year-on-year inflation swap quote.",
         )
         .with_examples(inflation_quote_examples),
-        component::<crate::quotes::rates::RateQuote>(
+        component::<crate::quotes::RateQuote>(
             "schemas/market/1/rate_quote.schema.json",
             "https://finstack_quant.dev/schemas/market/1/rate_quote.schema.json",
             "Rate Quote",
             "Deposit, FRA, futures or swap rate quote.",
         )
         .with_examples(rate_quote_examples),
-        component::<crate::quotes::vol::VolQuote>(
+        component::<crate::quotes::VolQuote>(
             "schemas/market/1/vol_quote.schema.json",
             "https://finstack_quant.dev/schemas/market/1/vol_quote.schema.json",
             "Vol Quote",
             "Option, swaption or cap/floor volatility quote.",
         )
         .with_examples(vol_quote_examples),
-        component::<crate::quotes::xccy::XccyQuote>(
+        component::<crate::quotes::XccyQuote>(
             "schemas/market/1/xccy_quote.schema.json",
             "https://finstack_quant.dev/schemas/market/1/xccy_quote.schema.json",
             "Cross-Currency Quote",

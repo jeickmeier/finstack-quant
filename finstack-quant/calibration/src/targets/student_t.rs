@@ -370,8 +370,8 @@ impl StudentTTarget {
 mod tests {
     use super::*;
     use crate::api::schema::{CalibrationEnvelope, CalibrationPlan, CalibrationStep, StepParams};
-    use crate::quotes::cds_tranche::CdsTrancheQuote;
-    use crate::quotes::ids::QuoteId;
+    use crate::quotes::CdsTrancheQuote;
+    use crate::quotes::QuoteId;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::{

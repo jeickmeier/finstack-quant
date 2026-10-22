@@ -2,8 +2,8 @@
 
 use crate::build::helpers::resolve_spot_date;
 use crate::build::BuildCtx;
-use crate::quotes::ids::Pillar;
-use crate::quotes::rates::RateQuote;
+use crate::quotes::Pillar;
+use crate::quotes::RateQuote;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{
@@ -580,7 +580,7 @@ fn resolve_fixing_date(start: Date, conv: &RateIndexConventions) -> Result<Date>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::quotes::ids::{Pillar, QuoteId};
+    use crate::quotes::{Pillar, QuoteId};
     use finstack_quant_core::types::IndexId;
     use finstack_quant_core::FxHashMap;
 

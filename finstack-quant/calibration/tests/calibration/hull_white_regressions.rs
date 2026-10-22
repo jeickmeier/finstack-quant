@@ -1,7 +1,7 @@
 use finstack_quant_calibration::api::{
     engine, market_datum::MarketDatum, prior_market::PriorMarketObject, schema::*,
 };
-use finstack_quant_calibration::quotes::{ids::QuoteId, vol::VolQuote};
+use finstack_quant_calibration::quotes::{QuoteId, VolQuote};
 use finstack_quant_core::{
     currency::Currency,
     dates::{Date, DayCount},

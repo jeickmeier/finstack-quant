@@ -4,9 +4,9 @@
 use crate::build::cds::build_cds_instrument;
 use crate::build::cds_tranche::{build_cds_tranche_instrument, CdsTrancheBuildOverrides};
 use crate::build::BuildCtx;
-use crate::quotes::cds::CdsQuote;
-use crate::quotes::cds_tranche::CdsTrancheQuote;
-use crate::quotes::ids::Pillar;
+use crate::quotes::CdsQuote;
+use crate::quotes::CdsTrancheQuote;
+use crate::quotes::Pillar;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, Tenor};
 use finstack_quant_core::FxHashMap;

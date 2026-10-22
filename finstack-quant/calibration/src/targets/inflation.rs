@@ -4,7 +4,7 @@ use crate::api::schema::InflationCurveParams;
 use crate::build::prepared::PreparedQuote;
 use crate::config::{CalibrationConfig, CalibrationMethod};
 use crate::constants::WEIGHT_MIN_FLOOR;
-use crate::quotes::inflation::InflationQuote;
+use crate::quotes::InflationQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
 use crate::solver::bootstrap;
 use crate::solver::global;

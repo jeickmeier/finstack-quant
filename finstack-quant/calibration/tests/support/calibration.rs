@@ -6,8 +6,8 @@ use finstack_quant_calibration::api::prior_market::PriorMarketObject;
 use finstack_quant_calibration::api::schema::{
     CalibrationEnvelope, CalibrationPlan, CalibrationStep, StepParams,
 };
-use finstack_quant_calibration::quotes::ids::QuoteId;
 use finstack_quant_calibration::quotes::MarketQuote;
+use finstack_quant_calibration::quotes::QuoteId;
 use finstack_quant_calibration::{CalibrationConfig, CalibrationReport};
 use finstack_quant_core::market_data::context::{CurveState, MarketContext, MarketContextState};
 use finstack_quant_core::Result;

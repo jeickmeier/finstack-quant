@@ -38,7 +38,7 @@ pub(crate) fn execute(envelope: &CalibrationEnvelope) -> MarketContext {
 fn sparse_surface_report_matches_published_grid_and_enforces_tolerance() {
     use finstack_quant_calibration::api::market_datum::MarketDatum;
     use finstack_quant_calibration::api::schema::StepParams;
-    use finstack_quant_calibration::quotes::vol::VolQuote;
+    use finstack_quant_calibration::quotes::VolQuote;
     let mut envelope = load_envelope("08_equity_vol_surface.json");
     envelope.plan.settings.vol_surface.validation_tolerance = 0.001;
     envelope.plan.settings.fail_on_bad_fit = false;
@@ -100,7 +100,7 @@ fn parametric_calibration_rejects_disconnected_discount_curve() {
 #[test]
 fn distressed_hazard_quotes_do_not_expand_explicit_bounds() {
     use finstack_quant_calibration::api::market_datum::MarketDatum;
-    use finstack_quant_calibration::quotes::cds::CdsQuote;
+    use finstack_quant_calibration::quotes::CdsQuote;
     let mut envelope = load_envelope("03_single_name_hazard.json");
     for datum in &mut envelope.market_data {
         if let MarketDatum::CdsQuote(CdsQuote::CdsParSpread { spread_bp, .. }) = datum {

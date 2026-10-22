@@ -5,7 +5,7 @@ use crate::build::cds::resolve_cds_tenor_maturity;
 use crate::build::cds_tranche::{build_cds_tranche_instrument, CdsTrancheBuildOverrides};
 use crate::build::context::BuildCtx;
 use crate::config::CalibrationConfig;
-use crate::quotes::cds_tranche::CdsTrancheQuote;
+use crate::quotes::CdsTrancheQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
 use crate::solver::bootstrap;
 use crate::solver::traits::BootstrapTarget;

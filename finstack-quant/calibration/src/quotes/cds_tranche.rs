@@ -22,8 +22,8 @@ use serde::{Deserialize, Serialize};
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
-/// use finstack_quant_calibration::quotes::ids::QuoteId;
+/// use finstack_quant_calibration::quotes::CdsTrancheQuote;
+/// use finstack_quant_calibration::quotes::QuoteId;
 /// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::currency::Currency;
@@ -84,8 +84,8 @@ impl CdsTrancheQuote {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
-    /// use finstack_quant_calibration::quotes::ids::QuoteId;
+    /// use finstack_quant_calibration::quotes::CdsTrancheQuote;
+    /// use finstack_quant_calibration::quotes::QuoteId;
     /// use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
     /// use finstack_quant_core::dates::Date;
     /// use finstack_quant_core::currency::Currency;

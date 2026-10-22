@@ -22,8 +22,8 @@ use finstack_quant_valuations_core::market::conventions::ids::SwaptionConvention
 ///
 /// Option volatility quote:
 /// ```rust
-/// use finstack_quant_calibration::quotes::vol::VolQuote;
-/// use finstack_quant_calibration::quotes::ids::QuoteId;
+/// use finstack_quant_calibration::quotes::VolQuote;
+/// use finstack_quant_calibration::quotes::QuoteId;
 /// use finstack_quant_models::types::OptionType;
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::types::UnderlyingId;
@@ -40,8 +40,8 @@ use finstack_quant_valuations_core::market::conventions::ids::SwaptionConvention
 ///
 /// Swaption volatility quote:
 /// ```rust
-/// use finstack_quant_calibration::quotes::vol::VolQuote;
-/// use finstack_quant_calibration::quotes::ids::QuoteId;
+/// use finstack_quant_calibration::quotes::VolQuote;
+/// use finstack_quant_calibration::quotes::QuoteId;
 /// use finstack_quant_valuations_core::market::conventions::ids::SwaptionConventionId;
 /// use finstack_quant_core::dates::Date;
 /// use finstack_quant_core::market_data::surfaces::VolQuoteType;

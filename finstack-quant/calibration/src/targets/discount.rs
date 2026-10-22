@@ -4,9 +4,9 @@ use crate::api::schema::DiscountCurveParams;
 use crate::build::prepared::PreparedQuote;
 use crate::config::{CalibrationConfig, CalibrationMethod};
 use crate::constants::*;
-use crate::quotes::rates::RateQuote;
 use crate::quotes::ExtractQuotes;
 use crate::quotes::MarketQuote;
+use crate::quotes::RateQuote;
 use crate::solver::bootstrap;
 use crate::solver::global;
 use crate::solver::traits::TimeGridAndGuesses;
@@ -310,7 +310,7 @@ impl DiscountCurveTarget {
         // Build rate_calibration sidecar before consuming rates_quotes so that the
         // produced curve carries the original benchmark quotes.  Downstream metrics
         // that re-bump and re-bootstrap (e.g. CDS option IR DV01) require this.
-        let raw_rates_quotes: Vec<crate::quotes::rates::RateQuote> = quotes.extract_quotes();
+        let raw_rates_quotes: Vec<crate::quotes::RateQuote> = quotes.extract_quotes();
         if raw_rates_quotes.is_empty() {
             return Err(finstack_quant_core::Error::Input(
                 finstack_quant_core::InputError::TooFewPoints,
@@ -900,10 +900,10 @@ mod tests {
 
         // Native Quote
         // Native Quote
-        let quote = crate::quotes::rates::RateQuote::Swap {
-            id: crate::quotes::ids::QuoteId::new("SWP-1Y"),
+        let quote = crate::quotes::RateQuote::Swap {
+            id: crate::quotes::QuoteId::new("SWP-1Y"),
             index: finstack_quant_core::types::IndexId::new("USD-SOFR-OIS"),
-            pillar: crate::quotes::ids::Pillar::Date(maturity), // 1Y
+            pillar: crate::quotes::Pillar::Date(maturity), // 1Y
             rate: 0.02,
             spread_decimal: None,
         };
@@ -994,10 +994,10 @@ mod tests {
         let p_time = 1.0;
 
         // RateQuote::Deposit
-        let quote = crate::quotes::rates::RateQuote::Deposit {
-            id: crate::quotes::ids::QuoteId::new("DEP-1Y"),
+        let quote = crate::quotes::RateQuote::Deposit {
+            id: crate::quotes::QuoteId::new("DEP-1Y"),
             index: finstack_quant_core::types::IndexId::new("USD-SOFR"),
-            pillar: crate::quotes::ids::Pillar::Date(maturity),
+            pillar: crate::quotes::Pillar::Date(maturity),
             rate,
         };
 
@@ -1066,10 +1066,10 @@ mod tests {
                     .year_fraction(base_date, maturity, DayCountContext::default())
                     .expect("year_fraction");
 
-                let quote = crate::quotes::rates::RateQuote::Deposit {
-                    id: crate::quotes::ids::QuoteId::new(format!("DEP-{}D", days)),
+                let quote = crate::quotes::RateQuote::Deposit {
+                    id: crate::quotes::QuoteId::new(format!("DEP-{}D", days)),
                     index: finstack_quant_core::types::IndexId::new("USD-SOFR"),
-                    pillar: crate::quotes::ids::Pillar::Date(maturity),
+                    pillar: crate::quotes::Pillar::Date(maturity),
                     rate,
                 };
 
@@ -1177,8 +1177,8 @@ mod tests {
 
         // Build two futures quotes: one without adjustment, one with 20bp adjustment
         let make_futures_quote = |adj: f64| -> PreparedQuote<RateQuote> {
-            let quote = crate::quotes::rates::RateQuote::Futures {
-                id: crate::quotes::ids::QuoteId::new("FUT-3M"),
+            let quote = crate::quotes::RateQuote::Futures {
+                id: crate::quotes::QuoteId::new("FUT-3M"),
                 contract:
                     finstack_quant_valuations_core::market::conventions::ids::IrFutureContractId::new(
                         "CME:SR3",
@@ -1249,20 +1249,20 @@ mod tests {
         let index = finstack_quant_core::types::IndexId::new("USD-SOFR-OIS");
         let quotes = [
             RateQuote::Deposit {
-                id: crate::quotes::ids::QuoteId::new("DEP"),
+                id: crate::quotes::QuoteId::new("DEP"),
                 index: index.clone(),
-                pillar: crate::quotes::ids::Pillar::Date(date),
+                pillar: crate::quotes::Pillar::Date(date),
                 rate: 0.043,
             },
             RateQuote::Fra {
-                id: crate::quotes::ids::QuoteId::new("FRA"),
+                id: crate::quotes::QuoteId::new("FRA"),
                 index: index.clone(),
-                start: crate::quotes::ids::Pillar::Tenor("3M".parse().expect("valid tenor")),
-                end: crate::quotes::ids::Pillar::Date(date),
+                start: crate::quotes::Pillar::Tenor("3M".parse().expect("valid tenor")),
+                end: crate::quotes::Pillar::Date(date),
                 rate: 0.041,
             },
             RateQuote::Futures {
-                id: crate::quotes::ids::QuoteId::new("FUT"),
+                id: crate::quotes::QuoteId::new("FUT"),
                 contract:
                     finstack_quant_valuations_core::market::conventions::ids::IrFutureContractId::new(
                         "CME:SR3",
@@ -1272,9 +1272,9 @@ mod tests {
                 convexity_adjustment: 0.0001,
             },
             RateQuote::Swap {
-                id: crate::quotes::ids::QuoteId::new("SWAP"),
+                id: crate::quotes::QuoteId::new("SWAP"),
                 index,
-                pillar: crate::quotes::ids::Pillar::Tenor("5Y".parse().expect("valid tenor")),
+                pillar: crate::quotes::Pillar::Tenor("5Y".parse().expect("valid tenor")),
                 rate: 0.039,
                 spread_decimal: Some(0.00025),
             },

@@ -929,7 +929,7 @@ impl PyCalibrationPlan {
         quote_sets: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         let settings = extract_config(py, settings)?;
-        let mut sets: IndexMap<String, Vec<finstack_quant_calibration::quotes::ids::QuoteId>> =
+        let mut sets: IndexMap<String, Vec<finstack_quant_calibration::quotes::QuoteId>> =
             IndexMap::new();
         if let Some(quote_sets) = quote_sets {
             for (name, ids) in quote_sets.iter() {
@@ -938,7 +938,7 @@ impl PyCalibrationPlan {
                 sets.insert(
                     name,
                     ids.into_iter()
-                        .map(finstack_quant_calibration::quotes::ids::QuoteId::new)
+                        .map(finstack_quant_calibration::quotes::QuoteId::new)
                         .collect(),
                 );
             }

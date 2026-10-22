@@ -1489,7 +1489,7 @@ export type Id5 = string;
  * # Examples
  *
  * ```rust
- * use finstack_quant_calibration::quotes::ids::QuoteId;
+ * use finstack_quant_calibration::quotes::QuoteId;
  *
  * let id = QuoteId::new("USD-SOFR-DEP-1M");
  * assert_eq!(id.as_str(), "USD-SOFR-DEP-1M");

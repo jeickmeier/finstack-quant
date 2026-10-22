@@ -19,8 +19,8 @@ use finstack_quant_valuations_core::market::conventions::ids::InflationSwapConve
 ///
 /// Zero-coupon inflation swap:
 /// ```rust
-/// use finstack_quant_calibration::quotes::inflation::InflationQuote;
-/// use finstack_quant_calibration::quotes::ids::QuoteId;
+/// use finstack_quant_calibration::quotes::InflationQuote;
+/// use finstack_quant_calibration::quotes::QuoteId;
 /// use finstack_quant_valuations_core::market::conventions::ids::InflationSwapConventionId;
 /// use finstack_quant_core::dates::Date;
 ///
@@ -35,8 +35,8 @@ use finstack_quant_valuations_core::market::conventions::ids::InflationSwapConve
 ///
 /// Year-on-year inflation swap:
 /// ```rust
-/// use finstack_quant_calibration::quotes::inflation::InflationQuote;
-/// use finstack_quant_calibration::quotes::ids::QuoteId;
+/// use finstack_quant_calibration::quotes::InflationQuote;
+/// use finstack_quant_calibration::quotes::QuoteId;
 /// use finstack_quant_valuations_core::market::conventions::ids::InflationSwapConventionId;
 /// use finstack_quant_core::dates::{Date, Tenor};
 ///
@@ -112,8 +112,8 @@ impl InflationQuote {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_calibration::quotes::inflation::InflationQuote;
-    /// use finstack_quant_calibration::quotes::ids::QuoteId;
+    /// use finstack_quant_calibration::quotes::InflationQuote;
+    /// use finstack_quant_calibration::quotes::QuoteId;
     /// use finstack_quant_valuations_core::market::conventions::ids::InflationSwapConventionId;
     /// use finstack_quant_core::dates::Date;
     ///

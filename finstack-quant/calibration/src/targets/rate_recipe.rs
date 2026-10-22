@@ -8,8 +8,8 @@
 //! (recipe → curve) share one mapping per pair.
 
 use crate::config::CalibrationMethod;
-use crate::quotes::ids::{Pillar, QuoteId};
-use crate::quotes::rates::RateQuote;
+use crate::quotes::RateQuote;
+use crate::quotes::{Pillar, QuoteId};
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::market_data::term_structures::{
     RateCalibrationFutureContractId, RateCalibrationMethod, RateCalibrationOisCompounding,

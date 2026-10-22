@@ -2,8 +2,8 @@
 
 use crate::api::market_datum::{DividendScheduleDatum, FxSpotDatum, MarketDatum, PriceDatum};
 use crate::api::prior_market::PriorMarketObject;
-use crate::quotes::ids::QuoteId;
 use crate::quotes::MarketQuote;
+use crate::quotes::QuoteId;
 use finstack_quant_core::market_data::context::{CurveState, MarketContext, MarketContextState};
 
 pub(crate) const STANDARD_NOTIONAL: f64 = 1_000_000.0;

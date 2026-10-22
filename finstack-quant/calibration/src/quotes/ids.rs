@@ -18,7 +18,7 @@ use std::fmt;
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_calibration::quotes::ids::QuoteId;
+/// use finstack_quant_calibration::quotes::QuoteId;
 ///
 /// let id = QuoteId::new("USD-SOFR-DEP-1M");
 /// assert_eq!(id.as_str(), "USD-SOFR-DEP-1M");
@@ -64,7 +64,7 @@ impl QuoteId {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_calibration::quotes::ids::QuoteId;
+    /// use finstack_quant_calibration::quotes::QuoteId;
     ///
     /// let id = QuoteId::new("USD-SOFR-DEP-1M");
     /// ```
@@ -81,7 +81,7 @@ impl QuoteId {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_calibration::quotes::ids::QuoteId;
+    /// use finstack_quant_calibration::quotes::QuoteId;
     ///
     /// let id = QuoteId::new("USD-SOFR-DEP-1M");
     /// assert_eq!(id.as_str(), "USD-SOFR-DEP-1M");
@@ -123,7 +123,7 @@ impl From<String> for QuoteId {
 ///
 /// Using a tenor pillar:
 /// ```rust
-/// use finstack_quant_calibration::quotes::ids::Pillar;
+/// use finstack_quant_calibration::quotes::Pillar;
 ///
 /// # fn example() -> finstack_quant_core::Result<()> {
 /// let pillar = Pillar::Tenor("5Y".parse()?);
@@ -133,7 +133,7 @@ impl From<String> for QuoteId {
 ///
 /// Using a date pillar:
 /// ```rust
-/// use finstack_quant_calibration::quotes::ids::Pillar;
+/// use finstack_quant_calibration::quotes::Pillar;
 /// use finstack_quant_core::dates::Date;
 ///
 /// let pillar = Pillar::Date(Date::from_calendar_date(2029, time::Month::June, 20).unwrap());

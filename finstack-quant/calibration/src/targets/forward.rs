@@ -4,9 +4,9 @@ use crate::api::schema::ForwardCurveParams;
 use crate::build::prepared::PreparedQuote;
 use crate::config::CalibrationConfig;
 use crate::config::CalibrationMethod;
-use crate::quotes::rates::RateQuote;
 use crate::quotes::ExtractQuotes;
 use crate::quotes::MarketQuote;
+use crate::quotes::RateQuote;
 use crate::solver::global;
 use crate::solver::traits::GlobalSolveTarget;
 use crate::solver::traits::TimeGridAndGuesses;
@@ -651,9 +651,9 @@ mod tests {
     use super::*;
     use crate::build::prepared::PreparedQuote;
     use crate::constants::WEIGHT_MIN_FLOOR;
-    use crate::quotes::ids::{Pillar, QuoteId};
-    use crate::quotes::rates::RateQuote;
     use crate::quotes::MarketQuote;
+    use crate::quotes::RateQuote;
+    use crate::quotes::{Pillar, QuoteId};
     use crate::solver::traits::GlobalSolveTarget;
     use crate::targets::util::quote_annuity_proxy;
     use crate::validation::RateBounds;
@@ -778,7 +778,7 @@ mod tests {
                     Arc::new(RateQuote::Deposit {
                         id: QuoteId::new(format!("DEP-{pillar_time}")),
                         index: finstack_quant_core::types::IndexId::new("USD-SOFR-3M"),
-                        pillar: crate::quotes::ids::Pillar::Date(maturity),
+                        pillar: crate::quotes::Pillar::Date(maturity),
                         rate: quote_rate,
                     }),
                     Arc::new(Deposit {
@@ -886,7 +886,7 @@ mod tests {
                     Arc::new(RateQuote::Deposit {
                         id: QuoteId::new(format!("DEP-{days}D")),
                         index: finstack_quant_core::types::IndexId::new("USD-SOFR-3M"),
-                        pillar: crate::quotes::ids::Pillar::Date(maturity),
+                        pillar: crate::quotes::Pillar::Date(maturity),
                         rate,
                     }),
                     Arc::new(Deposit {
@@ -958,7 +958,7 @@ mod tests {
                     Arc::new(RateQuote::Deposit {
                         id: QuoteId::new(format!("DEP-{days}D")),
                         index: finstack_quant_core::types::IndexId::new("USD-SOFR-3M"),
-                        pillar: crate::quotes::ids::Pillar::Date(maturity),
+                        pillar: crate::quotes::Pillar::Date(maturity),
                         rate,
                     }),
                     Arc::new(Deposit {
@@ -1108,8 +1108,8 @@ mod tests {
             let quote = MarketQuote::Rates(RateQuote::Fra {
                 id: QuoteId::new("FRA-3X6"),
                 index: finstack_quant_core::types::IndexId::new("USD-SOFR-3M"),
-                start: crate::quotes::ids::Pillar::Date(base_date + time::Duration::days(90)),
-                end: crate::quotes::ids::Pillar::Date(base_date + time::Duration::days(180)),
+                start: crate::quotes::Pillar::Date(base_date + time::Duration::days(90)),
+                end: crate::quotes::Pillar::Date(base_date + time::Duration::days(180)),
                 rate: 0.04,
             });
             let params = ForwardCurveParams {
@@ -1280,7 +1280,7 @@ mod tests {
         let quote = RateQuote::Swap {
             id: QuoteId::new("SWAP-DATE"),
             index: finstack_quant_core::types::IndexId::new("USD-SOFR-3M"),
-            pillar: crate::quotes::ids::Pillar::Date(date),
+            pillar: crate::quotes::Pillar::Date(date),
             rate: 0.039,
             spread_decimal: Some(0.00025),
         };
