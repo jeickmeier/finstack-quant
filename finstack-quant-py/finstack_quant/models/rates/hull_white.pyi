@@ -53,7 +53,7 @@ class HullWhiteParams:
     --------
     >>> from finstack_quant.models.rates.hull_white import HullWhiteParams
     >>> params = HullWhiteParams(0.05, 0.01)
-    >>> (params.kappa, params.sigma(0.5), params.times)
+    >>> (params.kappa, params.get_sigma(0.5), params.get_times())
     (0.05, 0.01, [0.0])
     """
 
@@ -87,7 +87,7 @@ class HullWhiteParams:
         Examples
         --------
         >>> from finstack_quant.models.rates.hull_white import HullWhiteParams
-        >>> HullWhiteParams.piecewise(0.05, [0.0, 1.0], [0.01, 0.012]).sigma(1.5)
+        >>> HullWhiteParams.piecewise(0.05, [0.0, 1.0], [0.01, 0.012]).get_sigma(1.5)
         0.012
         """
         ...
@@ -110,16 +110,15 @@ class HullWhiteParams:
         """
         ...
 
-    @property
-    def times(self) -> list[float]:
+    def get_times(self) -> list[float]:
         """
         Knot times of the piecewise-constant volatility schedule.
 
         Returns
         -------
         list[float]
-            Non-decreasing year fractions measured from the model base date;
-            an empty list for a flat-volatility parameterisation.
+            Strictly increasing segment starts in years from the model base date;
+            ``[0.0]`` for a flat-volatility parameterisation.
 
         Notes
         -----
@@ -127,8 +126,7 @@ class HullWhiteParams:
         """
         ...
 
-    @property
-    def values(self) -> list[float]:
+    def get_values(self) -> list[float]:
         """
         Short-rate volatility applying on each knot interval.
 
@@ -136,7 +134,7 @@ class HullWhiteParams:
         -------
         list[float]
             Absolute (normal) volatilities in rate units per square root of a
-            year, aligned with :attr:`times`; ``0.01`` means 100 bp per
+            year, aligned with :meth:`get_times`; ``0.01`` means 100 bp per
             square-root year. A single-element list for a flat schedule.
 
         Notes
@@ -145,7 +143,7 @@ class HullWhiteParams:
         """
         ...
 
-    def sigma(self, t: float) -> float:
+    def get_sigma(self, t: float) -> float:
         """Return the short-rate volatility applying at time ``t``.
 
         Parameters
@@ -166,7 +164,7 @@ class HullWhiteParams:
         Examples
         --------
         >>> from finstack_quant.models.rates.hull_white import HullWhiteParams
-        >>> HullWhiteParams(0.05, 0.01).sigma(3.0)
+        >>> HullWhiteParams(0.05, 0.01).get_sigma(3.0)
         0.01
         """
         ...

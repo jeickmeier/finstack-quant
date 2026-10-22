@@ -2094,6 +2094,8 @@ js = "models.rates.dtsm"
 types = { FactorTimeSeries = "FactorTimeSeries", YieldForecast = "YieldForecast", YieldPcaView = "YieldPcaView" }
 
 [parity.modules."finstack_quant.models.rates.hull_white"]
+# HullWhiteParams schedule reads use get_sigma/get_times/get_values in Rust and Python;
+# WASM exposes getSigma/getTimes/getValues methods. The volatility JSON shape is unchanged.
 js = "models.rates.hullWhite"
 
 [parity.modules."finstack_quant.models.volatility"]

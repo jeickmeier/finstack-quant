@@ -249,9 +249,9 @@ fn piecewise_cap_floor_bootstrap_recovers_synthetic_segments() {
     .expect("bootstrap");
 
     assert!(report.success);
-    assert_eq!(bootstrapped.volatility.times(), &[0.0, 0.75]);
-    assert!((bootstrapped.volatility.values()[0] - 0.01).abs() < 1.0e-10);
-    assert!((bootstrapped.volatility.values()[1] - 0.02).abs() < 1.0e-10);
+    assert_eq!(bootstrapped.get_times(), &[0.0, 0.75]);
+    assert!((bootstrapped.get_values()[0] - 0.01).abs() < 1.0e-10);
+    assert!((bootstrapped.get_values()[1] - 0.02).abs() < 1.0e-10);
 }
 
 #[test]

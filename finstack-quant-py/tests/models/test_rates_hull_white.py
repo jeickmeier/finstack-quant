@@ -1,6 +1,7 @@
 """Hull-White one-factor scalar bindings."""
 
 import datetime
+import json
 import math
 import pickle
 
@@ -19,8 +20,10 @@ from finstack_quant.models.rates.hull_white import (
 
 def test_params_constant_and_piecewise_agree_with_scalars() -> None:
     params = HullWhiteParams(0.05, 0.01)
-    assert params.times == [0.0]
-    assert params.sigma(2.0) == 0.01
+    assert params.get_times() == [0.0]
+    assert params.get_values() == [0.01]
+    assert json.loads(params.to_json())["volatility"] == {"times": [0.0], "values": [0.01]}
+    assert params.get_sigma(2.0) == 0.01
     assert params.bond_vol(0.0, 1.0, 2.0) == pytest.approx(hw_bond_vol(0.05, 0.01, 0.0, 1.0, 2.0))
     expected_var = 0.01**2 * (1.0 - math.exp(-0.1)) / 0.1
     assert params.state_variance(1.0) == pytest.approx(expected_var)
@@ -28,7 +31,8 @@ def test_params_constant_and_piecewise_agree_with_scalars() -> None:
     assert pickle.loads(pickle.dumps(params)) == params  # noqa: S301
 
     stepped = HullWhiteParams.piecewise(0.05, [0.0, 1.0], [0.01, 0.02])
-    assert stepped.sigma(1.5) == 0.02
+    assert stepped.get_sigma(1.0) == 0.02
+    assert stepped.get_sigma(1.5) == 0.02
     with pytest.raises(ValueError, match=r"kappa must be positive and finite"):
         HullWhiteParams(0.0, 0.01)
     with pytest.raises(ValueError, match=r"first knot must be 0.0"):

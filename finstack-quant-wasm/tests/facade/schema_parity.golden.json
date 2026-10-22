@@ -843,7 +843,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_cap_floor_calibration_config.schema.json",
             "type_name": "CapFloorCalibrationConfig",
             "kind": "component",
-            "bytes": 2989
+            "bytes": 2977
           },
           {
             "path": "schemas/calibration/1/hull_white_cap_floor_quote.schema.json",
@@ -3316,7 +3316,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
             "type_name": "EnhancedMonteCarloResult",
             "kind": "output",
-            "bytes": 52387
+            "bytes": 52257
           },
           {
             "path": "schemas/results/1/equity_metrics.schema.json",
@@ -3610,7 +3610,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_cap_floor_calibration_config.schema.json",
             "type_name": "CapFloorCalibrationConfig",
             "kind": "component",
-            "bytes": 2989
+            "bytes": 2977
           },
           {
             "domain": "calibration",
@@ -5410,7 +5410,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
             "type_name": "EnhancedMonteCarloResult",
             "kind": "output",
-            "bytes": 52387
+            "bytes": 52257
           },
           {
             "domain": "valuations",

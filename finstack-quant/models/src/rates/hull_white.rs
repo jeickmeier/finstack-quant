@@ -130,9 +130,9 @@ impl HullWhiteCalibrationParams {
 pub struct HullWhiteParams {
     /// Mean-reversion speed κ in inverse years; strictly positive and finite.
     pub kappa: f64,
-    /// Left-continuous short-rate volatility σ(t), in absolute rate units per
+    /// Piecewise-constant short-rate volatility σ(t), in absolute rate units per
     /// square-root year.
-    pub volatility: PiecewiseConstantCurve,
+    volatility: PiecewiseConstantCurve,
 }
 
 #[derive(serde::Deserialize)]
@@ -214,23 +214,23 @@ impl HullWhiteParams {
     ///
     /// # Arguments
     ///
-    /// * `t` - Model time in years; the left-continuous schedule segment
-    ///   containing `t` supplies the value (flat after the last knot).
+    /// * `t` - Model time in years; the segment starting at or before `t`
+    ///   supplies the value, clamped to the first or last segment outside the knots.
     #[must_use]
-    pub fn sigma(&self, t: f64) -> f64 {
+    pub fn get_sigma(&self, t: f64) -> f64 {
         self.volatility.value_at(t)
     }
 
     /// Segment start times of the volatility schedule, in years.
     #[must_use]
-    pub fn times(&self) -> &[f64] {
+    pub fn get_times(&self) -> &[f64] {
         self.volatility.times()
     }
 
     /// Volatility on each schedule segment, in absolute rate units per
     /// square-root year.
     #[must_use]
-    pub fn values(&self) -> &[f64] {
+    pub fn get_values(&self) -> &[f64] {
         self.volatility.values()
     }
 
@@ -276,8 +276,13 @@ impl HullWhiteParams {
     /// Returns an error when the integration interval or volatility schedule
     /// is invalid.
     pub fn state_variance(&self, t: f64) -> Result<f64> {
+        self.state_variance_between(0.0, t)
+    }
+
+    /// Exact centered-state variance contributed over an interval in years.
+    pub(crate) fn state_variance_between(&self, start: f64, end: f64) -> Result<f64> {
         self.volatility
-            .integrate_squared_exp_weight(self.kappa, t, 0.0, t)
+            .integrate_squared_exp_weight(self.kappa, end, start, end)
     }
 
     /// Compute covariance of the centered short-rate state at two times.
