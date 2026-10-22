@@ -434,3 +434,15 @@ test('market freshness age is accepted as a plain number', () => {
   const canonical = JSON.parse(calibration.validateCalibrationJson(envelope));
   assert.equal(canonical.plan.settings.market_freshness.max_age_seconds, 3600);
 });
+
+test('calibration configuration accepts nested solver settings and rejects flat shortcuts', () => {
+  const envelope = JSON.parse(readFileSync(EQUITY_VOL_EXAMPLE, 'utf8'));
+  envelope.plan.settings = { solver: { max_iterations: 64 } };
+  assert.doesNotThrow(() => calibration.dryRun(envelope));
+  for (const field of ['tolerance', 'max_iterations']) {
+    envelope.plan.settings = { [field]: 1 };
+    const error = captureError(() => calibration.dryRun(envelope));
+    assertStructuredError(error);
+    assert.match(error.message, new RegExp(field));
+  }
+});

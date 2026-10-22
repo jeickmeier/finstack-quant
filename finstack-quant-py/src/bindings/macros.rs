@@ -55,6 +55,15 @@ macro_rules! wire_methods {
             }
         }
     };
+    ($py_type:ident, $rust_type:ty, $name:literal, module = $module:literal, validate) => {
+        $crate::bindings::macros::wire_methods!(@documented_json $py_type, $rust_type, $name, [], |inner| {
+            inner.validate().map_err($crate::errors::core_to_py)?;
+            inner
+        },
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_json")),
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".from_json")));
+        $crate::bindings::macros::wire_methods!(@reduce $py_type);
+    };
     ($py_type:ident, $rust_type:ty, $name:literal, validate) => {
         $crate::bindings::macros::wire_methods!(@json $py_type, $rust_type, $name, [], |inner| {
             inner.validate().map_err($crate::errors::core_to_py)?;

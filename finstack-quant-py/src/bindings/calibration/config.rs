@@ -3,6 +3,7 @@
 use crate::bindings::macros::wire_methods;
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::pydoc::pydoc;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_calibration::validation::{RateBounds, ValidationConfig};
@@ -288,19 +289,7 @@ wire_methods!(
     validate
 );
 
-/// Plan-level calibration settings (solver, validation, parallelism, diagnostics).
-///
-/// Every field defaults to the Rust default; nested wire fields not exposed
-/// as keyword arguments (``discount_curve``, ``hazard_curve``, ``fx``,
-/// ``market_freshness``, ...) can be overridden through ``**overrides``
-/// with partial dicts that merge into the defaults.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.calibration import CalibrationConfig
-/// >>> cfg = CalibrationConfig(tolerance=1e-10, compute_diagnostics=True, use_parallel=False)
-/// >>> cfg.tolerance, cfg.compute_diagnostics, cfg.use_parallel
-/// (1e-10, True, False)
+#[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig")]
 #[pyclass(
     name = "CalibrationConfig",
     module = "finstack_quant.calibration",
@@ -320,165 +309,70 @@ impl PyCalibrationConfig {
 
 #[pymethods]
 impl PyCalibrationConfig {
-    /// Build settings from the Rust defaults plus keyword overrides.
-    ///
-    /// Parameters
-    /// ----------
-    /// tolerance : float | None, default None
-    ///     Solver convergence tolerance (shorthand for ``solver.tolerance``).
-    /// max_iterations : int | None, default None
-    ///     Solver iteration cap (shorthand for ``solver.max_iterations``).
-    /// solver : SolverConfig | None, default None
-    ///     Full solver settings (applied before ``tolerance`` / ``max_iterations``).
-    /// use_parallel : bool | None, default None
-    ///     Run independent steps in parallel batches.
-    /// fail_on_bad_fit : bool | None, default None
-    ///     Raise instead of returning ``success=False`` when a step misses tolerance.
-    /// compute_diagnostics : bool | None, default None
-    ///     Populate per-quote diagnostics (target / fitted / sensitivity).
-    /// validation_mode : str | None, default None
-    ///     ``"warn"`` or ``"error"`` for post-solve validation findings.
-    /// rate_bounds : RateBounds | None, default None
-    ///     Explicit admissible-rate bounds (sets ``rate_bounds_policy`` to
-    ///     ``"explicit"``).
-    /// validation : ValidationConfig | None, default None
-    ///     Post-solve validation thresholds.
-    /// **overrides
-    ///     Any other wire field of ``CalibrationConfig`` (partial nested dicts
-    ///     merge into the defaults).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a field is unknown or the merged configuration fails validation.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.__init__")]
     #[new]
-    #[pyo3(signature = (*, tolerance = None, max_iterations = None, solver = None, use_parallel = None, fail_on_bad_fit = None, compute_diagnostics = None, validation_mode = None, rate_bounds = None, validation = None, **overrides))]
-    #[pyo3(
-        text_signature = "(*, tolerance=None, max_iterations=None, solver=None, use_parallel=None, fail_on_bad_fit=None, compute_diagnostics=None, validation_mode=None, rate_bounds=None, validation=None, **overrides)"
-    )]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        py: Python<'_>,
-        tolerance: Option<f64>,
-        max_iterations: Option<usize>,
-        solver: Option<PyRef<'_, PySolverConfig>>,
-        use_parallel: Option<bool>,
-        fail_on_bad_fit: Option<bool>,
-        compute_diagnostics: Option<bool>,
-        validation_mode: Option<&str>,
-        rate_bounds: Option<PyRef<'_, PyRateBounds>>,
-        validation: Option<PyRef<'_, PyValidationConfig>>,
-        overrides: Option<&Bound<'_, PyDict>>,
-    ) -> PyResult<Self> {
-        let mut inner = CalibrationConfig::default();
-        if let Some(solver) = solver {
-            inner.solver = solver.inner.clone();
-        }
-        if let Some(tolerance) = tolerance {
-            inner = inner.with_tolerance(tolerance);
-        }
-        if let Some(max_iterations) = max_iterations {
-            inner = inner.with_max_iterations(max_iterations);
-        }
-        if let Some(flag) = use_parallel {
-            inner.use_parallel = flag;
-        }
-        if let Some(flag) = fail_on_bad_fit {
-            inner.fail_on_bad_fit = flag;
-        }
-        if let Some(flag) = compute_diagnostics {
-            inner = inner.with_compute_diagnostics(flag);
-        }
-        if let Some(mode) = validation_mode {
-            inner.validation_mode = serde_json::from_value(Value::String(mode.to_string()))
-                .map_err(|e| serde_json_to_py(e, "invalid validation_mode"))?;
-        }
-        if let Some(bounds) = rate_bounds {
-            inner = inner.with_rate_bounds(bounds.inner.clone());
-        }
-        if let Some(validation) = validation {
-            inner.validation = validation.inner.clone();
-        }
+    #[pyo3(signature = (**overrides))]
+    #[pyo3(text_signature = "(**overrides)")]
+    fn new(py: Python<'_>, overrides: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
         let overrides = match overrides {
-            Some(dict) if !dict.is_empty() => {
-                py_to_json_value(py, dict.as_any(), "calibration config overrides")?
-            }
-            _ => Value::Object(serde_json::Map::new()),
+            Some(dict) => py_to_json_value(py, dict.as_any(), "calibration config overrides")?,
+            None => Value::Object(serde_json::Map::new()),
         };
-        inner
+        CalibrationConfig::default()
             .with_json_overrides(overrides)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
 
-    /// Solver convergence tolerance.
-    #[getter]
-    fn tolerance(&self) -> f64 {
-        self.inner.solver.tolerance()
-    }
-
-    /// Solver iteration cap.
-    #[getter]
-    fn max_iterations(&self) -> usize {
-        self.inner.solver.max_iterations()
-    }
-
-    /// Solver settings.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.solver")]
     #[getter]
     fn solver(&self) -> PySolverConfig {
         PySolverConfig::from_inner(self.inner.solver.clone())
     }
 
-    /// Whether independent steps run in parallel batches.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.use_parallel")]
     #[getter]
     fn use_parallel(&self) -> bool {
         self.inner.use_parallel
     }
 
-    /// Whether a missed tolerance raises instead of reporting ``success=False``.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.fail_on_bad_fit")]
     #[getter]
     fn fail_on_bad_fit(&self) -> bool {
         self.inner.fail_on_bad_fit
     }
 
-    /// Whether per-quote diagnostics are computed.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.compute_diagnostics")]
     #[getter]
     fn compute_diagnostics(&self) -> bool {
         self.inner.compute_diagnostics
     }
 
-    /// Post-solve validation mode (``"warn"`` or ``"error"``).
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.validation_mode")]
     #[getter]
     fn validation_mode(&self) -> String {
         self.inner.validation_mode.as_str().to_string()
     }
 
-    /// Admissible-rate bounds.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.rate_bounds")]
     #[getter]
     fn rate_bounds(&self) -> PyRateBounds {
         PyRateBounds::from_inner(self.inner.rate_bounds.clone())
     }
 
-    /// Post-solve validation thresholds.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.validation")]
     #[getter]
     fn validation(&self) -> PyValidationConfig {
         PyValidationConfig::from_inner(self.inner.validation.clone())
     }
 
-    /// All fields as a nested dict of wire values.
+    #[doc = pydoc!("finstack_quant.calibration", "CalibrationConfig.to_dict")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
     }
 
     fn __repr__(&self) -> String {
-        format!(
-            "CalibrationConfig(tolerance={:e}, max_iterations={}, use_parallel={}, fail_on_bad_fit={}, compute_diagnostics={})",
-            self.inner.solver.tolerance(),
-            self.inner.solver.max_iterations(),
-            if self.inner.use_parallel { "True" } else { "False" },
-            if self.inner.fail_on_bad_fit { "True" } else { "False" },
-            if self.inner.compute_diagnostics { "True" } else { "False" },
-        )
+        repr_from_serde("CalibrationConfig", &self.inner)
     }
 }
 
@@ -486,5 +380,6 @@ wire_methods!(
     PyCalibrationConfig,
     CalibrationConfig,
     "CalibrationConfig",
+    module = "finstack_quant.calibration",
     validate
 );

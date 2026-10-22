@@ -409,85 +409,50 @@ class ValidationConfig:
     def __repr__(self) -> str: ...
 
 class CalibrationConfig:
-    """Plan-level solver, parallelism and acceptance settings.
+    """Plan-level solver, parallelism and acceptance settings owned by Rust.
 
-    Examples:
+    Keyword names and nested objects follow the serialized ``CalibrationConfig``
+    schema. Omitted fields keep Rust defaults. Solver stopping settings belong
+    under ``solver``; they are not top-level fields or properties.
+
+    Examples
     --------
-    >>> from finstack_quant.calibration import CalibrationConfig
-    >>> CalibrationConfig(max_iterations=64).max_iterations
+    >>> from finstack_quant.calibration import CalibrationConfig, SolverConfig
+    >>> config = CalibrationConfig(solver={"max_iterations": 64})
+    >>> config.solver.max_iterations
     64
-
+    >>> config = CalibrationConfig(solver=SolverConfig(tolerance=1e-10))
+    >>> config.solver.tolerance
+    1e-10
     """
 
-    def __init__(
-        self,
-        *,
-        tolerance: float | None = None,
-        max_iterations: int | None = None,
-        solver: SolverConfig | None = None,
-        use_parallel: bool | None = None,
-        fail_on_bad_fit: bool | None = None,
-        compute_diagnostics: bool | None = None,
-        validation_mode: str | None = None,
-        rate_bounds: RateBounds | None = None,
-        validation: ValidationConfig | None = None,
-    ) -> None:
-        """Build a plan-level calibration configuration.
+    def __init__(self, **overrides: Any) -> None:
+        """Merge wire-shaped keyword fields into the Rust defaults and validate.
 
         Parameters
         ----------
-        tolerance : float | None
-            Absolute residual tolerance in each target's own units; Rust default
-            when None.
-        max_iterations : int | None
-            Maximum root-finder iterations per pillar; Rust default when None.
-        solver : SolverConfig | None
-            Complete solver block, overriding ``tolerance``/``max_iterations``.
-        use_parallel : bool | None
-            Run independent steps in parallel. Decimal-mode results are identical
-            either way.
-        fail_on_bad_fit : bool | None
-            Raise instead of returning a result when a step misses its tolerance.
-        compute_diagnostics : bool | None
-            Populate per-quote diagnostics (condition number, singular values).
-        validation_mode : str | None
-            Post-solve validation severity, ``"warn"`` or ``"error"``.
-        rate_bounds : RateBounds | None
-            Admissible zero-rate bracket for bootstrap solves.
-        validation : ValidationConfig | None
-            Post-solve acceptance thresholds.
+        overrides : Any
+            Serialized configuration fields. Nested dictionaries merge recursively,
+            retaining omitted defaults; typed ``SolverConfig``, ``RateBounds`` and
+            ``ValidationConfig`` objects supply their complete serialized fields.
+            Use ``solver={"tolerance": 1e-10, "max_iterations": 200}`` for positive,
+            finite numerical stopping tolerance and a positive iteration budget.
+            ``use_parallel`` controls independent step execution;
+            ``fail_on_bad_fit`` controls rejection of unsuccessful fits;
+            ``compute_diagnostics`` enables per-quote diagnostics;
+            ``validation_mode`` accepts ``"warn"`` or ``"error"``.
+            ``validation`` contains acceptance thresholds. Explicit decimal-rate
+            ``rate_bounds`` require ``rate_bounds_policy="explicit"`` to select
+            them. Other fields use their canonical schema names and conventions.
+            Unknown fields, including top-level ``tolerance`` and
+            ``max_iterations``, are rejected. Pass no keyword to retain a default;
+            ``None`` is not a general default sentinel.
 
         Raises
         ------
         ValueError
-            If a value is out of range or ``validation_mode`` is not recognized.
-
-        """
-
-    @property
-    def tolerance(self) -> float:
-        """
-        Absolute residual tolerance in each target's own units.
-
-        This property does not raise.
-
-        Returns
-        -------
-        float
-            Absolute residual tolerance in each target's own units.
-        """
-
-    @property
-    def max_iterations(self) -> int:
-        """
-        Maximum root-finder iterations per pillar.
-
-        This property does not raise.
-
-        Returns
-        -------
-        int
-            Maximum root-finder iterations per pillar.
+            If fields cannot be serialized, are unknown, have invalid types or
+            violate Rust configuration validation.
         """
 
     @property
