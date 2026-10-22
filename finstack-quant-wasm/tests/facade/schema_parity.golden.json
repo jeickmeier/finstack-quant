@@ -2107,7 +2107,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 382279
+            "bytes": 382281
           },
           {
             "path": "schemas/statements/1/metric_registry.schema.json",
@@ -4492,7 +4492,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 382279
+            "bytes": 382281
           },
           {
             "domain": "statements",

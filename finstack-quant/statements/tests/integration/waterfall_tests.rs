@@ -291,7 +291,7 @@ mod period_flow_waterfall_integration {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity".into(),
                 threshold: 100.0,
-                target_instrument_ids: Some(vec!["TL-PIK".into()]),
+                target_instrument_ids: vec!["TL-PIK".into()],
                 min_periods_in_pik: 0,
             }),
             ..Default::default()

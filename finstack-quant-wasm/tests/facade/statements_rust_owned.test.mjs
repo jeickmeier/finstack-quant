@@ -342,3 +342,18 @@ test('evaluateScenarioSet returns the ScenarioResults map', () => {
   assert.deepEqual(Object.keys(out), ['base', 'up']);
   assert.equal(out.up.nodes.profit['2025Q1'], 100);
 });
+
+test('PIK target lists are required and nonempty', () => {
+  for (const targets of [undefined, null, []]) {
+    const spec = { liquidity_metric: 'cash', threshold: 1 };
+    if (targets !== undefined) spec.target_instrument_ids = targets;
+    assert.throws(
+      () => statements.validatePikToggleSpecJson(spec),
+      (e) => e.kind === 'validation'
+    );
+  }
+  const spec = { liquidity_metric: 'cash', threshold: 1, target_instrument_ids: ['TL'] };
+  assert.deepEqual(JSON.parse(statements.validatePikToggleSpecJson(spec)).target_instrument_ids, [
+    'TL',
+  ]);
+});

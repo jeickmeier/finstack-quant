@@ -15443,11 +15443,13 @@ export interface D_321Bf35B4A9Ae99F3Cf3 {
    * Borrowing debt IDs whose cash coupons capitalize when the toggle triggers.
    *
    * Must be a non-empty list: instrument-level PIK capability is not
-   * modeled, so `None` or an empty list is rejected by
-   * [`PikToggleSpec::validate`] rather than meaning "every instrument".
+   * modeled, so an empty list is rejected by [`PikToggleSpec::validate`]
+   * rather than meaning "every instrument".
    * Swaps and options cannot be PIK targets.
+   *
+   * @minItems 1
    */
-  target_instrument_ids?: string[] | null;
+  target_instrument_ids: [string, ...string[]];
   /**
    * Threshold value: if metric < threshold, enable PIK; otherwise use cash
    */
