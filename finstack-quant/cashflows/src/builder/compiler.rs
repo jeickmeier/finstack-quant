@@ -583,7 +583,6 @@ pub(super) fn compute_coupon_schedules(
                     schedule: schedule.clone(),
                 };
                 let rate_params = FloatingRateParams::try_from(&spec.rate_spec)?;
-                let calendar = calendar_by_id_strict(&spec.schedule.calendar_id)?;
                 let fixing_calendar_id = spec
                     .rate_spec
                     .fixing_calendar_id

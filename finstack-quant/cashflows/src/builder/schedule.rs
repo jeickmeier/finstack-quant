@@ -45,7 +45,7 @@ fn kind_rank(kind: CFKind) -> u8 {
     }
 }
 
-/// Sort flows deterministically using schedule ordering semantics.
+/// Compare flows using schedule ordering semantics.
 ///
 /// Multi-key ordering, applied in priority order:
 ///
@@ -69,10 +69,6 @@ fn kind_rank(kind: CFKind) -> u8 {
 /// A stable sort is used deliberately: `merge_cashflow_schedules` concatenates
 /// already-sorted schedules, and the stable sort's run detection handles those
 /// pre-sorted runs in near-linear time (an unstable sort re-partitions them).
-fn sort_flows(flows: &mut [CashFlow]) {
-    flows.sort_by(compare_flows);
-}
-
 fn compare_flows(a: &CashFlow, b: &CashFlow) -> std::cmp::Ordering {
     a.date
         .cmp(&b.date)
@@ -312,7 +308,7 @@ where
     D: serde::Deserializer<'de>,
 {
     let mut flows = <Vec<CashFlow> as serde::Deserialize>::deserialize(deserializer)?;
-    sort_flows(&mut flows);
+    flows.sort_by(compare_flows);
     Ok(flows)
 }
 
@@ -343,7 +339,7 @@ impl CashFlowSchedule {
             day_count,
             meta,
         };
-        sort_flows(&mut schedule.flows);
+        schedule.flows.sort_by(compare_flows);
         schedule
     }
 
@@ -458,7 +454,7 @@ impl CashFlowSchedule {
         for flow in &mut self.flows {
             update(flow);
         }
-        sort_flows(&mut self.flows);
+        self.flows.sort_by(compare_flows);
     }
 
     /// Fallible variant of [`Self::update_flows`].
@@ -479,7 +475,7 @@ impl CashFlowSchedule {
         for flow in &mut self.flows {
             update(flow)?;
         }
-        sort_flows(&mut self.flows);
+        self.flows.sort_by(compare_flows);
         Ok(())
     }
 
@@ -491,7 +487,7 @@ impl CashFlowSchedule {
     /// Add one cashflow and restore canonical ordering.
     pub fn push_flow(&mut self, flow: CashFlow) {
         self.flows.push(flow);
-        sort_flows(&mut self.flows);
+        self.flows.sort_by(compare_flows);
     }
 
     /// Start a cashflow builder.
@@ -572,7 +568,7 @@ impl CashFlowSchedule {
                 *delta = delta.checked_mul_f64(scale)?;
             }
         }
-        sort_flows(&mut self.flows);
+        self.flows.sort_by(compare_flows);
         Ok(self)
     }
 
@@ -739,7 +735,7 @@ impl CashFlowSchedule {
         // An inception recipe cannot be reapplied to the rebased opening balance.
         self.notional.amort = super::AmortizationSpec::None;
         self.flows.retain(|cf| cf.date >= as_of);
-        sort_flows(&mut self.flows);
+        self.flows.sort_by(compare_flows);
         Ok(self)
     }
 
