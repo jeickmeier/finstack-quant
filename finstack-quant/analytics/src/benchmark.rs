@@ -244,10 +244,11 @@ pub(crate) fn r_squared(returns: &[f64], benchmark: &[f64]) -> f64 {
 
 /// OLS beta result with standard error and 95% confidence interval.
 ///
-/// All fields are [`f64::NAN`] when fewer than three paired observations are
+/// Floating-point estimates are [`f64::NAN`] when fewer than three paired observations are
 /// available or the benchmark variance is zero.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct BetaResult {
     /// Estimated beta coefficient, or [`f64::NAN`] when it is not estimable
     /// together with the confidence interval.
@@ -282,23 +283,16 @@ pub struct BetaResult {
     pub ci_upper: f64,
     /// Number of paired observations the regression used: the overlap after
     /// truncating both series to the shorter length. Reported even when the
-    /// estimates are [`f64::NAN`]. `0` when deserialized from JSON written
-    /// before this field existed.
-    #[serde(default)]
+    /// estimates are [`f64::NAN`]. Required in the serialized result.
     pub n_obs: usize,
     /// Two-sided confidence level of `ci_lower`/`ci_upper` as a decimal
     /// probability (`0.95` = 95%). The interval is
     /// `beta ± t_{n_obs − 2, (1 + confidence_level) / 2} × std_err`.
-    #[serde(default = "default_beta_confidence_level")]
     pub confidence_level: f64,
 }
 
 /// Two-sided confidence level of the [`BetaResult`] interval (95%).
 pub(crate) const BETA_CONFIDENCE_LEVEL: f64 = 0.95;
-
-fn default_beta_confidence_level() -> f64 {
-    BETA_CONFIDENCE_LEVEL
-}
 
 impl NonFiniteFields for BetaResult {
     const NON_FINITE_FIELDS: &'static [&'static str] = &["beta", "std_err", "ci_lower", "ci_upper"];
@@ -440,6 +434,7 @@ fn jensen_alpha(
 /// three observations.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct GreeksResult {
     /// Annualized Jensen alpha, or [`f64::NAN`] when the regression slope is
     /// undefined.
@@ -472,9 +467,7 @@ pub struct GreeksResult {
     pub adjusted_r_squared: f64,
     /// Number of paired observations the regression used: the overlap after
     /// truncating both series to the shorter length. Reported even when the
-    /// estimates are [`f64::NAN`]. `0` when deserialized from JSON written
-    /// before this field existed.
-    #[serde(default)]
+    /// estimates are [`f64::NAN`]. Required in the serialized result.
     pub n_obs: usize,
 }
 
@@ -554,6 +547,7 @@ pub(crate) fn greeks(
 /// Rolling greeks output.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct RollingGreeks {
     /// End dates for each rolling window.
     #[cfg_attr(
@@ -912,6 +906,7 @@ impl ReturnKind {
 /// Result of a multi-factor regression.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct MultiFactorResult {
     /// Annualized OLS intercept of the (possibly rf-adjusted) dependent series.
     pub alpha: f64,
@@ -939,9 +934,7 @@ pub struct MultiFactorResult {
     pub residual_vol: f64,
     /// Number of observations the regression used: the common length of the
     /// dependent series and every factor series. Residual degrees of freedom
-    /// are `n_obs − betas.len() − 1`. `0` when deserialized from JSON written
-    /// before this field existed.
-    #[serde(default)]
+    /// are `n_obs − betas.len() − 1`. Required in the serialized result.
     pub n_obs: usize,
 }
 
@@ -1382,16 +1375,6 @@ mod tests {
             multi.adjusted_r_squared,
             1.0 - (1.0 - multi.r_squared) * (multi.n_obs as f64 - 1.0) / dof
         );
-    }
-
-    #[test]
-    fn pre_change_json_deserializes_with_documented_defaults() {
-        let old: BetaResult = serde_json::from_str(
-            r#"{"beta": 1.0, "std_err": 0.1, "ci_lower": 0.8, "ci_upper": 1.2}"#,
-        )
-        .expect("old BetaResult JSON");
-        assert_eq!(old.n_obs, 0);
-        assert_eq!(old.confidence_level, 0.95);
     }
 
     #[test]

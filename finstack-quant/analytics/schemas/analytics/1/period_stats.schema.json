@@ -37,6 +37,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/analytics/1/period_stats.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Period-level aggregate statistics.",
   "properties": {
     "avg_loss": {

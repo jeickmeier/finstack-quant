@@ -91,7 +91,7 @@ class PeriodStats:
         Parameters
         ----------
         json : str
-            JSON string produced by :meth:`to_json`.
+            Complete JSON string produced by :meth:`to_json`; required metadata must be present and unknown fields are rejected.
 
         Returns
         -------
@@ -101,7 +101,7 @@ class PeriodStats:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or does not satisfy the serialized schema.
+            If ``json`` is malformed, omits required result fields, contains unknown fields, or does not satisfy the serialized schema.
 
         Examples
         --------
@@ -401,7 +401,7 @@ class BetaResult:
         Parameters
         ----------
         json : str
-            JSON string produced by :meth:`to_json`.
+            Complete JSON string produced by :meth:`to_json`; required metadata must be present and unknown fields are rejected.
 
         Returns
         -------
@@ -411,7 +411,7 @@ class BetaResult:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or does not satisfy the serialized schema.
+            If ``json`` is malformed, omits required result fields, contains unknown fields, or does not satisfy the serialized schema.
 
         Examples
         --------
@@ -517,8 +517,7 @@ class BetaResult:
         int
             Paired observations after truncating the portfolio and benchmark
             series to their common length. Reported even when the estimates
-            are ``NaN``; ``0`` only for a value parsed from JSON written
-            before the field existed. The interval uses ``n_obs - 2`` degrees
+            are ``NaN``. Required in serialized results. The interval uses ``n_obs - 2`` degrees
             of freedom.
 
         Notes
@@ -615,7 +614,7 @@ class GreeksResult:
         Parameters
         ----------
         json : str
-            JSON string produced by :meth:`to_json`.
+            Complete JSON string produced by :meth:`to_json`; required metadata must be present and unknown fields are rejected.
 
         Returns
         -------
@@ -625,7 +624,7 @@ class GreeksResult:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or does not satisfy the serialized schema.
+            If ``json`` is malformed, omits required result fields, contains unknown fields, or does not satisfy the serialized schema.
 
         Examples
         --------
@@ -731,8 +730,7 @@ class GreeksResult:
         int
             Paired observations after truncating the portfolio and benchmark
             series to their common length. Reported even when the estimates
-            are ``NaN``; ``0`` only for a value parsed from JSON written
-            before the field existed. Adjusted R² uses ``n_obs - 2`` residual
+            are ``NaN``. Required in serialized results. Adjusted R² uses ``n_obs - 2`` residual
             degrees of freedom.
 
         Notes
@@ -813,7 +811,7 @@ class RollingGreeks:
         Parameters
         ----------
         json : str
-            JSON string produced by :meth:`to_json`.
+            Complete JSON string produced by :meth:`to_json`; required metadata must be present and unknown fields are rejected.
 
         Returns
         -------
@@ -823,7 +821,7 @@ class RollingGreeks:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or does not satisfy the serialized schema.
+            If ``json`` is malformed, omits required result fields, contains unknown fields, or does not satisfy the serialized schema.
 
         Examples
         --------
@@ -964,7 +962,7 @@ class MultiFactorResult:
         Parameters
         ----------
         json : str
-            JSON string produced by :meth:`to_json`.
+            Complete JSON string produced by :meth:`to_json`; required metadata must be present and unknown fields are rejected.
 
         Returns
         -------
@@ -974,7 +972,7 @@ class MultiFactorResult:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or does not satisfy the serialized schema.
+            If ``json`` is malformed, omits required result fields, contains unknown fields, or does not satisfy the serialized schema.
 
         Examples
         --------
@@ -1095,9 +1093,8 @@ class MultiFactorResult:
         -------
         int
             Common length of the dependent series and every factor series.
-            Residual degrees of freedom are ``n_obs - len(betas) - 1``; ``0``
-            only for a value parsed from JSON written before the field
-            existed.
+            Residual degrees of freedom are ``n_obs - len(betas) - 1``.
+            Required in serialized results.
 
         Notes
         -----
@@ -1165,7 +1162,7 @@ class DrawdownEpisode:
         Parameters
         ----------
         json : str
-            JSON string produced by :meth:`to_json`.
+            Complete JSON string produced by :meth:`to_json`; required metadata must be present and unknown fields are rejected.
 
         Returns
         -------
@@ -1175,7 +1172,7 @@ class DrawdownEpisode:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or does not satisfy the serialized schema.
+            If ``json`` is malformed, omits required result fields, contains unknown fields, or does not satisfy the serialized schema.
 
         Examples
         --------
@@ -1368,7 +1365,7 @@ class LookbackReturns:
         Parameters
         ----------
         json : str
-            JSON string produced by :meth:`to_json`.
+            Complete JSON string produced by :meth:`to_json`; required metadata must be present and unknown fields are rejected.
 
         Returns
         -------
@@ -1378,7 +1375,7 @@ class LookbackReturns:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or does not satisfy the serialized schema.
+            If ``json`` is malformed, omits required result fields, contains unknown fields, or does not satisfy the serialized schema.
 
         Examples
         --------

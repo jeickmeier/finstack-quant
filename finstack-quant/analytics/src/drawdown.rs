@@ -14,6 +14,7 @@ use finstack_quant_core::dates::Date;
 /// Drawdown episode with start, valley, optional recovery, and max drawdown.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct DrawdownEpisode {
     /// Date when the drawdown began (peak date).
     #[cfg_attr(
@@ -46,7 +47,6 @@ pub struct DrawdownEpisode {
     /// peak), so `start` is the first observation rather than a true peak.
     /// Survival / duration analytics should treat such episodes as
     /// left-censored.
-    #[serde(default)]
     pub truncated_at_start: bool,
 }
 
