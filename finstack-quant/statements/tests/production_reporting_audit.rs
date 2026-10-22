@@ -20,13 +20,13 @@ fn leading_explicit_forecasts_preserve_run_anchor_and_seasonal_phase() {
     ] {
         let q1 = PeriodId::quarter(2025, 1).unwrap();
         let q2 = PeriodId::quarter(2025, 2).unwrap();
-        let baseline = ModelBuilder::new("forecast")
-            .periods("2025Q1..Q4", Some("2025Q1"))
-            .unwrap()
-            .value("revenue", &[(q1, AmountOrScalar::scalar(80.0))])
-            .forecast("revenue", forecast)
-            .build()
-            .unwrap();
+        let baseline = {
+            let mut model_builder = ModelBuilder::new("forecast");
+            model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+            model_builder.value("revenue", &[(q1, AmountOrScalar::scalar(80.0))]);
+            model_builder.forecast("revenue", forecast);
+            model_builder.build().unwrap()
+        };
         let mut overridden = baseline.clone();
         overridden
             .nodes
@@ -59,12 +59,12 @@ fn formula_tolerance_is_residual_acceptance_and_no_tolerance_is_predicate() {
         .copied()
         .zip([0., 0.1, -0.1, 0.2].map(AmountOrScalar::scalar))
         .collect();
-    let model = ModelBuilder::new("residual")
-        .periods("2025Q1..Q4", None)
-        .unwrap()
-        .value("residual", &values)
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("residual");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder.value("residual", &values);
+        model_builder.build().unwrap()
+    };
     let results = Evaluator::new().evaluate(&model).unwrap();
     for (formula, tolerance) in [("residual", Some(0.1)), ("residual <= 0.1", None)] {
         let suite:CheckSuiteSpec=serde_json::from_value(json!({"name":"residual", "formula_checks":[{"id":"r","name":"residual","category":"accounting_identity","severity":"error","formula":formula,"message_template":"bad {period}","tolerance":tolerance}]})).unwrap();
@@ -79,9 +79,11 @@ fn retained_earnings_uses_signed_dividend_change() {
     let ps: Vec<_> = (1..=4)
         .map(|q| PeriodId::quarter(2025, q).unwrap())
         .collect();
-    let mut builder = ModelBuilder::new("signed-div")
-        .periods("2025Q1..Q4", None)
-        .unwrap();
+    let mut builder = {
+        let mut model_builder = ModelBuilder::new("signed-div");
+        model_builder.periods("2025Q1..Q4", None).unwrap();
+        model_builder
+    };
     for (node, values) in [
         ("income", [100.; 4]),
         ("re", [1000., 1080., 1160., 1240.]),
@@ -92,7 +94,7 @@ fn retained_earnings_uses_signed_dividend_change() {
             .copied()
             .zip(values.map(AmountOrScalar::scalar))
             .collect();
-        builder = builder.value(node, &values);
+        builder.value(node, &values);
     }
     let model = builder.build().unwrap();
     let suite:CheckSuiteSpec=serde_json::from_value(json!({"name":"signed", "builtin_checks":[{"type":"retained_earnings_reconciliation","retained_earnings_node":"re","net_income_node":"income","dividends_node":"div","dividends_sign_convention":"inflow_positive"}]})).unwrap();

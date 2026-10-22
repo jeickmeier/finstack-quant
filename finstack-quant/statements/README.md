@@ -52,13 +52,13 @@ exclusive end date.
 | `builder` | `ModelBuilder`, `MixedNodeBuilder`, `validate_node_id` |
 | `types` | `FinancialModelSpec`, `NodeSpec`, `NodeId`, `NodeType`, `NodeValueType`, `AmountOrScalar`, `ForecastSpec`, `ForecastMethod`, `CapitalStructureSpec` |
 | `evaluator` | `Evaluator`, `StatementResult`, `PreparedEvaluation`, `EvaluationContext`, `DependencyGraph`, `MonteCarloConfig`/`MonteCarloResults`, `node_to_dated_schedule` |
-| `dsl` | `parse_formula`, `compile`, `parse_and_compile`, `extract_all_identifiers`, `StmtExpr`, `BinOp`, `UnaryOp` |
+| `dsl` | `parse_formula`, `compile`, `parse_and_compile`, `extract_all_identifiers`, `StmtExpr` |
 | `registry` | `Registry`, `MetricRegistry`, `MetricDefinition`, `UnitType` — the `fin.*` built-in catalog and user namespaces |
-| `capital_structure` | `WaterfallSpec`, `EcfSweepSpec`, `PikToggleSpec`, `CapitalStructureCashflows`, `CashflowBreakdown`, `CapitalStructureState`, `PrincipalClaim`, `execute_waterfall`, `calculate_period_flows` |
+| `capital_structure` | `WaterfallSpec`, `EcfSweepSpec`, `PikToggleSpec`, `CapitalStructureCashflows`, `CashflowBreakdown`, `calculate_period_flows` |
 | `checks` | `CheckSuite`, `CheckSuiteSpec`, `Check`, `CheckReport`, `FormulaCheckSpec`, and the `builtins` implementations |
 | `adjustments` | `normalize`, `merge_into_results`, `NormalizationConfig`, `Adjustment`, `AdjustmentValue`, `AdjustmentCap` |
-| `schema` | `financial_model_spec_schema`, `statement_result_schema`, `normalization_config_schema` |
-| `error` | `Error`, `Result`; both are also re-exported at the crate root |
+| `schema` | `ARTIFACTS` schema registry |
+| Crate root | `Error`, `Result` |
 | `prelude` | The `builder`, `checks`, `error`, and `types` surfaces, the headline `evaluator` items (`Evaluator`, `NumericMode`, `PreparedEvaluation`, `StatementResult`), `registry::Registry`, and core `Money`, `Currency`, `Date`, `PeriodId`, `Tenor` |
 
 The prelude deliberately stops short of `dsl`, `capital_structure`, `adjustments`,
@@ -77,19 +77,19 @@ use finstack_quant_statements::types::{AmountOrScalar, ForecastMethod, ForecastS
 use indexmap::indexmap;
 
 fn build_and_evaluate() -> Result<StatementResult> {
-    let model = ModelBuilder::new("acme")
-        .periods("2025Q1..Q4", Some("2025Q2"))?
-        .value("revenue", &[
-            (PeriodId::quarter(2025, 1)?, AmountOrScalar::scalar(10_000_000.0)),
-            (PeriodId::quarter(2025, 2)?, AmountOrScalar::scalar(11_000_000.0)),
-        ])
-        .forecast("revenue", ForecastSpec {
-            method: ForecastMethod::GrowthPct,
-            params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-        })
-        .compute("cogs", "revenue * 0.6")?
-        .compute("gross_profit", "revenue - cogs")?
-        .build()?;
+    let mut builder = ModelBuilder::new("acme");
+    builder.periods("2025Q1..Q4", Some("2025Q2"))?;
+    builder.value("revenue", &[
+        (PeriodId::quarter(2025, 1)?, AmountOrScalar::scalar(10_000_000.0)),
+        (PeriodId::quarter(2025, 2)?, AmountOrScalar::scalar(11_000_000.0)),
+    ]);
+    builder.forecast("revenue", ForecastSpec {
+        method: ForecastMethod::GrowthPct,
+        params: indexmap! { "rate".into() => serde_json::json!(0.05) },
+    });
+    builder.compute("cogs", "revenue * 0.6")?;
+    builder.compute("gross_profit", "revenue - cogs")?;
+    let model = builder.build()?;
 
     // Q1/Q2 come from explicit values; Q3/Q4 grow 5% off the last actual
     // (Q3 = 11_550_000.0).
@@ -118,7 +118,7 @@ Formulas are parsed by `nom` into a `StmtExpr` AST and compiled to
   `count`) with pandas-parity `min_periods` semantics.
 - Historical statistics over a node's own series: `std`, `var`, `median`,
   `rank`, `quantile`, `ewm_mean`, `ewm_std`, `ewm_var`.
-- Calendar aggregates: `ttm`/`ltm`, `ytd`, `qtd`, `fiscal_ytd`, `annualize`,
+- Calendar aggregates: `ttm`, `ytd`, `qtd`, `fiscal_ytd`, `annualize`,
   `annualize_rate`.
 
 There is no `lead()`: forward-looking references would leak future values into
@@ -199,17 +199,13 @@ missing-data error naming the instrument and must be evaluated with
 `Evaluator::evaluate_with_market(&model, &market_ctx, as_of)`, which also hides
 actuals not yet available at `as_of`.
 
-Rust callers using `execute_waterfall` directly can supply dated principal
-claims through `CapitalStructureState::set_period_principal_flows`. Each
-`PrincipalClaim` carries its cash payment date, economic principal-reduction
-date and native-currency amount. Unpaid claims retain those dates in
-`principal_shortfall`; paid advances remain in `principal_advance_payments`
-until their economic dates and reserve the principal already settled in cash.
-Market-aware evaluation supplies these runtime inputs using the actual model
-period, including fiscal dates. Aggregate-only callers that omit dated claims
-must ensure cash and economic principal movements fall in the same allocation
-period. These state types are intentionally absent from Python and WASM; both
-hosts use the canonical evaluator.
+The evaluator owns dated principal claims and waterfall state. It retains each
+claim's cash payment date, economic principal-reduction date, and native-currency
+amount so unpaid claims and paid advances affect outstanding balances exactly
+once. Market-aware evaluation derives those inputs from canonical instrument
+schedules and the actual model periods, including fiscal dates. Runtime state
+and allocation machinery are private; Rust, Python, and WASM callers use the
+canonical evaluator.
 
 Known limits (also stated in the module rustdoc): waterfall allocation is
 pro-rata inside each payment class, walking class rank (empty

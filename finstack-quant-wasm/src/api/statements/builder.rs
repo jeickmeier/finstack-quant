@@ -2,7 +2,7 @@
 //!
 //! Methods update the builder in place and return nothing
 //! (wasm-bindgen cannot return `this`), so calls are written as statements
-//! rather than a chain. Fallible steps use the crate's non-consuming `try_*`
+//! rather than a chain. Fallible steps use the crate's mutable setters
 //! twins, so a bad formula or period range throws without discarding the
 //! model built so far.
 
@@ -83,17 +83,10 @@ impl JsModelBuilder {
         self.inner.take().ok_or_else(consumed)
     }
 
-    /// Mutable access without taking ownership, so a failed `try_*` call
+    /// Mutable access without taking ownership, so a failed setter call
     /// leaves the builder usable.
     fn builder_mut(&mut self) -> Result<&mut ModelBuilder, JsValue> {
         self.inner.as_mut().ok_or_else(consumed)
-    }
-
-    /// Apply an infallible consuming builder step in place.
-    fn replace(&mut self, step: impl FnOnce(ModelBuilder) -> ModelBuilder) -> Result<(), JsValue> {
-        let builder = self.take()?;
-        self.inner = Some(step(builder));
-        Ok(())
     }
 }
 
@@ -129,7 +122,7 @@ impl JsModelBuilder {
 
     /// Define the model periods from a range expression.
     ///
-    /// Twin of Python `ModelBuilder.periods` (Rust `ModelBuilder::try_periods`).
+    /// Twin of Python `ModelBuilder.periods` (Rust `ModelBuilder::periods`).
     /// A failed call leaves the builder usable.
     ///
     /// @param range - Period range `<start>..<end>` in one period kind, e.g. `"2025Q1..Q4"`, `"2024M10..2025M03"` or `"2025..2030"`.
@@ -143,7 +136,7 @@ impl JsModelBuilder {
         let range = js_string(&range, "range")?;
         let actuals_until = js_opt_string(actuals_until.as_ref(), "actualsUntil")?;
         self.builder_mut()?
-            .try_periods(&range, actuals_until.as_deref())
+            .periods(&range, actuals_until.as_deref())
             .map_err(to_js_err)?;
         Ok(())
     }
@@ -154,15 +147,13 @@ impl JsModelBuilder {
     /// `ModelBuilder::periods_explicit`).
     ///
     /// @param periods - Array of `Period` objects (`id`, ISO `start`, exclusive ISO `end`, `is_actual`) in timeline order (array or JSON).
-    /// @throws Error with kind `validation` if `periods` is malformed, empty, unordered or overlapping, periods were already set, or the builder was consumed.
+    /// @throws Error with kind `validation` if `periods` is malformed or empty, periods were already set, or the builder was consumed.
     #[wasm_bindgen(js_name = periodsExplicit)]
     pub fn periods_explicit(&mut self, periods: JsValue) -> Result<(), JsValue> {
         let periods: Vec<Period> = from_js_json(&periods, "periods")?;
-        if !self.builder_mut()?.periods_slice().is_empty() {
-            return Err(invalid("Periods already set"));
-        }
-        let builder = self.take()?;
-        self.inner = Some(builder.periods_explicit(periods).map_err(to_js_err)?);
+        self.builder_mut()?
+            .periods_explicit(periods)
+            .map_err(to_js_err)?;
         Ok(())
     }
 
@@ -178,8 +169,7 @@ impl JsModelBuilder {
         let node_id = js_string(&node_id, "nodeId")?;
         let values: IndexMap<PeriodId, AmountOrScalar> = from_js_json(&values, "values")?;
         let values: Vec<(PeriodId, AmountOrScalar)> = values.into_iter().collect();
-        let builder = self.take()?;
-        self.inner = Some(builder.value(node_id, &values));
+        self.builder_mut()?.value(node_id, &values);
         Ok(())
     }
 
@@ -196,8 +186,7 @@ impl JsModelBuilder {
         let node_id = js_string(&node_id, "nodeId")?;
         let values: IndexMap<PeriodId, f64> = from_js_json(&values, "values")?;
         let values: Vec<(PeriodId, f64)> = values.into_iter().collect();
-        let builder = self.take()?;
-        self.inner = Some(builder.value_scalar(node_id, &values));
+        self.builder_mut()?.value_scalar(node_id, &values);
         Ok(())
     }
 
@@ -214,15 +203,14 @@ impl JsModelBuilder {
         let node_id = js_string(&node_id, "nodeId")?;
         let values: IndexMap<PeriodId, Money> = from_js_json(&values, "values")?;
         let values: Vec<(PeriodId, Money)> = values.into_iter().collect();
-        let builder = self.take()?;
-        self.inner = Some(builder.value_money(node_id, &values));
+        self.builder_mut()?.value_money(node_id, &values);
         Ok(())
     }
 
     /// Record the dates on which a node's period values became available.
     ///
     /// Twin of Python `ModelBuilder.availability_dates` (Rust
-    /// `ModelBuilder::try_availability_dates`). A failed call leaves the
+    /// `ModelBuilder::availability_dates`). A failed call leaves the
     /// builder usable.
     ///
     /// @param node_id - Existing node whose values the dates describe.
@@ -242,14 +230,14 @@ impl JsModelBuilder {
             .map(|(period, date)| Ok((period, crate::utils::parse_iso_date(&date)?)))
             .collect::<Result<Vec<(PeriodId, Date)>, JsValue>>()?;
         self.builder_mut()?
-            .try_availability_dates(&node_id, &dates)
+            .availability_dates(&node_id, &dates)
             .map_err(to_js_err)?;
         Ok(())
     }
 
     /// Add a calculated node defined by a DSL formula.
     ///
-    /// Twin of Python `ModelBuilder.compute` (Rust `ModelBuilder::try_compute`).
+    /// Twin of Python `ModelBuilder.compute` (Rust `ModelBuilder::compute`).
     /// A failed call leaves the builder usable.
     ///
     /// @param node_id - Node identifier, unique within the model.
@@ -259,7 +247,7 @@ impl JsModelBuilder {
         let node_id = js_string(&node_id, "nodeId")?;
         let formula = js_string(&formula, "formula")?;
         self.builder_mut()?
-            .try_compute(node_id, formula)
+            .compute(node_id, formula)
             .map_err(to_js_err)?;
         Ok(())
     }
@@ -305,8 +293,7 @@ impl JsModelBuilder {
     pub fn forecast(&mut self, node_id: JsValue, forecast_spec: JsValue) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
         let spec: ForecastSpec = from_js_json(&forecast_spec, "forecastSpec")?;
-        let builder = self.take()?;
-        self.inner = Some(builder.forecast(node_id, spec));
+        self.builder_mut()?.forecast(node_id, spec);
         Ok(())
     }
 
@@ -320,8 +307,7 @@ impl JsModelBuilder {
     #[wasm_bindgen(js_name = whereClause)]
     pub fn where_clause(&mut self, where_clause: JsValue) -> Result<(), JsValue> {
         let where_clause = js_string(&where_clause, "whereClause")?;
-        let builder = self.take()?;
-        self.inner = Some(builder.where_clause(where_clause));
+        self.builder_mut()?.where_clause(where_clause);
         Ok(())
     }
 
@@ -336,22 +322,21 @@ impl JsModelBuilder {
     pub fn with_meta(&mut self, key: JsValue, value: JsValue) -> Result<(), JsValue> {
         let key = js_string(&key, "key")?;
         let value = meta_value(&value)?;
-        let builder = self.take()?;
-        self.inner = Some(builder.with_meta(key, value));
+        self.builder_mut()?.with_meta(key, value);
         Ok(())
     }
 
     /// Add every built-in statement metric (`fin.*` namespace).
     ///
     /// Twin of Python `ModelBuilder.with_builtin_metrics` (Rust
-    /// `ModelBuilder::try_with_builtin_metrics`). A failed call leaves the
+    /// `ModelBuilder::with_builtin_metrics`). A failed call leaves the
     /// builder usable.
     ///
     /// @throws Error with kind `validation` if the built-in catalog cannot be loaded or the builder was consumed.
     #[wasm_bindgen(js_name = withBuiltinMetrics)]
     pub fn with_builtin_metrics(&mut self) -> Result<(), JsValue> {
         self.builder_mut()?
-            .try_with_builtin_metrics()
+            .with_builtin_metrics()
             .map_err(to_js_err)?;
         Ok(())
     }
@@ -359,7 +344,7 @@ impl JsModelBuilder {
     /// Add one metric and its dependencies from a registry.
     ///
     /// Twin of Python `ModelBuilder.add_metric_from_registry` (Rust
-    /// `ModelBuilder::try_add_metric_from_registry`). A failed call leaves the
+    /// `ModelBuilder::add_metric_from_registry`). A failed call leaves the
     /// builder usable.
     ///
     /// @param qualified_id - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
@@ -373,14 +358,14 @@ impl JsModelBuilder {
     ) -> Result<(), JsValue> {
         let qualified_id = js_string(&qualified_id, "qualifiedId")?;
         self.builder_mut()?
-            .try_add_metric_from_registry(&qualified_id, &registry.inner)
+            .add_metric_from_registry(&qualified_id, &registry.inner)
             .map_err(to_js_err)?;
         Ok(())
     }
 
     /// Add a fixed-rate bond to the capital structure (US conventions: 30/360, semi-annual).
     ///
-    /// Twin of Python `ModelBuilder.add_bond` (Rust `ModelBuilder::try_add_bond`).
+    /// Twin of Python `ModelBuilder.add_bond` (Rust `ModelBuilder::add_bond`).
     /// A failed call leaves the builder usable.
     ///
     /// @param id - Unique instrument identifier.
@@ -407,7 +392,7 @@ impl JsModelBuilder {
         let maturity = js_date(&maturity_date, "maturityDate")?;
         let curve = js_string(&discount_curve_id, "discountCurveId")?;
         self.builder_mut()?
-            .try_add_bond(id, notional, coupon_rate, issue, maturity, curve)
+            .add_bond(id, notional, coupon_rate, issue, maturity, curve)
             .map_err(to_js_err)?;
         Ok(())
     }
@@ -415,7 +400,7 @@ impl JsModelBuilder {
     /// Add a fixed-rate bond with a market convention preset.
     ///
     /// Twin of Python `ModelBuilder.add_bond_with_convention` (Rust
-    /// `ModelBuilder::try_add_bond_with_convention`). A failed call leaves
+    /// `ModelBuilder::add_bond_with_convention`). A failed call leaves
     /// the builder usable.
     ///
     /// @param id - Unique instrument identifier.
@@ -457,14 +442,14 @@ impl JsModelBuilder {
             discount_curve_id: js_string(&discount_curve_id, "discountCurveId")?,
         };
         self.builder_mut()?
-            .try_add_bond_with_convention(params)
+            .add_bond_with_convention(params)
             .map_err(to_js_err)?;
         Ok(())
     }
 
     /// Add a pay-fixed interest rate swap to the capital structure (US conventions).
     ///
-    /// Twin of Python `ModelBuilder.add_swap` (Rust `ModelBuilder::try_add_swap`).
+    /// Twin of Python `ModelBuilder.add_swap` (Rust `ModelBuilder::add_swap`).
     /// A failed call leaves the builder usable.
     ///
     /// @param id - Unique instrument identifier.
@@ -496,16 +481,14 @@ impl JsModelBuilder {
             discount_curve_id: js_string(&discount_curve_id, "discountCurveId")?,
             forward_curve_id: js_string(&forward_curve_id, "forwardCurveId")?,
         };
-        self.builder_mut()?
-            .try_add_swap(params)
-            .map_err(to_js_err)?;
+        self.builder_mut()?.add_swap(params).map_err(to_js_err)?;
         Ok(())
     }
 
     /// Add a pay-fixed interest rate swap with explicit leg conventions.
     ///
     /// Twin of Python `ModelBuilder.add_swap_with_conventions` (Rust
-    /// `ModelBuilder::try_add_swap_with_conventions`). A failed call leaves
+    /// `ModelBuilder::add_swap_with_conventions`). A failed call leaves
     /// the builder usable.
     ///
     /// @param id - Unique instrument identifier.
@@ -573,7 +556,7 @@ impl JsModelBuilder {
             business_day_convention,
         };
         self.builder_mut()?
-            .try_add_swap_with_conventions(params, conventions)
+            .add_swap_with_conventions(params, conventions)
             .map_err(to_js_err)?;
         Ok(())
     }
@@ -597,7 +580,8 @@ impl JsModelBuilder {
         )?)
         .map_err(to_js_err)?;
         let spec = FinancialStatementInstrument::try_from(spec).map_err(to_js_err)?;
-        self.replace(|b| b.add_debt(id, spec))
+        self.builder_mut()?.add_debt(id, spec);
+        Ok(())
     }
 
     /// Set the reporting currency used for capital-structure totals.
@@ -612,7 +596,8 @@ impl JsModelBuilder {
         let currency: finstack_quant_core::currency::Currency = js_string(&currency, "currency")?
             .parse()
             .map_err(to_js_err)?;
-        self.replace(|b| b.reporting_currency(currency))
+        self.builder_mut()?.reporting_currency(currency);
+        Ok(())
     }
 
     /// Set the FX conversion policy for capital-structure cashflows.
@@ -625,7 +610,8 @@ impl JsModelBuilder {
     pub fn fx_policy(&mut self, policy: JsValue) -> Result<(), JsValue> {
         let policy: finstack_quant_core::money::fx::FxConversionPolicy =
             js_wire(&policy, "policy")?;
-        self.replace(|b| b.fx_policy(policy))
+        self.builder_mut()?.fx_policy(policy);
+        Ok(())
     }
 
     /// Attach a waterfall (priority of payments, ECF sweep, PIK toggle, payment classes).
@@ -637,7 +623,8 @@ impl JsModelBuilder {
     /// @throws Error with kind `validation` if `waterfallSpec` is malformed or the builder was consumed.
     pub fn waterfall(&mut self, waterfall_spec: JsValue) -> Result<(), JsValue> {
         let spec: WaterfallSpec = from_js_json(&waterfall_spec, "waterfallSpec")?;
-        self.replace(|b| b.waterfall(spec))
+        self.builder_mut()?.waterfall(spec);
+        Ok(())
     }
 
     /// Build the model specification.
@@ -682,6 +669,12 @@ impl JsMixedNodeBuilder {
             .take()
             .ok_or_else(|| invalid("MixedNodeBuilder has already been consumed"))
     }
+
+    fn builder_mut(&mut self) -> Result<&mut MixedNodeBuilder, JsValue> {
+        self.inner
+            .as_mut()
+            .ok_or_else(|| invalid("MixedNodeBuilder has already been consumed"))
+    }
 }
 
 #[wasm_bindgen(js_class = MixedNodeBuilder)]
@@ -695,8 +688,7 @@ impl JsMixedNodeBuilder {
     pub fn values(&mut self, values: JsValue) -> Result<(), JsValue> {
         let values: IndexMap<PeriodId, AmountOrScalar> = from_js_json(&values, "values")?;
         let values: Vec<(PeriodId, AmountOrScalar)> = values.into_iter().collect();
-        let builder = self.take()?;
-        self.inner = Some(builder.values(&values));
+        self.builder_mut()?.values(&values);
         Ok(())
     }
 
@@ -714,8 +706,7 @@ impl JsMixedNodeBuilder {
             .into_iter()
             .map(|(period, money)| (period, AmountOrScalar::Amount(money)))
             .collect();
-        let builder = self.take()?;
-        self.inner = Some(builder.values(&values));
+        self.builder_mut()?.values(&values);
         Ok(())
     }
 
@@ -728,26 +719,21 @@ impl JsMixedNodeBuilder {
     /// @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
     pub fn forecast(&mut self, forecast_spec: JsValue) -> Result<(), JsValue> {
         let spec: ForecastSpec = from_js_json(&forecast_spec, "forecastSpec")?;
-        let builder = self.take()?;
-        self.inner = Some(builder.forecast(spec));
+        self.builder_mut()?.forecast(spec);
         Ok(())
     }
 
     /// Set the fallback formula used when no value or forecast applies.
     ///
     /// Twin of Python `MixedNodeBuilder.formula` (Rust
-    /// `MixedNodeBuilder::try_formula`). A failed call leaves the builder
+    /// `MixedNodeBuilder::formula`). A failed call leaves the builder
     /// usable.
     ///
     /// @param formula - Statements DSL expression, e.g. `"lag(revenue, 1) * 1.05"`.
     /// @throws Error with kind `validation` if the formula is blank or does not parse and compile, or the builder was consumed.
     pub fn formula(&mut self, formula: JsValue) -> Result<(), JsValue> {
         let formula = js_string(&formula, "formula")?;
-        self.inner
-            .as_mut()
-            .ok_or_else(|| invalid("MixedNodeBuilder has already been consumed"))?
-            .try_formula(formula)
-            .map_err(to_js_err)?;
+        self.builder_mut()?.formula(formula).map_err(to_js_err)?;
         Ok(())
     }
 
@@ -759,8 +745,7 @@ impl JsMixedNodeBuilder {
     /// @throws Error with kind `validation` if the builder was consumed.
     pub fn name(&mut self, name: JsValue) -> Result<(), JsValue> {
         let name = js_string(&name, "name")?;
-        let builder = self.take()?;
-        self.inner = Some(builder.name(name));
+        self.builder_mut()?.name(name);
         Ok(())
     }
 

@@ -153,24 +153,69 @@ test('statements matches the cross-host golden', () => {
     },
     builtin_check_names: statements.checkSuiteSpecBuiltinCheckNames(),
     cs: {
-      interest: statements.capitalStructureCashflowsGetInterest(cs, 'TL-A', Q1),
-      interest_cash: statements.capitalStructureCashflowsGetInterestCash(cs, 'TL-A', Q1),
-      interest_pik: statements.capitalStructureCashflowsGetInterestPik(cs, 'TL-A', Q1),
-      principal: statements.capitalStructureCashflowsGetPrincipal(cs, 'TL-A', Q1),
-      debt_balance: statements.capitalStructureCashflowsGetDebtBalance(cs, 'TL-A', Q1),
-      fees: statements.capitalStructureCashflowsGetFees(cs, 'TL-A', Q1),
-      accrued_interest: statements.capitalStructureCashflowsGetAccruedInterest(cs, 'TL-A', Q1),
-      total_interest: statements.capitalStructureCashflowsGetTotalInterest(cs, Q1),
-      total_principal: statements.capitalStructureCashflowsGetTotalPrincipal(cs, Q1),
-      total_debt_balance: statements.capitalStructureCashflowsGetTotalDebtBalance(cs, Q1),
-      total_fees: statements.capitalStructureCashflowsGetTotalFees(cs, Q1),
+      interest: statements.capitalStructureCashflowsGetComponent(
+        cs,
+        'interest_expense',
+        'TL-A',
+        Q1
+      ),
+      interest_cash: statements.capitalStructureCashflowsGetComponent(
+        cs,
+        'interest_expense_cash',
+        'TL-A',
+        Q1
+      ),
+      interest_pik: statements.capitalStructureCashflowsGetComponent(
+        cs,
+        'interest_expense_pik',
+        'TL-A',
+        Q1
+      ),
+      principal: statements.capitalStructureCashflowsGetComponent(
+        cs,
+        'principal_payment',
+        'TL-A',
+        Q1
+      ),
+      debt_balance: statements.capitalStructureCashflowsGetComponent(
+        cs,
+        'debt_balance',
+        'TL-A',
+        Q1
+      ),
+      fees: statements.capitalStructureCashflowsGetComponent(cs, 'fees', 'TL-A', Q1),
+      accrued_interest: statements.capitalStructureCashflowsGetComponent(
+        cs,
+        'accrued_interest',
+        'TL-A',
+        Q1
+      ),
+      total_interest: statements.capitalStructureCashflowsGetComponent(
+        cs,
+        'interest_expense',
+        'total',
+        Q1
+      ),
+      total_principal: statements.capitalStructureCashflowsGetComponent(
+        cs,
+        'principal_payment',
+        'total',
+        Q1
+      ),
+      total_debt_balance: statements.capitalStructureCashflowsGetComponent(
+        cs,
+        'debt_balance',
+        'total',
+        Q1
+      ),
+      total_fees: statements.capitalStructureCashflowsGetComponent(cs, 'fees', 'total', Q1),
     },
     registry: {
       count: registry.metricIds().length,
       first,
       has: [registry.has(first), registry.has('fin.no_such_metric')],
       definition: registry.get(first),
-      dependencies: registry.dependencies(first),
+      dependencies: registry.getDependencies(first),
     },
   };
   registry.free();
@@ -393,11 +438,18 @@ test('statement accessors reject malformed inputs with a validation kind', () =>
     (e) => e.kind === 'validation'
   );
   assert.throws(
-    () => statements.capitalStructureCashflowsGetInterest(INPUTS.cs_cashflows, 'TL-B', Q1),
+    () =>
+      statements.capitalStructureCashflowsGetComponent(
+        INPUTS.cs_cashflows,
+        'interest_expense',
+        'TL-B',
+        Q1
+      ),
     (e) => e.kind === 'computation'
   );
   assert.throws(
-    () => statements.capitalStructureCashflowsGetTotalFees(INPUTS.cs_cashflows, Q2),
+    () =>
+      statements.capitalStructureCashflowsGetComponent(INPUTS.cs_cashflows, 'fees', 'total', Q2),
     (e) => e.kind === 'computation'
   );
 });
@@ -441,16 +493,68 @@ test('mergeIntoResults writes normalized values back as a node', () => {
 
 test('capital-structure interest-income and total accessors are Rust twins', () => {
   const cs = INPUTS.cs_cashflows;
-  const cash = statements.capitalStructureCashflowsGetTotalInterestCash(cs, Q1);
-  const pik = statements.capitalStructureCashflowsGetTotalInterestPik(cs, Q1);
-  assert.equal(cash + pik, statements.capitalStructureCashflowsGetTotalInterest(cs, Q1));
-  assert.equal(typeof statements.capitalStructureCashflowsGetTotalInterestIncome(cs, Q1), 'number');
+  const cash = statements.capitalStructureCashflowsGetComponent(
+    cs,
+    'interest_expense_cash',
+    'total',
+    Q1
+  );
+  const pik = statements.capitalStructureCashflowsGetComponent(
+    cs,
+    'interest_expense_pik',
+    'total',
+    Q1
+  );
   assert.equal(
-    typeof statements.capitalStructureCashflowsGetTotalAccruedInterest(cs, Q1),
+    cash + pik,
+    statements.capitalStructureCashflowsGetComponent(cs, 'interest_expense', 'total', Q1)
+  );
+  assert.equal(
+    typeof statements.capitalStructureCashflowsGetComponent(cs, 'interest_income', 'total', Q1),
     'number'
   );
   assert.equal(
-    typeof statements.capitalStructureCashflowsGetInterestIncome(cs, 'TL-A', Q1),
+    typeof statements.capitalStructureCashflowsGetComponent(cs, 'accrued_interest', 'total', Q1),
     'number'
+  );
+  assert.equal(
+    typeof statements.capitalStructureCashflowsGetComponent(cs, 'interest_income', 'TL-A', Q1),
+    'number'
+  );
+});
+
+test('component lookup covers all flows and scopes', () => {
+  const expected = {
+    interest_expense: 35,
+    interest_expense_cash: 30,
+    interest_expense_pik: 5,
+    interest_income: 0,
+    principal_payment: 100,
+    debt_balance: 900,
+    fees: 2,
+    accrued_interest: 1.5,
+  };
+  for (const scope of ['TL-A', 'total']) {
+    for (const [component, value] of Object.entries(expected)) {
+      assert.equal(
+        statements.capitalStructureCashflowsGetComponent(INPUTS.cs_cashflows, component, scope, Q1),
+        value
+      );
+    }
+  }
+  assert.throws(
+    () =>
+      statements.capitalStructureCashflowsGetComponent(INPUTS.cs_cashflows, 'unknown', 'total', Q1),
+    (e) => e.kind === 'computation'
+  );
+  assert.throws(
+    () =>
+      statements.capitalStructureCashflowsGetComponent(
+        INPUTS.cs_cashflows,
+        'fees',
+        'total',
+        'bad period'
+      ),
+    (e) => e.kind === 'validation'
   );
 });

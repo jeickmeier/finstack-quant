@@ -9,10 +9,12 @@ use finstack_quant_statements::types::AmountOrScalar;
 
 #[test]
 fn exports_node_series_to_dated_schedule_using_period_end_minus_one_day() {
-    let model = ModelBuilder::new("re_noi_bridge")
-        .periods("2025Q1..Q2", None)
-        .expect("periods should parse")
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("re_noi_bridge");
+        model_builder
+            .periods("2025Q1..Q2", None)
+            .expect("periods should parse");
+        model_builder.value(
             "noi",
             &[
                 (
@@ -24,9 +26,9 @@ fn exports_node_series_to_dated_schedule_using_period_end_minus_one_day() {
                     AmountOrScalar::scalar(110.0),
                 ),
             ],
-        )
-        .build()
-        .expect("model should build");
+        );
+        model_builder.build().expect("model should build")
+    };
 
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).expect("evaluate should succeed");

@@ -247,19 +247,18 @@ impl Adjustment {
         }
     }
 
-    /// Add a cap to the adjustment. Uses the default `Reported` base mode.
-    #[must_use]
-    pub fn with_cap(mut self, base_node: Option<String>, value: f64) -> Self {
-        self.cap = Some(AdjustmentCap {
-            base_node,
-            value,
-            base_mode: CapBaseMode::default(),
-        });
-        self
-    }
-
     /// Add a cap with an explicit self-referential base mode.
-    pub fn with_cap_mode(
+    ///
+    /// # Arguments
+    ///
+    /// * `base_node` - Node whose value sets the cap base, or `None` for an
+    ///   absolute cap in the target metric's units.
+    /// * `value` - Maximum adjustment magnitude: a decimal fraction of the
+    ///   base node (0.20 means 20%), or an absolute amount when no base is set.
+    /// * `base_mode` - For a cap against the target itself, use its reported
+    ///   value or its progressive value including earlier adjustments.
+    #[must_use]
+    pub fn with_cap(
         mut self,
         base_node: Option<String>,
         value: f64,

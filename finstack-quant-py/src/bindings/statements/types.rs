@@ -5,6 +5,7 @@ use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{
     serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
 };
+use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, serde_json_to_py, statements_to_py};
 use finstack_quant_statements::types::{NodeSpec, NodeValueType};
 use indexmap::IndexMap;
@@ -192,22 +193,20 @@ impl PyForecastMethod {
         }
     }
 
-    /// Canonical snake_case wire discriminant (``"growth_pct"``,
-    /// ``"log_normal"``, ``"override"``, ...), derived from the Rust serde
-    /// rename so the string can never drift from the JSON schema.
+    #[doc = pydoc!("finstack_quant.statements", "ForecastMethod.kind")]
     #[getter]
-    fn kind(&self) -> String {
-        crate::bindings::statements_analytics::serde_variant_str(&self.inner)
+    fn kind(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner)
     }
 
     /// Return the canonical snake_case discriminant (same as ``kind``).
-    fn __str__(&self) -> String {
+    fn __str__(&self) -> PyResult<String> {
         self.kind()
     }
 
     /// Return ``ForecastMethod('growth_pct')`` style representation.
-    fn __repr__(&self) -> String {
-        format!("ForecastMethod({:?})", self.kind())
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("ForecastMethod({:?})", self.kind()?))
     }
 }
 
@@ -362,26 +361,10 @@ impl PyForecastSpec {
         ))
     }
 
-    /// Explicit per-period override spec.
-    ///
-    /// Forecast periods listed in ``overrides`` take the supplied value; any
-    /// forecast period without an entry inherits the most recent value
-    /// (forward fill), so a sparse mapping pins a few anchor periods.
-    ///
-    /// Parameters
-    /// ----------
-    /// overrides : Mapping[str, float] | Sequence[tuple[str, float]] | pd.Series
-    ///     Period identifier (``"2025Q3"``) to value, in the node's own
-    ///     units (a currency amount for monetary nodes, a decimal ratio for
-    ///     scalar nodes). Periods must belong to the model timeline.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a period identifier does not parse or a value is not numeric.
+    #[doc = pydoc!("finstack_quant.statements", "ForecastSpec.overrides")]
     #[staticmethod]
-    #[pyo3(name = "override", text_signature = "(overrides)")]
-    fn override_(overrides: &Bound<'_, PyAny>) -> PyResult<Self> {
+    #[pyo3(text_signature = "(overrides)")]
+    fn overrides(overrides: &Bound<'_, PyAny>) -> PyResult<Self> {
         let pairs = super::extract_scalar_series(overrides)?;
         let map: IndexMap<finstack_quant_core::dates::PeriodId, f64> = pairs.into_iter().collect();
         Ok(Self::wrap(
@@ -543,7 +526,7 @@ impl PyForecastSpec {
     }
 
     /// Return ``ForecastSpec(method='growth_pct', params={'rate': 0.05})``.
-    fn __repr__(&self) -> String {
+    fn __repr__(&self) -> PyResult<String> {
         let params = serde_json::Value::Object(
             self.inner
                 .params
@@ -551,11 +534,11 @@ impl PyForecastSpec {
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
         );
-        format!(
+        Ok(format!(
             "ForecastSpec(method={:?}, params={})",
-            crate::bindings::statements_analytics::serde_variant_str(&self.inner.method),
+            crate::bindings::extract::label(&self.inner.method)?,
             super::python_literal(&params)
-        )
+        ))
     }
 }
 
@@ -625,22 +608,20 @@ impl PyNodeType {
         }
     }
 
-    /// The canonical snake_case wire discriminant (``"value"``,
-    /// ``"calculated"``, or ``"mixed"``), derived from the Rust serde
-    /// rename so the string can never drift from the JSON schema.
+    #[doc = pydoc!("finstack_quant.statements", "NodeType.kind")]
     #[getter]
-    fn kind(&self) -> String {
-        crate::bindings::statements_analytics::serde_variant_str(&self.inner)
+    fn kind(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner)
     }
 
     /// Return the canonical snake_case discriminant (same as :attr:`kind`).
-    fn __str__(&self) -> String {
+    fn __str__(&self) -> PyResult<String> {
         self.kind()
     }
 
     /// Return ``NodeType('mixed')`` style representation.
-    fn __repr__(&self) -> String {
-        format!("NodeType({:?})", self.kind())
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("NodeType({:?})", self.kind()?))
     }
 }
 
@@ -727,11 +708,11 @@ impl PyNumericMode {
     }
 
     /// Return ``NumericMode('float64')`` style representation.
-    fn __repr__(&self) -> String {
-        format!(
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
             "NumericMode({:?})",
-            crate::bindings::statements_analytics::serde_variant_str(&self.inner)
-        )
+            crate::bindings::extract::label(&self.inner)?
+        ))
     }
 }
 
@@ -926,18 +907,18 @@ impl PyNodeSpec {
     }
 
     /// Return ``NodeSpec(node_id='revenue', node_type='mixed', ...)``.
-    fn __repr__(&self) -> String {
-        format!(
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
             "NodeSpec(node_id={:?}, node_type={:?}, values={}, forecast={}, formula_text={})",
             self.inner.node_id.as_str(),
-            crate::bindings::statements_analytics::serde_variant_str(&self.inner.node_type),
+            crate::bindings::extract::label(&self.inner.node_type)?,
             self.inner.values.as_ref().map_or(0, IndexMap::len),
             self.inner.forecast.is_some(),
             self.inner
                 .formula_text
                 .as_deref()
                 .map_or_else(|| "None".to_string(), |f| format!("{f:?}")),
-        )
+        ))
     }
 }
 
@@ -1112,18 +1093,7 @@ impl PyFinancialModelSpec {
             .transpose()
     }
 
-    /// Versioned SHA-256 hash of the model's canonical JSON.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     Stable content hash; two models with identical canonical JSON
-    ///     share a hash regardless of key order.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the model contains a non-finite number.
+    #[doc = pydoc!("finstack_quant.statements", "FinancialModelSpec.content_hash")]
     #[pyo3(text_signature = "($self)")]
     fn content_hash(&self) -> PyResult<String> {
         self.inner.content_hash().map_err(core_to_py)
@@ -1138,13 +1108,7 @@ impl PyFinancialModelSpec {
         self.inner.schema_version.into()
     }
 
-    /// Export one row per node as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``node_id``, ``node_type`` (``value`` / ``calculated`` /
-    /// ``mixed``), ``name``, ``formula_text``, ``forecast_method`` (snake
-    /// case method name or ``None``), ``value_type`` (``monetary`` /
-    /// ``scalar`` / ``None``), ``currency`` (ISO code for monetary nodes),
-    /// ``where_text``. Rows follow declaration order.
+    #[doc = pydoc!("finstack_quant.statements", "FinancialModelSpec.to_dataframe")]
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows: Vec<serde_json::Value> = self
@@ -1159,20 +1123,18 @@ impl PyFinancialModelSpec {
                     Some(NodeValueType::Scalar) => (Some("scalar"), None),
                     None => (None, None),
                 };
-                serde_json::json!({
+                Ok(serde_json::json!({
                     "node_id": node.node_id.as_str(),
-                    "node_type": crate::bindings::statements_analytics::serde_variant_str(&node.node_type),
+                    "node_type": crate::bindings::extract::label(&node.node_type)?,
                     "name": node.name,
                     "formula_text": node.formula_text,
-                    "forecast_method": node.forecast.as_ref().map(|f| {
-                        crate::bindings::statements_analytics::serde_variant_str(&f.method)
-                    }),
+                    "forecast_method": node.forecast.as_ref().map(|f| crate::bindings::extract::label(&f.method)).transpose()?,
                     "value_type": value_type,
                     "currency": currency,
                     "where_text": node.where_text,
-                })
+                }))
             })
-            .collect();
+            .collect::<PyResult<_>>()?;
         serde_rows_to_dataframe_with_schema(py, &rows, &NODE_COLUMNS)
     }
 

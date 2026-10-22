@@ -18,7 +18,7 @@ mod suite;
 mod traits;
 pub(crate) mod types;
 
-pub use helpers::{get_finite_node_value, get_node_value, sum_nodes};
+pub use helpers::{get_finite_node_value, sum_nodes};
 
 pub use suite::{
     BuiltinCheckSpec, CheckSuite, CheckSuiteBuilder, CheckSuiteSpec, FormulaCheckSpec,

@@ -8,7 +8,6 @@ use finstack_quant_core::wire::SchemaVersion;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-use crate::error::Result;
 use crate::types::NodeId;
 
 /// Results from evaluating a financial model.
@@ -29,14 +28,16 @@ use crate::types::NodeId;
 /// # use finstack_quant_statements::evaluator::Evaluator;
 /// # use finstack_quant_core::dates::PeriodId;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let model = ModelBuilder::new("demo")
-///     .periods("2025Q1..Q2", None)?
-///     .value("revenue", &[
+/// let model = {
+///     let mut model_builder = ModelBuilder::new("demo");
+///     model_builder.periods("2025Q1..Q2", None)?;
+///     model_builder.value("revenue", &[
 ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), 100_000.0.into()),
 ///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), 105_000.0.into()),
-///     ])
-///     .compute("gross_profit", "revenue * 0.6")?
-///     .build()?;
+///     ]);
+///     model_builder.compute("gross_profit", "revenue * 0.6")?;
+///     model_builder.build()?
+/// };
 ///
 /// let mut evaluator = Evaluator::new();
 /// let result = evaluator.evaluate(&model)?;
@@ -343,41 +344,6 @@ impl StatementResult {
             }
         }
     }
-
-    /// Export to a long-format table.
-    ///
-    /// Schema: `(node_id, period_id, value, value_money, currency, value_type, source)`.
-    /// Rows preserve the result's node and period declaration order. Monetary
-    /// nodes duplicate their numerical value in `value_money` and set
-    /// `currency`; scalar nodes leave those two fields null. `source` is the
-    /// cell's [`CellSource`] label (`value`, `forecast`, `formula`,
-    /// `where_masked`), or null when the result records no source for it.
-    ///
-    /// # Errors
-    ///
-    /// Returns a table-construction error if the result cannot be represented
-    /// as a valid [`finstack_quant_core::table::TableEnvelope`]. Empty results
-    /// are valid and produce an empty table with the full seven-column schema.
-    pub fn to_table_long(&self) -> Result<finstack_quant_core::table::TableEnvelope> {
-        super::export::to_table_long(self)
-    }
-
-    /// Export to a wide-format table.
-    ///
-    /// Schema: `(period_id, <node1>, <node2>, ...)`. One row is emitted per
-    /// unique period in ascending chronological order, and node columns follow
-    /// result declaration order. Missing node-period observations are encoded
-    /// as `NaN`, not zero, so downstream analytics can distinguish absence from
-    /// an evaluated zero.
-    ///
-    /// # Errors
-    ///
-    /// Returns a table-construction error if a node identifier or result shape
-    /// cannot be represented in a valid table envelope. Empty results are valid
-    /// and produce a zero-row table containing only `period_id`.
-    pub fn to_table_wide(&self) -> Result<finstack_quant_core::table::TableEnvelope> {
-        super::export::to_table_wide(self)
-    }
 }
 
 /// Build a `PeriodId -> Money` map, skipping cells outside Money's finite range.
@@ -434,12 +400,10 @@ impl std::fmt::Display for CapitalStructureClaimCategory {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum CapitalStructureWarning {
-    /// A schedule-to-model balance ratio exceeded the safety bound and was clamped.
-    ScaleClamped {
-        /// Unbounded ratio calculated from model and schedule balances.
-        raw_ratio: f64,
-        /// Ratio used after applying the safety bound.
-        clamped_ratio: f64,
+    /// The residual schedule opening differs from the stateful opening balance.
+    ResidualScaleMismatch {
+        /// Actual ratio of stateful to scheduled opening applied to the cashflows.
+        applied_ratio: f64,
     },
     /// A contractual cashflow kind is not represented in statement debt service.
     CashflowIgnored {

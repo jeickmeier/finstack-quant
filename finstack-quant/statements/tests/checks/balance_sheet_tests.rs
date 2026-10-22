@@ -15,32 +15,32 @@ fn q(quarter: u8) -> PeriodId {
 
 #[test]
 fn balanced_passes() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "total_assets",
             &[
                 (q(1), AmountOrScalar::scalar(1000.0)),
                 (q(2), AmountOrScalar::scalar(1100.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_liabilities",
             &[
                 (q(1), AmountOrScalar::scalar(600.0)),
                 (q(2), AmountOrScalar::scalar(700.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_equity",
             &[
                 (q(1), AmountOrScalar::scalar(400.0)),
                 (q(2), AmountOrScalar::scalar(400.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -72,32 +72,32 @@ fn balanced_passes() {
 
 #[test]
 fn imbalanced_fails_with_materiality() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "total_assets",
             &[
                 (q(1), AmountOrScalar::scalar(1000.0)),
                 (q(2), AmountOrScalar::scalar(1100.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_liabilities",
             &[
                 (q(1), AmountOrScalar::scalar(600.0)),
                 (q(2), AmountOrScalar::scalar(700.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_equity",
             &[
                 (q(1), AmountOrScalar::scalar(300.0)), // imbalance: 1000 - (600+300) = 100
                 (q(2), AmountOrScalar::scalar(400.0)), // balanced
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -160,32 +160,32 @@ fn imbalanced_fails_with_materiality() {
 
 #[test]
 fn within_tolerance_passes() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "total_assets",
             &[
                 (q(1), AmountOrScalar::scalar(100.0)),
                 (q(2), AmountOrScalar::scalar(100.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_liabilities",
             &[
                 (q(1), AmountOrScalar::scalar(60.0)),
                 (q(2), AmountOrScalar::scalar(60.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_equity",
             &[
                 (q(1), AmountOrScalar::scalar(39.995)), // imbalance = 0.005
                 (q(2), AmountOrScalar::scalar(39.995)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -209,12 +209,12 @@ fn within_tolerance_passes() {
 
 #[test]
 fn empty_node_group_is_rejected() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("total_assets", &[(q(1), AmountOrScalar::scalar(1000.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("total_assets", &[(q(1), AmountOrScalar::scalar(1000.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -238,12 +238,12 @@ fn empty_node_group_is_rejected() {
 
 #[test]
 fn misnamed_nodes_warn_instead_of_silently_passing() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("total_assets", &[(q(1), AmountOrScalar::scalar(1000.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("total_assets", &[(q(1), AmountOrScalar::scalar(1000.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -278,17 +278,17 @@ fn partially_missing_group_skips_period_with_warning() {
     // Assets are split across two subtotals but one is misspelled: summing the
     // resolvable one alone would fabricate an imbalance (or mask one), so the
     // period must be skipped with a warning instead of evaluated one-sided.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("current_assets", &[(q(1), AmountOrScalar::scalar(400.0))])
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("current_assets", &[(q(1), AmountOrScalar::scalar(400.0))]);
+        model_builder.value(
             "total_liabilities",
             &[(q(1), AmountOrScalar::scalar(600.0))],
-        )
-        .value("total_equity", &[(q(1), AmountOrScalar::scalar(400.0))])
-        .build()
-        .unwrap();
+        );
+        model_builder.value("total_equity", &[(q(1), AmountOrScalar::scalar(400.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -327,23 +327,23 @@ fn large_balance_sheet_within_relative_tolerance_passes() {
     // A $10B balance sheet with $0.05 of f64 accumulation drift must not fail
     // under the *default* config: the default tolerance is scale-aware
     // (relative component), not a flat absolute cent.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value(
             "total_assets",
             &[(q(1), AmountOrScalar::scalar(10_000_000_000.0))],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_liabilities",
             &[(q(1), AmountOrScalar::scalar(6_000_000_000.0))],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_equity",
             &[(q(1), AmountOrScalar::scalar(3_999_999_999.95))],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -371,17 +371,17 @@ fn nan_operand_warns_instead_of_silently_passing() {
     // without a guard, a genuinely broken balance sheet silently passes. The
     // check must treat a non-finite operand like a missing one - warn and
     // skip the period.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("total_assets", &[(q(1), AmountOrScalar::scalar(1000.0))])
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("total_assets", &[(q(1), AmountOrScalar::scalar(1000.0))]);
+        model_builder.value(
             "total_liabilities",
             &[(q(1), AmountOrScalar::scalar(600.0))],
-        )
-        .value("total_equity", &[(q(1), AmountOrScalar::scalar(400.0))])
-        .build()
-        .unwrap();
+        );
+        model_builder.value("total_equity", &[(q(1), AmountOrScalar::scalar(400.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let mut results = evaluator.evaluate(&model).unwrap();

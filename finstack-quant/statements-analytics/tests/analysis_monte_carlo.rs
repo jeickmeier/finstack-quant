@@ -8,11 +8,13 @@ use finstack_quant_statements::types::{AmountOrScalar, ForecastSpec};
 
 #[test]
 fn evaluate_monte_carlo_produces_deterministic_results() {
-    let model = ModelBuilder::new("mc-test")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .expect("valid periods")
-        .mixed("revenue")
-        .values(&[
+    let model = {
+        let mut model_builder = ModelBuilder::new("mc-test");
+        model_builder
+            .periods("2025Q1..Q4", Some("2025Q2"))
+            .expect("valid periods");
+        let mut model_builder = model_builder.mixed("revenue");
+        model_builder.values(&[
             (
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
@@ -21,12 +23,11 @@ fn evaluate_monte_carlo_produces_deterministic_results() {
                 PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 AmountOrScalar::scalar(110_000.0),
             ),
-        ])
-        .forecast(ForecastSpec::normal(120_000.0, 10_000.0, 42))
-        .build()
-        .expect("valid mixed node")
-        .build()
-        .expect("valid model");
+        ]);
+        model_builder.forecast(ForecastSpec::normal(120_000.0, 10_000.0, 42));
+        let model_builder = model_builder.build().expect("valid mixed node");
+        model_builder.build().expect("valid model")
+    };
 
     let config = MonteCarloConfig::new(32, 7);
 
@@ -61,11 +62,13 @@ fn evaluate_monte_carlo_correlated_normals_constant_spread() {
     fp_b.params
         .insert("correlation".into(), serde_json::json!(1.0));
 
-    let model = ModelBuilder::new("mc-corr")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .expect("valid periods")
-        .mixed("a")
-        .values(&[
+    let model = {
+        let mut model_builder = ModelBuilder::new("mc-corr");
+        model_builder
+            .periods("2025Q1..Q4", Some("2025Q2"))
+            .expect("valid periods");
+        let mut model_builder = model_builder.mixed("a");
+        model_builder.values(&[
             (
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
@@ -74,12 +77,11 @@ fn evaluate_monte_carlo_correlated_normals_constant_spread() {
                 PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 AmountOrScalar::scalar(110_000.0),
             ),
-        ])
-        .forecast(ForecastSpec::normal(100.0, 10.0, 42))
-        .build()
-        .expect("valid mixed node")
-        .mixed("b")
-        .values(&[
+        ]);
+        model_builder.forecast(ForecastSpec::normal(100.0, 10.0, 42));
+        let model_builder = model_builder.build().expect("valid mixed node");
+        let mut model_builder = model_builder.mixed("b");
+        model_builder.values(&[
             (
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
@@ -88,14 +90,12 @@ fn evaluate_monte_carlo_correlated_normals_constant_spread() {
                 PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 AmountOrScalar::scalar(110_000.0),
             ),
-        ])
-        .forecast(fp_b)
-        .formula("a")
-        .expect("valid formula")
-        .build()
-        .expect("valid mixed node")
-        .build()
-        .expect("valid model");
+        ]);
+        model_builder.forecast(fp_b);
+        model_builder.formula("a").expect("valid formula");
+        let model_builder = model_builder.build().expect("valid mixed node");
+        model_builder.build().expect("valid model")
+    };
 
     let config = MonteCarloConfig::new(4, 1);
     let mut eval = finstack_quant_statements::evaluator::Evaluator::new();
@@ -128,11 +128,13 @@ fn evaluate_monte_carlo_correlated_lognormals_preserve_ratio() {
     fp_b.params
         .insert("correlation".into(), serde_json::json!(1.0));
 
-    let model = ModelBuilder::new("mc-corr-lognormal")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .expect("valid periods")
-        .mixed("a")
-        .values(&[
+    let model = {
+        let mut model_builder = ModelBuilder::new("mc-corr-lognormal");
+        model_builder
+            .periods("2025Q1..Q4", Some("2025Q2"))
+            .expect("valid periods");
+        let mut model_builder = model_builder.mixed("a");
+        model_builder.values(&[
             (
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
@@ -141,12 +143,11 @@ fn evaluate_monte_carlo_correlated_lognormals_preserve_ratio() {
                 PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 AmountOrScalar::scalar(110_000.0),
             ),
-        ])
-        .forecast(ForecastSpec::log_normal(3.0, 0.2, 42))
-        .build()
-        .expect("valid mixed node")
-        .mixed("b")
-        .values(&[
+        ]);
+        model_builder.forecast(ForecastSpec::log_normal(3.0, 0.2, 42));
+        let model_builder = model_builder.build().expect("valid mixed node");
+        let mut model_builder = model_builder.mixed("b");
+        model_builder.values(&[
             (
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
@@ -155,14 +156,12 @@ fn evaluate_monte_carlo_correlated_lognormals_preserve_ratio() {
                 PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 AmountOrScalar::scalar(110_000.0),
             ),
-        ])
-        .forecast(fp_b)
-        .formula("a")
-        .expect("valid formula")
-        .build()
-        .expect("valid mixed node")
-        .build()
-        .expect("valid model");
+        ]);
+        model_builder.forecast(fp_b);
+        model_builder.formula("a").expect("valid formula");
+        let model_builder = model_builder.build().expect("valid mixed node");
+        model_builder.build().expect("valid model")
+    };
 
     let config = MonteCarloConfig::new(4, 1);
     let mut eval = finstack_quant_statements::evaluator::Evaluator::new();
@@ -195,11 +194,13 @@ fn evaluate_monte_carlo_correlated_forecast_rejects_unknown_peer() {
     fp.params
         .insert("correlation".into(), serde_json::json!(0.5));
 
-    let model = ModelBuilder::new("mc-corr-missing-peer")
-        .periods("2025Q1..Q4", Some("2025Q2"))
-        .expect("valid periods")
-        .mixed("revenue")
-        .values(&[
+    let model = {
+        let mut model_builder = ModelBuilder::new("mc-corr-missing-peer");
+        model_builder
+            .periods("2025Q1..Q4", Some("2025Q2"))
+            .expect("valid periods");
+        let mut model_builder = model_builder.mixed("revenue");
+        model_builder.values(&[
             (
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
@@ -208,12 +209,11 @@ fn evaluate_monte_carlo_correlated_forecast_rejects_unknown_peer() {
                 PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 AmountOrScalar::scalar(110_000.0),
             ),
-        ])
-        .forecast(fp)
-        .build()
-        .expect("valid mixed node")
-        .build()
-        .expect("valid model");
+        ]);
+        model_builder.forecast(fp);
+        let model_builder = model_builder.build().expect("valid mixed node");
+        model_builder.build().expect("valid model")
+    };
 
     let config = MonteCarloConfig::new(16, 7);
     let mut eval = finstack_quant_statements::evaluator::Evaluator::new();

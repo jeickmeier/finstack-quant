@@ -186,10 +186,12 @@ impl ScenarioSet {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    /// let model = ModelBuilder::new("scenario-model")
-    ///     .periods("2025Q1..Q1", None)?
-    ///     .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-    ///     .build()?;
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("scenario-model");
+    ///     model_builder.periods("2025Q1..Q1", None)?;
+    ///     model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+    ///     model_builder.build()?
+    /// };
     ///
     /// let mut scenarios = IndexMap::new();
     /// scenarios.insert(
@@ -266,10 +268,12 @@ impl ScenarioSet {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let period = PeriodId::quarter(2025, 1)?;
-    /// let model = ModelBuilder::new("scenario-model")
-    ///     .periods("2025Q1..Q1", None)?
-    ///     .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-    ///     .build()?;
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("scenario-model");
+    ///     model_builder.periods("2025Q1..Q1", None)?;
+    ///     model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+    ///     model_builder.build()?
+    /// };
     /// let set = ScenarioSet {
     ///     scenarios: IndexMap::from([("base".to_string(), ScenarioDefinition::default())]),
     /// };
@@ -357,10 +361,12 @@ impl ScenarioSet {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    /// let model = ModelBuilder::new("scenario-model")
-    ///     .periods("2025Q1..Q1", None)?
-    ///     .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-    ///     .build()?;
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("scenario-model");
+    ///     model_builder.periods("2025Q1..Q1", None)?;
+    ///     model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+    ///     model_builder.build()?
+    /// };
     ///
     /// let scenarios = IndexMap::from([
     ///     ("base".to_string(), ScenarioDefinition {
@@ -624,10 +630,12 @@ impl ScenarioResults {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    /// let model = ModelBuilder::new("scenario-model")
-    ///     .periods("2025Q1..Q1", None)?
-    ///     .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-    ///     .build()?;
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("scenario-model");
+    ///     model_builder.periods("2025Q1..Q1", None)?;
+    ///     model_builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+    ///     model_builder.build()?
+    /// };
     /// let scenarios = IndexMap::from([
     ///     ("base".to_string(), ScenarioDefinition {
     ///         parent: None,

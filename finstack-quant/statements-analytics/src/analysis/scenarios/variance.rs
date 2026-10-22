@@ -22,11 +22,13 @@
 //!
 //! # fn main() -> finstack_quant_statements::Result<()> {
 //! // Build and evaluate a simple model twice (e.g., management vs bank case)
-//! let model = ModelBuilder::new("demo")
-//!     .periods("2025Q1..Q2", None)?
-//!     .compute("revenue", "100000")?
-//!     .compute("ebitda", "60000")?
-//!     .build()?;
+//! let model = {
+//!     let mut model_builder = ModelBuilder::new("demo");
+//!     model_builder.periods("2025Q1..Q2", None)?;
+//!     model_builder.compute("revenue", "100000")?;
+//!     model_builder.compute("ebitda", "60000")?;
+//!     model_builder.build()?
+//! };
 //!
 //! let mut evaluator = Evaluator::new();
 //! let mgmt_results = evaluator.evaluate(&model)?;

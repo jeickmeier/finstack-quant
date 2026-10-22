@@ -59,16 +59,18 @@ struct DcfSpec {
 /// use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
 ///
 /// # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
-/// let model = ModelBuilder::new("demo")
-///     .periods("2025Q1..Q4", None)?
-///     .value_money("ufcf", &[
+/// let model = {
+///     let mut model_builder = ModelBuilder::new("demo");
+///     model_builder.periods("2025Q1..Q4", None)?;
+///     model_builder.value_money("ufcf", &[
 ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), Money::from((100_000_i64, Currency::USD))),
 ///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), Money::from((105_000_i64, Currency::USD))),
 ///         (PeriodId::quarter(2025, 3).expect("valid period fixture"), Money::from((110_000_i64, Currency::USD))),
 ///         (PeriodId::quarter(2025, 4).expect("valid period fixture"), Money::from((115_000_i64, Currency::USD))),
-///     ])
-///     .with_meta("currency", serde_json::json!("USD"))
-///     .build()?;
+///     ]);
+///     model_builder.with_meta("currency", serde_json::json!("USD"));
+///     model_builder.build()?
+/// };
 ///
 /// let checks = CheckSuite::builder("corporate")
 ///     .add_check(NonFiniteCheck { nodes: vec![] })
@@ -112,7 +114,11 @@ impl CorporateAnalysisBuilder {
     /// use finstack_quant_statements_analytics::analysis::CorporateAnalysisBuilder;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let model = ModelBuilder::new("demo").periods("2025Q1..Q1", None)?.build()?;
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("demo");
+    ///     model_builder.periods("2025Q1..Q1", None)?;
+    ///     model_builder.build()?
+    /// };
     /// let _builder = CorporateAnalysisBuilder::new(model);
     /// # Ok(())
     /// # }
@@ -186,7 +192,11 @@ impl CorporateAnalysisBuilder {
     /// use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let model = ModelBuilder::new("demo").periods("2025Q1..Q4", None)?.build()?;
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("demo");
+    ///     model_builder.periods("2025Q1..Q4", None)?;
+    ///     model_builder.build()?
+    /// };
     /// let _builder = CorporateAnalysisBuilder::new(model)
     ///     .dcf(0.10, TerminalValueSpec::GordonGrowth { stable_growth_rate: 0.02 });
     /// # Ok(())
@@ -337,10 +347,12 @@ impl CorporateAnalysisBuilder {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    /// let model = ModelBuilder::new("demo")
-    ///     .periods("2025Q1..Q1", None)?
-    ///     .value("ebitda", &[(period, AmountOrScalar::scalar(100.0))])
-    ///     .build()?;
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("demo");
+    ///     model_builder.periods("2025Q1..Q1", None)?;
+    ///     model_builder.value("ebitda", &[(period, AmountOrScalar::scalar(100.0))]);
+    ///     model_builder.build()?
+    /// };
     ///
     /// let analysis = CorporateAnalysisBuilder::new(model).analyze()?;
     /// assert!(analysis.equity.is_none());
@@ -655,10 +667,12 @@ mod tests {
 
     #[test]
     fn test_statement_only_analysis() {
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q2", None)
-            .expect("periods")
-            .value(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q2", None)
+                .expect("periods");
+            model_builder_1.value(
                 "revenue",
                 &[
                     (
@@ -670,11 +684,12 @@ mod tests {
                         AmountOrScalar::scalar(1_100_000.0),
                     ),
                 ],
-            )
-            .compute("ebitda", "revenue * 0.3")
-            .expect("formula")
-            .build()
-            .expect("model");
+            );
+            model_builder_1
+                .compute("ebitda", "revenue * 0.3")
+                .expect("formula");
+            model_builder_1.build().expect("model")
+        };
 
         let result = CorporateAnalysisBuilder::new(model)
             .analyze()
@@ -694,18 +709,20 @@ mod tests {
 
     #[test]
     fn run_corporate_analysis_statement_only_uses_defaults() {
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q1", None)
-            .expect("periods")
-            .value(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("periods");
+            model_builder_1.value(
                 "revenue",
                 &[(
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_000_000.0),
                 )],
-            )
-            .build()
-            .expect("model");
+            );
+            model_builder_1.build().expect("model")
+        };
 
         let options: CorporateAnalysisOptions = serde_json::from_str("{}").expect("empty options");
         let result = run_corporate_analysis(model, options, None).expect("statement-only");
@@ -716,18 +733,20 @@ mod tests {
 
     #[test]
     fn run_corporate_analysis_requires_terminal_value_with_wacc() {
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q1", None)
-            .expect("periods")
-            .value(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("test");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("periods");
+            model_builder_1.value(
                 "revenue",
                 &[(
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_000_000.0),
                 )],
-            )
-            .build()
-            .expect("model");
+            );
+            model_builder_1.build().expect("model")
+        };
         let options = CorporateAnalysisOptions {
             wacc: Some(0.10),
             ..CorporateAnalysisOptions::default()
@@ -745,10 +764,12 @@ mod tests {
 
     #[test]
     fn test_dcf_analysis() {
-        let model = ModelBuilder::new("dcf-test")
-            .periods("2025Q1..Q4", None)
-            .expect("periods")
-            .value_money(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("dcf-test");
+            model_builder_1
+                .periods("2025Q1..Q4", None)
+                .expect("periods");
+            model_builder_1.value_money(
                 "ufcf",
                 &[
                     (
@@ -768,10 +789,10 @@ mod tests {
                         Money::from((130_000_i64, Currency::USD)),
                     ),
                 ],
-            )
-            .with_meta("currency", serde_json::json!("USD"))
-            .build()
-            .expect("model");
+            );
+            model_builder_1.with_meta("currency", serde_json::json!("USD"));
+            model_builder_1.build().expect("model")
+        };
 
         let result = CorporateAnalysisBuilder::new(model)
             .dcf(
@@ -794,19 +815,21 @@ mod tests {
 
     #[test]
     fn test_dcf_requires_check_suite() {
-        let model = ModelBuilder::new("unchecked-dcf")
-            .periods("2025Q1..Q1", None)
-            .expect("periods")
-            .value(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("unchecked-dcf");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("periods");
+            model_builder_1.value(
                 "ufcf",
                 &[(
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100.0),
                 )],
-            )
-            .with_meta("currency", serde_json::json!("USD"))
-            .build()
-            .expect("model");
+            );
+            model_builder_1.with_meta("currency", serde_json::json!("USD"));
+            model_builder_1.build().expect("model")
+        };
 
         let error = CorporateAnalysisBuilder::new(model)
             .dcf(
@@ -823,14 +846,15 @@ mod tests {
 
     #[test]
     fn test_error_severity_check_blocks_dcf() {
-        let model = ModelBuilder::new("non-finite-dcf")
-            .periods("2025Q1..Q1", None)
-            .expect("periods")
-            .compute("ufcf", "0 / 0")
-            .expect("formula")
-            .with_meta("currency", serde_json::json!("USD"))
-            .build()
-            .expect("model");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("non-finite-dcf");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("periods");
+            model_builder_1.compute("ufcf", "0 / 0").expect("formula");
+            model_builder_1.with_meta("currency", serde_json::json!("USD"));
+            model_builder_1.build().expect("model")
+        };
 
         let error = CorporateAnalysisBuilder::new(model)
             .dcf(
@@ -848,16 +872,18 @@ mod tests {
 
     #[test]
     fn test_non_positive_enterprise_value_status_is_top_level() {
-        let model = ModelBuilder::new("non-positive-ev")
-            .periods("2025..2025", None)
-            .expect("periods")
-            .value_money(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("non-positive-ev");
+            model_builder_1
+                .periods("2025..2025", None)
+                .expect("periods");
+            model_builder_1.value_money(
                 "ufcf",
                 &[(PeriodId::annual(2025), Money::from((0_i64, Currency::USD)))],
-            )
-            .with_meta("currency", serde_json::json!("USD"))
-            .build()
-            .expect("model");
+            );
+            model_builder_1.with_meta("currency", serde_json::json!("USD"));
+            model_builder_1.build().expect("model")
+        };
 
         let result = CorporateAnalysisBuilder::new(model)
             .dcf(
@@ -878,10 +904,12 @@ mod tests {
     fn test_dcf_analysis_with_as_of_and_capital_structure_succeeds() {
         let as_of = date!(2025 - 01 - 01);
         let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
-        let model = ModelBuilder::new("dcf-cs-test")
-            .periods("2025Q1..Q4", Some("2025Q1"))
-            .expect("periods")
-            .value_money(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("dcf-cs-test");
+            model_builder_1
+                .periods("2025Q1..Q4", Some("2025Q1"))
+                .expect("periods");
+            model_builder_1.value_money(
                 "revenue",
                 &[
                     (
@@ -901,29 +929,32 @@ mod tests {
                         Money::from((1_300_000_i64, Currency::USD)),
                     ),
                 ],
-            )
-            .availability_dates(
-                "revenue",
-                &[(
-                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    as_of,
-                )],
-            )
-            .expect("availability")
-            .add_bond(
-                "BOND-001",
-                Money::from((1_000_000_i64, finstack_quant_core::currency::Currency::USD)),
-                0.05,
-                date!(2025 - 01 - 01),
-                date!(2026 - 01 - 01),
-                "USD-OIS",
-            )
-            .expect("bond")
-            .compute("ufcf", "revenue - cs.interest_expense.total")
-            .expect("formula")
-            .with_meta("currency", serde_json::json!("USD"))
-            .build()
-            .expect("model");
+            );
+            model_builder_1
+                .availability_dates(
+                    "revenue",
+                    &[(
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        as_of,
+                    )],
+                )
+                .expect("availability");
+            model_builder_1
+                .add_bond(
+                    "BOND-001",
+                    Money::from((1_000_000_i64, finstack_quant_core::currency::Currency::USD)),
+                    0.05,
+                    date!(2025 - 01 - 01),
+                    date!(2026 - 01 - 01),
+                    "USD-OIS",
+                )
+                .expect("bond");
+            model_builder_1
+                .compute("ufcf", "revenue - cs.interest_expense.total")
+                .expect("formula");
+            model_builder_1.with_meta("currency", serde_json::json!("USD"));
+            model_builder_1.build().expect("model")
+        };
 
         let result = CorporateAnalysisBuilder::new(model)
             .market(market)
@@ -1103,10 +1134,12 @@ mod tests {
         let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
         let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
-        let model = ModelBuilder::new("ltv-node")
-            .periods("2025Q1..Q2", Some("2025Q1"))
-            .expect("periods")
-            .value(
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("ltv-node");
+            model_builder_1
+                .periods("2025Q1..Q2", Some("2025Q1"))
+                .expect("periods");
+            model_builder_1.value(
                 "enterprise_value",
                 &[
                     (
@@ -1118,39 +1151,43 @@ mod tests {
                         AmountOrScalar::amount(8_000_000.0, Currency::USD).unwrap(),
                     ),
                 ],
-            )
-            .value(
+            );
+            model_builder_1.value(
                 "cfads",
                 &[
                     (q1, AmountOrScalar::scalar(1_000_000.0)),
                     (q2, AmountOrScalar::scalar(1_000_000.0)),
                 ],
-            )
-            .value(
+            );
+            model_builder_1.value(
                 "ebitda",
                 &[
                     (q1, AmountOrScalar::scalar(1_500_000.0)),
                     (q2, AmountOrScalar::scalar(1_500_000.0)),
                 ],
-            )
-            .availability_dates("enterprise_value", &[(q1, as_of)])
-            .expect("availability")
-            .availability_dates("cfads", &[(q1, as_of)])
-            .expect("availability")
-            .availability_dates("ebitda", &[(q1, as_of)])
-            .expect("availability")
-            .add_bond(
-                "BOND-001",
-                Money::from((4_000_000_i64, finstack_quant_core::currency::Currency::USD)),
-                0.05,
-                date!(2025 - 01 - 01),
-                date!(2026 - 01 - 01),
-                "USD-OIS",
-            )
-            .expect("bond")
-            .with_meta("currency", serde_json::json!("USD"))
-            .build()
-            .expect("model");
+            );
+            model_builder_1
+                .availability_dates("enterprise_value", &[(q1, as_of)])
+                .expect("availability");
+            model_builder_1
+                .availability_dates("cfads", &[(q1, as_of)])
+                .expect("availability");
+            model_builder_1
+                .availability_dates("ebitda", &[(q1, as_of)])
+                .expect("availability");
+            model_builder_1
+                .add_bond(
+                    "BOND-001",
+                    Money::from((4_000_000_i64, finstack_quant_core::currency::Currency::USD)),
+                    0.05,
+                    date!(2025 - 01 - 01),
+                    date!(2026 - 01 - 01),
+                    "USD-OIS",
+                )
+                .expect("bond");
+            model_builder_1.with_meta("currency", serde_json::json!("USD"));
+            model_builder_1.build().expect("model")
+        };
 
         let analysis = CorporateAnalysisBuilder::new(model)
             .market(market)

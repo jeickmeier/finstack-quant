@@ -583,18 +583,20 @@ mod tests {
 
     #[test]
     fn test_corkscrew_execute_with_empty_accounts() {
-        let model = ModelBuilder::new("test")
-            .periods("2025Q1..Q1", None)
-            .expect("valid periods")
-            .value(
+        let model = {
+            let mut model_builder = ModelBuilder::new("test");
+            model_builder
+                .periods("2025Q1..Q1", None)
+                .expect("valid periods");
+            model_builder.value(
                 "cash",
                 &[(
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100.0),
                 )],
-            )
-            .build()
-            .expect("model should build");
+            );
+            model_builder.build().expect("model should build")
+        };
         let mut evaluator = Evaluator::new();
         let results = evaluator
             .evaluate(&model)
@@ -625,10 +627,12 @@ mod tests {
 
     fn broken_rollforward_model() -> (FinancialModelSpec, StatementResult) {
         // cash: 100 → 250 with only +100 of inflows → 50 break.
-        let model = ModelBuilder::new("rollforward_break")
-            .periods("2025Q1..Q2", None)
-            .expect("valid periods")
-            .value(
+        let model = {
+            let mut model_builder = ModelBuilder::new("rollforward_break");
+            model_builder
+                .periods("2025Q1..Q2", None)
+                .expect("valid periods");
+            model_builder.value(
                 "cash",
                 &[
                     (
@@ -640,8 +644,8 @@ mod tests {
                         AmountOrScalar::scalar(250.0),
                     ),
                 ],
-            )
-            .value(
+            );
+            model_builder.value(
                 "inflows",
                 &[
                     (
@@ -653,9 +657,9 @@ mod tests {
                         AmountOrScalar::scalar(100.0),
                     ),
                 ],
-            )
-            .build()
-            .expect("model should build");
+            );
+            model_builder.build().expect("model should build")
+        };
         let mut evaluator = Evaluator::new();
         let results = evaluator
             .evaluate(&model)
@@ -804,18 +808,20 @@ mod tests {
 
     #[test]
     fn single_period_model_flags_nothing_to_validate() {
-        let model = ModelBuilder::new("single_period")
-            .periods("2025Q1..Q1", None)
-            .expect("valid periods")
-            .value(
+        let model = {
+            let mut model_builder = ModelBuilder::new("single_period");
+            model_builder
+                .periods("2025Q1..Q1", None)
+                .expect("valid periods");
+            model_builder.value(
                 "cash",
                 &[(
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100.0),
                 )],
-            )
-            .build()
-            .expect("model should build");
+            );
+            model_builder.build().expect("model should build")
+        };
         let mut evaluator = Evaluator::new();
         let results = evaluator
             .evaluate(&model)
@@ -852,10 +858,12 @@ mod tests {
     fn articulation_checked_at_every_period() {
         // Balanced in the last period but imbalanced in the first — the
         // check must catch the earlier imbalance.
-        let model = ModelBuilder::new("articulation_all_periods")
-            .periods("2025Q1..Q2", None)
-            .expect("valid periods")
-            .value(
+        let model = {
+            let mut model_builder = ModelBuilder::new("articulation_all_periods");
+            model_builder
+                .periods("2025Q1..Q2", None)
+                .expect("valid periods");
+            model_builder.value(
                 "assets",
                 &[
                     (
@@ -867,8 +875,8 @@ mod tests {
                         AmountOrScalar::scalar(100.0),
                     ),
                 ],
-            )
-            .value(
+            );
+            model_builder.value(
                 "liabilities",
                 &[
                     (
@@ -880,9 +888,9 @@ mod tests {
                         AmountOrScalar::scalar(100.0),
                     ),
                 ],
-            )
-            .build()
-            .expect("model should build");
+            );
+            model_builder.build().expect("model should build")
+        };
         let mut evaluator = Evaluator::new();
         let results = evaluator
             .evaluate(&model)
@@ -923,32 +931,34 @@ mod tests {
 
     #[test]
     fn test_corkscrew_uses_absolute_tolerance_for_articulation() {
-        let model = ModelBuilder::new("articulation_tolerance")
-            .periods("2025Q1..Q1", None)
-            .expect("valid periods")
-            .value(
+        let model = {
+            let mut model_builder = ModelBuilder::new("articulation_tolerance");
+            model_builder
+                .periods("2025Q1..Q1", None)
+                .expect("valid periods");
+            model_builder.value(
                 "assets",
                 &[(
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_000_000.00),
                 )],
-            )
-            .value(
+            );
+            model_builder.value(
                 "liabilities",
                 &[(
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(999_999.98),
                 )],
-            )
-            .value(
+            );
+            model_builder.value(
                 "equity",
                 &[(
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(0.0),
                 )],
-            )
-            .build()
-            .expect("model should build");
+            );
+            model_builder.build().expect("model should build")
+        };
 
         let mut evaluator = Evaluator::new();
         let results = evaluator
@@ -1001,10 +1011,12 @@ mod tests {
 
     #[test]
     fn decreases_are_subtracted_from_expected_balance() {
-        let model = ModelBuilder::new("decreases_identity")
-            .periods("2025Q1..Q2", None)
-            .expect("valid periods")
-            .value(
+        let model = {
+            let mut model_builder = ModelBuilder::new("decreases_identity");
+            model_builder
+                .periods("2025Q1..Q2", None)
+                .expect("valid periods");
+            model_builder.value(
                 "inventory",
                 &[
                     (
@@ -1016,8 +1028,8 @@ mod tests {
                         AmountOrScalar::scalar(130.0),
                     ),
                 ],
-            )
-            .value(
+            );
+            model_builder.value(
                 "additions",
                 &[
                     (
@@ -1029,8 +1041,8 @@ mod tests {
                         AmountOrScalar::scalar(50.0),
                     ),
                 ],
-            )
-            .value(
+            );
+            model_builder.value(
                 "disposals",
                 &[
                     (
@@ -1042,9 +1054,9 @@ mod tests {
                         AmountOrScalar::scalar(20.0),
                     ),
                 ],
-            )
-            .build()
-            .expect("model should build");
+            );
+            model_builder.build().expect("model should build")
+        };
         let mut evaluator = Evaluator::new();
         let results = evaluator
             .evaluate(&model)

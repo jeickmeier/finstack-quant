@@ -149,14 +149,16 @@ fn missing_market_data(instrument_id: &str, err: Error) -> Error {
 /// # use finstack_quant_statements::builder::ModelBuilder;
 /// # use finstack_quant_statements::evaluator::Evaluator;
 /// # use finstack_quant_core::dates::PeriodId;
-/// let model = ModelBuilder::new("demo")
-///     .periods("2025Q1..Q2", None)?
-///     .value("revenue", &[
+/// let model = {
+///     let mut model_builder = ModelBuilder::new("demo");
+///     model_builder.periods("2025Q1..Q2", None)?;
+///     model_builder.value("revenue", &[
 ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), 100_000.0.into()),
 ///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), 105_000.0.into()),
-///     ])
-///     .compute("gross_profit", "revenue * 0.6")?
-///     .build()?;
+///     ]);
+///     model_builder.compute("gross_profit", "revenue * 0.6")?;
+///     model_builder.build()?
+/// };
 ///
 /// let mut evaluator = Evaluator::new();
 /// let results = evaluator.evaluate(&model)?;
@@ -1079,14 +1081,17 @@ mod tests {
 
     #[test]
     fn where_clause_treats_nan_as_false() {
-        let model = ModelBuilder::new("nan-where")
-            .periods("2025Q1..Q1", None)
-            .expect("valid period range")
-            .compute("guarded_metric", "42")
-            .expect("valid formula")
-            .where_clause("0 / 0")
-            .build()
-            .expect("valid model");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("nan-where");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("valid period range");
+            model_builder_1
+                .compute("guarded_metric", "42")
+                .expect("valid formula");
+            model_builder_1.where_clause("0 / 0");
+            model_builder_1.build().expect("valid model")
+        };
 
         let mut evaluator = Evaluator::new();
         let results = evaluator
@@ -1114,14 +1119,15 @@ mod tests {
     fn evaluate_prepared_rejects_a_model_whose_formula_changed() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let build = |factor: &str| {
-            ModelBuilder::new("prepared-drift")
+            let mut model_builder_1 = ModelBuilder::new("prepared-drift");
+            model_builder_1
                 .periods("2025Q1..Q1", None)
-                .expect("valid periods")
-                .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
+                .expect("valid periods");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder_1
                 .compute("scaled", format!("revenue * {factor}"))
-                .expect("valid formula")
-                .build()
-                .expect("valid model")
+                .expect("valid formula");
+            model_builder_1.build().expect("valid model")
         };
 
         let original = build("2");

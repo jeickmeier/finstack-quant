@@ -823,9 +823,10 @@ class ScorecardReport:
         str
             Overall scorecard status after metric evaluation.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
     @property
@@ -978,6 +979,8 @@ class ScorecardReport:
         ------
         ValueError
             If the result cannot be serialized into a pandas object.
+        RuntimeError
+            If the report status cannot be rendered as its canonical Rust wire label.
         """
         ...
 
@@ -1494,9 +1497,10 @@ class CorkscrewReport:
         str
             Overall execution status.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
         """
         ...
     @property
@@ -1646,6 +1650,11 @@ class CorkscrewReport:
         ------
         ValueError
             If the result cannot be serialized into a pandas object.
+
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
+        RuntimeError
+            If the report status cannot be rendered as its canonical Rust wire label.
         """
         ...
 

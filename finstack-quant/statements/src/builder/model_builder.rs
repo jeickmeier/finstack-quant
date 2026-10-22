@@ -1,4 +1,4 @@
-//! Fluent builder for financial models.
+//! Mutable builder for financial models.
 
 use crate::error::{Error, Result};
 use crate::registry::dynamic::StoredMetric;
@@ -28,8 +28,8 @@ const RESERVED_DSL_IDENTIFIERS: &[&str] = &["if", "and", "or", "not", "true", "f
 /// language primitive. `period_id` is reserved for the timeline column in
 /// wide result exports.
 ///
-/// Exposed so binding layers can pre-validate a node id without consuming a
-/// (move-based) builder — mirroring the check `compute` runs internally.
+/// Shared by mutable model construction and complete-specification validation.
+/// The same identifier rules apply at both boundaries.
 ///
 /// # Arguments
 ///
@@ -71,6 +71,10 @@ pub fn validate_node_id(node_id: &str) -> Result<()> {
 
 /// Builder for financial models.
 ///
+/// Configuration methods borrow this builder mutably. Rejected setters leave
+/// the accumulated model unchanged. `build` consumes the completed builder,
+/// and `mixed` transfers ownership to a mixed-node builder.
+///
 /// 1. Start with `ModelBuilder::new()`.
 /// 2. Set the timeline once with `.periods()` or `.periods_explicit()`.
 /// 3. Add nodes, forecasts, capital structure, etc. (in any order).
@@ -85,12 +89,14 @@ pub fn validate_node_id(node_id: &str) -> Result<()> {
 /// use finstack_quant_core::dates::PeriodId;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let model = ModelBuilder::new("test_model")
-///     .periods("2025Q1..Q4", None)?
-///     .value("revenue", &[
+/// let model = {
+///     let mut model_builder = ModelBuilder::new("test_model");
+///     model_builder.periods("2025Q1..Q4", None)?;
+///     model_builder.value("revenue", &[
 ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0)),
-///     ])
-///     .build()?;
+///     ]);
+///     model_builder.build()?
+/// };
 /// # Ok(())
 /// # }
 /// ```
@@ -252,31 +258,7 @@ impl ModelBuilder {
     /// Returns a period error if the range or actuals cutoff cannot be parsed,
     /// uses incompatible period kinds, is reversed, or resolves to no periods.
     /// Periods can be set once; a second call is rejected.
-    pub fn periods(mut self, range: &str, actuals_until: Option<&str>) -> Result<Self> {
-        self.try_periods(range, actuals_until)?;
-        Ok(self)
-    }
-
-    /// Define periods from a range expression in place.
-    ///
-    /// Identical to [`periods`](Self::periods) but borrows the builder, so a
-    /// host wrapper that cannot express Rust's move semantics (Python, JS)
-    /// keeps everything accumulated so far when the range is rejected.
-    ///
-    /// # Arguments
-    ///
-    /// * `range` - Period range expression in the crate's period grammar
-    ///   (`"2025Q1..Q4"`, `"2024M10..2025M03"`, `"2025..2030"`); start and end
-    ///   must share one frequency family
-    /// * `actuals_until` - Optional inclusive cutoff (same family as `range`)
-    ///   through which periods are labelled actuals
-    ///
-    /// # Errors
-    ///
-    /// Leaves the builder unchanged and returns an error when periods are
-    /// already set, the range or cutoff cannot be parsed, the families are
-    /// incompatible, the range is reversed, or it resolves to no periods.
-    pub fn try_periods(&mut self, range: &str, actuals_until: Option<&str>) -> Result<&mut Self> {
+    pub fn periods(&mut self, range: &str, actuals_until: Option<&str>) -> Result<&mut Self> {
         self.ensure_periods_unset()?;
         let period_plan = build_periods(range, actuals_until)?;
         if period_plan.periods.is_empty() {
@@ -312,7 +294,7 @@ impl ModelBuilder {
     ///
     /// Returns a period error when `periods` is empty. No additional period
     /// ordering or continuity validation is performed at this boundary.
-    pub fn periods_explicit(mut self, periods: Vec<Period>) -> Result<Self> {
+    pub fn periods_explicit(&mut self, periods: Vec<Period>) -> Result<&mut Self> {
         self.ensure_periods_unset()?;
         if periods.is_empty() {
             return Err(Error::period(
@@ -390,13 +372,15 @@ impl ModelBuilder {
     /// # use finstack_quant_statements::types::AmountOrScalar;
     /// # use finstack_quant_core::dates::PeriodId;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let model = ModelBuilder::new("test")
-    ///     .periods("2025Q1..Q2", None)?
-    ///     .value("revenue", &[
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("test");
+    ///     model_builder.periods("2025Q1..Q2", None)?;
+    ///     model_builder.value("revenue", &[
     ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
     ///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(110_000.0)),
-    ///     ])
-    ///     .build()?;
+    ///     ]);
+    ///     model_builder.build()?
+    /// };
     /// # Ok(())
     /// # }
     /// ```
@@ -407,12 +391,11 @@ impl ModelBuilder {
     /// fluent method can remain useful while a node is being assembled.
     /// Reusing an existing node identifier replaces its former definition and
     /// emits a warning because its values, forecast, and formula are discarded.
-    #[must_use = "builder methods must be chained"]
     pub fn value(
-        mut self,
+        &mut self,
         node_id: impl Into<NodeId>,
         values: &[(PeriodId, AmountOrScalar)],
-    ) -> Self {
+    ) -> &mut Self {
         let node_id = node_id.into();
         let values_map: IndexMap<PeriodId, AmountOrScalar> = values.iter().cloned().collect();
 
@@ -440,13 +423,15 @@ impl ModelBuilder {
     /// # use finstack_quant_core::currency::Currency;
     /// # use finstack_quant_core::dates::PeriodId;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let model = ModelBuilder::new("test")
-    ///     .periods("2025Q1..Q2", None)?
-    ///     .value_money("revenue", &[
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("test");
+    ///     model_builder.periods("2025Q1..Q2", None)?;
+    ///     model_builder.value_money("revenue", &[
     ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), Money::from((100_000_i64, Currency::USD))),
     ///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), Money::from((110_000_i64, Currency::USD))),
-    ///     ])
-    ///     .build()?;
+    ///     ]);
+    ///     model_builder.build()?
+    /// };
     /// # Ok(())
     /// # }
     /// ```
@@ -456,12 +441,11 @@ impl ModelBuilder {
     /// unresolved so [`build`](Self::build) can reject the invalid series with
     /// a precise diagnostic. Duplicate periods retain their final entry.
     /// Reusing `node_id` replaces the former definition and emits a warning.
-    #[must_use = "builder methods must be chained"]
     pub fn value_money(
-        mut self,
+        &mut self,
         node_id: impl Into<NodeId>,
         values: &[(PeriodId, finstack_quant_core::money::Money)],
-    ) -> Self {
+    ) -> &mut Self {
         let node_id = node_id.into();
         let values_map: IndexMap<PeriodId, AmountOrScalar> = values
             .iter()
@@ -501,13 +485,15 @@ impl ModelBuilder {
     /// # use finstack_quant_statements::builder::ModelBuilder;
     /// # use finstack_quant_core::dates::PeriodId;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let model = ModelBuilder::new("test")
-    ///     .periods("2025Q1..Q2", None)?
-    ///     .value_scalar("gross_margin_pct", &[
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("test");
+    ///     model_builder.periods("2025Q1..Q2", None)?;
+    ///     model_builder.value_scalar("gross_margin_pct", &[
     ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), 0.35),
     ///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), 0.37),
-    ///     ])
-    ///     .build()?;
+    ///     ]);
+    ///     model_builder.build()?
+    /// };
     /// # Ok(())
     /// # }
     /// ```
@@ -515,8 +501,11 @@ impl ModelBuilder {
     /// Duplicate periods retain their final entry. Reusing `node_id` replaces
     /// the former definition and emits a warning; scalar consistency is already
     /// explicit in this typed convenience method.
-    #[must_use = "builder methods must be chained"]
-    pub fn value_scalar(mut self, node_id: impl Into<NodeId>, values: &[(PeriodId, f64)]) -> Self {
+    pub fn value_scalar(
+        &mut self,
+        node_id: impl Into<NodeId>,
+        values: &[(PeriodId, f64)],
+    ) -> &mut Self {
         let node_id = node_id.into();
         let values_map: IndexMap<PeriodId, AmountOrScalar> = values
             .iter()
@@ -546,34 +535,7 @@ impl ModelBuilder {
     ///
     /// Returns an error when `node_id` does not exist. Whole-model validation
     /// later rejects dates for periods that have no explicit observation.
-    #[must_use = "builder methods must be chained"]
     pub fn availability_dates(
-        mut self,
-        node_id: &str,
-        availability_dates: &[(PeriodId, finstack_quant_core::dates::Date)],
-    ) -> Result<Self> {
-        self.try_availability_dates(node_id, availability_dates)?;
-        Ok(self)
-    }
-
-    /// Set availability dates in place, leaving the builder usable on error.
-    ///
-    /// The non-consuming twin of
-    /// [`availability_dates`](Self::availability_dates) for host wrappers
-    /// that hold the builder behind a mutable reference: an unknown node
-    /// returns an error without discarding the accumulated model.
-    ///
-    /// # Arguments
-    ///
-    /// * `node_id` - Existing value or mixed node whose explicit observations
-    ///   are dated
-    /// * `availability_dates` - `(period, available_on)` pairs; observations
-    ///   without an entry default to the period's exclusive end date
-    ///
-    /// # Errors
-    ///
-    /// Returns a build error when `node_id` does not exist in the builder.
-    pub fn try_availability_dates(
         &mut self,
         node_id: &str,
         availability_dates: &[(PeriodId, finstack_quant_core::dates::Date)],
@@ -600,10 +562,12 @@ impl ModelBuilder {
     /// ```rust
     /// # use finstack_quant_statements::builder::ModelBuilder;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let model = ModelBuilder::new("test")
-    ///     .periods("2025Q1..Q2", None)?
-    ///     .compute("gross_profit", "revenue - cogs")?
-    ///     .build()?;
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("test");
+    ///     model_builder.periods("2025Q1..Q2", None)?;
+    ///     model_builder.compute("gross_profit", "revenue - cogs")?;
+    ///     model_builder.build()?
+    /// };
     /// # Ok(())
     /// # }
     /// ```
@@ -618,35 +582,7 @@ impl ModelBuilder {
     ///
     /// Returns an error if `node_id` uses an internal prefix or DSL keyword,
     /// `formula` is blank, or the formula cannot be parsed and compiled.
-    #[must_use = "builder methods must be chained"]
     pub fn compute(
-        mut self,
-        node_id: impl Into<NodeId>,
-        formula: impl Into<String>,
-    ) -> Result<Self> {
-        self.try_compute(node_id, formula)?;
-        Ok(self)
-    }
-
-    /// Add a calculated node in place, leaving the builder usable on error.
-    ///
-    /// The non-consuming twin of [`compute`](Self::compute): the same
-    /// node-id and formula validation runs *before* any state changes, so a
-    /// host wrapper holding the builder behind a mutable reference keeps its
-    /// accumulated nodes when a formula has a typo.
-    ///
-    /// # Arguments
-    ///
-    /// * `node_id` - Identifier for the node to create; must not use a
-    ///   reserved prefix or shadow a DSL keyword
-    /// * `formula` - Statements DSL expression (e.g. `"revenue - cogs"`);
-    ///   syntax-checked immediately, references checked at `build`
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `node_id` uses an internal prefix or DSL keyword,
-    /// `formula` is blank, or the formula cannot be parsed and compiled.
-    pub fn try_compute(
         &mut self,
         node_id: impl Into<NodeId>,
         formula: impl Into<String>,
@@ -685,24 +621,25 @@ impl ModelBuilder {
     /// # use finstack_quant_core::dates::PeriodId;
     /// # use indexmap::indexmap;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let model = ModelBuilder::new("test")
-    ///     .periods("2025Q1..Q4", Some("2025Q2"))?
-    ///     .mixed("revenue")
-    ///         .values(&[
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("test");
+    ///     model_builder.periods("2025Q1..Q4", Some("2025Q2"))?;
+    ///     let mut model_builder = model_builder.mixed("revenue");
+    ///     model_builder.values(&[
     ///             (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
     ///             (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(110_000.0)),
-    ///         ])
-    ///         .forecast(ForecastSpec {
+    ///         ]);
+    ///     model_builder.forecast(ForecastSpec {
     ///             method: ForecastMethod::GrowthPct,
     ///             params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-    ///         })
-    ///         .formula("lag(revenue, 1) * 1.05")?
-    ///         .build()?
-    ///     .build()?;
+    ///         });
+    ///     model_builder.formula("lag(revenue, 1) * 1.05")?;
+    ///     let model_builder = model_builder.build()?;
+    ///     model_builder.build()?
+    /// };
     /// # Ok(())
     /// # }
     /// ```
-    #[must_use = "builder methods must be chained"]
     pub fn mixed(self, node_id: impl Into<NodeId>) -> MixedNodeBuilder {
         MixedNodeBuilder {
             parent: self,
@@ -730,26 +667,27 @@ impl ModelBuilder {
     /// # use finstack_quant_core::dates::PeriodId;
     /// # use indexmap::indexmap;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let model = ModelBuilder::new("test")
-    ///     .periods("2025Q1..Q4", Some("2025Q2"))?
-    ///     .value("revenue", &[
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("test");
+    ///     model_builder.periods("2025Q1..Q4", Some("2025Q2"))?;
+    ///     model_builder.value("revenue", &[
     ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
     ///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(110_000.0)),
-    ///     ])
-    ///     .forecast("revenue", ForecastSpec {
+    ///     ]);
+    ///     model_builder.forecast("revenue", ForecastSpec {
     ///         method: ForecastMethod::GrowthPct,
     ///         params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-    ///     })
-    ///     .build()?;
+    ///     });
+    ///     model_builder.build()?
+    /// };
     /// # Ok(())
     /// # }
     /// ```
-    #[must_use = "builder methods must be chained"]
     pub fn forecast(
-        mut self,
+        &mut self,
         node_id: impl Into<NodeId>,
         forecast_spec: crate::types::ForecastSpec,
-    ) -> Self {
+    ) -> &mut Self {
         let node_id = node_id.into();
 
         if let Some(node) = self.nodes.get_mut(node_id.as_str()) {
@@ -785,16 +723,17 @@ impl ModelBuilder {
     /// ```rust
     /// # use finstack_quant_statements::builder::ModelBuilder;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let model = ModelBuilder::new("demo")
-    ///     .periods("2025Q1..Q2", None)?
-    ///     .with_meta("currency", serde_json::json!("USD"))
-    ///     .build()?;
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("demo");
+    ///     model_builder.periods("2025Q1..Q2", None)?;
+    ///     model_builder.with_meta("currency", serde_json::json!("USD"));
+    ///     model_builder.build()?
+    /// };
     /// assert_eq!(model.meta["currency"], "USD");
     /// # Ok(())
     /// # }
     /// ```
-    #[must_use = "builder methods must be chained"]
-    pub fn with_meta(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+    pub fn with_meta(&mut self, key: impl Into<String>, value: serde_json::Value) -> &mut Self {
         self.meta.insert(key.into(), value);
         self
     }
@@ -820,17 +759,19 @@ impl ModelBuilder {
     /// # use finstack_quant_statements::types::AmountOrScalar;
     /// # use finstack_quant_core::dates::PeriodId;
     /// # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    /// let model = ModelBuilder::new("test")
-    ///     .periods("2025Q1..Q4", Some("2025Q2"))?
-    ///     .value("revenue", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(1500000.0))])
-    ///     .compute("bonus", "revenue * 0.01")?
-    ///     .where_clause("revenue > 1000000")  // Only compute bonus if revenue > 1M
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("test");
+    ///     model_builder.periods("2025Q1..Q4", Some("2025Q2"))?;
+    ///     model_builder.value("revenue", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(1500000.0))]);
+    ///     model_builder.compute("bonus", "revenue * 0.01")?;
+    ///     model_builder.where_clause("revenue > 1000000");
+    ///     model_builder
+    /// }  // Only compute bonus if revenue > 1M
     ///     .build()?;
     /// # Ok(())
     /// # }
     /// ```
-    #[must_use = "builder methods must be chained"]
-    pub fn where_clause(mut self, where_clause: impl Into<String>) -> Self {
+    pub fn where_clause(&mut self, where_clause: impl Into<String>) -> &mut Self {
         match self
             .last_node
             .as_ref()
@@ -858,12 +799,14 @@ impl ModelBuilder {
     /// ```
     /// # use finstack_quant_statements::builder::ModelBuilder;
     /// # fn main() -> finstack_quant_statements::Result<()> {
-    /// let model = ModelBuilder::new("test")
-    ///     .periods("2025Q1..Q2", None)?
-    ///     .value("revenue", &[])
-    ///     .value("cogs", &[])
-    ///     .with_builtin_metrics()?
-    ///     .build()?;
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("test");
+    ///     model_builder.periods("2025Q1..Q2", None)?;
+    ///     model_builder.value("revenue", &[]);
+    ///     model_builder.value("cogs", &[]);
+    ///     model_builder.with_builtin_metrics()?;
+    ///     model_builder.build()?
+    /// };
     ///
     /// // Now you can use metrics like fin.gross_profit
     /// assert!(model.has_node("fin.gross_profit"));
@@ -880,35 +823,15 @@ impl ModelBuilder {
     /// formulas cannot be prepared for this builder. Existing nodes are not
     /// overwritten when their identifiers match a built-in metric or one of
     /// its dependencies.
-    #[must_use = "builder methods must be chained"]
-    pub fn with_builtin_metrics(mut self) -> Result<Self> {
-        self.try_with_builtin_metrics()?;
-        Ok(self)
-    }
-
-    /// Add the built-in metric catalog in place, leaving the builder usable
-    /// on error.
-    ///
-    /// The non-consuming twin of
-    /// [`with_builtin_metrics`](Self::with_builtin_metrics) for host wrappers.
-    /// Nothing is inserted unless the whole catalog loads and resolves.
-    ///
-    /// # Errors
-    ///
-    /// Returns registry or formula errors if the built-in catalog cannot be
-    /// loaded or a built-in metric has an unresolved dependency.
-    pub fn try_with_builtin_metrics(&mut self) -> Result<&mut Self> {
+    pub fn with_builtin_metrics(&mut self) -> Result<&mut Self> {
         let registry = crate::registry::Registry::with_builtins()?;
-        self.add_all_metrics_from_registry_in_place(&registry)?;
+        self.add_all_metrics_from_registry_in_place(&registry);
         Ok(self)
     }
 
     /// Add every metric from a loaded registry to the model, qualifying
     /// same-namespace references in the generated formulas.
-    fn add_all_metrics_from_registry_in_place(
-        &mut self,
-        registry: &crate::registry::Registry,
-    ) -> Result<()> {
+    fn add_all_metrics_from_registry_in_place(&mut self, registry: &crate::registry::Registry) {
         let mut namespace_cache: IndexMap<String, IndexSet<String>> = IndexMap::new();
         for (qualified_id, stored_metric) in registry.all_metrics() {
             // A user node with a built-in metric's id wins, as documented.
@@ -930,7 +853,6 @@ impl ModelBuilder {
             };
             self.insert_metric_node(qualified_id, stored_metric, formula);
         }
-        Ok(())
     }
 
     /// Add a specific metric from a registry.
@@ -951,13 +873,15 @@ impl ModelBuilder {
     /// let mut registry = Registry::new();
     /// registry.load_builtins()?;
     ///
-    /// let model = ModelBuilder::new("test")
-    ///     .periods("2025Q1..Q2", None)?
-    ///     .value("revenue", &[])
-    ///     .value("cogs", &[])
-    ///     .add_metric_from_registry("fin.gross_profit", &registry)?
-    ///     .add_metric_from_registry("fin.gross_margin", &registry)?
-    ///     .build()?;
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("test");
+    ///     model_builder.periods("2025Q1..Q2", None)?;
+    ///     model_builder.value("revenue", &[]);
+    ///     model_builder.value("cogs", &[]);
+    ///     model_builder.add_metric_from_registry("fin.gross_profit", &registry)?;
+    ///     model_builder.add_metric_from_registry("fin.gross_margin", &registry)?;
+    ///     model_builder.build()?
+    /// };
     /// # Ok(())
     /// # }
     /// ```
@@ -973,42 +897,14 @@ impl ModelBuilder {
     /// Returns a registry error if `qualified_id` is not in
     /// `namespace.metric_id` form, is unknown to `registry`, or any dependency
     /// is unavailable. It also propagates errors while obtaining the
-    /// dependency order. The builder is consumed, so callers should retain
-    /// validation at [`build`](Self::build) as the final model-level check.
+    /// dependency order. A failed lookup leaves the builder unchanged.
+    /// [`build`](Self::build) performs the final model-level validation.
     pub fn add_metric_from_registry(
-        mut self,
-        qualified_id: &str,
-        registry: &crate::registry::Registry,
-    ) -> Result<Self> {
-        self.try_add_metric_from_registry(qualified_id, registry)?;
-        Ok(self)
-    }
-
-    /// Add one registry metric in place, leaving the builder usable on error.
-    ///
-    /// The non-consuming twin of
-    /// [`add_metric_from_registry`](Self::add_metric_from_registry): the
-    /// metric and its dependency order are resolved before any node is
-    /// inserted, so an unknown `qualified_id` (a routine typo) leaves the
-    /// builder exactly as it was.
-    ///
-    /// # Arguments
-    ///
-    /// * `qualified_id` - Fully qualified metric identifier in
-    ///   `namespace.metric_id` form (e.g. `"fin.gross_margin"`)
-    /// * `registry` - Registry the metric and its dependencies are read from
-    ///
-    /// # Errors
-    ///
-    /// Returns a registry-not-found error if `qualified_id` is unknown to
-    /// `registry`, or a registry error if it is malformed or a dependency
-    /// cannot be resolved.
-    pub fn try_add_metric_from_registry(
         &mut self,
         qualified_id: &str,
         registry: &crate::registry::Registry,
     ) -> Result<&mut Self> {
-        let dependencies = registry.get_metric_dependencies(qualified_id)?;
+        let dependencies = registry.get_dependencies(qualified_id)?;
 
         let namespace = qualified_id
             .split('.')
@@ -1019,6 +915,7 @@ impl ModelBuilder {
             )))?;
         let metrics_in_namespace = Self::metric_ids_in_namespace(registry, namespace);
 
+        let mut pending = Vec::new();
         for dep_id in dependencies {
             if !self.nodes.contains_key(dep_id.as_str()) {
                 let dep_metric = registry.get(&dep_id)?;
@@ -1029,7 +926,7 @@ impl ModelBuilder {
                     namespace,
                 );
 
-                self.insert_metric_node(&dep_id, dep_metric, formula);
+                pending.push((dep_id, dep_metric, formula));
             }
         }
 
@@ -1042,9 +939,12 @@ impl ModelBuilder {
                 namespace,
             );
 
-            self.insert_metric_node(qualified_id, stored_metric, formula);
+            pending.push((qualified_id.to_string(), stored_metric, formula));
         }
 
+        for (id, metric, formula) in pending {
+            self.insert_metric_node(&id, metric, formula);
+        }
         Ok(self)
     }
 
@@ -1120,11 +1020,13 @@ impl MixedNodeBuilder {
     /// # use finstack_quant_core::dates::PeriodId;
     /// # use finstack_quant_statements::types::AmountOrScalar;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let builder = ModelBuilder::new("demo")
-    ///     .periods("2025Q1..Q2", None)?
-    ///     .mixed("revenue")
-    ///     .values(&[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))])
-    ///     .build()?;
+    /// let builder = {
+    ///     let mut model_builder = ModelBuilder::new("demo");
+    ///     model_builder.periods("2025Q1..Q2", None)?;
+    ///     let mut model_builder = model_builder.mixed("revenue");
+    ///     model_builder.values(&[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))]);
+    ///     model_builder.build()?
+    /// };
     /// # Ok(())
     /// # }
     /// ```
@@ -1135,8 +1037,7 @@ impl MixedNodeBuilder {
     /// is not valid Statements DSL. The formula is checked immediately, but
     /// reference resolution and type compatibility remain part of the parent
     /// model's final [`ModelBuilder::build`] validation.
-    #[must_use = "builder methods must be chained"]
-    pub fn values(mut self, values: &[(PeriodId, AmountOrScalar)]) -> Self {
+    pub fn values(&mut self, values: &[(PeriodId, AmountOrScalar)]) -> &mut Self {
         self.values = Some(values.iter().cloned().collect());
         self
     }
@@ -1152,16 +1053,17 @@ impl MixedNodeBuilder {
     /// # use finstack_quant_statements::builder::ModelBuilder;
     /// # use finstack_quant_statements::types::ForecastSpec;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let builder = ModelBuilder::new("demo")
-    ///     .periods("2025Q1..Q2", None)?
-    ///     .mixed("revenue")
-    ///     .forecast(ForecastSpec::forward_fill())
-    ///     .build()?;
+    /// let builder = {
+    ///     let mut model_builder = ModelBuilder::new("demo");
+    ///     model_builder.periods("2025Q1..Q2", None)?;
+    ///     let mut model_builder = model_builder.mixed("revenue");
+    ///     model_builder.forecast(ForecastSpec::forward_fill());
+    ///     model_builder.build()?
+    /// };
     /// # Ok(())
     /// # }
     /// ```
-    #[must_use = "builder methods must be chained"]
-    pub fn forecast(mut self, forecast_spec: crate::types::ForecastSpec) -> Self {
+    pub fn forecast(&mut self, forecast_spec: crate::types::ForecastSpec) -> &mut Self {
         self.forecast = Some(forecast_spec);
         self
     }
@@ -1178,12 +1080,14 @@ impl MixedNodeBuilder {
     /// # use finstack_quant_core::dates::PeriodId;
     /// # use finstack_quant_statements::types::AmountOrScalar;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let builder = ModelBuilder::new("demo")
-    ///     .periods("2025Q1..Q2", None)?
-    ///     .mixed("revenue")
-    ///     .values(&[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))])
-    ///     .formula("lag(revenue, 1)")?
-    ///     .build()?;
+    /// let builder = {
+    ///     let mut model_builder = ModelBuilder::new("demo");
+    ///     model_builder.periods("2025Q1..Q2", None)?;
+    ///     let mut model_builder = model_builder.mixed("revenue");
+    ///     model_builder.values(&[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))]);
+    ///     model_builder.formula("lag(revenue, 1)")?;
+    ///     model_builder.build()?
+    /// };
     /// # Ok(())
     /// # }
     /// ```
@@ -1197,29 +1101,7 @@ impl MixedNodeBuilder {
     /// Returns a formula parse or compilation error if `formula` is blank or
     /// invalid Statements DSL. It does not yet verify that referenced nodes
     /// exist or that their units are compatible.
-    #[must_use = "builder methods must be chained"]
-    pub fn formula(mut self, formula: impl Into<String>) -> Result<Self> {
-        self.try_formula(formula)?;
-        Ok(self)
-    }
-
-    /// Set the fallback formula in place, leaving the builder usable on error.
-    ///
-    /// The non-consuming twin of [`formula`](Self::formula): the formula is
-    /// syntax-checked before it is stored, so a host wrapper holding this
-    /// builder behind a mutable reference keeps its values, forecast, and
-    /// parent model when the formula has a typo.
-    ///
-    /// # Arguments
-    ///
-    /// * `formula` - DSL expression evaluated when neither an explicit value
-    ///   nor a forecast resolves for a period
-    ///
-    /// # Errors
-    ///
-    /// Returns a formula parse or compilation error if `formula` is blank or
-    /// invalid Statements DSL.
-    pub fn try_formula(&mut self, formula: impl Into<String>) -> Result<&mut Self> {
+    pub fn formula(&mut self, formula: impl Into<String>) -> Result<&mut Self> {
         let formula = formula.into();
 
         if formula.trim().is_empty() {
@@ -1246,16 +1128,17 @@ impl MixedNodeBuilder {
     /// ```rust
     /// # use finstack_quant_statements::builder::ModelBuilder;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let builder = ModelBuilder::new("demo")
-    ///     .periods("2025Q1..Q2", None)?
-    ///     .mixed("revenue")
-    ///     .name("Revenue (actual + forecast)")
-    ///     .build()?;
+    /// let builder = {
+    ///     let mut model_builder = ModelBuilder::new("demo");
+    ///     model_builder.periods("2025Q1..Q2", None)?;
+    ///     let mut model_builder = model_builder.mixed("revenue");
+    ///     model_builder.name("Revenue (actual + forecast)");
+    ///     model_builder.build()?
+    /// };
     /// # Ok(())
     /// # }
     /// ```
-    #[must_use = "builder methods must be chained"]
-    pub fn name(mut self, name: impl Into<String>) -> Self {
+    pub fn name(&mut self, name: impl Into<String>) -> &mut Self {
         self.name = Some(name.into());
         self
     }
@@ -1274,14 +1157,16 @@ impl MixedNodeBuilder {
     /// # use finstack_quant_statements::types::ForecastSpec;
     /// # use finstack_quant_core::dates::PeriodId;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let model = ModelBuilder::new("demo")
-    ///     .periods("2025Q1..Q2", None)?
-    ///     .mixed("revenue")
-    ///         .values(&[(PeriodId::quarter(2025, 1).expect("valid period fixture"), 100.0.into())])
-    ///         .forecast(ForecastSpec::forward_fill())
-    ///         .formula("lag(revenue, 1)")?
-    ///         .build()?
-    ///     .build()?;
+    /// let model = {
+    ///     let mut model_builder = ModelBuilder::new("demo");
+    ///     model_builder.periods("2025Q1..Q2", None)?;
+    ///     let mut model_builder = model_builder.mixed("revenue");
+    ///     model_builder.values(&[(PeriodId::quarter(2025, 1).expect("valid period fixture"), 100.0.into())]);
+    ///     model_builder.forecast(ForecastSpec::forward_fill());
+    ///     model_builder.formula("lag(revenue, 1)")?;
+    ///     let model_builder = model_builder.build()?;
+    ///     model_builder.build()?
+    /// };
     /// # Ok(())
     /// # }
     /// ```
@@ -1292,7 +1177,6 @@ impl MixedNodeBuilder {
     /// prefix or shadows a Statements DSL keyword. Formula syntax, forecast
     /// compatibility, period coverage, and cross-node references are validated
     /// later when the parent builder is finalized.
-    #[must_use = "builder methods must be chained"]
     pub fn build(mut self) -> Result<ModelBuilder> {
         validate_node_id(self.node_id.as_str())?;
 
@@ -1324,12 +1208,17 @@ mod tests {
     #[test]
     fn builtin_metrics_do_not_overwrite_an_existing_node() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let builder = ModelBuilder::new("user-roe")
-            .periods("2025Q1..Q1", None)
-            .expect("valid periods")
-            .value("fin.roe", &[(period, AmountOrScalar::scalar(0.12))])
-            .with_builtin_metrics()
-            .expect("built-in catalog loads");
+        let builder = {
+            let mut model_builder_1 = ModelBuilder::new("user-roe");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("valid periods");
+            model_builder_1.value("fin.roe", &[(period, AmountOrScalar::scalar(0.12))]);
+            model_builder_1
+                .with_builtin_metrics()
+                .expect("built-in catalog loads");
+            model_builder_1
+        };
 
         let roe = builder.nodes().get("fin.roe").expect("node kept");
         assert_eq!(roe.node_type, NodeType::Value);
@@ -1340,20 +1229,25 @@ mod tests {
     #[test]
     fn where_clause_targets_a_redefined_node_not_the_last_map_slot() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("where-target")
-            .periods("2025Q1..Q1", None)
-            .expect("valid periods")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-            .compute("bonus", "revenue * 0.1")
-            .expect("valid formula")
-            .compute("tax", "revenue * 0.2")
-            .expect("valid formula")
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("where-target");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("valid periods");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder_1
+                .compute("bonus", "revenue * 0.1")
+                .expect("valid formula");
+            model_builder_1
+                .compute("tax", "revenue * 0.2")
+                .expect("valid formula");
             // Redefining `bonus` keeps its original slot ahead of `tax`.
-            .compute("bonus", "revenue * 0.5")
-            .expect("valid formula")
-            .where_clause("revenue > 1000")
-            .build()
-            .expect("model builds");
+            model_builder_1
+                .compute("bonus", "revenue * 0.5")
+                .expect("valid formula");
+            model_builder_1.where_clause("revenue > 1000");
+            model_builder_1.build().expect("model builds")
+        };
 
         let where_text = |id: &str| model.get_node(id).expect("node exists").where_text.clone();
         assert_eq!(where_text("bonus").as_deref(), Some("revenue > 1000"));
@@ -1363,15 +1257,17 @@ mod tests {
     #[test]
     fn where_clause_targets_a_node_modified_by_forecast() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("where-forecast")
-            .periods("2025Q1..Q2", Some("2025Q1"))
-            .expect("valid periods")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
-            .value("costs", &[(period, AmountOrScalar::scalar(40.0))])
-            .forecast("revenue", crate::types::ForecastSpec::forward_fill())
-            .where_clause("costs > 0")
-            .build()
-            .expect("model builds");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("where-forecast");
+            model_builder_1
+                .periods("2025Q1..Q2", Some("2025Q1"))
+                .expect("valid periods");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder_1.value("costs", &[(period, AmountOrScalar::scalar(40.0))]);
+            model_builder_1.forecast("revenue", crate::types::ForecastSpec::forward_fill());
+            model_builder_1.where_clause("costs > 0");
+            model_builder_1.build().expect("model builds")
+        };
 
         let where_text = |id: &str| model.get_node(id).expect("node exists").where_text.clone();
         assert_eq!(where_text("revenue").as_deref(), Some("costs > 0"));
@@ -1381,15 +1277,20 @@ mod tests {
     #[test]
     fn test_formula_references_require_exact_node_ids() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = ModelBuilder::new("alias-test")
-            .periods("2025Q1..Q1", None)
-            .expect("valid periods")
-            .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
-            .value("cogs", &[(period, AmountOrScalar::scalar(40_000.0))])
-            .compute("gross_profit", "rev - cogs")
-            .expect("valid formula")
-            .build()
-            .expect("formula references are checked when preparing evaluation");
+        let model = {
+            let mut model_builder_1 = ModelBuilder::new("alias-test");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("valid periods");
+            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))]);
+            model_builder_1.value("cogs", &[(period, AmountOrScalar::scalar(40_000.0))]);
+            model_builder_1
+                .compute("gross_profit", "rev - cogs")
+                .expect("valid formula");
+            model_builder_1
+                .build()
+                .expect("formula references are checked when preparing evaluation")
+        };
 
         let mut evaluator = Evaluator::new();
         let error = evaluator
@@ -1403,10 +1304,12 @@ mod tests {
     #[test]
     fn test_build_rejects_cross_currency_addition() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let result = ModelBuilder::new("dimension-test")
-            .periods("2025Q1..Q1", None)
-            .expect("valid periods")
-            .value_money(
+        let result = {
+            let mut model_builder_1 = ModelBuilder::new("dimension-test");
+            model_builder_1
+                .periods("2025Q1..Q1", None)
+                .expect("valid periods");
+            model_builder_1.value_money(
                 "usd_revenue",
                 &[(
                     period,
@@ -1415,8 +1318,8 @@ mod tests {
                         finstack_quant_core::currency::Currency::USD,
                     )),
                 )],
-            )
-            .value_money(
+            );
+            model_builder_1.value_money(
                 "eur_cost",
                 &[(
                     period,
@@ -1425,10 +1328,12 @@ mod tests {
                         finstack_quant_core::currency::Currency::EUR,
                     )),
                 )],
-            )
-            .compute("bad_total", "usd_revenue + eur_cost")
-            .expect("formula syntax is valid")
-            .build();
+            );
+            model_builder_1
+                .compute("bad_total", "usd_revenue + eur_cost")
+                .expect("formula syntax is valid");
+            model_builder_1.build()
+        };
 
         assert!(result.is_err());
         assert!(result

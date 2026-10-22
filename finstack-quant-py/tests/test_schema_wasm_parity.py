@@ -56,12 +56,6 @@ REGISTRIES: dict[str, tuple[Any, str]] = {
 }
 # A payload no published object schema accepts, sent as JSON text by both hosts.
 INVALID_PAYLOAD = '{"not_a_field": 1}'
-NAMED_ACCESSORS: dict[str, tuple[Any, list[str]]] = {
-    "statements": (
-        statements.schema,
-        ["financial_model_spec_schema", "normalization_config_schema", "statement_result_schema"],
-    ),
-}
 
 
 def _summary(text: str) -> dict[str, Any]:
@@ -102,10 +96,6 @@ def _cases() -> dict[str, Any]:
         "invalid_payload": INVALID_PAYLOAD,
         "registries": registries,
         "domains": finstack_quant.schema.domains(),
-        "named": {
-            path: {name: _summary(getattr(module, name)()) for name in names}
-            for path, (module, names) in NAMED_ACCESSORS.items()
-        },
         "cashflows_resources": {uri: _summary(text) for uri, text in resources.items()},
         "instrument": {
             "json": instrument_json,

@@ -465,8 +465,11 @@ mod tests {
             50.0,
         );
 
-        let adj = Adjustment::fixed("syn", "Synergies", amounts)
-            .with_cap(Some("EBITDA".to_string()), 0.20);
+        let adj = Adjustment::fixed("syn", "Synergies", amounts).with_cap(
+            Some("EBITDA".to_string()),
+            0.20,
+            CapBaseMode::Reported,
+        );
 
         let config = NormalizationConfig::new("EBITDA")
             .add_adjustment(adj)
@@ -530,7 +533,7 @@ mod tests {
     /// outcomes must numerically diverge once an earlier adjustment has
     /// widened (or narrowed) the running total.
     #[test]
-    fn self_referential_cap_default_uses_reported_base_while_progressive_uses_adjusted_base() {
+    fn self_referential_cap_reported_and_progressive_bases() {
         let results = mock_results();
 
         let mut addback_amounts = IndexMap::new();
@@ -546,17 +549,20 @@ mod tests {
             40.0,
         );
 
-        // Omitted base_mode: `with_cap` uses `CapBaseMode::default()`.
-        let default_second = Adjustment::fixed("second", "Second", second_amounts.clone())
-            .with_cap(Some("EBITDA".to_string()), 0.30);
+        // Reported caps use the target value before any adjustments.
+        let reported_second = Adjustment::fixed("second", "Second", second_amounts.clone())
+            .with_cap(Some("EBITDA".to_string()), 0.30, CapBaseMode::Reported);
         // Explicit Progressive base mode.
-        let progressive_second = Adjustment::fixed("second", "Second", second_amounts)
-            .with_cap_mode(Some("EBITDA".to_string()), 0.30, CapBaseMode::Progressive);
+        let progressive_second = Adjustment::fixed("second", "Second", second_amounts).with_cap(
+            Some("EBITDA".to_string()),
+            0.30,
+            CapBaseMode::Progressive,
+        );
 
-        let default_config = NormalizationConfig::new("EBITDA")
+        let reported_config = NormalizationConfig::new("EBITDA")
             .add_adjustment(addback.clone())
             .expect("unique adjustment id")
-            .add_adjustment(default_second)
+            .add_adjustment(reported_second)
             .expect("unique adjustment id");
         let progressive_config = NormalizationConfig::new("EBITDA")
             .add_adjustment(addback)
@@ -564,19 +570,19 @@ mod tests {
             .add_adjustment(progressive_second)
             .expect("unique adjustment id");
 
-        let default_result =
-            normalize(&results, &default_config).expect("default reported-base cap normalizes");
+        let reported_result =
+            normalize(&results, &reported_config).expect("reported-base cap normalizes");
         let progressive_result = normalize(&results, &progressive_config)
             .expect("explicit progressive-base cap normalizes");
 
-        let default_capped = default_result[0].adjustments[1].capped_amount;
+        let reported_capped = reported_result[0].adjustments[1].capped_amount;
         let progressive_capped = progressive_result[0].adjustments[1].capped_amount;
 
         // Reported EBITDA is 100.0; the cap room does not widen from the
         // prior 20.0 addback: 100.0 * 0.30 = 30.0.
         assert_eq!(
-            default_capped, 30.0,
-            "omitted base_mode must cap against the reported (pre-adjustment) EBITDA"
+            reported_capped, 30.0,
+            "Reported must cap against the reported (pre-adjustment) EBITDA"
         );
         // Progressive base is 100.0 + 20.0 (running total after the prior
         // addback): (100.0 + 20.0) * 0.30 = 36.0.
@@ -585,10 +591,10 @@ mod tests {
             "explicit Progressive must cap against the running adjusted base"
         );
         assert_ne!(
-            default_capped, progressive_capped,
-            "default and Progressive self-referential caps must diverge after a prior adjustment"
+            reported_capped, progressive_capped,
+            "Reported and Progressive self-referential caps must diverge after a prior adjustment"
         );
-        assert!(default_result[0].adjustments[1].is_capped);
+        assert!(reported_result[0].adjustments[1].is_capped);
         assert!(progressive_result[0].adjustments[1].is_capped);
     }
 
@@ -608,8 +614,11 @@ mod tests {
             50.0,
         );
 
-        let adj = Adjustment::fixed("syn", "Synergies", amounts)
-            .with_cap(Some("EBITDA".to_string()), 0.20);
+        let adj = Adjustment::fixed("syn", "Synergies", amounts).with_cap(
+            Some("EBITDA".to_string()),
+            0.20,
+            CapBaseMode::Reported,
+        );
         let config = NormalizationConfig::new("EBITDA")
             .add_adjustment(adj)
             .expect("unique adjustment id");

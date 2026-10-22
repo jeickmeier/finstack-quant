@@ -9,6 +9,7 @@ use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::extract::{label, parse_label};
 use crate::bindings::macros::wire_methods;
+use crate::bindings::pydoc::pydoc;
 use crate::errors::statements_to_py;
 use finstack_quant_statements::capital_structure::{
     CapitalStructureCashflows, EcfSweepSpec, PaymentClassSpec, PaymentPriority, PikToggleSpec,
@@ -205,43 +206,13 @@ wire_methods!(PyPikToggleSpec, PikToggleSpec, "PikToggleSpec");
 
 #[pymethods]
 impl PyPikToggleSpec {
-    /// Construct a PIK toggle spec.
-    ///
-    /// Parameters
-    /// ----------
-    /// liquidity_metric : str
-    ///     Node reference or DSL formula for the liquidity signal (a balance
-    ///     such as ``"cash_balance"`` or a ratio such as
-    ///     ``"ebitda / interest_expense"``).
-    /// threshold : float
-    ///     PIK triggers when ``metric < threshold``. Expressed in the same
-    ///     units as ``liquidity_metric`` — currency amount for a balance,
-    ///     unitless for a ratio.
-    /// target_instrument_ids : list[str] | None
-    ///     Explicit nonempty borrowing-debt identifiers whose cash coupons may
-    ///     capitalize into principal. Instrument-level PIK capability is not
-    ///     modeled, so ``None`` and empty lists are rejected by :meth:`validate`
-    ///     and :meth:`WaterfallSpec.validate` (they do not mean "every
-    ///     instrument"); model validation also rejects hedge or option targets.
-    ///     Construction stores this specification unvalidated.
-    /// min_periods_in_pik : int
-    ///     Hysteresis floor counted in **periods** on the model's own cadence
-    ///     (not months): once triggered, PIK stays on for at least this many
-    ///     periods. Default 0 lets PIK toggle every period.
+    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.__init__")]
     #[new]
-    #[pyo3(
-        signature = (
-            liquidity_metric,
-            threshold,
-            target_instrument_ids=None,
-            min_periods_in_pik=0,
-        ),
-        text_signature = "(liquidity_metric, threshold, target_instrument_ids=None, min_periods_in_pik=0)"
-    )]
+    #[pyo3(signature = (liquidity_metric, threshold, target_instrument_ids, min_periods_in_pik=0))]
     fn new(
         liquidity_metric: String,
         threshold: f64,
-        target_instrument_ids: Option<Vec<String>>,
+        target_instrument_ids: Vec<String>,
         min_periods_in_pik: usize,
     ) -> Self {
         Self {
@@ -254,69 +225,35 @@ impl PyPikToggleSpec {
         }
     }
 
-    /// Validate the toggle on its own (the Rust ``PikToggleSpec::validate``).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``target_instrument_ids`` is ``None`` or empty.
-    #[pyo3(text_signature = "($self)")]
+    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.validate")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(statements_to_py)
     }
 
-    /// Node reference or DSL formula producing the liquidity signal.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     A node id (``"cash_balance"``) or an expression
-    ///     (``"ebitda / interest_expense"``). Whether the value is monetary
-    ///     or a unitless ratio depends on the expression — the threshold must
-    ///     use the same units.
+    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.liquidity_metric")]
     #[getter]
     fn liquidity_metric(&self) -> &str {
         &self.inner.liquidity_metric
     }
 
-    /// Level below which interest accrues as PIK instead of cash.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Threshold in the **same units as the liquidity metric** — a
-    ///     currency amount when the metric is a balance, a unitless ratio
-    ///     when it is a coverage ratio. PIK triggers when
-    ///     ``metric < threshold``.
+    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.threshold")]
     #[getter]
     fn threshold(&self) -> f64 {
         self.inner.threshold
     }
 
-    /// Explicit borrowing-debt targets, or ``None`` in an incomplete specification.
-    ///
-    /// ``None`` and empty lists fail waterfall validation. Model validation
-    /// rejects swaps and options because their cashflows cannot capitalize
-    /// into borrowing principal.
+    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.target_instrument_ids")]
     #[getter]
-    fn target_instrument_ids(&self) -> Option<Vec<String>> {
+    fn target_instrument_ids(&self) -> Vec<String> {
         self.inner.target_instrument_ids.clone()
     }
 
-    /// Hysteresis floor: minimum time PIK stays on once triggered.
-    ///
-    /// Returns
-    /// -------
-    /// int
-    ///     Count in **periods** on the model's own cadence (quarters for a
-    ///     quarterly model), not months. ``0`` disables hysteresis, letting
-    ///     PIK toggle every period.
+    #[doc = pydoc!("finstack_quant.statements", "PikToggleSpec.min_periods_in_pik")]
     #[getter]
     fn min_periods_in_pik(&self) -> usize {
         self.inner.min_periods_in_pik
     }
 
-    /// Return the representation with metric, threshold and hysteresis.
     fn __repr__(&self) -> String {
         format!(
             "PikToggleSpec(liquidity_metric={:?}, threshold={}, min_periods_in_pik={})",
@@ -682,302 +619,17 @@ impl PyCapitalStructureCashflows {
         self.inner.reporting_currency.map(|c| c.to_string())
     }
 
-    /// Total interest expense (cash + PIK) for one instrument and period.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Amount in the instrument's currency.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If the instrument or period is unknown.
-    /// ValueError
-    ///     If ``period`` is not a valid period id.
-    #[pyo3(text_signature = "($self, instrument_id, period)")]
-    fn get_interest(&self, instrument_id: &str, period: &str) -> PyResult<f64> {
-        let pid = super::parse_period_id(period)?;
+    #[doc = pydoc!("finstack_quant.statements", "CapitalStructureCashflows.get_component")]
+    #[pyo3(text_signature = "($self, component, instrument_or_total, period_id)")]
+    fn get_component(
+        &self,
+        component: &str,
+        instrument_or_total: &str,
+        period_id: &str,
+    ) -> PyResult<f64> {
+        let pid = super::parse_period_id(period_id)?;
         self.inner
-            .get_interest(instrument_id, &pid)
-            .map_err(statements_to_py)
-    }
-
-    /// Cash interest expense for one instrument and period.
-    #[pyo3(text_signature = "($self, instrument_id, period)")]
-    fn get_interest_cash(&self, instrument_id: &str, period: &str) -> PyResult<f64> {
-        let pid = super::parse_period_id(period)?;
-        self.inner
-            .get_interest_cash(instrument_id, &pid)
-            .map_err(statements_to_py)
-    }
-
-    /// PIK (non-cash) interest accrued for one instrument and period.
-    #[pyo3(text_signature = "($self, instrument_id, period)")]
-    fn get_interest_pik(&self, instrument_id: &str, period: &str) -> PyResult<f64> {
-        let pid = super::parse_period_id(period)?;
-        self.inner
-            .get_interest_pik(instrument_id, &pid)
-            .map_err(statements_to_py)
-    }
-
-    /// Principal repaid for one instrument and period.
-    #[pyo3(text_signature = "($self, instrument_id, period)")]
-    fn get_principal(&self, instrument_id: &str, period: &str) -> PyResult<f64> {
-        let pid = super::parse_period_id(period)?;
-        self.inner
-            .get_principal(instrument_id, &pid)
-            .map_err(statements_to_py)
-    }
-
-    /// Return one instrument's borrowing principal at the inclusive period end.
-    ///
-    /// Parameters
-    /// ----------
-    /// instrument_id : str
-    ///     Capital-structure identifier of the debt or rate hedge to inspect.
-    /// period : str
-    ///     Reporting-period label such as ``"2025Q1"``, matching this result.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Closing borrowing principal in the instrument's native currency.
-    ///     Rate hedges, including interest-rate swaps, return zero; their trade
-    ///     notional is not borrowing principal.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``period`` is not a valid reporting-period label.
-    /// RuntimeError
-    ///     If the instrument-period breakdown is absent.
-    #[pyo3(text_signature = "($self, instrument_id, period)")]
-    fn get_debt_balance(&self, instrument_id: &str, period: &str) -> PyResult<f64> {
-        let pid = super::parse_period_id(period)?;
-        self.inner
-            .get_debt_balance(instrument_id, &pid)
-            .map_err(statements_to_py)
-    }
-
-    /// Fees paid for one instrument and period.
-    #[pyo3(text_signature = "($self, instrument_id, period)")]
-    fn get_fees(&self, instrument_id: &str, period: &str) -> PyResult<f64> {
-        let pid = super::parse_period_id(period)?;
-        self.inner
-            .get_fees(instrument_id, &pid)
-            .map_err(statements_to_py)
-    }
-
-    /// Return debt interest accrued but unpaid at the inclusive period end.
-    ///
-    /// Parameters
-    /// ----------
-    /// instrument_id : str
-    ///     Capital-structure identifier of the debt or rate hedge to inspect.
-    /// period : str
-    ///     Reporting-period label such as ``"2025Q1"``, matching this result.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Unpaid debt coupon accrual in the instrument's native currency.
-    ///     Rate hedges, including interest-rate swaps, return zero; this debt
-    ///     accrual accessor does not report hedge mark-to-market or leg accruals.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``period`` is not a valid reporting-period label.
-    /// RuntimeError
-    ///     If the instrument-period breakdown is absent.
-    #[pyo3(text_signature = "($self, instrument_id, period)")]
-    fn get_accrued_interest(&self, instrument_id: &str, period: &str) -> PyResult<f64> {
-        let pid = super::parse_period_id(period)?;
-        self.inner
-            .get_accrued_interest(instrument_id, &pid)
-            .map_err(statements_to_py)
-    }
-
-    /// Total interest expense (cash + PIK) across instruments for a period,
-    /// in the reporting currency.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If the period has no totals.
-    #[pyo3(text_signature = "($self, period)")]
-    fn get_total_interest(&self, period: &str) -> PyResult<f64> {
-        let pid = super::parse_period_id(period)?;
-        self.inner
-            .get_total_interest(&pid)
-            .map_err(statements_to_py)
-    }
-
-    /// Total principal repaid across instruments for a period.
-    #[pyo3(text_signature = "($self, period)")]
-    fn get_total_principal(&self, period: &str) -> PyResult<f64> {
-        let pid = super::parse_period_id(period)?;
-        self.inner
-            .get_total_principal(&pid)
-            .map_err(statements_to_py)
-    }
-
-    /// Total debt balance across instruments at period end.
-    #[pyo3(text_signature = "($self, period)")]
-    fn get_total_debt_balance(&self, period: &str) -> PyResult<f64> {
-        let pid = super::parse_period_id(period)?;
-        self.inner
-            .get_total_debt_balance(&pid)
-            .map_err(statements_to_py)
-    }
-
-    /// Total fees across instruments for a period.
-    #[pyo3(text_signature = "($self, period)")]
-    fn get_total_fees(&self, period: &str) -> PyResult<f64> {
-        let pid = super::parse_period_id(period)?;
-        self.inner.get_total_fees(&pid).map_err(statements_to_py)
-    }
-
-    /// Total cash interest expense across instruments for a period.
-    ///
-    /// Parameters
-    /// ----------
-    /// period : str
-    ///     Reporting-period label such as ``"2025Q1"``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Cash interest expense in the reporting currency.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``period`` is not a valid period id.
-    /// RuntimeError
-    ///     If the period has no totals or the instruments span several
-    ///     currencies without a reporting currency.
-    #[pyo3(text_signature = "($self, period)")]
-    fn get_total_interest_cash(&self, period: &str) -> PyResult<f64> {
-        let pid = super::parse_period_id(period)?;
-        self.inner
-            .get_total_interest_cash(&pid)
-            .map_err(statements_to_py)
-    }
-
-    /// Total cash interest received across instruments for a period.
-    ///
-    /// Includes net hedge receipts and receipts from negative-rate debt
-    /// coupons; zero when nothing was received.
-    ///
-    /// Parameters
-    /// ----------
-    /// period : str
-    ///     Reporting-period label such as ``"2025Q1"``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Interest income in the reporting currency.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``period`` is not a valid period id.
-    /// RuntimeError
-    ///     If the period has no totals or the instruments span several
-    ///     currencies without a reporting currency.
-    #[pyo3(text_signature = "($self, period)")]
-    fn get_total_interest_income(&self, period: &str) -> PyResult<f64> {
-        let pid = super::parse_period_id(period)?;
-        self.inner
-            .get_total_interest_income(&pid)
-            .map_err(statements_to_py)
-    }
-
-    /// Total PIK (non-cash) interest accrued across instruments for a period.
-    ///
-    /// Parameters
-    /// ----------
-    /// period : str
-    ///     Reporting-period label such as ``"2025Q1"``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     PIK interest in the reporting currency.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``period`` is not a valid period id.
-    /// RuntimeError
-    ///     If the period has no totals or the instruments span several
-    ///     currencies without a reporting currency.
-    #[pyo3(text_signature = "($self, period)")]
-    fn get_total_interest_pik(&self, period: &str) -> PyResult<f64> {
-        let pid = super::parse_period_id(period)?;
-        self.inner
-            .get_total_interest_pik(&pid)
-            .map_err(statements_to_py)
-    }
-
-    /// Total accrued-but-unpaid debt interest across instruments at period end.
-    ///
-    /// Parameters
-    /// ----------
-    /// period : str
-    ///     Reporting-period label such as ``"2025Q1"``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Accrued interest in the reporting currency.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``period`` is not a valid period id.
-    /// RuntimeError
-    ///     If the period has no totals or the instruments span several
-    ///     currencies without a reporting currency.
-    #[pyo3(text_signature = "($self, period)")]
-    fn get_total_accrued_interest(&self, period: &str) -> PyResult<f64> {
-        let pid = super::parse_period_id(period)?;
-        self.inner
-            .get_total_accrued_interest(&pid)
-            .map_err(statements_to_py)
-    }
-
-    /// Cash interest received for one instrument and period.
-    ///
-    /// Includes net hedge receipts and receipts from negative-rate debt
-    /// coupons; zero when nothing was received.
-    ///
-    /// Parameters
-    /// ----------
-    /// instrument_id : str
-    ///     Capital-structure identifier of the instrument to inspect.
-    /// period : str
-    ///     Reporting-period label such as ``"2025Q1"``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Interest income in the instrument's native currency.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``period`` is not a valid period id.
-    /// RuntimeError
-    ///     If the instrument-period breakdown is absent.
-    #[pyo3(text_signature = "($self, instrument_id, period)")]
-    fn get_interest_income(&self, instrument_id: &str, period: &str) -> PyResult<f64> {
-        let pid = super::parse_period_id(period)?;
-        self.inner
-            .get_interest_income(instrument_id, &pid)
+            .get_component(component, instrument_or_total, &pid)
             .map_err(statements_to_py)
     }
 
@@ -985,7 +637,7 @@ impl PyCapitalStructureCashflows {
     ///
     /// Populated for every evaluation with capital-structure flows, including
     /// multi-currency structures without a reporting currency (where
-    /// ``to_totals_dataframe`` and the ``get_total_*`` accessors have nothing
+    /// ``to_totals_dataframe`` and the ``get_component(..., "total", ...)`` lookups have nothing
     /// to report).
     ///
     /// Returns

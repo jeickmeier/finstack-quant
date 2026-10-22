@@ -43,15 +43,17 @@
 //!
 //! # fn main() -> Result<()> {
 //! // Build a simple P&L model
-//! let model = ModelBuilder::new("Acme Corp")
-//!     .periods("2025Q1..Q4", Some("2025Q2"))?
-//!     .value("revenue", &[
+//! let model = {
+//!     let mut model_builder = ModelBuilder::new("Acme Corp");
+//!     model_builder.periods("2025Q1..Q4", Some("2025Q2"))?;
+//!     model_builder.value("revenue", &[
 //!         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(10_000_000.0)),
 //!         (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(11_000_000.0)),
-//!     ])
-//!     .compute("cogs", "revenue * 0.6")?
-//!     .compute("gross_profit", "revenue - cogs")?
-//!     .build()?;
+//!     ]);
+//!     model_builder.compute("cogs", "revenue * 0.6")?;
+//!     model_builder.compute("gross_profit", "revenue - cogs")?;
+//!     model_builder.build()?
+//! };
 //! # Ok(())
 //! # }
 //! ```
@@ -115,3 +117,12 @@ pub use error::{Error, Result};
 #[cfg(doctest)]
 #[doc = include_str!("../README.md")]
 struct ReadmeDoctests;
+
+#[cfg(test)]
+extern crate self as finstack_quant_statements;
+#[cfg(test)]
+#[path = "../tests/support/rates.rs"]
+mod rates_support;
+#[cfg(test)]
+#[path = "../tests/support/period_flows.rs"]
+mod support;

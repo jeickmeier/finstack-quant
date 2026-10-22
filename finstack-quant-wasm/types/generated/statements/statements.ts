@@ -1718,14 +1718,10 @@ export type PaymentPriority =
 export type CapitalStructureWarning =
   | {
       /**
-       * Ratio used after applying the safety bound.
+       * Actual ratio of stateful to scheduled opening applied to the cashflows.
        */
-      clamped_ratio: number;
-      kind: "scale_clamped";
-      /**
-       * Unbounded ratio calculated from model and schedule balances.
-       */
-      raw_ratio: number;
+      applied_ratio: number;
+      kind: "residual_scale_mismatch";
       [k: string]: unknown;
     }
   | {
@@ -4275,9 +4271,9 @@ export interface OvernightCouponConvention {
  * that downstream consumers can drill down or report aggregates.
  *
  * Monetary fields are stored as [`Money`] to preserve currency identity. The
- * accessor methods return raw `f64` amounts in the reporting currency for
- * convenience; callers that need full currency fidelity should inspect the
- * underlying maps directly.
+ * component accessor returns raw `f64` amounts in the instrument's native
+ * currency or the reporting currency for totals. Callers that need currency
+ * metadata should inspect the underlying maps directly.
  */
 export interface CapitalStructureCashflows {
   /**
@@ -6479,11 +6475,13 @@ export interface PikToggleSpec {
    * Borrowing debt IDs whose cash coupons capitalize when the toggle triggers.
    *
    * Must be a non-empty list: instrument-level PIK capability is not
-   * modeled, so `None` or an empty list is rejected by
-   * [`PikToggleSpec::validate`] rather than meaning "every instrument".
+   * modeled, so an empty list is rejected by [`PikToggleSpec::validate`]
+   * rather than meaning "every instrument".
    * Swaps and options cannot be PIK targets.
+   *
+   * @minItems 1
    */
-  target_instrument_ids?: string[] | null;
+  target_instrument_ids: [string, ...string[]];
   /**
    * Threshold value: if metric < threshold, enable PIK; otherwise use cash
    */

@@ -15,11 +15,13 @@ fn model_with_nodes(nodes: &[&str]) -> String {
     use finstack_quant_statements::types::AmountOrScalar;
 
     let q1 = PeriodId::quarter(2024, 1).expect("valid period fixture");
-    let mut builder = ModelBuilder::new("test")
-        .periods("2024Q1..Q1", None)
-        .unwrap();
+    let mut builder = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2024Q1..Q1", None).unwrap();
+        model_builder
+    };
     for &name in nodes {
-        builder = builder.value(name, &[(q1, AmountOrScalar::scalar(100.0))]);
+        builder.value(name, &[(q1, AmountOrScalar::scalar(100.0))]);
     }
     let model = builder.build().unwrap();
     serde_json::to_string(&model).unwrap()
@@ -73,20 +75,21 @@ fn evaluate_model_produces_computed_nodes() {
 
     let q1 = PeriodId::quarter(2024, 1).expect("valid period fixture");
     let q2 = PeriodId::quarter(2024, 2).expect("valid period fixture");
-    let model = ModelBuilder::new("demo")
-        .periods("2024Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("demo");
+        model_builder.periods("2024Q1..Q2", None).unwrap();
+        model_builder.value(
             "revenue",
             &[
                 (q1, AmountOrScalar::scalar(100.0)),
                 (q2, AmountOrScalar::scalar(110.0)),
             ],
-        )
-        .compute("gross_profit", "revenue * 0.4")
-        .unwrap()
-        .build()
-        .unwrap();
+        );
+        model_builder
+            .compute("gross_profit", "revenue * 0.4")
+            .unwrap();
+        model_builder.build().unwrap()
+    };
     let model_json = serde_json::to_string(&model).unwrap();
 
     // `Evaluator.evaluate` returns a structured JS object; decode it back into

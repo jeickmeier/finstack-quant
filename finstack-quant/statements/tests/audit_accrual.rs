@@ -33,7 +33,7 @@ use indexmap::IndexMap;
 use std::sync::Arc;
 use time::Month;
 
-use crate::dsl_all::support;
+use crate::support;
 
 /// Verify accrued interest accumulation and reset for a semi-annual bond.
 ///
@@ -106,10 +106,10 @@ fn test_accrued_interest_semi_annual_bond() -> Result<(), Box<dyn std::error::Er
         let period_id =
             finstack_quant_core::dates::PeriodId::month(2025, month).expect("valid period fixture");
         let accrued = cashflows
-            .get_accrued_interest("BOND-AUDIT", &period_id)
+            .get_component("accrued_interest", "BOND-AUDIT", &period_id)
             .expect("accrued");
         let cash = cashflows
-            .get_interest_cash("BOND-AUDIT", &period_id)
+            .get_component("interest_expense_cash", "BOND-AUDIT", &period_id)
             .expect("cash");
         (accrued, cash)
     };

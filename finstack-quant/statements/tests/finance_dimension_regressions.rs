@@ -11,25 +11,27 @@ use finstack_quant_statements::types::NodeValueType;
 fn model_with_formula(formula: &str) -> finstack_quant_statements::Result<FinancialModelSpec> {
     let q1 = PeriodId::quarter(2025, 1).expect("valid period");
     let q2 = PeriodId::quarter(2025, 2).expect("valid period");
-    ModelBuilder::new("dimension-regression")
-        .periods("2025Q1..Q2", None)?
-        .value_money(
+    {
+        let mut model_builder = ModelBuilder::new("dimension-regression");
+        model_builder.periods("2025Q1..Q2", None)?;
+        model_builder.value_money(
             "usd",
             &[
                 (q1, Money::from((100_i64, Currency::USD))),
                 (q2, Money::from((120_i64, Currency::USD))),
             ],
-        )
-        .value_money(
+        );
+        model_builder.value_money(
             "eur",
             &[
                 (q1, Money::from((1_i64, Currency::EUR))),
                 (q2, Money::from((2_i64, Currency::EUR))),
             ],
-        )
-        .value_scalar("rate", &[(q1, 0.1), (q2, 0.2)])
-        .compute("output", formula)?
-        .build()
+        );
+        model_builder.value_scalar("rate", &[(q1, 0.1), (q2, 0.2)]);
+        model_builder.compute("output", formula)?;
+        model_builder.build()
+    }
 }
 
 fn assert_dimension_error(formula: &str) {
@@ -121,7 +123,6 @@ fn valid_series_transforms_preserve_currency() {
         "std(usd)",
         "quantile(usd, 0.5)",
         "ttm(usd)",
-        "ltm(usd)",
         "ytd(usd)",
         "qtd(usd)",
         "fiscal_ytd(usd, 4)",

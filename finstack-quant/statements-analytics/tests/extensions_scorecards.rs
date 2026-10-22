@@ -118,10 +118,12 @@ fn test_scorecard_ttm_formula_uses_full_history() {
     use finstack_quant_statements::evaluator::Evaluator;
     use finstack_quant_statements::types::AmountOrScalar;
 
-    let model = ModelBuilder::new("scorecard-ttm")
-        .periods("2025Q1..Q4", None)
-        .expect("valid periods")
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("scorecard-ttm");
+        model_builder
+            .periods("2025Q1..Q4", None)
+            .expect("valid periods");
+        model_builder.value(
             "ebitda",
             &[
                 (
@@ -141,8 +143,8 @@ fn test_scorecard_ttm_formula_uses_full_history() {
                     AmountOrScalar::scalar(130.0),
                 ),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_debt",
             &[
                 (
@@ -162,9 +164,9 @@ fn test_scorecard_ttm_formula_uses_full_history() {
                     AmountOrScalar::scalar(1000.0),
                 ),
             ],
-        )
-        .build()
-        .expect("valid model");
+        );
+        model_builder.build().expect("valid model")
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator
@@ -214,25 +216,27 @@ fn test_scorecard_warns_when_thresholds_do_not_cover_metric_value() {
     use finstack_quant_statements::evaluator::Evaluator;
     use finstack_quant_statements::types::AmountOrScalar;
 
-    let model = ModelBuilder::new("scorecard-threshold-gap")
-        .periods("2025Q1..Q1", None)
-        .expect("valid periods")
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("scorecard-threshold-gap");
+        model_builder
+            .periods("2025Q1..Q1", None)
+            .expect("valid periods");
+        model_builder.value(
             "ebitda",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0),
             )],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_debt",
             &[(
                 PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(250.0),
             )],
-        )
-        .build()
-        .expect("valid model");
+        );
+        model_builder.build().expect("valid model")
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator

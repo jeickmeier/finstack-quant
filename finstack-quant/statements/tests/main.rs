@@ -37,12 +37,8 @@ mod finance_engine_regressions;
 mod finance_forecast_regressions;
 #[path = "finance_model_regressions.rs"]
 mod finance_model_regressions;
-#[path = "finance_residual_regressions.rs"]
-mod finance_residual_regressions;
 #[path = "finance_temporal_regressions.rs"]
 mod finance_temporal_regressions;
-#[path = "finance_waterfall_regressions.rs"]
-mod finance_waterfall_regressions;
 #[path = "forecast_all.rs"]
 mod forecast_all;
 #[path = "functions_all.rs"]
@@ -61,11 +57,14 @@ mod registry_dynamic;
 mod schema_contract;
 #[path = "senior_review_builder.rs"]
 mod senior_review_builder;
-#[path = "senior_review_capital.rs"]
-mod senior_review_capital;
 #[path = "senior_review_dsl.rs"]
 mod senior_review_dsl;
 #[path = "senior_review_engine_checks.rs"]
 mod senior_review_engine_checks;
 #[path = "spec_tests.rs"]
 mod spec_tests;
+
+#[path = "support/rates.rs"]
+mod rates_support;
+#[path = "support/period_flows.rs"]
+mod support;

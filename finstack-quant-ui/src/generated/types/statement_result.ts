@@ -251,14 +251,10 @@ export type D_76Adf23Abc095Fd56514 =
         warning:
           | {
               /**
-               * Ratio used after applying the safety bound.
+               * Actual ratio of stateful to scheduled opening applied to the cashflows.
                */
-              clamped_ratio: number;
-              kind: "scale_clamped";
-              /**
-               * Unbounded ratio calculated from model and schedule balances.
-               */
-              raw_ratio: number;
+              applied_ratio: number;
+              kind: "residual_scale_mismatch";
               [k: string]: unknown;
             }
           | {
@@ -823,9 +819,9 @@ export interface D_033184211Bfcc772Ee94 {
  * that downstream consumers can drill down or report aggregates.
  *
  * Monetary fields are stored as [`Money`] to preserve currency identity. The
- * accessor methods return raw `f64` amounts in the reporting currency for
- * convenience; callers that need full currency fidelity should inspect the
- * underlying maps directly.
+ * component accessor returns raw `f64` amounts in the instrument's native
+ * currency or the reporting currency for totals. Callers that need currency
+ * metadata should inspect the underlying maps directly.
  *
  * # Example
  *
@@ -868,7 +864,7 @@ export interface D_033184211Bfcc772Ee94 {
  *     voluntary_prepayment: None,
  * });
  *
- * assert_eq!(cs.get_total_interest(&period).unwrap(), 12_500.0);
+ * assert_eq!(cs.get_component("interest_expense", "total", &period).unwrap(), 12_500.0);
  * ```
  */
 export interface DF840Db5F4C38222F7Ca7 {

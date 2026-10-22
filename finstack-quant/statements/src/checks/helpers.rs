@@ -124,21 +124,6 @@ pub(crate) fn validate_identity_inputs<'a>(
     Ok(())
 }
 
-/// Look up a single node's value for a given period.
-///
-/// # Arguments
-///
-/// * `results` - Evaluated statement results to read from.
-/// * `node` - Identifier of the node whose value is requested.
-/// * `period` - Period to read; `None` is returned when the node or the
-///   period has no evaluated value.
-pub fn get_node_value(results: &StatementResult, node: &NodeId, period: &PeriodId) -> Option<f64> {
-    results
-        .nodes
-        .get(node.as_str())
-        .and_then(|m| m.get(period).copied())
-}
-
 /// Look up a node value that can participate in an accounting identity:
 /// present **and** finite.
 ///
@@ -158,7 +143,7 @@ pub fn get_finite_node_value(
     node: &NodeId,
     period: &PeriodId,
 ) -> Option<f64> {
-    get_node_value(results, node, period).filter(|v| v.is_finite())
+    results.get(node.as_str(), period).filter(|v| v.is_finite())
 }
 
 /// Sum several nodes' values for a given period, treating missing values as zero.
@@ -172,6 +157,29 @@ pub fn get_finite_node_value(
 pub fn sum_nodes(results: &StatementResult, nodes: &[NodeId], period: &PeriodId) -> f64 {
     nodes
         .iter()
-        .filter_map(|n| get_node_value(results, n, period))
+        .filter_map(|n| results.get(n.as_str(), period))
         .sum()
+}
+
+/// A failed identity whose intermediate arithmetic cannot be represented.
+///
+/// # Arguments
+///
+/// * `check_id` - Identifier of the accounting identity whose arithmetic overflowed.
+/// * `period` - Reporting period affected by the unrepresentable calculation.
+/// * `nodes` - Operand node identifiers attached to the diagnostic.
+pub(crate) fn arithmetic_failure(
+    check_id: &str,
+    period: finstack_quant_core::dates::PeriodId,
+    nodes: Vec<crate::types::NodeId>,
+) -> crate::checks::CheckFinding {
+    crate::checks::CheckFinding {
+        check_id: check_id.to_string(),
+        severity: crate::checks::Severity::Error,
+        message: format!("Arithmetic overflow while evaluating {check_id} in {period}; the identity could not be compared."),
+        period: Some(period),
+        materiality: None,
+        nodes,
+        comparison: None,
+    }
 }

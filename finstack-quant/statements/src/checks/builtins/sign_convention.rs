@@ -2,7 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::checks::helpers::get_node_value;
 use crate::checks::{Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Severity};
 use crate::types::NodeId;
 use crate::Result;
@@ -39,67 +38,38 @@ impl Check for SignConventionCheck {
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
         let mut findings = Vec::new();
 
-        // NaN compares false against both `< 0.0` and `> 0.0`, so a non-finite
-        // value would silently satisfy either sign expectation. Surface it as
-        // its own finding instead of letting it pass.
-        let non_finite_finding = |node: &NodeId, pid, val: f64| CheckFinding {
-            check_id: "sign_convention".to_string(),
-            severity: Severity::Warning,
-            message: format!(
-                "Node '{}' has non-finite value ({val}) in period {pid}; \
-                 its sign convention cannot be verified",
-                node.as_str()
-            ),
-            period: Some(pid),
-            materiality: None,
-            nodes: vec![node.clone()],
-            comparison: None,
-        };
-
         for period in &context.model.periods {
             let pid = &period.id;
-
-            for node in &self.positive_nodes {
-                if let Some(val) = get_node_value(context.results, node, pid) {
-                    if !val.is_finite() {
-                        findings.push(non_finite_finding(node, *pid, val));
-                    } else if val < 0.0 {
-                        findings.push(CheckFinding {
-                            check_id: self.id().to_string(),
-                            severity: Severity::Warning,
-                            message: format!(
-                                "Node '{}' has unexpected negative value ({val:.2}) \
-                                 in period {pid}",
-                                node.as_str()
-                            ),
-                            period: Some(*pid),
-                            materiality: None,
-                            nodes: vec![node.clone()],
-                            comparison: None,
-                        });
-                    }
-                }
-            }
-
-            for node in &self.negative_nodes {
-                if let Some(val) = get_node_value(context.results, node, pid) {
-                    if !val.is_finite() {
-                        findings.push(non_finite_finding(node, *pid, val));
-                    } else if val > 0.0 {
-                        findings.push(CheckFinding {
-                            check_id: self.id().to_string(),
-                            severity: Severity::Warning,
-                            message: format!(
-                                "Node '{}' has unexpected positive value ({val:.2}) \
-                                 in period {pid}",
-                                node.as_str()
-                            ),
-                            period: Some(*pid),
-                            materiality: None,
-                            nodes: vec![node.clone()],
-                            comparison: None,
-                        });
-                    }
+            // Preserve positive-node findings before negative-node findings.
+            for (nodes, positive) in [(&self.positive_nodes, true), (&self.negative_nodes, false)] {
+                for node in nodes {
+                    let Some(val) = context.results.get(node.as_str(), pid) else {
+                        continue;
+                    };
+                    let message = if !val.is_finite() {
+                        format!(
+                            "Node '{}' has non-finite value ({val}) in period {pid}; \
+                             its sign convention cannot be verified",
+                            node.as_str()
+                        )
+                    } else if (positive && val < 0.0) || (!positive && val > 0.0) {
+                        let sign = if positive { "negative" } else { "positive" };
+                        format!(
+                            "Node '{}' has unexpected {sign} value ({val:.2}) in period {pid}",
+                            node.as_str()
+                        )
+                    } else {
+                        continue;
+                    };
+                    findings.push(CheckFinding {
+                        check_id: self.id().to_string(),
+                        severity: Severity::Warning,
+                        message,
+                        period: Some(*pid),
+                        materiality: None,
+                        nodes: vec![node.clone()],
+                        comparison: None,
+                    });
                 }
             }
         }

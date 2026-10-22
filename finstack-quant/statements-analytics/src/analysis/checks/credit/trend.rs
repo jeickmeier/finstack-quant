@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use finstack_quant_statements::checks::{get_finite_node_value, get_node_value};
+use finstack_quant_statements::checks::get_finite_node_value;
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Severity,
 };
@@ -69,7 +69,9 @@ impl Check for TrendCheck {
             let prev_val = get_finite_node_value(context.results, &self.node, prev_pid);
             let curr_val = get_finite_node_value(context.results, &self.node, curr_pid);
             let (Some(prev_val), Some(curr_val)) = (prev_val, curr_val) else {
-                if get_node_value(context.results, &self.node, curr_pid)
+                if context
+                    .results
+                    .get(self.node.as_str(), curr_pid)
                     .is_some_and(|v| !v.is_finite())
                 {
                     findings.push(CheckFinding {

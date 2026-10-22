@@ -16,25 +16,25 @@ fn q(quarter: u8) -> PeriodId {
 #[test]
 fn cash_reconciliation_passes() {
     // Cash(Q2) = Cash(Q1) + TotalCF(Q2) = 100 + 50 = 150 ✓
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "cash",
             &[
                 (q(1), AmountOrScalar::scalar(100.0)),
                 (q(2), AmountOrScalar::scalar(150.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_cf",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(50.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -58,25 +58,25 @@ fn cash_reconciliation_passes() {
 #[test]
 fn cash_reconciliation_fails() {
     // Expected Cash(Q2) = 100 + 50 = 150, actual = 160 → diff = 10
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "cash",
             &[
                 (q(1), AmountOrScalar::scalar(100.0)),
                 (q(2), AmountOrScalar::scalar(160.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_cf",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(50.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -104,46 +104,46 @@ fn cash_reconciliation_fails() {
 fn component_check_passes() {
     // Cash(Q2)=150, Cash(Q1)=100, TotalCF(Q2)=50,
     // CFO=80, CFI=-20, CFF=-10 → 80-20-10=50=TotalCF ✓
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "cash",
             &[
                 (q(1), AmountOrScalar::scalar(100.0)),
                 (q(2), AmountOrScalar::scalar(150.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_cf",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(50.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cfo",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(80.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cfi",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(-20.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cff",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(-10.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -167,46 +167,46 @@ fn component_check_passes() {
 #[test]
 fn component_check_fails() {
     // TotalCF(Q2)=50, but CFO=80+CFI=-20+CFF=-5=55 → diff=5
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "cash",
             &[
                 (q(1), AmountOrScalar::scalar(100.0)),
                 (q(2), AmountOrScalar::scalar(150.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_cf",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(50.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cfo",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(80.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cfi",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(-20.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cff",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(-5.0)), // mismatch: 80-20-5=55≠50
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
@@ -243,25 +243,25 @@ fn nan_cash_balance_warns_and_skips() {
     // A NaN prior cash balance poisons the roll-forward (`NaN > tolerance`
     // is false), silently passing a blatantly broken reconciliation. It must
     // be treated like a missing input: warn and skip.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "cash",
             &[
                 (q(1), AmountOrScalar::scalar(100.0)),
                 (q(2), AmountOrScalar::scalar(9999.0)), // broken roll-forward
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_cf",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(50.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let mut results = evaluator.evaluate(&model).unwrap();
@@ -308,46 +308,46 @@ fn nan_component_warns_instead_of_silently_skipping() {
     // All three component nodes are configured, but CFO is NaN in Q2. The
     // component identity cannot be evaluated — that skip must be surfaced,
     // not silent.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "cash",
             &[
                 (q(1), AmountOrScalar::scalar(100.0)),
                 (q(2), AmountOrScalar::scalar(150.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_cf",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(50.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cfo",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(80.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cfi",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(-20.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cff",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(-10.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let mut results = evaluator.evaluate(&model).unwrap();
@@ -387,32 +387,32 @@ fn partial_component_configuration_warns() {
 
     // Configuring only CFO (without CFI/CFF) silently disabled the component
     // identity before; it must now surface a configuration warning.
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value(
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value(
             "cash",
             &[
                 (q(1), AmountOrScalar::scalar(100.0)),
                 (q(2), AmountOrScalar::scalar(150.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "total_cf",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(50.0)),
             ],
-        )
-        .value(
+        );
+        model_builder.value(
             "cfo",
             &[
                 (q(1), AmountOrScalar::scalar(0.0)),
                 (q(2), AmountOrScalar::scalar(50.0)),
             ],
-        )
-        .build()
-        .unwrap();
+        );
+        model_builder.build().unwrap()
+    };
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();

@@ -16,10 +16,7 @@ use finstack_quant_statements::checks::{
 use finstack_quant_statements::evaluator::{
     CapitalStructureWarning, EvalStats, EvalWarning, StatementResult,
 };
-use finstack_quant_statements::schema::{
-    financial_model_spec_schema, normalization_config_schema, statement_result_schema,
-    STATEMENTS_SCHEMA_BASE,
-};
+use finstack_quant_statements::schema::STATEMENTS_SCHEMA_BASE;
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::NodeValueType;
 use indexmap::IndexMap;
@@ -94,7 +91,7 @@ fn external_schema_resources() -> Vec<(String, jsonschema::Resource)> {
 fn validate_model_fixture(fixture: &Value) -> Result<(), Vec<String>> {
     let validator = jsonschema::options()
         .with_resources(external_schema_resources().into_iter())
-        .build(financial_model_spec_schema().expect("financial model schema parses"))
+        .build(&checked_in_schema("financial_model_spec.schema.json"))
         .expect("financial model schema and external references compile");
     let errors: Vec<_> = validator
         .iter_errors(fixture)
@@ -251,6 +248,14 @@ fn representative_statement_result() -> StatementResult {
 /// Only the registry path applies the packager, the single-branch-union
 /// collapse and examples, so `generated_schema` would drift from the bytes on
 /// disk.
+fn checked_in_schema(filename: &str) -> Value {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("schemas/statements/1")
+        .join(filename);
+    serde_json::from_str(&fs::read_to_string(path).expect("checked-in schema exists"))
+        .expect("checked-in schema parses")
+}
+
 fn expected_schema(filename: &str) -> Value {
     finstack_quant_statements::schema::ARTIFACTS
         .iter()
@@ -334,8 +339,8 @@ fn capital_structure_warning_uses_typed_canonical_values() {
 
 #[test]
 fn checked_in_schemas_have_stable_metadata() {
-    let model = financial_model_spec_schema().expect("financial model schema parses");
-    let result = statement_result_schema().expect("statement result schema parses");
+    let model = &checked_in_schema("financial_model_spec.schema.json");
+    let result = &checked_in_schema("statement_result.schema.json");
 
     assert_eq!(
         model["$id"],
@@ -354,7 +359,7 @@ fn checked_in_schemas_have_stable_metadata() {
         "https://json-schema.org/draft/2020-12/schema"
     );
 
-    let normalization = normalization_config_schema().expect("normalization config schema parses");
+    let normalization = &checked_in_schema("normalization_config.schema.json");
     assert_eq!(
         normalization["$id"],
         format!("{STATEMENTS_SCHEMA_BASE}normalization_config.schema.json")
@@ -367,7 +372,7 @@ fn checked_in_schemas_have_stable_metadata() {
 
 #[test]
 fn checked_in_schemas_apply_canonical_decimal_and_date_normalization() {
-    let model = financial_model_spec_schema().expect("financial model schema parses");
+    let model = &checked_in_schema("financial_model_spec.schema.json");
 
     assert_eq!(
         model.pointer("/$defs/DecimalWire/pattern"),
@@ -381,7 +386,7 @@ fn checked_in_schemas_apply_canonical_decimal_and_date_normalization() {
 
 #[test]
 fn normalization_config_schema_exposes_base_mode_reported_default() {
-    let schema = normalization_config_schema().expect("normalization schema parses");
+    let schema = &checked_in_schema("normalization_config.schema.json");
     let default_mode =
         serde_json::to_value(CapBaseMode::default()).expect("CapBaseMode default serializes");
     // Pin the wire value so a future default-variant change is caught here,
@@ -397,7 +402,7 @@ fn normalization_config_schema_exposes_base_mode_reported_default() {
 fn normalization_config_schema_matches_generated_type() {
     let expected = expected_schema("normalization_config.schema.json");
     assert_eq!(
-        normalization_config_schema().expect("normalization schema parses"),
+        &checked_in_schema("normalization_config.schema.json"),
         &expected
     );
 }
@@ -405,7 +410,7 @@ fn normalization_config_schema_matches_generated_type() {
 #[test]
 fn normalization_config_schema_validates_supported_variants() {
     validate_fixture(
-        normalization_config_schema().expect("normalization schema parses"),
+        &checked_in_schema("normalization_config.schema.json"),
         &normalization_fixture(),
     );
 }
@@ -414,10 +419,9 @@ fn normalization_config_schema_validates_supported_variants() {
 fn normalization_config_schema_rejects_unknown_adjustment_variant() {
     let mut fixture = normalization_fixture();
     fixture["adjustments"][0]["value"]["type"] = json!("run_rate");
-    let validator = jsonschema::validator_for(
-        normalization_config_schema().expect("normalization schema parses"),
-    )
-    .expect("checked-in normalization schema must compile");
+    let validator =
+        jsonschema::validator_for(&checked_in_schema("normalization_config.schema.json"))
+            .expect("checked-in normalization schema must compile");
     assert!(
         validator.iter_errors(&fixture).next().is_some(),
         "an unsupported AdjustmentValue tag must be rejected"
@@ -430,11 +434,11 @@ fn checked_in_schemas_match_generated_types() {
     let expected_result = expected_schema("statement_result.schema.json");
 
     assert_eq!(
-        financial_model_spec_schema().expect("financial model schema parses"),
+        &checked_in_schema("financial_model_spec.schema.json"),
         &expected_model
     );
     assert_eq!(
-        statement_result_schema().expect("statement result schema parses"),
+        &checked_in_schema("statement_result.schema.json"),
         &expected_result
     );
 }
@@ -448,7 +452,7 @@ fn checked_in_schemas_validate_canonical_fixtures() {
     validate_model_fixture(&model_fixture)
         .unwrap_or_else(|errors| panic!("financial model fixture failed validation: {errors:#?}"));
     validate_fixture(
-        statement_result_schema().expect("statement result schema parses"),
+        &checked_in_schema("statement_result.schema.json"),
         &result_fixture,
     );
     assert_eq!(result_fixture["schema_version"], 1);

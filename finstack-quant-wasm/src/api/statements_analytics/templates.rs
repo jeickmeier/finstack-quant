@@ -290,7 +290,7 @@ pub fn add_property_operating_statement(
 /// rent step, an occupancy outside `[0, 1]`, or an invalid renewal.
 #[wasm_bindgen(js_name = validateLeaseSpecJson)]
 pub fn validate_lease_spec_json(json: JsValue) -> Result<String, JsValue> {
-    crate::api::statements::validated_json(&json, real_estate::LeaseSpec::validate)
+    crate::utils::input::validated_json(&json, real_estate::LeaseSpec::validate)
 }
 
 /// Validate a `RenewalSpec` and return its canonical JSON.
@@ -307,5 +307,5 @@ pub fn validate_lease_spec_json(json: JsValue) -> Result<String, JsValue> {
 /// rent factor.
 #[wasm_bindgen(js_name = validateRenewalSpecJson)]
 pub fn validate_renewal_spec_json(json: JsValue) -> Result<String, JsValue> {
-    crate::api::statements::validated_json(&json, real_estate::RenewalSpec::validate)
+    crate::utils::input::validated_json(&json, real_estate::RenewalSpec::validate)
 }

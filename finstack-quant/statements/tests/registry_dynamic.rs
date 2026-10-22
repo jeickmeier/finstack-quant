@@ -4,6 +4,47 @@
 use finstack_quant_statements::registry::Registry;
 
 #[test]
+fn rejected_documents_preserve_existing_metrics_and_allow_corrected_retry() {
+    let anchor = r#"{"namespace":"test","schema_version":1,"metrics":[{"id":"anchor","name":"Anchor","formula":"input"}]}"#;
+    let corrected = r#"{"namespace":"test","schema_version":1,"metrics":[{"id":"total","name":"Total","formula":"leaf + anchor"},{"id":"leaf","name":"Leaf","formula":"anchor * 2"}]}"#;
+    for rejected_metrics in [
+        serde_json::json!([
+            {"id":"leaf","name":"Leaf","formula":"anchor * 2"},
+            {"id":"broken","name":"Broken","formula":"sum()"}
+        ]),
+        serde_json::json!([
+            {"id":"leaf","name":"Leaf","formula":"anchor * 2"},
+            {"id":"leaf","name":"Duplicate","formula":"anchor * 3"}
+        ]),
+        serde_json::json!([
+            {"id":"leaf","name":"Leaf","formula":"total * 2"},
+            {"id":"total","name":"Total","formula":"leaf + anchor"}
+        ]),
+    ] {
+        let mut registry = Registry::new();
+        registry.load_from_json_str(anchor).expect("load anchor");
+        let rejected = serde_json::json!({
+            "namespace": "test", "schema_version": 1, "metrics": rejected_metrics
+        });
+        assert!(registry.load_from_json_str(&rejected.to_string()).is_err());
+        assert_eq!(registry.len(), 1);
+        assert_eq!(
+            registry
+                .get("test.anchor")
+                .expect("anchor survives")
+                .definition
+                .formula,
+            "input"
+        );
+        registry
+            .load_from_json_str(corrected)
+            .expect("corrected retry");
+        let ids: Vec<_> = registry.all_metrics().map(|(id, _)| id).collect();
+        assert_eq!(ids, ["test.anchor", "test.leaf", "test.total"]);
+    }
+}
+
+#[test]
 fn test_load_from_json_str() {
     let json = r#"{
         "namespace": "test",
@@ -232,7 +273,7 @@ fn test_circular_dependency_detection() {
 }
 
 #[test]
-fn test_get_metric_dependencies() {
+fn test_get_dependencies() {
     let json = r#"{
         "namespace": "test",
         "schema_version": 1,
@@ -261,7 +302,7 @@ fn test_get_metric_dependencies() {
         .expect("should load valid JSON");
 
     let deps = registry
-        .get_metric_dependencies("test.c")
+        .get_dependencies("test.c")
         .expect("metric should exist");
     assert_eq!(deps.len(), 2);
     assert!(deps.contains(&"test.a".to_string()));
@@ -308,7 +349,7 @@ fn test_transitive_dependencies() {
         .expect("should load valid JSON");
 
     let deps = registry
-        .get_metric_dependencies("test.level3")
+        .get_dependencies("test.level3")
         .expect("metric should exist");
     assert_eq!(deps.len(), 2);
     assert!(deps.contains(&"test.level1".to_string()));
@@ -349,7 +390,7 @@ fn test_mixed_dependencies() {
     assert!(registry.has("test.ebitda_margin"));
 
     let deps = registry
-        .get_metric_dependencies("test.ebitda_margin")
+        .get_dependencies("test.ebitda_margin")
         .expect("metric should exist");
     assert_eq!(deps.len(), 2);
     assert!(deps.contains(&"test.gross_profit".to_string()));

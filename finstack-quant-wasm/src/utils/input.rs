@@ -486,6 +486,32 @@ pub fn from_js_json<T: DeserializeOwned>(value: &JsValue, label: &str) -> Result
     })
 }
 
+/// Parse `json` (object or JSON text) as `T`, run `validate`, and return the
+/// canonical JSON text of the validated value.
+///
+/// Backs every `validate*Json` export.
+///
+/// # Arguments
+///
+/// * `json` - Plain JavaScript value or JSON text to decode as `T`.
+/// * `validate` - Canonical Rust validator run before serializing the value.
+///
+/// # Errors
+///
+/// Returns the structured decoding, validation, or serialization error.
+pub(crate) fn validated_json<T, E>(
+    json: &JsValue,
+    validate: impl FnOnce(&T) -> Result<(), E>,
+) -> Result<String, JsValue>
+where
+    T: serde::Serialize + DeserializeOwned,
+    E: crate::utils::IntoJsError,
+{
+    let value: T = from_js_json(json, "json")?;
+    validate(&value).map_err(super::to_js_err)?;
+    serde_json::to_string(&value).map_err(super::to_js_err)
+}
+
 /// An optional structured argument: `undefined`/`null`/absent → `None`,
 /// otherwise as [`from_js_json`].
 ///

@@ -27,15 +27,15 @@ fn depreciation_reconciles_passes() {
     // PPE(t) = PPE(t-1) + Capex - D&A - Disposals
     // Q1: 1000 (seed)
     // Q2: 1000 + 200 - 50 - 10 = 1140
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("ppe", &[(q(1), s(1000.0)), (q(2), s(1140.0))])
-        .value("capex", &[(q(1), s(0.0)), (q(2), s(200.0))])
-        .value("da", &[(q(1), s(0.0)), (q(2), s(50.0))])
-        .value("disposals", &[(q(1), s(0.0)), (q(2), s(10.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("ppe", &[(q(1), s(1000.0)), (q(2), s(1140.0))]);
+        model_builder.value("capex", &[(q(1), s(0.0)), (q(2), s(200.0))]);
+        model_builder.value("da", &[(q(1), s(0.0)), (q(2), s(50.0))]);
+        model_builder.value("disposals", &[(q(1), s(0.0)), (q(2), s(10.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -59,14 +59,14 @@ fn depreciation_reconciles_passes() {
 #[test]
 fn depreciation_mismatch_flags_warning() {
     // Q2 actual PPE = 1200, expected = 1000 + 200 - 50 = 1150 → diff = 50
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("ppe", &[(q(1), s(1000.0)), (q(2), s(1200.0))])
-        .value("capex", &[(q(1), s(0.0)), (q(2), s(200.0))])
-        .value("da", &[(q(1), s(0.0)), (q(2), s(50.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("ppe", &[(q(1), s(1000.0)), (q(2), s(1200.0))]);
+        model_builder.value("capex", &[(q(1), s(0.0)), (q(2), s(200.0))]);
+        model_builder.value("da", &[(q(1), s(0.0)), (q(2), s(50.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -94,13 +94,13 @@ fn depreciation_mismatch_flags_warning() {
 
 #[test]
 fn interest_cs_matches_passes() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("interest", &[(q(1), s(25.0)), (q(2), s(30.0))])
-        .value("cs_interest", &[(q(1), s(25.0)), (q(2), s(30.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("interest", &[(q(1), s(25.0)), (q(2), s(30.0))]);
+        model_builder.value("cs_interest", &[(q(1), s(25.0)), (q(2), s(30.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -121,13 +121,13 @@ fn interest_cs_matches_passes() {
 #[test]
 fn interest_cs_mismatch_flags_warning() {
     // Interest = 30, CS interest = 25 → 20% diff > 5% default tolerance
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("interest", &[(q(1), s(30.0))])
-        .value("cs_interest", &[(q(1), s(25.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("interest", &[(q(1), s(30.0))]);
+        model_builder.value("cs_interest", &[(q(1), s(25.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -149,14 +149,14 @@ fn interest_cs_mismatch_flags_warning() {
 #[test]
 fn interest_implied_rate_reasonable_passes() {
     // Debt = 1000, rate = 0.05, implied interest = 50, IS interest = 50
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("interest", &[(q(1), s(50.0))])
-        .value("debt", &[(q(1), s(1000.0))])
-        .value("rate", &[(q(1), s(0.05))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("interest", &[(q(1), s(50.0))]);
+        model_builder.value("debt", &[(q(1), s(1000.0))]);
+        model_builder.value("rate", &[(q(1), s(0.05))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -182,14 +182,14 @@ fn interest_implied_rate_reasonable_passes() {
 /// convention (which would expect 60 = 1200 × 0.05, a 20 % miss).
 #[test]
 fn interest_implied_rate_uses_average_balance() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("interest", &[(q(1), s(40.0)), (q(2), s(50.0))])
-        .value("debt", &[(q(1), s(800.0)), (q(2), s(1200.0))])
-        .value("rate", &[(q(1), s(0.05)), (q(2), s(0.05))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("interest", &[(q(1), s(40.0)), (q(2), s(50.0))]);
+        model_builder.value("debt", &[(q(1), s(800.0)), (q(2), s(1200.0))]);
+        model_builder.value("rate", &[(q(1), s(0.05)), (q(2), s(0.05))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -223,14 +223,14 @@ fn interest_implied_rate_uses_average_balance() {
 
 #[test]
 fn capex_reconciles_passes() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("capex_cf", &[(q(1), s(100.0)), (q(2), s(150.0))])
-        .value("ppe_add", &[(q(1), s(80.0)), (q(2), s(120.0))])
-        .value("intangible_add", &[(q(1), s(20.0)), (q(2), s(30.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("capex_cf", &[(q(1), s(100.0)), (q(2), s(150.0))]);
+        model_builder.value("ppe_add", &[(q(1), s(80.0)), (q(2), s(120.0))]);
+        model_builder.value("intangible_add", &[(q(1), s(20.0)), (q(2), s(30.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -253,14 +253,14 @@ fn capex_reconciles_passes() {
 #[test]
 fn capex_mismatch_flags_warning() {
     // CF capex = 100, but PPE add = 60, intangible add = 20 → expected = 80, diff = 20
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("capex_cf", &[(q(1), s(100.0))])
-        .value("ppe_add", &[(q(1), s(60.0))])
-        .value("intangible_add", &[(q(1), s(20.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("capex_cf", &[(q(1), s(100.0))]);
+        model_builder.value("ppe_add", &[(q(1), s(60.0))]);
+        model_builder.value("intangible_add", &[(q(1), s(20.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -283,12 +283,12 @@ fn capex_mismatch_flags_warning() {
 
 #[test]
 fn capex_no_components_passes_trivially() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("capex_cf", &[(q(1), s(100.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("capex_cf", &[(q(1), s(100.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -311,13 +311,13 @@ fn capex_no_components_passes_trivially() {
 
 #[test]
 fn dividends_reconcile_passes() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q2", None)
-        .unwrap()
-        .value("div_cf", &[(q(1), s(10.0)), (q(2), s(12.0))])
-        .value("div_eq", &[(q(1), s(10.0)), (q(2), s(12.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("div_cf", &[(q(1), s(10.0)), (q(2), s(12.0))]);
+        model_builder.value("div_eq", &[(q(1), s(10.0)), (q(2), s(12.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -338,13 +338,13 @@ fn dividends_reconcile_passes() {
 
 #[test]
 fn dividends_mismatch_flags_warning() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("div_cf", &[(q(1), s(15.0))])
-        .value("div_eq", &[(q(1), s(10.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("div_cf", &[(q(1), s(15.0))]);
+        model_builder.value("div_eq", &[(q(1), s(10.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
@@ -366,13 +366,13 @@ fn dividends_mismatch_flags_warning() {
 
 #[test]
 fn dividends_nan_operand_warns_and_skips() {
-    let model = ModelBuilder::new("test")
-        .periods("2025Q1..Q1", None)
-        .unwrap()
-        .value("div_cf", &[(q(1), s(15.0))])
-        .value("div_eq", &[(q(1), s(10.0))])
-        .build()
-        .unwrap();
+    let model = {
+        let mut model_builder = ModelBuilder::new("test");
+        model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("div_cf", &[(q(1), s(15.0))]);
+        model_builder.value("div_eq", &[(q(1), s(10.0))]);
+        model_builder.build().unwrap()
+    };
 
     let mut ev = Evaluator::new();
     let mut results = ev.evaluate(&model).unwrap();

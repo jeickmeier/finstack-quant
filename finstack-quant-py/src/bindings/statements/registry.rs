@@ -2,6 +2,7 @@
 
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::serde_to_py;
+use crate::bindings::pydoc::pydoc;
 use crate::errors::statements_to_py;
 use pyo3::prelude::*;
 
@@ -58,14 +59,14 @@ impl PyMetricDefinition {
         self.inner.category.as_deref()
     }
 
-    /// Unit type as its snake_case name (``"percentage"``, ``"currency"``,
-    /// ``"ratio"``, ``"count"``, ``"time_period"``), or ``None``.
+    #[doc = pydoc!("finstack_quant.statements", "MetricDefinition.unit_type")]
     #[getter]
-    fn unit_type(&self) -> Option<String> {
+    fn unit_type(&self) -> PyResult<Option<String>> {
         self.inner
             .unit_type
             .as_ref()
-            .map(crate::bindings::statements_analytics::serde_variant_str)
+            .map(crate::bindings::extract::label)
+            .transpose()
     }
 
     /// Node identifiers the formula requires as inputs.
@@ -176,28 +177,11 @@ impl PyRegistry {
         })
     }
 
-    /// Transitive registry dependencies of a metric, dependencies first.
-    ///
-    /// Parameters
-    /// ----------
-    /// qualified_id : str
-    ///     Fully qualified metric identifier.
-    ///
-    /// Returns
-    /// -------
-    /// list[str]
-    ///     Fully qualified ids in an order suitable for model construction;
-    ///     the metric itself is excluded, as are model inputs that are not
-    ///     registry metrics.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If ``qualified_id`` is not registered.
+    #[doc = pydoc!("finstack_quant.statements", "Registry.get_dependencies")]
     #[pyo3(text_signature = "($self, qualified_id)")]
-    fn dependencies(&self, qualified_id: &str) -> PyResult<Vec<String>> {
+    fn get_dependencies(&self, qualified_id: &str) -> PyResult<Vec<String>> {
         self.inner
-            .get_metric_dependencies(qualified_id)
+            .get_dependencies(qualified_id)
             .map_err(statements_to_py)
     }
 

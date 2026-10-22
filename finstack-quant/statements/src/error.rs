@@ -141,19 +141,6 @@ impl Error {
         Self::NodeNotFound(node_id.into())
     }
 
-    /// Create a circular dependency error
-    pub fn circular_dependency(path: Vec<String>) -> Self {
-        Self::CircularDependency(path)
-    }
-
-    /// Create a currency mismatch error
-    pub fn currency_mismatch(
-        expected: finstack_quant_core::currency::Currency,
-        found: finstack_quant_core::currency::Currency,
-    ) -> Self {
-        Self::CurrencyMismatch(expected, found)
-    }
-
     /// Create a capital structure error
     pub fn capital_structure(msg: impl Into<String>) -> Self {
         Self::CapitalStructure(msg.into())
