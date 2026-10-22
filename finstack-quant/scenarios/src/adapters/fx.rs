@@ -35,17 +35,26 @@ fn post_shock_triangulation_warnings(
 
         let direct = bumped
             .rate(finstack_quant_core::money::fx::FxQuery::new(
-                from, to, as_of,
+                from,
+                to,
+                as_of,
+                Default::default(),
             ))
             .map(|r| r.rate);
         let via_pivot = bumped
             .rate(finstack_quant_core::money::fx::FxQuery::new(
-                from, pivot, as_of,
+                from,
+                pivot,
+                as_of,
+                Default::default(),
             ))
             .and_then(|lhs| {
                 bumped
                     .rate(finstack_quant_core::money::fx::FxQuery::new(
-                        pivot, to, as_of,
+                        pivot,
+                        to,
+                        as_of,
+                        Default::default(),
                     ))
                     .map(|rhs| lhs.rate * rhs.rate)
             });

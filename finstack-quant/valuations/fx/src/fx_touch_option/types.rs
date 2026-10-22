@@ -347,6 +347,7 @@ impl FxTouchOption {
                 self.base_currency,
                 self.quote_currency,
                 as_of,
+                Default::default(),
             ))?
             .rate)
     }
@@ -675,7 +676,12 @@ mod tests {
         let spot_before = market
             .fx()
             .expect("fx")
-            .rate(FxQuery::new(Currency::EUR, Currency::USD, as_of))
+            .rate(FxQuery::new(
+                Currency::EUR,
+                Currency::USD,
+                as_of,
+                Default::default(),
+            ))
             .expect("spot")
             .rate;
 
@@ -696,7 +702,12 @@ mod tests {
         let spot_after = market
             .fx()
             .expect("fx")
-            .rate(FxQuery::new(Currency::EUR, Currency::USD, as_of))
+            .rate(FxQuery::new(
+                Currency::EUR,
+                Currency::USD,
+                as_of,
+                Default::default(),
+            ))
             .expect("spot")
             .rate;
         assert!(

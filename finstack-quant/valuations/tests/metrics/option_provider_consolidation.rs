@@ -184,7 +184,12 @@ fn build_fx_market(
         .expect("fx quote should build");
     let fx_matrix = FxMatrix::new(provider);
     let _ = fx_matrix
-        .rate(FxQuery::new(Currency::EUR, Currency::USD, as_of))
+        .rate(FxQuery::new(
+            Currency::EUR,
+            Currency::USD,
+            as_of,
+            Default::default(),
+        ))
         .expect("fx rate should exist");
 
     MarketContext::new()

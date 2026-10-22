@@ -133,10 +133,10 @@ fn derived_fx_shocks_preserve_dates_policies_and_reciprocals() {
             FxConversionPolicy::CashflowDate,
             FxConversionPolicy::PeriodEnd,
         ] {
-            let query = FxQuery::with_policy(Currency::EUR, Currency::GBP, on, policy);
+            let query = FxQuery::new(Currency::EUR, Currency::GBP, on, policy);
             let expected = matrix.rate(query).unwrap().rate * 1.1;
             assert!((bumped.rate(query).unwrap().rate - expected).abs() < 1e-12);
-            let reverse = FxQuery::with_policy(Currency::GBP, Currency::EUR, on, policy);
+            let reverse = FxQuery::new(Currency::GBP, Currency::EUR, on, policy);
             assert!((bumped.rate(reverse).unwrap().rate - 1.0 / expected).abs() < 1e-12);
         }
     }

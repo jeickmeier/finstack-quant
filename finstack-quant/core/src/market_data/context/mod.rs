@@ -259,7 +259,12 @@ impl MarketContext {
             return Ok(ConvertedMoney { amount, rate: None });
         }
         let fx = self.fx_required()?;
-        let rate = fx.rate(FxQuery::new(amount.currency(), target_currency, as_of))?;
+        let rate = fx.rate(FxQuery::new(
+            amount.currency(),
+            target_currency,
+            as_of,
+            Default::default(),
+        ))?;
         Ok(ConvertedMoney {
             amount: amount.convert_at_rate(target_currency, rate.rate)?,
             rate: Some(rate),

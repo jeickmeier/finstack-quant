@@ -482,7 +482,7 @@ impl JsFxMatrix {
         date: JsValue,
         policy: &JsFxConversionPolicy,
     ) -> Result<JsFxRateResult, JsValue> {
-        let query = FxQuery::with_policy(
+        let query = FxQuery::new(
             js_currency(&base, "base")?,
             js_currency(&quote, "quote")?,
             js_date(&date, "date")?,

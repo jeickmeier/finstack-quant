@@ -547,7 +547,9 @@ pub(super) fn convert_amount(
     if from == to {
         return Ok(amount);
     }
-    let rate = market.fx_required()?.rate(FxQuery::new(from, to, as_of))?;
+    let rate = market
+        .fx_required()?
+        .rate(FxQuery::new(from, to, as_of, Default::default()))?;
     Ok(amount * rate.rate)
 }
 

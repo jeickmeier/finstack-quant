@@ -589,11 +589,21 @@ impl Ndf {
         let spot = if let Some(rate) = self.quoted_spot {
             rate
         } else if let Some(fx) = market.fx() {
-            match (**fx).rate(FxQuery::new(from_currency, to_currency, as_of)) {
+            match (**fx).rate(FxQuery::new(
+                from_currency,
+                to_currency,
+                as_of,
+                Default::default(),
+            )) {
                 Ok(fx_rate) => fx_rate.rate,
                 Err(_) => {
                     // Try inverse and flip
-                    let inverse = (**fx).rate(FxQuery::new(to_currency, from_currency, as_of))?;
+                    let inverse = (**fx).rate(FxQuery::new(
+                        to_currency,
+                        from_currency,
+                        as_of,
+                        Default::default(),
+                    ))?;
                     1.0 / inverse.rate
                 }
             }

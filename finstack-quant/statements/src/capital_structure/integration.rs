@@ -70,7 +70,7 @@ pub(crate) fn convert_to_reporting(
     };
 
     let rate = fx
-        .rate(FxQuery::with_policy(money.currency(), rc, on, fx_policy))?
+        .rate(FxQuery::new(money.currency(), rc, on, fx_policy))?
         .rate;
     Ok(finstack_quant_core::money::Money::new(
         money.amount() * rate,

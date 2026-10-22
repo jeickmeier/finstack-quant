@@ -25,11 +25,21 @@ fn m9_global_source_precedes_orientation_and_pinned_fixing() {
         )
         .expect("pinned");
     let forward = matrix
-        .rate(FxQuery::new(Currency::EUR, Currency::USD, on))
+        .rate(FxQuery::new(
+            Currency::EUR,
+            Currency::USD,
+            on,
+            Default::default(),
+        ))
         .expect("forward")
         .rate;
     let reverse = matrix
-        .rate(FxQuery::new(Currency::USD, Currency::EUR, on))
+        .rate(FxQuery::new(
+            Currency::USD,
+            Currency::EUR,
+            on,
+            Default::default(),
+        ))
         .expect("reverse")
         .rate;
     assert_eq!(forward, 1.25);
@@ -38,7 +48,12 @@ fn m9_global_source_precedes_orientation_and_pinned_fixing() {
         .set_quote(Currency::USD, Currency::GBP, 0.8)
         .expect("pivot leg");
     let cross = matrix
-        .rate(FxQuery::new(Currency::EUR, Currency::GBP, on))
+        .rate(FxQuery::new(
+            Currency::EUR,
+            Currency::GBP,
+            on,
+            Default::default(),
+        ))
         .expect("cross");
     assert!(
         (cross.rate - 1.0).abs() < 1e-12,
@@ -75,7 +90,7 @@ fn m9_snapshot_preserves_provider_below_pinned_source() {
         let rate = restored
             .fx_required()
             .expect("fx")
-            .rate(FxQuery::new(from, to, on))
+            .rate(FxQuery::new(from, to, on, Default::default()))
             .expect("restored rate")
             .rate;
         assert!((rate - expected).abs() < 1e-12, "{from}/{to}: {rate}");
@@ -87,6 +102,7 @@ fn m9_snapshot_preserves_provider_below_pinned_source() {
             Currency::USD,
             Currency::EUR,
             date!(2025 - 01 - 03),
+            Default::default(),
         ))
         .expect("provider remains available")
         .rate;

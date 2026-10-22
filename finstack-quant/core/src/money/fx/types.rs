@@ -58,13 +58,16 @@ pub struct FxQuery {
 }
 
 impl FxQuery {
-    /// Create a query using the CashflowDate policy.
-    pub fn new(from: Currency, to: Currency, on: Date) -> Self {
-        Self::with_policy(from, to, on, FxConversionPolicy::default())
-    }
-
     /// Create a query with an explicit provider rate-selection policy.
-    pub fn with_policy(from: Currency, to: Currency, on: Date, policy: FxConversionPolicy) -> Self {
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - Source currency whose units are being converted.
+    /// * `to` - Target currency received after multiplying by the quoted rate.
+    /// * `on` - Date on which the provider's quote must apply.
+    /// * `policy` - Provider rate-selection convention for the requested date;
+    ///   use [`FxConversionPolicy::default`] for cashflow-date conversion.
+    pub fn new(from: Currency, to: Currency, on: Date, policy: FxConversionPolicy) -> Self {
         Self {
             from,
             to,

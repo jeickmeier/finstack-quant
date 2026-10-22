@@ -307,7 +307,15 @@ impl FactorBumper for FxBumper {
         self.pairs.iter().any(|pair| {
             market
                 .fx()
-                .and_then(|fx| fx.rate(FxQuery::new(pair.base, pair.quote, as_of)).ok())
+                .and_then(|fx| {
+                    fx.rate(FxQuery::new(
+                        pair.base,
+                        pair.quote,
+                        as_of,
+                        Default::default(),
+                    ))
+                    .ok()
+                })
                 .is_some()
         })
     }

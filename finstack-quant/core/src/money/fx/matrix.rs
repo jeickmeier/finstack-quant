@@ -159,7 +159,7 @@ impl FxProvider for ResolvedPairProvider {
         {
             return self
                 .matrix
-                .rate(FxQuery::with_policy(from, to, on, policy))
+                .rate(FxQuery::new(from, to, on, policy))
                 .map(|result| result.rate);
         }
         self.matrix.provider.rate(from, to, on, policy)
@@ -874,7 +874,7 @@ impl FxMatrix {
             ));
         }
         // Verify a rate exists on the reference date and the bumped value is valid.
-        let query = FxQuery::new(from, to, on);
+        let query = FxQuery::new(from, to, on, Default::default());
         let current = self.rate(query)?;
         validate_fx_rate(from, to, current.rate * (1.0 + bump_pct))?;
 
@@ -991,12 +991,7 @@ impl FxMatrix {
         let rate = validate_fx_rate(from, to, rate)?;
         // Cache the derived rate together with its triangulated provenance so
         // repeat queries stamp the same metadata and value as the first lookup.
-        self.insert_observed_quote(
-            FxQuery::with_policy(from, to, on, policy),
-            rate,
-            true,
-            revision,
-        )
+        self.insert_observed_quote(FxQuery::new(from, to, on, policy), rate, true, revision)
     }
 
     fn invalidate_observed_quotes(&self) {
@@ -1113,7 +1108,7 @@ impl FxMatrix {
         if let Some(cached) = self.read_cached_rate(from, to, on, policy)? {
             return Ok(cached.rate);
         }
-        self.fetch_from_provider(FxQuery::with_policy(from, to, on, policy))
+        self.fetch_from_provider(FxQuery::new(from, to, on, policy))
     }
 
     /// Fetch `query` from the provider, validate the rate and record it as an
@@ -1252,8 +1247,7 @@ mod revision_tests {
             .expect("quotes");
         let matrix = FxMatrix::new(provider);
         let on = Date::from_ordinal_date(2025, 1).expect("date");
-        let query =
-            |from, to| FxQuery::with_policy(from, to, on, FxConversionPolicy::PeriodAverage);
+        let query = |from, to| FxQuery::new(from, to, on, FxConversionPolicy::PeriodAverage);
 
         assert_eq!(
             matrix

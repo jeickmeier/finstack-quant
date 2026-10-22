@@ -3980,7 +3980,7 @@ export interface FxMatrix extends WasmOwned {
    * Look up an FX rate.
    * Global quotes precede pinned fixings, then provider observations,
    * resolving source priority before taking a reciprocal. An omitted `policy`
-   * runs the Rust default query (`FxQuery::new`, cashflow-date policy).
+   * uses `FxConversionPolicy::default()` (cashflow-date policy).
    *
    * @returns Resolved FX rate, including whether it was triangulated.
    * @param base - Base (from) currency ISO code.
