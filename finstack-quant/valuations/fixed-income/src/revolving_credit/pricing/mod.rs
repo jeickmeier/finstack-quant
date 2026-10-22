@@ -1,20 +1,17 @@
 //! Revolving-credit pricing.
 //!
-//! [`RevolvingCreditPricer`] handles deterministic and stochastic facilities.
+//! [`crate::revolving_credit::RevolvingCreditPricer`] handles deterministic and stochastic facilities.
 //! Path generation lives in [`path_generator`].
 
-pub mod path_generator;
+pub(super) mod path_generator;
 mod path_pricing;
-mod results;
+pub(super) mod results;
 mod stochastic;
-#[doc(hidden)]
-pub mod unified;
-
-pub(crate) use unified::RevolvingCreditPricer;
+pub(super) mod unified;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::revolving_credit::RevolvingCreditPricer;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
