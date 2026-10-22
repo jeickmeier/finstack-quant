@@ -148,7 +148,8 @@ fn test_sabr_calibration() {
         .with_max_iterations(2000);
     let params = calibrator
         .calibrate(forward, &strikes, &market_vols, time_to_expiry, beta)
-        .expect("Volatility calculation should succeed in test");
+        .expect("Volatility calculation should succeed in test")
+        .parameters;
 
     assert!(params.alpha > 0.0);
     assert!(params.nu >= 0.0);
@@ -263,7 +264,8 @@ fn test_sabr_auto_shift_calibration() {
     let params = calibrator
         .with_shift(SabrShift::Auto)
         .calibrate(forward, &strikes, &market_vols, time_to_expiry, beta)
-        .expect("Volatility calculation should succeed in test");
+        .expect("Volatility calculation should succeed in test")
+        .parameters;
 
     assert!(params.is_shifted());
     assert!(params.shift().expect("Shift should be Some") > 0.0);
@@ -946,7 +948,8 @@ fn test_sabr_calibrate_with_atm_pinning_matches_synthetic_smile() {
         .with_max_iterations(200)
         .with_atm_pinning(true)
         .calibrate(forward, &strikes, &market_vols, expiry, beta)
-        .expect("ATM-pinned calibration should succeed");
+        .expect("ATM-pinned calibration should succeed")
+        .parameters;
 
     let atm_idx = strikes
         .iter()
@@ -995,7 +998,8 @@ fn test_sabr_beta_zero_calibrates_negative_cross_zero_forward() {
         .with_max_iterations(500)
         .with_atm_pinning(true)
         .calibrate(forward, &strikes, &market_vols, expiry, 0.0)
-        .expect("β=0 negative-forward calibration should succeed");
+        .expect("β=0 negative-forward calibration should succeed")
+        .parameters;
 
     let atm_market = market_vols[2];
     let calibrated_atm = prepared_model
@@ -1042,7 +1046,8 @@ fn test_sabr_calibrate_recovers_known_smile() {
         .with_tolerance(1e-5)
         .with_max_iterations(1000)
         .calibrate(forward, &strikes, &market_vols, expiry, beta)
-        .expect("derivative calibration should succeed");
+        .expect("derivative calibration should succeed")
+        .parameters;
 
     for (strike, market_vol) in strikes.into_iter().zip(market_vols) {
         let fitted = model
@@ -1263,7 +1268,8 @@ fn test_sabr_normal_convention_calibration_reprices_wings_unweighted() {
         .with_max_iterations(300)
         .with_atm_pinning(true)
         .calibrate(forward, &strikes, &market_vols, expiry, 0.0)
-        .expect("normal-convention calibration should succeed");
+        .expect("normal-convention calibration should succeed")
+        .parameters;
 
     // The optimizer must have moved off the initial guess.
     assert!(

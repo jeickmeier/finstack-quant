@@ -135,7 +135,7 @@ def test_sabr_calibrator_round_trip() -> None:
     smile = SabrSmile(params, 100.0, 1.0)
     strikes = [80.0, 90.0, 100.0, 110.0, 120.0]
     vols = smile.generate_smile(strikes)
-    fitted = SabrCalibrator().calibrate(100.0, strikes, vols, 1.0, 1.0)
+    fitted = SabrCalibrator().calibrate(100.0, strikes, vols, 1.0, 1.0).parameters
     assert abs(fitted.alpha - params.alpha) < 1e-2
     assert abs(fitted.nu - params.nu) < 1e-1
     # Refit smile shape must match input smile. Tolerance reflects rho's
@@ -160,7 +160,7 @@ def test_sabr_auto_shift_positive_rates_matches_calibrate() -> None:
     smile = SabrSmile(params, 0.03, 1.0)
     strikes = [0.01, 0.02, 0.03, 0.04, 0.05]
     vols = smile.generate_smile(strikes)
-    fitted = SabrCalibrator().with_shift("auto").calibrate(0.03, strikes, vols, 1.0, 0.5)
+    fitted = SabrCalibrator().with_shift("auto").calibrate(0.03, strikes, vols, 1.0, 0.5).parameters
     assert fitted.shift is None
     assert fitted.alpha > 0.0
 
@@ -171,7 +171,7 @@ def test_sabr_auto_shift_negative_rates_uses_shift() -> None:
     strikes = [-0.015, -0.01, -0.005, 0.0, 0.005]
     smile = SabrSmile(params, forward, 1.0)
     vols = smile.generate_smile(strikes)
-    fitted = SabrCalibrator().with_shift("auto").calibrate(forward, strikes, vols, 1.0, 0.5)
+    fitted = SabrCalibrator().with_shift("auto").calibrate(forward, strikes, vols, 1.0, 0.5).parameters
     assert fitted.shift is not None
     assert fitted.shift == 0.02
     repriced = SabrSmile(fitted, forward, 1.0).generate_smile(strikes)
@@ -187,7 +187,7 @@ def test_sabr_fixed_shift_and_atm_pinning() -> None:
     calibrator = SabrCalibrator().with_shift(0.03).with_atm_pinning(True)
     assert "shift=0.03" in repr(calibrator)
     assert "atm_pinning=True" in repr(calibrator)
-    fitted = calibrator.calibrate(forward, strikes, vols, 1.0, 0.5)
+    fitted = calibrator.calibrate(forward, strikes, vols, 1.0, 0.5).parameters
     assert fitted.shift == 0.03
     repriced = SabrSmile(fitted, forward, 1.0).generate_smile(strikes)
     assert abs(repriced[2] - vols[2]) / vols[2] <= 1e-4
@@ -256,3 +256,21 @@ def test_quanto_option_price_call_positive() -> None:
 def test_barrier_unknown_direction_raises() -> None:
     with pytest.raises(ValueError, match=r"barrier spec|direction"):
         barrier_option_price(100.0, 100.0, 110.0, 0.05, 0.02, 0.2, 1.0, "sideways", "in")
+
+
+def test_sabr_calibration_returns_diagnostics_with_parameters() -> None:
+    from finstack_quant.models.volatility import SabrCalibrationOutcome
+
+    params = SabrParameters(0.02, 0.5, 0.4, -0.3)
+    forward, expiry = 0.03, 2.0
+    strikes = [0.02, 0.025, 0.03, 0.035, 0.04]
+    quotes = SabrSmile(params, forward, expiry).generate_smile(strikes)
+    fit = SabrCalibrator().calibrate(forward, strikes, quotes, expiry, 0.5)
+    assert isinstance(fit, SabrCalibrationOutcome)
+    assert fit.total_iterations >= fit.winning_iterations > 0
+    assert fit.residual_evaluations > 0
+    assert len(fit.winning_start) == 3
+    assert len(fit.quote_errors) == len(quotes)
+    assert fit.max_relative_quote_error <= 1e-4
+    repriced = SabrSmile(fit.parameters, forward, expiry).generate_smile(strikes)
+    assert fit.quote_errors == pytest.approx([actual - quote for actual, quote in zip(repriced, quotes, strict=True)])

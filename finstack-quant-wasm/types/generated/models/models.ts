@@ -5310,6 +5310,47 @@ export interface RoughHestonParams {
   v0: number;
 }
 /**
+ * Calibrated SABR parameters and deterministic solver diagnostics.
+ */
+export interface SabrCalibrationOutcome {
+  /**
+   * Largest absolute quote error divided by its positive market quote.
+   */
+  max_relative_quote_error: number;
+  /**
+   * Calibrated model parameters.
+   */
+  parameters: SabrParameters;
+  /**
+   * Parameter names whose calibrated values landed on configured bounds.
+   */
+  parameters_at_bounds: string[];
+  /**
+   * Signed model-minus-market errors, in the original quote units: decimal
+   * absolute rate volatility for normal quotes, relative decimals for Black.
+   */
+  quote_errors: number[];
+  /**
+   * Total objective residual evaluations.
+   */
+  residual_evaluations: number;
+  /**
+   * Total iterations consumed across all attempted starts.
+   */
+  total_iterations: number;
+  /**
+   * Iterations consumed by the selected start.
+   */
+  winning_iterations: number;
+  /**
+   * Initial alpha, nu, and rho values for the selected start.
+   *
+   * @minItems 3
+   * @maxItems 3
+   */
+  winning_start: [number, number, number];
+}
+/**
  * SABR model parameters
  */
 export interface SabrParameters {

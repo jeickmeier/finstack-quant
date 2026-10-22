@@ -53,8 +53,8 @@ use crate::{
     volatility::arbitrage::ArbitrageCheckConfig, volatility::arbitrage::ArbitrageReport,
     volatility::heston::HestonParams, volatility::local_vol::LocalVolSurface,
     volatility::rough_heston::RoughHestonFourierParams,
-    volatility::sabr::ArbitrageValidationResult, volatility::sabr::SabrParameters,
-    volatility::svi::SviParams, volatility::VolatilityConvention,
+    volatility::sabr::ArbitrageValidationResult, volatility::sabr::SabrCalibrationOutcome,
+    volatility::sabr::SabrParameters, volatility::svi::SviParams, volatility::VolatilityConvention,
 };
 
 /// The crate's complete schema registry.
@@ -541,6 +541,13 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "rough_heston_params",
         Input,
         "Rough Heston model parameters."
+    ),
+    finstack_quant_core::schema_artifact!(
+        SabrCalibrationOutcome,
+        "models",
+        "sabr_calibration_outcome",
+        Output,
+        "Calibrated SABR parameters and deterministic solver diagnostics."
     ),
     finstack_quant_core::schema_artifact!(
         SabrParameters,

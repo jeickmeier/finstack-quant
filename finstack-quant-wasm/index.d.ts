@@ -159,6 +159,7 @@ import type {
 } from './types/generated/margin/index.js';
 import type {
   ArbitrageValidationResult,
+  SabrCalibrationOutcome,
   BsGreeks,
   BumpSizeConfig,
   ExchangeOfferAnalysis,
@@ -390,6 +391,7 @@ export type {
 };
 export type {
   ArbitrageValidationResult,
+  SabrCalibrationOutcome,
   BsGreeks,
   BumpSizeConfig,
   ExchangeOfferAnalysis,
@@ -24924,12 +24926,12 @@ export interface SabrCalibrator extends WasmOwned {
   withMaxIterations(maxIterations: number): SabrCalibrator;
   /**
    * Calibrate `(alpha, nu, rho)` to market vols with `beta` fixed.
-   * @returns A `SabrParameters` handle.
    * @param forward - Forward price or rate in the same quote convention as the strike.
    * @param strikes - Option strikes aligned one-for-one with market_vols.
-   * @param marketVols - Market-implied annualized volatilities aligned one-for-one with strikes.
-   * @param t - Time from the curve base date in years.
-   * @param beta - SABR CEV elasticity parameter held fixed during calibration.
+   * @param marketVols - Positive quotes aligned with strikes: absolute decimal-rate normal volatilities for beta near zero, otherwise annual Black volatilities in relative decimals.
+   * @param t - Positive time to expiry in years.
+   * @param beta - SABR CEV elasticity in `[0, 1]`, held fixed during calibration.
+   * @returns Calibrated parameters, signed model-minus-market quote errors, and deterministic solver diagnostics.
    * @throws Error - Throws a JavaScript exception if the strike and volatility lengths differ, the quote arrays are empty, the SABR inputs or fitted parameters are invalid, or the calibration solver does not converge.
    */
   calibrate(
@@ -24938,7 +24940,7 @@ export interface SabrCalibrator extends WasmOwned {
     marketVols: number[],
     t: number,
     beta: number
-  ): SabrParameters;
+  ): SabrCalibrationOutcome;
   /**
    * Return a copy of this calibrator with an overridden displacement policy,
    * preserving all other settings.
