@@ -230,3 +230,14 @@ def test_registry_rejects_partial_selectors(namespace: ModuleType, selector: str
 def test_registry_byte_count_matches_canonical_schema_file(namespace: ModuleType) -> None:
     row = json.loads(namespace.index())["artifacts"][0]
     assert row["bytes"] == len(namespace.get(row["$id"]).encode("utf-8")) + 1
+
+
+@pytest.mark.parametrize("family", ["rate", "cds", "cds_tranche", "inflation", "vol", "xccy"])
+def test_published_calibration_quote_examples(family: str) -> None:
+    selector = f"{family}_quote.schema.json"
+    examples = json.loads(calibration_schema.get(selector))["examples"]
+    assert examples
+    for example in examples:
+        assert json.loads(calibration_schema.validate(selector, json.dumps(example))) == []
+        if family == "cds_tranche":
+            assert example["upfront_pct"] == 0.0425

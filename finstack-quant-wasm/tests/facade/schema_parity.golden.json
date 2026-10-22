@@ -885,7 +885,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/cds_tranche_quote.schema.json",
             "type_name": "CdsTrancheQuote",
             "kind": "component",
-            "bytes": 5894
+            "bytes": 5896
           },
           {
             "path": "schemas/market/1/inflation_quote.schema.json",
@@ -3658,7 +3658,7 @@
             "$id": "https://finstack_quant.dev/schemas/market/1/cds_tranche_quote.schema.json",
             "type_name": "CdsTrancheQuote",
             "kind": "component",
-            "bytes": 5894
+            "bytes": 5896
           },
           {
             "domain": "calibration",

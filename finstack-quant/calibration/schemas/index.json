@@ -83,7 +83,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/market/1/cds_tranche_quote.schema.json",
-      "bytes": 5894,
+      "bytes": 5896,
       "kind": "component",
       "path": "schemas/market/1/cds_tranche_quote.schema.json",
       "summary": "Index tranche upfront quote.",

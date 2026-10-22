@@ -137,3 +137,15 @@ test('instrument validators return the canonical JSON Python returns', () => {
     (error) => error instanceof TypeError && error.kind === 'invalid_type'
   );
 });
+
+for (const family of ['rate', 'cds', 'cds_tranche', 'inflation', 'vol', 'xccy']) {
+  test(`published calibration ${family} quote examples validate`, () => {
+    const selector = `${family}_quote.schema.json`;
+    const { examples } = facade.calibration.schema.get(selector);
+    assert.ok(examples.length > 0);
+    for (const example of examples) {
+      assert.deepEqual(facade.calibration.schema.validate(selector, example), []);
+      if (family === 'cds_tranche') assert.equal(example.upfront_pct, 0.0425);
+    }
+  });
+}

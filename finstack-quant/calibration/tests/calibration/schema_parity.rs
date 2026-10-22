@@ -48,3 +48,40 @@ fn calibration_step_kinds_match_checked_in_schema() {
     expected.sort_unstable();
     assert_eq!(actual, expected);
 }
+
+#[test]
+#[cfg(feature = "json-schema")]
+fn published_quote_examples_pass_domain_validation() {
+    use finstack_quant_calibration::{json_schema, quotes::MarketQuote};
+    for (file, class) in [
+        ("rate_quote", "rates"),
+        ("cds_quote", "cds"),
+        ("cds_tranche_quote", "cds_tranche"),
+        ("inflation_quote", "inflation"),
+        ("vol_quote", "vol"),
+        ("xccy_quote", "xccy"),
+    ] {
+        let path = format!("schemas/market/1/{file}.schema.json");
+        let artifact = json_schema::artifacts()
+            .iter()
+            .find(|artifact| artifact.relative_path == path)
+            .expect("published quote family");
+        let schema = artifact.generate().expect("quote schema");
+        let examples = schema["examples"].as_array().expect("quote examples");
+        assert!(!examples.is_empty(), "{file}");
+        for example in examples {
+            let mut tagged = example.clone();
+            tagged["class"] = Value::String(class.to_string());
+            let quote: MarketQuote = serde_json::from_value(tagged).expect("typed quote example");
+            quote
+                .validate()
+                .unwrap_or_else(|error| panic!("{file}: {error}"));
+            if class == "cds_tranche" {
+                assert_eq!(
+                    example["upfront_pct"], 0.0425,
+                    "4.25% is a decimal fraction"
+                );
+            }
+        }
+    }
+}
