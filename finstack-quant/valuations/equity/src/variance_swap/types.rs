@@ -216,7 +216,6 @@ impl VarianceSwap {
                 "VarianceSwap requires a non-empty underlying_ticker".to_string(),
             ));
         }
-        validation::validate_money_finite(self.notional, "VarianceSwap notional")?;
         validation::validate_money_gt(self.notional, 0.0, "VarianceSwap notional")?;
         validation::validate_f64_non_negative(
             self.strike_variance,

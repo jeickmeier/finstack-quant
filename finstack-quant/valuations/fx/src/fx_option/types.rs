@@ -248,7 +248,6 @@ impl FxOption {
                 self.strike
             )));
         }
-        finstack_quant_core::validation::validate_money_finite(self.notional, "FxOption notional")?;
         finstack_quant_core::validation::validate_money_gt(
             self.notional,
             0.0,

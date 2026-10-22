@@ -155,7 +155,6 @@ impl FxForward {
                 self.base_currency
             )
         })?;
-        validation::validate_money_finite(self.notional, "FX forward notional")?;
         validation::validate_money_gt(self.notional, 0.0, "FX forward notional")?;
 
         // Contract rate must be positive if provided

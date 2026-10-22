@@ -209,7 +209,6 @@ impl ConvertibleBond {
         use finstack_quant_core::validation;
 
         validation::validate_date_range_strict(self.issue_date, self.maturity, "convertible bond")?;
-        validation::validate_money_finite(self.notional, "convertible bond notional")?;
         validation::validate_money_gt(self.notional, 0.0, "convertible bond notional")?;
 
         if let Some(settlement) = &self.resolved_settlement {
