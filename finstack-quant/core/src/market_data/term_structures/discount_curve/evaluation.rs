@@ -72,31 +72,24 @@ impl CurveTransform {
         }
         Ok(())
     }
-}
 
-impl DiscountCurve {
-    /// Restore the original interpolation, validating the redundant public
-    /// pillar samples instead of trusting either representation independently.
-    pub(super) fn restore_transform(&mut self, mut transform: CurveTransform) -> crate::Result<()> {
-        let source = Self::builder(self.id.clone())
-            .base_date(self.base)
-            .knots(transform.source_points.iter().copied())
-            .interp(self.interp.style())
-            .extrapolation(self.interp.extrapolation())
-            .validation(super::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            })
-            .build()?;
-        transform.refresh_normalization(&source.interp)?;
+    pub(super) fn source_points(&self) -> &[(f64, f64)] {
+        &self.source_points
+    }
+
+    /// Restore normalization and check visible pillars against the source interpolation.
+    pub(super) fn validate(
+        &mut self,
+        interp: &Interp,
+        knots: &[f64],
+        dfs: &[f64],
+    ) -> crate::Result<()> {
+        self.refresh_normalization(interp)?;
         validate_pillars(
-            self.knots.iter().copied().zip(self.dfs.iter().copied()),
+            knots.iter().copied().zip(dfs.iter().copied()),
             true,
             "discount-curve transformation",
-            |time| transform.df(&source.interp, time),
-        )?;
-        self.interp = source.interp;
-        self.transform = Some(transform);
-        Ok(())
+            |time| self.df(interp, time),
+        )
     }
 }
