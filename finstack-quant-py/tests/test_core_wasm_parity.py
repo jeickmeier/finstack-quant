@@ -35,6 +35,7 @@ from finstack_quant.core.market_data import (
     InflationIndex,
     MarketContext,
     PriceCurve,
+    SabrParameterData,
     ScalarTimeSeries,
     VolCubeExpirySlice,
     VolSurface,
@@ -173,6 +174,21 @@ REGISTRY = rating_scales.embedded_registry()
 SERIES = [100.0, 101.5, 99.75, 102.25, 103.0]
 
 CASES: dict[str, Callable[[], Any]] = {
+    # Validated data-class construction also has a callable WASM counterpart.
+    "tolerance_config_new": lambda: [
+        json.loads(config.ToleranceConfig().to_json()),
+        json.loads(config.ToleranceConfig(1e-8).to_json()),
+    ],
+    "rating_level_try_new": lambda: json.loads(rating_scales.RatingLevel("AAA", 95, 90).to_json()),
+    "scorecard_scale_try_new": lambda: json.loads(
+        rating_scales.ScorecardScale(
+            "custom", [rating_scales.RatingLevel("A", 90, 85), rating_scales.RatingLevel("B", 70, 65)], "fixture"
+        ).to_json()
+    ),
+    "sabr_parameter_data_new": lambda: [
+        json.loads(SabrParameterData(0.2, 1, 0, -0.5).to_json()),
+        json.loads(SabrParameterData(0.2, 0.5, 0.4, -0.3, shift=-0.01).to_json()),
+    ],
     # --- dates: IMM, CDS and option rules ---------------------------------
     "third_wednesday": lambda: _iso(dates.third_wednesday(3, 2025)),
     "third_friday": lambda: _iso(dates.third_friday(3, 2025)),

@@ -780,13 +780,16 @@
       "prevCdsSemiannualRoll",
       "quantile",
       "quarter",
+      "ratingLevelTryNew",
       "ratingScalesExtensionKey",
       "realizedVariance",
       "realizedVarianceOhlc",
       "registryFromConfig",
+      "sabrParameterDataNew",
       "sampleStdOrNan",
       "sampleVarianceOrNan",
       "schema",
+      "scorecardScaleTryNew",
       "sifmaSettlementDate",
       "singularThreshold",
       "standardNormalInvCdf",
@@ -796,8 +799,21 @@
       "symmetryTolerance",
       "thirdFriday",
       "thirdWednesday",
+      "toleranceConfigNew",
       "variance"
     ]
+  },
+  "core.toleranceConfigNew": {
+    "kind": "function"
+  },
+  "core.ratingLevelTryNew": {
+    "kind": "function"
+  },
+  "core.scorecardScaleTryNew": {
+    "kind": "function"
+  },
+  "core.sabrParameterDataNew": {
+    "kind": "function"
   },
   "core.Currency": {
     "kind": "class",

@@ -1956,6 +1956,7 @@ types = { FinstackError = "FinstackError" }
 [parity.modules."finstack_quant.core.config"]
 js = "core"
 types = { ToleranceConfig = "ToleranceConfig" }
+constructors = { ToleranceConfig = "core.toleranceConfigNew" }
 
 [parity.modules."finstack_quant.core.currency"]
 js = "core"
@@ -1984,6 +1985,7 @@ types = { BusinessDayConvention = "BusinessDayConvention", CalendarMetadata = "C
 [parity.modules."finstack_quant.core.market_data"]
 js = "core"
 types = { SabrParameterData = "SabrParameterData" }
+constructors = { SabrParameterData = "core.sabrParameterDataNew" }
 
 [parity.modules."finstack_quant.core.math.linalg"]
 js = "core"
@@ -2005,6 +2007,7 @@ js = "core"
 [parity.modules."finstack_quant.core.rating_scales"]
 js = "core"
 types = { RatingLevel = "RatingLevel", ScorecardScale = "ScorecardScale" }
+constructors = { RatingLevel = "core.ratingLevelTryNew", ScorecardScale = "core.scorecardScaleTryNew" }
 
 [parity.modules."finstack_quant.core.schema"]
 js = "core.schema"

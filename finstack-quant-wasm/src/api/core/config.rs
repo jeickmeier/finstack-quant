@@ -5,13 +5,37 @@
 //! typed by the schema-generated `ToleranceConfig` type.
 
 use crate::utils::input::{
-    from_js_json, js_currency, js_json_value, js_opt_string, js_string, js_uint,
+    from_js_json, js_currency, js_json_value, js_opt_f64, js_opt_string, js_string, js_uint,
 };
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::config::{FinstackConfig, RoundingMode, ToleranceConfig};
 use finstack_quant_core::currency::Currency;
 use std::collections::BTreeMap;
 use wasm_bindgen::prelude::*;
+
+/// Construct validated absolute comparison tolerances using Rust defaults.
+///
+/// # Arguments
+///
+/// * `generic_epsilon` - Optional finite, strictly positive absolute tolerance;
+///   `null` or omission uses `ToleranceConfig::default()` (currently `1e-10`).
+///
+/// @returns A `ToleranceConfig` plain object with `generic_epsilon`.
+/// @throws `TypeError` (kind `invalid_type`) for a supplied non-number;
+/// `FinstackError` (kind `validation`) for zero, negative or non-finite values.
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const tolerance = core.toleranceConfigNew();
+/// console.log(tolerance.generic_epsilon); // 1e-10
+/// ```
+#[wasm_bindgen(js_name = toleranceConfigNew)]
+pub fn tolerance_config_new(generic_epsilon: Option<JsValue>) -> Result<JsValue, JsValue> {
+    let epsilon = js_opt_f64(generic_epsilon.as_ref(), "genericEpsilon")?
+        .unwrap_or_else(|| ToleranceConfig::default().generic_epsilon);
+    to_js_value(&ToleranceConfig::new(epsilon).map_err(to_js_err)?)
+}
 
 /// Decimal rounding mode used when amounts are scaled for ingest or output.
 ///

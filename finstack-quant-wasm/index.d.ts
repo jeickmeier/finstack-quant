@@ -96,6 +96,7 @@ import type {
   MarketScalar,
   PeriodPlan,
   RateCalibrationRecipe,
+  RatingLevel,
   SabrParameterData,
   ScheduleSpec,
   ScheduleWarning,
@@ -7607,6 +7608,83 @@ export interface WorkspaceSchemaNamespace {
  * ```
  */
 export interface CoreNamespace {
+  /**
+   * Construct validated absolute comparison tolerances using Rust defaults.
+   * @example
+   * ```typescript
+   * import init, { core } from "finstack-quant-wasm";
+   * await init();
+   * const tolerance = core.toleranceConfigNew();
+   * console.log(tolerance.generic_epsilon); // 1e-10
+   * ```
+   * @param genericEpsilon - Optional finite, strictly positive absolute tolerance; `null` or omission uses `ToleranceConfig::default()` (currently `1e-10`).
+   * @returns A `ToleranceConfig` plain object with `generic_epsilon`.
+   * @throws `TypeError` (kind `invalid_type`) for a supplied non-number; `FinstackError` (kind `validation`) for zero, negative or non-finite values.
+   */
+  toleranceConfigNew(genericEpsilon?: number | null): ToleranceConfig;
+  /**
+   * Construct a validated rating threshold row on the 0–100 scorecard scale.
+   * @example
+   * ```typescript
+   * import init, { core } from "finstack-quant-wasm";
+   * await init();
+   * const level = core.ratingLevelTryNew("AAA", 95, 90);
+   * console.log(level.min_score); // 90
+   * ```
+   * @param name - Nonblank rating label, retained verbatim (for example `"AAA"`).
+   * @param score - Finite representative score in the inclusive range `[0, 100]`.
+   * @param minScore - Finite minimum qualifying score in `[0, 100]`.
+   * @returns A `RatingLevel` plain object with `name`, `score` and `min_score`.
+   * @throws `TypeError` (kind `invalid_type`) for a non-string name or non-number score; `FinstackError` (kind `validation`) for a blank name or invalid score.
+   */
+  ratingLevelTryNew(name: string, score: number, minScore: number): RatingLevel;
+  /**
+   * Construct a validated best-to-worst scorecard scale.
+   * @example
+   * ```typescript
+   * import init, { core } from "finstack-quant-wasm";
+   * await init();
+   * const scale = core.scorecardScaleTryNew("custom", undefined, [
+   *   core.ratingLevelTryNew("A", 90, 85),
+   *   core.ratingLevelTryNew("B", 70, 65),
+   * ]);
+   * console.log(scale.ratings.length); // 2
+   * ```
+   * @param scaleName - Display name stored verbatim and used in validation messages.
+   * @param description - Optional description; pass `null` or `undefined` for none.
+   * @param ratings - Nonempty array (or its JSON text) of `RatingLevel` objects; names must be unique and both score and minimum score must strictly descend.
+   * @returns A `ScorecardScale` plain object preserving the supplied rating order.
+   * @throws `TypeError` (kind `invalid_type`) for mistyped string arguments; `FinstackError` (kind `validation`) for malformed, empty, duplicated, out-of-range or incorrectly ordered rating data. Description precedes ratings as in Rust.
+   */
+  scorecardScaleTryNew(
+    scaleName: string,
+    description: string | null | undefined,
+    ratings: ReadonlyArray<RatingLevel> | string
+  ): ScorecardScale;
+  /**
+   * Construct validated SABR parameter data for a volatility-cube node.
+   * @example
+   * ```typescript
+   * import init, { core } from "finstack-quant-wasm";
+   * await init();
+   * const node = core.sabrParameterDataNew(0.2, 1, 0, -0.5);
+   * console.log(node.nu); // 0
+   * ```
+   * @param alpha - Finite, strictly positive initial volatility scale.
+   * @param beta - Finite CEV elasticity in the inclusive range `[0, 1]`.
+   * @param nu - Finite, nonnegative volatility of volatility; zero is deterministic.
+   * @param rho - Finite forward-volatility correlation strictly between `-1` and `1`.
+   * @param shift - Optional finite displacement in forward/strike units; `null` or omission records an unshifted node, and finite negative shifts are allowed.
+   * @returns A `SabrParameterData` plain object; an absent shift is omitted.
+   * @throws `TypeError` (kind `invalid_type`) for a non-number argument; `FinstackError` (kind `validation`) for a non-finite or out-of-range parameter.
+   */
+  sabrParameterDataNew(
+    alpha: number,
+    beta: number,
+    nu: number,
+    rho: number,
+    shift?: number | null
+  ): SabrParameterData;
   /**
    * Registry of the JSON Schemas this crate publishes (`index` / `get` / `validate`).
    */

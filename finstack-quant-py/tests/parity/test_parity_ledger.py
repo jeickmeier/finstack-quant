@@ -11,6 +11,7 @@ CONSTANT_CASE) name. Everything else is recorded explicitly:
 
 * ``renames``   -- Python name -> full WASM path, with a reason;
 * ``types``     -- Python data class -> TypeScript type declared for WASM;
+* ``constructors`` -- supplementary data-class constructor -> WASM factory;
 * ``excluded``  -- Python name -> host-exclusion reason from a fixed vocabulary;
 * ``backlog``   -- Python names not yet reachable from WASM (must reach zero);
 * ``wasm_only`` -- WASM keys with no Python twin, with a reason.
@@ -238,13 +239,30 @@ def test_python_module_is_partitioned(module_path: str) -> None:
     for name, ts_type in entry.get("types", {}).items():
         if ts_type not in TS_TYPES:
             problems.append(f"{module_path}.{name}: TypeScript type {ts_type!r} is not declared")
+    for name, target in entry.get("constructors", {}).items():
+        value = PY[module_path].get(name)
+        if not inspect.isclass(value):
+            problems.append(f"{module_path}.{name}: constructor mapping must name a public Python class")
+        if name not in entry.get("types", {}):
+            problems.append(f"{module_path}.{name}: a factory constructor must retain its TypeScript data type")
+        if SURFACE.get(target, {}).get("kind") != "function":
+            problems.append(f"{module_path}.{name}: constructor target {target!r} is not a WASM function")
     assert problems == []
+
+
+def test_constructor_factories_have_one_python_owner() -> None:
+    """Each runtime factory explicitly represents one validated Python data-class constructor."""
+    owners: dict[str, list[str]] = {}
+    for path, entry in MODULES.items():
+        for name, target in entry.get("constructors", {}).items():
+            owners.setdefault(target, []).append(f"{path}.{name}")
+    assert {target: names for target, names in owners.items() if len(names) != 1} == {}
 
 
 def claimed_js_paths() -> set[str]:
     """Full WASM paths that have a Python twin.
 
-    That is every rule match and module rename, plus every member rename whose
+    That is every rule match, module rename and constructor factory, plus every member rename whose
     target is a namespace function (the free-function twin of a data-class
     method); a member rename to a class member names no namespace key.
     """
@@ -256,6 +274,7 @@ def claimed_js_paths() -> set[str]:
             if js_name(name) in keys and name not in entry.get("renames", {}):
                 claimed.add(f"{js}.{js_name(name)}")
         claimed |= {rename["js"] for rename in entry.get("renames", {}).values()}
+        claimed |= set(entry.get("constructors", {}).values())
     for entry in MEMBERS.values():
         claimed |= {rename["js"] for rename in entry.get("renames", {}).values() if rename["js"] in SURFACE}
     return claimed
