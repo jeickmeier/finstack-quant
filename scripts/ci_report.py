@@ -736,6 +736,7 @@ def _resolve_default_rust_junit() -> Path | None:
     target_root = Path(os.environ.get("CARGO_TARGET_DIR", "target"))
     candidates = [
         target_root / "llvm-cov-target" / "nextest" / "default" / "junit.xml",
+        target_root / "nextest" / "ci" / "junit.xml",
         target_root / "nextest" / "default" / "junit.xml",
     ]
     existing = [candidate for candidate in candidates if candidate.is_file()]

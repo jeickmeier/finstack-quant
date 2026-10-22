@@ -9,3 +9,14 @@ fail-fast = false
 path = "junit.xml"
 store-success-output = false
 store-failure-output = true
+
+[profile.ci]
+# The PR gate budget: report at 20 s, kill at 60 s. A test that needs longer
+# belongs in the `#[ignore]` slow suite, which the full tier runs.
+slow-timeout = { period = "20s", terminate-after = 3 }
+fail-fast = false
+
+[profile.ci.junit]
+path = "junit.xml"
+store-success-output = false
+store-failure-output = true
