@@ -18,7 +18,7 @@ True
 
 import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, TypedDict
 
 import pandas as pd
 
@@ -4089,6 +4089,21 @@ class CalibrationReport:
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
 
+class _DependencyNode(TypedDict):
+    """Declared step and the market-object identifiers it consumes and produces."""
+
+    step_index: int
+    step_id: str
+    kind: str
+    reads: list[str]
+    writes: list[str]
+
+class _DependencyGraph(TypedDict):
+    """Initially available market identifiers and dependency nodes in plan order."""
+
+    initial_ids: list[str]
+    nodes: list[_DependencyNode]
+
 class CalibrationValidationReport:
     """Result of static, pre-solve validation of a calibration envelope.
 
@@ -4127,16 +4142,19 @@ class CalibrationValidationReport:
         """
 
     @property
-    def dependency_graph(self) -> dict[str, list[str]]:
-        """
-        Step identifiers mapped to the step ids they depend on.
+    def dependency_graph(self) -> _DependencyGraph:
+        """Return initially available market identifiers and per-step dependencies.
 
         This property does not raise.
 
         Returns
         -------
-        dict[str, list[str]]
-            Step identifiers mapped to the step ids they depend on.
+        _DependencyGraph
+            ``initial_ids`` lists the sorted market-object identifiers supplied
+            before execution. ``nodes`` follows declared plan order; each node
+            contains its zero-based ``step_index``, ``step_id``, step ``kind``,
+            consumed market identifiers in ``reads``, and produced market
+            identifiers in ``writes``. An empty plan has no nodes.
         """
 
     def to_dataframe(self) -> pd.DataFrame:
