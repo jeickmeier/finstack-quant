@@ -95,84 +95,6 @@ fn push_debt(
         .push(DebtInstrumentSpec { id, spec });
 }
 
-/// Build an `InterestRateSwap` from leg parameters.
-#[allow(clippy::too_many_arguments)]
-fn build_swap_internal(
-    id_str: &str,
-    notional: Money,
-    fixed_rate: f64,
-    start_date: Date,
-    maturity_date: Date,
-    discount_curve_id: String,
-    forward_curve_id: String,
-    fixed_frequency: Tenor,
-    fixed_day_count: DayCount,
-    float_frequency: Tenor,
-    float_day_count: DayCount,
-    business_day_convention: BusinessDayConvention,
-) -> crate::error::Result<InterestRateSwap> {
-    use finstack_quant_valuations::instruments::PayReceive;
-
-    let rate_decimal = finstack_quant_core::decimal::f64_to_decimal(fixed_rate)?;
-
-    // The swap rolls on its currency's standard rates calendar. A currency
-    // without one is rejected rather than silently rolled on US holidays.
-    let currency = notional.currency();
-    let calendar_id =
-        finstack_quant_valuations::instruments::pricing::default_rate_calendar_id(currency)
-            .ok_or_else(|| {
-                crate::error::Error::build(format!(
-                    "swap '{id_str}': no standard rates calendar is defined for {currency}; \
-                     add the swap with `add_debt` and explicit leg calendars"
-                ))
-            })?
-            .to_string();
-
-    let discount_curve_id = CurveId::new(discount_curve_id);
-    let forward_curve_id = CurveId::new(forward_curve_id);
-
-    let fixed = FixedLegSpec {
-        discount_curve_id: discount_curve_id.clone(),
-        rate: rate_decimal,
-        frequency: fixed_frequency,
-        day_count: fixed_day_count,
-        business_day_convention,
-        calendar_id: Some(calendar_id.clone().into()),
-        stub: StubKind::None,
-        start: start_date,
-        end: maturity_date,
-
-        payment_lag_days: 0,
-        end_of_month: false,
-    };
-
-    let float = FloatLegSpec {
-        discount_curve_id,
-        forward_curve_id,
-        spread_bp: Decimal::ZERO,
-        frequency: float_frequency,
-        day_count: float_day_count,
-        business_day_convention,
-        calendar_id: Some(calendar_id.into()),
-        stub: StubKind::None,
-        reset_lag_days: 0,
-        fixing_calendar_id: None,
-        start: start_date,
-        end: maturity_date,
-        compounding: FloatingLegCompounding::Simple,
-        payment_lag_days: 0,
-        end_of_month: false,
-    };
-
-    Ok(InterestRateSwap::builder()
-        .id(InstrumentId::new(id_str))
-        .notional(notional)
-        .side(PayReceive::Pay)
-        .fixed_leg(fixed)
-        .float_leg(float)
-        .build()?)
-}
-
 impl ModelBuilder {
     /// Add a bond instrument to the capital structure specification.
     ///
@@ -626,20 +548,66 @@ impl ModelBuilder {
             float_day_count,
             business_day_convention,
         } = conventions;
-        let swap = build_swap_internal(
-            &id_str,
-            notional,
-            fixed_rate,
-            start_date,
-            maturity_date,
+        use finstack_quant_valuations::instruments::PayReceive;
+
+        let rate_decimal = finstack_quant_core::decimal::f64_to_decimal(fixed_rate)?;
+
+        // The swap rolls on its currency's standard rates calendar. A currency
+        // without one is rejected rather than silently rolled on US holidays.
+        let currency = notional.currency();
+        let calendar_id =
+            finstack_quant_valuations::instruments::pricing::default_rate_calendar_id(currency)
+                .ok_or_else(|| {
+                    crate::error::Error::build(format!(
+                        "swap '{id_str}': no standard rates calendar is defined for {currency}; \
+                         add the swap with `add_debt` and explicit leg calendars"
+                    ))
+                })?
+                .to_string();
+
+        let discount_curve_id = CurveId::new(discount_curve_id);
+        let forward_curve_id = CurveId::new(forward_curve_id);
+
+        let fixed = FixedLegSpec {
+            discount_curve_id: discount_curve_id.clone(),
+            rate: rate_decimal,
+            frequency: fixed_frequency,
+            day_count: fixed_day_count,
+            business_day_convention,
+            calendar_id: Some(calendar_id.clone().into()),
+            stub: StubKind::None,
+            start: start_date,
+            end: maturity_date,
+
+            payment_lag_days: 0,
+            end_of_month: false,
+        };
+
+        let float = FloatLegSpec {
             discount_curve_id,
             forward_curve_id,
-            fixed_frequency,
-            fixed_day_count,
-            float_frequency,
-            float_day_count,
+            spread_bp: Decimal::ZERO,
+            frequency: float_frequency,
+            day_count: float_day_count,
             business_day_convention,
-        )?;
+            calendar_id: Some(calendar_id.into()),
+            stub: StubKind::None,
+            reset_lag_days: 0,
+            fixing_calendar_id: None,
+            start: start_date,
+            end: maturity_date,
+            compounding: FloatingLegCompounding::Simple,
+            payment_lag_days: 0,
+            end_of_month: false,
+        };
+
+        let swap = InterestRateSwap::builder()
+            .id(InstrumentId::new(&id_str))
+            .notional(notional)
+            .side(PayReceive::Pay)
+            .fixed_leg(fixed)
+            .float_leg(float)
+            .build()?;
         push_debt(
             &mut self.capital_structure,
             id_str,
