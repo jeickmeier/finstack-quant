@@ -3103,7 +3103,8 @@ class FloatingRateSpec:
 
     Used by bonds, swaps, credit facilities, and structured products;
     mirrors ``finstack_quant_cashflows::builder::FloatingRateSpec``
-    field-for-field.
+    field-for-field. Construction validates reset lag and floor/cap ordering
+    through the canonical Rust validator.
 
     Examples
     --------
@@ -3151,7 +3152,7 @@ class FloatingRateSpec:
             while overnight coupons use their daily observation schedule.
         gearing : decimal.Decimal | float, optional
             Leverage multiplier applied to the all-in rate (default ``1``);
-            must be strictly positive.
+            is stored as an exact decimal.
         gearing_includes_spread : bool
             Whether gearing multiplies ``(index + spread)`` (``True``,
             default) or only the index component (``False``).
@@ -3178,8 +3179,7 @@ class FloatingRateSpec:
             coupons; a disagreement with the curve exceeding 10% warns at build.
         reset_lag_days : int
             Nonnegative reset lag in business days (default ``2``, T-2
-            convention). Negative values are rejected by :meth:`validate`
-            or schedule construction, rather than by this constructor.
+            convention). Negative values raise ``ValueError`` immediately.
         fixing_calendar_id : str, optional
             Calendar for the reset lag; defaults to the coupon schedule
             calendar when omitted.
@@ -3204,7 +3204,8 @@ class FloatingRateSpec:
             or a tenor is neither a ``Tenor`` nor a string.
         ValueError
             If a decimal quote is not representable as a finite ``Decimal``,
-            or a tenor string is invalid.
+            a tenor string is invalid, the reset lag is negative, an index
+            floor exceeds its cap, or an all-in floor exceeds its cap.
         OverflowError
             If *reset_lag_days* is outside the signed 32-bit integer range.
         """

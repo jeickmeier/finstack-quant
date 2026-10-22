@@ -245,15 +245,14 @@ class TestBuilderSpecs:
             index_floor_bp=Decimal("0"),
         )
         spec.validate()
-        bad = FloatingRateSpec(
-            forward_curve_id="USD-SOFR-3M",
-            spread_bp=Decimal("200"),
-            reset_frequency="3M",
-            index_floor_bp=Decimal("100"),
-            index_cap_bp=Decimal("50"),
-        )
         with pytest.raises(ValueError, match="index_floor_bp"):
-            bad.validate()
+            FloatingRateSpec(
+                forward_curve_id="USD-SOFR-3M",
+                spread_bp=Decimal("200"),
+                reset_frequency="3M",
+                index_floor_bp=Decimal("100"),
+                index_cap_bp=Decimal("50"),
+            )
 
     def test_schedule_params_and_fixed_coupon_defaults_match_json(self) -> None:
         """Typed constructors must not hand-re-encode private Rust serde defaults.
@@ -1632,3 +1631,45 @@ def test_credit_rate_conversion_boundaries_and_errors() -> None:
         for invalid in [-0.01, 1.01, float("nan"), float("inf"), -float("inf")]:
             with pytest.raises(ValueError, match=rf"{name} must be a decimal in \[0,1\]"):
                 convert(invalid)
+
+
+@pytest.mark.parametrize(
+    ("fields", "message"),
+    [
+        ({"reset_lag_days": -1}, "reset_lag_days"),
+        ({"index_floor_bp": "100", "index_cap_bp": "50"}, "index_floor_bp"),
+        ({"all_in_floor_bp": "100", "all_in_cap_bp": "50"}, "all_in_floor_bp"),
+    ],
+)
+def test_floating_rate_constructor_and_json_reject_invalid_fields(fields: dict[str, int | str], message: str) -> None:
+    import json
+
+    from finstack_quant.cashflows.builder import FloatingRateSpec
+
+    with pytest.raises(ValueError, match=message):
+        FloatingRateSpec("USD-SOFR", "0", "3M", **fields)
+    payload = json.loads(FloatingRateSpec("USD-SOFR", "0", "3M").to_json())
+    payload.update(fields)
+    with pytest.raises(ValueError, match=message):
+        FloatingRateSpec.from_json(json.dumps(payload))
+
+
+def test_floating_rate_valid_equal_bounds_preserve_json_and_pickle() -> None:
+    import pickle
+
+    from finstack_quant.cashflows.builder import FloatingRateSpec
+
+    spec = FloatingRateSpec(
+        "USD-SOFR",
+        "0",
+        "3M",
+        reset_lag_days=0,
+        index_floor_bp="50",
+        index_cap_bp="50",
+        all_in_floor_bp="75",
+        all_in_cap_bp="75",
+    )
+    spec.validate()
+    assert FloatingRateSpec.from_json(spec.to_json()).to_json() == spec.to_json()
+    restored = pickle.loads(pickle.dumps(spec))  # noqa: S301 - locally serialized test fixture
+    assert restored.to_json() == spec.to_json()
