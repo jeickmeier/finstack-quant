@@ -51,7 +51,7 @@ use crate::monte_carlo::pricer::basis::{build_lsmc_basis, BasisFunctions, BasisK
 use crate::monte_carlo::process::gbm::GbmProcess;
 use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::{Discretization, RandomStream};
-use crate::types::OptionType;
+use crate::types::{OptionMarketParams, OptionType};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::math::time_grid::TimeGrid;
@@ -429,7 +429,7 @@ fn fill_gbm_antithetic_pair(
 /// [`LsmcEngine`] fixes the exercise grid at construction, while the host
 /// pricing calls may override the step count, basis and basis degree per
 /// call. This type keeps the construction-time choices and resolves each
-/// call's overrides through [`Self::call_config`].
+/// call's overrides before pricing.
 #[derive(Debug, Clone)]
 pub struct LsmcPricer {
     pricer: LsmcEngine,
@@ -517,6 +517,119 @@ impl LsmcPricer {
         self.basis_degree
     }
 
+    /// Price an American option under GBM with the binding convenience pipeline.
+    ///
+    /// Builds the GBM process, Laguerre/polynomial basis, unit-notional
+    /// exercise payoff, and every-step exercise schedule, then runs [`LsmcEngine::price`].
+    /// Host bindings must delegate here rather than assembling those pieces.
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - Call/put direction, positive spot/strike, decimal annual rate,
+    ///   carry and volatility, and expiry in years; see [`OptionMarketParams`].
+    /// * `num_steps` - Time-grid steps between `0` and `expiry`; `None` keeps the construction-time grid.
+    /// * `currency` - Currency stamped on the returned estimate; `None` uses the
+    ///   registry default `convenience.default_currency`.
+    /// * `basis` - Regression basis name (`laguerre`, `polynomial`, or `normalized_polynomial`); `None` keeps the construction-time family.
+    /// * `basis_degree` - Optional basis degree; `None` keeps the construction-time degree. It must be positive (`laguerre` also
+    ///   requires the degree in `[1, 4]`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the registry default currency cannot be resolved,
+    /// the strike, GBM parameters, basis, path count, step count, or
+    /// discounting inputs fail validation, or the run fails.
+    pub fn price_american(
+        &self,
+        params: &OptionMarketParams,
+        num_steps: Option<usize>,
+        currency: Option<Currency>,
+        basis: Option<&str>,
+        basis_degree: Option<usize>,
+    ) -> Result<MoneyEstimate> {
+        let &OptionMarketParams {
+            option_type,
+            spot,
+            strike,
+            rate,
+            dividend_yield: div_yield,
+            volatility: vol,
+            time_to_expiry: expiry,
+        } = params;
+        let (pricer, num_steps, basis, basis_degree) =
+            self.call_config(num_steps, basis, basis_degree)?;
+        let currency = crate::monte_carlo::convenience::resolve_currency(currency)?;
+        let exercise = AmericanExercise::new(option_type, strike)?;
+        crate::monte_carlo::require_positive_vol(vol)?;
+        let process = crate::monte_carlo::process::gbm::GbmParams::new(rate, div_yield, vol)
+            .map(GbmProcess::new)?;
+        let basis = lsmc_basis(basis, basis_degree, strike)?;
+        pricer.price(
+            &process, spot, expiry, num_steps, &exercise, &basis, currency, rate,
+        )
+    }
+
+    /// Two-pass unbiased American option price under GBM.
+    ///
+    /// Fits the exercise policy on the configured training seed and prices on
+    /// an independent `pricing_seed` path set via [`LsmcEngine::price_unbiased`].
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - Call/put direction, positive spot/strike, decimal annual rate,
+    ///   carry and volatility, and expiry in years; see [`OptionMarketParams`].
+    /// * `num_steps` - Time-grid steps between `0` and `expiry`; `None` keeps the construction-time grid.
+    /// * `currency` - Currency stamped on the returned estimate; `None` uses the
+    ///   registry default `convenience.default_currency`.
+    /// * `basis` - Regression basis name (`laguerre`, `polynomial`, or `normalized_polynomial`); `None` keeps the construction-time family.
+    /// * `basis_degree` - Optional basis degree; `None` keeps the construction-time degree. It must be positive (`laguerre` also
+    ///   requires the degree in `[1, 4]`).
+    /// * `pricing_seed` - Seed for the out-of-sample pricing paths; must differ
+    ///   from the configured training seed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when inputs fail validation, `pricing_seed` matches the
+    /// training seed, or either Monte Carlo pass fails.
+    pub fn price_american_unbiased(
+        &self,
+        params: &OptionMarketParams,
+        num_steps: Option<usize>,
+        currency: Option<Currency>,
+        basis: Option<&str>,
+        basis_degree: Option<usize>,
+        pricing_seed: u64,
+    ) -> Result<MoneyEstimate> {
+        let &OptionMarketParams {
+            option_type,
+            spot,
+            strike,
+            rate,
+            dividend_yield: div_yield,
+            volatility: vol,
+            time_to_expiry: expiry,
+        } = params;
+        let (pricer, num_steps, basis, basis_degree) =
+            self.call_config(num_steps, basis, basis_degree)?;
+        let currency = crate::monte_carlo::convenience::resolve_currency(currency)?;
+        let exercise = AmericanExercise::new(option_type, strike)?;
+        crate::monte_carlo::require_positive_vol(vol)?;
+        let process = crate::monte_carlo::process::gbm::GbmParams::new(rate, div_yield, vol)
+            .map(GbmProcess::new)?;
+        let basis = lsmc_basis(basis, basis_degree, strike)?;
+        pricer.price_unbiased(
+            &process,
+            spot,
+            expiry,
+            num_steps,
+            &exercise,
+            &basis,
+            currency,
+            rate,
+            pricing_seed,
+        )
+    }
+
     /// Resolve one pricing call's overrides against the construction-time
     /// defaults.
     ///
@@ -538,7 +651,7 @@ impl LsmcPricer {
     ///
     /// Returns [`Error::Validation`] for an unknown basis name, and an error
     /// if the step count is zero.
-    pub fn call_config(
+    fn call_config(
         &self,
         num_steps: Option<usize>,
         basis: Option<&str>,
@@ -1203,121 +1316,6 @@ impl LsmcEngine {
 
         present_values
     }
-
-    /// Price an American option under GBM with the binding convenience pipeline.
-    ///
-    /// Builds the GBM process, Laguerre/polynomial basis, unit-notional
-    /// exercise payoff, and every-step exercise schedule, then runs [`Self::price`].
-    /// Host bindings must delegate here rather than assembling those pieces.
-    ///
-    /// # Arguments
-    ///
-    /// * `option_type` - Call or put exercise payoff direction.
-    /// * `spot` - Spot level at time `0`.
-    /// * `strike` - Exercise price in the same units as `spot`; must be positive.
-    /// * `rate` - Continuously compounded risk-free rate (decimal, annualized).
-    /// * `div_yield` - Continuous dividend yield (decimal, annualized).
-    /// * `vol` - Annualized GBM volatility (decimal).
-    /// * `expiry` - Time to expiry in years.
-    /// * `num_steps` - Number of time-grid steps between `0` and `expiry`.
-    /// * `currency` - Currency stamped on the returned estimate; `None` uses the
-    ///   registry default `convenience.default_currency`.
-    /// * `basis` - Regression basis family.
-    /// * `basis_degree` - Basis degree; must be positive (`laguerre` also
-    ///   requires the degree in `[1, 4]`).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the registry default currency cannot be resolved,
-    /// the strike, GBM parameters, basis, path count, step count, or
-    /// discounting inputs fail validation, or the run fails.
-    #[allow(clippy::too_many_arguments)]
-    pub fn price_american(
-        &self,
-        option_type: OptionType,
-        spot: f64,
-        strike: f64,
-        rate: f64,
-        div_yield: f64,
-        vol: f64,
-        expiry: f64,
-        num_steps: usize,
-        currency: Option<Currency>,
-        basis: BasisKind,
-        basis_degree: usize,
-    ) -> Result<MoneyEstimate> {
-        let currency = crate::monte_carlo::convenience::resolve_currency(currency)?;
-        let exercise = AmericanExercise::new(option_type, strike)?;
-        crate::monte_carlo::require_positive_vol(vol)?;
-        let process = crate::monte_carlo::process::gbm::GbmParams::new(rate, div_yield, vol)
-            .map(GbmProcess::new)?;
-        let basis = lsmc_basis(basis, basis_degree, strike)?;
-        self.price(
-            &process, spot, expiry, num_steps, &exercise, &basis, currency, rate,
-        )
-    }
-
-    /// Two-pass unbiased American option price under GBM.
-    ///
-    /// Fits the exercise policy on the configured training seed and prices on
-    /// an independent `pricing_seed` path set via [`Self::price_unbiased`].
-    ///
-    /// # Arguments
-    ///
-    /// * `option_type` - Call or put exercise payoff direction.
-    /// * `spot` - Spot level at time `0`.
-    /// * `strike` - Exercise price in the same units as `spot`; must be positive.
-    /// * `rate` - Continuously compounded risk-free rate (decimal, annualized).
-    /// * `div_yield` - Continuous dividend yield (decimal, annualized).
-    /// * `vol` - Annualized GBM volatility (decimal).
-    /// * `expiry` - Time to expiry in years.
-    /// * `num_steps` - Number of time-grid steps between `0` and `expiry`.
-    /// * `currency` - Currency stamped on the returned estimate; `None` uses the
-    ///   registry default `convenience.default_currency`.
-    /// * `basis` - Regression basis family.
-    /// * `basis_degree` - Basis degree; must be positive (`laguerre` also
-    ///   requires the degree in `[1, 4]`).
-    /// * `pricing_seed` - Seed for the out-of-sample pricing paths; must differ
-    ///   from the configured training seed.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when inputs fail validation, `pricing_seed` matches the
-    /// training seed, or either Monte Carlo pass fails.
-    #[allow(clippy::too_many_arguments)]
-    pub fn price_american_unbiased(
-        &self,
-        option_type: OptionType,
-        spot: f64,
-        strike: f64,
-        rate: f64,
-        div_yield: f64,
-        vol: f64,
-        expiry: f64,
-        num_steps: usize,
-        currency: Option<Currency>,
-        basis: BasisKind,
-        basis_degree: usize,
-        pricing_seed: u64,
-    ) -> Result<MoneyEstimate> {
-        let currency = crate::monte_carlo::convenience::resolve_currency(currency)?;
-        let exercise = AmericanExercise::new(option_type, strike)?;
-        crate::monte_carlo::require_positive_vol(vol)?;
-        let process = crate::monte_carlo::process::gbm::GbmParams::new(rate, div_yield, vol)
-            .map(GbmProcess::new)?;
-        let basis = lsmc_basis(basis, basis_degree, strike)?;
-        self.price_unbiased(
-            &process,
-            spot,
-            expiry,
-            num_steps,
-            &exercise,
-            &basis,
-            currency,
-            rate,
-            pricing_seed,
-        )
-    }
 }
 
 fn lsmc_basis(kind: BasisKind, degree: usize, strike: f64) -> Result<LsmcBasis> {
@@ -1749,21 +1747,31 @@ mod tests {
 
     #[test]
     fn price_gbm_american_put_atm_is_positive() {
-        let pricer = LsmcEngine::gbm_american(1_000, 8, 42, false, true)
-            .expect("GBM American pricer should construct");
+        let pricer = LsmcPricer::new(
+            Some(1_000),
+            Some(42),
+            Some(false),
+            Some(8),
+            Some("laguerre"),
+            Some(3),
+            Some(true),
+        )
+        .expect("GBM American pricer should construct");
         let estimate = pricer
             .price_american(
-                OptionType::Put,
-                100.0,
-                100.0,
-                0.05,
-                0.0,
-                0.2,
-                1.0,
-                8,
+                &OptionMarketParams {
+                    option_type: OptionType::Put,
+                    spot: 100.0,
+                    strike: 100.0,
+                    rate: 0.05,
+                    dividend_yield: 0.0,
+                    volatility: 0.2,
+                    time_to_expiry: 1.0,
+                },
+                Some(8),
                 Some(Currency::USD),
-                BasisKind::Laguerre,
-                3,
+                Some("laguerre"),
+                Some(3),
             )
             .expect("American put pricing should succeed");
         assert!(estimate.mean.amount() > 0.0);
@@ -1771,21 +1779,31 @@ mod tests {
 
     #[test]
     fn lsmc_deep_itm_put_respects_intrinsic_floor() {
-        let pricer = LsmcEngine::gbm_american(4_000, 8, 7, false, true)
-            .expect("GBM American pricer should construct");
+        let pricer = LsmcPricer::new(
+            Some(4_000),
+            Some(7),
+            Some(false),
+            Some(8),
+            Some("laguerre"),
+            Some(3),
+            Some(true),
+        )
+        .expect("GBM American pricer should construct");
         let estimate = pricer
             .price_american(
-                OptionType::Put,
-                50.0,
-                100.0,
-                0.05,
-                0.0,
-                0.2,
-                1.0,
-                8,
+                &OptionMarketParams {
+                    option_type: OptionType::Put,
+                    spot: 50.0,
+                    strike: 100.0,
+                    rate: 0.05,
+                    dividend_yield: 0.0,
+                    volatility: 0.2,
+                    time_to_expiry: 1.0,
+                },
+                Some(8),
                 Some(Currency::USD),
-                BasisKind::Laguerre,
-                3,
+                Some("laguerre"),
+                Some(3),
             )
             .expect("deep ITM put should price");
         let intrinsic = 50.0;
@@ -1798,21 +1816,31 @@ mod tests {
 
     #[test]
     fn lsmc_deep_itm_put_floor_keeps_stderr() {
-        let pricer = LsmcEngine::gbm_american(2_000, 2, 17, false, true)
-            .expect("GBM American pricer should construct");
+        let pricer = LsmcPricer::new(
+            Some(2_000),
+            Some(17),
+            Some(false),
+            Some(2),
+            Some("laguerre"),
+            Some(3),
+            Some(true),
+        )
+        .expect("GBM American pricer should construct");
         let estimate = pricer
             .price_american(
-                OptionType::Put,
-                50.0,
-                100.0,
-                0.05,
-                0.0,
-                0.2,
-                1.0 / 252.0,
-                2,
+                &OptionMarketParams {
+                    option_type: OptionType::Put,
+                    spot: 50.0,
+                    strike: 100.0,
+                    rate: 0.05,
+                    dividend_yield: 0.0,
+                    volatility: 0.2,
+                    time_to_expiry: 1.0 / 252.0,
+                },
+                Some(2),
                 Some(Currency::USD),
-                BasisKind::Laguerre,
-                3,
+                Some("laguerre"),
+                Some(3),
             )
             .expect("deep ITM short-horizon put should price");
         let intrinsic = 50.0;
@@ -1858,21 +1886,31 @@ mod tests {
             crate::types::OptionType::Put,
         )
         .expect("valid Black-Scholes inputs");
-        let pricer = LsmcEngine::gbm_american(8_000, 8, 11, false, true)
-            .expect("GBM American pricer should construct");
+        let pricer = LsmcPricer::new(
+            Some(8_000),
+            Some(11),
+            Some(false),
+            Some(8),
+            Some("laguerre"),
+            Some(3),
+            Some(true),
+        )
+        .expect("GBM American pricer should construct");
         let estimate = pricer
             .price_american(
-                OptionType::Put,
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
-                8,
+                &OptionMarketParams {
+                    option_type: OptionType::Put,
+                    spot,
+                    strike,
+                    rate,
+                    dividend_yield: div_yield,
+                    volatility: vol,
+                    time_to_expiry: expiry,
+                },
+                Some(8),
                 Some(Currency::USD),
-                BasisKind::Laguerre,
-                3,
+                Some("laguerre"),
+                Some(3),
             )
             .expect("ATM American put should price");
         let price = estimate.mean.amount();
@@ -1902,21 +1940,31 @@ mod tests {
             crate::types::OptionType::Call,
         )
         .expect("valid Black-Scholes inputs");
-        let pricer = LsmcEngine::gbm_american(8_000, 8, 13, false, true)
-            .expect("GBM American pricer should construct");
+        let pricer = LsmcPricer::new(
+            Some(8_000),
+            Some(13),
+            Some(false),
+            Some(8),
+            Some("laguerre"),
+            Some(3),
+            Some(true),
+        )
+        .expect("GBM American pricer should construct");
         let estimate = pricer
             .price_american(
-                OptionType::Call,
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
-                8,
+                &OptionMarketParams {
+                    option_type: OptionType::Call,
+                    spot,
+                    strike,
+                    rate,
+                    dividend_yield: div_yield,
+                    volatility: vol,
+                    time_to_expiry: expiry,
+                },
+                Some(8),
                 Some(Currency::USD),
-                BasisKind::Laguerre,
-                3,
+                Some("laguerre"),
+                Some(3),
             )
             .expect("ATM American call should price");
         let price = estimate.mean.amount();
@@ -1944,62 +1992,79 @@ mod tests {
             0x4020f4f4ccf63499,
             0x3fdc7de115fa4ffb,
         ];
-        let pricer = LsmcEngine::gbm_american(400, 10, 42, false, true).expect("pricer");
+        let pricer = LsmcPricer::new(
+            Some(400),
+            Some(42),
+            Some(false),
+            Some(10),
+            Some("laguerre"),
+            Some(3),
+            Some(true),
+        )
+        .expect("pricer");
         let (spot, strike, rate, div_yield, vol, expiry, num_steps, currency) =
             (100.0, 105.0, 0.05, 0.03, 0.25, 1.0, 10, Currency::USD);
         let estimates = [
             pricer.price_american(
-                OptionType::Put,
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
-                num_steps,
+                &OptionMarketParams {
+                    option_type: OptionType::Put,
+                    spot,
+                    strike,
+                    rate,
+                    dividend_yield: div_yield,
+                    volatility: vol,
+                    time_to_expiry: expiry,
+                },
+                Some(num_steps),
                 Some(currency),
-                BasisKind::Laguerre,
-                3,
+                Some("laguerre"),
+                Some(3),
             ),
             pricer.price_american(
-                OptionType::Call,
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
-                num_steps,
+                &OptionMarketParams {
+                    option_type: OptionType::Call,
+                    spot,
+                    strike,
+                    rate,
+                    dividend_yield: div_yield,
+                    volatility: vol,
+                    time_to_expiry: expiry,
+                },
+                Some(num_steps),
                 Some(currency),
-                BasisKind::Polynomial,
-                2,
+                Some("polynomial"),
+                Some(2),
             ),
             pricer.price_american_unbiased(
-                OptionType::Put,
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
-                num_steps,
+                &OptionMarketParams {
+                    option_type: OptionType::Put,
+                    spot,
+                    strike,
+                    rate,
+                    dividend_yield: div_yield,
+                    volatility: vol,
+                    time_to_expiry: expiry,
+                },
+                Some(num_steps),
                 Some(currency),
-                BasisKind::Laguerre,
-                3,
+                Some("laguerre"),
+                Some(3),
                 99,
             ),
             pricer.price_american_unbiased(
-                OptionType::Call,
-                spot,
-                strike,
-                rate,
-                div_yield,
-                vol,
-                expiry,
-                num_steps,
+                &OptionMarketParams {
+                    option_type: OptionType::Call,
+                    spot,
+                    strike,
+                    rate,
+                    dividend_yield: div_yield,
+                    volatility: vol,
+                    time_to_expiry: expiry,
+                },
+                Some(num_steps),
                 Some(currency),
-                BasisKind::Polynomial,
-                2,
+                Some("polynomial"),
+                Some(2),
                 99,
             ),
         ];
