@@ -185,3 +185,12 @@ def test_fx_forward_trade_date_convention_defaults_in_rust_and_normalizes_names(
         ValueError, match="invalid business_day_convention: Validation error: Unknown business day convention"
     ):
         FxForward.from_trade_date(*args, business_day_convention="bogus")
+
+
+def test_currency_has_one_alphabetic_string_surface() -> None:
+    from finstack_quant.core.currency import Currency
+
+    currency = Currency("usd")
+    assert str(currency) == "USD"
+    assert currency.numeric == 840
+    assert not hasattr(currency, "code")

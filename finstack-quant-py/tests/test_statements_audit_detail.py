@@ -224,7 +224,7 @@ def test_available_cash_reconciles_the_period_uses() -> None:
     available = cashflows.available_cash[Q1]
     equity = cashflows.equity_distribution[Q1]
 
-    assert available.currency.code == "USD"
+    assert str(available.currency) == "USD"
     uses = amounts["fees"] + amounts["interest_expense_cash"] + amounts["principal_payment"] + float(equity.amount)
     assert uses == float(available.amount) == 1000.0
 

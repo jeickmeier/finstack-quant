@@ -190,7 +190,7 @@ class TestStatementResultTypedAccessors:
 
         money = result.get_money("revenue", "2025Q1")
         assert money is not None
-        assert money.currency.code == "USD"
+        assert str(money.currency) == "USD"
         assert float(money.amount) == pytest.approx(100.0)
         # Scalar node is not monetary.
         assert result.get_money("margin_pct", "2025Q1") is None

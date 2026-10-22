@@ -44,7 +44,7 @@ test('core namespace exposes expected constructors', () => {
 
 test('core.Currency creation', () => {
   const usd = new core.Currency('USD');
-  assert.equal(usd.code, 'USD');
+  assert.equal(usd.toString(), 'USD');
 });
 
 test('core log-normal CDF preserves underflowed tail probabilities', () => {
@@ -62,7 +62,7 @@ test('core.Money amount and lossless amountDecimal', () => {
   assert.equal(m.amountDecimal, '1234.56');
   const eur = new core.Currency('EUR');
   const converted = m.convertAtRate(eur, 0.9);
-  assert.equal(converted.currency.code, 'EUR');
+  assert.equal(converted.currency.toString(), 'EUR');
   assert.equal(converted.amount, 1111.104);
   const subCent = new core.Money(1.2345, usd);
   assert.equal(subCent.amountDecimal, '1.2345');
@@ -331,11 +331,11 @@ test('core FX delta surface absent wings use omitted arguments, not empty arrays
 
 test('core FX pair convention helpers', () => {
   const pair = core.fxMarketPair('USD', 'EUR');
-  assert.equal(pair[0].code, 'EUR');
-  assert.equal(pair[1].code, 'USD');
+  assert.equal(pair[0].toString(), 'EUR');
+  assert.equal(pair[1].toString(), 'USD');
   const conv = core.fxPairConvention('USD', 'JPY');
-  assert.equal(conv.base.code, 'USD');
-  assert.equal(conv.quote.code, 'JPY');
+  assert.equal(conv.base.toString(), 'USD');
+  assert.equal(conv.quote.toString(), 'JPY');
   assert.equal(conv.usdQuotation.toString(), 'indirect');
   assert.equal(conv.pipSize, 0.01);
   assert.equal(conv.settlementDays, 2);
@@ -377,7 +377,7 @@ test('core.Money.fromDecimalStr accepts exact fixed and scientific text', () => 
     const m = decimalMoney(text, currency);
     try {
       assert.equal(m.amountDecimal, expected);
-      assert.equal(m.currency.code, currency);
+      assert.equal(m.currency.toString(), currency);
     } finally {
       m.free();
     }

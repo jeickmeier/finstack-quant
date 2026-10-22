@@ -75,7 +75,7 @@ def _pinned_timestamp(result_json: str) -> str:
 
 
 def _money(value: Money) -> dict[str, Any]:
-    return {"amount": value.amount, "currency": value.currency.code}
+    return {"amount": value.amount, "currency": str(value.currency)}
 
 
 def _schema_summary(text: str) -> dict[str, Any]:

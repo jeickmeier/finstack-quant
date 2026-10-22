@@ -10835,7 +10835,7 @@ def evaluate_dcf(
     >>> _ = b.value_money("ufcf", [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))])
     >>> _ = b.with_meta("currency", '"USD"')
     >>> result = evaluate_dcf(b.build(), 0.10, TerminalValueSpec.gordon_growth(0.02), net_debt_override=0.0)
-    >>> result.enterprise_value.currency.code
+    >>> str(result.enterprise_value.currency)
     'USD'
     """
 

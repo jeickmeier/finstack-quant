@@ -51,7 +51,7 @@ function invalidType(label) {
 test('non-string scalar arguments throw TypeError instead of trapping', () => {
   assert.throws(() => new core.Currency({}), invalidType('code'));
   assert.throws(() => new core.Currency(840), invalidType('code'));
-  assert.equal(new core.Currency('EUR').code, 'EUR');
+  assert.equal(new core.Currency('EUR').toString(), 'EUR');
 });
 
 test('epoch-day arguments reject ISO strings, fractions and NaN', () => {
@@ -151,7 +151,7 @@ test('rejected arguments do not grow linear memory or poison the instance', () =
   const before = wasm.memory.buffer.byteLength;
   run();
   assert.equal(wasm.memory.buffer.byteLength, before);
-  assert.equal(new core.Currency('USD').code, 'USD');
+  assert.equal(new core.Currency('USD').toString(), 'USD');
 });
 
 test('narrow integers reject out-of-range values instead of wrapping', () => {

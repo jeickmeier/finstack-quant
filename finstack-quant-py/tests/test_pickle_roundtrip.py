@@ -268,7 +268,7 @@ class TestMultiprocessing:
         with ctx.Pool(1) as pool:
             out = pool.map(_double_money, [Money(10.0, "USD"), Money(20.0, "USD")])
         assert [m.amount for m in out] == pytest.approx([20.0, 40.0])
-        assert all(m.currency.code == "USD" for m in out)
+        assert all(str(m.currency) == "USD" for m in out)
 
 
 def _double_money(m: Any) -> Any:

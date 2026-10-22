@@ -51,7 +51,7 @@ impl JsMoney {
     /// const usd = new core.Currency("USD");
     /// const m = new core.Money(1234.56, usd);
     /// m.amount;          // 1234.56
-    /// m.currency.code;   // "USD"
+    /// m.currency.toString();   // "USD"
     /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(amount: JsValue, currency: &JsCurrency) -> Result<JsMoney, JsValue> {

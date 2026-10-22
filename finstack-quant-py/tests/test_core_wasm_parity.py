@@ -311,10 +311,10 @@ CASES: dict[str, Callable[[], Any]] = {
     "rate_zero": lambda: [types.Rate.ZERO.as_decimal, types.Bps.ZERO.as_bp],
     "money": lambda: [
         json.loads(Money.zero("USD").to_json()),
-        [Money(12.5, "EUR").amount, Money(12.5, "EUR").currency.code],
+        [Money(12.5, "EUR").amount, str(Money(12.5, "EUR").currency)],
     ],
     "currency": lambda: [
-        currency.Currency.from_numeric(840).code,
+        str(currency.Currency.from_numeric(840)),
         currency.JPY.decimals,
         currency.TRY.numeric,
     ],
@@ -430,7 +430,7 @@ CASES: dict[str, Callable[[], Any]] = {
         "fx_rate": _market().fx_required().rate("EUR", "USD", "2025-01-02").rate,
         "converted": [
             _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").amount.amount,
-            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").amount.currency.code,
+            str(_market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").amount.currency),
             _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").rate.rate,
             _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").rate.triangulated,
             _market().convert_money(Money(100.0, "USD"), "USD", "2025-01-02").rate is None,

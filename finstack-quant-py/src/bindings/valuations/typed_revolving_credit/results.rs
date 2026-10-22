@@ -39,7 +39,7 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::pric
 /// >>> as_of = datetime.date(2024, 1, 15)
 /// >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.03))
 /// >>> result = facility.price_with_paths(market, as_of)
-/// >>> (result.num_simulated_paths, len(result.path_pvs), result.pv.currency.code)
+/// >>> (result.num_simulated_paths, len(result.path_pvs), str(result.pv.currency))
 /// (16, 16, 'USD')
 /// >>> list(result.to_dataframe().columns)
 /// ['path', 'pv', 'draw_option_cost']

@@ -26,7 +26,7 @@ const validation = (message) => (error) => {
 };
 
 test('one Rust currency parser: case-insensitive, not trimmed, error names the code', () => {
-  assert.equal(new core.Currency('usd').code, 'USD');
+  assert.equal(new core.Currency('usd').toString(), 'USD');
   assert.equal(new core.Currency('usd').numeric, 840);
   for (const [build, code] of [
     [() => new core.Currency(' USD '), ' USD '],
@@ -305,4 +305,12 @@ test('plain-object constructor factories use Rust validation and defaults', () =
   }
   assert.equal('shift' in core.sabrParameterDataNew(0.2, 0.5, 0.4, -0.3), false);
   assert.equal(core.sabrParameterDataNew(0.2, 0.5, 0.4, -0.3, -0.01).shift, -0.01);
+});
+
+test('Currency has one alphabetic string surface', () => {
+  const currency = new core.Currency('usd');
+  assert.equal(currency.toString(), 'USD');
+  assert.equal(currency.numeric, 840);
+  assert.equal('code' in currency, false);
+  currency.free();
 });

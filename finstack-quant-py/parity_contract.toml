@@ -1960,10 +1960,8 @@ constructors = { ToleranceConfig = "core.toleranceConfigNew" }
 
 [parity.modules."finstack_quant.core.currency"]
 js = "core"
-# `Currency.code` (both hosts) duplicates `__str__`/`toString()`; it is kept as
-# the documented host convenience for reading the ISO code. The other
-# host-invented `code`/`name` getters that duplicated `toString()` (HolidayCalendar,
-# PeriodId, RoundingMode, CreditRating, UnknownScalePolicy) were removed.
+# ISO alphabetic strings use Python `str(currency)` and WASM `toString()`.
+# No duplicate `code` accessor is exposed.
 # The ISO-4217 module constants (`currency.USD`) are the static factories of
 # the WASM class (`core.Currency.usd()`): a facade value cannot hold a wasm
 # handle before `init()` runs, so each constant is a factory.

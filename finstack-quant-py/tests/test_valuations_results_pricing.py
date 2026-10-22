@@ -162,7 +162,7 @@ def test_valuation_result_dict_access_and_money_value() -> None:
     result = price_instrument(_bond(), _market(), AS_OF, metrics=["ytm", "dv01", "duration_mod"])
 
     assert isinstance(result.value, Money)
-    assert result.value.currency.code == "USD"
+    assert str(result.value.currency) == "USD"
     assert result.value.amount == pytest.approx(result.price)
 
     metrics = result.metrics

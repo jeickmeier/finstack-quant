@@ -324,7 +324,7 @@ test('HazardCurve JSON round trip and members pass through Rust', () => {
   assert.equal(hz.dayCount, 'act_365f');
   assert.equal(hz.issuer, 'ACME');
   assert.equal(hz.seniority, 'senior');
-  assert.equal(hz.currency.code, 'USD');
+  assert.equal(hz.currency.toString(), 'USD');
   assert.equal(hz.parInterp, 'log_linear');
   assert.equal(hz.cdsQuoteBp(3.0), hz.cdsQuoteBp(3.0, 'log_linear'));
   assert.ok(Math.abs(hz.defaultProb(1.0, 5.0) - (hz.sp(1.0) - hz.sp(5.0))) < 1e-15);

@@ -14737,7 +14737,7 @@ class FxForward:
     --------
     >>> from finstack_quant.valuations.instruments import FxForward
     >>> fwd = FxForward.example()
-    >>> (fwd.base_currency.code, fwd.quote_currency.code, fwd.contract_rate)
+    >>> (str(fwd.base_currency), str(fwd.quote_currency), fwd.contract_rate)
     ('EUR', 'USD', 1.12)
     """
 
@@ -32103,7 +32103,7 @@ class EnhancedMonteCarloResult:
     >>> as_of = datetime.date(2024, 1, 15)
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.03))
     >>> result = facility.price_with_paths(market, as_of)
-    >>> (result.num_simulated_paths, len(result.path_pvs), result.pv.currency.code)
+    >>> (result.num_simulated_paths, len(result.path_pvs), str(result.pv.currency))
     (16, 16, 'USD')
     >>> list(result.to_dataframe().columns)
     ['path', 'pv', 'draw_option_cost']
