@@ -36,8 +36,6 @@ pub(crate) struct ParametricCurveTargetParams {
     pub(crate) variant: NsVariant,
     /// Optional initial parameter guesses.
     pub(crate) initial_params: NelsonSiegelModel,
-    /// Base market context.
-    pub(crate) base_context: MarketContext,
     /// Residual normalization notional (used to scale PV residuals to per-unit notional).
     ///
     /// Calibration tolerances are interpreted in **per-notional** residual units, so
@@ -61,8 +59,12 @@ pub(crate) struct ParametricCurveTarget {
 
 impl ParametricCurveTarget {
     /// Create a new parametric curve target with pre-computed sample times.
-    pub(crate) fn new(params: ParametricCurveTargetParams, sample_times: Vec<f64>) -> Self {
-        let scratch = ContextScratch::new(params.base_context.clone());
+    pub(crate) fn new(
+        params: ParametricCurveTargetParams,
+        sample_times: Vec<f64>,
+        base_context: MarketContext,
+    ) -> Self {
+        let scratch = ContextScratch::new(base_context);
         Self {
             params,
             sample_times,
@@ -203,10 +205,10 @@ impl ParametricCurveTarget {
                 curve_id: schema_params.curve_id.clone(),
                 variant: schema_params.model,
                 initial_params,
-                base_context: context.clone(),
                 residual_notional,
             },
             Self::build_sample_times(schema_params.base_date, &prepared_quotes)?,
+            context.clone(),
         );
         let success_tolerance = config.discount_curve.validation_tolerance;
         let (curve, report) = GlobalFitOptimizer::optimize(

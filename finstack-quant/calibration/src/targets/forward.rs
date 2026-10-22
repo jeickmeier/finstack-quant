@@ -47,8 +47,6 @@ pub(crate) struct ForwardCurveTargetParams {
     pub(crate) time_day_count: DayCount,
     /// Residual normalization notional (used to scale PV residuals to per-unit notional).
     pub(crate) residual_notional: f64,
-    /// Context providing supporting market data (e.g. discount curves).
-    pub(crate) base_context: MarketContext,
 }
 
 /// Target for simultaneous forward-curve calibration.
@@ -69,8 +67,8 @@ pub(crate) struct ForwardCurveTarget {
 
 impl ForwardCurveTarget {
     /// Create a new `ForwardCurveTarget` from parameters.
-    pub(crate) fn new(params: ForwardCurveTargetParams) -> Self {
-        let scratch = ContextScratch::new(params.base_context.clone());
+    pub(crate) fn new(params: ForwardCurveTargetParams, base_context: MarketContext) -> Self {
+        let scratch = ContextScratch::new(base_context);
         Self {
             params,
             scratch,
@@ -116,17 +114,19 @@ impl ForwardCurveTarget {
 
         let config = global_config.clone();
 
-        let target = ForwardCurveTarget::new(ForwardCurveTargetParams {
-            base_date: params.base_date,
-            currency: params.currency,
-            fwd_curve_id: params.curve_id.clone(),
-            tenor_years: params.tenor_years,
-            solve_interp: params.interpolation,
-            config: config.clone(),
-            time_day_count: curve_day_count,
-            residual_notional: 1_000_000.0,
-            base_context: context.clone(),
-        });
+        let target = ForwardCurveTarget::new(
+            ForwardCurveTargetParams {
+                base_date: params.base_date,
+                currency: params.currency,
+                fwd_curve_id: params.curve_id.clone(),
+                tenor_years: params.tenor_years,
+                solve_interp: params.interpolation,
+                config: config.clone(),
+                time_day_count: curve_day_count,
+                residual_notional: 1_000_000.0,
+            },
+            context.clone(),
+        );
 
         let success_tolerance = config.forward_curve.validation_tolerance;
 
@@ -751,17 +751,19 @@ mod tests {
         let mut config = CalibrationConfig::default()
             .with_rate_bounds(RateBounds::new(-0.01, 0.10).expect("valid explicit rate bounds"));
         config.forward_curve.weighting_scheme = ResidualWeightingScheme::LinearTime;
-        let target = ForwardCurveTarget::new(ForwardCurveTargetParams {
-            base_date,
-            currency: Currency::USD,
-            fwd_curve_id: CurveId::new("fwd"),
-            tenor_years: 0.25,
-            solve_interp: InterpStyle::Linear,
-            config,
-            time_day_count: DayCount::Act360,
-            residual_notional: 1.0,
-            base_context: MarketContext::new(),
-        });
+        let target = ForwardCurveTarget::new(
+            ForwardCurveTargetParams {
+                base_date,
+                currency: Currency::USD,
+                fwd_curve_id: CurveId::new("fwd"),
+                tenor_years: 0.25,
+                solve_interp: InterpStyle::Linear,
+                config,
+                time_day_count: DayCount::Act360,
+                residual_notional: 1.0,
+            },
+            MarketContext::new(),
+        );
         let quotes = [(0.25, 0.05), (1.0, 0.20)]
             .into_iter()
             .map(|(pillar_time, quote_rate)| {
@@ -858,17 +860,19 @@ mod tests {
         let config = CalibrationConfig {
             ..CalibrationConfig::default()
         };
-        let target = ForwardCurveTarget::new(ForwardCurveTargetParams {
-            base_date,
-            currency: Currency::USD,
-            fwd_curve_id: CurveId::new("USD-FWD"),
-            tenor_years: 0.25,
-            solve_interp: InterpStyle::Linear,
-            config: config.clone(),
-            time_day_count: DayCount::Act360,
-            residual_notional: 1.0,
-            base_context: MarketContext::new(),
-        });
+        let target = ForwardCurveTarget::new(
+            ForwardCurveTargetParams {
+                base_date,
+                currency: Currency::USD,
+                fwd_curve_id: CurveId::new("USD-FWD"),
+                tenor_years: 0.25,
+                solve_interp: InterpStyle::Linear,
+                config: config.clone(),
+                time_day_count: DayCount::Act360,
+                residual_notional: 1.0,
+            },
+            MarketContext::new(),
+        );
         let quotes = [(90_i64, 0.04), (180_i64, 0.05)]
             .into_iter()
             .map(|(days, rate)| {
@@ -926,18 +930,20 @@ mod tests {
         let config = CalibrationConfig {
             ..CalibrationConfig::default()
         };
-        let target = ForwardCurveTarget::new(ForwardCurveTargetParams {
-            base_date,
-            currency: Currency::USD,
-            fwd_curve_id: CurveId::new("USD-FWD"),
-            tenor_years: 0.25,
-            solve_interp: InterpStyle::Linear,
-            config: config.clone(),
-            // Curve time axis deliberately different from the Act/360 index day_count.
-            time_day_count: DayCount::Act365F,
-            residual_notional: 1.0,
-            base_context: MarketContext::new(),
-        });
+        let target = ForwardCurveTarget::new(
+            ForwardCurveTargetParams {
+                base_date,
+                currency: Currency::USD,
+                fwd_curve_id: CurveId::new("USD-FWD"),
+                tenor_years: 0.25,
+                solve_interp: InterpStyle::Linear,
+                config: config.clone(),
+                // Curve time axis deliberately different from the Act/360 index day_count.
+                time_day_count: DayCount::Act365F,
+                residual_notional: 1.0,
+            },
+            MarketContext::new(),
+        );
         let quotes = [(90_i64, 0.04), (180_i64, 0.05)]
             .into_iter()
             .map(|(days, rate)| {
