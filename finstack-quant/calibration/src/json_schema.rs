@@ -107,7 +107,7 @@ fn cds_tranche_quote_examples() -> finstack_quant_core::Result<Vec<Value>> {
         "attachment": 0.03,
         "detachment": 0.07,
         "maturity": "2029-06-20",
-        "upfront_pct": 4.25,
+        "upfront_pct": 0.0425,
         "coupon_bp": 100.0,
         "convention": {"currency": "USD", "doc_clause": "isda_na"}
     }))
