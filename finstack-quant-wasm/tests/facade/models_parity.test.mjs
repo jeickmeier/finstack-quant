@@ -469,17 +469,17 @@ const CASES = {
       matrix().probability('A', 'D'),
       matrix().probabilityByIndex(1, 2),
       list(matrix().row('B')),
-      matrix().compose(matrix()).toMatrix(),
+      matrix().compose(matrix()).toRows(),
       list(matrix().defaultProbabilities()),
     ];
   },
   'migration.generator': () => [
     generator().exitRate('A'),
     generator().intensity('A', 'B'),
-    credit.migration.project(generator(), 2.0).toMatrix(),
+    credit.migration.project(generator(), 2.0).toRows(),
     credit.migration.GeneratorMatrix.fromTransitionMatrix(
       new credit.migration.TransitionMatrix(scale(), TRANSITIONS, 1.0)
-    ).toMatrix(),
+    ).toRows(),
   ],
   'migration.simulate': () => {
     const simulator = new credit.migration.MigrationSimulator(generator(), 5.0);
@@ -489,7 +489,7 @@ const CASES = {
       batch.length,
       batch.paths[0].transitions(),
       batch.paths[3].labelAt(5.0),
-      simulator.empiricalMatrix(200, 7).toMatrix(),
+      simulator.empiricalMatrix(200, 7).toRows(),
     ];
   },
 

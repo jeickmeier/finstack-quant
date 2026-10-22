@@ -86,7 +86,7 @@ def test_migration_rejects_reshaped_nested_matrix() -> None:
     scale = RatingScale.custom(["A", "D"])
     with pytest.raises(ValueError, match="rows"):
         TransitionMatrix(scale, [[0.9, 0.1, 0.0, 1.0]], 1.0)
-    assert TransitionMatrix(scale, [0.9, 0.1, 0.0, 1.0], 1.0).to_matrix() == [
+    assert TransitionMatrix(scale, [0.9, 0.1, 0.0, 1.0], 1.0).to_rows() == [
         [0.9, 0.1],
         [0.0, 1.0],
     ]

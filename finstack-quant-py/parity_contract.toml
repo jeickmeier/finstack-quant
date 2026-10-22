@@ -553,9 +553,8 @@ public = [
 # the Rust `LiquidityConfig::try_new`), `LiquidityTier` (surfaced as
 # the `"tier1".."tier5"` strings) and `SpreadVolatilityKind` (surfaced as the
 # `"relative"` / `"absolute"` strings on `LiquidityProfile`).
-# `KyleLambdaModel.lambda_from_series` is bound as the `kyle_lambda` free
-# function; the Rust argument order is `(returns, volumes, reference_price)`
-# in both hosts.
+# `kyle_lambda(returns, volumes, reference_price)` is the canonical Rust
+# estimator and uses the same argument order in both hosts.
 [crates.models.liquidity]
 python_package = "finstack_quant.models.liquidity"
 public = [
@@ -1841,8 +1840,6 @@ backlog_ceiling = { modules = 0, members = 0 }
 "finstack_quant.models.credit.ToggleExerciseModel.kind" = "serde tag of the Rust enum variant"
 "finstack_quant.models.credit.ToggleExerciseModel.params" = "the Rust enum variant's payload as a dict"
 "finstack_quant.models.credit.lgd.DownturnLgd.params" = "serde form of the Rust `method()` enum"
-"finstack_quant.models.credit.migration.GeneratorMatrix.to_matrix" = "Rust `to_rows()` (host nested-list / NumPy exit)"
-"finstack_quant.models.credit.migration.TransitionMatrix.to_matrix" = "Rust `to_rows()` (host nested-list / NumPy exit)"
 "finstack_quant.models.credit.migration.RatingPaths" = "host collection over the Rust `Vec<RatingPath>` returned by `MigrationSimulator::simulate`; Rust has no named type"
 "finstack_quant.models.credit.migration.RatingPaths.default_rate" = "share of the Rust paths that end in the default state"
 "finstack_quant.models.credit.migration.RatingPaths.paths" = "the Rust `Vec<RatingPath>`"
@@ -1866,14 +1863,11 @@ backlog_ceiling = { modules = 0, members = 0 }
 "finstack_quant.models.factor.risk.PositionResidualContribution.source_kind" = "variant of the Rust `source` enum (see the `risk` module note)"
 "finstack_quant.models.factor.risk.TailScenarioBreakdown.position_ids" = "position ids the Rust `position_pnls` are ordered by"
 "finstack_quant.models.factor.risk.position_component_var" = "free-function form of Rust `PositionRiskDecomposition::component_var` (see the `risk` module note)"
-"finstack_quant.models.liquidity.kyle_lambda" = "free-function form of Rust `KyleLambdaModel::lambda_from_series` (see `[crates.models.liquidity]`)"
 "finstack_quant.models.monte_carlo.Estimate.ci_lower" = "first element of the Rust `ci_95` tuple"
 "finstack_quant.models.monte_carlo.Estimate.ci_upper" = "second element of the Rust `ci_95` tuple"
 "finstack_quant.models.monte_carlo.MoneyEstimate.ci_lower" = "first element of the Rust `ci_95` tuple"
 "finstack_quant.models.monte_carlo.MoneyEstimate.ci_upper" = "second element of the Rust `ci_95` tuple"
 "finstack_quant.models.monte_carlo.LsmcPricer.antithetic" = "Rust `LsmcConfig::antithetic` of the pricer's config"
-"finstack_quant.models.monte_carlo.LsmcPricer.basis" = "Rust `LsmcConvenience::basis` (default regression basis)"
-"finstack_quant.models.monte_carlo.LsmcPricer.basis_degree" = "Rust `LsmcConvenience::basis_degree`"
 "finstack_quant.models.monte_carlo.LsmcPricer.num_paths" = "Rust `LsmcConfig::num_paths` of the pricer's config"
 "finstack_quant.models.monte_carlo.LsmcPricer.seed" = "Rust `LsmcConfig::seed` of the pricer's config"
 "finstack_quant.models.monte_carlo.LsmcPricer.use_parallel" = "Rust `LsmcConfig::use_parallel` of the pricer's config"

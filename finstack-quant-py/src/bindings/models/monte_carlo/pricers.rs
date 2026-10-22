@@ -3,8 +3,9 @@
 use super::engine::extract_optional_currency;
 use super::results::{PyLrmGreeks, PyMoneyEstimate};
 use crate::errors::core_to_py;
-use finstack_quant_models::monte_carlo::convenience::{self, LsmcConvenience};
+use finstack_quant_models::monte_carlo::convenience;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
+use finstack_quant_models::monte_carlo::pricer::lsmc::LsmcPricer;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
 use finstack_quant_models::types::OptionType;
 use pyo3::prelude::*;
@@ -382,7 +383,7 @@ impl PyPathDependentPricer {
     frozen
 )]
 pub struct PyLsmcPricer {
-    inner: LsmcConvenience,
+    inner: LsmcPricer,
 }
 
 #[pymethods]
@@ -437,7 +438,7 @@ impl PyLsmcPricer {
         basis_degree: Option<usize>,
         antithetic: Option<bool>,
     ) -> PyResult<Self> {
-        LsmcConvenience::new(
+        LsmcPricer::new(
             num_paths,
             seed,
             use_parallel,

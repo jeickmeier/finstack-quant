@@ -474,21 +474,21 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
             matrix().probability("A", "D"),
             matrix().probability_by_index(1, 2),
             list(matrix().row("B")),
-            matrix().compose(matrix()).to_matrix(),
+            matrix().compose(matrix()).to_rows(),
             list(matrix().default_probabilities()),
         ],
         "migration.generator": lambda: [
             _generator().exit_rate("A"),
             _generator().intensity("A", "B"),
-            migration.project(_generator(), 2.0).to_matrix(),
-            migration.GeneratorMatrix.from_transition_matrix(matrix()).to_matrix(),
+            migration.project(_generator(), 2.0).to_rows(),
+            migration.GeneratorMatrix.from_transition_matrix(matrix()).to_rows(),
         ],
         "migration.simulate": lambda: [
             simulator().simulate(0, 50, 7).default_rate,
             len(simulator().simulate(0, 50, 7)),
             [list(event) for event in simulator().simulate(0, 50, 7).paths[0].transitions()],
             simulator().simulate(0, 50, 7).paths[3].label_at(5.0),
-            simulator().empirical_matrix(200, 7).to_matrix(),
+            simulator().empirical_matrix(200, 7).to_rows(),
         ],
     }
 

@@ -2832,7 +2832,7 @@
       "probabilityByIndex",
       "row",
       "toJson",
-      "toMatrix"
+      "toRows"
     ],
     "getters": ["horizon", "nStates", "scale"]
   },
@@ -2840,7 +2840,7 @@
     "kind": "class",
     "constructor": true,
     "statics": ["fromJson", "fromTransitionMatrix"],
-    "methods": ["exitRate", "free", "intensity", "toJson", "toMatrix"],
+    "methods": ["exitRate", "free", "intensity", "toJson", "toRows"],
     "getters": ["nStates", "regularizationL1", "roundTripError", "scale"]
   },
   "models.credit.migration.RatingPath": {
