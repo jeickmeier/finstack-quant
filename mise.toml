@@ -104,7 +104,7 @@ run = [
 ]
 
 [tasks.all-ci]
-description = "Regenerate derived artifacts, then run the nightly CI checks locally (--release adds the release gates)"
+description = "Regenerate derived artifacts, then run the CI checks locally (--release adds the release gates)"
 usage = 'flag "--release" help="Also run the release gates (docs, doctests, slow suites, publish checks, semver)"'
 depends = ["gen-write"]
 run = [
@@ -118,7 +118,7 @@ run = [
     mise run rust-test --slow
     mise run python-test --slow
     mise run rust-publish-checks
-    baseline=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' HEAD^)
+    baseline=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' --exclude '*-*' HEAD^)
     echo "Baseline: $baseline"
     cargo semver-checks check-release \
       -p finstack-quant-core \
@@ -714,6 +714,19 @@ run = [
 # ─────────────────────────────────────────────────────────────────
 # Packaging and hooks
 # ─────────────────────────────────────────────────────────────────
+
+[tasks.stamp-version]
+description = "Write a version into the Cargo and npm manifests (CI stamps build versions; bumps master after a release branch is cut)"
+usage = 'arg "<version>" help="SemVer version, e.g. 0.12.0-rc.1 or 0.12.0-dev.202610210600"'
+run = 'uv run --no-sync python scripts/stamp_version.py "${usage_version?}"'
+
+[tasks.release-check-upstream]
+description = "Fail if a release branch carries a commit with no equivalent on master"
+usage = '''
+arg "[base]" help="Ref the branch was cut from or merges into" default="origin/master"
+arg "[head]" help="Ref to check" default="HEAD"
+'''
+run = 'uv run --no-sync python scripts/check_release_upstream.py check "${usage_base?}" "${usage_head?}"'
 
 [tasks.wheel-local]
 description = "Build a release wheel for the current platform and Python"

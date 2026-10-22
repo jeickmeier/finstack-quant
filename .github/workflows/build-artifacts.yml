@@ -1,0 +1,185 @@
+name: Build artifacts
+
+# Builds the distributable artifacts — Python wheels, the sdist, and the WASM
+# packages — at a given version, and uploads them as `dist-*` workflow
+# artifacts for the caller to publish. release.yml calls it for `vX.Y.Z` and
+# `vX.Y.Z-rc.N` tags, nightly.yml for the rolling nightly build, so every
+# channel ships the same build.
+#
+# Each job stamps `inputs.version` into the Cargo and npm manifests of its own
+# checkout (scripts/stamp_version.py) before building; nothing is committed.
+# maturin turns `-rc.N` into `rcN` and `-dev.N` into `.devN` for the wheels.
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: SemVer version to build, e.g. 0.12.0, 0.12.0-rc.1, 0.12.0-dev.202610210600
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Python Wheels ───────────────────────────────────────────────
+  build-wheels:
+    name: Wheel / ${{ matrix.os }} / py${{ matrix.python }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Native x86_64 keeps workspace fat LTO. Constrained arm64 jobs use
+          # thin LTO: linux-arm64 is a manylinux cross-link that OOMs with fat
+          # LTO (Release #142), and macos-14's 3-core runners spend 40+ minutes
+          # in rustc on finstack-quant-py and hit the job timeout (Release #143).
+          # ── Linux x86_64 ──
+          - { os: linux-x64,   runner: ubuntu-24.04,   target: x86_64,  python: "3.12", timeout: 60, lto: fat,  codegen_units: 1 }
+          - { os: linux-x64,   runner: ubuntu-24.04,   target: x86_64,  python: "3.13", timeout: 60, lto: fat,  codegen_units: 1 }
+          - { os: linux-x64,   runner: ubuntu-24.04,   target: x86_64,  python: "3.14", timeout: 60, lto: fat,  codegen_units: 1 }
+          # ── Linux arm64 ──
+          - { os: linux-arm64, runner: ubuntu-24.04,   target: aarch64, python: "3.12", timeout: 60, lto: thin, codegen_units: 16 }
+          - { os: linux-arm64, runner: ubuntu-24.04,   target: aarch64, python: "3.13", timeout: 60, lto: thin, codegen_units: 16 }
+          - { os: linux-arm64, runner: ubuntu-24.04,   target: aarch64, python: "3.14", timeout: 60, lto: thin, codegen_units: 16 }
+          # ── macOS arm64 (Apple Silicon) ──
+          - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.12", timeout: 90, lto: thin, codegen_units: 16 }
+          - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.13", timeout: 90, lto: thin, codegen_units: 16 }
+          - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.14", timeout: 90, lto: thin, codegen_units: 16 }
+          # ── Windows x86_64 (MSVC fat LTO — larger timeout) ──
+          # Release #155 cancelled py3.12 at the 90-minute cap while rustc was
+          # still compiling finstack-quant-py. py3.14 finished at 89 minutes.
+          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.12", timeout: 120, lto: fat,  codegen_units: 1 }
+          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.13", timeout: 120, lto: fat,  codegen_units: 1 }
+          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.14", timeout: 120, lto: fat,  codegen_units: 1 }
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set HOME for mise on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: '"HOME=$env:USERPROFILE" | Out-File -FilePath $env:GITHUB_ENV -Append'
+
+      - name: Provision toolchain (mise)
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        with:
+          cache: true
+          # Wheels only need the pinned stable compiler. A full `mise install`
+          # also compiles cargo-nextest, cargo-deny, cargo-public-api,
+          # cargo-llvm-cov, flamegraph, and maturin from source, and downloads
+          # nightly. On the Release #155 Windows cache miss that took 26
+          # minutes, then maturin-action installed its own maturin anyway.
+          install_args: rust@1.97.1
+        env:
+          # rustup download cache is not concurrency-safe under parallel cargo:*.
+          MISE_JOBS: "1"
+
+      - name: Set up matrix Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Stamp version
+        run: python scripts/stamp_version.py "${{ inputs.version }}"
+
+      - name: Build wheel
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1
+        with:
+          target: ${{ matrix.target }}
+          args: >-
+            --release
+            --out dist
+            --interpreter python${{ matrix.python }}
+          manylinux: "2_28"
+          # Windows wheel builds have hit rustc-version skew from cached artifacts
+          # (E0514). linux-arm64 is a manylinux cross-compile of the PyO3 cdylib;
+          # sccache + workspace fat LTO OOMs rustc (exit 2, no diagnostic).
+          sccache: ${{ runner.os != 'Windows' && matrix.os != 'linux-arm64' }}
+        env:
+          # sccache refuses to wrap rustc when incremental compilation is enabled.
+          CARGO_INCREMENTAL: "0"
+          CARGO_PROFILE_RELEASE_LTO: ${{ matrix.lto }}
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ matrix.codegen_units }}
+
+      # Linux arm64 remains build-only until the project selects a native arm64 runner.
+      - name: Install built wheel
+        if: matrix.os != 'linux-arm64'
+        run: |
+          python -c "from pathlib import Path; import subprocess, sys; wheels = sorted(Path('dist').glob('finstack_quant_py-*.whl')); assert len(wheels) == 1, f'Expected exactly one wheel in dist/, found: {wheels}'; subprocess.run([sys.executable, '-m', 'pip', 'install', str(wheels[0])], check=True)"
+
+      - name: Smoke test installed wheel
+        if: matrix.os != 'linux-arm64'
+        run: python scripts/smoke_python_wheel.py
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-wheel-${{ matrix.os }}-py${{ matrix.python }}
+          path: dist/*.whl
+          # The GitHub Release is the durable copy.
+          retention-days: 7
+
+  # ── Source Distribution ─────────────────────────────────────────
+  build-sdist:
+    name: Source dist
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Stamp version
+        run: python3 scripts/stamp_version.py "${{ inputs.version }}"
+
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1
+        with:
+          command: sdist
+          args: --out dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-sdist
+          path: dist/*.tar.gz
+          retention-days: 7
+
+  # ── WASM / npm Package ─────────────────────────────────────────
+  build-wasm:
+    name: WASM / npm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      # `mise run` would otherwise install every tool in mise.toml, including
+      # the cargo CLIs that build from source; this job needs only the four below.
+      MISE_TASK_RUN_AUTO_INSTALL: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Provision toolchain (mise)
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        with:
+          cache: true
+          install_args: rust@1.97.1 node github:wasm-bindgen/wasm-pack github:wasm-bindgen/wasm-bindgen aqua:WebAssembly/binaryen
+        env:
+          # rustup download cache is not concurrency-safe under parallel cargo:*.
+          MISE_JOBS: "1"
+
+      # wasm-pack takes the generated pkg/package.json version from Cargo.toml;
+      # the npm tarball takes it from finstack-quant-wasm/package.json.
+      - name: Stamp version
+        run: python3 scripts/stamp_version.py "${{ inputs.version }}"
+
+      # The size-optimized web package (release-size + wasm-opt) and the
+      # Node package, exactly as built locally.
+      - name: Build release WASM packages
+        run: mise run wasm-pkg
+
+      - name: Package npm tarball and per-target archives
+        run: |
+          mkdir -p dist
+          tar -czf dist/finstack-quant-wasm-web.tar.gz -C finstack-quant-wasm pkg
+          tar -czf dist/finstack-quant-wasm-nodejs.tar.gz -C finstack-quant-wasm pkg-node
+          (cd finstack-quant-wasm && npm pack --ignore-scripts --pack-destination ../dist)
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-wasm
+          path: dist/*
+          retention-days: 7

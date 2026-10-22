@@ -59,7 +59,7 @@ uv run --no-sync python scripts/generation_digest.py --write-manifest
 manifest paragraph in `scripts/README.md` describes the instrument JSON
 examples and the WASM TypeScript declarations, so it stays accurate.
 
-In `.github/workflows/nightly.yml`, delete the lint job step
+In `.github/workflows/checks.yml`, delete the lint job step
 `Install component registry dependencies` (`mise run ui-sync`).
 
 ## Keep the analyst reader, drop the gallery

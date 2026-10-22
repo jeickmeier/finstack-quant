@@ -1,0 +1,64 @@
+name: Backport
+
+# Label a pull request into master `backport release/X.Y` (before or after it
+# merges) and, once it is merged, this opens a pull request into release/X.Y
+# that cherry-picks its squash commit with `git cherry-pick -x`. The backport
+# pull request runs `PR gate`, including the upstream check, and merges itself
+# (squash auto-merge) when it passes. On a conflict it opens a draft pull
+# request with the conflict committed and comments the resolution steps on the
+# original pull request.
+#
+# The token comes from a GitHub App: pull requests opened with the default
+# GITHUB_TOKEN do not trigger workflows, so `PR gate` would never run. The App
+# needs Contents, Pull requests and Workflows (backports may touch
+# .github/workflows) read/write; set the BACKPORT_APP_CLIENT_ID variable and the
+# BACKPORT_APP_PRIVATE_KEY secret.
+#
+# pull_request_target runs this file from master with write access, so it
+# never checks out or runs code from the pull request; the action only
+# cherry-picks an already-merged commit.
+on:
+  pull_request_target:
+    types: [closed, labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  backport:
+    name: Backport
+    if: >-
+      github.event.pull_request.merged
+      && (
+        github.event.action == 'closed'
+        || startsWith(github.event.label.name, 'backport ')
+      )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Create backport token
+        id: token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.BACKPORT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.BACKPORT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ steps.token.outputs.token }}
+
+      - name: Open backport pull requests
+        uses: korthout/backport-action@8560fb503c275d433c56f05a2f64850093baa9f7 # v4.7.0
+        with:
+          github_token: ${{ steps.token.outputs.token }}
+          label_pattern: ^backport (release/[^ ]+)$
+          auto_merge_enabled: true
+          auto_merge_method: squash
+          experimental: >
+            {
+              "conflict_resolution": "draft_commit_conflicts"
+            }

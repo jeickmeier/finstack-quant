@@ -1,17 +1,18 @@
 name: PR
 
-# Runs the nightly check set (nightly.yml) unchanged on every pull request into
-# master. Running it unchanged, coverage included, keeps each job's build
-# identical to master's, so the caches master saves apply; the SonarQube scan
-# is master-only and skipped. `PR gate` is the one status check the master
-# ruleset requires, so jobs in nightly.yml can change without editing the
-# ruleset.
+# Runs the standard check set (checks.yml) unchanged on every pull request into
+# master or a release branch. Running it unchanged, coverage included, keeps
+# each job's build identical to master's, so the caches master saves apply; the
+# SonarQube scan is master-only and skipped. Pull requests into release/** also
+# run the upstream check: every commit must already be on master. `PR gate` is
+# the one status check the rulesets require, so jobs in checks.yml can change
+# without editing the rulesets.
 on:
   pull_request:
-    branches: [master]
+    branches: [master, "release/**"]
 
 # A new push to a pull request cancels that pull request's run in progress.
-# nightly.yml has no concurrency of its own (see its header); the caller owns it.
+# checks.yml has no concurrency of its own (see its header); the caller owns it.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -21,18 +22,42 @@ permissions:
 
 jobs:
   checks:
-    name: Nightly checks
-    uses: ./.github/workflows/nightly.yml
+    name: Checks
+    uses: ./.github/workflows/checks.yml
+
+  # Upstream first: a release branch carries only changes already on master.
+  upstream:
+    name: Upstream check
+    if: startsWith(github.base_ref, 'release/')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository (full history)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Require every commit to be on master
+        run: >-
+          python3 scripts/check_release_upstream.py check
+          "origin/${{ github.base_ref }}"
+          "${{ github.event.pull_request.head.sha }}"
 
   # A required check that is skipped counts as passing, so this job must not be
   # skipped when a check fails: it runs unless the run was cancelled, and fails
-  # unless every check passed.
+  # unless every check passed. `upstream` is skipped for pull requests into
+  # master.
   gate:
     name: PR gate
-    needs: checks
+    needs: [checks, upstream]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require every check to pass
-        run: test "${{ needs.checks.result }}" = success
+        run: |
+          test "${{ needs.checks.result }}" = success
+          case "${{ needs.upstream.result }}" in
+            success|skipped) ;;
+            *) echo "::error::Upstream check: ${{ needs.upstream.result }}"; exit 1 ;;
+          esac

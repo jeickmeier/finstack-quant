@@ -127,35 +127,104 @@ notes and tests that cover edge cases, invalid inputs, and units.
 
 ## Releases
 
-A release is cut from `master` by pushing a `vX.Y.Z` tag.
-[`release.yml`](.github/workflows/release.yml) then runs the release gates and
-publishes the GitHub Release; see
-[`.github/workflows/README.md`](.github/workflows/README.md).
+There are three channels, all GitHub Releases built by the same workflow
+([`build-artifacts.yml`](.github/workflows/build-artifacts.yml)); see
+[`.github/workflows/README.md`](.github/workflows/README.md):
 
-1. Open a release pull request that:
-   - sets the version in the workspace `Cargo.toml` and in
-     `finstack-quant-wasm/package.json`;
-   - adds the `## [X.Y.Z]` section to `CHANGELOG.md`;
-   - adds `release_notes/RELEASE_NOTES_X.Y.Z.md`.
+| Channel | Tag | Version | Built from |
+| --- | --- | --- | --- |
+| Nightly | `nightly` (moves) | `X.Y.Z-dev.YYYYMMDDHHMM` | `master`, every night it moved |
+| Release candidate | `vX.Y.Z-rc.N` | `X.Y.Z-rc.N` | `release/X.Y`, for QA/UAT |
+| Release | `vX.Y.Z` | `X.Y.Z` | the candidate QA signed off on |
 
-   The release workflow's Version metadata gate checks all four.
-   `mise run all-ci --release` runs the release gates locally.
-2. Once it merges, tag the merge commit on `master` and push the tag:
+Python spells the first two `X.Y.Z.devYYYYMMDDHHMM` and `X.Y.ZrcN`. Both
+orderings put dev builds below candidates below the release.
+
+### Upstream first
+
+Every change lands on `master` first, through a normal pull request, including
+the version bump and release notes. A release branch only receives backports
+of changes already on `master`, so it is always a subset of `master`: whatever
+is not backported ships in the next release line, and nothing ships that
+`master` lacks. The `PR gate` on release branches and the release workflow
+both enforce this (`mise run release-check-upstream` runs the check locally).
+
+### Cutting a release
+
+1. **Cut the line.** Create `release/X.Y` from a recent `master` commit, or from
+   the previous release tag for a release that carries only a few changes, push
+   it, and create the label `backport release/X.Y`:
 
    ```bash
-   git switch master
+   git switch -c release/X.Y <master commit or vX.Y'.Z'>
+   git push -u origin release/X.Y
+   gh label create "backport release/X.Y"
+   ```
+
+   Then bump `master` to the next minor version `X.(Y+1).0` (the workspace
+   `Cargo.toml` version and every internal `path` dependency requirement, and
+   `finstack-quant-wasm/package.json`; `mise run stamp-version -- X.(Y+1).0`
+   writes them all, then `cargo metadata --format-version 1 >/dev/null`
+   refreshes `Cargo.lock`) in a pull request, so nightly builds order above
+   everything on this line.
+2. **Write the release notes on `master`.** In a pull request into `master`,
+   labeled `backport release/X.Y`, add the `## [X.Y.Z]` section to
+   `CHANGELOG.md` and `release_notes/RELEASE_NOTES_X.Y.Z.md`.
+
+   The tag sets the version: the release workflow stamps `X.Y.Z` or
+   `X.Y.Z-rc.N` into the manifests before building, so a patch release or
+   candidate needs no version commit. Its Version metadata gate checks that the
+   committed version is on the tag's `X.Y` line, and, for the final tag, the
+   changelog section and notes file. `mise run all-ci --release` runs the
+   release gates locally.
+3. **Choose the pull requests.** Label each pull request into `master` that
+   should ship on this line `backport release/X.Y`, before or after it merges.
+   Once it is merged, the backport bot opens a pull request into
+   `release/X.Y` that merges itself when `PR gate` passes. On a conflict it
+   opens a draft pull request with the conflict committed and comments the
+   steps on the original pull request: resolve on that branch, mark it ready,
+   and merge.
+4. **Tag a candidate** on the release branch:
+
+   ```bash
+   git switch release/X.Y
    git pull
-   git tag -a vX.Y.Z -m "vX.Y.Z"
+   git tag -a vX.Y.Z-rc.N -m "vX.Y.Z-rc.N"
+   git push origin vX.Y.Z-rc.N
+   ```
+
+   [`release.yml`](.github/workflows/release.yml) runs every release gate and
+   publishes a GitHub pre-release. Its notes list the pull requests since the
+   previous tag and the `master` commits the candidate leaves out. QA/UAT
+   installs from it. For a fix, backport it and tag `rc.N+1`.
+5. **Promote.** When UAT signs off, tag the same commit as the release:
+
+   ```bash
+   git tag -a vX.Y.Z -m "vX.Y.Z" vX.Y.Z-rc.N^{}
    git push origin vX.Y.Z
    ```
 
-3. A failed gate leaves the tag without a release. Fix forward through a pull
-   request, then delete and re-push the tag, or tag the next patch version.
+   The release is built from exactly the commit QA tested and is marked
+   latest.
+6. A failed gate leaves the tag without a release. Fix forward through a pull
+   request into `master` and a backport, then delete and re-push the tag, or
+   tag the next candidate.
 
-A fix for a released version lands on `master` and ships in the next patch
-release. Only when an older release line needs a fix after `master` has moved
-on, create `release/X.Y` from that line's latest tag, cherry-pick the fix from
-`master`, and tag the patch release on that branch.
+Keep release branches short-lived. After `vX.Y.0` ships, `release/X.Y` takes
+only patch fixes for that line, through the same label; the next minor release
+cuts a new branch from `master`.
+
+A release can still be tagged straight on `master` when it should carry
+everything there: merge the release notes pull request, tag the merge commit
+`vX.Y.0` (`master` carries `X.Y.0`), then bump `master` to `X.(Y+1).0`.
+
+### Nightly builds
+
+Every night that `master` moved and its checks pass,
+[`nightly.yml`](.github/workflows/nightly.yml) publishes the same artifacts as
+a release under the rolling `nightly` pre-release. Install the latest master
+build with `gh release download nightly`. It is replaced on the next build and
+is not for production use.
 
 ## Maintainers and Review
 
