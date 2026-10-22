@@ -1939,15 +1939,6 @@ impl PyPrepaymentModelSpec {
         }
     }
 
-    /// 100% PSA (standard prepayment assumption).
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn psa_100() -> Self {
-        Self {
-            inner: PrepaymentModelSpec::psa_100(),
-        }
-    }
-
     /// CMBS lockout: zero prepayment for ``lockout_months``, then constant CPR.
     #[staticmethod]
     #[pyo3(text_signature = "(lockout_months, post_lockout_cpr)")]

@@ -61,7 +61,6 @@ export const cashflows = {
     wasm.mergeCashflowSchedules(scheduleJsonList(schedules), notional, dayCount),
   notionalPar: wasm.notionalPar,
   notionalValidate: wasm.notionalValidate,
-  prepaymentModelSpecPsa100: wasm.prepaymentModelSpecPsa100,
   prepaymentModelSpecSmm: wasm.prepaymentModelSpecSmm,
   prepaymentModelSpecValidate: wasm.prepaymentModelSpecValidate,
   recoveryModelSpecRecoveryRate: wasm.recoveryModelSpecRecoveryRate,

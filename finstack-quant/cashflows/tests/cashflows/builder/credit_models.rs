@@ -27,7 +27,7 @@ fn psa_smm_golden_values() {
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
     use finstack_quant_cashflows::builder::{cpr_to_smm, smm_to_cpr};
 
-    let model = PrepaymentModelSpec::psa_100();
+    let model = PrepaymentModelSpec::psa(1.0);
 
     // Month 0: 0% CPR → 0% SMM
     let smm_0 = model.smm(0).unwrap();
@@ -213,7 +213,7 @@ fn psa_matches_industry_standard_ramp() {
     use finstack_quant_cashflows::builder::smm_to_cpr;
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
-    let model = PrepaymentModelSpec::psa_100();
+    let model = PrepaymentModelSpec::psa(1.0);
 
     // Month 1: 0.2% CPR (1/30 * 6%)
     let cpr_1 = smm_to_cpr(model.smm(1).unwrap()).expect("valid SMM");
@@ -260,7 +260,7 @@ fn psa_multiplier_scales_correctly() {
 
     // 50% PSA, 100% PSA, 200% PSA at month 30
     let psa_50 = PrepaymentModelSpec::psa(0.5);
-    let psa_100 = PrepaymentModelSpec::psa_100();
+    let psa_100 = PrepaymentModelSpec::psa(1.0);
     let psa_200 = PrepaymentModelSpec::psa(2.0);
 
     let cpr_50 = smm_to_cpr(psa_50.smm(30).unwrap()).expect("valid SMM");
@@ -300,7 +300,7 @@ fn psa_terminal_rate_is_flat() {
     use finstack_quant_cashflows::builder::smm_to_cpr;
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
-    let model = PrepaymentModelSpec::psa_100();
+    let model = PrepaymentModelSpec::psa(1.0);
     let terminal_cpr = 0.06;
 
     // Test various months after the ramp
@@ -703,7 +703,7 @@ mod property_tests {
         fn psa_smm_monotonic_during_ramp(month1 in 0u32..30, month2 in 0u32..30) {
             use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
-            let model = PrepaymentModelSpec::psa_100();
+            let model = PrepaymentModelSpec::psa(1.0);
             let smm1 = model.smm(month1).unwrap();
             let smm2 = model.smm(month2).unwrap();
 
@@ -721,7 +721,7 @@ mod property_tests {
         fn psa_smm_constant_after_ramp(month in 30u32..500) {
             use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
-            let model = PrepaymentModelSpec::psa_100();
+            let model = PrepaymentModelSpec::psa(1.0);
             let smm_30 = model.smm(30).unwrap();
             let smm_month = model.smm(month).unwrap();
 

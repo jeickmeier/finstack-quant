@@ -88,7 +88,7 @@ fn default_cpr_volatility() -> f64 {
 
 impl Default for StochasticPrepaySpec {
     fn default() -> Self {
-        StochasticPrepaySpec::Deterministic(PrepaymentModelSpec::psa_100())
+        StochasticPrepaySpec::Deterministic(PrepaymentModelSpec::psa(1.0))
     }
 }
 

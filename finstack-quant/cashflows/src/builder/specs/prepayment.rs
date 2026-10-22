@@ -217,25 +217,6 @@ impl PrepaymentModelSpec {
         Self::Psa { speed_multiplier }
     }
 
-    /// 100% PSA (standard prepayment assumption).
-    ///
-    /// # Returns
-    ///
-    /// Prepayment model equivalent to [`Self::psa`] with `speed_multiplier = 1.0`.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_cashflows::builder::PrepaymentModelSpec;
-    ///
-    /// let spec = PrepaymentModelSpec::psa_100();
-    /// assert!(spec.smm(60)? > 0.0);
-    /// # Ok::<(), finstack_quant_core::Error>(())
-    /// ```
-    pub fn psa_100() -> Self {
-        Self::psa(1.0)
-    }
-
     /// CMBS-style lockout: zero prepayment for `lockout_months`, then constant CPR.
     ///
     /// This models the common CMBS pattern where commercial mortgage borrowers
