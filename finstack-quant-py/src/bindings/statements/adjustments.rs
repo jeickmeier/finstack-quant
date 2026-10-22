@@ -14,7 +14,7 @@ use pyo3::prelude::*;
 ///
 /// Build with :meth:`fixed` (explicit per-period amounts) or
 /// :meth:`percentage` (a fraction of another node), then optionally cap it
-/// with :meth:`with_cap` / :meth:`with_cap_mode`.
+/// with :meth:`with_cap`.
 #[pyclass(
     name = "Adjustment",
     module = "finstack_quant.statements",
@@ -86,59 +86,12 @@ impl PyAdjustment {
         }
     }
 
-    /// Return a copy of this adjustment with a cap (default ``"reported"``
-    /// base mode).
-    ///
-    /// Parameters
-    /// ----------
-    /// base_node : str | None
-    ///     Node the cap is measured against (``"ebitda"``); ``None`` makes
-    ///     ``value`` an absolute amount.
-    /// value : float
-    ///     Cap as a decimal fraction of ``base_node`` (``0.20`` = 20%), or
-    ///     an absolute amount in the metric's units when ``base_node`` is
-    ///     ``None``.
-    ///
-    /// Returns
-    /// -------
-    /// Adjustment
-    ///     New adjustment carrying the cap; the original is unchanged.
-    #[pyo3(text_signature = "($self, base_node, value)")]
-    fn with_cap(&self, base_node: Option<String>, value: f64) -> Self {
-        Self {
-            inner: self.inner.clone().with_cap(base_node, value),
-        }
-    }
-
-    /// Return a copy with a cap and an explicit self-referential base mode.
-    ///
-    /// Parameters
-    /// ----------
-    /// base_node : str | None
-    ///     Node the cap is measured against; ``None`` makes ``value``
-    ///     absolute.
-    /// value : float
-    ///     Cap as a decimal fraction of ``base_node`` or an absolute amount.
-    /// base_mode : str
-    ///     ``"reported"`` (cap against the pre-adjustment base — the
-    ///     credit-agreement convention) or ``"progressive"`` (cap against the
-    ///     base plus earlier adjustments). Only matters when ``base_node``
-    ///     is the target node itself.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``base_mode`` is not ``"reported"`` or ``"progressive"``.
+    #[doc = pydoc!("finstack_quant.statements", "Adjustment.with_cap")]
     #[pyo3(text_signature = "($self, base_node, value, base_mode)")]
-    fn with_cap_mode(
-        &self,
-        base_node: Option<String>,
-        value: f64,
-        base_mode: &str,
-    ) -> PyResult<Self> {
+    fn with_cap(&self, base_node: Option<String>, value: f64, base_mode: &str) -> PyResult<Self> {
         let mode = parse_cap_base_mode(base_mode)?;
         Ok(Self {
-            inner: self.inner.clone().with_cap_mode(base_node, value, mode),
+            inner: self.inner.clone().with_cap(base_node, value, mode),
         })
     }
 

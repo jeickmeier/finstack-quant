@@ -185,3 +185,16 @@ def test_model_rejects_rate_hedge_as_pik_target() -> None:
     builder.waterfall(s.WaterfallSpec(pik_toggle=s.PikToggleSpec("cash", 20.0, ["IRS"])))
     with pytest.raises(ValueError, match="only borrowing debt coupons can capitalize into principal"):
         builder.build()
+
+
+def test_adjustment_cap_requires_an_explicit_supported_base_mode() -> None:
+    adjustment = s.Adjustment.percentage("synergies", "Synergies", "revenue", 0.05)
+    for mode in ("reported", "progressive"):
+        capped = adjustment.with_cap("ebitda", 0.20, mode)
+        assert capped.cap_base_mode == mode
+    assert json.loads(adjustment.to_json()).get("cap") is None
+    assert not hasattr(adjustment, "with_cap_mode")
+    with pytest.raises(TypeError):
+        adjustment.with_cap("ebitda", 0.20)  # type: ignore[call-arg]
+    with pytest.raises(ValueError, match="reported or progressive"):
+        adjustment.with_cap("ebitda", 0.20, "same_period")
