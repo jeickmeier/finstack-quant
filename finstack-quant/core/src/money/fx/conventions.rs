@@ -180,8 +180,8 @@ pub fn fx_pip_size(base: Currency, quote: Currency) -> f64 {
 /// Reciprocal of a strictly positive finite FX rate.
 ///
 /// Non-finite inputs are rejected, zero is rejected, and the reciprocal itself
-/// must be a valid FX rate (finite and strictly positive). The pair stamped on
-/// currency-bearing errors is USD/USD because this helper is pair-agnostic.
+/// must be a valid FX rate (finite and strictly positive). This pair-agnostic
+/// helper reports validation errors without inventing a currency pair.
 ///
 /// # Arguments
 ///
@@ -197,24 +197,16 @@ pub fn fx_pip_size(base: Currency, quote: Currency) -> f64 {
 ///
 /// `1 / rate` when that reciprocal is a valid FX rate.
 pub fn invert_fx_rate(rate: f64) -> Result<f64> {
-    if !rate.is_finite() {
-        return Err(crate::InputError::NonFiniteValue {
-            kind: crate::NonFiniteKind::classify(rate),
-        }
-        .into());
-    }
-    if rate <= 0.0 {
-        return Err(crate::Error::Validation(format!(
+    use super::provider::{checked_reciprocal, ReciprocalError};
+    checked_reciprocal(rate).map_err(|failure| match failure {
+        ReciprocalError::NonFiniteInput(kind) => crate::InputError::NonFiniteValue { kind }.into(),
+        ReciprocalError::NonPositiveInput => crate::Error::Validation(format!(
             "Invalid FX rate: expected positive finite rate, got {rate}"
-        )));
-    }
-    let reciprocal = 1.0 / rate;
-    if !reciprocal.is_finite() || reciprocal <= 0.0 {
-        return Err(crate::Error::Validation(format!(
+        )),
+        ReciprocalError::InvalidReciprocal(reciprocal) => crate::Error::Validation(format!(
             "Invalid FX rate reciprocal: 1 / {rate} = {reciprocal}"
-        )));
-    }
-    Ok(reciprocal)
+        )),
+    })
 }
 
 #[cfg(test)]
@@ -308,6 +300,16 @@ mod tests {
         assert!(invert_fx_rate(-1.10).is_err());
         assert!(invert_fx_rate(f64::NAN).is_err());
         assert!(invert_fx_rate(f64::INFINITY).is_err());
+        assert!(matches!(
+            invert_fx_rate(1e-320),
+            Err(crate::Error::Validation(_))
+        ));
+        assert!(matches!(
+            invert_fx_rate(f64::NAN),
+            Err(crate::Error::Input(
+                crate::InputError::NonFiniteValue { .. }
+            ))
+        ));
     }
 
     #[test]
