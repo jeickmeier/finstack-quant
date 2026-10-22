@@ -160,3 +160,26 @@ pub fn sum_nodes(results: &StatementResult, nodes: &[NodeId], period: &PeriodId)
         .filter_map(|n| results.get(n.as_str(), period))
         .sum()
 }
+
+/// A failed identity whose intermediate arithmetic cannot be represented.
+///
+/// # Arguments
+///
+/// * `check_id` - Identifier of the accounting identity whose arithmetic overflowed.
+/// * `period` - Reporting period affected by the unrepresentable calculation.
+/// * `nodes` - Operand node identifiers attached to the diagnostic.
+pub(crate) fn arithmetic_failure(
+    check_id: &str,
+    period: finstack_quant_core::dates::PeriodId,
+    nodes: Vec<crate::types::NodeId>,
+) -> crate::checks::CheckFinding {
+    crate::checks::CheckFinding {
+        check_id: check_id.to_string(),
+        severity: crate::checks::Severity::Error,
+        message: format!("Arithmetic overflow while evaluating {check_id} in {period}; the identity could not be compared."),
+        period: Some(period),
+        materiality: None,
+        nodes,
+        comparison: None,
+    }
+}

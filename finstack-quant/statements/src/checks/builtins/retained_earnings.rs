@@ -223,6 +223,32 @@ impl Check for RetainedEarningsReconciliation {
             let diff = re_curr - expected;
             let reference = re_prev.abs().max(1.0);
             let tolerance = effective_tolerance(&context.config, self.tolerance, reference);
+            let relative = (diff / reference).abs() * 100.0;
+            if ![
+                adjustments,
+                re_prev + ni,
+                re_prev + ni + dividend_change,
+                expected,
+                diff,
+                tolerance,
+                relative,
+            ]
+            .iter()
+            .all(|v| v.is_finite())
+            {
+                let mut nodes = vec![
+                    self.retained_earnings_node.clone(),
+                    self.net_income_node.clone(),
+                ];
+                nodes.extend(self.dividends_node.iter().cloned());
+                nodes.extend(self.other_adjustments.iter().cloned());
+                findings.push(crate::checks::helpers::arithmetic_failure(
+                    self.id(),
+                    *curr_pid,
+                    nodes,
+                ));
+                continue;
+            }
             let comparison = CheckComparison {
                 identity: "retained_earnings_roll_forward".to_string(),
                 period: Some(*curr_pid),
@@ -233,8 +259,6 @@ impl Check for RetainedEarningsReconciliation {
             comparisons.push(comparison.clone());
 
             if diff.abs() > tolerance {
-                let relative = (diff / reference).abs() * 100.0;
-
                 let mut nodes = vec![
                     self.retained_earnings_node.clone(),
                     self.net_income_node.clone(),
