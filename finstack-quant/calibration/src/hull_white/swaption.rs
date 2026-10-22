@@ -371,11 +371,10 @@ pub(super) fn infer_hw_initial_guess(
     quotes: &[SwaptionQuote],
     fwd_swap_rates: &[f64],
 ) -> (f64, f64) {
-    let horizon = if quotes.is_empty() {
-        5.0
-    } else {
-        quotes.iter().map(|q| q.expiry + 0.5 * q.tenor).sum::<f64>() / quotes.len() as f64
-    };
+    debug_assert!(!quotes.is_empty());
+    debug_assert_eq!(quotes.len(), fwd_swap_rates.len());
+    let horizon =
+        quotes.iter().map(|q| q.expiry + 0.5 * q.tenor).sum::<f64>() / quotes.len() as f64;
     // Average ABSOLUTE-rate vol, branched per quote on the vol regime so
     // the σ seed never conflates Bachelier and Black quotes (W-39):
     //  - normal (Bachelier) quote: the vol is already an absolute-rate
@@ -384,26 +383,19 @@ pub(super) fn infer_hw_initial_guess(
     //    recovers an absolute-rate scale.
     // The HW1F σ is an absolute short-rate vol, so this average is the
     // right order of magnitude for the seed.
-    let avg_abs_vol = if quotes.is_empty() {
-        0.01 * 0.02 // fallback: ~1% Black vol at a 2% forward.
-    } else {
-        let sum: f64 = quotes
-            .iter()
-            .enumerate()
-            .map(|(i, q)| {
-                let v = q.volatility.abs();
-                if q.is_normal_vol {
-                    v
-                } else {
-                    // fwd_swap_rates is built quote-aligned by the callers;
-                    // fall back to a 2% forward if the slice is short.
-                    let fwd = fwd_swap_rates.get(i).map_or(0.02, |r| r.abs()).max(0.005);
-                    v * fwd
-                }
-            })
-            .sum();
-        sum / quotes.len() as f64
-    };
+    let avg_abs_vol = quotes
+        .iter()
+        .zip(fwd_swap_rates)
+        .map(|(q, forward)| {
+            let v = q.volatility.abs();
+            if q.is_normal_vol {
+                v
+            } else {
+                v * forward.abs().max(0.005)
+            }
+        })
+        .sum::<f64>()
+        / quotes.len() as f64;
 
     let kappa_init = (1.0 / horizon.max(0.5)).clamp(0.01, 0.30);
     let sigma_init = avg_abs_vol.clamp(0.001, 0.05);
