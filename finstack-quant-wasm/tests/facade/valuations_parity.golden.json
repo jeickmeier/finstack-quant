@@ -1032,10 +1032,7 @@
     "price": 91153.2666429046,
     "dv01": 4798.288799512549,
     "result_json": "{\"schema_version\":1,\"instrument_id\":\"IRS-1\",\"as_of\":\"2024-01-15\",\"value\":{\"amount\":\"91153.2666429046\",\"currency\":\"USD\"},\"measures\":{\"dv01\":4798.288799512549},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002024-01-15T00:00:00.000000000Z\",\"version\":\"0.11.0\"},\"covenants\":null,\"provenance\":{\"model\":\"discounting\",\"requested_as_of\":\"2024-01-15\",\"market_dependencies\":{\"curves\":{\"discount_curves\":[\"USD-OIS\"],\"forward_curves\":[\"USD-SOFR-3M\"],\"credit_curves\":[],\"inflation_curves\":[]},\"market_scalar_ids\":[],\"volatility_dependencies\":[],\"fx_pairs\":[],\"series_ids\":[\"FIXING:USD-SOFR-3M\"]},\"sensitivity_bumps\":{\"rate_bump_bp\":1.0,\"credit_spread_bump_bp\":1.0,\"spot_bump_decimal\":0.01,\"vol_bump_decimal\":0.01}}}",
-    "price_decimal": "91153.2666429046",
     "get_metric": 4798.288799512549,
-    "metric_keys": ["dv01"],
-    "metric_count": 1,
     "metric_units": {
       "dv01": "currency"
     },
@@ -5069,7 +5066,6 @@
         "CdsOptionStrike",
         "CdsTranche",
         "CdsValuationConvention",
-        "ClawbackSettle",
         "ClawbackSpec",
         "ClearingStatus",
         "CliquetOption",
