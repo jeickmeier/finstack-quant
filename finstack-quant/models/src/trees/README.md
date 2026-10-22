@@ -33,7 +33,7 @@ only through the instrument pricers.
 
 The shared `price_recombining_tree` engine is binomial. Trinomial lattices
 (the Black-Karasinski short-rate lattice, `HullWhiteTree`, and the
-convertible-bond Tsiveriotis-Zhang engine over `EvolutionParams::equity_trinomial`)
+convertible-bond Tsiveriotis-Zhang engine)
 carry their own backward induction.
 
 ## The valuator trait
@@ -370,8 +370,8 @@ mise run rust-bench
    privately and inject it through the `RecombiningLattice::ShortRate`
    closures.
 5. Add a typed `NodeState` field for any new per-node datum a valuator reads.
-6. Derive evolution parameters through `EvolutionParams::equity_crr` /
-   `equity_trinomial` / `with_drift` where possible — they validate that the
+6. Derive binomial evolution parameters through `EvolutionParams::equity_crr` /
+   `with_drift` where possible — they validate that the
    risk-neutral probabilities lie in `[0, 1]` and sum to one in release builds,
    which is the guard against silent lattice arbitrage.
 
@@ -382,8 +382,7 @@ mise run rust-bench
 - Ho, T. & Lee, S. (1986). "Term Structure Movements and Pricing Interest Rate
   Contingent Claims." *Journal of Finance*, 41(5), 1011-1029.
 - Boyle, P. (1986). "Option Valuation Using a Three-Jump Process."
-  *International Options Journal*, 3, 7-12. (Trinomial construction used by
-  `EvolutionParams::equity_trinomial`.)
+  *International Options Journal*, 3, 7-12.
 - Black, F., Derman, E. & Toy, W. (1990). "A One-Factor Model of Interest Rates
   and Its Application to Treasury Bond Options." *Financial Analysts Journal*,
   46(1), 33-39.

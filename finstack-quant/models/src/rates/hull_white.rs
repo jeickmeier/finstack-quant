@@ -51,7 +51,7 @@ pub fn capfloor_hw1f_sigma_schedule_key(curve_id: &str) -> String {
 /// use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 ///
 /// let params = HullWhiteCalibrationParams::new(0.05, 0.01).unwrap();
-/// assert!(!params.is_uncalibrated_default());
+/// assert_eq!(params.sigma, 0.01);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -120,12 +120,6 @@ impl HullWhiteCalibrationParams {
             )));
         }
         Ok(Self { kappa, sigma })
-    }
-
-    /// Return whether the parameters equal the generic uncalibrated defaults.
-    #[must_use]
-    pub fn is_uncalibrated_default(&self) -> bool {
-        (self.kappa - 0.03).abs() < f64::EPSILON && (self.sigma - 0.01).abs() < f64::EPSILON
     }
 }
 
@@ -709,50 +703,6 @@ pub fn hw1f_cap_floor_price(
                 discount_df(t_pay),
                 t_fix,
                 t_pay,
-                accrual,
-                strike,
-                is_cap,
-            )
-        })
-        .sum()
-}
-
-/// Price a cap or floor under scheduled Hull-White volatility.
-///
-/// # Arguments
-///
-/// * `params` - Validated mean reversion and piecewise volatility schedule.
-/// * `discount_df` - Discount-factor function for payment discounting.
-/// * `forward_df` - Projection-curve discount-factor function.
-/// * `periods` - Coupon periods as `(fixing_time, start_time, end_time,
-///   accrual)` in years.
-/// * `strike` - Cap or floor strike as a decimal rate.
-/// * `is_cap` - `true` for a cap and `false` for a floor.
-///
-/// # Errors
-///
-/// Returns an error when any caplet input is invalid or scheduled volatility
-/// integration fails.
-pub fn hw1f_cap_floor_price_with_model(
-    params: &HullWhiteParams,
-    discount_df: &dyn Fn(f64) -> f64,
-    forward_df: &dyn Fn(f64) -> f64,
-    periods: &[(f64, f64, f64, f64)],
-    strike: f64,
-    is_cap: bool,
-) -> Result<f64> {
-    periods
-        .iter()
-        .map(|&(t_fix, t_start, t_end, accrual)| {
-            hw1f_term_caplet_price_from_dfs_with_model(
-                params,
-                forward_df(t_start),
-                forward_df(t_end),
-                discount_df(t_end),
-                t_fix,
-                t_start,
-                t_end,
-                t_end,
                 accrual,
                 strike,
                 is_cap,

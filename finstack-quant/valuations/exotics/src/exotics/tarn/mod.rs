@@ -15,8 +15,7 @@
 //! # See Also
 //!
 //! - [`Tarn`](crate::exotics::tarn::Tarn) for instrument definition
-//! - [`finstack_quant_models::rates::hw1f::CumulativeCouponTracker`], the
-//!   cumulative coupon tracker used during MC simulation
+//! - The TARN pricer owns coupon-target state during MC simulation.
 
 pub(crate) mod metrics;
 pub(crate) mod pricer;
