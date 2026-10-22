@@ -7,7 +7,7 @@ use finstack_quant_models::fourier::cos::{bs_cos_price, CosMarketParams};
 use finstack_quant_models::monte_carlo::{
     pricer::{
         basis::PolynomialBasis,
-        lsmc::{AmericanExercise, LsmcConfig, LsmcPricer},
+        lsmc::{AmericanExercise, LsmcConfig, LsmcEngine},
     },
     process::gbm::GbmProcess,
 };
@@ -74,7 +74,7 @@ fn lsmc_only_applies_immediate_exercise_when_scheduled_in_both_pricing_modes() {
             .with_parallel(false)
             .with_antithetic(false)
             .with_seed(7);
-        let pricer = LsmcPricer::new(config);
+        let pricer = LsmcEngine::new(config);
         let estimate = pricer
             .price(&process, 50.0, 1.0, 1, &payoff, &basis, Currency::USD, 0.2)
             .unwrap();

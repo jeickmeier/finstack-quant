@@ -116,7 +116,7 @@ test('migration lookups report the Rust error kind', () => {
     [0.9, 0.08, 0.02, 0.1, 0.8, 0.1, 0, 0, 1],
     1
   );
-  const rows = new credit.migration.TransitionMatrix(scale(), flat.toMatrix(), 1);
+  const rows = new credit.migration.TransitionMatrix(scale(), flat.toRows(), 1);
   assert.equal(rows.toJson(), flat.toJson());
   assert.throws(
     () =>

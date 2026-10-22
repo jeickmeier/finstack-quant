@@ -15,9 +15,10 @@ use crate::utils::input::{
 
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_models::monte_carlo::convenience::{self, LsmcConvenience};
+use finstack_quant_models::monte_carlo::convenience;
 use finstack_quant_models::monte_carlo::greeks::gbm_european::{self, GbmEuropeanFdSpec};
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
+use finstack_quant_models::monte_carlo::pricer::lsmc::LsmcPricer;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::simulate::PathSimulationSpec;
@@ -675,12 +676,12 @@ impl JsPathDependentPricer {
 /// Longstaff-Schwartz Monte Carlo pricer for American options under GBM.
 #[wasm_bindgen(js_name = LsmcPricer)]
 pub struct JsLsmcPricer {
-    inner: LsmcConvenience,
+    inner: LsmcPricer,
 }
 
 /// One LSMC pricing call after its overrides are resolved by Rust.
 struct LsmcCall {
-    pricer: finstack_quant_models::monte_carlo::pricer::lsmc::LsmcPricer,
+    pricer: finstack_quant_models::monte_carlo::pricer::lsmc::LsmcEngine,
     gbm: GbmInputs,
     num_steps: usize,
     currency: Option<Currency>,
@@ -751,7 +752,7 @@ impl JsLsmcPricer {
         antithetic: Option<JsValue>,
     ) -> Result<JsLsmcPricer, JsValue> {
         let basis = js_opt_string(basis.as_ref(), "basis")?;
-        LsmcConvenience::new(
+        LsmcPricer::new(
             js_opt_uint(num_paths.as_ref(), "numPaths")?,
             js_opt_u64(seed.as_ref(), "seed")?,
             js_opt_bool(use_parallel.as_ref(), "useParallel")?,

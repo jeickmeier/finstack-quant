@@ -24,7 +24,7 @@ use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::payoff::vanilla::European;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
-use finstack_quant_models::monte_carlo::pricer::lsmc::{AmericanExercise, LsmcConfig, LsmcPricer};
+use finstack_quant_models::monte_carlo::pricer::lsmc::{AmericanExercise, LsmcConfig, LsmcEngine};
 use finstack_quant_models::monte_carlo::pricer::lsq::solve_least_squares;
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
@@ -87,7 +87,7 @@ fn bench_lsmc_pricer(c: &mut Criterion) {
             let config = LsmcConfig::new(n, exercise_dates.clone(), num_steps)
                 .expect("valid LSMC config")
                 .with_seed(42);
-            let pricer = LsmcPricer::new(config);
+            let pricer = LsmcEngine::new(config);
             b.iter(|| {
                 pricer
                     .price(

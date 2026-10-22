@@ -57,8 +57,8 @@ def test_empirical_matrix_shape() -> None:
     matrix = sim.empirical_matrix(20, 7)
 
     assert matrix.n_states == 2
-    assert len(matrix.to_matrix()) == 2
-    assert all(len(row) == 2 for row in matrix.to_matrix())
+    assert len(matrix.to_rows()) == 2
+    assert all(len(row) == 2 for row in matrix.to_rows())
 
 
 def test_matrices_accept_nested_rows_and_export_labelled_frames() -> None:
@@ -67,7 +67,7 @@ def test_matrices_accept_nested_rows_and_export_labelled_frames() -> None:
     scale = migration.RatingScale.custom(["A", "D"])
     nested = migration.TransitionMatrix(scale, [[0.9, 0.1], [0.0, 1.0]], 1.0)
     flat = migration.TransitionMatrix(scale, [0.9, 0.1, 0.0, 1.0], 1.0)
-    assert nested.to_matrix() == flat.to_matrix()
+    assert nested.to_rows() == flat.to_rows()
     assert nested.probability_by_index(0, 1) == pytest.approx(0.1)
     assert nested.probability(from_="A", to="D") == pytest.approx(0.1)
     assert nested.scale == scale
@@ -76,25 +76,25 @@ def test_matrices_accept_nested_rows_and_export_labelled_frames() -> None:
     assert list(frame.index) == ["A", "D"] == list(frame.columns)
     assert frame.loc["A", "D"] == pytest.approx(0.1)
     rebuilt = migration.TransitionMatrix.from_dataframe(frame, 1.0)
-    assert rebuilt.to_matrix() == nested.to_matrix()
+    assert rebuilt.to_rows() == nested.to_rows()
 
     two_year = nested.compose(nested)
     assert two_year.horizon == pytest.approx(2.0)
     assert two_year.probability("A", "A") == pytest.approx(0.81)
 
-    assert migration.TransitionMatrix.from_json(nested.to_json()).to_matrix() == nested.to_matrix()
-    assert pickle.loads(pickle.dumps(nested)).to_matrix() == nested.to_matrix()  # noqa: S301 - trusted in-process round trip
+    assert migration.TransitionMatrix.from_json(nested.to_json()).to_rows() == nested.to_rows()
+    assert pickle.loads(pickle.dumps(nested)).to_rows() == nested.to_rows()  # noqa: S301 - trusted in-process round trip
 
     gen = migration.GeneratorMatrix(scale, [[-0.1, 0.1], [0.0, 0.0]])
     assert gen.intensity(from_="A", to="D") == pytest.approx(0.1)
     assert gen.scale == scale
     assert list(gen.to_dataframe().columns) == ["A", "D"]
-    assert pickle.loads(pickle.dumps(gen)).to_matrix() == gen.to_matrix()  # noqa: S301 - trusted in-process round trip
+    assert pickle.loads(pickle.dumps(gen)).to_rows() == gen.to_rows()  # noqa: S301 - trusted in-process round trip
     tol = migration.GeneratorMatrix.from_transition_matrix(nested, 1e-6)
     assert tol.round_trip_error <= 1e-6
 
     sim = migration.MigrationSimulator(gen, 2.0)
-    assert sim.generator.to_matrix() == gen.to_matrix()
+    assert sim.generator.to_rows() == gen.to_rows()
     assert migration.MigrationSimulator.from_json(sim.to_json()).horizon == pytest.approx(2.0)
 
 

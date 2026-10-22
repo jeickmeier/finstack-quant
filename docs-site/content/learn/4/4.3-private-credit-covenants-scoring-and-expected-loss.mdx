@@ -224,7 +224,7 @@ one_year = migration.project(credit_generator,1.0)
 five_year = migration.project(credit_generator,5.0)
 pd_term = [(t,migration.project(credit_generator,t).probability("B","D")) for t in [0.5,1,2,3,5]]
 Path("credit-generator.json").write_text(credit_generator.to_json())
-print("Annual generator (per year):",credit_generator.to_matrix())
+print("Annual generator (per year):",credit_generator.to_rows())
 print("Extraction regularization L1 / round-trip error:",credit_generator.regularization_l1,credit_generator.round_trip_error)
 print("B cumulative PD term structure:",pd_term)
 ```

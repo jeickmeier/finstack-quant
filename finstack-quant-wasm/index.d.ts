@@ -25580,7 +25580,7 @@ export interface GeneratorMatrix extends WasmOwned {
    * @returns An array of `number[]` rows in scale order.
    * @throws Error - Throws a `validation` error if the rows cannot be converted.
    */
-  toMatrix(): number[][];
+  toRows(): number[][];
   /**
    * Number of states in the scale.
    */
@@ -26771,7 +26771,7 @@ export interface TransitionMatrix extends WasmOwned {
    * @returns An array of `number[]` rows in scale order.
    * @throws Error - Throws a `validation` error if the rows cannot be converted.
    */
-  toMatrix(): number[][];
+  toRows(): number[][];
   /**
    * Horizon the probabilities apply to, in years.
    */

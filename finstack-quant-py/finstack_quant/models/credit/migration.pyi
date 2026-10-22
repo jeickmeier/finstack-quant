@@ -575,7 +575,7 @@ class TransitionMatrix:
         """
         ...
 
-    def to_matrix(self) -> list[list[float]]:
+    def to_rows(self) -> list[list[float]]:
         """
         Row-major copy of the underlying matrix.
 
@@ -864,7 +864,7 @@ class GeneratorMatrix:
         """
         ...
 
-    def to_matrix(self) -> list[list[float]]:
+    def to_rows(self) -> list[list[float]]:
         """
         Row-major copy of the underlying matrix.
 

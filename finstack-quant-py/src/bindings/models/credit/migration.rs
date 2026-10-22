@@ -324,7 +324,7 @@ impl PyTransitionMatrix {
 
     /// Row-major copy of the underlying matrix as nested lists.
     #[pyo3(text_signature = "($self)")]
-    fn to_matrix(&self) -> Vec<Vec<f64>> {
+    fn to_rows(&self) -> Vec<Vec<f64>> {
         self.inner.to_rows()
     }
 
@@ -464,7 +464,7 @@ impl PyGeneratorMatrix {
 
     /// Row-major copy of the underlying matrix as nested lists.
     #[pyo3(text_signature = "($self)")]
-    fn to_matrix(&self) -> Vec<Vec<f64>> {
+    fn to_rows(&self) -> Vec<Vec<f64>> {
         self.inner.to_rows()
     }
 

@@ -229,7 +229,7 @@ accessor methods.
 ### Unbiased American pricing (two-pass LSMC)
 
 Single-pass Longstaff-Schwartz fits the regression and prices on the same path
-set, biasing the price upward. `LsmcPricer::price_unbiased` trains the policy on
+set, biasing the price upward. `LsmcEngine::price_unbiased` trains the policy on
 one path set and replays it on a second, independent set. It rejects a
 `pricing_seed` equal to the configured training seed.
 
@@ -237,7 +237,7 @@ one path set and replays it on a second, independent set. It rejects a
 use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::pricer::lsmc::{
-    AmericanExercise, LsmcConfig, LsmcPricer,
+    AmericanExercise, LsmcConfig, LsmcEngine,
 };
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 use finstack_quant_models::types::OptionType;
@@ -245,7 +245,7 @@ use finstack_quant_models::types::OptionType;
 let cfg = LsmcConfig::new(50_000, vec![25, 50, 75, 100], 100)
     .expect("valid LSMC config")
     .with_seed(42);
-let pricer = LsmcPricer::new(cfg);
+let pricer = LsmcEngine::new(cfg);
 let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.05, 0.0, 0.3).map(GbmProcess::new).expect("valid GBM parameters");
 let put = AmericanExercise::new(OptionType::Put, 100.0).expect("valid strike");
 let basis = PolynomialBasis::new(2).expect("valid regression basis");
@@ -267,8 +267,8 @@ let unbiased = pricer
 assert!(unbiased.mean.amount() > 0.0);
 ```
 
-For finer control, `LsmcPricer::fit_exercise_policy` returns an `ExercisePolicy`
-that `LsmcPricer::price_with_policy` can replay across multiple scenarios.
+For finer control, `LsmcEngine::fit_exercise_policy` returns an `ExercisePolicy`
+that `LsmcEngine::price_with_policy` can replay across multiple scenarios.
 `LsmcConfig::every_step(num_paths, num_steps)` builds the American exercise grid
 `1..=num_steps`. Note that terminal exercise at `num_steps` is always applied
 whether or not it is listed, and immediate exercise at `t = 0` floors the

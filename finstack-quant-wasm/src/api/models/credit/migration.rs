@@ -279,8 +279,8 @@ impl JsTransitionMatrix {
     /// # Errors
     ///
     /// Throws a `validation` error if the rows cannot be converted.
-    #[wasm_bindgen(js_name = toMatrix)]
-    pub fn to_matrix(&self) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = toRows)]
+    pub fn to_rows(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.to_rows())
     }
 
@@ -395,8 +395,8 @@ impl JsGeneratorMatrix {
     /// # Errors
     ///
     /// Throws a `validation` error if the rows cannot be converted.
-    #[wasm_bindgen(js_name = toMatrix)]
-    pub fn to_matrix(&self) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = toRows)]
+    pub fn to_rows(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.to_rows())
     }
 

@@ -22,7 +22,7 @@
 //! For mission-critical pricing the standard remedy is to fit the regression
 //! on one independent path set ("training") and apply the frozen exercise
 //! policy to a separate path set ("pricing"). Use
-//! [`LsmcPricer::price_unbiased`] for that two-pass workflow, or complement
+//! [`LsmcEngine::price_unbiased`] for that two-pass workflow, or complement
 //! this estimator with an Andersen-Broadie dual upper bound to bracket the true
 //! value.
 //!
@@ -31,7 +31,7 @@
 //! Early exercise is evaluated on the discrete simulation steps listed in
 //! [`LsmcConfig::exercise_dates`] (the GBM convenience constructors use every
 //! step `0..=num_steps`). That is a **Bermudan** option on the time grid, not a
-//! continuous American. In the in-sample [`LsmcPricer::price`] method, when index
+//! continuous American. In the in-sample [`LsmcEngine::price`] method, when index
 //! `0` is included, immediate exercise is applied as a floor so the estimate cannot print below
 //! intrinsic. When that floor binds, the reported mean is the intrinsic
 //! value while stderr and sample standard deviation stay those of the
@@ -55,7 +55,7 @@ use crate::types::OptionType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::math::time_grid::TimeGrid;
-use finstack_quant_core::Result;
+use finstack_quant_core::{Error, Result};
 
 // Bound retained path storage to 512 MB of f64 values and the time/exercise
 // grids to 100,000 intervals. Streaming MC limits do not protect this pricer,
@@ -95,11 +95,11 @@ fn checked_path_values(num_paths: usize, num_steps: usize, antithetic: bool) -> 
 /// A frozen LSMC exercise policy fit on one path set, applicable to another.
 ///
 /// Captures the per-exercise-date least-squares regression coefficients used to
-/// approximate continuation values. Apply it via [`LsmcPricer::price_with_policy`]
+/// approximate continuation values. Apply it via [`LsmcEngine::price_with_policy`]
 /// to a fresh, independent path set to recover an *out-of-sample* American option
 /// price free of the in-sample regression bias.
 ///
-/// Build one with [`LsmcPricer::fit_exercise_policy`].
+/// Build one with [`LsmcEngine::fit_exercise_policy`].
 #[derive(Debug, Clone)]
 pub struct ExercisePolicy {
     /// Whether the training paths selected immediate exercise at time zero.
@@ -111,7 +111,7 @@ pub struct ExercisePolicy {
     /// `(0, num_steps)` are stored; terminal exercise is always applied.
     pub coefficients_by_date: Vec<(usize, Vec<f64>)>,
     /// Number of basis functions used during fitting; the same basis must be
-    /// passed to [`LsmcPricer::price_with_policy`].
+    /// passed to [`LsmcEngine::price_with_policy`].
     pub num_basis: usize,
     /// Number of simulation steps in the training run; the pricing run must
     /// agree.
@@ -423,17 +423,171 @@ fn fill_gbm_antithetic_pair(
     }
 }
 
+/// American LSMC pricer together with its default exercise grid and
+/// regression basis.
+///
+/// [`LsmcEngine`] fixes the exercise grid at construction, while the host
+/// pricing calls may override the step count, basis and basis degree per
+/// call. This type keeps the construction-time choices and resolves each
+/// call's overrides through [`Self::call_config`].
+#[derive(Debug, Clone)]
+pub struct LsmcPricer {
+    pricer: LsmcEngine,
+    num_steps: usize,
+    basis: BasisKind,
+    basis_degree: usize,
+}
+
+impl LsmcPricer {
+    /// Build the pricer, taking omitted settings from the registry.
+    ///
+    /// # Arguments
+    ///
+    /// * `num_paths` - Number of Monte Carlo paths; `None` uses the registry
+    ///   default.
+    /// * `seed` - Seed of the random streams; `None` uses the registry
+    ///   default.
+    /// * `use_parallel` - Whether paths run on the thread pool (ignored on
+    ///   `wasm32`); `None` uses the registry default.
+    /// * `num_steps` - Exercise dates between `0` and expiry; `None` uses the
+    ///   registry default.
+    /// * `basis` - Regression basis name accepted by `BasisKind::parse`
+    ///   (such as `"laguerre"` or `"polynomial"`); `None` uses the registry
+    ///   default.
+    /// * `basis_degree` - Highest polynomial degree of the regression basis;
+    ///   `None` uses the registry default.
+    /// * `antithetic` - Whether antithetic variates are used; `None` uses the
+    ///   registry default.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] for an unknown basis name, and an error
+    /// if the path or step count is zero.
+    pub fn new(
+        num_paths: Option<usize>,
+        seed: Option<u64>,
+        use_parallel: Option<bool>,
+        num_steps: Option<usize>,
+        basis: Option<&str>,
+        basis_degree: Option<usize>,
+        antithetic: Option<bool>,
+    ) -> Result<Self> {
+        let defaults = &super::super::registry::embedded_defaults()?
+            .convenience
+            .lsmc;
+        let basis = BasisKind::parse(basis.unwrap_or(defaults.basis.as_str()))
+            .map_err(Error::Validation)?;
+        let num_steps = num_steps.unwrap_or(defaults.num_steps);
+        let pricer = LsmcEngine::gbm_american(
+            num_paths.unwrap_or(defaults.num_paths),
+            num_steps,
+            seed.unwrap_or(defaults.seed),
+            use_parallel.unwrap_or(defaults.use_parallel),
+            antithetic.unwrap_or(defaults.antithetic),
+        )?;
+        Ok(Self {
+            pricer,
+            num_steps,
+            basis,
+            basis_degree: basis_degree.unwrap_or(defaults.basis_degree),
+        })
+    }
+
+    /// The pricer built at construction, on the default exercise grid.
+    #[must_use]
+    pub fn pricer(&self) -> &LsmcEngine {
+        &self.pricer
+    }
+
+    /// Default number of exercise dates.
+    #[must_use]
+    pub fn num_steps(&self) -> usize {
+        self.num_steps
+    }
+
+    /// Default regression basis.
+    #[must_use]
+    pub fn basis(&self) -> BasisKind {
+        self.basis
+    }
+
+    /// Default highest polynomial degree of the regression basis.
+    #[must_use]
+    pub fn basis_degree(&self) -> usize {
+        self.basis_degree
+    }
+
+    /// Resolve one pricing call's overrides against the construction-time
+    /// defaults.
+    ///
+    /// # Arguments
+    ///
+    /// * `num_steps` - Exercise dates for this call; `None` keeps the
+    ///   construction-time value.
+    /// * `basis` - Regression basis name for this call; `None` keeps the
+    ///   construction-time basis.
+    /// * `basis_degree` - Basis degree for this call; `None` keeps the
+    ///   construction-time degree.
+    ///
+    /// # Returns
+    ///
+    /// The pricer rebuilt on the resolved exercise grid, with the resolved
+    /// step count, basis and basis degree to pass to its pricing methods.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] for an unknown basis name, and an error
+    /// if the step count is zero.
+    pub fn call_config(
+        &self,
+        num_steps: Option<usize>,
+        basis: Option<&str>,
+        basis_degree: Option<usize>,
+    ) -> Result<(LsmcEngine, usize, BasisKind, usize)> {
+        let (pricer, num_steps) = match num_steps {
+            Some(steps) => {
+                let config = self.pricer.config();
+                (
+                    LsmcEngine::gbm_american(
+                        config.num_paths,
+                        steps,
+                        config.seed,
+                        config.use_parallel,
+                        config.antithetic,
+                    )?,
+                    steps,
+                )
+            }
+            None => (self.pricer.clone(), self.num_steps),
+        };
+        let basis = match basis {
+            Some(name) => BasisKind::parse(name).map_err(Error::Validation)?,
+            None => self.basis,
+        };
+        Ok((
+            pricer,
+            num_steps,
+            basis,
+            basis_degree.unwrap_or(self.basis_degree),
+        ))
+    }
+}
+
 /// LSMC pricer for American/Bermudan options.
 ///
 /// Uses backward induction with least-squares regression to estimate
 /// continuation values and optimal exercise decisions.
 #[derive(Debug, Clone)]
-pub struct LsmcPricer {
+pub struct LsmcEngine {
     config: LsmcConfig,
 }
 
-impl LsmcPricer {
-    /// Create a new LSMC pricer.
+impl LsmcEngine {
+    /// Create a new LSMC engine.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Simulation paths, exercise grid, RNG and regression settings.
     pub fn new(config: LsmcConfig) -> Self {
         Self { config }
     }
@@ -1185,7 +1339,7 @@ mod tests {
 
         let mut config = LsmcConfig::new(16, vec![1], 1).expect("small config");
         config.num_paths = usize::MAX;
-        let pricer = LsmcPricer::new(config);
+        let pricer = LsmcEngine::new(config);
         let process = crate::monte_carlo::process::gbm::GbmParams::new(0.05, 0.0, 0.2)
             .map(GbmProcess::new)
             .expect("process");
@@ -1202,7 +1356,7 @@ mod tests {
         for antithetic in [false, true] {
             for num_paths in [0, 1] {
                 assert!(LsmcConfig::new(num_paths, vec![1], 1).is_err());
-                assert!(LsmcPricer::gbm_american(num_paths, 1, 42, false, antithetic).is_err());
+                assert!(LsmcEngine::gbm_american(num_paths, 1, 42, false, antithetic).is_err());
                 // Public fields can be changed after construction; pricing
                 // must revalidate before simulating either paths or pairs.
                 let mut config = LsmcConfig::new(2, vec![1], 1)
@@ -1210,7 +1364,7 @@ mod tests {
                     .with_antithetic(antithetic);
                 config.num_paths = num_paths;
                 let seed = config.seed;
-                assert!(LsmcPricer::new(config)
+                assert!(LsmcEngine::new(config)
                     .generate_paths_with_seed(&process, 100.0, 1.0, 1, seed)
                     .is_err());
             }
@@ -1305,7 +1459,7 @@ mod tests {
         let config = LsmcConfig::new(1_000, exercise_dates, 100)
             .unwrap()
             .with_seed(42);
-        let pricer = LsmcPricer::new(config);
+        let pricer = LsmcEngine::new(config);
 
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.3).unwrap());
         let put = AmericanExercise {
@@ -1330,7 +1484,7 @@ mod tests {
         let config = LsmcConfig::new(5_000, exercise_dates, 100)
             .unwrap()
             .with_seed(42);
-        let pricer = LsmcPricer::new(config);
+        let pricer = LsmcEngine::new(config);
 
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.3).unwrap());
         let put = AmericanExercise {
@@ -1358,7 +1512,7 @@ mod tests {
         let config = LsmcConfig::new(5_000, exercise_dates, 100)
             .unwrap()
             .with_seed(123);
-        let pricer = LsmcPricer::new(config);
+        let pricer = LsmcEngine::new(config);
 
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 1.0).unwrap());
         let put = AmericanExercise {
@@ -1385,7 +1539,7 @@ mod tests {
         let config = LsmcConfig::new(1_000, exercise_dates, 100)
             .unwrap()
             .with_seed(456);
-        let pricer = LsmcPricer::new(config);
+        let pricer = LsmcEngine::new(config);
 
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.05).unwrap());
         let put = AmericanExercise {
@@ -1408,7 +1562,7 @@ mod tests {
     #[test]
     fn test_lsmc_insufficient_itm_paths_preserves_continuation() {
         let config = LsmcConfig::new(2, vec![1], 2).unwrap();
-        let pricer = LsmcPricer::new(config);
+        let pricer = LsmcEngine::new(config);
         let exercise = AmericanExercise {
             option_type: OptionType::Call,
             strike: 100.0,
@@ -1456,7 +1610,7 @@ mod tests {
         let config = LsmcConfig::new(2_000, exercise_dates, 100)
             .unwrap()
             .with_seed(42);
-        let pricer = LsmcPricer::new(config);
+        let pricer = LsmcEngine::new(config);
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.3).unwrap());
         let put = AmericanExercise::new(OptionType::Put, 100.0).unwrap();
         let basis = PolynomialBasis::new(2).expect("valid regression basis");
@@ -1483,7 +1637,7 @@ mod tests {
     #[test]
     fn test_price_unbiased_rejects_matching_seeds() {
         let cfg = LsmcConfig::new(100, vec![10], 20).unwrap().with_seed(7);
-        let pricer = LsmcPricer::new(cfg);
+        let pricer = LsmcEngine::new(cfg);
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.2).unwrap());
         let put = AmericanExercise::new(OptionType::Put, 100.0).unwrap();
         let basis = PolynomialBasis::new(2).expect("valid regression basis");
@@ -1507,7 +1661,7 @@ mod tests {
         let config = LsmcConfig::new(2, vec![0, 1], 1)
             .unwrap()
             .with_antithetic(false);
-        let pricer = LsmcPricer::new(config);
+        let pricer = LsmcEngine::new(config);
         let exercise = AmericanExercise::new(OptionType::Put, 100.0).unwrap();
         let basis = PolynomialBasis::new(1).expect("valid regression basis");
         let zero_continuation = PathMatrix::from_rows(&vec![vec![90.0, 100.0]; 2]);
@@ -1543,7 +1697,7 @@ mod tests {
     #[test]
     fn test_price_with_policy_rejects_basis_mismatch() {
         let cfg = LsmcConfig::new(500, vec![10], 20).unwrap().with_seed(1);
-        let pricer = LsmcPricer::new(cfg);
+        let pricer = LsmcEngine::new(cfg);
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.2).unwrap());
         let put = AmericanExercise::new(OptionType::Put, 100.0).unwrap();
         let basis_train = PolynomialBasis::new(2).expect("valid regression basis");
@@ -1573,7 +1727,7 @@ mod tests {
     #[test]
     fn test_lsmc_tiny_positive_intrinsic_values_are_treated_as_itm() {
         let config = LsmcConfig::new(16, vec![1], 2).unwrap();
-        let pricer = LsmcPricer::new(config);
+        let pricer = LsmcEngine::new(config);
         let exercise = AmericanExercise {
             option_type: OptionType::Call,
             strike: 100.0,
@@ -1595,7 +1749,7 @@ mod tests {
 
     #[test]
     fn price_gbm_american_put_atm_is_positive() {
-        let pricer = LsmcPricer::gbm_american(1_000, 8, 42, false, true)
+        let pricer = LsmcEngine::gbm_american(1_000, 8, 42, false, true)
             .expect("GBM American pricer should construct");
         let estimate = pricer
             .price_american(
@@ -1617,7 +1771,7 @@ mod tests {
 
     #[test]
     fn lsmc_deep_itm_put_respects_intrinsic_floor() {
-        let pricer = LsmcPricer::gbm_american(4_000, 8, 7, false, true)
+        let pricer = LsmcEngine::gbm_american(4_000, 8, 7, false, true)
             .expect("GBM American pricer should construct");
         let estimate = pricer
             .price_american(
@@ -1644,7 +1798,7 @@ mod tests {
 
     #[test]
     fn lsmc_deep_itm_put_floor_keeps_stderr() {
-        let pricer = LsmcPricer::gbm_american(2_000, 2, 17, false, true)
+        let pricer = LsmcEngine::gbm_american(2_000, 2, 17, false, true)
             .expect("GBM American pricer should construct");
         let estimate = pricer
             .price_american(
@@ -1704,7 +1858,7 @@ mod tests {
             crate::types::OptionType::Put,
         )
         .expect("valid Black-Scholes inputs");
-        let pricer = LsmcPricer::gbm_american(8_000, 8, 11, false, true)
+        let pricer = LsmcEngine::gbm_american(8_000, 8, 11, false, true)
             .expect("GBM American pricer should construct");
         let estimate = pricer
             .price_american(
@@ -1748,7 +1902,7 @@ mod tests {
             crate::types::OptionType::Call,
         )
         .expect("valid Black-Scholes inputs");
-        let pricer = LsmcPricer::gbm_american(8_000, 8, 13, false, true)
+        let pricer = LsmcEngine::gbm_american(8_000, 8, 13, false, true)
             .expect("GBM American pricer should construct");
         let estimate = pricer
             .price_american(
@@ -1790,7 +1944,7 @@ mod tests {
             0x4020f4f4ccf63499,
             0x3fdc7de115fa4ffb,
         ];
-        let pricer = LsmcPricer::gbm_american(400, 10, 42, false, true).expect("pricer");
+        let pricer = LsmcEngine::gbm_american(400, 10, 42, false, true).expect("pricer");
         let (spot, strike, rate, div_yield, vol, expiry, num_steps, currency) =
             (100.0, 105.0, 0.05, 0.03, 0.25, 1.0, 10, Currency::USD);
         let estimates = [
@@ -1869,5 +2023,32 @@ mod tests {
             actual.as_slice() == EXPECTED || actual.as_slice() == LINUX,
             "GBM American prices moved off the macOS and Linux libm pins:\n{actual:#x?}"
         );
+    }
+    #[test]
+    fn lsmc_call_config_layers_call_overrides_over_construction() {
+        let lsmc = LsmcPricer::new(
+            Some(500),
+            Some(3),
+            Some(false),
+            Some(10),
+            None,
+            Some(2),
+            None,
+        )
+        .expect("valid");
+        assert_eq!(lsmc.num_steps(), 10);
+        assert_eq!(lsmc.basis_degree(), 2);
+
+        let (pricer, steps, basis, degree) = lsmc.call_config(None, None, None).expect("defaults");
+        assert_eq!(pricer.config().num_paths, 500);
+        assert_eq!((steps, basis, degree), (10, lsmc.basis(), 2));
+
+        let (_, steps, _, degree) = lsmc
+            .call_config(Some(20), None, Some(4))
+            .expect("overrides");
+        assert_eq!((steps, degree), (20, 4));
+
+        assert!(lsmc.call_config(None, Some("not-a-basis"), None).is_err());
+        assert!(LsmcPricer::new(None, None, None, None, Some("nope"), None, None).is_err());
     }
 }
