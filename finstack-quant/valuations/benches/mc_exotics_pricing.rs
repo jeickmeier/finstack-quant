@@ -1,7 +1,7 @@
 //! Monte Carlo and barrier PDE exotic instrument pricing benchmarks.
 //!
 //! `AsianOption`'s `Instrument::value` uses Turnbull–Wakeman for arithmetic averages; the Asian group
-//! calls `AsianOption::npv_mc` so timings reflect Monte Carlo paths controlled by `InstrumentPricingOverrides::with_mc_paths`.
+//! selects `ModelKey::MonteCarloGBM` through the registry so timings reflect configured Monte Carlo paths.
 //!
 //! `CliquetOption` uses an internal GBM MC engine with step count driven by the number of reset dates.
 //! Barrier cases price total at-hit rebates under continuous and quarterly monitoring.
@@ -176,8 +176,22 @@ fn bench_asian_option_mc(c: &mut Criterion) {
     let paths = 2_500_u64;
     group.throughput(Throughput::Elements(paths));
     let option = asian_option(paths as usize);
+    let registry = STANDARD.pricers();
     group.bench_with_input(BenchmarkId::from_parameter(paths), &paths, |b, &_paths| {
-        b.iter(|| black_box(option.npv_mc(black_box(&market), black_box(as_of)).unwrap()));
+        b.iter(|| {
+            black_box(
+                registry
+                    .price_with_metrics(
+                        &option,
+                        finstack_quant_valuations::pricer::ModelKey::MonteCarloGBM,
+                        black_box(&market),
+                        black_box(as_of),
+                        &[],
+                        finstack_quant_valuations::instruments::PricingOptions::default(),
+                    )
+                    .unwrap(),
+            )
+        });
     });
     group.finish();
 }
