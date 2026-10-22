@@ -353,6 +353,8 @@ mod tests {
                     &[0.0, 1.0],
                     &[4000.0, 6000.0],
                     &[0.2, 0.2, 0.2, 0.2],
+                    Default::default(),
+                    None,
                 )
                 .expect("surface"),
             )

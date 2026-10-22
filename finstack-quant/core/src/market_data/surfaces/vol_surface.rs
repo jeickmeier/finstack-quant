@@ -215,7 +215,7 @@ impl TryFrom<VolSurfaceWire> for VolSurface {
     type Error = crate::Error;
 
     fn try_from(state: VolSurfaceWire) -> crate::Result<Self> {
-        Self::from_grid_opts(
+        Self::from_grid(
             &state.id,
             &state.expiries,
             &state.strikes,
@@ -716,7 +716,7 @@ impl VolSurfaceBuilder {
     ///
     /// Returns a validation error when the number of rows does not match
     /// expiries or a row does not match strikes. It also propagates axis and
-    /// volatility validation failures from [`VolSurface::from_grid_opts`].
+    /// volatility validation failures from [`VolSurface::from_grid`].
     pub fn build(self) -> crate::Result<VolSurface> {
         VolSurface::from_rows_opts(
             self.id.as_str(),
@@ -733,7 +733,7 @@ impl VolSurfaceBuilder {
     }
 }
 
-/// Options bundle for [`VolSurface::from_grid_opts`].
+/// Options bundle for [`VolSurface::from_grid`].
 ///
 /// Use this when grid construction needs a non-default secondary-axis or
 /// interpolation contract.
@@ -770,7 +770,7 @@ impl VolSurface {
     /// * `vols_row_major` - Annualized decimal volatilities flattened in expiry-major row order.
     /// * `opts` - Secondary-axis meaning, quote type, and interpolation contract for the grid.
     /// * `displacements` - One finite additive shift per expiry for shifted Black quotes; must be absent for normal or unshifted Black quotes.
-    pub fn from_grid_opts(
+    pub fn from_grid(
         id: impl AsRef<str>,
         expiries: &[f64],
         strikes: &[f64],
@@ -790,38 +790,6 @@ impl VolSurface {
             displacements: displacements.map(Into::into),
             vols: vols_row_major.to_vec().into_boxed_slice(),
         })
-    }
-
-    /// Construct directly from axes and a row-major flat values array.
-    ///
-    /// Equivalent to [`from_grid_opts`](Self::from_grid_opts) with
-    /// [`VolGridOpts::default()`].
-    ///
-    /// # Errors
-    ///
-    /// Propagates the grid-shape, axis, and volatility validation errors from
-    /// [`Self::from_grid_opts`].
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Market-data identifier stored on the surface and used for context lookup.
-    /// * `expiries` - Strictly increasing option expiries in year-fraction units.
-    /// * `strikes` - Strictly ordered strike coordinates in underlying price units.
-    /// * `vols_row_major` - Annualized decimal volatilities flattened in expiry-major row order.
-    pub fn from_grid(
-        id: impl AsRef<str>,
-        expiries: &[f64],
-        strikes: &[f64],
-        vols_row_major: &[f64],
-    ) -> crate::Result<Self> {
-        Self::from_grid_opts(
-            id,
-            expiries,
-            strikes,
-            vols_row_major,
-            VolGridOpts::default(),
-            None,
-        )
     }
 
     fn from_rows_opts(
@@ -857,7 +825,7 @@ impl VolSurface {
         for row in vol_rows {
             flat.extend_from_slice(row);
         }
-        Self::from_grid_opts(id, expiries, strikes, &flat, opts, displacements)
+        Self::from_grid(id, expiries, strikes, &flat, opts, displacements)
     }
 }
 
@@ -924,10 +892,9 @@ mod displacement_tests {
             ..VolGridOpts::default()
         };
         assert!(
-            VolSurface::from_grid_opts("BAD", &[1.0, 2.0], &[0.03], &[0.2, 0.2], opts, None)
-                .is_err()
+            VolSurface::from_grid("BAD", &[1.0, 2.0], &[0.03], &[0.2, 0.2], opts, None).is_err()
         );
-        assert!(VolSurface::from_grid_opts(
+        assert!(VolSurface::from_grid(
             "BAD",
             &[1.0, 2.0],
             &[0.03],
@@ -936,12 +903,20 @@ mod displacement_tests {
             Some(&[0.02])
         )
         .is_err());
-        let unshifted = VolSurface::from_grid("UNSHIFTED", &[1.0], &[0.03], &[0.2]).unwrap();
+        let unshifted = VolSurface::from_grid(
+            "UNSHIFTED",
+            &[1.0],
+            &[0.03],
+            &[0.2],
+            Default::default(),
+            None,
+        )
+        .unwrap();
         assert!(unshifted
             .with_quote_type(VolQuoteType::ShiftedBlackLognormal)
             .is_err());
 
-        let surface = VolSurface::from_grid_opts(
+        let surface = VolSurface::from_grid(
             "SHIFT",
             &[1.0, 2.0],
             &[0.03],
@@ -958,13 +933,19 @@ mod displacement_tests {
 
     #[test]
     fn surface_expiries_must_be_nonnegative_in_construction_and_serde() {
-        let zero_expiry = VolSurface::from_grid("ZERO", &[0.0], &[0.03], &[0.2]).unwrap();
+        let zero_expiry =
+            VolSurface::from_grid("ZERO", &[0.0], &[0.03], &[0.2], Default::default(), None)
+                .unwrap();
         let restored: VolSurface =
             serde_json::from_value(serde_json::to_value(zero_expiry).unwrap()).unwrap();
         assert_eq!(restored.expiries(), &[0.0]);
-        assert!(VolSurface::from_grid("BAD", &[-0.25], &[0.03], &[0.2]).is_err());
+        assert!(
+            VolSurface::from_grid("BAD", &[-0.25], &[0.03], &[0.2], Default::default(), None)
+                .is_err()
+        );
 
-        let surface = VolSurface::from_grid("OK", &[1.0], &[0.03], &[0.2]).unwrap();
+        let surface =
+            VolSurface::from_grid("OK", &[1.0], &[0.03], &[0.2], Default::default(), None).unwrap();
         let mut raw = serde_json::to_value(surface).unwrap();
         raw["expiries"][0] = serde_json::json!(-0.25);
         assert!(serde_json::from_value::<VolSurface>(raw).is_err());

@@ -270,7 +270,15 @@ fn test_vol_surface_negative_strikes() {
 #[test]
 fn test_vol_surface_from_grid() {
     let vols = vec![0.2, 0.21, 0.22, 0.19, 0.2, 0.21];
-    let surface = VolSurface::from_grid("TEST", &[1.0, 2.0], &[90.0, 100.0, 110.0], &vols).unwrap();
+    let surface = VolSurface::from_grid(
+        "TEST",
+        &[1.0, 2.0],
+        &[90.0, 100.0, 110.0],
+        &vols,
+        Default::default(),
+        None,
+    )
+    .unwrap();
 
     assert_eq!(surface.id().as_str(), "TEST");
     assert_eq!(surface.expiries(), &[1.0, 2.0]);
@@ -280,7 +288,14 @@ fn test_vol_surface_from_grid() {
 #[test]
 fn test_vol_surface_from_grid_wrong_size() {
     let vols = vec![0.2, 0.21]; // Should be 6 values (2 * 3)
-    let result = VolSurface::from_grid("TEST", &[1.0, 2.0], &[90.0, 100.0, 110.0], &vols);
+    let result = VolSurface::from_grid(
+        "TEST",
+        &[1.0, 2.0],
+        &[90.0, 100.0, 110.0],
+        &vols,
+        Default::default(),
+        None,
+    );
     assert!(result.is_err());
 }
 

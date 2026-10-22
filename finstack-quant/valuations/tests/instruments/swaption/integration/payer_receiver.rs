@@ -93,7 +93,7 @@ fn test_forward_swap_rate_includes_first_multicurve_float_period() {
 #[test]
 fn test_normal_vol_surface_uses_underlying_tenor_axis() {
     let (as_of, expiry, swap_start, swap_end_5y) = standard_dates();
-    let tenor_surface = VolSurface::from_grid_opts(
+    let tenor_surface = VolSurface::from_grid(
         "USD_SWAPTION_VOL",
         &[1.0],
         &[5.0, 10.0],

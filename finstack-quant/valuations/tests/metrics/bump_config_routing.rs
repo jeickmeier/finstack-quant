@@ -731,6 +731,8 @@ fn lookback_fixture() -> (LookbackOption, MarketContext, Date) {
         &[0.0, 10.0],
         &[0.0, 10_000.0],
         &[0.20, 0.20, 0.20, 0.20],
+        Default::default(),
+        None,
     )
     .expect("surface");
     let market = MarketContext::new()

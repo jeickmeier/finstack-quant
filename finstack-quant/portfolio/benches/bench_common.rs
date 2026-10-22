@@ -279,6 +279,8 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0],
         &[100.0, 120.0, 140.0, 160.0, 180.0],
         &[0.25; 20],
+        Default::default(),
+        None,
     )
     .unwrap();
 
@@ -287,6 +289,8 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0, 5.0],
         &[0.02, 0.03, 0.04, 0.05, 0.06],
         &[0.20; 25],
+        Default::default(),
+        None,
     )
     .unwrap();
 
@@ -295,6 +299,8 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0],
         &[1.05, 1.10, 1.15, 1.20, 1.25],
         &[0.10; 20],
+        Default::default(),
+        None,
     )
     .unwrap();
 
@@ -306,6 +312,8 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         &[0.25, 1.0, 2.0, 5.0, 10.0],
         &[0.5, 1.0, 1.5],
         &[0.02; 15],
+        Default::default(),
+        None,
     )
     .unwrap();
 
@@ -314,6 +322,8 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0],
         &[0.005, 0.01, 0.015, 0.02, 0.03],
         &[0.30; 20],
+        Default::default(),
+        None,
     )
     .unwrap();
 

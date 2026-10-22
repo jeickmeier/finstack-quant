@@ -428,7 +428,15 @@ mod tests {
                 values.push((variance / time).sqrt());
             }
         }
-        let surface = VolSurface::from_grid("CARRY", &expiries, &strikes, &values).unwrap();
+        let surface = VolSurface::from_grid(
+            "CARRY",
+            &expiries,
+            &strikes,
+            &values,
+            Default::default(),
+            None,
+        )
+        .unwrap();
         let fixed_strike_slope = 2.0 * values[7 + 2].powi(2) - values[2].powi(2);
         assert!(fixed_strike_slope < -0.005);
         for ei in 0..2 {
@@ -497,6 +505,8 @@ mod tests {
             &[0.25, 0.5, 1.0, 2.0],
             &[80.0, 90.0, 100.0, 110.0, 120.0],
             &[0.2; 20],
+            Default::default(),
+            None,
         )
         .unwrap();
         let calendar = VolSurface::builder("CALENDAR-BAD")

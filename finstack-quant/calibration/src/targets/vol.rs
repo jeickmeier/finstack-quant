@@ -215,6 +215,8 @@ impl VolSurfaceTarget {
             &params.target_expiries,
             &params.target_strikes,
             &grid,
+            Default::default(),
+            None,
         )?
         .with_interpolation_mode(VolInterpolationMode::TotalVariance);
 

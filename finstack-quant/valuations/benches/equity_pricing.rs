@@ -96,6 +96,8 @@ fn create_equity_market() -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0, 3.0, 5.0],
         &[4500.0, 4800.0, 5000.0, 5200.0, 5500.0],
         &[0.28; 30],
+        Default::default(),
+        None,
     )
     .unwrap();
 
@@ -115,6 +117,8 @@ fn create_equity_market() -> MarketContext {
         &[0.25, 0.5, 1.0],
         &[15.0, 18.0, 21.0, 24.0, 27.0],
         &[0.80; 15],
+        Default::default(),
+        None,
     )
     .unwrap();
 

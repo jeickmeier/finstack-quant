@@ -142,7 +142,7 @@ impl PyVolSurface {
         }
         let grid = extract_vol_grid(vols)?;
         let surface = match grid {
-            VolInput::Flat(values) => VolSurface::from_grid_opts(
+            VolInput::Flat(values) => VolSurface::from_grid(
                 id,
                 &expiries,
                 &strikes,

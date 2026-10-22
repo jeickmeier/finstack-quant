@@ -359,7 +359,7 @@ struct VolSurfaceOptions {
 #[wasm_bindgen(js_class = VolSurface)]
 impl JsVolSurface {
     /// Construct a surface from a row-major volatility grid (Rust
-    /// `VolSurface::from_grid_opts`).
+    /// `VolSurface::from_grid`).
     ///
     /// # Arguments
     ///
@@ -412,7 +412,7 @@ impl JsVolSurface {
             opts.quote_type = quote.parse().map_err(to_js_err)?;
         }
         let vols = js_f64_seq(&vols, "vols")?;
-        let surface = RustVolSurface::from_grid_opts(
+        let surface = RustVolSurface::from_grid(
             id,
             &expiries,
             &strikes,
