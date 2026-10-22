@@ -161,7 +161,7 @@ impl HullWhite1FParams {
     /// Instantaneous short-rate volatility at `t`.
     #[must_use]
     pub fn sigma_at_time(&self, t: f64) -> f64 {
-        self.model.volatility.value_at(t)
+        self.model.get_sigma(t)
     }
 
     /// Exact OU state variance over `[t, t + dt]`.
@@ -169,9 +169,7 @@ impl HullWhite1FParams {
         if dt <= 0.0 {
             return Ok(0.0);
         }
-        self.model
-            .volatility
-            .integrate_squared_exp_weight(self.model.kappa, t + dt, t, t + dt)
+        self.model.state_variance_between(t, t + dt)
     }
 
     /// Theta schedule values.

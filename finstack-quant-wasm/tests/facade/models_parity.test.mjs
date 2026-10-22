@@ -670,7 +670,7 @@ const CASES = {
   'hull_white.params': () => {
     const params = hullWhite.HullWhiteParams.piecewise(0.05, [0.0, 2.5], [0.01, 0.012]);
     return [
-      params.sigma(3.0),
+      params.getSigma(3.0),
       params.stateVariance(2.0),
       params.stateCovariance(1.0, 2.0),
       params.bondVol(0.0, 1.0, 5.0),

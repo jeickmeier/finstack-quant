@@ -516,9 +516,9 @@ test('Monte Carlo pricers take their defaults from the Rust registry', () => {
 test('rates handles expose their accessors and reject bad input', () => {
   const params = new hullWhite.HullWhiteParams(0.05, 0.01);
   assert.equal(params.kappa, 0.05);
-  assert.deepEqual(Array.from(params.values), [0.01]);
-  assert.equal(params.times.length, 1);
-  assert.equal(params.sigma(10), 0.01);
+  assert.deepEqual(Array.from(params.getValues()), [0.01]);
+  assert.equal(params.getTimes().length, 1);
+  assert.equal(params.getSigma(10), 0.01);
   assert.throws(() => new hullWhite.HullWhiteParams(-1, 0.01), kind('validation'));
   assert.throws(
     () => hullWhite.HullWhiteParams.piecewise(0.05, [0], [0.01, 0.02]),

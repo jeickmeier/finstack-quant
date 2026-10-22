@@ -567,10 +567,9 @@ fn execute_params(
                             },
                         )?;
                     let observations = model
-                        .volatility
-                        .times()
+                        .get_times()
                         .iter()
-                        .zip(model.volatility.values())
+                        .zip(model.get_values())
                         .map(|(&time, &sigma)| {
                             (
                                 p.base_date + time::Duration::days((time * 365.0).round() as i64),

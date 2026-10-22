@@ -661,7 +661,7 @@ def _rates_cases() -> dict[str, Callable[[], Any]]:
     pca = lambda: dtsm.YieldPca.fit(_panel())  # noqa: E731
     return {
         "hull_white.params": lambda: [
-            params().sigma(3.0),
+            params().get_sigma(3.0),
             params().state_variance(2.0),
             params().state_covariance(1.0, 2.0),
             params().bond_vol(0.0, 1.0, 5.0),

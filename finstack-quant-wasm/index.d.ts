@@ -28195,7 +28195,7 @@ export interface HullWhiteParams extends WasmOwned {
    * @returns The volatility of the segment containing `t`.
    * @throws Error - Throws a `TypeError` if `t` is not a number.
    */
-  sigma(t: number): number;
+  getSigma(t: number): number;
   /**
    * Covariance of the short-rate state variable at two times.
    * @param leftTime - First time in years; non-negative.
@@ -28223,13 +28223,17 @@ export interface HullWhiteParams extends WasmOwned {
    */
   readonly kappa: number;
   /**
-   * Segment end times of the volatility schedule, in years.
+   * Segment start times of the volatility schedule, in years.
+   * @returns A copy of the strictly increasing knots, starting at zero.
+   * @throws Never throws; reads the validated schedule.
    */
-  readonly times: Float64Array;
+  getTimes(): Float64Array;
   /**
-   * Volatility on each schedule segment, as decimals.
+   * Volatility on each schedule segment, in absolute rate units per square-root year.
+   * @returns A copy of the non-negative volatility values aligned with `getTimes()`.
+   * @throws Never throws; reads the validated schedule.
    */
-  readonly values: Float64Array;
+  getValues(): Float64Array;
 }
 
 /**
@@ -28239,7 +28243,7 @@ export interface HullWhiteParams extends WasmOwned {
  * import init, { models } from "finstack-quant-wasm";
  * await init();
  * const params = models.rates.hullWhite.HullWhiteParams.piecewise(0.05, [0, 2.5], [0.01, 0.012]);
- * console.log(params.sigma(3), params.stateVariance(2), params.bondVol(0, 1, 5));
+ * console.log(params.getSigma(3), params.stateVariance(2), params.bondVol(0, 1, 5));
  * params.free();
  * ```
  */

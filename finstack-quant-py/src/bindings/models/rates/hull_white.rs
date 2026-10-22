@@ -87,21 +87,19 @@ impl PyHullWhiteParams {
     }
 
     /// Volatility knot times in years.
-    #[getter]
-    fn times(&self) -> Vec<f64> {
-        self.inner.times().to_vec()
+    fn get_times(&self) -> Vec<f64> {
+        self.inner.get_times().to_vec()
     }
 
     /// Volatility values per knot (absolute rate units per square-root year).
-    #[getter]
-    fn values(&self) -> Vec<f64> {
-        self.inner.values().to_vec()
+    fn get_values(&self) -> Vec<f64> {
+        self.inner.get_values().to_vec()
     }
 
     /// Short-rate volatility applying at model time ``t`` (years).
     #[pyo3(text_signature = "(self, t)")]
-    fn sigma(&self, t: f64) -> f64 {
-        self.inner.sigma(t)
+    fn get_sigma(&self, t: f64) -> f64 {
+        self.inner.get_sigma(t)
     }
 
     /// Variance of the centered short-rate state at time ``t`` (years).
@@ -136,8 +134,8 @@ impl PyHullWhiteParams {
         format!(
             "HullWhiteParams(kappa={:?}, times={:?}, values={:?})",
             self.inner.kappa,
-            self.inner.times(),
-            self.inner.values()
+            self.inner.get_times(),
+            self.inner.get_values()
         )
     }
 }

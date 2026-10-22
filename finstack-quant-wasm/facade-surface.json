@@ -3284,8 +3284,17 @@
     "kind": "class",
     "constructor": true,
     "statics": ["fromJson", "piecewise"],
-    "methods": ["bondVol", "free", "sigma", "stateCovariance", "stateVariance", "toJson"],
-    "getters": ["kappa", "times", "values"]
+    "methods": [
+      "bondVol",
+      "free",
+      "getSigma",
+      "getTimes",
+      "getValues",
+      "stateCovariance",
+      "stateVariance",
+      "toJson"
+    ],
+    "getters": ["kappa"]
   },
   "models.rates.hullWhite.hw1fConvexityAdjustment": {
     "kind": "function"

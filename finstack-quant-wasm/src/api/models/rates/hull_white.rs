@@ -69,15 +69,19 @@ impl JsHullWhiteParams {
     }
 
     /// Segment start times of the volatility schedule, in years.
-    #[wasm_bindgen(getter)]
-    pub fn times(&self) -> Box<[f64]> {
-        self.inner.times().into()
+    /// @returns A copy of the strictly increasing knots, starting at zero.
+    /// @throws Never throws; reads the validated schedule.
+    #[wasm_bindgen(js_name = getTimes)]
+    pub fn get_times(&self) -> Box<[f64]> {
+        self.inner.get_times().into()
     }
 
-    /// Volatility on each schedule segment, as decimals.
-    #[wasm_bindgen(getter)]
-    pub fn values(&self) -> Box<[f64]> {
-        self.inner.values().into()
+    /// Volatility on each schedule segment, in absolute rate units per square-root year.
+    /// @returns A copy of the non-negative volatility values aligned with `getTimes()`.
+    /// @throws Never throws; reads the validated schedule.
+    #[wasm_bindgen(js_name = getValues)]
+    pub fn get_values(&self) -> Box<[f64]> {
+        self.inner.get_values().into()
     }
 
     /// Short-rate volatility in force at a time.
@@ -87,8 +91,9 @@ impl JsHullWhiteParams {
     /// # Errors
     ///
     /// Throws a `TypeError` if `t` is not a number.
-    pub fn sigma(&self, t: JsValue) -> Result<f64, JsValue> {
-        Ok(self.inner.sigma(js_f64(&t, "t")?))
+    #[wasm_bindgen(js_name = getSigma)]
+    pub fn get_sigma(&self, t: JsValue) -> Result<f64, JsValue> {
+        Ok(self.inner.get_sigma(js_f64(&t, "t")?))
     }
 
     /// Variance of the short-rate state variable at a time.

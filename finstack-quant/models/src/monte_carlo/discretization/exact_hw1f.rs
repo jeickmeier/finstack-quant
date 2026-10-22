@@ -108,8 +108,8 @@ impl Discretization<HullWhite1FProcess> for ExactHullWhite1F {
         // Reuse the precomputed `dt`-dependent constants when this step's `dt`
         // matches the prepared one (exact bit match → identical value); fall
         // back to inline computation for unprepared or non-uniform grids.
-        let constant_sigma = (params.model.volatility.times().len() == 1)
-            .then(|| params.model.volatility.values()[0]);
+        let constant_sigma =
+            (params.model.get_times().len() == 1).then(|| params.model.get_values()[0]);
         let consts = match (self.prepared, constant_sigma) {
             (Some(c), Some(_)) if c.dt.to_bits() == dt.to_bits() => c,
             (_, Some(sigma)) => Hw1fStepConstants::compute(params.model.kappa, sigma, dt),
@@ -134,10 +134,10 @@ impl Discretization<HullWhite1FProcess> for ExactHullWhite1F {
             return;
         }
         let params = process.params();
-        self.prepared = if params.model.volatility.times().len() == 1 {
+        self.prepared = if params.model.get_times().len() == 1 {
             Some(Hw1fStepConstants::compute(
                 params.model.kappa,
-                params.model.volatility.values()[0],
+                params.model.get_values()[0],
                 time_grid.dt(0),
             ))
         } else {
