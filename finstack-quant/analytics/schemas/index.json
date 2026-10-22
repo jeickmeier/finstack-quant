@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/beta_result.schema.json",
-      "bytes": 3082,
+      "bytes": 3076,
       "kind": "output",
       "path": "schemas/analytics/1/beta_result.schema.json",
       "summary": "OLS beta result with standard error and 95% confidence interval.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/drawdown_episode.schema.json",
-      "bytes": 2130,
+      "bytes": 2165,
       "kind": "component",
       "path": "schemas/analytics/1/drawdown_episode.schema.json",
       "summary": "Drawdown episode with start, valley, optional recovery, and max drawdown.",
@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/greeks_result.schema.json",
-      "bytes": 2771,
+      "bytes": 2764,
       "kind": "output",
       "path": "schemas/analytics/1/greeks_result.schema.json",
       "summary": "Greeks (alpha, beta, R-squared, adjusted R-squared) from a single-factor regression.",
@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/lookback_returns.schema.json",
-      "bytes": 1318,
+      "bytes": 1351,
       "kind": "component",
       "path": "schemas/analytics/1/lookback_returns.schema.json",
       "summary": "Lookback returns for each period horizon.",
@@ -56,7 +56,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/multi_factor_result.schema.json",
-      "bytes": 3025,
+      "bytes": 3018,
       "kind": "output",
       "path": "schemas/analytics/1/multi_factor_result.schema.json",
       "summary": "Result of a multi-factor regression.",
@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/period_stats.schema.json",
-      "bytes": 3963,
+      "bytes": 3996,
       "kind": "output",
       "path": "schemas/analytics/1/period_stats.schema.json",
       "summary": "Period-level aggregate statistics.",
@@ -101,7 +101,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/rolling_greeks.schema.json",
-      "bytes": 1000,
+      "bytes": 1033,
       "kind": "component",
       "path": "schemas/analytics/1/rolling_greeks.schema.json",
       "summary": "Rolling greeks output.",

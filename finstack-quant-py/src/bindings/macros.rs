@@ -312,13 +312,20 @@ pub(crate) use typed_or_label;
 /// Generate `_repr_html_` delegating to the wrapper's `to_dataframe`.
 macro_rules! impl_repr_html_via_dataframe {
     ($py_ty:ident) => {
+        $crate::bindings::macros::impl_repr_html_via_dataframe!(
+            $py_ty,
+            concat!(
+                "Render as an HTML table in Jupyter notebooks.\n\n",
+                "Delegates to the frame from ``to_dataframe``, so pandas' own\n",
+                "row/column truncation applies; returns ``None`` if the frame\n",
+                "cannot be built so IPython falls back to ``__repr__``."
+            )
+        );
+    };
+    ($py_ty:ident, $doc:expr) => {
         #[::pyo3::pymethods]
         impl $py_ty {
-            /// Render as an HTML table in Jupyter notebooks.
-            ///
-            /// Delegates to the frame from ``to_dataframe``, so pandas' own
-            /// row/column truncation applies; returns ``None`` if the frame
-            /// cannot be built so IPython falls back to ``__repr__``.
+            #[doc = $doc]
             fn _repr_html_(&self, py: ::pyo3::Python<'_>) -> Option<String> {
                 use ::pyo3::types::PyAnyMethods;
                 let frame = self.to_dataframe(py).ok()?;

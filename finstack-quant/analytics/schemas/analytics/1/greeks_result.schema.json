@@ -37,6 +37,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/analytics/1/greeks_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Greeks (alpha, beta, R-squared, adjusted R-squared) from a single-factor regression.",
   "properties": {
     "adjusted_r_squared": {
@@ -52,8 +53,7 @@
       "description": "Beta (slope) of portfolio vs benchmark, or [`f64::NAN`] when undefined."
     },
     "n_obs": {
-      "default": 0,
-      "description": "Number of paired observations the regression used: the overlap after\ntruncating both series to the shorter length. Reported even when the\nestimates are [`f64::NAN`]. `0` when deserialized from JSON written\nbefore this field existed.",
+      "description": "Number of paired observations the regression used: the overlap after\ntruncating both series to the shorter length. Reported even when the\nestimates are [`f64::NAN`]. Required in the serialized result.",
       "format": "uint",
       "minimum": 0,
       "type": "integer"
@@ -67,7 +67,8 @@
     "alpha",
     "beta",
     "r_squared",
-    "adjusted_r_squared"
+    "adjusted_r_squared",
+    "n_obs"
   ],
   "title": "GreeksResult",
   "type": "object"

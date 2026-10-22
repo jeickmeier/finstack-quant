@@ -1,6 +1,7 @@
 {
   "$id": "https://finstack_quant.dev/schemas/analytics/1/lookback_returns.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Lookback returns for each period horizon.",
   "properties": {
     "fytd": {

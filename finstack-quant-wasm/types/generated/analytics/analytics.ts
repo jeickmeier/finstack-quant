@@ -216,19 +216,17 @@ export interface BetaResult {
    * probability (`0.95` = 95%). The interval is
    * `beta ± t_{n_obs − 2, (1 + confidence_level) / 2} × std_err`.
    */
-  confidence_level?: number;
+  confidence_level: number;
   /**
    * Number of paired observations the regression used: the overlap after
    * truncating both series to the shorter length. Reported even when the
-   * estimates are [`f64::NAN`]. `0` when deserialized from JSON written
-   * before this field existed.
+   * estimates are [`f64::NAN`]. Required in the serialized result.
    */
-  n_obs?: number;
+  n_obs: number;
   /**
    * Standard error of the beta estimate, or [`f64::NAN`] when undefined.
    */
   std_err: NonFiniteF64Wire;
-  [k: string]: unknown;
 }
 /**
  * A dated time-series column: scalar values aligned with window-end dates.
@@ -282,12 +280,11 @@ export interface DrawdownEpisode {
    * Survival / duration analytics should treat such episodes as
    * left-censored.
    */
-  truncated_at_start?: boolean;
+  truncated_at_start: boolean;
   /**
    * Date of the maximum drawdown depth.
    */
   valley: DateWire;
-  [k: string]: unknown;
 }
 /**
  * Greeks (alpha, beta, R-squared, adjusted R-squared) from a single-factor regression.
@@ -309,15 +306,13 @@ export interface GreeksResult {
   /**
    * Number of paired observations the regression used: the overlap after
    * truncating both series to the shorter length. Reported even when the
-   * estimates are [`f64::NAN`]. `0` when deserialized from JSON written
-   * before this field existed.
+   * estimates are [`f64::NAN`]. Required in the serialized result.
    */
-  n_obs?: number;
+  n_obs: number;
   /**
    * R-squared of the regression, or [`f64::NAN`] when undefined.
    */
   r_squared: NonFiniteF64Wire;
-  [k: string]: unknown;
 }
 /**
  * Lookback returns for each period horizon.
@@ -343,7 +338,6 @@ export interface LookbackReturns {
    * Year-to-date compounded return per ticker.
    */
   ytd: number[];
-  [k: string]: unknown;
 }
 /**
  * Result of a multi-factor regression.
@@ -368,10 +362,9 @@ export interface MultiFactorResult {
   /**
    * Number of observations the regression used: the common length of the
    * dependent series and every factor series. Residual degrees of freedom
-   * are `n_obs − betas.len() − 1`. `0` when deserialized from JSON written
-   * before this field existed.
+   * are `n_obs − betas.len() − 1`. Required in the serialized result.
    */
-  n_obs?: number;
+  n_obs: number;
   /**
    * Fraction of variance explained; NaN for a constant dependent series.
    */
@@ -380,7 +373,6 @@ export interface MultiFactorResult {
    * Annualized residual volatility.
    */
   residual_vol: number;
-  [k: string]: unknown;
 }
 /**
  * Central performance analytics engine.
@@ -460,7 +452,6 @@ export interface PeriodStats {
    * Worst single-period return.
    */
   worst: number;
-  [k: string]: unknown;
 }
 /**
  * One calendar bucket of a periodic-return series.
@@ -491,5 +482,4 @@ export interface RollingGreeks {
    * End dates for each rolling window.
    */
   dates: DateWire[];
-  [k: string]: unknown;
 }

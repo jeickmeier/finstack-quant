@@ -5,6 +5,7 @@ use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
     dates_to_datetime_index, dates_to_pylist, dict_to_dataframe, labeled_values_to_series,
 };
+use crate::bindings::pydoc::pydoc;
 use finstack_quant_analytics::{
     BetaResult, DatedSeries, DrawdownEpisode, GreeksResult, LookbackReturns, MultiFactorResult,
     PeriodStats, RollingGreeks,
@@ -13,7 +14,7 @@ use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-/// Aggregated statistics for grouped periodic returns.
+#[doc = pydoc!("finstack_quant.analytics", "PeriodStats")]
 #[pyclass(name = "PeriodStats", module = "finstack_quant.analytics", frozen)]
 pub struct PyPeriodStats {
     pub(super) inner: PeriodStats,
@@ -21,71 +22,68 @@ pub struct PyPeriodStats {
 
 #[pymethods]
 impl PyPeriodStats {
-    /// Best period return.
+    #[doc = pydoc!("finstack_quant.analytics", "PeriodStats.best")]
     #[getter]
     fn best(&self) -> f64 {
         self.inner.best
     }
-    /// Worst period return.
+    #[doc = pydoc!("finstack_quant.analytics", "PeriodStats.worst")]
     #[getter]
     fn worst(&self) -> f64 {
         self.inner.worst
     }
-    /// Longest consecutive winning streak.
+    #[doc = pydoc!("finstack_quant.analytics", "PeriodStats.consecutive_wins")]
     #[getter]
     fn consecutive_wins(&self) -> usize {
         self.inner.consecutive_wins
     }
-    /// Longest consecutive losing streak.
+    #[doc = pydoc!("finstack_quant.analytics", "PeriodStats.consecutive_losses")]
     #[getter]
     fn consecutive_losses(&self) -> usize {
         self.inner.consecutive_losses
     }
-    /// Fraction of positive-return periods.
+    #[doc = pydoc!("finstack_quant.analytics", "PeriodStats.win_rate")]
     #[getter]
     fn win_rate(&self) -> f64 {
         self.inner.win_rate
     }
-    /// Average return across all periods.
+    #[doc = pydoc!("finstack_quant.analytics", "PeriodStats.avg_return")]
     #[getter]
     fn avg_return(&self) -> f64 {
         self.inner.avg_return
     }
-    /// Average return of positive periods.
+    #[doc = pydoc!("finstack_quant.analytics", "PeriodStats.avg_win")]
     #[getter]
     fn avg_win(&self) -> f64 {
         self.inner.avg_win
     }
-    /// Average return of negative periods.
+    #[doc = pydoc!("finstack_quant.analytics", "PeriodStats.avg_loss")]
     #[getter]
     fn avg_loss(&self) -> f64 {
         self.inner.avg_loss
     }
-    /// Payoff ratio (avg win / |avg loss|).
+    #[doc = pydoc!("finstack_quant.analytics", "PeriodStats.payoff_ratio")]
     #[getter]
     fn payoff_ratio(&self) -> f64 {
         self.inner.payoff_ratio
     }
-    /// Profit factor (gross profits / gross losses).
+    #[doc = pydoc!("finstack_quant.analytics", "PeriodStats.profit_factor")]
     #[getter]
     fn profit_factor(&self) -> f64 {
         self.inner.profit_factor
     }
-    /// Common-sense ratio (CPC).
+    #[doc = pydoc!("finstack_quant.analytics", "PeriodStats.cpc_ratio")]
     #[getter]
     fn cpc_ratio(&self) -> f64 {
         self.inner.cpc_ratio
     }
-    /// Kelly criterion optimal fraction.
+    #[doc = pydoc!("finstack_quant.analytics", "PeriodStats.kelly_criterion")]
     #[getter]
     fn kelly_criterion(&self) -> f64 {
         self.inner.kelly_criterion
     }
 
-    /// The twelve statistics as a ``pandas.Series`` named ``period_stats``
-    /// and indexed by statistic name (``best``, ``worst``, ``win_rate``, ...).
-    ///
-    /// Streak counts are cast to ``float`` so the Series stays ``float64``.
+    #[doc = pydoc!("finstack_quant.analytics", "PeriodStats.to_series")]
     fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let (labels, values): (Vec<String>, Vec<f64>) = self
             .fields()
@@ -95,14 +93,7 @@ impl PyPeriodStats {
         labeled_values_to_series(py, &labels, values, "period_stats")
     }
 
-    /// The twelve statistics as a single-row ``pandas.DataFrame``.
-    ///
-    /// Columns: ``best``, ``worst``, ``consecutive_wins``,
-    /// ``consecutive_losses``, ``win_rate``, ``avg_return``, ``avg_win``,
-    /// ``avg_loss``, ``payoff_ratio``, ``profit_factor``, ``cpc_ratio``,
-    /// ``kelly_criterion``. One row per ticker after ``pd.concat`` across
-    /// tickers. Non-finite ratios remain native ``NaN`` / ``inf`` in
-    /// ``float64`` columns; streak counts remain integers.
+    #[doc = pydoc!("finstack_quant.analytics", "PeriodStats.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         for (name, value) in self.fields() {
@@ -144,7 +135,7 @@ impl PyPeriodStats {
     }
 }
 
-/// Regression beta with confidence interval.
+#[doc = pydoc!("finstack_quant.analytics", "BetaResult")]
 #[pyclass(name = "BetaResult", module = "finstack_quant.analytics", frozen)]
 pub struct PyBetaResult {
     pub(super) inner: BetaResult,
@@ -152,48 +143,38 @@ pub struct PyBetaResult {
 
 #[pymethods]
 impl PyBetaResult {
-    /// Beta coefficient.
+    #[doc = pydoc!("finstack_quant.analytics", "BetaResult.beta")]
     #[getter]
     fn beta(&self) -> f64 {
         self.inner.beta
     }
-    /// Standard error of the beta estimate.
+    #[doc = pydoc!("finstack_quant.analytics", "BetaResult.std_err")]
     #[getter]
     fn std_err(&self) -> f64 {
         self.inner.std_err
     }
-    /// Lower 95% confidence bound.
+    #[doc = pydoc!("finstack_quant.analytics", "BetaResult.ci_lower")]
     #[getter]
     fn ci_lower(&self) -> f64 {
         self.inner.ci_lower
     }
-    /// Upper 95% confidence bound.
+    #[doc = pydoc!("finstack_quant.analytics", "BetaResult.ci_upper")]
     #[getter]
     fn ci_upper(&self) -> f64 {
         self.inner.ci_upper
     }
-    /// Number of paired observations the regression used.
+    #[doc = pydoc!("finstack_quant.analytics", "BetaResult.n_obs")]
     #[getter]
     fn n_obs(&self) -> usize {
         self.inner.n_obs
     }
-    /// Two-sided confidence level of the interval as a decimal (0.95 = 95%).
+    #[doc = pydoc!("finstack_quant.analytics", "BetaResult.confidence_level")]
     #[getter]
     fn confidence_level(&self) -> f64 {
         self.inner.confidence_level
     }
 
-    /// Export as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``beta``, ``std_err``, ``ci_lower``, ``ci_upper``, ``n_obs``
-    /// (``int64``), ``confidence_level``.
-    ///
-    /// One flat record describes one regression, so a one-row frame is the
-    /// right shape: ``pd.concat([r.to_dataframe() for r in results])`` stacks
-    /// every ticker's beta into one comparison table without reshaping.
-    ///
-    /// Undefined estimates from a degenerate regression remain ``NaN``
-    /// in numeric ``float64`` columns.
+    #[doc = pydoc!("finstack_quant.analytics", "BetaResult.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let r = &self.inner;
         let data = PyDict::new(py);
@@ -217,7 +198,7 @@ impl PyBetaResult {
     }
 }
 
-/// Alpha, beta, and R-squared from a single-index regression.
+#[doc = pydoc!("finstack_quant.analytics", "GreeksResult")]
 #[pyclass(name = "GreeksResult", module = "finstack_quant.analytics", frozen)]
 pub struct PyGreeksResult {
     pub(super) inner: GreeksResult,
@@ -225,43 +206,33 @@ pub struct PyGreeksResult {
 
 #[pymethods]
 impl PyGreeksResult {
-    /// Annualized Jensen alpha.
+    #[doc = pydoc!("finstack_quant.analytics", "GreeksResult.alpha")]
     #[getter]
     fn alpha(&self) -> f64 {
         self.inner.alpha
     }
-    /// Beta coefficient.
+    #[doc = pydoc!("finstack_quant.analytics", "GreeksResult.beta")]
     #[getter]
     fn beta(&self) -> f64 {
         self.inner.beta
     }
-    /// Coefficient of determination of the fitted model.
+    #[doc = pydoc!("finstack_quant.analytics", "GreeksResult.r_squared")]
     #[getter]
     fn r_squared(&self) -> f64 {
         self.inner.r_squared
     }
-    /// Adjusted R-squared.
+    #[doc = pydoc!("finstack_quant.analytics", "GreeksResult.adjusted_r_squared")]
     #[getter]
     fn adjusted_r_squared(&self) -> f64 {
         self.inner.adjusted_r_squared
     }
-    /// Number of paired observations the regression used.
+    #[doc = pydoc!("finstack_quant.analytics", "GreeksResult.n_obs")]
     #[getter]
     fn n_obs(&self) -> usize {
         self.inner.n_obs
     }
 
-    /// Export as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``alpha``, ``beta``, ``r_squared``, ``adjusted_r_squared``,
-    /// ``n_obs`` (``int64``).
-    ///
-    /// One flat record describes one regression, so a one-row frame is the
-    /// right shape: ``pd.concat([r.to_dataframe() for r in results])`` stacks
-    /// every ticker's greeks into one comparison table without reshaping.
-    ///
-    /// Undefined estimates from a degenerate fit remain ``NaN`` in numeric
-    /// ``float64`` columns.
+    #[doc = pydoc!("finstack_quant.analytics", "GreeksResult.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let r = &self.inner;
         let data = PyDict::new(py);
@@ -284,7 +255,7 @@ impl PyGreeksResult {
     }
 }
 
-/// Rolling alpha and beta time series.
+#[doc = pydoc!("finstack_quant.analytics", "RollingGreeks")]
 #[pyclass(name = "RollingGreeks", module = "finstack_quant.analytics", frozen)]
 pub struct PyRollingGreeks {
     pub(super) inner: RollingGreeks,
@@ -292,24 +263,23 @@ pub struct PyRollingGreeks {
 
 #[pymethods]
 impl PyRollingGreeks {
-    /// Date labels for each rolling window.
+    #[doc = pydoc!("finstack_quant.analytics", "RollingGreeks.dates")]
     #[getter]
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
         dates_to_pylist(py, &self.inner.dates)
     }
-    /// Rolling alpha values.
+    #[doc = pydoc!("finstack_quant.analytics", "RollingGreeks.alphas")]
     #[getter]
     fn alphas<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         PyArray1::from_slice(py, &self.inner.alphas)
     }
-    /// Rolling beta values.
+    #[doc = pydoc!("finstack_quant.analytics", "RollingGreeks.betas")]
     #[getter]
     fn betas<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         PyArray1::from_slice(py, &self.inner.betas)
     }
 
-    /// Convert to a pandas ``DataFrame`` with a ``DatetimeIndex`` and
-    /// ``alpha`` / ``beta`` columns.
+    #[doc = pydoc!("finstack_quant.analytics", "RollingGreeks.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         data.set_item("alpha", PyArray1::from_slice(py, &self.inner.alphas))?;
@@ -323,7 +293,7 @@ impl PyRollingGreeks {
     }
 }
 
-/// Multi-factor regression result.
+#[doc = pydoc!("finstack_quant.analytics", "MultiFactorResult")]
 #[pyclass(
     name = "MultiFactorResult",
     module = "finstack_quant.analytics",
@@ -335,63 +305,38 @@ pub struct PyMultiFactorResult {
 
 #[pymethods]
 impl PyMultiFactorResult {
-    /// Annualized OLS intercept of the (possibly rf-adjusted) dependent series.
+    #[doc = pydoc!("finstack_quant.analytics", "MultiFactorResult.alpha")]
     #[getter]
     fn alpha(&self) -> f64 {
         self.inner.alpha
     }
-    /// One beta per factor, in factor order.
+    #[doc = pydoc!("finstack_quant.analytics", "MultiFactorResult.betas")]
     #[getter]
     fn betas<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         PyArray1::from_slice(py, &self.inner.betas)
     }
-    /// Coefficient of determination of the fitted model.
+    #[doc = pydoc!("finstack_quant.analytics", "MultiFactorResult.r_squared")]
     #[getter]
     fn r_squared(&self) -> f64 {
         self.inner.r_squared
     }
-    /// Adjusted R-squared.
+    #[doc = pydoc!("finstack_quant.analytics", "MultiFactorResult.adjusted_r_squared")]
     #[getter]
     fn adjusted_r_squared(&self) -> f64 {
         self.inner.adjusted_r_squared
     }
-    /// Residual volatility.
+    #[doc = pydoc!("finstack_quant.analytics", "MultiFactorResult.residual_vol")]
     #[getter]
     fn residual_vol(&self) -> f64 {
         self.inner.residual_vol
     }
-    /// Number of observations the regression used.
+    #[doc = pydoc!("finstack_quant.analytics", "MultiFactorResult.n_obs")]
     #[getter]
     fn n_obs(&self) -> usize {
         self.inner.n_obs
     }
 
-    /// Export the factor loadings as a pandas ``DataFrame``, one row per factor.
-    ///
-    /// Columns: ``factor``, ``beta``, ``alpha``, ``r_squared``,
-    /// ``adjusted_r_squared``, ``residual_vol``, ``n_obs`` (``int64``).
-    ///
-    /// The loadings are the per-row payload; the five regression-level
-    /// statistics repeat on every row so a single row carries its own fit
-    /// context after ``pd.concat`` across tickers or ``groupby("factor")``.
-    ///
-    /// Rows follow the order of the ``factor_returns`` passed to
-    /// :meth:`Performance.multi_factor_greeks`, which is also the order of
-    /// :attr:`betas`. There is always at least one row: the regression rejects
-    /// an empty factor set.
-    ///
-    /// Parameters
-    /// ----------
-    /// factor_names : list[str], optional
-    ///     Labels for the ``factor`` column, positionally aligned with
-    ///     :attr:`betas`. Defaults to ``factor_0``, ``factor_1``, ... because
-    ///     the regression itself carries no names.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``factor_names`` is supplied and its length differs from the
-    ///     number of fitted betas.
+    #[doc = pydoc!("finstack_quant.analytics", "MultiFactorResult.to_dataframe")]
     #[pyo3(signature = (factor_names=None))]
     #[pyo3(text_signature = "(self, factor_names=None)")]
     fn to_dataframe<'py>(
@@ -451,7 +396,7 @@ impl PyMultiFactorResult {
     }
 }
 
-/// A single drawdown episode with timing and depth information.
+#[doc = pydoc!("finstack_quant.analytics", "DrawdownEpisode")]
 #[pyclass(name = "DrawdownEpisode", module = "finstack_quant.analytics", frozen)]
 pub struct PyDrawdownEpisode {
     pub(super) inner: DrawdownEpisode,
@@ -459,17 +404,17 @@ pub struct PyDrawdownEpisode {
 
 #[pymethods]
 impl PyDrawdownEpisode {
-    /// Start date of the drawdown.
+    #[doc = pydoc!("finstack_quant.analytics", "DrawdownEpisode.start")]
     #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.start)
     }
-    /// Date of the maximum drawdown within this episode.
+    #[doc = pydoc!("finstack_quant.analytics", "DrawdownEpisode.valley")]
     #[getter]
     fn valley<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.valley)
     }
-    /// Recovery date (``None`` if still in drawdown).
+    #[doc = pydoc!("finstack_quant.analytics", "DrawdownEpisode.end")]
     #[getter]
     fn end<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         match self.inner.end {
@@ -477,34 +422,28 @@ impl PyDrawdownEpisode {
             None => Ok(None),
         }
     }
-    /// Duration in calendar days.
+    #[doc = pydoc!("finstack_quant.analytics", "DrawdownEpisode.duration_days")]
     #[getter]
     fn duration_days(&self) -> i64 {
         self.inner.duration_days
     }
-    /// Maximum drawdown depth (negative).
+    #[doc = pydoc!("finstack_quant.analytics", "DrawdownEpisode.max_drawdown")]
     #[getter]
     fn max_drawdown(&self) -> f64 {
         self.inner.max_drawdown
     }
-    /// Near-recovery threshold.
+    #[doc = pydoc!("finstack_quant.analytics", "DrawdownEpisode.near_recovery_threshold")]
     #[getter]
     fn near_recovery_threshold(&self) -> f64 {
         self.inner.near_recovery_threshold
     }
-    /// ``True`` when the episode began before the first observation
-    /// (left-censored: no prior peak observed).
+    #[doc = pydoc!("finstack_quant.analytics", "DrawdownEpisode.truncated_at_start")]
     #[getter]
     fn truncated_at_start(&self) -> bool {
         self.inner.truncated_at_start
     }
 
-    /// Export as a single-row pandas ``DataFrame``.
-    ///
-    /// Columns: ``start``, ``valley``, ``end`` (``datetime64``; ``NaT`` while
-    /// still in drawdown), ``duration_days``, ``max_drawdown``,
-    /// ``near_recovery_threshold``, ``truncated_at_start``. Stack episodes
-    /// with ``pd.concat([ep.to_dataframe() for ep in episodes])``.
+    #[doc = pydoc!("finstack_quant.analytics", "DrawdownEpisode.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let e = &self.inner;
         let data = PyDict::new(py);
@@ -542,7 +481,7 @@ impl PyDrawdownEpisode {
     }
 }
 
-/// Period-to-date returns for each ticker.
+#[doc = pydoc!("finstack_quant.analytics", "LookbackReturns")]
 #[pyclass(name = "LookbackReturns", module = "finstack_quant.analytics", frozen)]
 pub struct PyLookbackReturns {
     pub(super) inner: LookbackReturns,
@@ -550,36 +489,33 @@ pub struct PyLookbackReturns {
 
 #[pymethods]
 impl PyLookbackReturns {
-    /// Ticker names aligned with the ``mtd`` / ``qtd`` / ``ytd`` / ``fytd``
-    /// vectors.
+    #[doc = pydoc!("finstack_quant.analytics", "LookbackReturns.ticker_names")]
     #[getter]
     fn ticker_names(&self) -> Vec<String> {
         self.inner.ticker_names.clone()
     }
-    /// Month-to-date returns per ticker.
+    #[doc = pydoc!("finstack_quant.analytics", "LookbackReturns.mtd")]
     #[getter]
     fn mtd<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         PyArray1::from_slice(py, &self.inner.mtd)
     }
-    /// Quarter-to-date returns per ticker.
+    #[doc = pydoc!("finstack_quant.analytics", "LookbackReturns.qtd")]
     #[getter]
     fn qtd<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         PyArray1::from_slice(py, &self.inner.qtd)
     }
-    /// Year-to-date returns per ticker.
+    #[doc = pydoc!("finstack_quant.analytics", "LookbackReturns.ytd")]
     #[getter]
     fn ytd<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         PyArray1::from_slice(py, &self.inner.ytd)
     }
-    /// Fiscal-year-to-date returns per ticker.
+    #[doc = pydoc!("finstack_quant.analytics", "LookbackReturns.fytd")]
     #[getter]
     fn fytd<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         PyArray1::from_slice(py, &self.inner.fytd)
     }
 
-    /// Convert to a pandas ``DataFrame`` indexed by :attr:`ticker_names`.
-    ///
-    /// Columns: mtd, qtd, ytd, and fytd.
+    #[doc = pydoc!("finstack_quant.analytics", "LookbackReturns.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         data.set_item("mtd", PyArray1::from_slice(py, &self.inner.mtd))?;
@@ -653,19 +589,72 @@ impl PyDatedSeries {
     }
 }
 
-wire_methods!(PyPeriodStats, PeriodStats, "PeriodStats");
-impl_repr_html_via_dataframe!(PyPeriodStats);
-wire_methods!(PyBetaResult, BetaResult, "BetaResult");
-impl_repr_html_via_dataframe!(PyBetaResult);
-wire_methods!(PyGreeksResult, GreeksResult, "GreeksResult");
-impl_repr_html_via_dataframe!(PyGreeksResult);
-wire_methods!(PyRollingGreeks, RollingGreeks, "RollingGreeks");
-impl_repr_html_via_dataframe!(PyRollingGreeks);
-wire_methods!(PyMultiFactorResult, MultiFactorResult, "MultiFactorResult");
-wire_methods!(PyDrawdownEpisode, DrawdownEpisode, "DrawdownEpisode");
-impl_repr_html_via_dataframe!(PyDrawdownEpisode);
-wire_methods!(PyLookbackReturns, LookbackReturns, "LookbackReturns");
-impl_repr_html_via_dataframe!(PyLookbackReturns);
+wire_methods!(
+    PyPeriodStats,
+    PeriodStats,
+    "PeriodStats",
+    module = "finstack_quant.analytics"
+);
+impl_repr_html_via_dataframe!(
+    PyPeriodStats,
+    pydoc!("finstack_quant.analytics", "PeriodStats._repr_html_")
+);
+wire_methods!(
+    PyBetaResult,
+    BetaResult,
+    "BetaResult",
+    module = "finstack_quant.analytics"
+);
+impl_repr_html_via_dataframe!(
+    PyBetaResult,
+    pydoc!("finstack_quant.analytics", "BetaResult._repr_html_")
+);
+wire_methods!(
+    PyGreeksResult,
+    GreeksResult,
+    "GreeksResult",
+    module = "finstack_quant.analytics"
+);
+impl_repr_html_via_dataframe!(
+    PyGreeksResult,
+    pydoc!("finstack_quant.analytics", "GreeksResult._repr_html_")
+);
+wire_methods!(
+    PyRollingGreeks,
+    RollingGreeks,
+    "RollingGreeks",
+    module = "finstack_quant.analytics"
+);
+impl_repr_html_via_dataframe!(
+    PyRollingGreeks,
+    pydoc!("finstack_quant.analytics", "RollingGreeks._repr_html_")
+);
+wire_methods!(
+    PyMultiFactorResult,
+    MultiFactorResult,
+    "MultiFactorResult",
+    module = "finstack_quant.analytics"
+);
+wire_methods!(
+    PyDrawdownEpisode,
+    DrawdownEpisode,
+    "DrawdownEpisode",
+    module = "finstack_quant.analytics"
+);
+impl_repr_html_via_dataframe!(
+    PyDrawdownEpisode,
+    pydoc!("finstack_quant.analytics", "DrawdownEpisode._repr_html_")
+);
+wire_methods!(
+    PyLookbackReturns,
+    LookbackReturns,
+    "LookbackReturns",
+    module = "finstack_quant.analytics"
+);
+impl_repr_html_via_dataframe!(
+    PyLookbackReturns,
+    pydoc!("finstack_quant.analytics", "LookbackReturns._repr_html_")
+);
 wire_methods!(PyDatedSeries, DatedSeries, "DatedSeries");
 impl_repr_html_via_dataframe!(PyDatedSeries);
 

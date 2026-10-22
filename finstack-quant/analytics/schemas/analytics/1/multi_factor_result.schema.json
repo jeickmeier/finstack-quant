@@ -37,6 +37,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/analytics/1/multi_factor_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Result of a multi-factor regression.",
   "properties": {
     "adjusted_r_squared": {
@@ -57,8 +58,7 @@
       "type": "array"
     },
     "n_obs": {
-      "default": 0,
-      "description": "Number of observations the regression used: the common length of the\ndependent series and every factor series. Residual degrees of freedom\nare `n_obs − betas.len() − 1`. `0` when deserialized from JSON written\nbefore this field existed.",
+      "description": "Number of observations the regression used: the common length of the\ndependent series and every factor series. Residual degrees of freedom\nare `n_obs − betas.len() − 1`. Required in the serialized result.",
       "format": "uint",
       "minimum": 0,
       "type": "integer"
@@ -78,7 +78,8 @@
     "betas",
     "r_squared",
     "adjusted_r_squared",
-    "residual_vol"
+    "residual_vol",
+    "n_obs"
   ],
   "title": "MultiFactorResult",
   "type": "object"

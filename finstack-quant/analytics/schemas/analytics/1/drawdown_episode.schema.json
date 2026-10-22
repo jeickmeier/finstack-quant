@@ -8,6 +8,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/analytics/1/drawdown_episode.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Drawdown episode with start, valley, optional recovery, and max drawdown.",
   "properties": {
     "duration_days": {
@@ -41,7 +42,6 @@
       "description": "Date when the drawdown began (peak date)."
     },
     "truncated_at_start": {
-      "default": false,
       "description": "`true` when the series began already in drawdown (no observed prior\npeak), so `start` is the first observation rather than a true peak.\nSurvival / duration analytics should treat such episodes as\nleft-censored.",
       "type": "boolean"
     },
@@ -55,7 +55,8 @@
     "valley",
     "duration_days",
     "max_drawdown",
-    "near_recovery_threshold"
+    "near_recovery_threshold",
+    "truncated_at_start"
   ],
   "title": "DrawdownEpisode",
   "type": "object"

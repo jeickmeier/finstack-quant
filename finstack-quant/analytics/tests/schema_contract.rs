@@ -6,7 +6,8 @@
 
 use finstack_quant_analytics::schema::ARTIFACTS;
 use finstack_quant_analytics::{
-    BetaResult, DatedSeries, GreeksResult, MultiFactorResult, Performance, PeriodStats,
+    BetaResult, DatedSeries, DrawdownEpisode, GreeksResult, LookbackReturns, MultiFactorResult,
+    Performance, PeriodStats, RollingGreeks,
 };
 use finstack_quant_core::dates::{Date, PeriodKind};
 use serde::de::DeserializeOwned;
@@ -47,18 +48,18 @@ fn from_json<T: DeserializeOwned>(value: Value) -> T {
 #[test]
 fn non_finite_results_validate_against_their_schemas() {
     let beta: BetaResult = from_json(json!({
-        "beta": "nan", "std_err": "inf", "ci_lower": "-inf", "ci_upper": 1.25
+        "beta": "nan", "std_err": "inf", "ci_lower": "-inf", "ci_upper": 1.25, "n_obs": 6, "confidence_level": 0.95
     }));
     assert_wire_matches_schema("BetaResult", &beta);
 
     let greeks: GreeksResult = from_json(json!({
-        "alpha": 0.01, "beta": "nan", "r_squared": "nan", "adjusted_r_squared": "-inf"
+        "alpha": 0.01, "beta": "nan", "r_squared": "nan", "adjusted_r_squared": "-inf", "n_obs": 6
     }));
     assert_wire_matches_schema("GreeksResult", &greeks);
 
     let multi: MultiFactorResult = from_json(json!({
         "alpha": 0.02, "betas": [0.5, 1.1], "r_squared": "nan",
-        "adjusted_r_squared": "nan", "residual_vol": 0.1
+        "adjusted_r_squared": "nan", "residual_vol": 0.1, "n_obs": 6
     }));
     assert_wire_matches_schema("MultiFactorResult", &multi);
 
@@ -83,7 +84,7 @@ fn schema_rejects_an_unknown_sentinel() {
     let validator = jsonschema::options()
         .build(&schema("BetaResult"))
         .expect("schema compiles");
-    let wire = json!({ "beta": "infinite", "std_err": 0.1, "ci_lower": 0.0, "ci_upper": 1.0 });
+    let wire = json!({ "beta": "infinite", "std_err": 0.1, "ci_lower": 0.0, "ci_upper": 1.0, "n_obs": 6, "confidence_level": 0.95 });
     assert!(!validator.is_valid(&wire));
 }
 
@@ -105,4 +106,107 @@ fn performance_state_validates_against_its_schema() {
     )
     .expect("valid panel");
     assert_wire_matches_schema("Performance", &perf);
+}
+
+fn assert_strict_result<T: Serialize + DeserializeOwned>(
+    type_name: &str,
+    wire: Value,
+    required_metadata: &[&str],
+) {
+    let value: T = from_json(wire.clone());
+    assert_wire_matches_schema(type_name, &value);
+    let validator = jsonschema::options()
+        .build(&schema(type_name))
+        .expect("valid schema");
+    let mut extra = wire.clone();
+    extra
+        .as_object_mut()
+        .expect("object")
+        .insert("unknown_result_field".to_owned(), json!(true));
+    assert!(
+        serde_json::from_value::<T>(extra.clone()).is_err(),
+        "{type_name} accepted an unknown field"
+    );
+    assert!(
+        !validator.is_valid(&extra),
+        "{type_name} schema accepted an unknown field"
+    );
+    for field in required_metadata {
+        let mut missing = wire.clone();
+        missing.as_object_mut().expect("object").remove(*field);
+        assert!(
+            serde_json::from_value::<T>(missing.clone()).is_err(),
+            "{type_name} accepted missing {field}"
+        );
+        assert!(
+            !validator.is_valid(&missing),
+            "{type_name} schema accepted missing {field}"
+        );
+    }
+}
+
+#[test]
+fn result_metadata_is_required_and_unknown_fields_are_rejected() {
+    assert_strict_result::<BetaResult>(
+        "BetaResult",
+        json!({
+            "beta": "nan", "std_err": "nan", "ci_lower": "nan", "ci_upper": "nan",
+            "n_obs": 2, "confidence_level": 0.95
+        }),
+        &["n_obs", "confidence_level"],
+    );
+    assert_strict_result::<GreeksResult>(
+        "GreeksResult",
+        json!({
+            "alpha": "nan", "beta": "nan", "r_squared": "nan", "adjusted_r_squared": "nan", "n_obs": 1
+        }),
+        &["n_obs"],
+    );
+    assert_strict_result::<MultiFactorResult>(
+        "MultiFactorResult",
+        json!({
+            "alpha": 0.0, "betas": [1.0], "r_squared": "nan", "adjusted_r_squared": "nan", "residual_vol": 0.0, "n_obs": 4
+        }),
+        &["n_obs"],
+    );
+    assert_strict_result::<DrawdownEpisode>(
+        "DrawdownEpisode",
+        json!({
+            "start": "2025-01-01", "valley": "2025-01-02", "end": null, "duration_days": 2,
+            "max_drawdown": -0.1, "near_recovery_threshold": -0.001, "truncated_at_start": true
+        }),
+        &["truncated_at_start"],
+    );
+    assert_strict_result::<PeriodStats>(
+        "PeriodStats",
+        json!({
+            "best": 0.01, "worst": -0.01, "consecutive_wins": 1, "consecutive_losses": 1,
+            "win_rate": 0.5, "avg_return": 0.0, "avg_win": 0.01, "avg_loss": -0.01,
+            "payoff_ratio": 1.0, "profit_factor": 1.0, "cpc_ratio": 0.5, "kelly_criterion": 0.0
+        }),
+        &[],
+    );
+    assert_strict_result::<RollingGreeks>(
+        "RollingGreeks",
+        json!({
+            "dates": ["2025-01-02"], "alphas": [0.0], "betas": [1.0]
+        }),
+        &[],
+    );
+    assert_strict_result::<LookbackReturns>(
+        "LookbackReturns",
+        json!({
+            "ticker_names": ["FUND"], "mtd": [0.1], "qtd": [0.1], "ytd": [0.1], "fytd": [0.1]
+        }),
+        &[],
+    );
+}
+
+#[test]
+fn drawdown_recovery_date_remains_optional() {
+    let episode: DrawdownEpisode = from_json(json!({
+        "start": "2025-01-01", "valley": "2025-01-02", "duration_days": 2,
+        "max_drawdown": -0.1, "near_recovery_threshold": -0.001, "truncated_at_start": false
+    }));
+    assert!(episode.end.is_none());
 }
