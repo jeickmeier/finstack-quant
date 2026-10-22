@@ -5,7 +5,6 @@
 //! registered via `register_cds_tranche_metrics`.
 //!
 //! Exposed metrics:
-//! - Upfront (currency units)
 //! - Spread DV01 (per 1bp change in running coupon)
 //! - Expected loss (currency units)
 //! - Jump-to-default (currency units)
@@ -42,9 +41,6 @@ pub(crate) fn register_cds_tranche_metrics(
             (JumpToDefault, JumpToDefaultCalculator),
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
-        ],
-        custom: [
-            ("model_upfront", ModelUpfrontCalculator),
         ]
     }
     Ok(())
@@ -89,20 +85,6 @@ impl MetricCalculator for JumpToDefaultCalculator {
         // Propagate error when credit index data is missing rather than silently
         // returning zero, which would mask missing market data in risk reports.
         tranche.jump_to_default(&context.curves, context.as_of)
-    }
-}
-
-/// Model-upfront calculator for CDS Tranche
-///
-/// Computes the model upfront (net present value at the contractual running
-/// coupon) using the Gaussian Copula pricing engine; a missing credit index
-/// is a `NotFound` error. Distinct from the contractual `upfront` field.
-pub(crate) struct ModelUpfrontCalculator;
-
-impl MetricCalculator for ModelUpfrontCalculator {
-    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let tranche: &CdsTranche = context.instrument_as()?;
-        tranche.model_upfront(&context.curves, context.as_of)
     }
 }
 
