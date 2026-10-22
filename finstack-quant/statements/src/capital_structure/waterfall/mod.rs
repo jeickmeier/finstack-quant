@@ -546,7 +546,7 @@ fn execute_waterfall_inner(
                     for s in &mut staged {
                         s.scheduled_principal = s.principal.get_scheduled_capacity()?;
                     }
-                    let allocations = allocate_by_class(&staged, &mut remaining_cash, |s| {
+                    let allocations = allocate_by_class(&mut staged, &mut remaining_cash, |s| {
                         s.scheduled_principal.amount().max(0.0)
                     })?;
                     for (s, allocated) in staged.iter_mut().zip(allocations) {
