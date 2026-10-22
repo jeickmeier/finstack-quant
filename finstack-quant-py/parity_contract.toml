@@ -850,7 +850,7 @@ public = [
 # directly from core: `nearest_correlation`, `validate_correlation_matrix` and
 # `cholesky_correlation` from
 # finstack_quant_core::math::linalg; `CorrelatedBernoulli`,
-# `correlation_bounds` and `joint_probabilities` from
+# `correlation_bounds` from
 # finstack_quant_core::math::probability.
 # Errors: `finstack_quant_models::correlation::Error` folds into the core
 # taxonomy (`From<correlation::Error> for core::Error`); non-convergence /
@@ -885,7 +885,6 @@ public = [
     "TrancheLossStatistics",
     "cholesky_correlation",
     "correlation_bounds",
-    "joint_probabilities",
     "nearest_correlation",
     "simulate_portfolio_loss",
     "validate_correlation_matrix",

@@ -408,7 +408,7 @@ fn models_correlation_dts_uses_float64array_returns() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "jointProbabilities(p1: number, p2: number, correlation: number): Float64Array;",
+        "jointProbabilities(): Float64Array;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
@@ -435,9 +435,7 @@ fn models_correlation_dts_uses_float64array_returns() {
     assert!(!interface_block(&dts, "CorrelationNamespace").contains("trancheLossStatistics("));
     // The stale `number[]` declarations must be gone from this namespace.
     assert!(!dts.contains("correlationBounds(p1: number, p2: number): number[];"));
-    assert!(
-        !dts.contains("jointProbabilities(p1: number, p2: number, correlation: number): number[];")
-    );
+    assert!(!interface_block(&dts, "CorrelationNamespace").contains("jointProbabilities("));
 }
 
 #[test]

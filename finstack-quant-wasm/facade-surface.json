@@ -2411,7 +2411,6 @@
       "RecoverySpec",
       "choleskyCorrelation",
       "correlationBounds",
-      "jointProbabilities",
       "maxPortfolioLossPaths",
       "nearestCorrelation",
       "simulatePortfolioLoss",
@@ -2500,9 +2499,6 @@
     "getters": ["correlationMatrix", "numFactors", "volatilities"]
   },
   "models.correlation.correlationBounds": {
-    "kind": "function"
-  },
-  "models.correlation.jointProbabilities": {
     "kind": "function"
   },
   "models.correlation.validateCorrelationMatrix": {
