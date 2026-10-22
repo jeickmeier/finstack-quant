@@ -136,10 +136,8 @@ pub(super) mod get {
 /// calls `utils::input` / `utils::wire` directly.
 pub(super) mod arg {
     use super::*;
-    pub(crate) use crate::utils::input::{
-        from_js_json as json, js_bool as flag, js_f64 as num, js_string as text, js_uint as uint,
-    };
-    pub(crate) use crate::utils::wire::{js_date as date, js_wire as en};
+    pub(crate) use crate::utils::input::{from_js_json, js_bool, js_f64, js_string, js_uint};
+    pub(crate) use crate::utils::wire::{js_date, js_wire};
 
     /// A string identifier (instrument, curve, calendar or price id).
     pub(crate) fn id<T: From<String>>(value: &JsValue, label: &str) -> Result<T, JsValue> {

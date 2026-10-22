@@ -10,13 +10,13 @@ use crate::bindings::module_utils::{
     opt_spec_from_py, py_to_json_string, py_to_serde, spec_from_py,
 };
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, serde_to_py};
-use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, display_to_py, value_error};
 use finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope;
 use finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::risk::{MarketHistory, MarketScenario};
 use pyo3::prelude::*;
-use pyo3::types::PyString;
+use pyo3::types::{PyDict, PyString};
 
 /// Metric-time pricing overrides merged into an instrument before pricing.
 ///
@@ -613,7 +613,7 @@ fn price_instrument(
     let prepared = py
         .detach(move || instrument.into_parsed(overrides.as_deref()))
         .map_err(core_to_py)?;
-    super::instruments::price_prepared(
+    price_prepared(
         py,
         prepared,
         market,
@@ -718,21 +718,6 @@ fn list_models() -> Vec<String> {
 #[pyfunction]
 fn list_models_grouped() -> std::collections::BTreeMap<String, Vec<String>> {
     finstack_quant_valuations::pricer::list_models_grouped()
-}
-
-#[doc = pydoc!("finstack_quant.valuations.market", "listed_product_catalog")]
-#[pyfunction(signature = (exchange=None))]
-fn listed_product_catalog<'py>(
-    py: Python<'py>,
-    exchange: Option<&str>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let exchange = exchange
-        .map(str::parse::<finstack_quant_valuations::market::listed::ListedExchange>)
-        .transpose()
-        .map_err(value_error)?;
-    let rows = finstack_quant_valuations::market::listed::listed_product_catalog(exchange)
-        .map_err(core_to_py)?;
-    serde_to_py(py, &rows)
 }
 
 /// Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
@@ -1028,12 +1013,6 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-/// Register listed-market catalog functions on the valuations market submodule.
-pub fn register_market(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(pyo3::wrap_pyfunction!(listed_product_catalog, m)?)?;
-    Ok(())
-}
-
 /// Names this module contributes to `finstack_quant.valuations.instruments.__all__`.
 ///
 /// Extend this list (sorted) when adding a class or function here; `mod.rs`
@@ -1050,3 +1029,168 @@ pub(crate) const EXPORTS: &[&str] = &[
     "metric_metadata",
     "price_instrument",
 ];
+
+/// Price an instrument envelope through the canonical Rust pricer.
+///
+/// Shared by `price_instrument` and every typed wrapper's `.price()`, so all
+/// Python pricing entry points coerce their options identically.
+///
+/// # Arguments
+///
+/// * `py` - GIL token; parsing and pricing run with the GIL released.
+/// * `instrument` - Owned native Rust instrument, validated before pricing.
+/// * `market` - `MarketContext` object or market-context JSON string.
+/// * `as_of` - Valuation date (date-like or ISO 8601 string).
+/// * `model` - Model key (`"default"` selects the instrument-native model).
+/// * `metrics` - Metric identifiers to compute; `None` means valuation only.
+/// * `metric_pricing_overrides` - Optional `MetricPricingOverrides | dict |
+///   str` merged into `instrument.spec.metric_pricing_overrides` before
+///   validation; `None` keeps the instrument's own overrides.
+/// * `market_history` - Optional `MarketHistory | dict | str` scenarios for
+///   the historical risk metrics (`hvar`, `expected_shortfall`).
+// PyO3 binding helper: mirrors the keyword surface of `price_instrument`.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn price_typed(
+    py: Python<'_>,
+    instrument: Box<dyn Instrument>,
+    market: &Bound<'_, PyAny>,
+    as_of: &Bound<'_, PyAny>,
+    model: &str,
+    metrics: Option<Vec<String>>,
+    metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
+    market_history: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyValuationResult> {
+    let overrides = metric_pricing_overrides_json(py, metric_pricing_overrides)?;
+    let instrument = py.detach(move || {
+        finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
+            instrument,
+            overrides.as_deref(),
+        )
+        .map_err(core_to_py)
+    })?;
+    price_prepared(
+        py,
+        instrument,
+        market,
+        as_of,
+        model,
+        metrics,
+        market_history,
+        false,
+    )
+}
+/// Pricing options shared by the host entry points: the recalibration
+/// provider, plus a step trace on the result when `explain` is set.
+fn pricing_options(explain: bool) -> finstack_quant_valuations::instruments::PricingOptions {
+    let options = finstack_quant_calibration::recalibration::pricing_options();
+    if explain {
+        options.with_explain(finstack_quant_core::explain::ExplainOpts::enabled())
+    } else {
+        options
+    }
+}
+
+/// Price a prepared instrument after host market/date conversion.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn price_prepared(
+    py: Python<'_>,
+    instrument: finstack_quant_valuations::pricer::ParsedInstrument,
+    market: &Bound<'_, PyAny>,
+    as_of: &Bound<'_, PyAny>,
+    model: &str,
+    metrics: Option<Vec<String>>,
+    market_history: Option<&Bound<'_, PyAny>>,
+    explain: bool,
+) -> PyResult<PyValuationResult> {
+    let market = extract_market(py, market)?;
+    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
+    let model = model.to_owned();
+    let metrics = metrics.unwrap_or_default();
+    let market_history = market_history_json(py, market_history)?;
+    let inner = py
+        .detach(move || {
+            finstack_quant_valuations::pricer::price_instrument(
+                &instrument,
+                &market,
+                &as_of,
+                &model,
+                &metrics,
+                market_history.as_deref(),
+                pricing_options(explain),
+            )
+        })
+        .map_err(core_to_py)?;
+    Ok(PyValuationResult { inner })
+}
+
+/// Compute one scalar metric for a native Rust instrument.
+pub(crate) fn metric_typed(
+    py: Python<'_>,
+    instrument: Box<dyn Instrument>,
+    market: &Bound<'_, PyAny>,
+    as_of: &Bound<'_, PyAny>,
+    metric_id: &str,
+    model: &str,
+) -> PyResult<f64> {
+    let market = extract_market(py, market)?;
+    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
+    let model = model.to_owned();
+    let metric_id = metric_id.to_owned();
+    py.detach(move || {
+        let instrument =
+            finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(instrument, None)?;
+        finstack_quant_valuations::pricer::metric_value(
+            &instrument,
+            &market,
+            &as_of,
+            &model,
+            &metric_id,
+            finstack_quant_calibration::recalibration::pricing_options(),
+        )
+    })
+    .map_err(core_to_py)
+}
+
+/// Compute the standard option Greek set for a native Rust instrument.
+///
+/// Mirrors the WASM `greeks` method: non-finite Greeks are rejected rather
+/// than returned, so both hosts fail identically instead of one silently
+/// yielding `NaN`.
+///
+/// # Arguments
+///
+/// * `py` - GIL token; the pricer runs with the GIL released.
+/// * `instrument` - Owned native Rust instrument, validated before pricing.
+/// * `market` - `MarketContext` object or market-context JSON string.
+/// * `as_of` - Valuation date (date-like or ISO string).
+/// * `model` - Model key (`"default"` selects the instrument-native model).
+pub(crate) fn typed_option_greeks<'py>(
+    py: Python<'py>,
+    instrument: Box<dyn finstack_quant_valuations::instruments::Instrument>,
+    market: &Bound<'py, PyAny>,
+    as_of: &Bound<'py, PyAny>,
+    model: &str,
+) -> PyResult<Bound<'py, PyDict>> {
+    let market = extract_market(py, market)?;
+    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
+    let model = model.to_owned();
+    let pairs = py
+        .detach(move || {
+            let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
+                instrument, None,
+            )?;
+            finstack_quant_valuations::pricer::present_standard_option_greeks(
+                &instrument,
+                &market,
+                &as_of,
+                &model,
+                finstack_quant_calibration::recalibration::pricing_options(),
+            )
+        })
+        .map_err(core_to_py)?;
+    let out = PyDict::new(py);
+    for (metric, value) in pairs {
+        out.set_item(metric, value)?;
+    }
+    Ok(out)
+}

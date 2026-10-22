@@ -12,18 +12,17 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsO
 use finstack_quant_valuations::market::conventions::CdsConvention;
 use rust_decimal::Decimal;
 
+use super::super::convert::enum_from_str;
 use super::super::convert::{
     attributes_from_py, bool_repr, date_repr, enum_to_py_string, float_repr, money_repr,
     money_to_py,
 };
-use super::super::instruments::enum_from_str;
 use super::super::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
 use crate::bindings::module_utils::spec_from_py;
 
-type CdsOptionBuilderInner =
-    finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionBuilder;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionBuilder;
 
 /// European option on a single-name or index CDS (typed wrapper for Rust ``CdsOption``).
 ///
@@ -230,7 +229,7 @@ crate::bindings::macros::py_getters!(PyCdsOption |s| {
     skip_from_py_object
 )]
 pub struct PyCdsOptionBuilder {
-    inner: Option<CdsOptionBuilderInner>,
+    inner: Option<CdsOptionBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
@@ -258,7 +257,7 @@ impl PyCdsOptionBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, id, format!("{value:?}"), |b: CdsOptionBuilderInner| b
+        builder_set!(slf, id, format!("{value:?}"), |b: CdsOptionBuilder| b
             .id(InstrumentId::new(value.to_string())))
     }
 
@@ -288,8 +287,7 @@ impl PyCdsOptionBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let strike: CdsOptionStrike = spec_from_py(py, value, "strike")?;
         let shown = value.repr()?.to_string();
-        builder_set!(slf, strike, shown, |b: CdsOptionBuilderInner| b
-            .strike(strike))
+        builder_set!(slf, strike, shown, |b: CdsOptionBuilder| b.strike(strike))
     }
 
     /// Set the option type.
@@ -318,7 +316,7 @@ impl PyCdsOptionBuilder {
             slf,
             option_type,
             format!("{value:?}"),
-            |b: CdsOptionBuilderInner| b.option_type(parsed)
+            |b: CdsOptionBuilder| b.option_type(parsed)
         )
     }
 
@@ -339,7 +337,7 @@ impl PyCdsOptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(value)?;
-        builder_set!(slf, expiry, date_repr(date), |b: CdsOptionBuilderInner| b
+        builder_set!(slf, expiry, date_repr(date), |b: CdsOptionBuilder| b
             .expiry(date))
     }
 
@@ -364,7 +362,7 @@ impl PyCdsOptionBuilder {
             slf,
             underlying_maturity,
             date_repr(date),
-            |b: CdsOptionBuilderInner| b.underlying_maturity(date)
+            |b: CdsOptionBuilder| b.underlying_maturity(date)
         )
     }
 
@@ -385,12 +383,8 @@ impl PyCdsOptionBuilder {
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = value.inner;
-        builder_set!(
-            slf,
-            notional,
-            money_repr(money),
-            |b: CdsOptionBuilderInner| b.notional(money)
-        )
+        builder_set!(slf, notional, money_repr(money), |b: CdsOptionBuilder| b
+            .notional(money))
     }
 
     /// Set the settlement type.
@@ -416,7 +410,7 @@ impl PyCdsOptionBuilder {
             slf,
             settlement,
             format!("{value:?}"),
-            |b: CdsOptionBuilderInner| b.settlement(parsed)
+            |b: CdsOptionBuilder| b.settlement(parsed)
         )
     }
 
@@ -442,7 +436,7 @@ impl PyCdsOptionBuilder {
             slf,
             exercise_settlement_date,
             date_repr(date),
-            |b: CdsOptionBuilderInner| b.exercise_settlement_date(date)
+            |b: CdsOptionBuilder| b.exercise_settlement_date(date)
         )
     }
 
@@ -468,7 +462,7 @@ impl PyCdsOptionBuilder {
             slf,
             underlying_start_date,
             date_repr(date),
-            |b: CdsOptionBuilderInner| b.underlying_start_date(date)
+            |b: CdsOptionBuilder| b.underlying_start_date(date)
         )
     }
 
@@ -499,7 +493,7 @@ impl PyCdsOptionBuilder {
             slf,
             protection_start_convention,
             format!("{value:?}"),
-            |b: CdsOptionBuilderInner| b.protection_start_convention(parsed)
+            |b: CdsOptionBuilder| b.protection_start_convention(parsed)
         )
     }
 
@@ -520,7 +514,7 @@ impl PyCdsOptionBuilder {
             slf,
             knockout,
             bool_repr(value).to_string(),
-            |b: CdsOptionBuilderInner| b.knockout(value)
+            |b: CdsOptionBuilder| b.knockout(value)
         )
     }
 
@@ -544,7 +538,7 @@ impl PyCdsOptionBuilder {
             slf,
             recovery_rate,
             float_repr(value),
-            |b: CdsOptionBuilderInner| b.recovery_rate(value)
+            |b: CdsOptionBuilder| b.recovery_rate(value)
         )
     }
 
@@ -568,7 +562,7 @@ impl PyCdsOptionBuilder {
             slf,
             discount_curve_id,
             format!("{value:?}"),
-            |b: CdsOptionBuilderInner| b.discount_curve_id(CurveId::new(value))
+            |b: CdsOptionBuilder| b.discount_curve_id(CurveId::new(value))
         )
     }
 
@@ -592,7 +586,7 @@ impl PyCdsOptionBuilder {
             slf,
             credit_curve_id,
             format!("{value:?}"),
-            |b: CdsOptionBuilderInner| b.credit_curve_id(CurveId::new(value))
+            |b: CdsOptionBuilder| b.credit_curve_id(CurveId::new(value))
         )
     }
 
@@ -616,7 +610,7 @@ impl PyCdsOptionBuilder {
             slf,
             vol_surface_id,
             format!("{value:?}"),
-            |b: CdsOptionBuilderInner| b.vol_surface_id(CurveId::new(value))
+            |b: CdsOptionBuilder| b.vol_surface_id(CurveId::new(value))
         )
     }
 
@@ -646,7 +640,7 @@ impl PyCdsOptionBuilder {
             slf,
             underlying_convention,
             format!("{value:?}"),
-            |b: CdsOptionBuilderInner| b.underlying_convention(convention)
+            |b: CdsOptionBuilder| b.underlying_convention(convention)
         )
     }
 
@@ -671,7 +665,7 @@ impl PyCdsOptionBuilder {
             slf,
             underlying_is_index,
             bool_repr(value).to_string(),
-            |b: CdsOptionBuilderInner| b.underlying_is_index(value)
+            |b: CdsOptionBuilder| b.underlying_is_index(value)
         )
     }
 
@@ -696,7 +690,7 @@ impl PyCdsOptionBuilder {
             slf,
             index_factor,
             float_repr(value),
-            |b: CdsOptionBuilderInner| b.index_factor(value)
+            |b: CdsOptionBuilder| b.index_factor(value)
         )
     }
 
@@ -721,7 +715,7 @@ impl PyCdsOptionBuilder {
             slf,
             strike_index_factor,
             float_repr(value),
-            |b: CdsOptionBuilderInner| b.strike_index_factor(value)
+            |b: CdsOptionBuilder| b.strike_index_factor(value)
         )
     }
 
@@ -746,7 +740,7 @@ impl PyCdsOptionBuilder {
             slf,
             realized_loss,
             float_repr(value),
-            |b: CdsOptionBuilderInner| b.realized_loss(value)
+            |b: CdsOptionBuilder| b.realized_loss(value)
         )
     }
 
@@ -774,12 +768,8 @@ impl PyCdsOptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let coupon = decimal_arg(value)?;
-        builder_set!(
-            slf,
-            coupon_bp,
-            coupon.to_string(),
-            |b: CdsOptionBuilderInner| b.coupon_bp(coupon)
-        )
+        builder_set!(slf, coupon_bp, coupon.to_string(), |b: CdsOptionBuilder| b
+            .coupon_bp(coupon))
     }
 
     /// Set free-form instrument attributes (tags and metadata).
@@ -809,7 +799,7 @@ impl PyCdsOptionBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
         let shown = value.repr()?.to_string();
-        builder_set!(slf, attributes, shown, |b: CdsOptionBuilderInner| b
+        builder_set!(slf, attributes, shown, |b: CdsOptionBuilder| b
             .attributes(attrs))
     }
 }

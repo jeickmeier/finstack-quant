@@ -18,11 +18,11 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::{core_to_py, display_to_py};
 
+use super::convert::{decimal_from_f64, enum_from_str, stub_kind_from_py};
 use super::convert::{enum_to_py_string, opt_repr};
-use super::instruments::{decimal_from_f64, enum_from_str, stub_kind_from_py};
 use crate::bindings::extract::{extract_basis_points, extract_rate_decimal};
 
-type FloatingLegCompounding = finstack_quant_cashflows::builder::FloatingLegCompounding;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 
 /// Coerce `str | dict` to a `FloatingLegCompounding`.
 ///

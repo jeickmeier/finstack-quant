@@ -21,9 +21,8 @@ use crate::bindings::portfolio::valuation::PyPortfolioValuation;
 use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::valuations::composite::PyCompositeInstrument;
-use crate::bindings::valuations::instruments::{
-    serialize_typed_instrument_json, PyBond, PyTermLoan,
-};
+use crate::bindings::valuations::convert::serialize_typed_instrument_json;
+use crate::bindings::valuations::instruments::{PyBond, PyTermLoan};
 use crate::bindings::valuations::typed_asset_backed_facility::PyAssetBackedFacility;
 use crate::bindings::valuations::typed_convertible::PyConvertibleBond;
 use crate::bindings::valuations::typed_credit::{

@@ -12,7 +12,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     PutExercisePolicy, ReinvestmentPeriod,
 };
 
-use super::super::instruments::enum_from_str;
+use super::super::convert::enum_from_str;
 use super::{PyPoolAsset, PyRepLine};
 
 /// Parse an internally tagged policy/destination enum from a bare variant

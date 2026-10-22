@@ -734,10 +734,8 @@ fn register_market(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()>
         pydoc!("finstack_quant.valuations.market", "__module__"),
     )?;
 
-    pricing::register_market(py, &m)?;
     market::register(py, &m)?;
-    let mut exports = vec!["listed_product_catalog"];
-    exports.extend_from_slice(market::EXPORTS);
+    let mut exports = market::EXPORTS.to_vec();
     exports.sort_unstable();
     let all = PyList::new(py, exports)?;
     m.setattr("__all__", all)?;

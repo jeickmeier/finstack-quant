@@ -35,7 +35,7 @@ macro_rules! instrument_pricing_methods {
                 metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
                 market_history: Option<&Bound<'_, PyAny>>,
             ) -> PyResult<$crate::bindings::valuations::PyValuationResult> {
-                $crate::bindings::valuations::instruments::price_typed(
+                $crate::bindings::valuations::pricing::price_typed(
                     py,
                     Box::new(self.inner.clone()),
                     market,
@@ -58,7 +58,7 @@ macro_rules! instrument_pricing_methods {
                 metric_id: &str,
                 model: &str,
             ) -> PyResult<f64> {
-                $crate::bindings::valuations::instruments::metric_typed(
+                $crate::bindings::valuations::pricing::metric_typed(
                     py,
                     Box::new(self.inner.clone()),
                     market,
@@ -127,7 +127,7 @@ macro_rules! instrument_greek_methods {
                     as_of: &Bound<'_, PyAny>,
                     model: &str,
                 ) -> PyResult<f64> {
-                    $crate::bindings::valuations::instruments::metric_typed(
+                    $crate::bindings::valuations::pricing::metric_typed(
                         py,
                         Box::new(self.inner.clone()),
                         market,
@@ -224,13 +224,13 @@ macro_rules! instrument_envelope_methods {
             #[staticmethod]
             #[pyo3(text_signature = "(json)")]
             fn from_json(json: &str) -> PyResult<Self> {
-                $crate::bindings::valuations::instruments::parse_typed_instrument_json(json).map(|inner| Self { inner })
+                $crate::bindings::valuations::convert::parse_typed_instrument_json(json).map(|inner| Self { inner })
             }
 
             #[doc = $crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", concat!($name, ".to_json"))]
             #[pyo3(text_signature = "($self)")]
             fn to_json(&self) -> PyResult<String> {
-                $crate::bindings::valuations::instruments::serialize_typed_instrument_json(
+                $crate::bindings::valuations::convert::serialize_typed_instrument_json(
                     finstack_quant_valuations::instruments::json_loader::InstrumentJson::from(
                         self.inner.clone(),
                     ),

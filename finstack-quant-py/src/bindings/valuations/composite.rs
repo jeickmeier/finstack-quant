@@ -13,7 +13,7 @@ use crate::bindings::module_utils::opt_spec_from_py;
 use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::bindings::pandas_utils::{serde_to_py, ColumnSchema};
 use crate::bindings::pydoc::pydoc;
-use crate::bindings::valuations::instruments::{
+use crate::bindings::valuations::convert::{
     parse_typed_instrument_json, serialize_typed_instrument_json,
 };
 use crate::errors::core_to_py;

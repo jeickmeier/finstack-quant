@@ -13,18 +13,17 @@ use finstack_quant_valuations::market::conventions::CdsConvention;
 use finstack_quant_valuations::market::conventions::CdsValuationConvention;
 use rust_decimal::prelude::ToPrimitive;
 
+use super::super::convert::enum_from_str;
 use super::super::convert::{
     attributes_from_py, date_repr, dated_money_from_py, enum_to_py_string, money_repr, money_to_py,
     opt_repr,
 };
-use super::super::instruments::enum_from_str;
 use super::super::typed_legs::{PyPremiumLegSpec, PyProtectionLegSpec};
 use super::super::typed_macros::{
     builder_set, instrument_envelope_methods, instrument_pricing_methods,
 };
 
-type CdsBuilderInner =
-    finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwapBuilder;
+use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwapBuilder;
 
 /// Single-name credit default swap (typed wrapper for Rust ``CreditDefaultSwap``).
 ///
@@ -235,7 +234,7 @@ crate::bindings::macros::py_getters!(PyCreditDefaultSwap |s| {
     skip_from_py_object
 )]
 pub struct PyCreditDefaultSwapBuilder {
-    inner: Option<CdsBuilderInner>,
+    inner: Option<CreditDefaultSwapBuilder>,
     fields: Vec<(&'static str, String)>,
 }
 
@@ -254,8 +253,12 @@ impl PyCreditDefaultSwapBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        builder_set!(slf, id, format!("{value:?}"), |b: CdsBuilderInner| b
-            .id(InstrumentId::new(value.to_string())))
+        builder_set!(
+            slf,
+            id,
+            format!("{value:?}"),
+            |b: CreditDefaultSwapBuilder| b.id(InstrumentId::new(value.to_string()))
+        )
     }
 
     /// Set the notional amount.
@@ -275,8 +278,12 @@ impl PyCreditDefaultSwapBuilder {
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = value.inner;
-        builder_set!(slf, notional, money_repr(money), |b: CdsBuilderInner| b
-            .notional(money))
+        builder_set!(
+            slf,
+            notional,
+            money_repr(money),
+            |b: CreditDefaultSwapBuilder| b.notional(money)
+        )
     }
 
     /// Set the protection buyer/seller perspective.
@@ -299,8 +306,12 @@ impl PyCreditDefaultSwapBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn side<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let side = enum_from_str(value, "side")?;
-        builder_set!(slf, side, format!("{value:?}"), |b: CdsBuilderInner| b
-            .side(side))
+        builder_set!(
+            slf,
+            side,
+            format!("{value:?}"),
+            |b: CreditDefaultSwapBuilder| b.side(side)
+        )
     }
 
     /// Set the ISDA regional convention.
@@ -329,7 +340,7 @@ impl PyCreditDefaultSwapBuilder {
             slf,
             convention,
             format!("{value:?}"),
-            |b: CdsBuilderInner| b.convention(convention)
+            |b: CreditDefaultSwapBuilder| b.convention(convention)
         )
     }
 
@@ -356,7 +367,7 @@ impl PyCreditDefaultSwapBuilder {
             date_repr(leg.start),
             date_repr(leg.end)
         );
-        builder_set!(slf, premium_leg, shown, |b: CdsBuilderInner| b
+        builder_set!(slf, premium_leg, shown, |b: CreditDefaultSwapBuilder| b
             .premium_leg(leg))
     }
 
@@ -382,7 +393,7 @@ impl PyCreditDefaultSwapBuilder {
             leg.credit_curve_id.as_str(),
             leg.recovery_rate
         );
-        builder_set!(slf, protection_leg, shown, |b: CdsBuilderInner| b
+        builder_set!(slf, protection_leg, shown, |b: CreditDefaultSwapBuilder| b
             .protection_leg(leg))
     }
 
@@ -414,7 +425,7 @@ impl PyCreditDefaultSwapBuilder {
             slf,
             valuation_convention,
             format!("{value:?}"),
-            |b: CdsBuilderInner| b.valuation_convention(convention)
+            |b: CreditDefaultSwapBuilder| b.valuation_convention(convention)
         )
     }
 
@@ -443,7 +454,7 @@ impl PyCreditDefaultSwapBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let (date, money) = dated_money_from_py(value, None, "upfront")?;
         let shown = format!("({}, {})", date_repr(date), money_repr(money));
-        builder_set!(slf, upfront, shown, |b: CdsBuilderInner| b
+        builder_set!(slf, upfront, shown, |b: CreditDefaultSwapBuilder| b
             .upfront((date, money)))
     }
 
@@ -475,7 +486,7 @@ impl PyCreditDefaultSwapBuilder {
             slf,
             doc_clause,
             format!("{value:?}"),
-            |b: CdsBuilderInner| b.doc_clause(clause)
+            |b: CreditDefaultSwapBuilder| b.doc_clause(clause)
         )
     }
 
@@ -502,7 +513,7 @@ impl PyCreditDefaultSwapBuilder {
             slf,
             protection_effective_date,
             date_repr(date),
-            |b: CdsBuilderInner| b.protection_effective_date(date)
+            |b: CreditDefaultSwapBuilder| b.protection_effective_date(date)
         )
     }
 
@@ -532,7 +543,7 @@ impl PyCreditDefaultSwapBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec = crate::bindings::module_utils::py_to_serde(py, value, "margin_spec")?;
         let shown = value.repr()?.to_string();
-        builder_set!(slf, margin_spec, shown, |b: CdsBuilderInner| b
+        builder_set!(slf, margin_spec, shown, |b: CreditDefaultSwapBuilder| b
             .margin_spec(spec))
     }
 
@@ -563,7 +574,7 @@ impl PyCreditDefaultSwapBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
         let shown = value.repr()?.to_string();
-        builder_set!(slf, attributes, shown, |b: CdsBuilderInner| b
+        builder_set!(slf, attributes, shown, |b: CreditDefaultSwapBuilder| b
             .attributes(attrs))
     }
 }
