@@ -45,7 +45,8 @@ class PeriodAggregation:
     Read-only mapping ``{period_id_label: {currency_code: Money}}``
     (``agg["2025Q1"]["USD"]``, ``"2025Q1" in agg``, ``len(agg)``) plus a tidy
     ``to_dataframe()`` with one ``(period, currency, amount)`` row per cell.
-    Amounts are never FX-converted; empty periods are omitted.
+    Amounts are never FX-converted. Aggregators omit periods receiving no flows;
+    empty buckets supplied through JSON remain present.
 
     Examples
     --------
@@ -58,12 +59,14 @@ class PeriodAggregation:
     ... )
     >>> agg.periods
     ['2025Q1']
+    >>> agg.get_period("2025Q1")["USD"].amount
+    100.0
     """
 
     @property
     def periods(self) -> list[str]:
         """
-        Period id labels with at least one flow, in reporting-period order.
+        Stored period id labels in reporting-period order, including empty buckets.
 
         Returns
         -------
@@ -76,6 +79,29 @@ class PeriodAggregation:
         """
         ...
 
+    def get_period(self, period: str) -> dict[str, Money] | None:
+        """Read the currency totals for one exact period label.
+
+        Parameters
+        ----------
+        period : str
+            Exact case-sensitive display label, such as ``"2025Q1"``. Whitespace
+            is not trimmed and aliases are not parsed.
+
+        Returns
+        -------
+        dict[str, Money] or None
+            Independent dictionary of currency totals, with no FX conversion.
+            Returns an empty dictionary for a stored empty bucket, or ``None``
+            for an absent or malformed label. Editing the dictionary does not
+            change the aggregation.
+
+        Notes
+        -----
+        This accessor does not raise for absent or malformed labels.
+        """
+        ...
+
     def get_amount(self, period: str, currency: Currency | str) -> Money | None:
         """
         Total for one ``(period, currency)`` cell.
@@ -83,7 +109,8 @@ class PeriodAggregation:
         Parameters
         ----------
         period : str
-            Period id label (e.g. ``"2025Q1"``).
+            Exact case-sensitive display label (e.g. ``"2025Q1"``); whitespace
+            is not trimmed. An absent or malformed label returns ``None``.
         currency : Currency or str
             ISO 4217 currency of the requested total.
 
@@ -121,7 +148,7 @@ class PeriodAggregation:
         Parameters
         ----------
         period : str
-            Period id label.
+            Exact case-sensitive display label; whitespace is not trimmed.
 
         Returns
         -------
@@ -131,18 +158,18 @@ class PeriodAggregation:
         Raises
         ------
         KeyError
-            If ``period`` has no flows.
+            If the exact period label is absent.
         """
         ...
 
     def __contains__(self, period: str) -> bool:
         """
-        Whether ``period`` has at least one flow.
+        Whether the exact period label is present, including an empty bucket.
 
         Parameters
         ----------
         period : str
-            Period id label.
+            Exact case-sensitive display label; whitespace is not trimmed.
 
         Returns
         -------
@@ -157,12 +184,12 @@ class PeriodAggregation:
 
     def __len__(self) -> int:
         """
-        Number of non-empty periods.
+        Number of stored periods, including empty buckets.
 
         Returns
         -------
         int
-            Count of periods with flows.
+            Count of period entries.
 
         Notes
         -----

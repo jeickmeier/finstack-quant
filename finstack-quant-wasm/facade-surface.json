@@ -428,6 +428,8 @@
       "monthlyToAnnual",
       "notionalPar",
       "notionalValidate",
+      "periodAggregationGetAmount",
+      "periodAggregationGetPeriod",
       "prepaymentModelSpecSmm",
       "prepaymentModelSpecValidate",
       "recoveryModelSpecRecoveryRate",
@@ -590,6 +592,12 @@
     "kind": "function"
   },
   "cashflows.notionalValidate": {
+    "kind": "function"
+  },
+  "cashflows.periodAggregationGetAmount": {
+    "kind": "function"
+  },
+  "cashflows.periodAggregationGetPeriod": {
     "kind": "function"
   },
   "cashflows.prepaymentModelSpecSmm": {

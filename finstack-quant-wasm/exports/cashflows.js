@@ -60,6 +60,8 @@ export const cashflows = {
   monthlyToAnnual: wasm.monthlyToAnnual,
   notionalPar: wasm.notionalPar,
   notionalValidate: wasm.notionalValidate,
+  periodAggregationGetAmount: wasm.periodAggregationGetAmount,
+  periodAggregationGetPeriod: wasm.periodAggregationGetPeriod,
   prepaymentModelSpecSmm: wasm.prepaymentModelSpecSmm,
   prepaymentModelSpecValidate: wasm.prepaymentModelSpecValidate,
   recoveryModelSpecRecoveryRate: wasm.recoveryModelSpecRecoveryRate,

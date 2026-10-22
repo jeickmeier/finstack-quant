@@ -325,9 +325,9 @@ const cases = {
     return {
       by_period: aggregation,
       get_amount: [
-        aggregation['2026Q1']?.['EUR'] ?? null,
-        aggregation['2025Q1']?.['EUR'] ?? null,
-        aggregation['nope']?.['USD'] ?? null,
+        cashflows.periodAggregationGetAmount(aggregation, '2026Q1', 'EUR'),
+        cashflows.periodAggregationGetAmount(aggregation, '2025Q1', 'EUR'),
+        cashflows.periodAggregationGetAmount(aggregation, 'nope', 'USD'),
       ],
       checked: cashflows.aggregateCashflowsChecked(flows.slice(0, 2), 'USD'),
       ladder: cashflows.calendarYearLadder(

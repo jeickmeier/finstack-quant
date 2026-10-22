@@ -13,6 +13,7 @@ use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::macros::wire_methods;
+use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 
 /// Convert Python ``[(date, Money), ...]`` into Rust dated flows.
@@ -25,26 +26,7 @@ pub(crate) fn extract_dated_flows(
         .collect()
 }
 
-/// Per-period, per-currency totals from ``aggregate_by_period`` or
-/// ``CashFlowSchedule.pv_by_period``.
-///
-/// Behaves like a read-only mapping ``{period_id_label: {currency_code: Money}}``
-/// (``agg["2025Q1"]["USD"]``, ``"2025Q1" in agg``, ``len(agg)``) and exports
-/// a tidy ``pandas.DataFrame`` with one ``(period, currency, amount)`` row per
-/// entry. Periods with no flows are omitted; amounts are never FX-converted.
-///
-/// Examples
-/// --------
-/// >>> import datetime
-/// >>> from finstack_quant.cashflows.aggregation import aggregate_by_period
-/// >>> from finstack_quant.core.dates import build_periods
-/// >>> from finstack_quant.core.money import Money
-/// >>> flows = [(datetime.date(2025, 3, 15), Money(100.0, "USD"))]
-/// >>> agg = aggregate_by_period(flows, build_periods("2025Q1..Q4").periods)
-/// >>> agg.periods
-/// ['2025Q1']
-/// >>> agg.to_dataframe().columns.tolist()
-/// ['period', 'currency', 'amount']
+#[doc = pydoc!("finstack_quant.cashflows.aggregation", "PeriodAggregation")]
 #[pyclass(
     name = "PeriodAggregation",
     module = "finstack_quant.cashflows.aggregation",
@@ -82,30 +64,26 @@ wire_methods!(PyPeriodAggregation, PeriodAggregation, "PeriodAggregation");
 
 #[pymethods]
 impl PyPeriodAggregation {
-    /// Period id labels with at least one flow, in reporting-period order.
+    #[doc = pydoc!("finstack_quant.cashflows.aggregation", "PeriodAggregation.periods")]
     #[getter]
     fn periods(&self) -> Vec<String> {
         self.inner.keys().map(ToString::to_string).collect()
     }
 
-    /// Total for one ``(period, currency)`` cell, or ``None`` when absent.
-    ///
-    /// Parameters
-    /// ----------
-    /// period : str
-    ///     Period id label (e.g. ``"2025Q1"``).
-    /// currency : Currency or str
-    ///     ISO 4217 currency of the requested total.
-    ///
-    /// Returns
-    /// -------
-    /// Money or None
-    ///     Nominal (or PV) total in ``currency`` for ``period``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``currency`` is not a valid ISO 4217 code.
+    #[doc = pydoc!("finstack_quant.cashflows.aggregation", "PeriodAggregation.get_period")]
+    #[pyo3(text_signature = "(self, period)")]
+    fn get_period<'py>(
+        &self,
+        py: Python<'py>,
+        period: &str,
+    ) -> PyResult<Option<Bound<'py, PyDict>>> {
+        self.inner
+            .get_period(period)
+            .map(|per_currency| Self::period_dict(py, per_currency))
+            .transpose()
+    }
+
+    #[doc = pydoc!("finstack_quant.cashflows.aggregation", "PeriodAggregation.get_amount")]
     #[pyo3(text_signature = "(self, period, currency)")]
     fn get_amount(&self, period: &str, currency: &Bound<'_, PyAny>) -> PyResult<Option<PyMoney>> {
         let currency = extract_currency(currency)?;
@@ -125,17 +103,11 @@ impl PyPeriodAggregation {
         Ok(out)
     }
 
-    /// ``{currency_code: Money}`` for one period label.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If ``period`` has no flows.
+    #[doc = pydoc!("finstack_quant.cashflows.aggregation", "PeriodAggregation.__getitem__")]
     fn __getitem__<'py>(&self, py: Python<'py>, period: &str) -> PyResult<Bound<'py, PyDict>> {
         self.inner
-            .iter()
-            .find(|(id, _)| id.to_string() == period)
-            .map(|(_, per_currency)| Self::period_dict(py, per_currency))
+            .get_period(period)
+            .map(|per_currency| Self::period_dict(py, per_currency))
             .unwrap_or_else(|| {
                 Err(pyo3::exceptions::PyKeyError::new_err(format!(
                     "no flows in period '{period}'"
@@ -143,12 +115,12 @@ impl PyPeriodAggregation {
             })
     }
 
-    /// Whether ``period`` has at least one flow.
+    #[doc = pydoc!("finstack_quant.cashflows.aggregation", "PeriodAggregation.__contains__")]
     fn __contains__(&self, period: &str) -> bool {
-        self.inner.keys().any(|id| id.to_string() == period)
+        self.inner.get_period(period).is_some()
     }
 
-    /// Number of non-empty periods.
+    #[doc = pydoc!("finstack_quant.cashflows.aggregation", "PeriodAggregation.__len__")]
     fn __len__(&self) -> usize {
         self.inner.len()
     }

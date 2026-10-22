@@ -68,6 +68,25 @@ use indexmap::IndexMap;
 pub struct PeriodAggregation(IndexMap<PeriodId, IndexMap<Currency, Money>>);
 
 impl PeriodAggregation {
+    /// Read one period's currency totals by its exact display label.
+    ///
+    /// # Arguments
+    ///
+    /// * `period` - Exact case-sensitive `PeriodId` display label, such as
+    ///   `"2025Q1"`. Whitespace is not trimmed and aliases are not parsed.
+    ///
+    /// # Returns
+    ///
+    /// A borrowed currency map, including an empty map if one was supplied
+    /// during construction, or `None` for an absent or malformed label.
+    #[must_use]
+    pub fn get_period(&self, period: &str) -> Option<&IndexMap<Currency, Money>> {
+        self.0
+            .iter()
+            .find(|(id, _)| id.to_string() == period)
+            .map(|(_, per_currency)| per_currency)
+    }
+
     /// Amount aggregated for one period code and currency.
     ///
     /// # Arguments
@@ -83,10 +102,8 @@ impl PeriodAggregation {
     /// flows in `currency`.
     #[must_use]
     pub fn get_amount(&self, period: &str, currency: Currency) -> Option<Money> {
-        self.0
-            .iter()
-            .find(|(id, _)| id.to_string() == period)
-            .and_then(|(_, per_currency)| per_currency.get(&currency))
+        self.get_period(period)
+            .and_then(|per_currency| per_currency.get(&currency))
             .copied()
     }
 
@@ -973,6 +990,30 @@ pub(crate) fn pv_by_period(
 #[cfg(test)]
 mod period_aggregation_tests {
     use super::*;
+
+    #[test]
+    fn exact_period_lookup_preserves_empty_buckets_and_currency_totals() {
+        let totals: PeriodAggregation = serde_json::from_str(
+            r#"{"2025Q1":{"USD":{"amount":"100.25","currency":"USD"},"EUR":{"amount":"40","currency":"EUR"}},"2025Q2":{}}"#,
+        ).expect("valid aggregation");
+        let first = totals.get_period("2025Q1").expect("present period");
+        assert_eq!(first.len(), 2);
+        assert_eq!(
+            totals.get_amount("2025Q1", Currency::USD),
+            first.get(&Currency::USD).copied()
+        );
+        assert!(totals
+            .get_period("2025Q2")
+            .expect("present empty period")
+            .is_empty());
+        assert_eq!(totals.get_amount("2025Q2", Currency::USD), None);
+        for missing in ["2025Q3", "2025q1", " 2025Q1", "nope", ""] {
+            assert!(
+                totals.get_period(missing).is_none(),
+                "unexpected match for {missing:?}"
+            );
+        }
+    }
 
     #[test]
     fn checked_map_construction_rejects_currency_mismatch() {
