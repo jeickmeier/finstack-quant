@@ -3,7 +3,7 @@
   "sources": [
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
-      "sha256": "5124c646b289a5c4b38905f5a5cf74bde3757839a933ca174c2862d82cc3f696"
+      "sha256": "567c909e02b4e8017b5bd26f0a646364853f03e44aecdeaf5016e6134d2672ca"
     },
     {
       "path": "finstack-quant/valuations/tests/fixtures/valuation_binding_regressions.json",
@@ -11,7 +11,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "4378c0845a071111ac9973a0dd0d8a1b868f9bb3ab7e9cbf41b91516fe44117d"
+      "sha256": "9c88720101020a5ecbdf10d1fc4fd7d66d7485bfb8b3b34879da26367105c3a5"
     },
     {
       "path": "finstack-quant-wasm/tests/facade/covenants.test.mjs",
@@ -19,7 +19,7 @@
     },
     {
       "path": "finstack-quant-wasm/index.d.ts",
-      "sha256": "46f6135eaa334985ff556f91d07ebe9d0965088d0fecf4b6ce980d05121e39a4"
+      "sha256": "89a358284a3534248ebd062b334f35a1229c96c40d644239ea3bcb2f95ce4df7"
     },
     {
       "path": "finstack-quant-wasm/src/utils/mod.rs",

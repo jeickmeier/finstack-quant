@@ -729,11 +729,11 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "abfefd32bb278f1ee55359216ea8aef41e782946213b9ef8db39b38736d523b2"
+      "sha256": "dad3f7fdbe06a225bea21c6d6a6482d273b8afbcfacdc9858de5951394cc9f93"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "ac2b1a9dfc3aaa6dbca70e534318705df91c6a33bdfdd32f547b9ffe1d4d56ec"
+      "sha256": "6756ba81fd565524cacb36a08f606eff41e49b6ff50d6f0963f249ba5b36a763"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
