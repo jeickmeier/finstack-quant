@@ -803,10 +803,6 @@ impl Bumpable for PriceCurve {
                 (BumpMode::Additive, BumpUnits::Fraction) => {
                     let bump = spec.value;
                     let new_id = crate::market_data::bumps::id_bump_bp(id, bump * 100.0);
-                    if self.knots.len() < 2 {
-                        return self
-                            .shocked(new_id, self.spot_price + bump, |_, price| price + bump);
-                    }
                     // Spot is not bumped in a key-rate shock; neither are rolled
                     // source pillars at or before the current origin.
                     self.shocked(new_id, self.spot_price, |t, price| {

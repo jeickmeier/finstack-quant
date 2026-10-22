@@ -445,12 +445,7 @@ impl Tenor {
     #[inline]
     #[must_use]
     pub fn compounding_frequency(&self) -> f64 {
-        let years = self.to_years();
-        if years > 0.0 && years.is_finite() {
-            (1.0 / years).round().max(1.0)
-        } else {
-            1.0
-        }
+        (1.0 / self.to_years()).round().max(1.0)
     }
 
     /// Number of payments per year for a payment-frequency tenor.

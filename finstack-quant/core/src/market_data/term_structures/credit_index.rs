@@ -126,11 +126,7 @@ impl CreditIndexData {
         }
         validate_issuer_curves(&self.issuer_credit_curves, self.num_constituents)?;
         validate_issuer_recovery_rates(&self.issuer_credit_curves, &self.issuer_recovery_rates)?;
-        validate_issuer_weights(
-            &self.issuer_credit_curves,
-            &self.issuer_weights,
-            self.num_constituents,
-        )
+        validate_issuer_weights(&self.issuer_credit_curves, &self.issuer_weights)
     }
 
     /// Get the credit curve for a specific issuer.
@@ -418,7 +414,6 @@ fn validate_issuer_recovery_rates(
 fn validate_issuer_weights(
     issuer_curves: &Option<BTreeMap<String, Arc<HazardCurve>>>,
     issuer_weights: &Option<BTreeMap<String, f64>>,
-    num_constituents: u16,
 ) -> Result<()> {
     let Some(weights) = issuer_weights else {
         return Ok(());
@@ -442,13 +437,6 @@ fn validate_issuer_weights(
             curves.len()
         )));
     }
-    if weights.len() > usize::from(num_constituents) {
-        return Err(crate::Error::Validation(format!(
-            "issuer_weights has {} entries, which exceeds num_constituents={num_constituents}",
-            weights.len()
-        )));
-    }
-
     let mut weight_sum = 0.0;
     for (issuer, weight) in weights {
         if !curves.contains_key(issuer) {

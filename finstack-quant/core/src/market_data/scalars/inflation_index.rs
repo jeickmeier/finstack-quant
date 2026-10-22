@@ -471,16 +471,21 @@ impl InflationIndex {
     /// available observations). Seasonal multiplication itself does not add
     /// validation errors.
     pub fn value_on(&self, date: Date) -> Result<f64> {
-        if let InflationLag::Months(months) = self.lag {
-            let contract_date = match self.interpolation() {
-                SeriesInterpolation::Linear => date,
-                SeriesInterpolation::Step => date
-                    .replace_day(1)
-                    .map_err(|_| crate::InputError::InvalidDateRange)?,
-            };
-            return self.ref_cpi_months_lag(contract_date, months.into());
-        }
-        let effective_date = self.apply_lag(date)?;
+        let effective_date = match self.lag {
+            InflationLag::Months(months) => {
+                let contract_date = match self.interpolation() {
+                    SeriesInterpolation::Linear => date,
+                    SeriesInterpolation::Step => date
+                        .replace_day(1)
+                        .map_err(|_| crate::InputError::InvalidDateRange)?,
+                };
+                return self.ref_cpi_months_lag(contract_date, months.into());
+            }
+            InflationLag::None => date,
+            InflationLag::Days(days) => date
+                .checked_sub(time::Duration::days(days as i64))
+                .ok_or(Error::Input(crate::InputError::InvalidDateRange))?,
+        };
         let base_value = self.series.value_on(effective_date)?;
         let adjusted_value = self.apply_seasonality(base_value, effective_date)?;
 
@@ -620,19 +625,6 @@ impl InflationIndex {
     /// Monthly seasonality factors (January through December), if configured.
     pub fn seasonality(&self) -> Option<&[f64; 12]> {
         self.seasonality.as_ref()
-    }
-
-    fn apply_lag(&self, date: Date) -> Result<Date> {
-        match self.lag {
-            InflationLag::None => Ok(date),
-            InflationLag::Days(days) => date
-                .checked_sub(time::Duration::days(days as i64))
-                .ok_or(Error::Input(crate::InputError::InvalidDateRange)),
-            InflationLag::Months(months) => {
-                // Proper month arithmetic using shared helper
-                date.add_months(-(months as i32))
-            }
-        }
     }
 
     fn apply_seasonality(&self, base_value: f64, date: Date) -> Result<f64> {
