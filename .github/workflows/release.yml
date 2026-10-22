@@ -3,10 +3,10 @@ name: Release
 # Pushing a vX.Y.Z tag cuts a numbered release; pushing vX.Y.Z-rc.N cuts a
 # release candidate for QA/UAT:
 #
-#   1. Gates: the tag matches the version metadata, the standard check set
-#      (checks.yml), every commit is on master (upstream first),
-#      documentation and every doc example, the slow Rust and Python suites,
-#      crate publish checks, and semver against the previous release tag.
+#   1. Gates: the tag matches the version metadata, the fast and full check
+#      tiers (checks.yml, full-checks.yml), every commit is on master
+#      (upstream first), crate publish checks, and semver against the previous
+#      release tag.
 #   2. Artifacts, only after every gate passes: wheels, sdist, WASM packages
 #      (build-artifacts.yml), stamped with the tag's version.
 #   3. Publish, only after every artifact builds: a GitHub Release carrying the
@@ -92,6 +92,12 @@ jobs:
     needs: version
     uses: ./.github/workflows/checks.yml
 
+  full-checks:
+    name: Full checks
+    needs: version
+    uses: ./.github/workflows/full-checks.yml
+    secrets: inherit
+
   # Upstream first: the tagged commit carries nothing master lacks. A tag on
   # master passes trivially; a tag on release/X.Y passes when every commit
   # since the branch point is a backport of a master change.
@@ -108,152 +114,6 @@ jobs:
 
       - name: Require every commit to be on master
         run: python3 scripts/check_release_upstream.py check origin/master "$GITHUB_SHA"
-
-  # Release-only jobs build cold: nothing on master saves a cache for them, and
-  # caches saved on a tag are visible only to that tag.
-  docs:
-    name: Documentation
-    needs: version
-    runs-on: ubuntu-24.04
-    # Rustdoc and the Rust doctests, then the Python extension and the WASM web
-    # package for their doc examples, all cold.
-    timeout-minutes: 150
-
-    env:
-      CARGO_BUILD_JOBS: 4
-      CARGO_INCREMENTAL: 0
-      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
-      # Must include the getrandom cfg: this env replaces crate `.cargo/config.toml`
-      # rustflags rather than appending. `debuginfo=0` avoids the rust-lld
-      # SIGBUS on huge wasm-bindgen describe-export lists (LLVM #195482).
-      CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: "--cfg getrandom_backend=\"wasm_js\" -C debuginfo=0"
-      PYO3_PYTHON: python3
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up swap space
-        uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
-        with:
-          swap-size-gb: 10
-
-      - name: Provision toolchain (mise)
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
-        with:
-          cache: true
-          cache_save: false
-        env:
-          # rustup download cache is not concurrency-safe under parallel cargo:*.
-          MISE_JOBS: "1"
-
-      # cargo-public-api (scripts/check_public_api_input_docs.py) needs nightly
-      # rustdoc JSON. mise.toml provisions nightly; this step makes the job
-      # self-sufficient when the shared mise cache was primed without it.
-      - name: Ensure nightly for rustdoc JSON
-        run: rustup toolchain install nightly --profile minimal
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-
-      - name: Set up Python environment
-        run: |
-          uv venv --python 3.14
-          echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
-          uv sync --locked --no-build --no-install-project
-
-      - name: Install WASM dependencies
-        run: npm ci --ignore-scripts
-        working-directory: finstack-quant-wasm
-
-      # Strict rustdoc, the public-API input-doc and deprecation contracts, the
-      # Python and WASM IntelliSense contracts, and the benchmark documents.
-      - name: Check documentation
-        run: mise run all-doc
-
-      - name: Run Rust doctests
-        run: mise run rust-test --doctest
-
-      - name: Run Python stub and module doctests
-        run: mise run python-test --doctest
-
-      - name: Run WASM documented code samples
-        run: mise run wasm-test --doctest
-
-  slow-rust:
-    name: Test ignored Rust suite
-    needs: version
-    runs-on: ubuntu-24.04
-    timeout-minutes: 180
-
-    env:
-      CARGO_BUILD_JOBS: 4
-      CARGO_INCREMENTAL: 0
-      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up swap space
-        uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
-        with:
-          swap-size-gb: 10
-
-      - name: Provision toolchain (mise)
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
-        with:
-          cache: true
-          cache_save: false
-        env:
-          # rustup download cache is not concurrency-safe under parallel cargo:*.
-          MISE_JOBS: "1"
-
-      - name: Run ignored and slow Rust tests
-        run: mise run rust-test --slow
-
-  slow-python:
-    name: Test slow Python suite
-    needs: version
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-
-    env:
-      CARGO_BUILD_JOBS: 4
-      CARGO_INCREMENTAL: 0
-      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
-      PYO3_PYTHON: python3
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up swap space
-        uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
-        with:
-          swap-size-gb: 10
-
-      - name: Provision toolchain (mise)
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
-        with:
-          cache: true
-          cache_save: false
-        env:
-          # rustup download cache is not concurrency-safe under parallel cargo:*.
-          MISE_JOBS: "1"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-
-      - name: Set up Python environment
-        run: |
-          uv venv --python 3.14
-          echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
-          uv sync --locked --no-build --no-install-project
-
-      # Golden pricing comparisons and Monte Carlo.
-      - name: Build extension and run slow Python tests
-        run: mise run python-test --slow
 
   publish-checks:
     name: Rust Publish Checks
@@ -332,7 +192,7 @@ jobs:
   # ── Artifacts ───────────────────────────────────────────────────
   build:
     name: Build
-    needs: [version, checks, upstream, docs, slow-rust, slow-python, publish-checks, semver]
+    needs: [version, checks, full-checks, upstream, publish-checks, semver]
     uses: ./.github/workflows/build-artifacts.yml
     with:
       version: ${{ needs.version.outputs.version }}
