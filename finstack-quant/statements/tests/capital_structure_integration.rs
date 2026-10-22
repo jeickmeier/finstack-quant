@@ -12,8 +12,8 @@ use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{fixed_income::bond::Bond, PayReceive};
 use time::Month;
 
-use crate::dsl_all::rates_support;
-use crate::dsl_all::support;
+use crate::rates_support;
+use crate::support;
 
 use rates_support::usd_irs_swap;
 
