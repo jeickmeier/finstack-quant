@@ -1298,11 +1298,8 @@ public = [
 [crates.statements.module_symbols.schema]
 python_package = "finstack_quant.statements.schema"
 public = [
-    "financial_model_spec_schema",
     "get",
     "index",
-    "normalization_config_schema",
-    "statement_result_schema",
     "validate",
 ]
 

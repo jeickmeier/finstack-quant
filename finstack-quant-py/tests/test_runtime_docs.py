@@ -128,7 +128,7 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
     "finstack_quant.models.factor.schema": _SCHEMA_REGISTRY,
     "finstack_quant.portfolio.schema": _SCHEMA_REGISTRY,
     "finstack_quant.scenarios.schema": _SCHEMA_REGISTRY,
-    "finstack_quant.statements.schema": _SCHEMA_REGISTRY,
+    "finstack_quant.statements.schema": None,
 }
 
 if os.environ.get("RUNTIME_DOCS_MODULE"):

@@ -1,7 +1,7 @@
 /**
  * Facade tests for the `*.schema` namespaces bound by parity slice PX1: the
  * per-crate `index` / `get` / `validate` registries, the whole-workspace
- * `schema` namespace, the named schema accessors and the instrument validators.
+ * `schema` namespace, the cashflow resources and the instrument validators.
  *
  * Expected values come from `schema_parity.golden.json`, which
  * `finstack-quant-py/tests/test_schema_wasm_parity.py` generates and asserts
@@ -27,8 +27,6 @@ const golden = JSON.parse(
 /** The `schema` namespace at a facade path (`""` is the workspace registry). */
 const schemaAt = (path) =>
   path.split('.').reduce((node, key) => (key ? node[key] : node), facade).schema;
-
-const camel = (name) => name.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 
 const summary = (document) => ({
   id: document.$id ?? null,
@@ -103,15 +101,6 @@ test('schema.domains lists the domains of the workspace index', () => {
   assert.deepEqual(facade.schema.domains(), golden.domains);
   const domains = new Set(facade.schema.index().artifacts.map((row) => row.domain));
   assert.deepEqual([...domains].sort(), golden.domains);
-});
-
-test('named schema accessors return the Python documents', () => {
-  for (const [path, accessors] of Object.entries(golden.named)) {
-    const schema = schemaAt(path);
-    for (const [name, expected] of Object.entries(accessors)) {
-      assert.deepEqual(summary(schema[camel(name)]()), expected, `${path}.schema.${name}`);
-    }
-  }
 });
 
 test('cashflows.schema.resources maps every schema id to its document', () => {

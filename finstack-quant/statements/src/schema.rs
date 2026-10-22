@@ -1,6 +1,4 @@
-//! Embedded JSON Schemas owned by the statements crate.
-
-use std::sync::OnceLock;
+//! Canonical JSON Schema registry owned by the statements crate.
 
 use serde_json::Value;
 
@@ -9,67 +7,9 @@ use crate::checks::CheckSuiteSpec;
 use crate::evaluator::{MonteCarloConfig, MonteCarloResults, RollupSpec, StatementResult};
 use crate::registry::MetricRegistry;
 use crate::types::FinancialModelSpec;
-use crate::{Error, Result};
 
 /// Stable base URI for statements-owned schemas.
 pub const STATEMENTS_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/statements/1/";
-
-fn parse_schema(
-    cache: &'static OnceLock<std::result::Result<Value, String>>,
-    raw: &'static str,
-    filename: &'static str,
-) -> Result<&'static Value> {
-    cache
-        .get_or_init(|| {
-            serde_json::from_str(raw)
-                .map_err(|error| format!("invalid statements schema JSON at {filename}: {error}"))
-        })
-        .as_ref()
-        .map_err(|error| Error::Serde(error.clone()))
-}
-
-/// Return the checked-in schema for [`crate::types::FinancialModelSpec`].
-///
-/// # Errors
-///
-/// Returns [`Error::Serde`] if the embedded schema JSON is malformed.
-pub fn financial_model_spec_schema() -> Result<&'static Value> {
-    static SCHEMA: OnceLock<std::result::Result<Value, String>> = OnceLock::new();
-    parse_schema(
-        &SCHEMA,
-        include_str!("../schemas/statements/1/financial_model_spec.schema.json"),
-        "financial_model_spec.schema.json",
-    )
-}
-
-/// Return the checked-in schema for [`crate::evaluator::StatementResult`].
-///
-/// # Errors
-///
-/// Returns [`Error::Serde`] if the embedded schema JSON is malformed.
-pub fn statement_result_schema() -> Result<&'static Value> {
-    static SCHEMA: OnceLock<std::result::Result<Value, String>> = OnceLock::new();
-    parse_schema(
-        &SCHEMA,
-        include_str!("../schemas/statements/1/statement_result.schema.json"),
-        "statement_result.schema.json",
-    )
-}
-
-/// Return the checked-in schema for
-/// [`crate::adjustments::NormalizationConfig`].
-///
-/// # Errors
-///
-/// Returns [`Error::Serde`] if the embedded schema JSON is malformed.
-pub fn normalization_config_schema() -> Result<&'static Value> {
-    static SCHEMA: OnceLock<std::result::Result<Value, String>> = OnceLock::new();
-    parse_schema(
-        &SCHEMA,
-        include_str!("../schemas/statements/1/normalization_config.schema.json"),
-        "normalization_config.schema.json",
-    )
-}
 
 /// A canonical two-period model with one value node and one formula node.
 ///
