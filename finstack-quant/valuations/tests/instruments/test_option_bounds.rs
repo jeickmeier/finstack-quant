@@ -11,7 +11,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{VolGridOpts, VolSurface};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
@@ -58,6 +58,8 @@ fn create_option_market(
         &[0.25, 0.5, 1.0, 2.0],
         &[50.0, 75.0, 100.0, 125.0, 150.0],
         &[vol; 20], // 4 expiries × 5 strikes
+        VolGridOpts::default(),
+        None,
     )
     .unwrap();
 
