@@ -16,7 +16,7 @@ use tracing::warn;
 use crate::builder::overnight::overnight_day_count_basis;
 use crate::builder::overnight::{OvernightObservationSchedule, OvernightRateConstraints};
 use crate::builder::rate_helpers::{
-    apply_bp_bounds, calculate_floating_rate, observed_term_fixing, project_index_rate,
+    apply_bp_bounds, calculate_floating_rate, observed_index_fixing, project_index_rate,
     project_overnight_rate,
 };
 use crate::builder::{
@@ -96,13 +96,8 @@ fn observed_overnight_rate(
     forward_curve_id: &str,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
-    if obs_date < as_of {
-        return require_fixing_value_exact(fixings, forward_curve_id, obs_date, as_of);
-    }
-    if obs_date == as_of {
-        if let Some(fixing) = fixings.and_then(|series| series.value_on_exact(obs_date).ok()) {
-            return Ok(fixing);
-        }
+    if let Some(fixing) = observed_index_fixing(obs_date, fixings, forward_curve_id, as_of)? {
+        return Ok(fixing);
     }
     project_overnight_rate(fwd, obs_date, day_count_basis)
 }
@@ -370,7 +365,7 @@ fn project_segment_indices(
     match observation {
         FloatingRateObservation::Term { reset_date, .. } => {
             let index_rate = if let Some(fixing) =
-                observed_term_fixing(*reset_date, fixings, forward_curve_id, as_of)?
+                observed_index_fixing(*reset_date, fixings, forward_curve_id, as_of)?
             {
                 fixing
             } else {
@@ -771,6 +766,35 @@ mod tests {
     use crate::builder::FloatingLegCompounding;
     use finstack_quant_core::dates::{calendar_by_id_strict, DayCount};
     use time::Month;
+
+    #[test]
+    fn overnight_fixing_policy_uses_valuation_cutoff_not_curve_base() {
+        let base = Date::from_calendar_date(2025, Month::January, 2).expect("base");
+        let past = Date::from_calendar_date(2025, Month::January, 3).expect("past");
+        let as_of = Date::from_calendar_date(2025, Month::January, 6).expect("valuation");
+        let future = Date::from_calendar_date(2025, Month::January, 7).expect("future");
+        let curve = ForwardCurve::builder("TEST-ON", 1.0 / 360.0)
+            .base_date(base)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 0.04), (1.0, 0.04)])
+            .build()
+            .expect("curve");
+        let complete = ScalarTimeSeries::new(
+            "FIXING:TEST-ON",
+            vec![(past, 0.051), (as_of, 0.052), (future, 0.99)],
+            None,
+        )
+        .expect("series");
+        for (date, expected) in [(past, 0.051), (as_of, 0.052), (future, 0.04)] {
+            let actual =
+                observed_overnight_rate(date, 360.0, &curve, Some(&complete), "TEST-ON", as_of)
+                    .expect("realized or projected rate");
+            assert!((actual - expected).abs() < 1e-12);
+        }
+        let unpublished = observed_overnight_rate(as_of, 360.0, &curve, None, "TEST-ON", as_of)
+            .expect("unpublished valuation-day fixing projects");
+        assert!((unpublished - 0.04).abs() < 1e-12);
+    }
 
     #[test]
     fn overnight_history_diagnostics_use_valuation_date_after_curve_base() {

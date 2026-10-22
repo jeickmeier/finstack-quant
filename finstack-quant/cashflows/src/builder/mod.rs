@@ -73,7 +73,7 @@ pub use periods::{
     SchedulePeriod,
 };
 pub use rate_helpers::{
-    apply_bp_bounds, calculate_floating_rate, observed_term_fixing, project_floating_rate,
+    apply_bp_bounds, calculate_floating_rate, observed_index_fixing, project_floating_rate,
     project_index_rate, project_overnight_rate, FloatingRateParams,
 };
 pub use schedule::{

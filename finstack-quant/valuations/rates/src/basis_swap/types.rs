@@ -452,7 +452,7 @@ impl BasisSwap {
                 fixing_calendar,
             )?;
             let index_rate = if let Some(fixing) =
-                finstack_quant_cashflows::builder::observed_term_fixing(
+                finstack_quant_cashflows::builder::observed_index_fixing(
                     reset_date,
                     fixings,
                     leg.forward_curve_id.as_str(),
