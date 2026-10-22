@@ -81,44 +81,6 @@ factories!(JsEquityOption, "EquityOption", finstack_quant_valuations::instrument
         example as example,
 });
 
-greek_methods!(JsEquityOption, "EquityOption", {
-        /// Spot delta of the option under the selected model.
-        /// @param market_json - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
-        /// @param as_of - ISO-8601 valuation date.
-        /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-        /// @returns Spot delta produced by the selected model.
-        /// @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
-        delta as delta => "delta",
-        /// Gamma of the option under the selected model.
-        /// @param market_json - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
-        /// @param as_of - ISO-8601 valuation date.
-        /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-        /// @returns Gamma produced by the selected model.
-        /// @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
-        gamma as gamma => "gamma",
-        /// Vega (per 1% vol) of the option under the selected model.
-        /// @param market_json - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
-        /// @param as_of - ISO-8601 valuation date.
-        /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-        /// @returns Vega (per 1% vol) produced by the selected model.
-        /// @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
-        vega as vega => "vega",
-        /// Theta (per day on `metric_pricing_overrides.theta_day_basis`, calendar days by default) of the option under the selected model.
-        /// @param market_json - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
-        /// @param as_of - ISO-8601 valuation date.
-        /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-        /// @returns Theta (per day on `metric_pricing_overrides.theta_day_basis`, calendar days by default) produced by the selected model.
-        /// @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
-        theta as theta => "theta",
-        /// Rho of the option under the selected model.
-        /// @param market_json - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
-        /// @param as_of - ISO-8601 valuation date.
-        /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-        /// @returns Rho produced by the selected model.
-        /// @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
-        rho as rho => "rho",
-});
-
 builder_class!(
     /// Fluent builder for `EquityOption`; one setter per Rust `FinancialBuilder` setter.
     ///

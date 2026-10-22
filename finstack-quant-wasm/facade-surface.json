@@ -5100,19 +5100,14 @@
     "constructor": false,
     "statics": ["builder", "european", "example", "fromJson"],
     "methods": [
-      "delta",
       "free",
-      "gamma",
       "greeks",
       "impliedVol",
       "marketDependencies",
       "metric",
       "price",
-      "rho",
-      "theta",
       "toDict",
-      "toJson",
-      "vega"
+      "toJson"
     ],
     "getters": [
       "attributes",
@@ -5271,22 +5266,14 @@
     "constructor": false,
     "statics": ["builder", "european", "example", "fromJson"],
     "methods": [
-      "delta",
-      "foreignRho",
       "free",
-      "gamma",
       "greeks",
       "impliedVol",
       "marketDependencies",
       "metric",
       "price",
-      "rho",
-      "theta",
       "toDict",
-      "toJson",
-      "vanna",
-      "vega",
-      "volga"
+      "toJson"
     ],
     "getters": [
       "attributes",

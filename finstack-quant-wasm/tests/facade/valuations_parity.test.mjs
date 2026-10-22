@@ -346,7 +346,7 @@ test('equity option and convertible analytics match Python', () => {
   const price = Number(option.price(equity.market, '2024-01-15').value.amount);
   close(price, equity.price, TIGHT, 'price');
   same(plain(option.greeks(equity.market, '2024-01-15')), equity.greeks, 'greeks', LOOSE);
-  close(option.delta(equity.market, '2024-01-15'), equity.delta, LOOSE, 'delta');
+  close(option.metric(equity.market, '2024-01-15', 'delta'), equity.delta, LOOSE, 'delta');
   close(
     option.impliedVol(equity.market, '2024-01-15', equity.price),
     equity.implied_vol,

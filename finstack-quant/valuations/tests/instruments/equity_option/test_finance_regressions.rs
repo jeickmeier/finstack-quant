@@ -28,7 +28,13 @@ fn cash_dividend_theta_matches_smooth_calendar_repricing() {
                 };
                 option.discrete_dividends = dividends;
                 let market = build_standard_market(as_of, 100.0, 0.25, rate, 0.0);
-                let actual = option.theta(&market, as_of).unwrap();
+                let actual = crate::metrics::common::direct_equity_greek(
+                    &option,
+                    &market,
+                    as_of,
+                    finstack_quant_valuations::instruments::OptionGreekKind::Theta,
+                )
+                .unwrap();
                 let dividend_pv: f64 = option
                     .discrete_dividends
                     .iter()
@@ -83,8 +89,20 @@ fn cash_dividend_theta_on_ex_date_uses_the_post_dividend_state() {
     // The ex-date cash payment and spot jump are already reflected in the
     // observed spot. Smooth forward theta must not count the cashflow again.
     assert_eq!(
-        option.theta(&market, ex_date).unwrap(),
-        no_dividends.theta(&market, ex_date).unwrap()
+        crate::metrics::common::direct_equity_greek(
+            &option,
+            &market,
+            ex_date,
+            finstack_quant_valuations::instruments::OptionGreekKind::Theta
+        )
+        .unwrap(),
+        crate::metrics::common::direct_equity_greek(
+            &no_dividends,
+            &market,
+            ex_date,
+            finstack_quant_valuations::instruments::OptionGreekKind::Theta
+        )
+        .unwrap()
     );
     let tomorrow = ex_date + Duration::days(1);
     let next_pv = option
@@ -95,7 +113,13 @@ fn cash_dividend_theta_on_ex_date_uses_the_post_dividend_state() {
         .unwrap()
         .amount();
     let pv = option.value(&market, ex_date).unwrap().amount();
-    let theta = option.theta(&market, ex_date).unwrap();
+    let theta = crate::metrics::common::direct_equity_greek(
+        &option,
+        &market,
+        ex_date,
+        finstack_quant_valuations::instruments::OptionGreekKind::Theta,
+    )
+    .unwrap();
     assert!((next_pv - pv - theta).abs() < 0.005);
 }
 
@@ -211,15 +235,50 @@ fn pending_cash_exercise_keeps_rate_risk_and_accretion() {
     let market = build_standard_market(as_of, 100.0, 0.25, 0.05, 0.0);
     let pv = option.value(&market, as_of).unwrap().amount();
     let tau = 31.0 / 365.0;
-    assert!((option.rho(&market, as_of).unwrap() + tau * pv * 1e-4).abs() < 1e-10);
     assert!(
-        (option.theta(&market, as_of).unwrap()
+        (crate::metrics::common::direct_equity_greek(
+            &option,
+            &market,
+            as_of,
+            finstack_quant_valuations::instruments::OptionGreekKind::Rho
+        )
+        .unwrap()
+            + tau * pv * 1e-4)
+            .abs()
+            < 1e-10
+    );
+    assert!(
+        (crate::metrics::common::direct_equity_greek(
+            &option,
+            &market,
+            as_of,
+            finstack_quant_valuations::instruments::OptionGreekKind::Theta
+        )
+        .unwrap()
             - 0.05 * pv / option.metric_pricing_overrides.theta_days_per_year())
         .abs()
             < 1e-10
     );
-    assert_eq!(option.delta(&market, as_of).unwrap(), 0.0);
-    assert_eq!(option.rho(&market, pay + Duration::days(1)).unwrap(), 0.0);
+    assert_eq!(
+        crate::metrics::common::direct_equity_greek(
+            &option,
+            &market,
+            as_of,
+            finstack_quant_valuations::instruments::OptionGreekKind::Delta
+        )
+        .unwrap(),
+        0.0
+    );
+    assert_eq!(
+        crate::metrics::common::direct_equity_greek(
+            &option,
+            &market,
+            pay + Duration::days(1),
+            finstack_quant_valuations::instruments::OptionGreekKind::Rho
+        )
+        .unwrap(),
+        0.0
+    );
 }
 
 #[test]
@@ -234,7 +293,21 @@ fn tree_theta_rolls_expiry_dividends_and_bermudan_dates() {
         if style == ExerciseStyle::Bermudan {
             option.exercise_dates = Some(vec![as_of + Duration::days(1), expiry]);
         }
-        assert!(option.theta(&market, as_of).unwrap().is_finite());
-        assert!(option.delta(&market, as_of).unwrap().is_finite());
+        assert!(crate::metrics::common::direct_equity_greek(
+            &option,
+            &market,
+            as_of,
+            finstack_quant_valuations::instruments::OptionGreekKind::Theta
+        )
+        .unwrap()
+        .is_finite());
+        assert!(crate::metrics::common::direct_equity_greek(
+            &option,
+            &market,
+            as_of,
+            finstack_quant_valuations::instruments::OptionGreekKind::Delta
+        )
+        .unwrap()
+        .is_finite());
     }
 }

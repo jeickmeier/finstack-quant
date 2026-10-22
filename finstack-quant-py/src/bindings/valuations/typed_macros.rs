@@ -103,45 +103,6 @@ macro_rules! instrument_pricing_methods {
 }
 pub(crate) use instrument_pricing_methods;
 
-/// Stamp fixed-metric Greek methods on a typed option wrapper.
-///
-/// `instrument_greek_methods!(PyType("Name") { delta, gamma, ... })` expands
-/// each entry to `name(market, as_of, model="default") -> float`, which prices
-/// the wrapped instrument and returns the metric whose id is `stringify!(name)`
-/// (the same call as ``metric(market, as_of, "name", model)``). Each method's
-/// docstring is the stub's `Name.<greek>`.
-macro_rules! instrument_greek_methods {
-    ($ty:ident($name:literal) { $( $greek:ident ),+ $(,)? }) => {
-        #[pymethods]
-        impl $ty {
-            $(
-                #[doc = $crate::bindings::pydoc::pydoc!(
-                    "finstack_quant.valuations.instruments",
-                    concat!($name, ".", stringify!($greek))
-                )]
-                #[pyo3(signature = (market, as_of, model="default"))]
-                fn $greek(
-                    &self,
-                    py: Python<'_>,
-                    market: &Bound<'_, PyAny>,
-                    as_of: &Bound<'_, PyAny>,
-                    model: &str,
-                ) -> PyResult<f64> {
-                    $crate::bindings::valuations::pricing::metric_typed(
-                        py,
-                        Box::new(self.inner.clone()),
-                        market,
-                        as_of,
-                        stringify!($greek),
-                        model,
-                    )
-                }
-            )+
-        }
-    };
-}
-pub(crate) use instrument_greek_methods;
-
 /// Stamp the envelope and builder surface of a typed instrument wrapper.
 ///
 /// On the instrument wrapper `$ty`: `builder`, `__reduce__`, `from_json`,

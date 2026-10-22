@@ -25,9 +25,7 @@ use super::convert::{
     money_repr, money_to_py, opt_repr,
 };
 use super::pricing::typed_option_greeks;
-use super::typed_macros::{
-    builder_set, instrument_envelope_methods, instrument_greek_methods, instrument_pricing_methods,
-};
+use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
 
 use finstack_quant_valuations::instruments::fx::fx_forward::FxForwardBuilder;
 use finstack_quant_valuations::instruments::fx::fx_option::FxOptionBuilder;
@@ -956,8 +954,6 @@ crate::bindings::macros::py_getters!(PyFxOption |s| {
     /// FX volatility surface identifier.
     vol_surface_id -> String = s.inner.vol_surface_id.to_string();
 });
-
-instrument_greek_methods!(PyFxOption("FxOption") { delta, gamma, vega, theta, rho, foreign_rho, vanna, volga });
 
 /// Fluent builder for ``FxOption``; wraps the Rust
 /// ``FinancialBuilder``-generated builder (consuming setters).

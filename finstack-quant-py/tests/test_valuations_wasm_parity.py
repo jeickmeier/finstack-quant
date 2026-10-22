@@ -193,7 +193,7 @@ def build_cases() -> dict[str, Any]:
         "market": equity_market.to_json(),
         "price": option_price,
         "greeks": option.greeks(equity_market, "2024-01-15"),
-        "delta": option.delta(equity_market, "2024-01-15"),
+        "delta": option.metric(equity_market, "2024-01-15", "delta"),
         "implied_vol": option.implied_vol(equity_market, "2024-01-15", option_price),
         "european": european.to_json(),
     }

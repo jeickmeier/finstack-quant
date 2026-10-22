@@ -17,9 +17,7 @@ use super::convert::{
     attributes_from_py, bool_repr, date_repr, day_count_from_py, enum_to_py_string, float_repr,
 };
 use super::pricing::typed_option_greeks;
-use super::typed_macros::{
-    builder_set, instrument_envelope_methods, instrument_greek_methods, instrument_pricing_methods,
-};
+use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
 
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOptionBuilder;
 
@@ -340,8 +338,6 @@ crate::bindings::macros::py_getters!(PyEquityOption |s| {
     /// Continuous dividend yield identifier, or ``None``.
     div_yield_id -> Option<String> = s.inner.div_yield_id.as_ref().map(|id| id.to_string());
 });
-
-instrument_greek_methods!(PyEquityOption("EquityOption") { delta, gamma, vega, theta, rho });
 
 /// Fluent builder for ``EquityOption``; wraps the Rust
 /// ``FinancialBuilder``-generated builder (consuming setters).
