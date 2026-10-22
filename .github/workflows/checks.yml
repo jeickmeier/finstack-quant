@@ -78,14 +78,13 @@ jobs:
         run: mise run all-audit
 
   # ============================================
-  # Lint — pre-commit checks and generated-artifact drift
+  # Lint — pre-commit checks
   # ============================================
   lint:
     name: Lint
     runs-on: ubuntu-24.04
-    # Clippy + gen-check are cargo-heavy; keep headroom above the ~50m wall
-    # that cancelled a green run during post-step cleanup.
-    timeout-minutes: 90
+    # Clippy is cargo-heavy; a cold rust-cache needs far more than a warm run.
+    timeout-minutes: 30
     needs: prime-cache
 
     env:
@@ -129,7 +128,7 @@ jobs:
           # master's cache.
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
-      # Test Python is the single writer of the uv cache; both jobs sync the
+      # Test Python is the single writer of the uv cache; every job syncs the
       # same uv.lock, so they share one key and concurrent saves would race.
       - name: Install uv
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
@@ -142,10 +141,6 @@ jobs:
       - name: Install WASM dependencies
         run: npm ci --ignore-scripts
         working-directory: finstack-quant-wasm
-
-      # gen-check runs the registry generator in --check mode.
-      - name: Install component registry dependencies
-        run: mise run ui-sync
 
       - name: Set up Python environment
         run: |
@@ -166,6 +161,65 @@ jobs:
         env:
           SKIP: cargo-deny,osv-scanner
         run: mise run pre-commit-run
+
+  # ============================================
+  # Generated artifacts — schema, binding and registry drift
+  # ============================================
+  gen-check:
+    name: Generated artifacts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: prime-cache
+
+    env:
+      CARGO_BUILD_JOBS: 4
+      CARGO_INCREMENTAL: 0
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up swap space
+        uses: pierotofy/set-swap-space@fc79b3f67fa8a838184ce84a674ca12238d2c761 # v1.0 line, master @ 2025-05-08
+        with:
+          swap-size-gb: 10
+
+      - name: Provision toolchain (mise)
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        with:
+          cache: true
+          cache_save: false
+
+      # Keeps the image's Rust out of the rust-cache key (see Lint).
+      - name: Remove the runner image's Rust toolchain
+        run: rustup toolchain uninstall stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          shared-key: gen-check
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          save-cache: false
+
+      # The contract-type generator runs under finstack-quant-wasm.
+      - name: Install WASM dependencies
+        run: npm ci --ignore-scripts
+        working-directory: finstack-quant-wasm
+
+      # gen-check runs the registry generator in --check mode.
+      - name: Install component registry dependencies
+        run: mise run ui-sync
+
+      - name: Set up Python environment
+        run: |
+          uv venv --python 3.14
+          echo "${{ github.workspace }}/.venv/bin" >> $GITHUB_PATH
+          uv sync --locked --no-build --no-install-project
 
       - name: Check generated schemas and bindings
         run: mise run gen-check
