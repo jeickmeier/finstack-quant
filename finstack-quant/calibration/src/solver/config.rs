@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn solver_config_validate_rejects_unusable_settings() {
         assert!(SolverConfig::default().validate().is_ok());
-        for tolerance in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+        for tolerance in [0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             let error = SolverConfig::default()
                 .with_tolerance(tolerance)
                 .validate()
@@ -202,24 +202,5 @@ mod tests {
         let json = serde_json::to_string(&config).expect("serialize");
         let deserialized: SolverConfig = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(config, deserialized);
-    }
-
-    #[test]
-    fn solver_config_rejects_invalid_stopping_settings() {
-        for tolerance in [0.0, -1e-8, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-            assert!(SolverConfig::default()
-                .with_tolerance(tolerance)
-                .validate()
-                .expect_err("invalid tolerance")
-                .to_string()
-                .contains("tolerance"));
-        }
-        assert!(SolverConfig::default()
-            .with_max_iterations(0)
-            .validate()
-            .expect_err("zero iteration budget")
-            .to_string()
-            .contains("max_iterations"));
-        SolverConfig::default().validate().expect("valid defaults");
     }
 }
