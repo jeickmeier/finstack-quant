@@ -15,7 +15,8 @@ use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricing
 use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::SettlementType;
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::{MetricContext, MetricId};
+use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations_test_support::commodity_curves::flat_price_curve;
 use finstack_quant_valuations_test_support::date::date;
 use finstack_quant_valuations_test_support::discount_forward_curves::flat_discount_with_tenor;
@@ -70,7 +71,7 @@ fn test_commodity_spot_option_core_greeks_registered() -> finstack_quant_core::R
         pv,
         MetricContext::default_config(),
     );
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let res = registry.compute(
         &[MetricId::Gamma, MetricId::Vanna, MetricId::Volga],
         &mut ctx,
@@ -99,7 +100,8 @@ fn commodity_spot_option_volga_is_per_vol_point_squared() -> finstack_quant_core
         pv,
         MetricContext::default_config(),
     );
-    let actual = *standard_registry()
+    let actual = *finstack_quant_valuations::pricer::STANDARD
+        .metrics()
         .compute(&[MetricId::Volga], &mut ctx)?
         .get(&MetricId::Volga)
         .expect("volga");
@@ -185,7 +187,7 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_quant_
         pv,
         MetricContext::default_config(),
     );
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let res = registry.compute(&[MetricId::Gamma, MetricId::Vanna], &mut ctx)?;
 
     let gamma = *res.get(&MetricId::Gamma).expect("gamma");
@@ -348,7 +350,7 @@ fn atm_commodity_spot_option(
 /// option positive vega.
 #[test]
 fn test_commodity_spot_option_delta_and_vega_signs() -> finstack_quant_core::Result<()> {
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
 
     // Call: positive delta, positive vega.
     let (call, market, as_of) = atm_commodity_spot_option(OptionType::Call);
@@ -399,7 +401,7 @@ fn test_commodity_spot_option_delta_and_vega_signs() -> finstack_quant_core::Res
 /// with the parallel DV01.
 #[test]
 fn test_commodity_spot_option_dv01_and_bucketed_dv01() -> finstack_quant_core::Result<()> {
-    let registry = standard_registry();
+    let registry = STANDARD.metrics();
     let (call, market, as_of) = atm_commodity_spot_option(OptionType::Call);
     let pv = call.value(&market, as_of)?;
     let mut ctx = MetricContext::new(
@@ -522,7 +524,7 @@ fn commodity_spot_option_zero_vol_delta_matches_resolved_forward_payoff(
 fn resolved_delivery_greeks_are_independent_of_selected_optional_model() {
     use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOptionExercise;
     use finstack_quant_valuations::instruments::PricingOptions;
-    use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
+    use finstack_quant_valuations::pricer::ModelKey;
     let (mut option, market, as_of) = atm_commodity_spot_option(OptionType::Call);
     let delivery = as_of + time::Duration::days(10);
     option.exercise_style = ExerciseStyle::American;
@@ -546,7 +548,8 @@ fn resolved_delivery_greeks_are_independent_of_selected_optional_model() {
             0.0
         };
         for model in [ModelKey::Black76, ModelKey::MonteCarloSchwartzSmith] {
-            let result = standard_pricer_registry()
+            let result = finstack_quant_valuations::pricer::STANDARD
+                .pricers()
                 .price_with_metrics(
                     &option,
                     model,

@@ -13,6 +13,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations::pricer::*;
 use std::collections::BTreeMap;
 use std::str::FromStr;
@@ -227,7 +228,7 @@ fn test_pricing_error_from_core_error() {
 #[test]
 fn cds_adapter_preserves_missing_market_data_and_context() {
     let cds = CreditDefaultSwap::example().expect("CDS example");
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
     let key = PricerKey::new(InstrumentType::Cds, ModelKey::HazardRate);
     let pricer = registry.get_pricer(key).expect("CDS hazard pricer");
     let error = pricer
@@ -310,7 +311,7 @@ fn removed_option_discounting_aliases_return_unknown_pricer() {
     let equity_option = EquityOption::example().expect("equity option example");
     let swaption = Swaption::example().expect("example");
     let commodity_spot_option = CommoditySpotOption::example().expect("example");
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
     let market = MarketContext::new();
     let as_of = date!(2025 - 01 - 01);
 
@@ -494,7 +495,12 @@ fn standard_pricer_registry_has_exact_expected_coverage() {
         (I::AssetBackedFacility, vec![M::Discounting]),
     ]);
 
-    assert_eq!(standard_pricer_registry().all_models_grouped(), expected);
+    assert_eq!(
+        finstack_quant_valuations::pricer::STANDARD
+            .pricers()
+            .all_models_grouped(),
+        expected
+    );
 }
 
 #[test]
@@ -580,7 +586,7 @@ fn test_model_key_repr_values() {
 
 #[test]
 fn test_all_models_is_sorted_deduplicated_and_registry_derived() {
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
     let models = registry.all_models();
 
     assert!(!models.is_empty());
@@ -603,7 +609,7 @@ fn test_all_models_is_sorted_deduplicated_and_registry_derived() {
 
 #[test]
 fn test_all_models_grouped_agrees_with_available_models_for_instrument() {
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
     let grouped = registry.all_models_grouped();
     assert!(!grouped.is_empty());
 
@@ -623,7 +629,8 @@ fn test_all_models_grouped_agrees_with_available_models_for_instrument() {
 
 #[test]
 fn test_list_models_mirrors_the_standard_pricer_registry_and_is_deterministic() {
-    let expected: Vec<String> = standard_pricer_registry()
+    let expected: Vec<String> = finstack_quant_valuations::pricer::STANDARD
+        .pricers()
         .all_models()
         .into_iter()
         .map(|model| model.to_string())
@@ -663,7 +670,8 @@ fn test_list_models_grouped_covers_the_same_models_as_list_models() {
         grouped
             .get(&InstrumentType::Bond.to_string())
             .expect("bond models"),
-        &standard_pricer_registry()
+        &finstack_quant_valuations::pricer::STANDARD
+            .pricers()
             .available_models_for_instrument(InstrumentType::Bond)
             .into_iter()
             .map(|model| model.to_string())

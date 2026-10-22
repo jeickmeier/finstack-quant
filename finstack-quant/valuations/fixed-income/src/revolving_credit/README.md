@@ -417,7 +417,7 @@ Registered for `InstrumentType::RevolvingCredit` in `metrics/mod.rs`:
 | `custom("accrued_interest")` | Cash interest accrued to the settlement date, in the facility currency |
 | `custom("oid_eir_amortization")` | Total EIR amortization; stores `oid_eir_rate` and the dated amortization and carrying-value series |
 
-`Theta` is registered universally by `metrics::standard_registry()`.
+`Theta` is registered universally by `pricer::STANDARD.metrics()`.
 
 ## Bindings
 

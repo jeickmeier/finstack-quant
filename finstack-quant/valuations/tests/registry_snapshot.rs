@@ -7,16 +7,14 @@
 //! `UPDATE_REGISTRY_SNAPSHOT=1` after an intentional registration change and
 //! review the diff.
 
+use finstack_quant_valuations::pricer::STANDARD;
 use std::collections::BTreeMap;
-
-use finstack_quant_valuations::metrics::standard_registry;
-use finstack_quant_valuations::pricer::standard_pricer_registry;
 
 const SNAPSHOT: &str = include_str!("data/registry_snapshot.json");
 
 fn current_snapshot() -> String {
-    let pricers = standard_pricer_registry();
-    let metrics = standard_registry();
+    let pricers = STANDARD.pricers();
+    let metrics = STANDARD.metrics();
     let mut by_type: BTreeMap<String, serde_json::Value> = BTreeMap::new();
     for (instrument_type, models) in pricers.all_models_grouped() {
         let models: Vec<String> = models.iter().map(ToString::to_string).collect();

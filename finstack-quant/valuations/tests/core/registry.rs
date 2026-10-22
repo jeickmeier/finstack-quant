@@ -3,6 +3,7 @@
 
 use finstack_quant_core::market_data::context::MarketContext as Market;
 use finstack_quant_valuations::instruments::Instrument as Priceable;
+use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
 };
@@ -306,7 +307,7 @@ fn bond_discounting_parity_instrument_vs_registry() {
     let bond = fixed_test_bond();
     let disc = flat_discount_curve("USD-TREASURY", as_of);
     let market = MarketContext::new().insert(disc);
-    let registry = finstack_quant_valuations::pricer::standard_pricer_registry();
+    let registry = STANDARD.pricers();
 
     let trait_result = bond
         .price_with_metrics(
@@ -346,7 +347,7 @@ fn commodity_swaption_default_model_matches_registry() {
         finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption::example()
             .expect("example");
     let market = commodity_swaption_market(as_of, 3.75, 0.30, 0.05);
-    let registry = finstack_quant_valuations::pricer::standard_pricer_registry();
+    let registry = STANDARD.pricers();
 
     let instrument_result = swaption
         .price_with_metrics(
@@ -441,7 +442,7 @@ fn non_discounting_risk_only_metrics_preserve_config_metadata() {
     let market = finstack_quant_core::market_data::context::MarketContext::new()
         .insert(flat_discount_curve("USD-TREASURY", as_of))
         .insert(flat_hazard_curve("USD-CREDIT", as_of));
-    let registry = finstack_quant_valuations::pricer::standard_pricer_registry();
+    let registry = STANDARD.pricers();
 
     let mut cfg = FinstackConfig::default();
     cfg.rounding
@@ -487,7 +488,7 @@ fn structured_credit_parity_instrument_vs_registry() {
         .expect("example");
     let disc = multi_knot_discount_curve("USD-OIS", as_of);
     let market = MarketContext::new().insert(disc);
-    let registry = finstack_quant_valuations::pricer::standard_pricer_registry();
+    let registry = STANDARD.pricers();
 
     let trait_result = clo.price_with_metrics(
         &market,
@@ -585,7 +586,9 @@ fn composite_reuses_leaf_results_only_within_one_request() {
         }
     }
     let calls = Arc::new(AtomicUsize::new(0));
-    let mut registry = finstack_quant_valuations::pricer::standard_pricer_registry().clone();
+    let mut registry = finstack_quant_valuations::pricer::STANDARD
+        .pricers()
+        .clone();
     registry.replace(CountingEquity {
         calls: Arc::clone(&calls),
     });
@@ -644,7 +647,7 @@ fn fx_policy_propagates_from_curve_to_non_fx_instrument_result() {
     let bond = fixed_test_bond();
     let disc = flat_discount_curve_with_fx_policy("USD-TREASURY", as_of, "xccy_basis::USD/EUR");
     let market = MarketContext::new().insert(disc);
-    let registry = finstack_quant_valuations::pricer::standard_pricer_registry();
+    let registry = STANDARD.pricers();
 
     let result = registry
         .price_with_metrics(
@@ -749,7 +752,7 @@ fn bond_hazard_rate_registry_path_succeeds() {
         "USD-CREDIT".to_string(),
     ));
     let market = MarketContext::new().insert(disc).insert(hazard);
-    let registry = finstack_quant_valuations::pricer::standard_pricer_registry();
+    let registry = STANDARD.pricers();
 
     let result = registry
         .price_with_metrics(
@@ -797,7 +800,7 @@ fn bond_hazard_rate_instrument_override_matches_registry() {
         "USD-CREDIT".to_string(),
     ));
     let market = MarketContext::new().insert(disc).insert(hazard);
-    let registry = finstack_quant_valuations::pricer::standard_pricer_registry();
+    let registry = STANDARD.pricers();
 
     let instrument_result = bond_with_credit
         .price_with_metrics(
@@ -958,7 +961,7 @@ fn empty_metrics_does_not_alter_pv() {
     let bond = fixed_test_bond();
     let disc = flat_discount_curve("USD-TREASURY", as_of);
     let market = MarketContext::new().insert(disc);
-    let registry = finstack_quant_valuations::pricer::standard_pricer_registry();
+    let registry = STANDARD.pricers();
 
     let baseline = bond
         .value(&market, as_of)

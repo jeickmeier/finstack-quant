@@ -7,7 +7,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_models::types::ExerciseStyle;
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
-use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
+use finstack_quant_valuations::pricer::ModelKey;
 use time::{macros::date, Duration};
 
 #[test]
@@ -100,7 +100,8 @@ fn cash_dividend_theta_on_ex_date_uses_the_post_dividend_state() {
 }
 
 fn pde_price(option: &EquityOption, market: &MarketContext, as_of: Date) -> f64 {
-    standard_pricer_registry()
+    finstack_quant_valuations::pricer::STANDARD
+        .pricers()
         .price_with_metrics(
             option,
             ModelKey::PdeCrankNicolson1D,

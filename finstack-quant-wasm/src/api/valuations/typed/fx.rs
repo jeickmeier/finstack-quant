@@ -468,7 +468,7 @@ factories!(JsFxOption, "FxOption", instruments::fx::fx_option::FxOption, {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_valuations::metrics::{standard_registry, MetricId};
+    use finstack_quant_valuations::metrics::MetricId;
     use finstack_quant_valuations::pricer::{InstrumentType, STANDARD_OPTION_GREEKS};
 
     #[test]
@@ -494,7 +494,8 @@ mod tests {
             .iter()
             .map(|metric| MetricId::parse_strict(metric).expect("standard greek"))
             .collect();
-        standard_registry()
+        finstack_quant_valuations::pricer::STANDARD
+            .metrics()
             .applicable_subset(&menu, instrument_type)
             .iter()
             .map(|id| id.as_str().to_string())

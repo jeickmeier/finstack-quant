@@ -290,7 +290,8 @@ pub fn validate_instrument_json(
 
 /// List all metric IDs in the standard metric registry.
 pub fn list_standard_metrics() -> Vec<String> {
-    crate::metrics::standard_registry()
+    crate::pricer::STANDARD
+        .metrics()
         .available_metrics()
         .into_iter()
         .map(|id| id.to_string())
@@ -299,7 +300,8 @@ pub fn list_standard_metrics() -> Vec<String> {
 
 /// List all standard metrics grouped by display category.
 pub fn list_standard_metrics_grouped() -> BTreeMap<String, Vec<String>> {
-    crate::metrics::standard_registry()
+    crate::pricer::STANDARD
+        .metrics()
         .available_metrics_grouped()
         .into_iter()
         .map(|(group, metrics)| {
@@ -388,7 +390,8 @@ pub fn metric_metadata(keys: &[String]) -> finstack_quant_core::Result<Vec<Metri
 ///
 /// Deduplicated canonical model keys in ascending [`ModelKey`] order.
 pub fn list_models() -> Vec<String> {
-    crate::pricer::standard_pricer_registry()
+    crate::pricer::STANDARD
+        .pricers()
         .all_models()
         .into_iter()
         .map(|model| model.to_string())
@@ -408,7 +411,8 @@ pub fn list_models() -> Vec<String> {
 /// A map from instrument type to its ascending, deduplicated model keys, in
 /// ascending instrument-type order.
 pub fn list_models_grouped() -> BTreeMap<String, Vec<String>> {
-    crate::pricer::standard_pricer_registry()
+    crate::pricer::STANDARD
+        .pricers()
         .all_models_grouped()
         .into_iter()
         .map(|(instrument, models)| {
@@ -560,7 +564,7 @@ pub fn price_instrument(
     let metric_registry = pricing_options.metric_registry.clone();
     let metric_registry = metric_registry
         .as_deref()
-        .unwrap_or_else(|| crate::metrics::standard_registry());
+        .unwrap_or_else(|| crate::pricer::STANDARD.metrics());
     let metric_ids = metric_registry.resolve_metric_ids(metrics)?;
     let pricing_options = if let Some(json) = market_history_json {
         let history: crate::metrics::risk::MarketHistory = serde_json::from_str(json)
@@ -663,7 +667,7 @@ pub fn present_standard_option_greeks(
     // instead of letting the rejection escape as a spurious error.
     let metric_registry = match pricing_options.metric_registry.as_deref() {
         Some(registry) => registry,
-        None => crate::metrics::standard_registry(),
+        None => crate::pricer::STANDARD.metrics(),
     };
     let candidates: Vec<MetricId> = STANDARD_OPTION_GREEKS
         .iter()

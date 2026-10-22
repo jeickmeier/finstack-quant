@@ -27,9 +27,8 @@ use finstack_quant_valuations::instruments::exotics::snowball::Snowball;
 use finstack_quant_valuations::instruments::exotics::tarn::Tarn;
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions, QuantoSpec};
-use finstack_quant_valuations::pricer::{
-    standard_pricer_registry, InstrumentType, ModelKey, PricerKey,
-};
+use finstack_quant_valuations::pricer::STANDARD;
+use finstack_quant_valuations::pricer::{InstrumentType, ModelKey, PricerKey};
 use std::hint::black_box;
 use time::Month;
 
@@ -151,7 +150,7 @@ fn bench_quanto_range_accrual(c: &mut Criterion) {
     group.bench_function("analytic_12_observations", |b| {
         b.iter(|| inst.value(black_box(&market), black_box(as_of)).unwrap());
     });
-    let registry = standard_pricer_registry();
+    let registry = STANDARD.pricers();
     let pricer = registry
         .get_pricer(PricerKey::new(
             InstrumentType::RangeAccrual,

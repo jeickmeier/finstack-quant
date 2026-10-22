@@ -20,7 +20,7 @@ use finstack_quant_valuations::instruments::exotics::basket::{
 };
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+use finstack_quant_valuations::metrics::{MetricContext, MetricId};
 use std::sync::Arc;
 use time::Month;
 
@@ -762,7 +762,8 @@ fn test_constituent_count_metric() {
         MetricContext::default_config(),
     );
     // Act
-    let results = standard_registry()
+    let results = finstack_quant_valuations::pricer::STANDARD
+        .metrics()
         .compute(&[MetricId::ConstituentCount], &mut metric_context)
         .unwrap();
 
@@ -784,7 +785,8 @@ fn test_expense_ratio_metric() {
         MetricContext::default_config(),
     );
     // Act
-    let results = standard_registry()
+    let results = finstack_quant_valuations::pricer::STANDARD
+        .metrics()
         .compute(&[MetricId::ExpenseRatio], &mut metric_context)
         .unwrap();
 
@@ -1331,7 +1333,8 @@ fn production_risk_basket_weights_are_currency_per_bp() {
         metric.unit(),
         finstack_quant_valuations::metrics::MetricUnit::Currency
     );
-    standard_registry()
+    finstack_quant_valuations::pricer::STANDARD
+        .metrics()
         .compute(std::slice::from_ref(&metric), &mut context)
         .expect("weight risk");
     let rows = &context.computed_series[&metric];
@@ -1442,7 +1445,8 @@ fn weight_reallocation_preserves_partial_and_leveraged_budgets() {
             pv,
             MetricContext::default_config(),
         );
-        standard_registry()
+        finstack_quant_valuations::pricer::STANDARD
+            .metrics()
             .compute(&[MetricId::WeightRisk], &mut context)
             .unwrap();
         for (_, risk) in &context.computed_series[&MetricId::WeightRisk] {

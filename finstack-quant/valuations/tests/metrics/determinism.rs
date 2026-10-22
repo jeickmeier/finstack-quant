@@ -17,7 +17,6 @@
 
 mod tests {
     // Imports are only used when `slow` feature is enabled, so allow unused warnings
-    #[allow(unused_imports)]
     use finstack_quant_core::currency::Currency;
     #[allow(unused_imports)]
     use finstack_quant_core::dates::{Date, DayCount};
@@ -46,7 +45,9 @@ mod tests {
     #[allow(unused_imports)]
     use finstack_quant_valuations::instruments::Instrument;
     #[allow(unused_imports)]
-    use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
+    use finstack_quant_valuations::metrics::{MetricContext, MetricId};
+    #[allow(unused_imports)]
+    use finstack_quant_valuations::pricer::STANDARD;
     #[allow(unused_imports)]
     use std::sync::Arc;
     #[allow(unused_imports)]
@@ -90,7 +91,7 @@ mod tests {
         metric_id: MetricId,
         num_runs: usize,
     ) {
-        let registry = standard_registry();
+        let registry = STANDARD.metrics();
 
         let mut results = Vec::with_capacity(num_runs);
         for _ in 0..num_runs {
@@ -431,7 +432,7 @@ mod tests {
             past_fixings: vec![],
         };
 
-        let registry = standard_registry();
+        let registry = STANDARD.metrics();
 
         // Compute delta at several spot levels
         let spot_levels = [95.0, 97.0, 99.0, 100.0, 101.0, 103.0, 105.0];
