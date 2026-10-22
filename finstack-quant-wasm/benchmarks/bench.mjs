@@ -606,7 +606,7 @@ async function main() {
     pricePerf.cumulativeReturns();
   });
 
-  bench('analytics', 'drawdownSeries', 6000, () => {
+  bench('analytics', 'getDrawdownSeries', 6000, () => {
     returnPerf.getDrawdownSeries();
   });
 
@@ -810,7 +810,7 @@ async function main() {
     returnPerf.excessReturns(benchRf, 252);
   });
 
-  bench('analytics', 'drawdownSeries', 4000, () => {
+  bench('analytics', 'getDrawdownSeries', 4000, () => {
     returnPerf.getDrawdownSeries();
   });
 

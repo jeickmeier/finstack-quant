@@ -2,10 +2,9 @@
 //!
 //! Crate-internal except for [`PeriodStats`] and [`PeriodicReturn`]
 //! (re-exported at the crate root).
-//! Uses `dates::periods::PeriodId` as grouping keys and `DateExt` for
-//! date-to-period mapping.
+//! Uses core `PeriodId::from_date` for calendar and fiscal grouping keys.
 
-use finstack_quant_core::dates::{Date, DateExt, FiscalConfig, PeriodId, PeriodKind};
+use finstack_quant_core::dates::{Date, FiscalConfig, PeriodId, PeriodKind};
 use finstack_quant_core::wire::NonFiniteFields;
 
 use super::returns::comp_total;
@@ -130,20 +129,6 @@ impl PeriodStats {
     }
 }
 
-/// Map a date to its `PeriodId` for the requested frequency.
-fn date_to_period_id(
-    date: Date,
-    frequency: PeriodKind,
-    fiscal_config: Option<FiscalConfig>,
-) -> PeriodId {
-    if frequency == PeriodKind::Annual {
-        if let Some(config) = fiscal_config {
-            return PeriodId::annual(date.fiscal_year(config));
-        }
-    }
-    PeriodId::from_date(date, frequency)
-}
-
 /// Compound each contiguous calendar or fiscal bucket into a dated return.
 ///
 /// Each point carries the bucket's last observation date and uses [`comp_total`]
@@ -153,19 +138,19 @@ pub(crate) fn group_period_buckets(
     returns: &[f64],
     frequency: PeriodKind,
     fiscal_config: Option<FiscalConfig>,
-) -> Vec<PeriodicReturn> {
+) -> finstack_quant_core::Result<Vec<PeriodicReturn>> {
     let mut observations = dates.iter().copied().zip(returns.iter().copied());
     let Some((first_date, first_return)) = observations.next() else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
 
     let mut result = Vec::new();
-    let mut current_pid = date_to_period_id(first_date, frequency, fiscal_config);
+    let mut current_pid = PeriodId::from_date(first_date, frequency, fiscal_config)?;
     let mut period_returns = vec![first_return];
     let mut last_date = first_date;
 
     for (date, ret) in observations {
-        let pid = date_to_period_id(date, frequency, fiscal_config);
+        let pid = PeriodId::from_date(date, frequency, fiscal_config)?;
         if pid != current_pid {
             result.push(PeriodicReturn {
                 date: last_date,
@@ -181,7 +166,7 @@ pub(crate) fn group_period_buckets(
         date: last_date,
         value: comp_total(&period_returns),
     });
-    result
+    Ok(result)
 }
 
 pub(crate) fn period_stats_inner(returns: impl Iterator<Item = f64>) -> PeriodStats {
@@ -325,7 +310,8 @@ mod tests {
             d(2021, 2, 25),
         ];
         let rets = vec![0.01, 0.02, -0.01, 0.03];
-        let out = group_period_buckets(&dates, &rets, PeriodKind::Monthly, None);
+        let out = group_period_buckets(&dates, &rets, PeriodKind::Monthly, None)
+            .expect("representable calendar periods");
 
         assert_eq!(out.len(), 2);
         assert_eq!(out[0].date, d(2021, 1, 20));
@@ -339,7 +325,8 @@ mod tests {
 
     #[test]
     fn group_period_buckets_empty_is_empty() {
-        let out = group_period_buckets(&[], &[], PeriodKind::Monthly, None);
+        let out = group_period_buckets(&[], &[], PeriodKind::Monthly, None)
+            .expect("representable calendar periods");
         assert!(out.is_empty());
     }
 
@@ -366,7 +353,8 @@ mod tests {
     fn group_by_monthly() {
         let dates = vec![d(2025, 1, 2), d(2025, 1, 3), d(2025, 2, 3), d(2025, 2, 4)];
         let returns = vec![0.01, 0.02, -0.01, 0.03];
-        let grouped = group_period_buckets(&dates, &returns, PeriodKind::Monthly, None);
+        let grouped = group_period_buckets(&dates, &returns, PeriodKind::Monthly, None)
+            .expect("representable calendar periods");
         assert_eq!(grouped.len(), 2);
         assert_eq!(grouped[0].date, d(2025, 1, 3));
         assert_eq!(grouped[1].date, d(2025, 2, 4));
@@ -400,7 +388,8 @@ mod tests {
         let dates = vec![d(2024, 12, 30), d(2024, 12, 31), d(2025, 1, 2)];
         let returns = vec![0.01, 0.02, 0.03];
 
-        let grouped = group_period_buckets(&dates, &returns, PeriodKind::Weekly, None);
+        let grouped = group_period_buckets(&dates, &returns, PeriodKind::Weekly, None)
+            .expect("representable calendar periods");
 
         assert_eq!(
             grouped.len(),
@@ -409,5 +398,41 @@ mod tests {
         );
         assert_eq!(grouped[0].date, d(2025, 1, 2));
         assert!((grouped[0].value - (1.01 * 1.02 * 1.03 - 1.0)).abs() < 1e-12);
+    }
+}
+
+#[cfg(test)]
+mod fiscal_reconciliation {
+    use super::*;
+    use finstack_quant_core::dates::parse_iso_date;
+
+    #[test]
+    fn fiscal_buckets_reconcile_at_every_frequency() {
+        let dates = [
+            "2024-04-05",
+            "2024-04-06",
+            "2024-05-05",
+            "2024-05-06",
+            "2024-10-06",
+        ]
+        .map(|value| parse_iso_date(value).unwrap());
+        let returns = [0.01, -0.02, 0.03, 0.04, -0.01];
+        for kind in [
+            PeriodKind::Daily,
+            PeriodKind::Weekly,
+            PeriodKind::Monthly,
+            PeriodKind::Quarterly,
+            PeriodKind::SemiAnnual,
+            PeriodKind::Annual,
+        ] {
+            let grouped =
+                group_period_buckets(&dates, &returns, kind, Some(FiscalConfig::uk())).unwrap();
+            let linked: Vec<_> = grouped.iter().map(|point| point.value).collect();
+            assert!(
+                (comp_total(&linked) - comp_total(&returns)).abs() < 1e-12,
+                "{kind}"
+            );
+            assert_eq!(grouped.last().unwrap().date, *dates.last().unwrap());
+        }
     }
 }

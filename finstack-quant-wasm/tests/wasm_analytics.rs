@@ -85,7 +85,7 @@ fn build_perf() -> JsPerformance {
 #[wasm_bindgen_test]
 fn from_returns_exposes_active_dates() {
     let perf = build_perf();
-    // `dates()` is the full constructed grid; `activeDates()` matches it
+    // `getDates()` is the full constructed grid; `getActiveDates()` matches it
     // until a window is set.
     let dates = perf.get_dates();
     assert_eq!(dates.len(), fixture().dates.len());

@@ -8673,7 +8673,6 @@ declare class Performance {
   /**
    * Resolve an exact, case-sensitive ticker label.
    * @param ticker - Case-sensitive ticker label supplied when the panel was constructed.
-   * @param ticker - Exact, case-sensitive ticker label from getTickerNames().
    * @returns Zero-based column index for the loaded ticker.
    * @throws Error - Rejects a non-string value or a name absent from the panel.
    */
@@ -9011,7 +9010,7 @@ declare class Performance {
    * ```
    * @param frequency - Optional calendar frequency token: `"daily"`, `"weekly"`, `"monthly"`, `"quarterly"`, `"semi_annual"`, or `"annual"`; defaults to `"monthly"`.
    * @returns Ticker-major nested arrays of chronological Rust `PeriodicReturn` `{ date, value }` points with simple decimal returns.
-   * @throws Error - Rejects an unsupported frequency or a panel that cannot be serialized to JavaScript.
+   * @throws Error - Rejects an unsupported frequency, an unrepresentable period boundary, or a panel that cannot be serialized to JavaScript.
    */
   periodicReturns(frequency?: string): PeriodicReturn[][];
   /**
@@ -9157,9 +9156,9 @@ declare class Performance {
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
    * @param aggregationFrequency - Optional aggregation frequency token; defaults to monthly.
    * @param fiscalYearStartMonth - Optional fiscal-year start month from 1 through 12; when only the day is given the month is January.
-   * @param fiscalYearStartDay - Optional fiscal-year start day within the selected month; when only the month is given the day is the 1st.
+   * @param fiscalYearStartDay - Optional fiscal-year start day from 1 through 31, clamped to the selected month end; when only the month is given the day is the 1st.
    * @returns Period statistics object for the selected ticker at the requested frequency.
-   * @throws Error - Rejects an unsupported `aggregation_frequency`, a fiscal month outside `1..=12`, a fiscal day outside `1..=31`, an out-of-range `ticker_idx`, or period statistics that cannot be serialized to JavaScript.
+   * @throws Error - Rejects an unsupported `aggregation_frequency`, a fiscal month outside `1..=12`, a fiscal day outside `1..=31`, an out-of-range `ticker_idx`, an unrepresentable period boundary, or period statistics that cannot be serialized to JavaScript.
    */
   periodStats(
     tickerIdx: number,

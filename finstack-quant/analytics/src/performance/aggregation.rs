@@ -262,15 +262,16 @@ impl Performance {
     /// # Arguments
     ///
     /// * `ticker_idx` - Zero-based column index of the ticker.
-    /// * `aggregation_frequency` - Calendar bucket the per-period returns are
-    ///   compounded into before the statistics are taken.
+    /// * `aggregation_frequency` - Calendar or fiscal bucket the per-period returns
+    ///   are compounded into before the statistics are taken.
     /// * `fiscal_config` - Fiscal year start used to bucket fiscal periods;
-    ///   `None` uses calendar periods.
+    ///   `None` uses calendar periods; `Some` applies fiscal boundaries at every frequency.
     ///
     /// # Errors
     ///
     /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
-    /// `ticker_idx` is outside the loaded ticker columns.
+    /// `ticker_idx` is outside the loaded ticker columns, or a validation error
+    /// when a containing period boundary is outside the supported date range.
     pub fn period_stats(
         &self,
         ticker_idx: usize,
@@ -283,7 +284,7 @@ impl Performance {
             self.active_returns(ticker_idx),
             aggregation_frequency,
             fiscal_config,
-        );
+        )?;
         Ok(period_stats_inner(
             grouped.into_iter().map(|point| point.value),
         ))
@@ -307,15 +308,25 @@ impl Performance {
     ///
     /// A ticker-major panel of chronological [`PeriodicReturn`] points over
     /// the active analysis window.
-    pub fn periodic_returns(&self, frequency: PeriodKind) -> Vec<Vec<PeriodicReturn>> {
-        self.map_tickers(|i| {
-            group_period_buckets(
-                self.active_dates_for_ticker_unchecked(i),
-                self.active_returns(i),
-                frequency,
-                None,
-            )
-        })
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when a containing calendar period boundary
+    /// is outside the supported date range.
+    pub fn periodic_returns(
+        &self,
+        frequency: PeriodKind,
+    ) -> finstack_quant_core::Result<Vec<Vec<PeriodicReturn>>> {
+        (0..self.get_ticker_names().len())
+            .map(|i| {
+                group_period_buckets(
+                    self.active_dates_for_ticker_unchecked(i),
+                    self.active_returns(i),
+                    frequency,
+                    None,
+                )
+            })
+            .collect()
     }
 }
 
@@ -456,7 +467,9 @@ mod tests {
     #[test]
     fn periodic_returns_monthly_has_one_bucket_per_month() {
         let perf = sample_two_month_daily_performance();
-        let periodic = perf.periodic_returns(PeriodKind::Monthly);
+        let periodic = perf
+            .periodic_returns(PeriodKind::Monthly)
+            .expect("calendar periods");
         assert_eq!(periodic.len(), perf.get_ticker_names().len());
         assert_eq!(periodic[0].len(), 2);
         assert_eq!(periodic[0][0].date.month(), Month::January);

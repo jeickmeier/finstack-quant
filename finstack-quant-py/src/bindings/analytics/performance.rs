@@ -736,7 +736,7 @@ impl PyPerformance {
         frequency: Option<&str>,
     ) -> PyResult<PyPeriodicReturnPanel<'py>> {
         let kind = parse_frequency(frequency, DEFAULT_PERIODIC_FREQUENCY)?;
-        let panel = self.inner.periodic_returns(kind);
+        let panel = self.inner.periodic_returns(kind).map_err(analytics_to_py)?;
         panel
             .into_iter()
             .map(|series| {

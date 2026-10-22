@@ -3371,8 +3371,10 @@ class Performance:
             Fiscal year start month in ``1..=12``. When only the day is given
             the month is January (Rust ``FiscalConfig::from_parts``).
         fiscal_year_start_day : int, optional
-            Fiscal year start day in ``1..=31``. When only the month is given
-            the day is the 1st.
+            Fiscal year start day in ``1..=31``, clamped to the month end.
+            When only the month is given
+            the day is the 1st. Supplying either fiscal argument applies fiscal
+            day, week, month, quarter, half-year and year boundaries.
 
         Returns
         -------
@@ -3381,9 +3383,11 @@ class Performance:
 
         Raises
         ------
-        ValueError
-            If *fiscal_year_start_month* is not in ``1..=12`` or
-            *fiscal_year_start_day* is not in ``1..=31``.
+        AnalyticsError
+            If the frequency or fiscal start is invalid, the ticker index is
+            out of range, or a containing period boundary cannot be represented.
+        KeyError
+            If a ticker name is not present in the panel.
         """
 
     def periodic_returns(
@@ -3404,7 +3408,7 @@ class Performance:
         Returns
         -------
         list[list[tuple[datetime.date, float]]]
-            Ticker-major panel in :attr:`ticker_names` order. Each inner list
+            Ticker-major panel in :meth:`get_ticker_names` order. Each inner list
             contains chronological ``(period_end_date, compounded_return)``
             points. Returns are simple decimal fractions (``0.01`` means 1%);
             chaining one ticker's points reconciles with the final value from
@@ -3412,8 +3416,9 @@ class Performance:
 
         Raises
         ------
-        ValueError
-            If ``frequency`` is not a supported token.
+        AnalyticsError
+            If ``frequency`` is not a supported token or a containing calendar
+            period boundary cannot be represented.
 
         Examples
         --------

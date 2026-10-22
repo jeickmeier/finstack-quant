@@ -280,7 +280,6 @@ impl JsPerformance {
     /// # Errors
     ///
     /// Rejects a non-string value or a name absent from the panel.
-    /// @param ticker - Exact, case-sensitive ticker label from getTickerNames().
     /// @returns Zero-based column index for the loaded ticker.
     #[wasm_bindgen(js_name = getTickerIndex)]
     pub fn get_ticker_index(&self, ticker: JsValue) -> Result<usize, JsValue> {
@@ -898,14 +897,14 @@ impl JsPerformance {
     ///
     /// # Errors
     ///
-    /// Rejects an unsupported frequency or a panel that cannot be serialized
-    /// to JavaScript.
+    /// Rejects an unsupported frequency, an unrepresentable period boundary,
+    /// or a panel that cannot be serialized to JavaScript.
     /// @returns Ticker-major nested arrays of chronological Rust `PeriodicReturn` `{ date, value }` points with simple decimal returns.
     #[wasm_bindgen(js_name = periodicReturns)]
     pub fn periodic_returns(&self, frequency: Option<JsValue>) -> Result<JsValue, JsValue> {
         let frequency = js_opt_string(frequency.as_ref(), "frequency")?;
         let kind = parse_frequency(frequency.as_deref(), DEFAULT_PERIODIC_FREQUENCY)?;
-        to_js_value(&self.inner.periodic_returns(kind))
+        to_js_value(&self.inner.periodic_returns(kind).map_err(to_js_err)?)
     }
 
     /// Drawdown series per asset.
@@ -1256,16 +1255,19 @@ impl JsPerformance {
     }
 
     /// Aggregated period statistics for one asset at the given frequency.
+    /// Supplying a fiscal start applies fiscal day, week, month, quarter,
+    /// half-year and year boundaries, including clamped month ends.
     ///
     /// # Errors
     ///
     /// Rejects an unsupported `aggregation_frequency`, a fiscal month outside
     /// `1..=12`, a fiscal day outside `1..=31`, an out-of-range `ticker_idx`,
-    /// or period statistics that cannot be serialized to JavaScript.
+    /// an unrepresentable period boundary, or period statistics that cannot
+    /// be serialized to JavaScript.
     /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param aggregation_frequency - Optional aggregation frequency token; defaults to monthly.
     /// @param fiscal_year_start_month - Optional fiscal-year start month from 1 through 12; when only the day is given the month is January.
-    /// @param fiscal_year_start_day - Optional fiscal-year start day within the selected month; when only the month is given the day is the 1st.
+    /// @param fiscal_year_start_day - Optional fiscal-year start day from 1 through 31, clamped to the selected month end; when only the month is given the day is the 1st.
     /// @returns Period statistics object for the selected ticker at the requested frequency.
     #[wasm_bindgen(js_name = periodStats)]
     pub fn period_stats(

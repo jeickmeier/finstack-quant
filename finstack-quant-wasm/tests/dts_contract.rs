@@ -155,7 +155,7 @@ fn analytics_dts_matches_runtime_hotspots() {
     dates: string[],
     returns: NumericMatrix,",
     );
-    let ticker_names_docs = preceding_jsdoc(&dts, "  tickerNames(): string[];");
+    let ticker_names_docs = preceding_jsdoc(&dts, "  getTickerNames(): string[];");
     let drawdown_duration_docs = preceding_jsdoc(&dts, "  maxDrawdownDuration(): number[];");
     let periodic_returns_docs = preceding_jsdoc(
         &dts,
@@ -174,7 +174,7 @@ fn analytics_dts_matches_runtime_hotspots() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "activeDatesForTicker(tickerIdx: number): string[];",
+        "getActiveDatesForTicker(tickerIdx: number): string[];",
     ));
     assert!(declares_type(&dts, "PeriodicReturn"));
     assert!(contains_ignoring_ws(
@@ -220,7 +220,11 @@ fn analytics_dts_matches_runtime_hotspots() {
     ));
     assert!(!from_returns_docs.contains("Row-major"));
     assert!(!from_returns_docs.contains("one row per"));
-    assert!(contains_signature(&dts, "tickerNames(): string[];"));
+    assert!(contains_signature(&dts, "getTickerNames(): string[];"));
+    assert!(contains_signature(
+        &dts,
+        "getTickerIndex(ticker: string): number;"
+    ));
     assert!(ticker_names_docs.contains("Ticker names in column order."));
     assert!(
         ticker_names_docs.contains("Ticker labels in column order as a JavaScript string array.")
