@@ -315,7 +315,7 @@ fn application_report_records_the_size_of_each_market_shock() {
         .expect("discount curve should build");
     let provider = std::sync::Arc::new(SimpleFxProvider::new());
     provider
-        .set_quote(Currency::EUR, Currency::USD, 1.10)
+        .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
         .expect("quote should set");
     let mut market = MarketContext::new()
         .insert(curve)

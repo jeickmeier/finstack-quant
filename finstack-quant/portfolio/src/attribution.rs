@@ -972,7 +972,7 @@ mod tests {
             .build()?;
         let market = |spot: f64, eur_usd: f64| -> Result<MarketContext> {
             let provider = Arc::new(SimpleFxProvider::new());
-            provider.set_quote(Currency::EUR, Currency::USD, eur_usd)?;
+            provider.set_quotes(&[(Currency::EUR, Currency::USD, eur_usd)])?;
             Ok(MarketContext::new()
                 .insert_price("E", MarketScalar::Unitless(spot))
                 .insert_price("U", MarketScalar::Unitless(50.0))

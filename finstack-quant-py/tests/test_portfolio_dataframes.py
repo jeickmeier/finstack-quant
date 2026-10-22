@@ -370,7 +370,7 @@ def _moving_attribution() -> tuple[PortfolioAttribution, pd.DataFrame]:
         context.insert(DiscountCurve("USD-OIS", date.fromisoformat(AS_OF), usd_knots, day_count="act_365f"))
         context.insert(DiscountCurve("EUR-OIS", date.fromisoformat(AS_OF), eur_knots, day_count="act_365f"))
         fx = FxMatrix()
-        fx.set_quote("EUR", "USD", eurusd)
+        fx.set_quotes([("EUR", "USD", eurusd)])
         context.insert_fx(fx)
         return context
 
@@ -1146,7 +1146,7 @@ def test_position_value_exports_the_fx_rate_applied() -> None:
     context = MarketContext()
     context.insert(DiscountCurve("EUR-OIS", date.fromisoformat(AS_OF), [(0.0, 1.0), (1.0, 0.97)], day_count="act_365f"))
     fx = FxMatrix()
-    fx.set_quote("EUR", "USD", 1.10)
+    fx.set_quotes([("EUR", "USD", 1.10)])
     context.insert_fx(fx)
     portfolio = Portfolio.from_spec(
         json.dumps({

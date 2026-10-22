@@ -37,7 +37,7 @@ fn create_test_market(as_of: Date) -> MarketContext {
     // Create FX provider with EUR/USD = 1.10
     let fx_provider = Arc::new(SimpleFxProvider::new());
     fx_provider
-        .set_quote(Currency::EUR, Currency::USD, 1.10)
+        .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
         .expect("valid rate");
     let fx_matrix = FxMatrix::new(fx_provider);
 

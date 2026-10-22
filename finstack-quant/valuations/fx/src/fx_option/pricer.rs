@@ -288,7 +288,7 @@ mod delegation_tests {
             .expect("vol surface");
         let provider = SimpleFxProvider::new();
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.20)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.20)])
             .expect("valid rate");
         let fx_matrix = FxMatrix::new(Arc::new(provider));
 

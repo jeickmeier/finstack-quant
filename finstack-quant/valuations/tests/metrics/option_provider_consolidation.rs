@@ -180,7 +180,7 @@ fn build_fx_market(
 
     let provider = Arc::new(SimpleFxProvider::new());
     provider
-        .set_quote(Currency::EUR, Currency::USD, spot)
+        .set_quotes(&[(Currency::EUR, Currency::USD, spot)])
         .expect("fx quote should build");
     let fx_matrix = FxMatrix::new(provider);
     let _ = fx_matrix

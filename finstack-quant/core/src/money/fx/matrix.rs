@@ -526,79 +526,9 @@ impl FxMatrix {
         }
     }
 
-    /// Seed or update a single **date- and policy-independent constant** quote.
-    ///
-    /// # ⚠️ Shadows the provider for every query
-    ///
-    /// An explicit quote set here is checked *before* the underlying
-    /// [`FxProvider`] in [`rate`](Self::rate) and is **not** keyed by `on` or
-    /// [`FxConversionPolicy`]. Once set, the pair is pinned to this single rate
-    /// for **all** valuation dates and policies — a date-aware provider is
-    /// silently bypassed. Use this only for genuinely constant rates (e.g.
-    /// pegged currencies or deterministic tests).
-    ///
-    /// For a rate that should vary across a time series, do **not** call this:
-    /// either rely on the date-aware provider, or seed a specific date with
-    /// [`set_quote_on`](Self::set_quote_on), which is scoped by `(on, policy)`.
-    ///
-    /// The quote is stored in a **non-evicting** map, so a seeded peg is never
-    /// silently dropped under cache pressure (the bounded LRU governs only the
-    /// transient provider-observed cache).
-    ///
-    /// Note: This does not automatically insert a reciprocal. Lookups will use
-    /// the reciprocal on demand if the opposite direction is requested.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use finstack_quant_core::money::fx::{FxMatrix, FxProvider, FxConversionPolicy, FxQuery};
-    /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_core::dates::Date;
-    /// use std::sync::Arc;
-    /// use time::Month;
-    ///
-    /// struct StaticFx;
-    /// impl FxProvider for StaticFx {
-    ///     fn rate(
-    ///         &self,
-    ///         _from: Currency,
-    ///         _to: Currency,
-    ///         _on: Date,
-    ///         _policy: FxConversionPolicy,
-    ///     ) -> finstack_quant_core::Result<f64> {
-    ///         Ok(1.2)
-    ///     }
-    /// }
-    ///
-    /// let matrix = FxMatrix::new(Arc::new(StaticFx));
-    /// matrix.set_quote(Currency::GBP, Currency::USD, 1.3)
-    ///     .expect("finite, positive explicit quote");
-    /// let res = matrix.rate(FxQuery::new(
-    ///     Currency::GBP,
-    ///     Currency::USD,
-    ///     Date::from_calendar_date(2024, Month::April, 1).expect("Valid date"),
-    ///     FxConversionPolicy::default(),
-    /// )).expect("FX rate lookup should succeed");
-    /// assert_eq!(res.rate, 1.3);
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `rate` is non-finite or not strictly positive. The
-    /// existing quote remains unchanged on error; no reciprocal quote is
-    /// inserted automatically.
-    ///
-    /// # Arguments
-    ///
-    /// * `from` - Base currency of the pair-global quote.
-    /// * `to` - Quote currency. `rate` is units of `to` per one unit of `from`.
-    /// * `rate` - Finite, strictly positive outright quote. It shadows the provider for every date and policy.
-    pub fn set_quote(&self, from: Currency, to: Currency, rate: f64) -> crate::Result<()> {
-        self.set_quotes(&[(from, to, rate)])
-    }
-
     /// Seed a quote scoped to a specific date and policy.
     ///
-    /// Unlike [`set_quote`](Self::set_quote), this keys the quote by
+    /// Unlike [`set_quotes`](Self::set_quotes), this keys the quote by
     /// `(from, to, on, policy)`, so it only answers queries for that date and
     /// policy and does **not** shadow the provider across an entire time
     /// series. Use it to pin individual fixings while letting the provider
@@ -608,7 +538,7 @@ impl FxMatrix {
     /// (separate from the bounded provider-observed cache), so it is never
     /// silently dropped under cache pressure and always wins over the provider
     /// for its `(on, policy)`. It is, however, outranked by a pair-global
-    /// [`set_quote`](Self::set_quote).
+    /// [`set_quotes`](Self::set_quotes).
     ///
     /// # Errors
     ///
@@ -643,9 +573,8 @@ impl FxMatrix {
     /// * `quotes` - `(from, to, rate)` triples. Each rate is units of `to` per one unit of `from` and must be finite and strictly positive.
     ///
     /// This is an atomic batch with respect to the pair-global quote map: every
-    /// input is validated before any replacement occurs. Like
-    /// [`set_quote`](Self::set_quote),
-    /// these quotes shadow the provider for every date and policy and do not
+    /// input is validated before any replacement occurs. These quotes
+    /// shadow the provider for every date and policy and do not
     /// expire under LRU pressure.
     ///
     /// # Errors
@@ -1266,7 +1195,9 @@ mod revision_tests {
         assert!(cross.triangulated);
 
         // An explicit peg answers both directions under every policy.
-        matrix.set_quote(Currency::USD, Currency::HKD, 7.8).unwrap();
+        matrix
+            .set_quotes(&[(Currency::USD, Currency::HKD, 7.8)])
+            .unwrap();
         let peg = matrix.rate(query(Currency::HKD, Currency::USD)).unwrap();
         assert!((peg.rate - 1.0 / 7.8).abs() < 1e-15);
     }
@@ -1282,7 +1213,9 @@ mod revision_tests {
         };
         for mutation in ["single", "batch", "pinned"] {
             let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
-            matrix.set_quote(key.from, key.to, 1.1).expect("global");
+            matrix
+                .set_quotes(&[(key.from, key.to, 1.1)])
+                .expect("global");
             matrix
                 .set_quote_on(key.from, key.to, on, key.policy, 1.1)
                 .expect("pinned");
@@ -1292,7 +1225,9 @@ mod revision_tests {
             let observed = lock(&matrix.observed_quotes);
             std::thread::scope(|scope| {
                 let writer = scope.spawn(|| match mutation {
-                    "single" => matrix.set_quote(key.from, key.to, 1.2).expect("update"),
+                    "single" => matrix
+                        .set_quotes(&[(key.from, key.to, 1.2)])
+                        .expect("update"),
                     "batch" => matrix
                         .set_quotes(&[(key.from, key.to, 1.2)])
                         .expect("batch update"),

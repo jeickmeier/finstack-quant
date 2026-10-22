@@ -73,7 +73,7 @@ fn cross_currency_values_and_dependencies_use_reporting_fx() -> Result<()> {
     );
     let composite = spec.initialize_fixed(date!(2025 - 01 - 01))?.instrument;
     let provider = Arc::new(SimpleFxProvider::new());
-    provider.set_quote(Currency::EUR, Currency::USD, 1.2)?;
+    provider.set_quotes(&[(Currency::EUR, Currency::USD, 1.2)])?;
     let market = MarketContext::new().insert_fx(FxMatrix::new(provider));
 
     let dependencies = composite.market_dependencies()?;

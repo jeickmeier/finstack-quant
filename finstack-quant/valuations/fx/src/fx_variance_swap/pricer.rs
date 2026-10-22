@@ -424,7 +424,7 @@ mod tests {
             .expect("eur curve");
         let provider = SimpleFxProvider::new();
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("valid rate");
         let fx = FxMatrix::new(Arc::new(provider));
         MarketContext::new()
@@ -447,7 +447,7 @@ mod tests {
         }
         let provider = SimpleFxProvider::new();
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.0)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.0)])
             .expect("spot");
         let strikes: Vec<_> = (1..=400).map(|i| f64::from(i) * 0.01).collect();
         let vols = vec![volatility; strikes.len()];
@@ -733,7 +733,7 @@ mod tests {
             .collect();
         let provider = SimpleFxProvider::new();
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.02)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.02)])
             .expect("spot");
         let market = zero_rate_market(as_of, 0.2)
             .insert_fx(FxMatrix::new(Arc::new(provider)))
@@ -1045,7 +1045,7 @@ mod tests {
             .expect("eur curve");
         let provider = SimpleFxProvider::new();
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("valid rate");
         // Dense wings support Carr-Madan replication while preserving a strong slope.
         let surface = VolSurface::builder("EURUSD-VOL")
@@ -1218,7 +1218,7 @@ mod tests {
             .expect("eur curve");
         let provider = SimpleFxProvider::new();
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("valid rate");
         let surface = VolSurface::builder("EURUSD-VOL")
             .expiries(&[1.0])

@@ -21,7 +21,7 @@ fn test_fx_shock() {
     // Setup FX provider
     let fx_provider = Arc::new(SimpleFxProvider::new());
     fx_provider
-        .set_quote(Currency::EUR, Currency::USD, 1.1)
+        .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
         .expect("valid rate");
 
     let fx_matrix = FxMatrix::new(fx_provider);
@@ -83,10 +83,10 @@ fn test_fx_shock() {
 fn test_fx_shock_preserves_other_quotes() {
     let fx_provider = Arc::new(SimpleFxProvider::new());
     fx_provider
-        .set_quote(Currency::EUR, Currency::USD, 1.1)
+        .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
         .expect("valid rate");
     fx_provider
-        .set_quote(Currency::GBP, Currency::USD, 1.25)
+        .set_quotes(&[(Currency::GBP, Currency::USD, 1.25)])
         .expect("valid rate");
 
     let fx_matrix = FxMatrix::new(fx_provider);

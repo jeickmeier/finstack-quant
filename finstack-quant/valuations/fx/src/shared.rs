@@ -557,7 +557,7 @@ mod tests {
             .expect("valid vol");
         let provider = Arc::new(SimpleFxProvider::new());
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.1)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
             .expect("valid rate");
         let fx = FxMatrix::new(provider);
         MarketContext::new()

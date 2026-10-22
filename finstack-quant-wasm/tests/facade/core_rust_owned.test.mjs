@@ -186,7 +186,7 @@ test('DayCountContext is built by DayCountContextState::try_new', () => {
 
 test('FxMatrix.rate takes an optional policy defaulting to the Rust default', () => {
   const fx = new core.FxMatrix();
-  fx.setQuote('EUR', 'USD', 1.1);
+  fx.setQuotes([['EUR', 'USD', 1.1]]);
   const cashflowDate = core.FxConversionPolicy.cashflowDate();
   assert.equal(fx.rate('EUR', 'USD', '2025-01-02').rate, 1.1);
   assert.equal(fx.rate('EUR', 'USD', '2025-01-02', null).rate, 1.1);

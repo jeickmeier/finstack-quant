@@ -1553,7 +1553,7 @@
   "core.FxMatrix": {
     "kind": "class",
     "statics": ["fromDict"],
-    "methods": ["free", "rate", "setQuote", "setQuoteOn", "setQuotes"],
+    "methods": ["free", "rate", "setQuoteOn", "setQuotes"],
     "getters": []
   },
   "core.FxQuoteConvention": {

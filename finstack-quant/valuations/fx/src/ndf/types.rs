@@ -1135,7 +1135,7 @@ mod tests {
 
         let fx_provider = {
             let p = Arc::new(SimpleFxProvider::new());
-            p.set_quote(Currency::CNY, Currency::USD, 7.25)
+            p.set_quotes(&[(Currency::CNY, Currency::USD, 7.25)])
                 .expect("valid rate");
             p
         };

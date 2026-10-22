@@ -251,7 +251,7 @@ mod tests {
             / usd.df_between_dates(as_of, far).expect("far USD DF");
         let provider = SimpleFxProvider::new();
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.1)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
             .expect("FX quote");
         let market = MarketContext::new()
             .insert(usd)
@@ -370,7 +370,7 @@ mod tests {
             .expect("eur curve");
         let provider = SimpleFxProvider::new();
         provider
-            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("valid rate");
         let market = MarketContext::new()
             .insert(usd)

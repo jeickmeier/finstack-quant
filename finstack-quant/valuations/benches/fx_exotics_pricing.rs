@@ -140,13 +140,13 @@ fn create_market(as_of: Date) -> MarketContext {
 
     let fx_provider = Arc::new(SimpleFxProvider::new());
     fx_provider
-        .set_quote(Currency::EUR, Currency::USD, 1.10)
+        .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
         .unwrap();
     fx_provider
-        .set_quote(Currency::JPY, Currency::USD, 1.0 / 150.0)
+        .set_quotes(&[(Currency::JPY, Currency::USD, 1.0 / 150.0)])
         .unwrap();
     fx_provider
-        .set_quote(Currency::USD, Currency::USD, 1.0)
+        .set_quotes(&[(Currency::USD, Currency::USD, 1.0)])
         .unwrap();
     let fx = FxMatrix::new(fx_provider);
 
