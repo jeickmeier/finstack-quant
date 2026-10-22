@@ -27,7 +27,7 @@ export type AmortizationSpec =
         /**
          * Ordered list of `(date, remaining_principal_after_date)`.
          */
-        schedule: [unknown, unknown][];
+        schedule: [valuations.DateWire, valuations.Money][];
       };
     }
   | {
@@ -67,7 +67,7 @@ export type AmortizationSpec =
         /**
          * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
          */
-        items: [unknown, unknown][];
+        items: [valuations.DateWire, valuations.Money][];
       };
     };
 /**
@@ -734,7 +734,7 @@ export interface CashFlowAccrual {
    * @minItems 2
    * @maxItems 2
    */
-  coupon_period?: [unknown, unknown] | null;
+  coupon_period?: [valuations.DateWire, valuations.DateWire] | null;
   /**
    * Day-count convention used for the accrual factor.
    */
@@ -1345,7 +1345,7 @@ export interface StepUpCouponSpec {
    * applied here. The rate is set at accrual start (per market
    * convention for step-up bonds).
    */
-  step_schedule: [unknown, unknown][];
+  step_schedule: [valuations.DateWire, valuations.DecimalWire][];
   /**
    * Stub-handling rule used when the start/end dates do not fit an exact
    * whole number of periods.
