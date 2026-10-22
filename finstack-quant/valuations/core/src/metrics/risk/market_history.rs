@@ -686,6 +686,7 @@ mod tests {
                 Currency::EUR,
                 Currency::USD,
                 date!(2024 - 01 - 02),
+                Default::default(),
             ))?
             .rate;
 

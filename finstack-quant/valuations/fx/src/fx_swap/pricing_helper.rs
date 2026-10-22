@@ -82,7 +82,12 @@ impl FxSwapPricingContext {
         // exchanged cashflows; they are not valid substitutes for market spot.
         let model_spot = if let Some(fx) = curves.fx() {
             (**fx)
-                .rate(FxQuery::new(swap.base_currency, swap.quote_currency, as_of))?
+                .rate(FxQuery::new(
+                    swap.base_currency,
+                    swap.quote_currency,
+                    as_of,
+                    Default::default(),
+                ))?
                 .rate
         } else {
             return Err(finstack_quant_core::Error::Validation(format!(

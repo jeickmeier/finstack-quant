@@ -389,6 +389,7 @@ impl XccySwap {
                 leg.notional.currency(),
                 self.reporting_currency,
                 leg.leg.start,
+                Default::default(),
             ))
             .map_err(|err| {
                 finstack_quant_core::Error::Validation(format!(
@@ -791,6 +792,7 @@ impl XccySwap {
                     leg.notional.currency(),
                     self.reporting_currency,
                     as_of,
+                    Default::default(),
                 ))?
                 .rate;
             Ok(amount * rate)

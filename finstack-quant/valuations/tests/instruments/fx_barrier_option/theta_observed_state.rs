@@ -48,7 +48,12 @@ fn eurusd_spot(market: &MarketContext, as_of: Date) -> f64 {
     market
         .fx()
         .expect("FX matrix")
-        .rate(FxQuery::new(Currency::EUR, Currency::USD, as_of))
+        .rate(FxQuery::new(
+            Currency::EUR,
+            Currency::USD,
+            as_of,
+            Default::default(),
+        ))
         .expect("EURUSD quote")
         .rate
 }

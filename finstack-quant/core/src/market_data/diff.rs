@@ -555,8 +555,8 @@ pub fn measure_fx_shift(
     let fx_t1 = market_t1.fx_required()?;
 
     // Get rates using FxQuery with the provided valuation dates
-    let query_t0 = FxQuery::new(base_currency, quote_currency, as_of_t0);
-    let query_t1 = FxQuery::new(base_currency, quote_currency, as_of_t1);
+    let query_t0 = FxQuery::new(base_currency, quote_currency, as_of_t0, Default::default());
+    let query_t1 = FxQuery::new(base_currency, quote_currency, as_of_t1, Default::default());
     let rate_t0 = fx_t0.rate(query_t0)?.rate;
     let rate_t1 = fx_t1.rate(query_t1)?.rate;
 

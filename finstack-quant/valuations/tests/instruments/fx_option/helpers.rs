@@ -249,6 +249,7 @@ pub fn finite_diff_delta(
             option.base_currency,
             option.quote_currency,
             as_of,
+            Default::default(),
         ))?
         .rate;
 
@@ -282,6 +283,7 @@ pub fn finite_diff_gamma(
             option.base_currency,
             option.quote_currency,
             as_of,
+            Default::default(),
         ))?
         .rate;
 

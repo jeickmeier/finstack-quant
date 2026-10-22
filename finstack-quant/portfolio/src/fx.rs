@@ -119,7 +119,12 @@ pub(crate) fn spot_fx_to_base(
         .fx()
         .ok_or_else(|| Error::MissingMarketData("FX matrix not available".to_string()))?;
     fx_matrix
-        .rate(FxQuery::new(from_currency, base_currency, as_of))
+        .rate(FxQuery::new(
+            from_currency,
+            base_currency,
+            as_of,
+            Default::default(),
+        ))
         .map_err(|_| Error::FxConversionFailed {
             from: from_currency,
             to: base_currency,

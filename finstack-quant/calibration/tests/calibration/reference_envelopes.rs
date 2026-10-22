@@ -187,7 +187,12 @@ fn example_09_fx_matrix_supports_cross_rate_lookup() {
 
     // --- Direct quote: EUR/USD ---
     let eur_usd = fx
-        .rate(FxQuery::new(Currency::EUR, Currency::USD, as_of))
+        .rate(FxQuery::new(
+            Currency::EUR,
+            Currency::USD,
+            as_of,
+            Default::default(),
+        ))
         .expect("EUR/USD direct quote must be retrievable");
     assert!(
         !eur_usd.triangulated,
@@ -202,7 +207,12 @@ fn example_09_fx_matrix_supports_cross_rate_lookup() {
     // --- Triangulated cross: EUR/JPY via USD pivot ---
     // EUR/JPY is not a direct quote; it must be computed as EUR→USD→JPY.
     let eur_jpy = fx
-        .rate(FxQuery::new(Currency::EUR, Currency::JPY, as_of))
+        .rate(FxQuery::new(
+            Currency::EUR,
+            Currency::JPY,
+            as_of,
+            Default::default(),
+        ))
         .expect("EUR/JPY cross rate must be computable via USD triangulation");
     assert!(
         eur_jpy.triangulated,
@@ -216,9 +226,14 @@ fn example_09_fx_matrix_supports_cross_rate_lookup() {
 
     // Sanity: EUR/JPY ≈ EUR/USD × USD/JPY = 1.085 × 152.40 ≈ 165.35
     let expected_approx = eur_usd.rate
-        * fx.rate(FxQuery::new(Currency::USD, Currency::JPY, as_of))
-            .expect("USD/JPY direct quote must be retrievable")
-            .rate;
+        * fx.rate(FxQuery::new(
+            Currency::USD,
+            Currency::JPY,
+            as_of,
+            Default::default(),
+        ))
+        .expect("USD/JPY direct quote must be retrievable")
+        .rate;
     assert!(
         (eur_jpy.rate - expected_approx).abs() < 1e-6,
         "EUR/JPY cross rate {:.6} should match EUR/USD × USD/JPY {:.6}",

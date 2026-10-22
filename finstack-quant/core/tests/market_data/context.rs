@@ -1116,6 +1116,7 @@ fn market_context_bump_fx_spot_error_and_success_paths() {
             Currency::USD,
             Currency::EUR,
             date,
+            Default::default(),
         ))
         .unwrap()
         .rate;
@@ -1135,6 +1136,7 @@ fn market_context_bump_fx_spot_error_and_success_paths() {
             Currency::USD,
             Currency::EUR,
             date,
+            Default::default(),
         ))
         .unwrap()
         .rate;
@@ -1183,6 +1185,7 @@ fn market_context_apply_bumps_exercises_all_variants() {
             Currency::USD,
             Currency::EUR,
             date,
+            Default::default(),
         ))
         .unwrap()
         .rate;
@@ -1233,6 +1236,7 @@ fn market_context_apply_bumps_exercises_all_variants() {
             Currency::USD,
             Currency::EUR,
             date,
+            Default::default(),
         ))
         .unwrap()
         .rate;

@@ -88,8 +88,12 @@ fn test_fx_equity_curve_combo() {
 
     // Verify all shocks applied
     let fx = market.fx().unwrap();
-    let query =
-        finstack_quant_core::money::fx::FxQuery::new(Currency::EUR, Currency::USD, base_date);
+    let query = finstack_quant_core::money::fx::FxQuery::new(
+        Currency::EUR,
+        Currency::USD,
+        base_date,
+        Default::default(),
+    );
     let rate = fx.rate(query).unwrap().rate;
     assert!((rate - 1.155).abs() < 1e-6, "FX should be shocked");
 

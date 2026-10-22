@@ -203,7 +203,7 @@ impl PyFxMatrix {
     ///     Applicable date for the rate.
     /// policy : FxConversionPolicy | str, optional
     ///     Conversion policy; ``None`` selects the Rust default query
-    ///     (``FxQuery::new``, ``"cashflow_date"``).
+    ///     (``FxConversionPolicy::default()``, ``"cashflow_date"``).
     ///
     /// Returns
     /// -------
@@ -221,10 +221,8 @@ impl PyFxMatrix {
         let quote_currency = extract_currency(quote)?;
         let d = py_to_date(date)?;
         let query = match policy {
-            Some(p) => {
-                FxQuery::with_policy(base_currency, quote_currency, d, extract_fx_policy(p)?)
-            }
-            None => FxQuery::new(base_currency, quote_currency, d),
+            Some(p) => FxQuery::new(base_currency, quote_currency, d, extract_fx_policy(p)?),
+            None => FxQuery::new(base_currency, quote_currency, d, Default::default()),
         };
 
         let result = self.inner.rate(query).map_err(core_to_py)?;

@@ -525,7 +525,7 @@ fn convert_money_to_reporting(
         ))
     })?;
     let rate = fx
-        .rate(FxQuery::with_policy(
+        .rate(FxQuery::new(
             value.currency(),
             reporting_currency,
             on,

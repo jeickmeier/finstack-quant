@@ -368,6 +368,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
                     self.base_currency,
                     self.quote_currency,
                     as_of,
+                    Default::default(),
                 );
                 matrix.as_ref().rate(q)?.rate
             };

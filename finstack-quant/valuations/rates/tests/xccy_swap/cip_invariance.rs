@@ -411,6 +411,7 @@ fn mtm_reset_cashflow_schedule_npv_matches_base_value() {
                         ccy,
                         Currency::USD,
                         as_of,
+                        Default::default(),
                     ))
                     .expect("fx rate")
                     .rate;
