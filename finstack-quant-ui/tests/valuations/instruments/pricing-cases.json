@@ -11,7 +11,7 @@
     },
     {
       "path": "finstack-quant/valuations/tests/fixtures/production_cds_option.json",
-      "sha256": "24e78c5cfaebc8885ee0a2d77f836b3c3bbcec7c61cffa30c42f369fc2df78dd"
+      "sha256": "75cd96080c88d3fdf4efb121492b7fe50bbbaab1fbdde13b59e4183e23d990ad"
     },
     {
       "path": "finstack-quant/valuations/tests/fixtures/production_inflation.json",
@@ -378,13 +378,13 @@
       "type": "bermudan_swaption",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/fixtures/production_hw.json",
-        "sha256": "4433573981e7bb4918168d48c8a04819de38b2ae574ccede0166198da1050aaa",
+        "sha256": "965eca0d897842980fe5ab0e46c0de4846d71d405fc79a828ddbc52269deb50e",
         "pointer": ["instrument"]
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant/valuations/tests/fixtures/production_hw.json",
-        "sha256": "4433573981e7bb4918168d48c8a04819de38b2ae574ccede0166198da1050aaa",
+        "sha256": "965eca0d897842980fe5ab0e46c0de4846d71d405fc79a828ddbc52269deb50e",
         "pointer": ["market"]
       },
       "marketPatches": [],
@@ -654,7 +654,7 @@
       "type": "cds_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/cds_option.json",
-        "sha256": "9d16da9dfb5943c22c52b7171a6dac377ff4a8d8d2561ae9fb0357d2507935b3",
+        "sha256": "f44138dfaa6a5024b7cbd3d60c24d91495f27e18a0ba56dfe8c3cbdd64b10bdd",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2956,7 +2956,7 @@
       "type": "volatility_index_future",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/volatility_index_future.json",
-        "sha256": "d73c2c1d9aca9d6398733047ffc6afea3b0901f8b0fa4860833f6451648f6e9b",
+        "sha256": "ca351146e86051b318b36c3beff6151af19605f4ea4aefc09d88bf648f02a88b",
         "pointer": []
       },
       "instrumentPatches": [],
