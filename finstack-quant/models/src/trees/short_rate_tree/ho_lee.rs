@@ -214,12 +214,6 @@ impl ShortRateTree {
                 let df_in_range =
                     (MIN_NODE_DISCOUNT_FACTOR..=MAX_NODE_DISCOUNT_FACTOR).contains(&node_df);
                 if !df_in_range {
-                    self.calibration_quality = Some(TreeCalibrationResult {
-                        max_error_bp,
-                        max_error_step,
-                        fallback_count: 0,
-                        converged: false,
-                    });
                     return Err(Error::Validation(format!(
                         "Ho-Lee calibration produced a pathologically extreme \
                          node discount factor {node_df:.3e} at step {step}, \
@@ -241,8 +235,6 @@ impl ShortRateTree {
         self.calibration_quality = Some(TreeCalibrationResult {
             max_error_bp,
             max_error_step,
-            fallback_count: 0,
-            converged: true,
         });
 
         Ok(())
