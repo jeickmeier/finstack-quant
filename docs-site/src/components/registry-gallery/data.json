@@ -89,7 +89,6 @@
         "implied_collateral_return",
         "index_ratio",
         "lp_irr",
-        "moic_lp",
         "nav01",
         "real_yield",
         "repo_interest",
@@ -12061,7 +12060,7 @@
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "cd6ca198c4297d933233ca622d8c0b869f0246124d77e6dfb658dc4f5d320454"
+        "sha256": "150a521a83a397327d5045ef990dda4b8063cf2a75de1138a3563cc20b3fbbc1"
       },
       {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/equity_option.json",
@@ -12166,7 +12165,7 @@
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-        "sha256": "cd6ca198c4297d933233ca622d8c0b869f0246124d77e6dfb658dc4f5d320454"
+        "sha256": "150a521a83a397327d5045ef990dda4b8063cf2a75de1138a3563cc20b3fbbc1"
       },
       {
         "path": "finstack-quant-wasm/tests/facade/covenants.test.mjs",

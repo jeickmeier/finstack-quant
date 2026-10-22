@@ -257,7 +257,6 @@ impl MetricGroup {
                 MetricId::BreakevenInflation,
                 MetricId::LpIrr,
                 MetricId::GpCarryTotal,
-                MetricId::MoicLp,
                 MetricId::DpiLp,
                 MetricId::TvpiLp,
                 MetricId::CarryAccrued,
