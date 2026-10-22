@@ -851,11 +851,13 @@ impl CalibrationConfig {
                 "failed to serialize calibration config: {e}"
             ))
         })?;
+        // Disabled explanation options are omitted from the wire representation,
+        // but their entry limit must still survive a partial override.
+        base["explain"] = serde_json::json!(self.explain);
         merge_json(&mut base, overrides);
-        let mut merged: Self = serde_json::from_value(base).map_err(|e| {
+        let merged: Self = serde_json::from_value(base).map_err(|e| {
             finstack_quant_core::Error::Validation(format!("invalid calibration config: {e}"))
         })?;
-        merged.explain = self.explain;
         merged.validate()?;
         Ok(merged)
     }
@@ -1131,14 +1133,52 @@ mod override_regressions {
     use super::*;
 
     #[test]
-    fn json_overrides_preserve_nonserialized_explanation_options() {
-        let config = CalibrationConfig {
-            explain: ExplainOpts::enabled(),
-            ..Default::default()
-        };
-        let merged = config
-            .with_json_overrides(serde_json::json!({}))
-            .expect("empty override");
-        assert!(merged.explain.enabled);
+    fn json_overrides_merge_explanation_options() {
+        for enabled in [false, true] {
+            let config = CalibrationConfig {
+                explain: ExplainOpts {
+                    enabled,
+                    max_entries: Some(37),
+                },
+                ..Default::default()
+            };
+            for (overrides, expected) in [
+                (serde_json::json!({}), config.explain),
+                (serde_json::json!({"explain": {}}), config.explain),
+                (
+                    serde_json::json!({"explain": {"enabled": !enabled}}),
+                    ExplainOpts {
+                        enabled: !enabled,
+                        max_entries: Some(37),
+                    },
+                ),
+                (
+                    serde_json::json!({"explain": {"max_entries": 2}}),
+                    ExplainOpts {
+                        enabled,
+                        max_entries: Some(2),
+                    },
+                ),
+                (
+                    serde_json::json!({"explain": {"enabled": !enabled, "max_entries": 0}}),
+                    ExplainOpts {
+                        enabled: !enabled,
+                        max_entries: Some(0),
+                    },
+                ),
+                (
+                    serde_json::json!({"explain": {"max_entries": null}}),
+                    ExplainOpts {
+                        enabled,
+                        max_entries: None,
+                    },
+                ),
+            ] {
+                let merged = config
+                    .with_json_overrides(overrides)
+                    .expect("valid override");
+                assert_eq!(merged.explain, expected);
+            }
+        }
     }
 }
