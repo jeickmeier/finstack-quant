@@ -56,3 +56,15 @@ def test_calibration_config_rejects_unknown_nested_fields() -> None:
         CalibrationConfig(solver={"unknown_field": 1})
     with pytest.raises(ValueError, match="null"):
         CalibrationConfig(solver=None)
+
+
+@pytest.mark.parametrize(
+    "options", [{}, {"enabled": True}, {"enabled": True, "max_entries": 2}, {"enabled": True, "max_entries": None}]
+)
+def test_calibration_config_explanation_overrides(options: dict) -> None:
+    config = CalibrationConfig(explain=options).to_dict()
+    if options.get("enabled", False):
+        assert config["explain"]["enabled"] is True
+        assert config["explain"].get("max_entries") == options.get("max_entries")
+    else:
+        assert "explain" not in config

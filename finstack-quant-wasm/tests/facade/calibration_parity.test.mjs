@@ -540,3 +540,29 @@ test('calendar acceptance uses forward moneyness and the configured tolerance', 
     [100, 200]
   );
 });
+
+for (const [enabled, limit] of [
+  [false, 1],
+  [true, 0],
+  [true, 1],
+  [true, null],
+]) {
+  test(`explanation options reach step report: enabled=${enabled}, limit=${limit}`, () => {
+    const envelope = structuredClone(GOLDEN.envelope);
+    envelope.plan.settings = { explain: { enabled, max_entries: limit } };
+    const report = calibration.calibrationResultStepReport(
+      calibration.calibrate(envelope),
+      'USD-OIS'
+    );
+    if (enabled) {
+      const count = GOLDEN.step_report.residual_ids.length;
+      assert.equal(
+        report.explanation.entries.length,
+        limit === null ? count : Math.min(count, limit)
+      );
+      assert.equal(report.explanation.truncated ?? false, limit !== null && count > limit);
+    } else {
+      assert.equal(report.explanation, undefined);
+    }
+  });
+}

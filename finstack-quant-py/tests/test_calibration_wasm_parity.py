@@ -20,6 +20,7 @@ from typing import Any
 import pytest
 
 from finstack_quant.calibration import (
+    CalibrationConfig,
     CalibrationEnvelope,
     CalibrationEnvelopeError,
     CalibrationStep,
@@ -262,3 +263,18 @@ def test_checked_quote_constructors_reject_invalid_values() -> None:
             ValueError, match=r"attachment|detachment|upfront_pct|coupon_bp|currency|Currency|date|CDS doc clause"
         ):
             CdsTrancheQuote(**(fields | patch))
+
+
+@pytest.mark.parametrize(("enabled", "limit"), [(False, 1), (True, 0), (True, 1), (True, None)])
+def test_explanation_options_reach_step_report(enabled: bool, limit: int | None) -> None:
+    envelope = json.loads(json.dumps(GOLDEN["envelope"]))
+    envelope["plan"]["settings"] = CalibrationConfig(explain={"enabled": enabled, "max_entries": limit}).to_dict()
+    result = calibrate(CalibrationEnvelope.from_json(json.dumps(envelope)))
+    report = json.loads(result.step_report("USD-OIS").to_json())
+    if enabled:
+        trace = report["explanation"]
+        count = len(GOLDEN["step_report"]["residual_ids"])
+        assert len(trace["entries"]) == (count if limit is None else min(count, limit))
+        assert trace.get("truncated", False) == (limit is not None and count > limit)
+    else:
+        assert report.get("explanation") is None
