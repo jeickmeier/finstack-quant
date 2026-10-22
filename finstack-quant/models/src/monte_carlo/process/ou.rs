@@ -25,7 +25,7 @@
 //! This crate exclusively uses the Vasicek-style mean-reversion-level
 //! convention. The calibrator [`calibrate_theta_from_curve`] produces θ
 //! in this convention; callers constructing [`HullWhite1FParams::new`]
-//! or [`HullWhite1FProcess::vasicek`] directly must likewise supply θ as
+//! directly must likewise supply θ as
 //! a stationary rate level.
 //!
 //! The Hull-White 1F model uses a time-dependent θ(t) to fit the initial
@@ -37,7 +37,6 @@ use crate::monte_carlo::traits::ProcessMetadata;
 use crate::rates::hull_white::{fd_instantaneous_forward, HullWhiteParams};
 use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
 use finstack_quant_core::Result;
-use std::ops::Deref;
 use tracing::warn;
 
 /// Validated Hull-White one-factor process parameters.
@@ -68,14 +67,6 @@ impl TryFrom<RawHullWhite1FParams> for HullWhite1FParams {
 
     fn try_from(raw: RawHullWhite1FParams) -> Result<Self> {
         Self::from_parts(raw.model, raw.theta_curve, raw.theta_times)
-    }
-}
-
-impl Deref for HullWhite1FParams {
-    type Target = HullWhiteParams;
-
-    fn deref(&self) -> &Self::Target {
-        &self.model
     }
 }
 
@@ -180,7 +171,7 @@ impl HullWhite1FParams {
         }
         self.model
             .volatility
-            .integrate_squared_exp_weight(self.kappa, t + dt, t, t + dt)
+            .integrate_squared_exp_weight(self.model.kappa, t + dt, t, t + dt)
     }
 
     /// Theta schedule values.
@@ -260,8 +251,8 @@ impl HullWhite1FParams {
                 continue;
             }
             let segment_end = boundary.min(end);
-            let weight = (-self.kappa * (end - segment_end)).exp()
-                * -(-self.kappa * (segment_end - start)).exp_m1();
+            let weight = (-self.model.kappa * (end - segment_end)).exp()
+                * -(-self.model.kappa * (segment_end - start)).exp_m1();
             contribution += self.theta_at_time(start) * weight;
             start = segment_end;
             if start >= end {
@@ -303,21 +294,6 @@ impl HullWhite1FProcess {
         Self { params }
     }
 
-    /// Create a constant-level Vasicek process.
-    ///
-    /// # Arguments
-    ///
-    /// * `kappa` - Positive finite mean-reversion speed in inverse years.
-    /// * `theta` - Finite long-run short-rate level as a decimal.
-    /// * `sigma` - Positive finite short-rate volatility per square-root year.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when a parameter is non-finite or outside its range.
-    pub fn vasicek(kappa: f64, theta: f64, sigma: f64) -> Result<Self> {
-        Ok(Self::new(HullWhite1FParams::new(kappa, sigma, theta)?))
-    }
-
     /// Borrow the validated process parameters.
     pub fn params(&self) -> &HullWhite1FParams {
         &self.params
@@ -347,7 +323,7 @@ impl StochasticProcess for HullWhite1FProcess {
     fn drift(&self, t: f64, x: &[f64], out: &mut [f64]) {
         // μ(r) = κ[θ(t) - r]
         let theta = self.theta_at_time(t);
-        out[0] = self.params.kappa * (theta - x[0]);
+        out[0] = self.params.model.kappa * (theta - x[0]);
     }
 
     fn diffusion(&self, t: f64, _x: &[f64], out: &mut [f64]) {
@@ -378,7 +354,7 @@ impl StochasticProcess for HullWhite1FProcess {
 impl ProcessMetadata for HullWhite1FProcess {
     fn metadata(&self) -> ProcessParams {
         let mut params = ProcessParams::new("HullWhite1F");
-        params.add_param("kappa", self.params.kappa);
+        params.add_param("kappa", self.params.model.kappa);
         params.with_factors(vec!["short_rate".to_string()])
     }
 }
@@ -615,7 +591,7 @@ mod tests {
     fn test_hw1f_params_constant_theta() {
         let params = HullWhite1FParams::new(0.1, 0.01, 0.03).expect("valid parameters");
 
-        assert_eq!(params.kappa, 0.1);
+        assert_eq!(params.model.kappa, 0.1);
         assert_eq!(params.sigma_at_time(0.0), 0.01);
         assert_eq!(params.theta_at_time(0.0), 0.03);
         assert_eq!(params.theta_at_time(1.0), 0.03);
@@ -667,11 +643,12 @@ mod tests {
     }
 
     #[test]
-    fn test_vasicek_alias() {
-        let process =
-            HullWhite1FProcess::vasicek(0.1, 0.03, 0.01).expect("valid Vasicek parameters");
+    fn test_constant_theta_process() {
+        let process = crate::monte_carlo::process::ou::HullWhite1FParams::new(0.1, 0.01, 0.03)
+            .map(HullWhite1FProcess::new)
+            .expect("valid Vasicek parameters");
 
-        assert_eq!(process.params().kappa, 0.1);
+        assert_eq!(process.params().model.kappa, 0.1);
         assert_eq!(process.params().sigma_at_time(0.0), 0.01);
         assert_eq!(process.theta_at_time(0.0), 0.03);
     }
@@ -691,7 +668,7 @@ mod tests {
         // But we add the forward derivative which is near zero
         // Actually for flat curve: θ(t) = κ·f + σ²/(2κ²)·(1-e^{-κt})²
 
-        assert_eq!(params.kappa, 0.03);
+        assert_eq!(params.model.kappa, 0.03);
         assert_eq!(params.sigma_at_time(0.0), 0.01);
         assert_eq!(params.theta_times().len(), 5);
 

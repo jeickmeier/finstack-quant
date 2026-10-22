@@ -299,7 +299,7 @@ impl PathDependentPricerConfig {
 ///     .with_seed(42)
 ///     .with_parallel(false);
 /// let pricer = PathDependentPricer::new(config);
-/// let process = GbmProcess::with_params(0.05, 0.02, 0.20).unwrap();
+/// let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.05, 0.02, 0.20).map(GbmProcess::new).unwrap();
 /// let payoff = Asian::new(
 ///     OptionType::Call,
 ///     100.0,
@@ -630,7 +630,8 @@ impl PathDependentPricer {
                 .num_steps,
         );
         crate::monte_carlo::require_positive_vol(vol)?;
-        let process = GbmProcess::with_params(rate, div_yield, vol)?;
+        let process = crate::monte_carlo::process::gbm::GbmParams::new(rate, div_yield, vol)
+            .map(GbmProcess::new)?;
         let discount_factor = flat_discount_factor(rate, expiry)?;
         let payoff = Asian::new(
             option_type,
@@ -708,7 +709,8 @@ impl PathDependentPricer {
         crate::monte_carlo::require_positive_vol(vol)?;
         // Before the fixing schedule, which holds one entry per step.
         self.require_lrm_capture_fits(num_steps)?;
-        let process = GbmProcess::with_params(rate, div_yield, vol)?;
+        let process = crate::monte_carlo::process::gbm::GbmParams::new(rate, div_yield, vol)
+            .map(GbmProcess::new)?;
         let discount_factor = flat_discount_factor(rate, expiry)?;
         let payoff = Asian::new(
             option_type,
@@ -1277,7 +1279,9 @@ mod tests {
 
     #[test]
     fn sobol_reuses_engine_payoff_and_runtime_validation() {
-        let gbm = GbmProcess::with_params(0.0, 0.0, 0.2).unwrap();
+        let gbm = crate::monte_carlo::process::gbm::GbmParams::new(0.0, 0.0, 0.2)
+            .map(GbmProcess::new)
+            .unwrap();
         for (paths, maturity_step, discount_factor, message) in [
             (32, 2, 1.0, "event at step 2"),
             (32, 1, -1.0, "discount_factor"),
@@ -1306,7 +1310,9 @@ mod tests {
     fn lrm_rejects_initial_spot_observations_before_simulation() {
         let pricer =
             PathDependentPricer::new(PathDependentPricerConfig::new(2).with_parallel(false));
-        let gbm = GbmProcess::with_params(0.0, 0.0, 0.2).unwrap();
+        let gbm = crate::monte_carlo::process::gbm::GbmParams::new(0.0, 0.0, 0.2)
+            .map(GbmProcess::new)
+            .unwrap();
         let asian = Asian::new(
             crate::types::OptionType::Call,
             90.0,
@@ -1384,7 +1390,9 @@ mod tests {
                 .with_seed(42)
                 .with_parallel(false),
         );
-        let gbm = GbmProcess::with_params(0.05, 0.0, 0.2).expect("valid GBM parameters");
+        let gbm = crate::monte_carlo::process::gbm::GbmParams::new(0.05, 0.0, 0.2)
+            .map(GbmProcess::new)
+            .expect("valid GBM parameters");
 
         for averaging in [AveragingMethod::Arithmetic, AveragingMethod::Geometric] {
             let call = Asian::with_history(
@@ -1426,7 +1434,9 @@ mod tests {
 
     #[test]
     fn grid_entry_points_preserve_estimates_and_capture_contracts() {
-        let gbm = GbmProcess::with_params(0.05, 0.0, 0.2).expect("valid GBM");
+        let gbm = crate::monte_carlo::process::gbm::GbmParams::new(0.05, 0.0, 0.2)
+            .map(GbmProcess::new)
+            .expect("valid GBM");
         let call = European::new(OptionType::Call, 100.0, 1.0, 4);
         for sobol in [false, true] {
             let config = PathDependentPricerConfig::new(32)

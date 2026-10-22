@@ -242,8 +242,8 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
 
         // a_j = κ(θ − V_j)            (drift rate, weighted by ∫K ds)
         // n_j = σᵥ √V_j dW̃_j          (noise increment)
-        work[step] = p.kappa * (p.theta - v_current);
-        work[n + step] = p.sigma_v * v_current.sqrt() * dw_tilde;
+        work[step] = p.model.kappa * (p.model.theta - v_current);
+        work[n + step] = p.model.sigma_v * v_current.sqrt() * dw_tilde;
 
         // V_{next} = v₀ + (1/Γ(α)) Σ_{j=0}^{step} [a_j·∫_{t_j}^{t_{j+1}}K ds
         //                                          + w_j·n_j]
@@ -264,10 +264,10 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
         }
         // The extra near-field innovation is independent of both ordinary
         // Brownian increments. Only ΔW is retained for the far-field history.
-        volterra_sum += p.sigma_v * v_current.sqrt() * self.bridge_std[step] * z[2];
-        let v_next = (p.v0 + self.inv_gamma_alpha * volterra_sum).max(0.0);
+        volterra_sum += p.model.sigma_v * v_current.sqrt() * self.bridge_std[step] * z[2];
+        let v_next = (p.model.v0 + self.inv_gamma_alpha * volterra_sum).max(0.0);
 
-        let z_spot = p.rho * z_vol + (1.0 - p.rho * p.rho).max(0.0).sqrt() * z[0];
+        let z_spot = p.model.rho * z_vol + (1.0 - p.model.rho * p.model.rho).max(0.0).sqrt() * z[0];
 
         let sqrt_v_dt = (v_current * dt).max(0.0).sqrt();
         x[0] *= ((p.r - p.q - 0.5 * v_current) * dt + sqrt_v_dt * z_spot).exp();
@@ -375,7 +375,7 @@ mod tests {
         let disc = RoughHestonHybrid::new(&times, h).expect("valid");
 
         let s0 = 100.0;
-        let v0 = p.v0;
+        let v0 = p.model.v0;
         let dt = 0.01_f64;
         let z_indep = 0.5;
         let z_vol = 0.3;
@@ -389,8 +389,8 @@ mod tests {
         // With the bridge normal set to zero, conditioning on ΔW leaves the
         // interval-average kernel weight; the drift integral is exact.
         let dw_tilde = z_vol * dt.sqrt();
-        let drift_rate = p.kappa * (p.theta - v0);
-        let noise = p.sigma_v * v0.sqrt() * dw_tilde;
+        let drift_rate = p.model.kappa * (p.model.theta - v0);
+        let noise = p.model.sigma_v * v0.sqrt() * dw_tilde;
         let kernel_int = dt.powf(alpha) / alpha;
         let noise_weight = dt.powf(alpha - 1.0) / alpha;
         let inv_gamma = 1.0 / finstack_quant_core::math::special_functions::ln_gamma(alpha).exp();
@@ -404,7 +404,8 @@ mod tests {
             expected_v
         );
 
-        let z_spot = p.rho * z_vol + (1.0 - p.rho * p.rho).max(0.0).sqrt() * z_indep;
+        let z_spot =
+            p.model.rho * z_vol + (1.0 - p.model.rho * p.model.rho).max(0.0).sqrt() * z_indep;
         let sqrt_v_dt = (v0 * dt).sqrt();
         let expected_s = s0 * ((p.r - p.q - 0.5 * v0) * dt + sqrt_v_dt * z_spot).exp();
 
@@ -493,7 +494,7 @@ mod tests {
         let dt = 0.01_f64;
         let disc = RoughHestonHybrid::new(&[0.0, dt], p.hurst.value()).expect("valid");
         let run = |z: [f64; 3]| {
-            let mut x = [100.0, p.v0];
+            let mut x = [100.0, p.model.v0];
             let mut work = vec![0.0; disc.work_size(&process)];
             disc.step(&process, 0.0, dt, &mut x, &z, &mut work);
             x
@@ -503,7 +504,7 @@ mod tests {
         let bridge = run([0.0, 0.0, 1.0]);
         let b = brownian[1] - base[1];
         let c = bridge[1] - base[1];
-        let scale = p.sigma_v * p.v0.sqrt()
+        let scale = p.model.sigma_v * p.model.v0.sqrt()
             / finstack_quant_core::math::special_functions::ln_gamma(alpha).exp();
         let exact_variance = scale * scale * dt.powf(2.0 * alpha - 1.0) / (2.0 * alpha - 1.0);
         let exact_covariance = scale * dt.powf(alpha) / alpha;
@@ -514,7 +515,7 @@ mod tests {
             "bridge does not change the spot Brownian increment"
         );
         let log_spot_coefficient = (brownian[0] / base[0]).ln();
-        let exact_leverage = p.rho * p.v0.sqrt() * exact_covariance;
+        let exact_leverage = p.model.rho * p.model.v0.sqrt() * exact_covariance;
         assert!((log_spot_coefficient * b - exact_leverage).abs() < 1e-14);
     }
 

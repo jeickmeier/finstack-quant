@@ -514,7 +514,7 @@ fn long_dated_high_kappa_theta_does_not_fall_back_to_bs() {
     let spot = 100.0;
     let strike = 100.0;
     let time = 15.0;
-    let settings = HestonFourierSettings::for_maturity(time, params.v0);
+    let settings = HestonFourierSettings::for_maturity(time, params.model.v0);
 
     // Neither Gil-Pelaez probability may be flagged corrupted.
     for j in [1u8, 2u8] {
@@ -530,14 +530,21 @@ fn long_dated_high_kappa_theta_does_not_fall_back_to_bs() {
     // fallback at either v0 or v_bar(T).
     let price = heston_call_price_fourier(spot, strike, time, &params, Some(&settings))
         .expect("Heston Fourier call price");
-    let bs_v0 = black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
+    let bs_v0 = black_scholes_call(
+        spot,
+        strike,
+        time,
+        params.r,
+        params.q,
+        params.model.v0.sqrt(),
+    );
     let bs_vbar = black_scholes_call(
         spot,
         strike,
         time,
         params.r,
         params.q,
-        params.deterministic_avg_variance(time).sqrt(),
+        params.model.deterministic_avg_variance(time).sqrt(),
     );
     assert!(price.is_finite() && price > 0.0);
     assert!(
@@ -560,7 +567,7 @@ fn small_vol_of_vol_uses_deterministic_avg_variance_not_v0() {
     // Closed-form check of v_bar itself.
     let kt: f64 = 2.0;
     let expected_vbar = 0.09 + (0.01 - 0.09) * (1.0 - (-kt).exp()) / kt;
-    let vbar = params.deterministic_avg_variance(time);
+    let vbar = params.model.deterministic_avg_variance(time);
     assert!(
         (vbar - expected_vbar).abs() < 1e-14,
         "v_bar(T) mismatch: got {vbar}, expected {expected_vbar}"
@@ -570,7 +577,14 @@ fn small_vol_of_vol_uses_deterministic_avg_variance_not_v0() {
     let price = heston_call_price_fourier(spot, strike, time, &params, None)
         .expect("Heston Fourier call price");
     let bs_vbar = black_scholes_call(spot, strike, time, params.r, params.q, vbar.sqrt());
-    let bs_v0 = black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
+    let bs_v0 = black_scholes_call(
+        spot,
+        strike,
+        time,
+        params.r,
+        params.q,
+        params.model.v0.sqrt(),
+    );
     assert!(
         (price - bs_vbar).abs() < 1e-12,
         "Heston limit must use v_bar: got {price}, expected {bs_vbar}"
@@ -593,8 +607,8 @@ fn deterministic_avg_variance_taylor_branch_is_continuous() {
     };
     // Just below and just above the 1e-6 κt switch. The two κ values
     // genuinely differ, so allow the O(κt·(v0−θ)) ≈ 1e-8 physical gap.
-    let below = mk(0.9e-6).deterministic_avg_variance(t);
-    let above = mk(1.1e-6).deterministic_avg_variance(t);
+    let below = mk(0.9e-6).model.deterministic_avg_variance(t);
+    let above = mk(1.1e-6).model.deterministic_avg_variance(t);
     assert!(
         (below - above).abs() < 5e-8,
         "Taylor/closed-form branches must agree at the switch: {below} vs {above}"
@@ -611,8 +625,8 @@ fn canonical_heston_params_validate_correlation() {
 
     let params = HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04)
         .expect("valid Heston params");
-    assert_eq!(params.rho, -0.7);
-    assert_eq!(params.kappa, 2.0);
+    assert_eq!(params.model.rho, -0.7);
+    assert_eq!(params.model.kappa, 2.0);
 }
 
 /// Scalar Fourier integration reports convergence failure after bounded refinement.
@@ -763,7 +777,7 @@ fn heston_small_vol_of_vol_is_continuous_to_deterministic_variance() {
                 1.0,
                 params.r,
                 params.q,
-                params.deterministic_avg_variance(1.0).sqrt(),
+                params.model.deterministic_avg_variance(1.0).sqrt(),
             );
             let actual = heston_call_price_fourier(100.0, 100.0, 1.0, &params, None)
                 .expect("converged near-deterministic Heston price");

@@ -74,7 +74,7 @@ in the engine loop and configured with `McEngineConfig::antithetic`.
 | `process::brownian` | `BrownianParams`, `BrownianProcess`, `MultiBrownianProcess` |
 | `process::heston` | `HestonProcess`; uses canonical `closed_form::HestonPricingParams` and `volatility::heston::HestonParams` |
 | `process::cir` | `CirParams`, `CirProcess`, `CirPlusPlusProcess` |
-| `process::ou` | `HullWhite1FParams`, `HullWhite1FProcess` (`HullWhite1FProcess::vasicek` for constant θ), `calibrate_theta_from_curve` |
+| `process::ou` | `HullWhite1FParams`, `HullWhite1FProcess`, `calibrate_theta_from_curve` |
 | `process::multi_ou` | `MultiOuParams`, `MultiOuProcess` |
 | `process::schwartz_smith` | `SchwartzSmithParams`, `SchwartzSmithProcess` |
 | `process::lmm` | `LmmParams`, `LmmProcess` |
@@ -144,7 +144,7 @@ let engine = McEngine::new(
 );
 
 let rng = PhiloxRng::new(11);
-let process = GbmProcess::with_params(0.03, 0.01, 0.20).expect("valid GBM parameters");
+let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.03, 0.01, 0.20).map(GbmProcess::new).expect("valid GBM parameters");
 let disc = ExactGbm::new();
 let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 let discount_factor = (-0.03_f64).exp();
@@ -196,7 +196,7 @@ let engine = McEngine::new(
 );
 
 let rng = PhiloxRng::new(11);
-let process = GbmProcess::with_params(0.03, 0.01, 0.20).expect("valid GBM parameters");
+let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.03, 0.01, 0.20).map(GbmProcess::new).expect("valid GBM parameters");
 let disc = ExactGbm::new();
 let payoff = European::new(OptionType::Call, 100.0, 1.0, 12);
 let process_params = ProcessParams::new("GBM").with_factors(vec!["spot".to_string()]);
@@ -246,7 +246,7 @@ let cfg = LsmcConfig::new(50_000, vec![25, 50, 75, 100], 100)
     .expect("valid LSMC config")
     .with_seed(42);
 let pricer = LsmcPricer::new(cfg);
-let process = GbmProcess::with_params(0.05, 0.0, 0.3).expect("valid GBM parameters");
+let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.05, 0.0, 0.3).map(GbmProcess::new).expect("valid GBM parameters");
 let put = AmericanExercise::new(OptionType::Put, 100.0).expect("valid strike");
 let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
@@ -300,7 +300,7 @@ let engine = McEngine::new(
         .parallel(false),
 );
 let rng = PhiloxRng::new(42);
-let gbm = GbmProcess::with_params(0.05, 0.0, 0.2).expect("valid GBM parameters");
+let gbm = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.05, 0.0, 0.2).map(GbmProcess::new).expect("valid GBM parameters");
 let disc = ExactGbm::new();
 let call = European::new(OptionType::Call, 100.0, 1.0, 50);
 
@@ -340,7 +340,7 @@ let pricer = EuropeanPricer::new(25_000)
     .expect("positive path count")
     .with_seed(19)
     .with_parallel(false);
-let process = GbmProcess::with_params(0.03, 0.01, 0.20).expect("valid GBM parameters");
+let process = finstack_quant_models::monte_carlo::process::gbm::GbmParams::new(0.03, 0.01, 0.20).map(GbmProcess::new).expect("valid GBM parameters");
 let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
 
 let result = pricer

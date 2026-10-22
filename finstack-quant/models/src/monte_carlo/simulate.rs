@@ -591,7 +591,9 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             }
         }
         ProcessSpec::Cir(p) => {
-            let process = CirProcess::with_params(p.kappa, p.theta, p.sigma)?;
+            let process =
+                crate::monte_carlo::process::cir::CirParams::new(p.kappa, p.theta, p.sigma)
+                    .map(CirProcess::new)?;
             require_domain(spec, &process, 0.0)?;
             match spec.scheme {
                 SchemeSpec::Default => {
@@ -609,7 +611,12 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             shift_times,
         } => {
             let process = CirPlusPlusProcess::new(
-                CirProcess::with_params(params.kappa, params.theta, params.sigma)?,
+                crate::monte_carlo::process::cir::CirParams::new(
+                    params.kappa,
+                    params.theta,
+                    params.sigma,
+                )
+                .map(CirProcess::new)?,
                 shift_curve.clone(),
                 shift_times.clone(),
             )?;
@@ -645,9 +652,17 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             Ok(summary)
         }
         ProcessSpec::Heston(p) => {
-            let process =
-                HestonProcess::with_params(p.r, p.q, p.kappa, p.theta, p.sigma_v, p.rho, p.v0)?;
-            require_spot_and_v0(spec, x0, p.v0)?;
+            let process = crate::closed_form::HestonPricingParams::new(
+                p.r,
+                p.q,
+                p.model.kappa,
+                p.model.theta,
+                p.model.sigma_v,
+                p.model.rho,
+                p.model.v0,
+            )
+            .map(HestonProcess::new)?;
+            require_spot_and_v0(spec, x0, p.model.v0)?;
             match spec.scheme {
                 SchemeSpec::Default => {
                     simulate_with_noise(&process, &QeHeston::new(), spec, x0, parallel, None)
@@ -742,7 +757,7 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
         ProcessSpec::RoughHeston(p) => {
             p.validate()?;
             let process = RoughHestonProcess::new(p.clone());
-            require_spot_and_v0(spec, x0, p.v0)?;
+            require_spot_and_v0(spec, x0, p.model.v0)?;
             if spec.scheme != SchemeSpec::Default {
                 return unsupported();
             }

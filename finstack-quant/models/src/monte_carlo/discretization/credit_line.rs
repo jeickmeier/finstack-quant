@@ -190,7 +190,7 @@ impl Discretization<CreditLineProcess> for CreditLineDiscretization {
                 //
                 // For HW1F:
                 // r_{t+dt} = r_t e^{-κdt} + θ(1 - e^{-κdt}) + σ√[(1-e^{-2κdt})/(2κ)] Z
-                let kappa = params.kappa;
+                let kappa = params.model.kappa;
                 let theta = params.theta_at_time(process.get_params().time_offset + t);
 
                 let exp_kappa_dt = (-kappa * dt).exp();

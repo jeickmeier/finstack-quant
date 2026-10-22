@@ -112,8 +112,8 @@
 //! let heston = HestonProcess::new(params.clone());
 //!
 //! // Check Feller condition
-//! let feller = 2.0 * params.kappa * params.theta;
-//! let sigma_v_sq = params.sigma_v * params.sigma_v;
+//! let feller = 2.0 * params.model.kappa * params.model.theta;
+//! let sigma_v_sq = params.model.sigma_v * params.model.sigma_v;
 //! println!("Feller satisfied: {}", feller >= sigma_v_sq);
 //! ```
 
@@ -176,7 +176,7 @@ impl HestonProcess {
     ///
     /// This constructor accepts already validated parameters and does not
     /// enforce the Feller condition (2κθ ≥ σᵥ²). [`HestonPricingParams::new`]
-    /// (used by [`Self::with_params`]) logs the one warning when it is
+    /// (used before process construction) logs the one warning when it is
     /// violated; the QE scheme truncates variance at zero either way.
     ///
     /// # Arguments
@@ -209,41 +209,6 @@ impl HestonProcess {
         )
     }
 
-    /// Create with explicit parameters.
-    ///
-    /// This validates raw annualized Heston parameters through
-    /// [`HestonPricingParams::new`], then constructs a process. A Feller-condition
-    /// violation is permitted and logged by [`Self::new`], because the QE
-    /// discretization supports boundary truncation.
-    ///
-    /// # Errors
-    ///
-    /// Returns the validation errors from [`HestonPricingParams::new`] for non-finite
-    /// rates, invalid variance parameters, or an out-of-range correlation.
-    ///
-    /// # Arguments
-    ///
-    /// * `r` - Continuously compounded risk-free rate in decimal annual units
-    /// * `q` - Continuous dividend yield in decimal annual units
-    /// * `kappa` - Mean-reversion speed of the stochastic volatility or short-rate factor
-    /// * `theta` - Long-run mean level of the mean-reverting stochastic factor
-    /// * `sigma_v` - Volatility-of-variance parameter for the Heston-style variance process
-    /// * `rho` - Instantaneous correlation between Brownian drivers, in `[-1, 1]`
-    /// * `v0` - Initial variance level for the stochastic volatility process at time zero
-    pub fn with_params(
-        r: f64,
-        q: f64,
-        kappa: f64,
-        theta: f64,
-        sigma_v: f64,
-        rho: f64,
-        v0: f64,
-    ) -> finstack_quant_core::Result<Self> {
-        Ok(Self::new(HestonPricingParams::new(
-            r, q, kappa, theta, sigma_v, rho, v0,
-        )?))
-    }
-
     /// Get parameters.
     pub fn params(&self) -> &HestonPricingParams {
         &self.params
@@ -267,7 +232,7 @@ impl StochasticProcess for HestonProcess {
         out[0] = (self.params.r - self.params.q) * s;
 
         // dv/dt = κ(θ - v)
-        out[1] = self.params.kappa * (self.params.theta - v);
+        out[1] = self.params.model.kappa * (self.params.model.theta - v);
     }
 
     fn diffusion(&self, _t: f64, x: &[f64], out: &mut [f64]) {
@@ -279,11 +244,11 @@ impl StochasticProcess for HestonProcess {
         out[0] = sqrt_v * s;
 
         // Diffusion for v: σ_v √v
-        out[1] = self.params.sigma_v * sqrt_v;
+        out[1] = self.params.model.sigma_v * sqrt_v;
     }
 
     fn factor_correlation(&self) -> Option<Vec<f64>> {
-        let rho = self.params.rho;
+        let rho = self.params.model.rho;
         Some(vec![1.0, rho, rho, 1.0])
     }
 }
@@ -293,14 +258,14 @@ impl ProcessMetadata for HestonProcess {
         let mut params = ProcessParams::new("Heston");
         params.add_param("r", self.params.r);
         params.add_param("q", self.params.q);
-        params.add_param("kappa", self.params.kappa);
-        params.add_param("theta", self.params.theta);
-        params.add_param("sigma_v", self.params.sigma_v);
-        params.add_param("rho", self.params.rho);
-        params.add_param("v0", self.params.v0);
+        params.add_param("kappa", self.params.model.kappa);
+        params.add_param("theta", self.params.model.theta);
+        params.add_param("sigma_v", self.params.model.sigma_v);
+        params.add_param("rho", self.params.model.rho);
+        params.add_param("v0", self.params.model.v0);
 
         // Create 2x2 correlation matrix for [S, v]
-        let correlation = vec![1.0, self.params.rho, self.params.rho, 1.0];
+        let correlation = vec![1.0, self.params.model.rho, self.params.model.rho, 1.0];
 
         params
             .with_correlation(correlation)
@@ -325,19 +290,19 @@ mod tests {
         )
         .expect("valid");
 
-        assert_eq!(params.kappa, 2.0);
-        assert!(params.satisfies_feller());
+        assert_eq!(params.model.kappa, 2.0);
+        assert!(params.model.satisfies_feller());
     }
 
     #[test]
     fn test_feller_condition() {
         let params_feller =
             HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.2, -0.5, 0.04).expect("valid");
-        assert!(params_feller.satisfies_feller());
+        assert!(params_feller.model.satisfies_feller());
 
         let params_no_feller =
             HestonPricingParams::new(0.05, 0.02, 0.5, 0.04, 0.5, -0.5, 0.04).expect("valid");
-        assert!(!params_no_feller.satisfies_feller());
+        assert!(!params_no_feller.model.satisfies_feller());
     }
 
     #[test]
@@ -350,13 +315,15 @@ mod tests {
         // The params method delegates to the same predicate.
         let boundary =
             HestonPricingParams::new(0.05, 0.02, 1.0, 0.045, 0.3, -0.5, 0.04).expect("valid");
-        assert!(boundary.satisfies_feller());
+        assert!(boundary.model.satisfies_feller());
     }
 
     #[test]
     fn test_heston_drift_diffusion() {
         let heston =
-            HestonProcess::with_params(0.05, 0.02, 2.0, 0.04, 0.3, -0.5, 0.04).expect("valid");
+            crate::closed_form::HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.5, 0.04)
+                .map(HestonProcess::new)
+                .expect("valid");
 
         let x = vec![100.0_f64, 0.04_f64];
         let mut drift = vec![0.0_f64; 2];

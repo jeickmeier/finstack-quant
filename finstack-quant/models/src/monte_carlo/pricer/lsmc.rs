@@ -1095,7 +1095,8 @@ impl LsmcPricer {
         let currency = crate::monte_carlo::convenience::resolve_currency(currency)?;
         let exercise = AmericanExercise::new(option_type, strike)?;
         crate::monte_carlo::require_positive_vol(vol)?;
-        let process = GbmProcess::with_params(rate, div_yield, vol)?;
+        let process = crate::monte_carlo::process::gbm::GbmParams::new(rate, div_yield, vol)
+            .map(GbmProcess::new)?;
         let basis = lsmc_basis(basis, basis_degree, strike)?;
         self.price(
             &process, spot, expiry, num_steps, &exercise, &basis, currency, rate,
@@ -1148,7 +1149,8 @@ impl LsmcPricer {
         let currency = crate::monte_carlo::convenience::resolve_currency(currency)?;
         let exercise = AmericanExercise::new(option_type, strike)?;
         crate::monte_carlo::require_positive_vol(vol)?;
-        let process = GbmProcess::with_params(rate, div_yield, vol)?;
+        let process = crate::monte_carlo::process::gbm::GbmParams::new(rate, div_yield, vol)
+            .map(GbmProcess::new)?;
         let basis = lsmc_basis(basis, basis_degree, strike)?;
         self.price_unbiased(
             &process,
@@ -1184,7 +1186,9 @@ mod tests {
         let mut config = LsmcConfig::new(16, vec![1], 1).expect("small config");
         config.num_paths = usize::MAX;
         let pricer = LsmcPricer::new(config);
-        let process = GbmProcess::with_params(0.05, 0.0, 0.2).expect("process");
+        let process = crate::monte_carlo::process::gbm::GbmParams::new(0.05, 0.0, 0.2)
+            .map(GbmProcess::new)
+            .expect("process");
         assert!(pricer
             .generate_paths_with_seed(&process, 100.0, 1.0, 1, pricer.config.seed)
             .is_err());
@@ -1192,7 +1196,9 @@ mod tests {
 
     #[test]
     fn lsmc_requires_two_independent_estimators_with_or_without_antithetics() {
-        let process = GbmProcess::with_params(0.05, 0.0, 0.2).expect("process");
+        let process = crate::monte_carlo::process::gbm::GbmParams::new(0.05, 0.0, 0.2)
+            .map(GbmProcess::new)
+            .expect("process");
         for antithetic in [false, true] {
             for num_paths in [0, 1] {
                 assert!(LsmcConfig::new(num_paths, vec![1], 1).is_err());
