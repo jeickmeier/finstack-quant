@@ -3,7 +3,7 @@
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
-    dates_to_datetime_index, dict_to_dataframe, labeled_values_to_series,
+    dates_to_datetime_index, dates_to_pylist, dict_to_dataframe, labeled_values_to_series,
 };
 use finstack_quant_analytics::{
     BetaResult, DatedSeries, DrawdownEpisode, GreeksResult, LookbackReturns, MultiFactorResult,
@@ -295,11 +295,7 @@ impl PyRollingGreeks {
     /// Date labels for each rolling window.
     #[getter]
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-        self.inner
-            .dates
-            .iter()
-            .map(|&d| date_to_py(py, d))
-            .collect()
+        dates_to_pylist(py, &self.inner.dates)
     }
     /// Rolling alpha values.
     #[getter]
@@ -627,11 +623,7 @@ impl PyDatedSeries {
     /// Window-end dates aligned 1:1 with [`values`](Self::values).
     #[getter]
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-        self.inner
-            .dates
-            .iter()
-            .map(|&d| date_to_py(py, d))
-            .collect()
+        dates_to_pylist(py, &self.inner.dates)
     }
     /// Metric name of the series (Rust `RollingMetric`), also the column name
     /// used by [`to_dataframe`](Self::to_dataframe).

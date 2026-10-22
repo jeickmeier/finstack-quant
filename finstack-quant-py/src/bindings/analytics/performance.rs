@@ -5,7 +5,7 @@ use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::wire_methods;
-use crate::bindings::pandas_utils::{int_values_to_series, values_to_series};
+use crate::bindings::pandas_utils::{dates_to_pylist, int_values_to_series, values_to_series};
 use crate::errors::analytics_to_py;
 use finstack_quant_analytics::{
     CagrDayCount, Performance, ReturnKind, DEFAULT_ANNUALIZE, DEFAULT_CONFIDENCE,
@@ -401,11 +401,7 @@ impl PyPerformance {
     /// Matches Rust ``Performance::dates``. For the dates inside the
     /// currently selected analysis window, use :meth:`active_dates`.
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-        self.inner
-            .dates()
-            .iter()
-            .map(|&d| date_to_py(py, d))
-            .collect()
+        dates_to_pylist(py, self.inner.dates())
     }
 
     /// Date grid of the currently active analysis window.
@@ -413,11 +409,7 @@ impl PyPerformance {
     /// Matches Rust ``Performance::active_dates``. Equal to :meth:`dates`
     /// until :meth:`reset_date_range` narrows the window.
     fn active_dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-        self.inner
-            .active_dates()
-            .iter()
-            .map(|&d| date_to_py(py, d))
-            .collect()
+        dates_to_pylist(py, self.inner.active_dates())
     }
 
     /// Date grid corresponding to one ticker's active return series.
@@ -430,12 +422,12 @@ impl PyPerformance {
         ticker_idx: &Bound<'_, PyAny>,
     ) -> PyResult<Vec<Bound<'py, PyAny>>> {
         let ticker_idx = self.resolve_ticker(ticker_idx)?;
-        self.inner
-            .active_dates_for_ticker(ticker_idx)
-            .map_err(analytics_to_py)?
-            .iter()
-            .map(|&d| date_to_py(py, d))
-            .collect()
+        dates_to_pylist(
+            py,
+            self.inner
+                .active_dates_for_ticker(ticker_idx)
+                .map_err(analytics_to_py)?,
+        )
     }
 
     // -- Scalar-per-ticker methods --
