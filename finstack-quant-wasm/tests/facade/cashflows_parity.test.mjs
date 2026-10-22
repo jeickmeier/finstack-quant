@@ -620,6 +620,16 @@ test('spec functions validate through Rust and reject wrong host types', () => {
       }),
     kind('validation', /reset_lag_days must be non-negative/)
   );
+  for (const [fields, message] of [
+    [{ index_floor_bp: '100', index_cap_bp: '50' }, /index_floor_bp/],
+    [{ all_in_floor_bp: '100', all_in_cap_bp: '50' }, /all_in_floor_bp/],
+  ]) {
+    assert.throws(
+      () =>
+        cashflows.floatingRateSpecValidate({ ...cashflows.floatingRateSpecSofr('0'), ...fields }),
+      kind('validation', message)
+    );
+  }
   assert.equal(cashflows.notionalValidate(cashflows.notionalPar(100, 'USD')), undefined);
   assert.throws(
     () =>
