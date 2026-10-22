@@ -298,7 +298,8 @@ python_package = "finstack_quant.cashflows.builder"
 # credit-rate helpers annual_to_monthly_clamped / psa_cpr /
 # PSA_RAMP_MONTHS / PSA_TERMINAL_CPR / SDA_PEAK_CDR. The FloatingRateSpec
 # DEFAULT_GEARING / DEFAULT_GEARING_INCLUDES_SPREAD / DEFAULT_RESET_LAG_DAYS
-# constants are Rust-only; the Python constructor defaults read them.
+# constants and ScheduleParams::DEFAULT_STUB are Rust-only; the Python
+# constructor defaults read them.
 note = "Typed CashFlowBuilder includes build_as_of / buildAsOf for explicit fixing cutoffs and matches the Rust coupon-program methods (including fixed_to_float and float_margin_steps); WASM binds CashFlowSchedule / CashFlowBuilder as classes, and the spec types cross as plain objects whose constructors and methods are free functions (see the [parity] ledger)."
 public = [
     "AmortizationSpec", "CashFlowBuilder", "CashFlowMeta", "CashFlowSchedule", "CouponType",
