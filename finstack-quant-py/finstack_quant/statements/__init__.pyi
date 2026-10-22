@@ -547,9 +547,9 @@ class MonteCarloResults:
         float | None
             Fraction of paths in ``[0, 1]`` with at least one breach, or
             ``None`` when the metric was not simulated, there are no forecast
-            periods, the path buffer is incomplete, or the result was
-            reconstructed from JSON / pickle (the per-path buffer is not
-            serialized).
+            periods, or the retained path data is incomplete. Results restored
+            from JSON / pickle support this calculation when they include
+            complete path data (``include_path_data=True``).
 
         Notes
         -----
@@ -637,57 +637,6 @@ class MonteCarloResults:
         Notes
         -----
         This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    @property
-    def metrics(self) -> list[str]:
-        """Return simulated metric identifiers in model order.
-
-        Returns
-        -------
-        list[str]
-            Node identifiers represented by percentile summaries.
-
-        Notes
-        -----
-        This accessor does not raise; it returns stored or derived model data.
-        """
-        ...
-
-    @property
-    def warnings(self) -> list[str]:
-        """Return warnings encountered during path evaluation.
-
-        Returns
-        -------
-        list[str]
-            Human-readable Rust evaluation warnings; empty when every path evaluated cleanly.
-
-        Notes
-        -----
-        This accessor does not raise; it returns stored or derived model data.
-        """
-        ...
-
-    def breach_probability(self, metric: str, threshold: float) -> float | None:
-        """Estimate the probability of exceeding a level in any forecast period.
-
-        Parameters
-        ----------
-        metric:
-            Simulated node identifier.
-        threshold:
-            Upper breach level in the metric's own units; breaches use strict value > threshold.
-
-        Returns
-        -------
-        float | None
-            Fraction of paths with at least one upside breach. None means an unknown metric, absent forecast data, incomplete paths, or reconstruction from JSON/pickle: the internal path buffer is not serialized, even with include_path_data=True.
-
-        Notes
-        -----
-        This accessor does not raise; it returns stored or derived model data.
         """
         ...
 
@@ -2091,21 +2040,6 @@ class FinancialModelSpec:
         Notes
         -----
         This accessor does not raise; it returns stored or derived model data.
-        """
-        ...
-
-    def content_hash(self) -> str:
-        """Compute the versioned SHA-256 hash of canonical model JSON.
-
-        Returns
-        -------
-        str
-            Stable model content hash, independent of JSON object key order.
-
-        Raises
-        ------
-        ValueError
-            If a model value cannot be represented by the canonical hash contract.
         """
         ...
 
@@ -5108,9 +5042,9 @@ class CheckReport:
         """
         ...
 
-    def findings_by_severity(self, severity: str) -> list[dict[str, object]]:
+    def findings_by_severity(self, severity: str) -> list[CheckFinding]:
         """
-        Return all retained findings of one severity as serde dicts.
+        Return all retained findings of one severity as CheckFinding objects.
 
         Delegates to the canonical Rust ``CheckReport::findings_by_severity``.
 
@@ -5122,8 +5056,8 @@ class CheckReport:
 
         Returns
         -------
-        list[dict[str, object]]
-            One ``CheckFinding`` serde dict per matching retained finding.
+        list[CheckFinding]
+            One ``CheckFinding`` object per matching retained finding.
 
         Raises
         ------

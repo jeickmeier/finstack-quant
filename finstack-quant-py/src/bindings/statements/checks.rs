@@ -4,6 +4,7 @@ use crate::bindings::macros::impl_repr_html_via_dataframe;
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::bindings::pandas_utils::{serde_to_py, ColumnSchema};
+use crate::bindings::pydoc::pydoc;
 use crate::errors::{serde_json_to_py, statements_to_py, value_error};
 use finstack_quant_statements::checks::{
     BuiltinCheckSpec, CheckCategory, CheckConfig, CheckFinding, FormulaCheckSpec, Severity,
@@ -729,25 +730,7 @@ impl PyCheckReport {
         self.inner.has_warnings()
     }
 
-    /// Return all retained findings of one severity.
-    ///
-    /// Delegates to the canonical Rust ``CheckReport::findings_by_severity``.
-    ///
-    /// Parameters
-    /// ----------
-    /// severity : str
-    ///     One of ``"info"``, ``"warning"``, ``"error"`` (the canonical
-    ///     snake_case severity discriminants).
-    ///
-    /// Returns
-    /// -------
-    /// list[CheckFinding]
-    ///     One typed finding per matching retained finding, in check order.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``severity`` is not a canonical severity discriminant.
+    #[doc = pydoc!("finstack_quant.statements", "CheckReport.findings_by_severity")]
     #[pyo3(text_signature = "($self, severity)")]
     fn findings_by_severity(&self, severity: &str) -> PyResult<Vec<PyCheckFinding>> {
         let severity = parse_severity(severity)?;
