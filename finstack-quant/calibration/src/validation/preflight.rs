@@ -261,7 +261,10 @@ fn validate_inflation_step(
     }
 
     // The lag must be one the inflation curve can carry: a month lag or none.
-    let lag = crate::targets::inflation::parse_observation_lag(&p.observation_lag)?;
+    let lag = crate::targets::inflation::parse_observation_lag(&p.observation_lag)?.map_or(
+        finstack_quant_core::market_data::scalars::InflationLag::None,
+        finstack_quant_core::market_data::scalars::InflationLag::Months,
+    );
 
     // If an InflationIndex fixings series is provided, enforce consistency:
     // - currency match

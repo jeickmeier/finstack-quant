@@ -396,6 +396,54 @@ fn inflation_calibration_rejects_unrepresentable_day_lags() {
 }
 
 #[test]
+fn inflation_month_lags_preserve_leap_day_and_monthly_anchor_contracts() {
+    let base = time::macros::date!(2028 - 02 - 29);
+    let maturity = time::macros::date!(2032 - 02 - 29);
+    let market = MarketContext::new().insert(
+        DiscountCurve::builder("GBP-SONIA")
+            .base_date(base)
+            .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
+            .build()
+            .expect("discount curve"),
+    );
+    let quotes = [MarketQuote::Inflation(InflationQuote::InflationSwap {
+        id: QuoteId::new("LEAP-DAY"),
+        maturity,
+        rate: 0.02,
+        index: "UK-RPI".to_string(),
+        convention: InflationSwapConventionId::new("UK-RPI"),
+    })];
+    for (lag, origin, anchor) in [
+        (
+            "1M",
+            time::macros::date!(2028 - 01 - 29),
+            time::macros::date!(2032 - 01 - 01),
+        ),
+        // The canonical parser normalizes 0M to None, while 00M is Months(0).
+        ("00M", base, time::macros::date!(2032 - 02 - 01)),
+        ("0M", base, maturity),
+        ("none", base, maturity),
+    ] {
+        let mut params = lag_calibration_params(lag, CalibrationMethod::Bootstrap);
+        params.base_date = base;
+        let (calibrated, report) = cal_utils::execute_step(
+            &StepParams::Inflation(params),
+            &quotes,
+            &market,
+            &CalibrationConfig::default(),
+        )
+        .expect("calibrate leap-day quote");
+        assert!(report.success, "{lag}: {report:?}");
+        let curve = calibrated.get_inflation_curve("UK-RPI").expect("curve");
+        assert_eq!(curve.base_date(), origin, "{lag}");
+        let expected = DayCount::Act365F
+            .year_fraction(origin, anchor, DayCountContext::default())
+            .expect("pillar clock");
+        assert_eq!(curve.knots().last().copied(), Some(expected), "{lag}");
+    }
+}
+
+#[test]
 fn inflation_params_reject_unsupported_seasonal_factors() {
     let params = lag_calibration_params("2M", CalibrationMethod::Bootstrap);
     for unsupported in [
