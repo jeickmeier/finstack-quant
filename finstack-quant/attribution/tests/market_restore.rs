@@ -197,7 +197,7 @@ fn parametric_curve(beta0: f64) -> ParametricCurve {
 }
 
 fn vol_cube(alpha: f64) -> VolCube {
-    let params = SabrParameterData::new(alpha, 0.5, 0.4, -0.2).expect("valid SABR params");
+    let params = SabrParameterData::new(alpha, 0.5, 0.4, -0.2, None).expect("valid SABR params");
     VolCube::from_grid(
         "SWPT-CUBE",
         &[1.0, 2.0],

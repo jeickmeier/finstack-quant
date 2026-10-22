@@ -512,7 +512,7 @@ impl PySabrParameterData {
     #[new]
     #[pyo3(signature = (alpha, beta, nu, rho, shift=None))]
     fn new(alpha: f64, beta: f64, nu: f64, rho: f64, shift: Option<f64>) -> PyResult<Self> {
-        SabrParameterData::new_with_shift(alpha, beta, nu, rho, shift)
+        SabrParameterData::new(alpha, beta, nu, rho, shift)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
