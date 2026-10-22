@@ -477,7 +477,7 @@ mod tests {
                 .clone()
                 .with_quote_type(VolQuoteType::Normal)
                 .unwrap(),
-            finstack_quant_core::market_data::surfaces::VolSurface::from_grid_opts(
+            finstack_quant_core::market_data::surfaces::VolSurface::from_grid(
                 base.id(),
                 base.expiries(),
                 base.strikes(),

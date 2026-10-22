@@ -334,8 +334,15 @@ fn test_butterfly_arbitrage_detected_and_fails() {
         0.22, 0.20, 0.22,
     ];
 
-    let surface = VolSurface::from_grid("TEST-BUTTERFLY-ARB", &expiries, &strikes, &vol_grid)
-        .expect("should build vol surface for testing");
+    let surface = VolSurface::from_grid(
+        "TEST-BUTTERFLY-ARB",
+        &expiries,
+        &strikes,
+        &vol_grid,
+        Default::default(),
+        None,
+    )
+    .expect("should build vol surface for testing");
 
     let strict_config = ValidationConfig::default();
     let result = validate_butterfly_spread(&surface, &strict_config);
@@ -372,6 +379,8 @@ fn test_call_convexity_rejects_vertical_spread_above_strike_width() {
             &[1.0],
             &strikes[..point_count],
             &vols[..point_count],
+            Default::default(),
+            None,
         )
         .expect("surface should build");
         let error =
@@ -397,6 +406,8 @@ fn test_call_convexity_checks_two_strike_monotonicity() {
         &[1.0],
         &[90.0, 100.0],
         &[0.01, 0.80],
+        Default::default(),
+        None,
     )
     .expect("surface should build");
     let error = validate_butterfly_call_convexity(&surface, &ValidationConfig::default(), &[100.0])
@@ -411,9 +422,15 @@ fn test_call_convexity_accepts_valid_two_strike_spreads() {
     // Zero volatility saturates the strike-width bound for two in-the-money
     // calls; a flat positive-volatility smile lies strictly within the bound.
     for vols in [[0.0, 0.0], [0.20, 0.20]] {
-        let surface =
-            VolSurface::from_grid("TEST-VALID-VERTICAL-SPREAD", &[1.0], &[80.0, 90.0], &vols)
-                .expect("surface should build");
+        let surface = VolSurface::from_grid(
+            "TEST-VALID-VERTICAL-SPREAD",
+            &[1.0],
+            &[80.0, 90.0],
+            &vols,
+            Default::default(),
+            None,
+        )
+        .expect("surface should build");
         assert!(validate_butterfly_call_convexity(
             &surface,
             &ValidationConfig::default(),
@@ -432,6 +449,8 @@ fn test_call_convexity_still_rejects_butterfly_with_valid_vertical_spreads() {
         &[1.0],
         &[90.0, 100.0, 110.0],
         &[0.20, 0.25, 0.20],
+        Default::default(),
+        None,
     )
     .expect("surface should build");
     let error = validate_butterfly_call_convexity(&surface, &ValidationConfig::default(), &[100.0])
@@ -454,8 +473,15 @@ fn test_calendar_arbitrage_detected_and_fails() {
         0.20, 0.22, 0.20,
     ];
 
-    let surface = VolSurface::from_grid("TEST-CALENDAR-ARB", &expiries, &strikes, &vol_grid)
-        .expect("should build vol surface for testing");
+    let surface = VolSurface::from_grid(
+        "TEST-CALENDAR-ARB",
+        &expiries,
+        &strikes,
+        &vol_grid,
+        Default::default(),
+        None,
+    )
+    .expect("should build vol surface for testing");
 
     let strict_config = ValidationConfig::default();
     let result = validate_calendar_spread(&surface, &strict_config);
@@ -485,8 +511,15 @@ fn test_valid_surface_passes_arbitrage_checks() {
         0.245, 0.24, 0.245,
     ];
 
-    let surface = VolSurface::from_grid("TEST-VALID-SURFACE", &expiries, &strikes, &vol_grid)
-        .expect("should build valid vol surface");
+    let surface = VolSurface::from_grid(
+        "TEST-VALID-SURFACE",
+        &expiries,
+        &strikes,
+        &vol_grid,
+        Default::default(),
+        None,
+    )
+    .expect("should build valid vol surface");
 
     let config = ValidationConfig::default();
     assert!(validate_calendar_spread(&surface, &config).is_ok());

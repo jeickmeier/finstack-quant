@@ -52,6 +52,8 @@ fn flat_vol_surface(id: &str) -> VolSurface {
         &[0.25, 0.5, 1.0, 2.0],
         &[80.0, 90.0, 100.0, 110.0, 120.0],
         &[0.25; 20],
+        Default::default(),
+        None,
     )
     .unwrap()
 }

@@ -346,7 +346,7 @@ impl LocalVolSurface {
 
         // Smoothing changes values only, preserving the full artifact contract
         // before the canonical extractor validates it again.
-        let smoothed_surface = VolSurface::from_grid_opts(
+        let smoothed_surface = VolSurface::from_grid(
             surface.id().as_str(),
             expiries,
             strikes,
@@ -493,7 +493,8 @@ pub(crate) mod test_support {
                     vols.push(self.implied_vol((strike / forward).ln(), t));
                 }
             }
-            VolSurface::from_grid("SSVI", expiries, strikes, &vols).expect("SSVI surface builds")
+            VolSurface::from_grid("SSVI", expiries, strikes, &vols, Default::default(), None)
+                .expect("SSVI surface builds")
         }
     }
 
@@ -531,6 +532,8 @@ mod tests {
             expiries,
             strikes,
             &vec![vol; expiries.len() * strikes.len()],
+            Default::default(),
+            None,
         )
         .expect("flat surface should build")
     }
@@ -554,7 +557,7 @@ mod tests {
         let (base, forwards) = test_surface();
         let shifted = base.clone().with_displacements(&[20.0; 4]).unwrap();
         let normal = base.clone().with_quote_type(VolQuoteType::Normal).unwrap();
-        let tenor_grid = VolSurface::from_grid_opts(
+        let tenor_grid = VolSurface::from_grid(
             base.id(),
             base.expiries(),
             base.strikes(),

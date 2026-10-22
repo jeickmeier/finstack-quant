@@ -619,8 +619,15 @@ mod tests {
 
     #[test]
     fn scratch_surface_bump_restores_original_surface() {
-        let surface =
-            VolSurface::from_grid("VOL", &[0.5, 1.0], &[90.0, 100.0], &[0.2; 4]).expect("surface");
+        let surface = VolSurface::from_grid(
+            "VOL",
+            &[0.5, 1.0],
+            &[90.0, 100.0],
+            &[0.2; 4],
+            Default::default(),
+            None,
+        )
+        .expect("surface");
         let mut ctx = MarketContext::new().insert_surface(surface);
 
         let token = ctx

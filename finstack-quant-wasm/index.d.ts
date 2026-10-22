@@ -6802,7 +6802,7 @@ export interface VolSurfaceOptions {
 export interface VolSurfaceConstructor {
   /**
    * Construct a surface from a row-major volatility grid (Rust
-   * `VolSurface::from_grid_opts`).
+   * `VolSurface::from_grid`).
    *
    * @param id - Surface identifier, the `MarketContext` lookup key.
    * @param expiries - Option expiries in years, strictly increasing.

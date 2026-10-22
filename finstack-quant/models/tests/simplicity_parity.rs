@@ -6,7 +6,7 @@
 //!    `format(decimals, show_currency)` matches the corresponding `FormatOpts`.
 //! 2. `DiscountCurveBuilder::validation(ValidationMode::*)` covers the
 //!    market-standard, negative-rate-friendly, and raw validation policies.
-//! 3. `VolSurface::from_grid_opts` preserves the explicit axis and
+//! 3. `VolSurface::from_grid` preserves the explicit axis and
 //!    interpolation contract.
 //! 4. `VolSurface::value_checked` and `value_in_bounds` agree on interior
 //!    evaluation points (the shared bilinear kernel regression test).
@@ -164,11 +164,11 @@ fn sample_grid() -> (Vec<f64>, Vec<f64>, Vec<f64>) {
 }
 
 #[test]
-fn from_grid_opts_default_matches_from_grid() {
+fn from_grid_default_matches_from_grid() {
     let (exp, strikes, vols) = sample_grid();
-    let a = VolSurface::from_grid("S", &exp, &strikes, &vols).unwrap();
-    let b = VolSurface::from_grid_opts("S", &exp, &strikes, &vols, VolGridOpts::default(), None)
-        .unwrap();
+    let a = VolSurface::from_grid("S", &exp, &strikes, &vols, Default::default(), None).unwrap();
+    let b =
+        VolSurface::from_grid("S", &exp, &strikes, &vols, VolGridOpts::default(), None).unwrap();
 
     for &e in &exp {
         for &k in &strikes {
@@ -195,7 +195,7 @@ fn vol_surface_builder_matches_grid_constructor() {
         builder = builder.row(row);
     }
     let built = builder.build().expect("builder surface");
-    let direct = VolSurface::from_grid_opts(
+    let direct = VolSurface::from_grid(
         "S",
         &expiries,
         &strikes,
@@ -227,9 +227,9 @@ fn vol_surface_builder_matches_grid_constructor() {
 }
 
 #[test]
-fn from_grid_opts_preserves_axis_and_interpolation_mode() {
+fn from_grid_preserves_axis_and_interpolation_mode() {
     let (exp, strikes, vols) = sample_grid();
-    let surface = VolSurface::from_grid_opts(
+    let surface = VolSurface::from_grid(
         "S",
         &exp,
         &strikes,
@@ -265,7 +265,8 @@ fn from_grid_opts_preserves_axis_and_interpolation_mode() {
 #[test]
 fn value_checked_matches_value_clamped_on_interior() {
     let (exp, strikes, vols) = sample_grid();
-    let surface = VolSurface::from_grid("S", &exp, &strikes, &vols).unwrap();
+    let surface =
+        VolSurface::from_grid("S", &exp, &strikes, &vols, Default::default(), None).unwrap();
     // Strictly interior samples (not on grid edges) exercise the
     // shared bilinear kernel used by both evaluators.
     let test_pts = [

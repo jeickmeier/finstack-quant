@@ -1111,7 +1111,7 @@ mod tests {
         for surface in [
             base.clone(),
             base.clone().with_displacements(&[0.02]).unwrap(),
-            finstack_quant_core::market_data::surfaces::VolSurface::from_grid_opts(
+            finstack_quant_core::market_data::surfaces::VolSurface::from_grid(
                 base.id(),
                 base.expiries(),
                 base.strikes(),

@@ -674,8 +674,15 @@ fn materialize_cube_tenor_slice_with_convention(
             });
         }
     }
-    let surface = VolSurface::from_grid(cube.id().as_str(), cube.expiries(), strikes, &values)?
-        .with_interpolation_mode(cube.interpolation_mode());
+    let surface = VolSurface::from_grid(
+        cube.id().as_str(),
+        cube.expiries(),
+        strikes,
+        &values,
+        Default::default(),
+        None,
+    )?
+    .with_interpolation_mode(cube.interpolation_mode());
     Ok(if normal {
         surface.with_quote_type(VolQuoteType::Normal)?
     } else {

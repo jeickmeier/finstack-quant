@@ -61,6 +61,8 @@ fn create_market() -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0],
         &[0.8, 0.9, 1.0, 1.1, 1.2],
         &[0.10; 20],
+        Default::default(),
+        None,
     )
     .unwrap();
 
