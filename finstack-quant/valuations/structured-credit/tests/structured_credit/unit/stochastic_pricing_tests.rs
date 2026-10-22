@@ -7,6 +7,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_models::correlation::RecoverySpec;
 use finstack_quant_models::credit::pool::StochasticPrepaySpec;
 use finstack_quant_models::credit::pool::{CorrelationStructure, StochasticDefaultSpec};
 use finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides;
@@ -1138,4 +1139,26 @@ fn default_monte_carlo_matches_explicit_estimator_count_and_honors_override() {
         result.npv.amount().to_bits(),
         "the estimator-count override must affect pricing, not only metadata"
     );
+}
+
+#[test]
+fn recovery_only_configuration_is_reported_and_fully_disabled() {
+    for recovery in [
+        RecoverySpec::constant(0.4).expect("constant recovery"),
+        RecoverySpec::market_correlated(0.4, 0.25, 0.4).expect("correlated recovery"),
+    ] {
+        let mut sc = build_sc("ABS-RECOVERY-ONLY", 1_000_000.0);
+        let deterministic_recovery = sc.credit_model.recovery_spec.clone();
+        sc.credit_model.stochastic_recovery_spec = Some(recovery);
+        assert!(sc.is_stochastic());
+        for _ in 0..2 {
+            sc.disable_stochastic();
+            assert!(!sc.is_stochastic());
+            assert!(sc.credit_model.stochastic_prepay_spec.is_none());
+            assert!(sc.credit_model.stochastic_default_spec.is_none());
+            assert!(sc.credit_model.stochastic_recovery_spec.is_none());
+            assert!(sc.credit_model.correlation_structure.is_none());
+            assert_eq!(sc.credit_model.recovery_spec, deterministic_recovery);
+        }
+    }
 }

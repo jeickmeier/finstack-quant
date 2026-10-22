@@ -285,7 +285,7 @@ getters!(JsStructuredCredit, "StructuredCredit", |i| {
         /// Expiry date from the Rust `Instrument` trait.
         /// @returns The expiry date, or `null` when the instrument has none.
         expiry as expiry => opt_date(Instrument::expiry(i)),
-        /// Whether a stochastic prepayment, default or correlation spec is set (mirrors Rust `StructuredCredit::is_stochastic`).
+        /// Whether a stochastic prepayment, default, recovery or correlation spec is set (mirrors Rust `StructuredCredit::is_stochastic`).
         /// @returns `true` when `priceStochastic` has specs to simulate.
         is_stochastic as isStochastic => json(i.is_stochastic()),
         /// Loss-allocation policy in force for pricing: `lossAllocation` when set, otherwise the deal-type convention.
@@ -772,8 +772,8 @@ impl JsStructuredCredit {
     /// Return a copy of this deal with every stochastic specification cleared.
     ///
     /// Mirrors Rust `StructuredCredit::disable_stochastic`, the inverse of
-    /// `enableStochastic`: clears the stochastic prepayment, default and
-    /// correlation specs (the stochastic recovery spec is kept). The receiver
+    /// `enableStochastic`: clears the stochastic prepayment, default, recovery
+    /// and correlation specs. The receiver
     /// is not modified.
     /// @returns A new deal priced deterministically.
     #[wasm_bindgen(js_name = disableStochastic)]
