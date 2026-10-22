@@ -962,11 +962,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "4818.91352768402",
+          "amount": "4817.72188146454",
           "currency": "USD"
         },
         "edited": {
-          "amount": "3855.130822147213",
+          "amount": "3854.177505171635",
           "currency": "USD"
         }
       }
