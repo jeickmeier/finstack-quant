@@ -10840,9 +10840,7 @@ class CdsOptionBuilder:
             not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
         """
         ...
-    def metric_pricing_overrides(
-        self, value: MetricPricingOverrides | dict[str, object] | str
-    ) -> CdsOptionBuilder:
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> CdsOptionBuilder:
         """
         Set the metric-time pricing configuration stored on the instrument.
 

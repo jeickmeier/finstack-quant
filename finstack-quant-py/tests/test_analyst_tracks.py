@@ -128,9 +128,7 @@ def test_real_clo_one_payment_cash_conservation_and_separate_bbb(tracks: ModuleT
     receipts["EQUITY"] = principal + interest - sum(receipts.values())
     market = tracks.build_market("credit")
     df = market.get_discount("USD-OIS").df((date(2025, 4, 15) - tracks.AS_OF).days / 365.0)
-    native = {
-        iid: tranche_metrics(json.dumps(deal), iid, market, tracks.AS_OF).pv for iid in receipts
-    }
+    native = {iid: tranche_metrics(json.dumps(deal), iid, market, tracks.AS_OF).pv for iid in receipts}
     assert sum(native.values()) / df == pytest.approx(principal + interest, abs=0.01)
     assert all(native[iid] == pytest.approx(receipts[iid] * df, abs=0.01) for iid in receipts)
     holding = tracks.clo_bbb_holding()
@@ -143,10 +141,7 @@ def test_oc_breach_changes_priority_and_does_not_invent_a_bbb_instrument(tracks:
     base, breach = tracks.clo_deal(), tracks.clo_deal(oc_trigger=1.30)
     assert 100e6 / 80e6 < 1.30
     metrics = [
-        {
-            iid: tranche_metrics(json.dumps(payload), iid, market, tracks.AS_OF)
-            for iid in ("AAA", "BBB", "EQUITY")
-        }
+        {iid: tranche_metrics(json.dumps(payload), iid, market, tracks.AS_OF) for iid in ("AAA", "BBB", "EQUITY")}
         for payload in (base, breach)
     ]
     assert metrics[1]["AAA"].wal < metrics[0]["AAA"].wal
