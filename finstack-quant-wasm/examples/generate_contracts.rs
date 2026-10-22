@@ -58,8 +58,9 @@ fn main() -> Result<()> {
     ).with_packager(host_numbers);
     run_schema_generator(
         Path::new(env!("CARGO_MANIFEST_DIR")),
-        Path::new("schemas/host/1"),
+        &["schemas/host/1"],
         &[artifact],
+        None,
         &SchemaGenerationCommand::from_env()?,
     )
 }

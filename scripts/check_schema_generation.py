@@ -34,7 +34,7 @@ class Generator:
     binary: str
 
 
-# Written by `run_schema_index_generator` once per crate, alongside the schemas.
+# Written by `run_schema_generator` once per crate, alongside the schemas.
 SCHEMA_INDEX_RELATIVE_PATH = Path("schemas/index.json")
 
 GENERATORS = (

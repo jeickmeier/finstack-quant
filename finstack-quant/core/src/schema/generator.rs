@@ -93,63 +93,129 @@ impl SchemaGenerationCommand {
     }
 }
 
-/// Execute a complete registry-driven schema generation operation.
+/// Generate a crate's schema artifacts and index from one rendered document set.
 ///
-/// The expected artifact set is built in memory before any writes occur.
-/// Check mode is non-mutating and reports missing, changed, and extra schema
-/// files. Write mode removes extras only below `owned_root` after both the root
-/// and every artifact path have passed strict relative-path validation.
+/// All paths and documents are validated before writing. Extra schema files are
+/// removed only from `owned_roots`; unrelated directories remain untouched.
+/// List mode prints sorted artifact paths without rendering or listing the index.
 ///
 /// # Arguments
 ///
 /// * `manifest_dir` - Owning crate's absolute Cargo manifest directory.
-/// * `owned_root` - Crate-relative schema directory exclusively owned by this
-///   registry, such as `schemas/cashflow`.
-/// * `artifacts` - Complete set of generated schemas for the owned root.
-/// * `command` - Explicit generation mode and optional output root.
+/// * `owned_roots` - Non-overlapping crate-relative schema directories owned by
+///   the registry, such as `schemas/dates` and `schemas/market_data`.
+/// * `artifacts` - Complete registry whose documents and metadata form the index.
+/// * `index_relative_path` - Optional crate-relative index destination. `None`
+///   emits artifacts only, as required by the WASM host-contract generator.
+/// * `command` - Generation mode and optional replacement output root.
 ///
 /// # Errors
 ///
-/// Returns an error for invalid paths, duplicate registry entries, generation
-/// failures, filesystem failures, or check-mode drift.
+/// Returns an error for invalid or duplicate paths/IDs, overlapping roots,
+/// generation or filesystem failures, or check-mode drift.
 pub fn run_schema_generator(
     manifest_dir: &Path,
-    owned_root: &Path,
+    owned_roots: &[&str],
     artifacts: &[SchemaArtifact],
+    index_relative_path: Option<&Path>,
     command: &SchemaGenerationCommand,
 ) -> Result<()> {
-    validate_owned_root(owned_root)?;
+    let roots: Vec<&Path> = owned_roots.iter().map(Path::new).collect();
+    for (index, root) in roots.iter().enumerate() {
+        validate_owned_root(root)?;
+        if roots[..index]
+            .iter()
+            .any(|other| root.starts_with(other) || other.starts_with(root))
+        {
+            return Err(Error::Validation(
+                "schema roots must not overlap".to_string(),
+            ));
+        }
+    }
     let base = command.output_root.as_deref().unwrap_or(manifest_dir);
-    let mut expected = BTreeMap::new();
+    let mut paths = BTreeSet::new();
     let mut ids = BTreeSet::new();
     for artifact in artifacts {
-        let relative_path = Path::new(artifact.relative_path);
+        let path = Path::new(artifact.relative_path);
+        let root = roots
+            .iter()
+            .find(|root| path.starts_with(root))
+            .ok_or_else(|| {
+                Error::Validation(format!(
+                    "schema artifact is outside the owned roots: {}",
+                    path.display()
+                ))
+            })?;
+        validate_generated_path(path, root, ".schema.json", "schema")?;
         if !ids.insert(artifact.id) {
             return Err(Error::Validation(format!(
                 "duplicate schema id in registry: {}",
                 artifact.id
             )));
         }
-        let rendered = deterministic_json_bytes(&artifact.generate()?)?;
-        if expected
-            .insert(relative_path.to_path_buf(), rendered)
-            .is_some()
-        {
+        if !paths.insert(path.to_path_buf()) {
             return Err(Error::Validation(format!(
                 "duplicate schema path in registry: {}",
-                relative_path.display()
+                path.display()
             )));
         }
     }
+    if let Some(index_path) = index_relative_path {
+        validate_relative_path(index_path, "schema index path")?;
+        if paths.contains(index_path) {
+            return Err(Error::Validation(
+                "schema index overlaps an artifact path".to_string(),
+            ));
+        }
+    }
+    if command.mode == SchemaGenerationMode::List {
+        for path in paths {
+            println!("{}", path.display());
+        }
+        return Ok(());
+    }
 
-    sync_generated_files(
+    let mut expected = BTreeMap::new();
+    let mut rows = BTreeMap::new();
+    for artifact in artifacts {
+        let document = artifact.generate()?;
+        let bytes = deterministic_json_bytes(&document)?;
+        if index_relative_path.is_some() {
+            rows.insert(
+                artifact.relative_path,
+                Value::Object(index_row(artifact, bytes.len())),
+            );
+        }
+        expected.insert(PathBuf::from(artifact.relative_path), bytes);
+    }
+    if let Some(index_path) = index_relative_path {
+        expected.insert(
+            index_path.to_path_buf(),
+            deterministic_json_bytes(&index_document(rows))?,
+        );
+    }
+    let mut extra = BTreeSet::new();
+    for root in &roots {
+        extra.extend(
+            generated_files(&base.join(root), base, ".schema.json")?
+                .into_iter()
+                .filter(|path| !expected.contains_key(path)),
+        );
+    }
+    sync_outputs(
         base,
-        owned_root,
         &expected,
-        ".schema.json",
+        &extra.into_iter().collect::<Vec<_>>(),
         "schema",
         command.mode,
-    )
+    )?;
+    if command.mode == SchemaGenerationMode::Write {
+        for root in roots {
+            let directory = base.join(root);
+            remove_empty_directories(&directory, &directory)?;
+        }
+    }
+    Ok(())
 }
 
 /// Synchronize one owned directory of generated files with their expected bytes.
@@ -204,6 +270,21 @@ pub fn sync_generated_files(
         .cloned()
         .collect::<Vec<_>>();
 
+    sync_outputs(base, expected, &extra, label, mode)?;
+    if mode == SchemaGenerationMode::Write {
+        remove_empty_directories(&owned_directory, &owned_directory)?;
+    }
+    Ok(())
+}
+
+/// Compare or write an already validated file set and remove only known extras.
+fn sync_outputs(
+    base: &Path,
+    expected: &BTreeMap<PathBuf, Vec<u8>>,
+    extra: &[PathBuf],
+    label: &str,
+    mode: SchemaGenerationMode,
+) -> Result<()> {
     match mode {
         SchemaGenerationMode::Check => {
             let mut drift = Vec::new();
@@ -253,13 +334,12 @@ pub fn sync_generated_files(
                 println!("updated {}", path.display());
             }
             for relative_path in extra {
-                let path = base.join(&relative_path);
+                let path = base.join(relative_path);
                 std::fs::remove_file(&path).map_err(|error| {
                     Error::Internal(format!("remove stale {label} {}: {error}", path.display()))
                 })?;
                 println!("removed stale {}", path.display());
             }
-            remove_empty_directories(&owned_directory, &owned_directory)?;
             Ok(())
         }
         SchemaGenerationMode::List => Ok(()),
@@ -296,6 +376,10 @@ pub fn build_schema_index(artifacts: &[SchemaArtifact]) -> Result<Value> {
         }
     }
 
+    Ok(index_document(rows))
+}
+
+fn index_document(rows: BTreeMap<&str, Value>) -> Value {
     let mut document = Map::new();
     document.insert(
         "artifacts".to_string(),
@@ -305,7 +389,7 @@ pub fn build_schema_index(artifacts: &[SchemaArtifact]) -> Result<Value> {
         "schema_index_version".to_string(),
         Value::Number(serde_json::Number::from(SCHEMA_INDEX_VERSION)),
     );
-    Ok(Value::Object(document))
+    Value::Object(document)
 }
 
 /// Render canonical metadata for a schema index row.
@@ -324,11 +408,15 @@ pub fn build_schema_index(artifacts: &[SchemaArtifact]) -> Result<Value> {
 /// Returns an error if the schema cannot be encoded as JSON.
 pub fn schema_index_row(artifact: &SchemaArtifact, rendered: &Value) -> Result<Map<String, Value>> {
     let bytes = deterministic_json_bytes(rendered)?;
+    Ok(index_row(artifact, bytes.len()))
+}
+
+fn index_row(artifact: &SchemaArtifact, byte_count: usize) -> Map<String, Value> {
     let mut row = Map::new();
     row.insert("$id".to_string(), Value::String(artifact.id.to_string()));
     row.insert(
         "bytes".to_string(),
-        Value::Number(serde_json::Number::from(bytes.len())),
+        Value::Number(serde_json::Number::from(byte_count)),
     );
     row.insert(
         "kind".to_string(),
@@ -350,88 +438,7 @@ pub fn schema_index_row(artifact: &SchemaArtifact, rendered: &Value) -> Result<M
         "type_name".to_string(),
         Value::String(artifact.type_name().into_owned()),
     );
-    Ok(row)
-}
-
-/// Write or verify the schema index for one crate's registry.
-///
-/// The index is what a non-Rust consumer reads first: it names every contract
-/// the crate publishes, whether the caller authors or reads it, and how large
-/// the document is. Call this once per generator with the crate's complete
-/// artifact list, even when the artifacts span several owned roots.
-///
-/// `--write` writes the index and `--check` byte-compares it. `--list`
-/// deliberately does **not** name it: that listing is the *schema artifact*
-/// inventory and is required to be sorted, and one index per crate cannot sit
-/// in sorted position relative to every crate's root directory name. The index
-/// is instead reconstructed from each generator's crate by
-/// `scripts/check_schema_generation.py`, which is what compares the generated
-/// tree against the registry.
-///
-/// # Arguments
-///
-/// * `manifest_dir` - Owning crate's manifest directory.
-/// * `index_relative_path` - Index destination relative to the crate.
-/// * `artifacts` - Complete registry for the owning crate.
-/// * `command` - Parsed generator command selecting the mode and output root.
-///
-/// # Errors
-///
-/// Returns [`Error::Validation`] when the path escapes the crate or the
-/// checked-in index has drifted, and [`Error::Internal`] on IO failure.
-pub fn run_schema_index_generator(
-    manifest_dir: &Path,
-    index_relative_path: &Path,
-    artifacts: &[SchemaArtifact],
-    command: &SchemaGenerationCommand,
-) -> Result<()> {
-    validate_relative_path(index_relative_path, "schema index path")?;
-    if command.mode == SchemaGenerationMode::List {
-        return Ok(());
-    }
-
-    let rendered = deterministic_json_bytes(&build_schema_index(artifacts)?)?;
-    let base = command.output_root.as_deref().unwrap_or(manifest_dir);
-    let path = base.join(index_relative_path);
-
-    match command.mode {
-        SchemaGenerationMode::Check => match std::fs::read(&path) {
-            Ok(actual) if actual == rendered => Ok(()),
-            Ok(_) => Err(Error::Validation(format!(
-                "schema index is not current: changed {}",
-                index_relative_path.display()
-            ))),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                Err(Error::Validation(format!(
-                    "schema index is not current: missing {}",
-                    index_relative_path.display()
-                )))
-            }
-            Err(error) => Err(Error::Internal(format!(
-                "read schema index {}: {error}",
-                path.display()
-            ))),
-        },
-        SchemaGenerationMode::Write => {
-            if std::fs::read(&path).ok().as_deref() == Some(rendered.as_slice()) {
-                return Ok(());
-            }
-            if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent).map_err(|error| {
-                    Error::Internal(format!(
-                        "create schema index directory {}: {error}",
-                        parent.display()
-                    ))
-                })?;
-            }
-            std::fs::write(&path, rendered).map_err(|error| {
-                Error::Internal(format!("write schema index {}: {error}", path.display()))
-            })?;
-            println!("updated {}", path.display());
-            Ok(())
-        }
-        SchemaGenerationMode::List => Ok(()),
-    }
+    row
 }
 
 /// Render a JSON value with recursively sorted object keys, UTF-8 encoding,
