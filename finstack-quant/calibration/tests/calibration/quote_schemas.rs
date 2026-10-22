@@ -1,10 +1,10 @@
 //! Unit tests for market quote schema helpers and bump logic.
 //!
 //! These target previously uncovered quote-type modules:
-//! - `market/quotes/cds.rs`
-//! - `market/quotes/cds_tranche.rs`
-//! - `market/quotes/inflation.rs`
-//! - `market/quotes/vol.rs`
+//! - `quotes/cds.rs`
+//! - `quotes/cds_tranche.rs`
+//! - `quotes/inflation.rs`
+//! - `quotes/vol.rs`
 
 use finstack_quant_calibration::quotes::CdsQuote;
 use finstack_quant_calibration::quotes::CdsTrancheQuote;

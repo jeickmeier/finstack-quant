@@ -566,7 +566,7 @@ fn vol_surface_requires_quotes_even_when_params_valid() {
             underlying_ticker: "SPX".to_string(),
             discount_curve_id: Some("USD-OIS".into()),
             beta: 0.5,
-            target_expiries: vec![1.0], // year fraction (validated by VolSurfaceTarget)
+            target_expiries: vec![1.0], // year fraction (validated by the surface target)
             target_strikes: vec![0.9, 1.0, 1.1],
             spot_override: Some(100.0),
             dividend_yield_override: Some(0.0),

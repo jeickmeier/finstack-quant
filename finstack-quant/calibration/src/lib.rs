@@ -19,10 +19,10 @@
 //! # let _ = market;
 //! ```
 //!
-//! Python and JavaScript users get the same surface: `finstack_quant.calibration.calibrate(json).market`
-//! returns a `MarketContext`; the `CalibrationResult` wrapper additionally exposes per-step
-//! residuals and a plan-level report next to the context, so users can verify their curves
-//! actually fit.
+//! Python's `finstack_quant.calibration.calibrate(json)` returns a
+//! `CalibrationResultEnvelope` wrapper with `.market`, `.report`, and per-step
+//! residual access. JavaScript's `calibration.calibrate(envelope)` returns the
+//! plain result envelope, including `result.final_market` and `result.step_reports`.
 //!
 //! See `finstack-quant/calibration/examples/market_bootstrap/` for canonical envelope JSON examples
 //! covering discount curves, hazard curves layered on snapshot inputs in `market_data`,

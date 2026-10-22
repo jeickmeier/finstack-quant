@@ -3447,7 +3447,7 @@ class QuoteQuality:
 
         Native quote units: decimal rate for deposits, FRAs, swaps and
         inflation swaps; price for rate futures; basis points for CDS par
-        spreads and cross-currency basis; percent for CDS and tranche upfronts.
+        spreads and cross-currency basis; decimal fractions for CDS and tranche upfronts.
 
         This property does not raise.
 
@@ -3463,28 +3463,28 @@ class QuoteQuality:
         """
         Signed calibration residual; the calibration target is zero.
 
-        The value of the instrument built at ``quote_value``, priced on the
-        calibrated curve and divided by the target's residual notional.
+        Uses the report's ``residual_units``: typically instrument PV per unit
+        notional or a decimal volatility difference.
 
         This property does not raise.
 
         Returns
         -------
         float
-            Normalized value of the quote instrument on the calibrated curve.
+            Signed error in the report's declared residual units.
         """
 
     @property
     def sensitivity(self) -> float:
         """
-        Absolute derivative of the residual with respect to the solved parameter.
+        Absolute residual derivative for a bootstrap knot or maximum across global-fit parameters.
 
         This property does not raise.
 
         Returns
         -------
         float
-            Absolute derivative of the residual with respect to the solved parameter.
+            Residual units per parameter unit; ``NaN`` when not recorded.
         """
 
     def to_json(self) -> str:
@@ -4346,7 +4346,7 @@ class CalibrationResultEnvelope:
         -------
         pandas.DataFrame
             Columns ``quote_id``, ``quote_value`` (native quote units),
-            ``residual`` (normalized instrument value, target zero) and
+            ``residual`` (in the report's declared units, target zero) and
             ``sensitivity``.
 
         Raises

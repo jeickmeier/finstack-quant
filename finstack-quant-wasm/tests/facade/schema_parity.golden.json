@@ -829,7 +829,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
             "type_name": "CalibrationResultEnvelope",
             "kind": "output",
-            "bytes": 131848
+            "bytes": 131923
           },
           {
             "path": "schemas/calibration/1/calibration_validation_report.schema.json",
@@ -3594,7 +3594,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
             "type_name": "CalibrationResultEnvelope",
             "kind": "output",
-            "bytes": 131848
+            "bytes": 131923
           },
           {
             "domain": "calibration",

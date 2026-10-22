@@ -65,7 +65,7 @@ fn forward(t: f64) -> f64 {
 }
 
 /// Non-flat USD discount curve. Knot DFs are `exp(-r(T)*T)` so the forward
-/// curve seen by `SviSurfaceTarget::solve` matches [`forward`].
+/// curve seen by the SVI target matches [`forward`].
 fn nonflat_discount_curve(base_date: Date) -> DiscountCurve {
     let knot_times = [0.0_f64, 0.5, 0.9, 1.5, 2.2, 3.0, 4.0];
     let knots: Vec<(f64, f64)> = knot_times

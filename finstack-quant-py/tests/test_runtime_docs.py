@@ -95,6 +95,7 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
         "validate_butterfly_spread",
         "validate_vol_bounds",
         "CalibrationConfig",
+        "QuoteQuality",
         "CalibrationValidationReport.dependency_graph",
         "CalibrationReport.metadata",
         "CalibrationReport.solver_method",

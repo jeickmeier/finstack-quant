@@ -1,6 +1,6 @@
 //! Global calibration solver benchmarks.
 //!
-//! Benchmarks the `GlobalFitOptimizer` / `CalibrationMethod::GlobalSolve` pathway
+//! Benchmarks the `CalibrationMethod::GlobalSolve` pathway
 //! that is absent from the existing `calibration.rs` (which only exercises
 //! sequential bootstrap plans).
 //!

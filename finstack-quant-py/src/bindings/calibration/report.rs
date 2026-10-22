@@ -9,31 +9,7 @@ use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-/// Fit quality record for one calibration quote.
-///
-/// Attributes
-/// ----------
-/// quote_label : str
-///     Quote identifier as supplied in the envelope (``QuoteId``).
-/// quote_value : float | None
-///     Market quote the calibration instrument was built from, in the quote's
-///     native units: decimal rate for deposits, FRAs, swaps and inflation
-///     swaps; price for rate futures; basis points for CDS par spreads and
-///     cross-currency basis; percent for CDS and tranche upfronts. ``None``
-///     when diagnostics were not computed or the target has no scalar quote.
-/// residual : float
-///     Value of the instrument built at ``quote_value``, priced on the
-///     calibrated curve and divided by the target's residual notional. The
-///     calibration target is zero.
-/// sensitivity : float
-///     Absolute local sensitivity of the residual to the solved knot.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.calibration import QuoteQuality
-/// >>> q = QuoteQuality.from_json('{"quote_label": "USD-OIS-SWAP-5Y", "quote_value": 0.045, "residual": 0.0, "sensitivity": 1.0}')
-/// >>> q.quote_label
-/// 'USD-OIS-SWAP-5Y'
+#[doc = pydoc!("finstack_quant.calibration", "QuoteQuality")]
 #[pyclass(
     name = "QuoteQuality",
     module = "finstack_quant.calibration",
@@ -53,26 +29,25 @@ impl PyQuoteQuality {
 
 #[pymethods]
 impl PyQuoteQuality {
-    /// Quote identifier as supplied in the envelope.
+    #[doc = pydoc!("finstack_quant.calibration", "QuoteQuality.quote_label")]
     #[getter]
     fn quote_label(&self) -> String {
         self.inner.quote_label.clone()
     }
 
-    /// Market quote in its native units, or ``None`` when not recorded.
+    #[doc = pydoc!("finstack_quant.calibration", "QuoteQuality.quote_value")]
     #[getter]
     fn quote_value(&self) -> Option<f64> {
         self.inner.quote_value
     }
 
-    /// Signed residual: normalized value of the quote instrument on the
-    /// calibrated curve (target zero).
+    #[doc = pydoc!("finstack_quant.calibration", "QuoteQuality.residual")]
     #[getter]
     fn residual(&self) -> f64 {
         self.inner.residual
     }
 
-    /// Absolute local sensitivity of the residual to the solved parameter.
+    #[doc = pydoc!("finstack_quant.calibration", "QuoteQuality.sensitivity")]
     #[getter]
     fn sensitivity(&self) -> f64 {
         self.inner.sensitivity
@@ -83,7 +58,12 @@ impl PyQuoteQuality {
     }
 }
 
-wire_methods!(PyQuoteQuality, QuoteQuality, "QuoteQuality");
+wire_methods!(
+    PyQuoteQuality,
+    QuoteQuality,
+    "QuoteQuality",
+    module = "finstack_quant.calibration"
+);
 
 /// Per-quote fit quality and conditioning diagnostics for one calibration step.
 ///

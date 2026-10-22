@@ -40,11 +40,12 @@ pub fn calibration_result_step_report(
 ///
 /// Free-function twin of Python `CalibrationResultEnvelope.residuals`, which returns
 /// the same rows (Rust `CalibrationReport::quote_rows`) as a pandas
-/// `DataFrame`. `quote_value` is absent and `sensitivity` is `NaN` unless
-/// `CalibrationConfig.compute_diagnostics` was enabled.
+/// `DataFrame`. Rows use the report's declared residual units. Without recorded
+/// diagnostics, `quote_value` is absent and `sensitivity` is `NaN`. Python's
+/// DataFrame represents an absent quote value as `NaN`.
 /// @param result_json - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
 /// @param step_id - Identifier of the calibration step, as given in the plan.
-/// @returns One `QuoteQuality` row per quote: `quote_label`, `quote_value` (the market quote in its native units, when recorded), `residual` (normalized value of the quote instrument on the calibrated curve; the target is zero) and `sensitivity`.
+/// @returns One `QuoteQuality` row per quote: `quote_label`, `quote_value` (the market quote in its native units, when recorded), `residual` (signed error in the report's declared units; the target is zero) and `sensitivity`.
 ///
 /// # Errors
 ///

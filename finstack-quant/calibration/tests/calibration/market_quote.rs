@@ -1,4 +1,4 @@
-//! Tests for `market::quotes::market_quote` (`MarketQuote` serde).
+//! Tests for `quotes::MarketQuote` (`MarketQuote` serde).
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
