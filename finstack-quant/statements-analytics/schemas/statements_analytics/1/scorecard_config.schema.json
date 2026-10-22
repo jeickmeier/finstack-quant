@@ -81,8 +81,8 @@
       ]
     },
     "rating_scale": {
-      "default": "S&P",
-      "description": "Rating scale to use (e.g., \"S&P\", \"Moody's\", \"Fitch\")",
+      "default": "sp",
+      "description": "Canonical rating-scale id (`sp` or `moodys`); lookup ignores outer whitespace and ASCII case.",
       "type": "string"
     }
   },

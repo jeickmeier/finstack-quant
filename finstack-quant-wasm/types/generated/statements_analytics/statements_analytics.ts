@@ -3877,7 +3877,7 @@ export interface ScorecardConfig {
    */
   period?: string | null;
   /**
-   * Rating scale to use (e.g., "S&P", "Moody's", "Fitch")
+   * Canonical rating-scale id (`sp` or `moodys`); lookup ignores outer whitespace and ASCII case.
    */
   rating_scale?: string;
 }

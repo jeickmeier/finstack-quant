@@ -8,7 +8,7 @@
 //!
 //! ```json
 //! {
-//!   "rating_scale": "S&P",
+//!   "rating_scale": "sp",
 //!   "metrics": [
 //!     {
 //!       "name": "debt_to_ebitda",
@@ -57,7 +57,7 @@
 //! let results = evaluator.evaluate(&model)?;
 //!
 //! let config = ScorecardConfig {
-//!     rating_scale: "S&P".into(),
+//!     rating_scale: "sp".into(),
 //!     metrics: vec![ScorecardMetric {
 //!         name: "debt_to_ebitda".into(),
 //!         formula: "total_debt / ttm(ebitda)".into(),
@@ -98,7 +98,7 @@ fn is_supported_rating_scale(scale_name: &str) -> bool {
 ///
 /// **Features:**
 /// - Credit rating assignment using weighted metric scores
-/// - Support for multiple rating scales (S&P, Moody's, Fitch)
+/// - Support for the canonical `sp` and `moodys` scorecard scales
 /// - Configurable thresholds per rating level
 /// - Minimum rating compliance checks
 pub struct CreditScorecardExtension {
@@ -111,7 +111,7 @@ pub struct CreditScorecardExtension {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ScorecardConfig {
-    /// Rating scale to use (e.g., "S&P", "Moody's", "Fitch")
+    /// Canonical rating-scale id (`sp` or `moodys`); lookup ignores outer whitespace and ASCII case.
     #[serde(default = "default_rating_scale")]
     pub rating_scale: String,
 
@@ -130,6 +130,17 @@ pub struct ScorecardConfig {
     /// only periods up to (and including) the rated period as history.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub period: Option<String>,
+}
+
+impl Default for ScorecardConfig {
+    fn default() -> Self {
+        Self {
+            rating_scale: default_rating_scale(),
+            metrics: Vec::new(),
+            min_rating: None,
+            period: None,
+        }
+    }
 }
 
 /// Definition of a scorecard metric.
@@ -157,7 +168,7 @@ pub struct ScorecardMetric {
 }
 
 fn default_rating_scale() -> String {
-    "S&P".into()
+    "sp".into()
 }
 
 fn default_weight() -> f64 {
@@ -226,7 +237,7 @@ impl CreditScorecardExtension {
     pub fn validate_config(config: &ScorecardConfig) -> Result<()> {
         if !is_supported_rating_scale(&config.rating_scale) {
             return Err(finstack_quant_statements::Error::invalid_input(format!(
-                "Unsupported rating_scale '{}'. Expected one of: S&P, Moody's, Fitch",
+                "Unsupported rating_scale '{}'. Expected one of: sp, moodys",
                 config.rating_scale
             )));
         }
@@ -650,7 +661,7 @@ mod tests {
 
     fn extension() -> CreditScorecardExtension {
         CreditScorecardExtension::new(ScorecardConfig {
-            rating_scale: "S&P".into(),
+            rating_scale: "sp".into(),
             metrics: vec![],
             min_rating: None,
             period: None,

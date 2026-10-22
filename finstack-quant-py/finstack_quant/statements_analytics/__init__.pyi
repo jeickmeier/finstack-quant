@@ -647,7 +647,7 @@ class ScorecardConfig:
 
     def __init__(
         self,
-        rating_scale: str = "S&P",
+        rating_scale: str | None = None,
         metrics: list[ScorecardMetric] = ...,
         min_rating: str | None = None,
         period: str | None = None,
@@ -657,8 +657,9 @@ class ScorecardConfig:
 
         Parameters
         ----------
-        rating_scale : str, default "S&P"
-            Registered rating-scale identifier used to interpret thresholds.
+        rating_scale : str | None, default None
+            Canonical id (``"sp"`` or ``"moodys"``) used to interpret thresholds.
+            None uses the Rust default, ``"sp"``.
         metrics : list[ScorecardMetric]
             Weighted metric definitions included in the composite rating.
         min_rating : str or None, default None

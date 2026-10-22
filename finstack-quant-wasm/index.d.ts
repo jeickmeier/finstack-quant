@@ -5695,7 +5695,7 @@ export interface UnknownScalePolicyConstructor {
 }
 
 /**
- * Versioned registry of scorecard rating scales (S&P, Moody's, Fitch, …).
+ * Versioned registry of scorecard rating scales (canonical ids `sp` and `moodys`).
  *
  * Get one from `embeddedRegistry()`, `registryFromConfig(config)` or
  * `RatingScaleRegistry.fromJson(json)`.
@@ -5723,9 +5723,9 @@ export interface RatingScaleRegistry extends WasmOwned {
    */
   defaultScaleId(): string;
   /**
-   * Primary id of every registered scale, in registry order.
+   * Canonical normalized id of every registered scale, in registry order.
    *
-   * @returns Scale ids; aliases are not listed.
+   * @returns Canonical trimmed, ASCII-lowercase scale ids.
    */
   scaleIds(): string[];
   /**
@@ -5735,18 +5735,18 @@ export interface RatingScaleRegistry extends WasmOwned {
    */
   unknownScalePolicy(): UnknownScalePolicy;
   /**
-   * Whether a name is a registered scale id or alias.
+   * Whether a name is a registered canonical id after trimming and ASCII case folding.
    *
-   * @param name - Scale id or alias to look up.
+   * @param name - Canonical id (`sp` or `moodys`); surrounding whitespace and ASCII case are ignored.
    * @returns `true` when the registry knows the name.
    * @throws `TypeError` if `name` is not a string.
    */
   isKnownRatingScale(name: string): boolean;
   /**
-   * Resolve a scale by id or alias under the unknown-scale policy (Rust
+   * Resolve a canonical scale id under the unknown-scale policy (Rust
    * `RatingScaleRegistry::rating_scale`).
    *
-   * @param name - Scale id or alias; an unknown name returns the default scale under a fallback policy.
+   * @param name - Canonical id, ignoring surrounding whitespace and ASCII case; an unknown name returns the default scale under a fallback policy.
    * @returns A plain `ScorecardScale` object: `scale_name`, optional `description` and `ratings` ordered best to worst, each with `name`, `score` and `min_score` on the 0–100 scale.
    * @throws `TypeError` if `name` is not a string; `FinstackError` if the name is unknown and the policy is `error`.
    */
@@ -5761,7 +5761,7 @@ export interface RatingScaleRegistry extends WasmOwned {
 }
 
 /**
- * Versioned registry of scorecard rating scales (S&P, Moody's, Fitch, …).
+ * Versioned registry of scorecard rating scales (canonical ids `sp` and `moodys`).
  *
  * Get one from `embeddedRegistry()`, `registryFromConfig(config)` or
  * `RatingScaleRegistry.fromJson(json)`.
@@ -5783,7 +5783,7 @@ export interface RatingScaleRegistryConstructor {
   /**
    * Deserialize and validate a registry (Rust `RatingScaleRegistry::from_json`).
    *
-   * @param json - Registry JSON text or plain object, such as `toJson()` output. Validation enforces the schema version, unique scale ids and aliases, an existing default scale and in-range scores.
+   * @param json - Registry JSON text or plain object, such as `toJson()` output. Validation enforces the schema version, unique normalized scale ids, an existing default scale and in-range scores.
    * @returns The validated `RatingScaleRegistry`.
    * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it is malformed or fails validation.
    */
@@ -32558,7 +32558,7 @@ export interface CorkscrewExtensionConstructor {
  * const model = builder.build();
  * const results = new statements.Evaluator().evaluate(model);
  * const extension = new statements_analytics.CreditScorecardExtension({
- * rating_scale: "S&P",
+ * rating_scale: "sp",
  * metrics: [{ name: "leverage", formula: "debt / ebitda", weight: 1.0, thresholds: { AAA: [0, 1], BBB: [1, 4] } }],
  * });
  * extension.execute(model, results).status;
@@ -32609,7 +32609,7 @@ export interface CreditScorecardExtension extends WasmOwned {
  * const model = builder.build();
  * const results = new statements.Evaluator().evaluate(model);
  * const extension = new statements_analytics.CreditScorecardExtension({
- * rating_scale: "S&P",
+ * rating_scale: "sp",
  * metrics: [{ name: "leverage", formula: "debt / ebitda", weight: 1.0, thresholds: { AAA: [0, 1], BBB: [1, 4] } }],
  * });
  * extension.execute(model, results).status;

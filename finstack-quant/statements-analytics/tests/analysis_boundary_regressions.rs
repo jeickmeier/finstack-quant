@@ -169,7 +169,7 @@ fn empty_scorecard_has_no_fabricated_rating() {
     let model = monetary_model(Currency::USD);
     let results = Evaluator::new().evaluate(&model).unwrap();
     let report = CreditScorecardExtension::new(ScorecardConfig {
-        rating_scale: "S&P".into(),
+        rating_scale: "sp".into(),
         metrics: vec![],
         min_rating: None,
         period: None,
