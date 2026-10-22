@@ -67,7 +67,7 @@ use finstack_quant_valuations_rates::swaption::BermudanSwaption;
 
 /// Inputs describing the co-terminal swap underlying one European swaption
 /// slice of a Bermudan exercise schedule, expressed in LMM forward-rate
-/// coordinates.
+/// coordinates, already trimmed to the earliest eligible exercise.
 #[derive(Debug, Clone)]
 pub(crate) struct CoTerminalSlice<'a> {
     /// Tenor dates `T_0..T_N` (year fractions, length `N+1`).
@@ -80,8 +80,6 @@ pub(crate) struct CoTerminalSlice<'a> {
     pub displacements: &'a [f64],
     /// Unscaled factor-loading shapes `ĝ_i` per forward (length `N`).
     pub loading_shapes: &'a [[f64; 3]],
-    /// Index of the first forward alive at the swaption expiry (`first`).
-    pub first_alive: usize,
 }
 
 /// Rebonato decomposition of the co-terminal swap: shape factor plus the
@@ -99,18 +97,16 @@ pub(crate) struct RebonatoFactors {
 /// Full Rebonato decomposition; see [`RebonatoFactors`].
 pub(crate) fn rebonato_factors(slice: &CoTerminalSlice<'_>) -> Option<RebonatoFactors> {
     let n = slice.accrual_factors.len();
-    let first = slice.first_alive;
-    if first >= n || slice.tenors.len() != n + 1 {
+    if n == 0 || slice.tenors.len() != n + 1 {
         return None;
     }
 
-    // Discount factors P(0, T_j) for j = first..=N from the live forwards.
-    // P(0, T_first) is the numeraire base; carry it as 1.0 and divide out via
+    // Discount factors P(0, T_j) for j = 0..=N from the live forwards.
+    // P(0, T_0) is the numeraire base; carry it as 1.0 and divide out via
     // the annuity weights, which is scale-invariant for the basket.
-    let live = n - first;
-    let mut df = vec![1.0_f64; live + 1];
-    for k in 1..=live {
-        let idx = first + k - 1;
+    let mut df = vec![1.0_f64; n + 1];
+    for k in 1..=n {
+        let idx = k - 1;
         let denom = 1.0 + slice.accrual_factors[idx] * slice.initial_forwards[idx];
         if denom.abs() < 1e-15 {
             return None;
@@ -120,8 +116,8 @@ pub(crate) fn rebonato_factors(slice: &CoTerminalSlice<'_>) -> Option<RebonatoFa
 
     // Annuity A = Σ τ_j P(0, T_{j+1}).
     let mut annuity = 0.0_f64;
-    for k in 0..live {
-        annuity += slice.accrual_factors[first + k] * df[k + 1];
+    for k in 0..n {
+        annuity += slice.accrual_factors[k] * df[k + 1];
     }
     if annuity.abs() < 1e-15 {
         return None;
@@ -131,15 +127,14 @@ pub(crate) fn rebonato_factors(slice: &CoTerminalSlice<'_>) -> Option<RebonatoFa
     // The displaced-lognormal swap rate diffuses about this shifted level.
     // The unshifted swap rate S = Σ w_j F_j is carried alongside for the
     // Black → displaced vol conversion.
-    let mut weights = vec![0.0_f64; live];
+    let mut weights = vec![0.0_f64; n];
     let mut basket = 0.0_f64;
     let mut swap_rate = 0.0_f64;
-    for k in 0..live {
-        let idx = first + k;
-        let w = slice.accrual_factors[idx] * df[k + 1] / annuity;
+    for k in 0..n {
+        let w = slice.accrual_factors[k] * df[k + 1] / annuity;
         weights[k] = w;
-        swap_rate += w * slice.initial_forwards[idx];
-        basket += w * (slice.initial_forwards[idx] + slice.displacements[idx]);
+        swap_rate += w * slice.initial_forwards[k];
+        basket += w * (slice.initial_forwards[k] + slice.displacements[k]);
     }
     if !(basket.is_finite()) || basket <= 1e-12 {
         return None;
@@ -147,16 +142,14 @@ pub(crate) fn rebonato_factors(slice: &CoTerminalSlice<'_>) -> Option<RebonatoFa
 
     // R² = (1/S²) Σ_i Σ_j w_i w_j (F_i+d_i)(F_j+d_j) (ĝ_i·ĝ_j).
     let mut acc = 0.0_f64;
-    for ki in 0..live {
-        let i = first + ki;
+    for i in 0..n {
         let fi = slice.initial_forwards[i] + slice.displacements[i];
         let gi = slice.loading_shapes[i];
-        for kj in 0..live {
-            let j = first + kj;
+        for j in 0..n {
             let fj = slice.initial_forwards[j] + slice.displacements[j];
             let gj = slice.loading_shapes[j];
             let dot = gi[0] * gj[0] + gi[1] * gj[1] + gi[2] * gj[2];
-            acc += weights[ki] * weights[kj] * fi * fj * dot;
+            acc += weights[i] * weights[j] * fi * fj * dot;
         }
     }
     let r_sq = acc / (basket * basket);
@@ -281,7 +274,6 @@ pub fn calibrate_bermudan_lmm_base_vol(
         initial_forwards: &structure.initial_forwards,
         displacements: &structure.displacements,
         loading_shapes,
-        first_alive: 0,
     };
     let factors = rebonato_factors(&slice).ok_or_else(|| {
         finstack_quant_core::Error::Validation(format!(
@@ -453,7 +445,6 @@ mod tests {
             initial_forwards: &forwards,
             displacements: &disp,
             loading_shapes: &shapes,
-            first_alive: 0,
         };
         let r = rebonato_factors(&slice).expect("factors").shape_factor;
         assert!(
@@ -558,7 +549,7 @@ mod tests {
     }
 
     #[test]
-    fn calibration_uses_next_exercise_on_and_between_exercise_dates() {
+    fn calibration_uses_next_exercise_before_on_and_between_exercise_dates() {
         let start = time::macros::date!(2025 - 01 - 01);
         let next_exercise = time::macros::date!(2026 - 01 - 01);
         let end = time::macros::date!(2027 - 01 - 01);
@@ -569,7 +560,11 @@ mod tests {
         swaption.underlying_float_leg.end = end;
         swaption.exercise_schedule = BermudanSchedule::new(vec![start, next_exercise]);
 
-        for as_of in [start, time::macros::date!(2025 - 07 - 01)] {
+        for (as_of, first_exercise, forwards) in [
+            (time::macros::date!(2024 - 12 - 31), start, 2),
+            (start, next_exercise, 1),
+            (time::macros::date!(2025 - 07 - 01), next_exercise, 1),
+        ] {
             let curve = test_discount_curve(as_of, "D");
             let market = MarketContext::new()
                 .insert(curve.clone())
@@ -583,8 +578,8 @@ mod tests {
             let params =
                 BermudanSwaptionLmmPricer::build_lmm_params(&swaption, &curve, as_of, base_vol)
                     .expect("remaining-exercise model");
-            let expiry = finstack_quant_models::rates::clock::model_time(as_of, next_exercise);
-            assert_eq!(params.num_forwards, 1);
+            let expiry = finstack_quant_models::rates::clock::model_time(as_of, first_exercise);
+            assert_eq!(params.num_forwards, forwards);
             assert_eq!(params.tenors[0], expiry);
             assert!(params.tenors.iter().all(|tenor| *tenor > 0.0));
             let factors = rebonato_factors(&CoTerminalSlice {
@@ -593,7 +588,6 @@ mod tests {
                 initial_forwards: &params.initial_forwards,
                 displacements: &params.displacements,
                 loading_shapes: &params.vol_values[0],
-                first_alive: 0,
             })
             .expect("actual calibrated loadings");
             let model_premium = black_call(
@@ -772,7 +766,6 @@ mod tests {
             initial_forwards: &forwards,
             displacements: &disp,
             loading_shapes: &shapes,
-            first_alive: 0,
         };
         let market_vol = 0.22;
         let base_vol = super::calibrate_base_vol(
@@ -796,21 +789,19 @@ mod tests {
     }
 
     #[test]
-    fn first_alive_offset_handled() {
-        // Co-terminal swaption with expiry past the first tenor: only
-        // forwards [first_alive, N) participate.
-        let tenors = vec![0.0, 1.0, 2.0, 3.0, 4.0];
-        let accruals = vec![1.0; 4];
-        let forwards = vec![0.03, 0.032, 0.034, 0.036];
-        let disp = vec![0.0; 4];
+    fn trimmed_live_schedule_reprices() {
+        // Match production: discard elapsed periods before building the slice.
+        let tenors = [0.0, 1.0, 2.0, 3.0, 4.0];
+        let accruals = [1.0; 4];
+        let forwards = [0.03, 0.032, 0.034, 0.036];
+        let disp = [0.0; 4];
         let shapes = loading_shapes(4, 0.4);
         let slice = CoTerminalSlice {
-            tenors: &tenors,
-            accrual_factors: &accruals,
-            initial_forwards: &forwards,
-            displacements: &disp,
-            loading_shapes: &shapes,
-            first_alive: 2,
+            tenors: &tenors[2..],
+            accrual_factors: &accruals[2..],
+            initial_forwards: &forwards[2..],
+            displacements: &disp[2..],
+            loading_shapes: &shapes[2..],
         };
         let base_vol =
             super::calibrate_base_vol(&rebonato_factors(&slice).expect("valid factors"), 0.20, 2.0)
@@ -833,14 +824,17 @@ mod tests {
             initial_forwards: &forwards,
             displacements: &disp,
             loading_shapes: &shapes,
-            first_alive: 1, // no live forwards
         };
-        assert!(rebonato_factors(&slice).is_none());
+        let empty = CoTerminalSlice {
+            tenors: &tenors[..1],
+            accrual_factors: &[],
+            initial_forwards: &[],
+            displacements: &[],
+            loading_shapes: &[],
+        };
+        assert!(rebonato_factors(&empty).is_none());
         // Non-positive market vol rejected.
-        let live_slice = CoTerminalSlice {
-            first_alive: 0,
-            ..slice
-        };
+        let live_slice = slice;
         assert!(super::calibrate_base_vol(
             &rebonato_factors(&live_slice).expect("valid factors"),
             0.0,
@@ -876,7 +870,6 @@ mod tests {
             initial_forwards: &forwards,
             displacements: &shifted,
             loading_shapes: &shapes,
-            first_alive: 0,
         };
         let market_vol = 0.30;
         let expiry = 10.0;
@@ -933,7 +926,6 @@ mod tests {
             initial_forwards: &forwards,
             displacements: &no_shift,
             loading_shapes: &shapes,
-            first_alive: 0,
         };
         let shifted_slice = CoTerminalSlice {
             displacements: &shifted,
